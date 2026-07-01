@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -259,6 +259,7 @@ class EventAlphaArtifactDoctorResult:
     research_review_digest_too_many_items: int = 0
     research_review_digest_missing_feedback_target: int = 0
     research_review_digest_skipped_without_reason: int = 0
+    research_review_digest_missing_family_summary: int = 0
     research_review_digest_absolute_path: int = 0
     notification_body_card_mismatch_canonical: int = 0
     notification_body_feedback_mismatch_canonical: int = 0
@@ -335,6 +336,9 @@ class EventAlphaArtifactDoctorResult:
     garbage_primary_subject_incidents: int = 0
     fresh_incident_linkage_blockers: int = 0
     legacy_incident_linkage_warnings: int = 0
+    namespace_status: str | None = None
+    namespace_stale_deprecated: int = 0
+    namespace_superseded_by: str | None = None
     strict_legacy: bool = False
     strict: bool = False
     blockers: tuple[str, ...] = ()
@@ -372,6 +376,7 @@ def diagnose_artifacts(
     strict: bool = False,
     strict_legacy: bool = False,
     delivery_strict_scope: str | None = None,
+    include_stale_artifacts: bool = False,
 ) -> EventAlphaArtifactDoctorResult:
     """Diagnose cross-artifact lineage, mode, and profile/namespace cleanliness."""
     raw_runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
@@ -855,6 +860,24 @@ def diagnose_artifacts(
         daily_brief_path,
         integrated_outcomes_path,
     )
+    namespace_status = event_alpha_namespace_status.load_namespace_status(namespace_dir)
+    if event_alpha_namespace_status.is_stale_deprecated(namespace_status) and not include_stale_artifacts:
+        return EventAlphaArtifactDoctorResult(
+            status="STALE",
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+            run_rows=len(runs),
+            alert_rows=len(alerts),
+            feedback_rows=len(feedback),
+            outcome_rows=len(outcomes),
+            card_files=0,
+            namespace_status=namespace_status.status if namespace_status else None,
+            namespace_stale_deprecated=1,
+            namespace_superseded_by=namespace_status.superseded_by if namespace_status else None,
+            strict=strict,
+            strict_legacy=strict_legacy,
+            warnings=(event_alpha_namespace_status.format_namespace_status(namespace_status),),
+        )
     structured_path_conflicts = _structured_operator_path_conflicts(
         (
             *runs,
@@ -1561,6 +1584,7 @@ def diagnose_artifacts(
         "research_review_digest_too_many_items",
         "research_review_digest_missing_feedback_target",
         "research_review_digest_skipped_without_reason",
+        "research_review_digest_missing_family_summary",
         "research_review_digest_absolute_path",
     ):
         if delivery_conflicts[key]:
@@ -1570,6 +1594,7 @@ def diagnose_artifacts(
                 "research_review_digest_contains_hard_gated_candidate",
                 "research_review_digest_missing_feedback_target",
                 "research_review_digest_skipped_without_reason",
+                "research_review_digest_missing_family_summary",
                 "research_review_digest_absolute_path",
             }:
                 (blockers if strict else warnings).append(message)
@@ -2073,6 +2098,7 @@ def diagnose_artifacts(
         research_review_digest_too_many_items=delivery_conflicts["research_review_digest_too_many_items"],
         research_review_digest_missing_feedback_target=delivery_conflicts["research_review_digest_missing_feedback_target"],
         research_review_digest_skipped_without_reason=delivery_conflicts["research_review_digest_skipped_without_reason"],
+        research_review_digest_missing_family_summary=delivery_conflicts["research_review_digest_missing_family_summary"],
         research_review_digest_absolute_path=delivery_conflicts["research_review_digest_absolute_path"],
         notification_body_card_mismatch_canonical=delivery_conflicts["notification_body_card_mismatch_canonical"],
         notification_body_feedback_mismatch_canonical=delivery_conflicts["notification_body_feedback_mismatch_canonical"],
@@ -2157,6 +2183,9 @@ def diagnose_artifacts(
             + incident_linkage["legacy_missing_watchlist"]
             + incident_linkage["legacy_missing_alerts"]
         ),
+        namespace_status=namespace_status.status if namespace_status else event_alpha_namespace_status.STATUS_ACTIVE,
+        namespace_stale_deprecated=1 if event_alpha_namespace_status.is_stale_deprecated(namespace_status) else 0,
+        namespace_superseded_by=namespace_status.superseded_by if namespace_status else None,
         strict_legacy=bool(strict_legacy),
         strict=bool(strict),
         blockers=tuple(dict.fromkeys(blockers)),
@@ -4062,10 +4091,18 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
             out["source_coverage_provider_marked_healthy_without_observation"] += len(healthy & unknown)
     if "Most useful next data source categories:" not in text:
         out["source_coverage_category_priority_missing"] = 1
-    if (
-        event_alpha_source_coverage.LIVE_PROVIDER_READINESS_MD not in text
-        or "Live-provider activation readiness:" not in text
-    ):
+    readiness_present = "Live-provider activation readiness:" in text
+    readiness_md_path = report_path.parent / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_MD
+    readiness_json_path = report_path.parent / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_JSON
+    readiness_artifact_exists = readiness_md_path.exists() or readiness_json_path.exists()
+    readiness_command_present = "event-alpha-live-provider-readiness" in text
+    if readiness_artifact_exists:
+        if not readiness_present or (
+            event_alpha_source_coverage.LIVE_PROVIDER_READINESS_MD not in text
+            and event_alpha_source_coverage.LIVE_PROVIDER_READINESS_JSON not in text
+        ):
+            out["source_coverage_readiness_link_missing"] = 1
+    elif not readiness_present or not readiness_command_present:
         out["source_coverage_readiness_link_missing"] = 1
     if "Recommended next activation order" not in text and "Most useful next data source categories:" not in text:
         out["source_coverage_readiness_link_missing"] = 1
@@ -4693,6 +4730,7 @@ def _notification_delivery_conflicts(
         "research_review_digest_too_many_items": 0,
         "research_review_digest_missing_feedback_target": 0,
         "research_review_digest_skipped_without_reason": 0,
+        "research_review_digest_missing_family_summary": 0,
         "research_review_digest_absolute_path": 0,
         "notification_body_card_mismatch_canonical": 0,
         "notification_body_feedback_mismatch_canonical": 0,
@@ -4773,16 +4811,35 @@ def _notification_delivery_conflicts(
             if not str(row.get("feedback_target") or "").strip():
                 out["research_review_digest_missing_feedback_target"] += 1
             summary = row.get("channel_summary") if isinstance(row.get("channel_summary"), Mapping) else {}
-            skipped_count = _as_int(summary.get("skipped_candidate_count") if isinstance(summary, Mapping) else 0)
+            skipped_count = _as_int(row.get("skipped_candidate_count") or summary.get("skipped_candidate_count") if isinstance(summary, Mapping) else 0)
             if skipped_count > 0:
-                reason_counts = summary.get("skip_reason_counts") if isinstance(summary, Mapping) else {}
-                skipped_items = summary.get("skipped_candidates") if isinstance(summary, Mapping) else []
+                reason_counts = (
+                    row.get("skipped_reason_counts")
+                    if isinstance(row.get("skipped_reason_counts"), Mapping)
+                    else summary.get("skipped_reason_counts") or summary.get("skip_reason_counts")
+                    if isinstance(summary, Mapping)
+                    else {}
+                )
+                skipped_items = (
+                    row.get("skipped_candidates_sample")
+                    if isinstance(row.get("skipped_candidates_sample"), list)
+                    else summary.get("skipped_candidates_sample") or summary.get("skipped_candidates")
+                    if isinstance(summary, Mapping)
+                    else []
+                )
+                family_summary = (
+                    row.get("skipped_family_summary")
+                    if isinstance(row.get("skipped_family_summary"), list)
+                    else summary.get("skipped_family_summary")
+                    if isinstance(summary, Mapping)
+                    else []
+                )
                 has_reason_counts = isinstance(reason_counts, Mapping) and any(str(key).strip() for key in reason_counts)
                 has_item_reasons = isinstance(skipped_items, list) and all(
                     isinstance(item, Mapping) and str(item.get("skip_reason") or "").strip()
                     for item in skipped_items
                 )
-                body_has_skipped_reasons = "Skipped candidates" in telegram_body and bool(
+                body_has_skipped_reasons = ("Skipped candidate families" in telegram_body or "Skipped raw sample" in telegram_body) and bool(
                     re.search(
                         r"(?im)^\s*-\s*.+:\s*(max_items|lower_rank|duplicate_family|cooldown|stale|missing_card|hard_gated|quality_blocked|suppressed_duplicate|already_represented)",
                         telegram_body,
@@ -4790,6 +4847,12 @@ def _notification_delivery_conflicts(
                 )
                 if not (has_reason_counts or has_item_reasons or body_has_skipped_reasons):
                     out["research_review_digest_skipped_without_reason"] += 1
+                has_family_summary = isinstance(family_summary, list) and any(
+                    isinstance(item, Mapping) and str(item.get("candidate_family_id") or item.get("label") or "").strip()
+                    for item in family_summary
+                )
+                if skipped_count > 10 and not has_family_summary:
+                    out["research_review_digest_missing_family_summary"] += 1
             if core_ids:
                 body_lower = telegram_body.casefold()
                 card_paths = _tuple_value(row.get("canonical_card_paths")) or _tuple_value(row.get("canonical_card_path"))
@@ -5762,6 +5825,12 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
         f"status: {result.status}",
         f"profile: {result.profile or 'any'}",
         f"namespace: {result.artifact_namespace or 'any'}",
+        (
+            "namespace_status: "
+            f"{result.namespace_status or 'active'} "
+            f"stale_deprecated={result.namespace_stale_deprecated} "
+            f"superseded_by={result.namespace_superseded_by or 'none'}"
+        ),
         f"strict: {str(result.strict).lower()}",
         f"strict_legacy: {str(result.strict_legacy).lower()}",
         (
@@ -6042,6 +6111,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"research_review_too_many={result.research_review_digest_too_many_items} "
             f"research_review_feedback_missing={result.research_review_digest_missing_feedback_target} "
             f"research_review_skipped_without_reason={result.research_review_digest_skipped_without_reason} "
+            f"research_review_missing_family_summary={result.research_review_digest_missing_family_summary} "
             f"research_review_absolute_path={result.research_review_digest_absolute_path} "
             f"body_card_mismatch={result.notification_body_card_mismatch_canonical} "
             f"body_feedback_mismatch={result.notification_body_feedback_mismatch_canonical} "

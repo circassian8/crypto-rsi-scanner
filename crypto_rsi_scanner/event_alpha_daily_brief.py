@@ -1333,10 +1333,13 @@ def _source_activation_plan_lines(
         providers = item.get("providers") or ()
         if category:
             top.append(f"{category} ({', '.join(str(provider) for provider in providers if str(provider)) or 'providers TBD'})")
-    return [
+    lines = [
         f"- Live-provider activation readiness: {readiness_label}",
         "- Recommended next activation order: " + ("; ".join(top) if top else "none"),
     ]
+    if readiness_md is None or not readiness_md.exists():
+        lines.append("- Readiness command: make event-alpha-live-provider-readiness PROFILE=notify_llm_deep")
+    return lines
 
 
 def _source_coverage_json_next_source(packs: Iterable[Mapping[str, Any]], coverage: Mapping[str, Any]) -> str:
@@ -1934,11 +1937,52 @@ def _research_review_delivery_line(row: Mapping[str, Any]) -> str:
         core_id = str(row.get("core_opportunity_id") or (core_ids[0] if core_ids else "") or row.get("alert_id") or "unknown")
     state = str(row.get("delivery_state") or row.get("state") or "planned")
     mode = str(row.get("mode") or row.get("send_mode") or "")
+    summary = row.get("channel_summary") if isinstance(row.get("channel_summary"), Mapping) else {}
+    rendered = _int(row.get("rendered_candidate_count") or summary.get("rendered_candidate_count"))
+    eligible = _int(row.get("eligible_candidate_count") or summary.get("eligible_candidate_count"))
+    skipped = _int(row.get("skipped_candidate_count") or summary.get("skipped_candidate_count"))
+    reason_counts = row.get("skipped_reason_counts") if isinstance(row.get("skipped_reason_counts"), Mapping) else summary.get("skipped_reason_counts") or summary.get("skip_reason_counts")
+    family_summary = row.get("skipped_family_summary") if isinstance(row.get("skipped_family_summary"), list) else summary.get("skipped_family_summary")
+    suffix = ""
+    if eligible or rendered or skipped:
+        suffix += f" candidates={rendered}/{eligible} rendered skipped={skipped}"
+    if isinstance(reason_counts, Mapping) and reason_counts:
+        suffix += f" skip_reasons={_format_count_map(reason_counts, limit=4)}"
+    if isinstance(family_summary, list) and family_summary:
+        families = []
+        for family in family_summary[:3]:
+            if not isinstance(family, Mapping):
+                continue
+            label = str(family.get("label") or family.get("candidate_family_id") or "unknown")
+            count = _int(family.get("skipped_count"))
+            families.append(f"{label}={count}")
+        if families:
+            suffix += f" skipped_families={', '.join(families)}"
+            if len(family_summary) > len(families):
+                suffix += f", +{len(family_summary) - len(families)} more"
     return (
         f"- {label}/{coin} core={core_id} "
         f"delivery={state} would_send={str(bool(row.get('would_send'))).lower()} "
-        f"mode={mode or 'unknown'}"
+        f"mode={mode or 'unknown'}{suffix}"
     )
+
+
+def _format_count_map(counts: Mapping[str, Any], *, limit: int) -> str:
+    items = sorted(
+        ((str(key), _int(value)) for key, value in counts.items()),
+        key=lambda item: (-item[1], item[0]),
+    )
+    shown = [f"{key}={value}" for key, value in items[:limit]]
+    if len(items) > limit:
+        shown.append(f"+{len(items) - limit} more")
+    return ", ".join(shown) or "none"
+
+
+def _int(value: Any) -> int:
+    try:
+        return int(float(value or 0))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _market_anomaly_daily_lines(

@@ -23,6 +23,7 @@ from . import (
     event_alpha_run_ledger,
     event_alpha_router,
     event_alpha_source_coverage,
+    event_live_provider_readiness,
     event_core_opportunity_store,
     event_derivatives_crowding,
     event_market_anomaly_scanner,
@@ -79,6 +80,7 @@ class EventIntegratedRadarResult:
     core_opportunity_store_path: str
     input_manifest_path: Path | None = None
     source_coverage_json_path: Path | None = None
+    source_coverage_path: Path | None = None
     research_observed_at: datetime | None = None
     wall_started_at: datetime | None = None
     wall_finished_at: datetime | None = None
@@ -226,10 +228,35 @@ def run_integrated_radar_cycle(
         latest_run=True,
         include_legacy=True,
     ).rows
+    readiness_report = event_live_provider_readiness.build_readiness_report(
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        smoke_mode=fixture,
+        now=research_observed_at,
+    )
+    readiness_json_path, readiness_md_path = event_live_provider_readiness.write_readiness_artifacts(
+        readiness_report,
+        namespace_dir,
+    )
     source_coverage_path = namespace_dir / SOURCE_COVERAGE_FILENAME
-    source_coverage_path.write_text(format_integrated_source_coverage(candidates), encoding="utf-8")
+    source_coverage_path.write_text(
+        format_integrated_source_coverage(
+            candidates,
+            readiness_json_path=readiness_json_path,
+            readiness_md_path=readiness_md_path,
+        ),
+        encoding="utf-8",
+    )
     source_coverage_json_path = namespace_dir / SOURCE_COVERAGE_JSON_FILENAME
-    _write_json(source_coverage_json_path, format_integrated_source_coverage_json(candidates, input_manifest=input_manifest))
+    _write_json(
+        source_coverage_json_path,
+        format_integrated_source_coverage_json(
+            candidates,
+            input_manifest=input_manifest,
+            readiness_json_path=readiness_json_path,
+            readiness_md_path=readiness_md_path,
+        ),
+    )
     delivery_path = namespace_dir / INTEGRATED_DELIVERIES_FILENAME
     delivery_rows = build_integrated_notification_delivery_rows(
         candidates,
@@ -317,6 +344,7 @@ def run_integrated_radar_cycle(
         core_opportunity_store_path=str(context.core_opportunity_store_path),
         input_manifest_path=manifest_path,
         source_coverage_json_path=source_coverage_json_path,
+        source_coverage_path=source_coverage_path,
         send_lane_items_attempted=dict(lane_due),
         send_lane_items_delivered={lane: 0 for lane in lane_due},
         send_would_send_items=sum(lane_due.values()),
@@ -832,7 +860,12 @@ def _row_card_path(
     return ""
 
 
-def format_integrated_source_coverage(candidates: Iterable[Mapping[str, Any]]) -> str:
+def format_integrated_source_coverage(
+    candidates: Iterable[Mapping[str, Any]],
+    *,
+    readiness_json_path: str | Path | None = None,
+    readiness_md_path: str | Path | None = None,
+) -> str:
     rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
     source_counts = Counter(
         source for row in rows for source in (row.get("source_packs") or [row.get("source_pack") or "unknown"])
@@ -867,6 +900,21 @@ def format_integrated_source_coverage(candidates: Iterable[Mapping[str, Any]]) -
                 f"   reason: {category.get('reason') or 'none'}",
             ]
         )
+    if readiness_md_path or readiness_json_path:
+        lines.extend([
+            "",
+            "Live-provider activation readiness:",
+            f"- readiness report: {event_artifact_paths.artifact_display_path(readiness_md_path or event_live_provider_readiness.READINESS_MD)}",
+            f"- readiness JSON: {event_artifact_paths.artifact_display_path(readiness_json_path or event_live_provider_readiness.READINESS_JSON)}",
+            "- command: make event-alpha-live-provider-readiness PROFILE=fixture ARTIFACT_NAMESPACE=integrated_radar_smoke",
+            "- next activation plan: use no-send/readiness commands only; no live calls were made by this smoke.",
+        ])
+    else:
+        lines.extend([
+            "",
+            "Live-provider activation readiness:",
+            "- readiness: not generated; run make event-alpha-live-provider-readiness PROFILE=fixture ARTIFACT_NAMESPACE=integrated_radar_smoke",
+        ])
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -874,6 +922,8 @@ def format_integrated_source_coverage_json(
     candidates: Iterable[Mapping[str, Any]],
     *,
     input_manifest: Iterable[Mapping[str, Any]] = (),
+    readiness_json_path: str | Path | None = None,
+    readiness_md_path: str | Path | None = None,
 ) -> dict[str, Any]:
     rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
     source_counts = Counter(
@@ -887,6 +937,12 @@ def format_integrated_source_coverage_json(
         "candidate_count": len(rows),
         "lane_counts": dict(sorted(lane_counts.items())),
         "source_pack_counts": dict(source_counts.most_common()),
+        "live_provider_readiness_report_path": event_artifact_paths.artifact_display_path(readiness_md_path)
+        if readiness_md_path
+        else None,
+        "live_provider_readiness_json_path": event_artifact_paths.artifact_display_path(readiness_json_path)
+        if readiness_json_path
+        else None,
         "category_priorities": [
             {
                 "category_priority_rank": idx + 1,

@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Stale Event Alpha namespaces are explicit markers, not silent failures
+**Status:** accepted
+**Decision:** Superseded Event Alpha artifact namespaces may be marked with an
+`event_alpha_namespace_status.json` stale marker that records the namespace,
+reason, timestamp, and replacement namespace. Artifact doctor should
+short-circuit stale namespaces by default and report the marker instead of
+blocking on known legacy rows. Operators must opt into legacy inspection with
+`--event-alpha-include-stale-artifacts`; prune/archive commands are dry-run
+plans unless a future explicit destructive workflow is approved.
+**Why:** Old `notify_llm_deep` artifacts can preserve pre-policy routes,
+preview wording, or delivery rows that should not be used for current
+send-readiness. An explicit marker preserves auditability while preventing stale
+data from masquerading as current blockers.
+**Revisit when:** Namespace retention moves to a managed artifact database with
+typed lifecycle states and reviewed archive/delete controls.
+
 ## 2026-07-01 - Live-provider activation readiness is no-call and no-send by default
 **Status:** accepted
 **Decision:** Event Alpha live-provider activation readiness artifacts may

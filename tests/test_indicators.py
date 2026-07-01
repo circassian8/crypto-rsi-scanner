@@ -1216,7 +1216,17 @@ def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor
         payload = json.loads(json_path.read_text(encoding="utf-8"))
         assert payload["live_calls_allowed"] is False
         assert payload["smoke_mode"] is True
+        assert payload["activation_runbook"]
         assert all(provider["live_call_allowed"] is False for provider in payload["providers"])
+        by_provider = {provider["provider_name"]: provider for provider in payload["providers"]}
+        assert by_provider["coinalyze"]["sidecar_fixture_available"] is True
+        assert by_provider["coinalyze"]["smoke_target_available"] is True
+        assert "event-alpha-derivatives-smoke" in by_provider["coinalyze"]["smoke_targets"]
+        assert "event-alpha-fade-review-smoke" in by_provider["coinalyze"]["smoke_targets"]
+        assert by_provider["binance_announcements_public_or_fixture"]["env_vars_required"] == []
+        assert by_provider["binance_announcements_public_or_fixture"]["preflight_status"] == "fixture_ready"
+        assert by_provider["binance_announcements_signed_listener"]["env_vars_required"]
+        assert by_provider["binance_announcements_signed_listener"]["activation_phase"] == "blocked"
         assert not event_alpha_artifact_doctor._text_has_secret_like_value(md_path.read_text(encoding="utf-8"))
         clean = event_alpha_artifact_doctor.diagnose_artifacts(
             source_coverage_report_path=source_path,
@@ -24891,6 +24901,25 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
         assert "OPENAI_API_KEY" not in zf.read("cards/card.md").decode()
 
 
+def test_normalize_export_timestamps_clamps_future_mtimes():
+    import os
+    from scripts import normalize_export_timestamps
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        future = root / "future.txt"
+        future.write_text("future\n", encoding="utf-8")
+        old = root / "old.txt"
+        old.write_text("old\n", encoding="utf-8")
+        now_ts = 1_800_000_000.0
+        os.utime(future, (now_ts + 500, now_ts + 500))
+        os.utime(old, (now_ts - 500, now_ts - 500))
+        changed = normalize_export_timestamps.normalize_path_timestamps(root, now_ts=now_ts)
+        assert changed == 1
+        assert future.stat().st_mtime <= now_ts
+        assert old.stat().st_mtime == now_ts - 500
+
+
 def test_event_alpha_burn_in_readiness_requires_no_send_and_reviewable_artifacts():
     from crypto_rsi_scanner import (
         event_alpha_artifact_doctor,
@@ -26152,6 +26181,8 @@ def test_event_alpha_research_review_digest_surfaces_near_misses_without_alertin
         assert "DOGE / doge" in text
         assert "Eligible candidates: 2" in text
         assert "Skipped candidates: 1" in text
+        assert "Skipped candidate families" in text
+        assert "Skipped raw sample" in text
         assert "VELVET / velvet" in text
         assert "max_items" in text
         assert "Why not alertable: missing confirmation" in text
@@ -26188,6 +26219,12 @@ def test_event_alpha_research_review_digest_surfaces_near_misses_without_alertin
         assert rows[-1]["channel_summary"]["rendered_candidate_count"] == 1
         assert rows[-1]["channel_summary"]["eligible_candidate_count"] == 2
         assert rows[-1]["channel_summary"]["skip_reason_counts"]["max_items"] == 1
+        assert rows[-1]["rendered_candidate_count"] == 1
+        assert rows[-1]["eligible_candidate_count"] == 2
+        assert rows[-1]["skipped_candidate_count"] == 1
+        assert rows[-1]["skipped_reason_counts"]["max_items"] == 1
+        assert rows[-1]["skipped_candidates_sample"][0]["skip_reason"] == "max_items"
+        assert rows[-1]["skipped_family_summary"][0]["skipped_count"] == 1
 
 
 def test_event_alpha_research_review_digest_policy_excludes_controls_and_strict_alerts():
@@ -26228,6 +26265,40 @@ def test_event_alpha_research_review_digest_policy_excludes_controls_and_strict_
     )
     assert with_alerts.lane_counts[notif.LANE_DAILY_DIGEST] == 1
     assert with_alerts.lane_counts[notif.LANE_RESEARCH_REVIEW_DIGEST] == 1
+
+
+def test_event_alpha_research_review_skipped_sample_dedupes_by_family():
+    from crypto_rsi_scanner import event_alpha_notifications as notif
+
+    skipped = [
+        notif.EventAlphaResearchReviewSkippedItem(
+            symbol="CHZ",
+            coin_id="chiliz",
+            core_opportunity_id=f"agg:chz-{idx}",
+            candidate_family_id="world-cup:chiliz",
+            score=70 - idx,
+            rank_score=70 - idx,
+            skip_reason="max_items",
+        )
+        for idx in range(8)
+    ]
+    skipped.append(
+        notif.EventAlphaResearchReviewSkippedItem(
+            symbol="VELVET",
+            coin_id="velvet",
+            core_opportunity_id="agg:velvet-spacex",
+            candidate_family_id="spacex:velvet",
+            score=65,
+            rank_score=65,
+            skip_reason="max_items",
+        )
+    )
+    sample = notif._diverse_skipped_sample(skipped, limit=2)  # noqa: SLF001
+    assert [item.candidate_family_id for item in sample] == ["world-cup:chiliz", "spacex:velvet"]
+    summary = notif._research_review_skipped_family_summary(skipped)  # noqa: SLF001
+    by_family = {row["candidate_family_id"]: row for row in summary}
+    assert by_family["world-cup:chiliz"]["skipped_count"] == 8
+    assert by_family["spacex:velvet"]["skipped_count"] == 1
 
 
 def test_event_alpha_research_review_digest_inbox_and_doctor_checks():
@@ -26406,6 +26477,78 @@ def test_event_alpha_research_review_digest_inbox_and_doctor_checks():
         assert bad.research_review_digest_missing_feedback_target == 1
         assert bad.research_review_digest_absolute_path == 1
         assert bad.status == "BLOCKED"
+
+        missing_family = {
+            **rows[-1],
+            "run_id": "run-missing-family-summary",
+            "channel_summary": {
+                "rendered_candidate_count": 1,
+                "eligible_candidate_count": 20,
+                "skipped_candidate_count": 19,
+                "skip_reason_counts": {"max_items": 19},
+                "skipped_candidates": [{"symbol": "CHZ", "coin_id": "chiliz", "skip_reason": "max_items"}],
+            },
+            "skipped_candidate_count": 19,
+            "skipped_reason_counts": {"max_items": 19},
+            "skipped_candidates_sample": [{"symbol": "CHZ", "coin_id": "chiliz", "skip_reason": "max_items"}],
+            "skipped_family_summary": [],
+        }
+        missing_family_result = doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-missing-family-summary",
+                "profile": "fixture",
+                "artifact_namespace": namespace,
+                "run_mode": "test",
+            }],
+            delivery_rows=[missing_family],
+            core_opportunity_rows=[core_row],
+            profile="fixture",
+            artifact_namespace=namespace,
+            include_test_artifacts=True,
+            strict=True,
+            delivery_strict_scope="latest_run",
+        )
+        assert missing_family_result.research_review_digest_missing_family_summary == 1
+        assert missing_family_result.status == "BLOCKED"
+
+
+def test_event_alpha_artifact_doctor_short_circuits_stale_namespace_marker():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_namespace_status
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        namespace_dir = base / "notify_llm_deep"
+        marker = event_alpha_namespace_status.mark_namespace_stale(
+            namespace_dir,
+            namespace="notify_llm_deep",
+            reason="pre-canonical notification artifacts",
+            superseded_by="notify_llm_deep_rehearsal",
+            now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
+        )
+        assert marker.exists()
+        result = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "old", "profile": "notify_llm_deep", "artifact_namespace": "notify_llm_deep", "run_mode": "burn_in"}],
+            source_coverage_report_path=namespace_dir / "event_alpha_source_coverage.md",
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep",
+            strict=True,
+        )
+        assert result.status == "STALE"
+        assert result.namespace_stale_deprecated == 1
+        assert result.namespace_superseded_by == "notify_llm_deep_rehearsal"
+        included = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "old", "profile": "notify_llm_deep", "artifact_namespace": "notify_llm_deep", "run_mode": "burn_in"}],
+            source_coverage_report_path=namespace_dir / "event_alpha_source_coverage.md",
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep",
+            strict=False,
+            include_stale_artifacts=True,
+        )
+        assert included.namespace_stale_deprecated == 1
+        plan = event_alpha_namespace_status.stale_namespace_plan(namespace_dir)
+        assert plan["dry_run_only"] is True
+        assert plan["file_count"] >= 1
 
 
 def test_event_alpha_artifact_doctor_blocks_research_review_body_not_using_canonical_core():
@@ -38857,6 +39000,12 @@ def test_integrated_radar_fixture_lanes_and_merge():
         source_coverage = json.loads(result.source_coverage_json_path.read_text(encoding="utf-8"))
         assert source_coverage["candidate_count"] == len(rows)
         assert "official_exchange_announcements" in source_coverage["lane_critical_priority"]
+        assert source_coverage["live_provider_readiness_report_path"].endswith("event_live_provider_activation_readiness.md")
+        assert source_coverage["live_provider_readiness_json_path"].endswith("event_live_provider_activation_readiness.json")
+        assert (context.namespace_dir / "event_live_provider_activation_readiness.md").exists()
+        source_coverage_md = result.source_coverage_path.read_text(encoding="utf-8")
+        assert "Live-provider activation readiness:" in source_coverage_md
+        assert "event_live_provider_activation_readiness.md" in source_coverage_md
 
         run_row = json.loads(context.run_ledger_path.read_text(encoding="utf-8").splitlines()[-1])
         assert 0 <= float(run_row["runtime_seconds"]) < 60

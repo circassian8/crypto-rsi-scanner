@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Harden live-provider readiness telemetry and stale namespace handling · Codex
+**Why:** Integrated radar source coverage needed to carry its own no-call
+provider-readiness evidence, research-review previews needed clearer skip
+telemetry, and stale `notify_llm_deep` artifacts needed an explicit safe
+operator path instead of failing current send-readiness checks.
+**Changes:**
+- Expanded live-provider activation readiness artifacts with fixture/smoke
+  availability, activation phase, request/budget policy, provider-health keys,
+  source-pack impacts, blocked lanes, and a no-call activation runbook.
+- Made integrated radar smoke write readiness JSON/Markdown before source
+  coverage and link those artifacts from source coverage and daily brief output.
+- Added structured research-review skip telemetry, family-level skipped
+  candidate summaries, and row-level delivery fields so previews and reports can
+  explain rendered/eligible/skipped counts without dumping duplicate support
+  rows.
+- Added explicit namespace stale markers plus dry-run prune/archive planning;
+  strict artifact doctor short-circuits stale namespaces unless the operator
+  opts into legacy inspection.
+- Added a timestamp normalization helper and Make target for future-dated review
+  exports.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests scripts/normalize_export_timestamps.py`;
+`python3 tests/test_indicators.py`;
+`make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`;
+`make event-alpha-live-provider-readiness-smoke PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Readiness remains no-call/no-send and reports environment
+variable names only, never secret values. Stale namespace pruning is a plan-only
+dry run unless a future explicit archive/delete workflow is approved. No
+Telegram sends, normal RSI rows, paper/live trades, execution, or Event
+Alpha-created `TRIGGERED_FADE`.
+
 ## 2026-07-01 — Add live-provider activation readiness and final preview cleanup · Codex
 **Why:** Event Alpha was ready for operator rehearsal, but normal notification
 previews still used legacy broad `Alerts` wording, some command summaries

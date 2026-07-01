@@ -111,6 +111,10 @@ class EventAlphaResearchReviewSkippedItem:
     score: float
     rank_score: float
     skip_reason: str
+    candidate_family_id: str | None = None
+    opportunity_type: str | None = None
+    final_opportunity_level: str | None = None
+    card_path: str | None = None
     detail: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -118,9 +122,13 @@ class EventAlphaResearchReviewSkippedItem:
             "symbol": self.symbol,
             "coin_id": self.coin_id,
             "core_opportunity_id": self.core_opportunity_id,
+            "candidate_family_id": self.candidate_family_id,
+            "opportunity_type": self.opportunity_type,
+            "final_opportunity_level": self.final_opportunity_level,
             "score": self.score,
             "rank_score": self.rank_score,
             "skip_reason": self.skip_reason,
+            "card_path": self.card_path,
             "detail": self.detail,
         }
 
@@ -753,13 +761,30 @@ def select_research_review_candidates_with_diagnostics(
         components = dict(getattr(entry, "latest_score_components", {}) or {})
         symbol = str(core.get("symbol") or core.get("validated_symbol") or entry.symbol or components.get("validated_symbol") or "UNKNOWN")
         coin_id = str(core.get("coin_id") or core.get("validated_coin_id") or entry.coin_id or components.get("validated_coin_id") or "unknown")
+        core_id = _core_id_for_decision(decision, core_index)
+        card_path = str(core.get("research_card_path") or core.get("card_path") or components.get("research_card_path") or "") or None
         skipped.append(EventAlphaResearchReviewSkippedItem(
             symbol=symbol,
             coin_id=coin_id,
-            core_opportunity_id=_core_id_for_decision(decision, core_index),
+            core_opportunity_id=core_id,
             score=_research_review_score(decision),
             rank_score=float(rank_score if rank_score is not None else _research_review_score(decision)),
             skip_reason=reason,
+            candidate_family_id=_research_review_family_id(
+                symbol=symbol,
+                coin_id=coin_id,
+                core_opportunity_id=core_id,
+                decision=decision,
+                core=core,
+            ),
+            opportunity_type=str(core.get("opportunity_type") or components.get("opportunity_type") or "").strip() or None,
+            final_opportunity_level=str(
+                core.get("final_opportunity_level")
+                or components.get("opportunity_level")
+                or getattr(decision, "opportunity_level", "")
+                or ""
+            ).strip() or None,
+            card_path=event_artifact_paths.artifact_display_path(card_path) if card_path else None,
             detail=detail,
         ))
 
@@ -832,6 +857,28 @@ def select_research_review_candidates_with_diagnostics(
             score=_research_review_score(item.decision),
             rank_score=item.rank_score,
             skip_reason="max_items",
+            candidate_family_id=_research_review_family_id(
+                symbol=str(item.decision.entry.symbol or "UNKNOWN"),
+                coin_id=str(item.decision.entry.coin_id or "unknown"),
+                core_opportunity_id=_core_id_for_decision(item.decision, core_index),
+                decision=item.decision,
+                core=_core_row_for_decision(item.decision, core_index) or {},
+            ),
+            opportunity_type=str(
+                (_core_row_for_decision(item.decision, core_index) or {}).get("opportunity_type")
+                or item.decision.entry.latest_score_components.get("opportunity_type")
+                or ""
+            ).strip() or None,
+            final_opportunity_level=str(
+                (_core_row_for_decision(item.decision, core_index) or {}).get("final_opportunity_level")
+                or item.decision.entry.latest_score_components.get("opportunity_level")
+                or ""
+            ).strip() or None,
+            card_path=event_artifact_paths.artifact_display_path(
+                (_core_row_for_decision(item.decision, core_index) or {}).get("research_card_path")
+                or (_core_row_for_decision(item.decision, core_index) or {}).get("card_path")
+                or ""
+            ) or None,
             detail=f"ranked below top {max_items}",
         ))
     return selected, len(items), tuple(skipped)
@@ -943,6 +990,32 @@ def _research_review_is_sector(symbol: object, coin_id: object) -> bool:
         "ai_ipo_proxy",
         "market_anomaly",
     }
+
+
+def _research_review_family_id(
+    *,
+    symbol: str,
+    coin_id: str,
+    core_opportunity_id: str | None,
+    decision: event_alpha_router.EventAlphaRouteDecision | None = None,
+    core: Mapping[str, Any] | None = None,
+) -> str:
+    core = core or {}
+    for key in ("candidate_family_id", "event_family_id", "event_family", "incident_asset_key"):
+        value = core.get(key)
+        if value:
+            return str(value)
+    if core_opportunity_id:
+        return str(core_opportunity_id)
+    entry = decision.entry if decision else None
+    incident = str(getattr(entry, "incident_id", "") or core.get("incident_id") or "").strip() if entry else str(core.get("incident_id") or "").strip()
+    external = str(core.get("external_asset") or (getattr(entry, "external_asset", "") if entry else "")).strip()
+    asset = str(coin_id or symbol or "unknown").strip().casefold()
+    if incident:
+        return f"{incident}:{asset}"
+    if external:
+        return f"{external.casefold()}:{asset}"
+    return asset or "unknown"
 
 
 def _research_review_hard_gate_reason(decision: event_alpha_router.EventAlphaRouteDecision) -> str | None:
@@ -1121,15 +1194,27 @@ def format_research_review_telegram_digest(
         displayed += 1
     lines.append("")
     if skipped:
-        lines.append("<b>Skipped candidates</b>")
-        for row in skipped[:10]:
+        family_summary = _research_review_skipped_family_summary(skipped)
+        lines.append("<b>Skipped candidate families</b>")
+        for family in family_summary[:8]:
+            lines.append(
+                "- "
+                f"{_esc(family['label'])}: {_esc(str(family['skipped_count']))} skipped · "
+                f"reasons: {_esc(_format_counts(family.get('skip_reason_counts') or {}))}"
+            )
+        if len(family_summary) > 8:
+            lines.append(f"- +{len(family_summary) - 8} more skipped families in local artifacts/inbox.")
+        lines.append("")
+        lines.append("<b>Skipped raw sample</b>")
+        sample = _diverse_skipped_sample(skipped, limit=5)
+        for row in sample:
             label = f"{row.symbol} / {row.coin_id}"
             detail = f" · {row.detail}" if row.detail else ""
             lines.append(
                 f"- {_esc(label)}: {_esc(row.skip_reason)}{_esc(detail)}"
             )
-        if len(skipped) > 10:
-            lines.append(f"- +{len(skipped) - 10} more skipped candidates in local artifacts/inbox.")
+        if len(skipped) > len(sample):
+            lines.append(f"- +{len(skipped) - len(sample)} more skipped candidates in local artifacts/inbox.")
         lines.append("")
     lines.append("Research cards and feedback commands are available in local artifacts/inbox.")
     return "\n".join(lines)
@@ -1140,13 +1225,87 @@ def _research_review_channel_summary(plan: EventAlphaNotificationPlan) -> dict[s
     for item in plan.research_review_skipped_items:
         reason = str(item.skip_reason or "unknown")
         reason_counts[reason] = reason_counts.get(reason, 0) + 1
+    family_summary = _research_review_skipped_family_summary(plan.research_review_skipped_items)
+    sample = _diverse_skipped_sample(plan.research_review_skipped_items, limit=20)
+    rendered = len(plan.research_review_items)
     return {
-        "rendered_candidate_count": len(plan.research_review_items),
+        "rendered_candidate_count": rendered,
         "eligible_candidate_count": int(plan.research_review_eligible_count or 0),
         "skipped_candidate_count": len(plan.research_review_skipped_items),
         "skip_reason_counts": dict(sorted(reason_counts.items())),
-        "skipped_candidates": [item.to_dict() for item in plan.research_review_skipped_items[:20]],
+        "skipped_reason_counts": dict(sorted(reason_counts.items())),
+        "skipped_candidates": [item.to_dict() for item in sample],
+        "skipped_candidates_sample": [item.to_dict() for item in sample],
+        "skipped_family_summary": family_summary,
+        "selection_policy": "rank by research-review score, source quality, market confirmation, and recency; render top max_items",
+        "max_items": rendered,
+        "ranking_policy": "rank_score_desc_then_score_recency_symbol",
+        "cooldown_policy": "research_review_digest lane cooldown",
     }
+
+
+def _research_review_skipped_family_summary(
+    skipped_items: Iterable[EventAlphaResearchReviewSkippedItem],
+) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for item in skipped_items:
+        family_id = item.candidate_family_id or item.core_opportunity_id or item.coin_id or item.symbol or "unknown"
+        row = grouped.setdefault(
+            family_id,
+            {
+                "candidate_family_id": family_id,
+                "symbol": item.symbol,
+                "coin_id": item.coin_id,
+                "label": f"{item.symbol}/{item.coin_id}",
+                "skipped_count": 0,
+                "skip_reason_counts": {},
+                "max_score": item.score,
+                "sample_core_opportunity_ids": [],
+            },
+        )
+        row["skipped_count"] = int(row["skipped_count"]) + 1
+        reasons = row["skip_reason_counts"]
+        reasons[item.skip_reason] = int(reasons.get(item.skip_reason, 0)) + 1
+        row["max_score"] = max(float(row.get("max_score") or 0.0), float(item.score or 0.0))
+        if item.core_opportunity_id and item.core_opportunity_id not in row["sample_core_opportunity_ids"]:
+            row["sample_core_opportunity_ids"].append(item.core_opportunity_id)
+    return sorted(
+        grouped.values(),
+        key=lambda row: (int(row.get("skipped_count") or 0), float(row.get("max_score") or 0.0), str(row.get("label") or "")),
+        reverse=True,
+    )
+
+
+def _format_counts(values: Mapping[str, Any]) -> str:
+    items = sorted(
+        ((str(key), int(value or 0)) for key, value in values.items()),
+        key=lambda item: (-item[1], item[0]),
+    )
+    return ", ".join(f"{key}={value}" for key, value in items) or "none"
+
+
+def _diverse_skipped_sample(
+    skipped_items: Iterable[EventAlphaResearchReviewSkippedItem],
+    *,
+    limit: int,
+) -> list[EventAlphaResearchReviewSkippedItem]:
+    out: list[EventAlphaResearchReviewSkippedItem] = []
+    seen: set[str] = set()
+    materialized = list(skipped_items)
+    for item in materialized:
+        family_id = item.candidate_family_id or item.core_opportunity_id or item.coin_id or item.symbol or "unknown"
+        if family_id in seen:
+            continue
+        out.append(item)
+        seen.add(family_id)
+        if len(out) >= limit:
+            return out
+    for item in materialized:
+        if item not in out:
+            out.append(item)
+        if len(out) >= limit:
+            return out
+    return out
 
 
 def write_notification_plan_preview(
@@ -2574,6 +2733,23 @@ class _DeliveryWriter:
         dedupe_bucket: str | None = None,
         **kwargs: Any,
     ) -> None:
+        extra_delivery_fields: dict[str, Any] = {}
+        channel_summary = kwargs.get("channel_summary")
+        if lane == LANE_RESEARCH_REVIEW_DIGEST and isinstance(channel_summary, Mapping):
+            for key in (
+                "eligible_candidate_count",
+                "rendered_candidate_count",
+                "skipped_candidate_count",
+                "skipped_candidates_sample",
+                "skipped_family_summary",
+                "skipped_reason_counts",
+                "selection_policy",
+                "max_items",
+                "ranking_policy",
+                "cooldown_policy",
+            ):
+                if key in channel_summary:
+                    extra_delivery_fields[key] = channel_summary.get(key)
         identity = kwargs.pop("identity", None)
         identity_fields = _identity_record_fields(identity)
         record = delivery.build_record(
@@ -2591,7 +2767,12 @@ class _DeliveryWriter:
             now=self.now,
             **kwargs,
         )
-        row = delivery.append_delivery_record(record, path=self.cfg.path)
+        if extra_delivery_fields:
+            row = record.to_row()
+            row.update(extra_delivery_fields)
+            row = delivery.append_delivery_record(row, path=self.cfg.path)
+        else:
+            row = delivery.append_delivery_record(record, path=self.cfg.path)
         self.existing.append(row)
         if state in self.counts:
             self.counts[state] += 1

@@ -87,6 +87,7 @@ from . import event_integrated_radar
 from . import event_integrated_radar_outcomes
 from . import event_live_provider_readiness
 from . import event_alpha_missed
+from . import event_alpha_namespace_status
 from . import event_alpha_notifications
 from . import event_alpha_notification_checklist
 from . import event_alpha_notification_delivery
@@ -4999,6 +5000,57 @@ def event_alpha_live_provider_readiness_report(
     print(event_live_provider_readiness.format_readiness_report(report))
 
 
+def event_alpha_mark_namespace_stale(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    reason: str | None = None,
+    superseded_by: str | None = None,
+) -> None:
+    """Write an explicit stale/deprecated marker for one artifact namespace."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name or "notify_llm_deep", artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    marker = event_alpha_namespace_status.mark_namespace_stale(
+        context.namespace_dir,
+        namespace=context.artifact_namespace,
+        reason=reason or "operator marked stale/deprecated",
+        superseded_by=superseded_by,
+        now=_event_research_now(),
+    )
+    status = event_alpha_namespace_status.load_namespace_status(context.namespace_dir)
+    print(_event_alpha_context_block(context))
+    print(f"namespace_status_marker: {event_artifact_paths.artifact_display_path(marker)}")
+    print(event_alpha_namespace_status.format_namespace_status(status))
+
+
+def event_alpha_prune_or_archive_stale_namespace(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    archive: bool = False,
+) -> None:
+    """Print a dry-run stale namespace prune/archive plan."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name or "notify_llm_deep", artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    status = event_alpha_namespace_status.load_namespace_status(context.namespace_dir)
+    plan = event_alpha_namespace_status.stale_namespace_plan(context.namespace_dir, archive=archive)
+    print(_event_alpha_context_block(context))
+    print(event_alpha_namespace_status.format_namespace_status(status))
+    print("stale_namespace_prune_archive_plan:")
+    print(json.dumps(plan, indent=2, sort_keys=True))
+    print("dry_run_only: true")
+
+
 def event_alpha_provider_health_reset(
     verbose: bool = False,
     *,
@@ -7003,6 +7055,7 @@ def event_alpha_artifact_doctor_report(
     strict: bool = False,
     strict_legacy: bool = False,
     delivery_strict_scope: str | None = None,
+    include_stale_artifacts: bool = False,
 ) -> None:
     """Print artifact lineage/namespace diagnostics for Event Alpha."""
     _setup_event_discovery_logging(verbose)
@@ -7050,6 +7103,7 @@ def event_alpha_artifact_doctor_report(
         strict=strict or bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT),
         strict_legacy=strict_legacy,
         delivery_strict_scope=delivery_strict_scope,
+        include_stale_artifacts=include_stale_artifacts,
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_artifact_doctor.format_artifact_doctor_report(result))
@@ -10816,6 +10870,26 @@ def cli() -> None:
         help="Write fixture/config-only live-provider readiness artifacts; no network, keys, or sends required.",
     )
     parser.add_argument(
+        "--event-alpha-mark-namespace-stale",
+        action="store_true",
+        help="Mark the selected Event Alpha artifact namespace stale/deprecated so default reports skip it.",
+    )
+    parser.add_argument(
+        "--event-alpha-prune-or-archive-stale-namespace",
+        action="store_true",
+        help="Print a dry-run prune/archive plan for a stale Event Alpha artifact namespace.",
+    )
+    parser.add_argument(
+        "--event-alpha-stale-superseded-by",
+        default=None,
+        help="Optional replacement namespace for --event-alpha-mark-namespace-stale.",
+    )
+    parser.add_argument(
+        "--event-alpha-stale-archive",
+        action="store_true",
+        help="For stale namespace prune/archive plan, mark archive intent; output remains dry-run only.",
+    )
+    parser.add_argument(
         "--event-alpha-provider-health-reset",
         action="store_true",
         help="Clear selected profile-scoped provider health backoff state. Requires --confirm.",
@@ -11366,6 +11440,11 @@ def cli() -> None:
         help="Include legacy/default Event Alpha artifact rows in artifact reports for migration review.",
     )
     parser.add_argument(
+        "--event-alpha-include-stale-artifacts",
+        action="store_true",
+        help="Include namespaces explicitly marked stale/deprecated in artifact doctor checks.",
+    )
+    parser.add_argument(
         "--event-alpha-artifact-doctor-strict",
         action="store_true",
         help="Escalate fresh/current artifact mismatches, mixed namespaces, and unknown IDs to artifact-doctor blockers.",
@@ -11848,6 +11927,23 @@ def cli() -> None:
             smoke_mode=bool(args.event_alpha_live_provider_readiness_smoke),
         )
         return
+    if args.event_alpha_mark_namespace_stale:
+        event_alpha_mark_namespace_stale(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            reason=args.reason,
+            superseded_by=args.event_alpha_stale_superseded_by,
+        )
+        return
+    if args.event_alpha_prune_or_archive_stale_namespace:
+        event_alpha_prune_or_archive_stale_namespace(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            archive=args.event_alpha_stale_archive,
+        )
+        return
     if args.event_alpha_provider_health_reset:
         event_alpha_provider_health_reset(
             verbose=args.verbose,
@@ -12082,6 +12178,7 @@ def cli() -> None:
             strict=args.event_alpha_artifact_doctor_strict,
             strict_legacy=args.event_alpha_artifact_doctor_strict_legacy,
             delivery_strict_scope=args.event_alpha_artifact_doctor_delivery_scope,
+            include_stale_artifacts=args.event_alpha_include_stale_artifacts,
         )
         return
     if args.event_alpha_tuning_worksheet:

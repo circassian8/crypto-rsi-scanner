@@ -739,6 +739,12 @@ candidates and no-send guard enabled. It should write a blocked
 `research_review_digest_would_send`, and pass strict artifact doctor. If those
 fields show candidates but the delivery ledger has no research-review row, treat
 the rehearsal as not ready.
+Research-review delivery rows also carry structured skip telemetry:
+eligible/rendered/skipped counts, skip-reason counts, skipped-family summaries,
+selection policy, max items, ranking policy, and cooldown policy. Telegram
+preview copy should show family-level skip summaries before raw skipped samples,
+so an operator can see which opportunity families were deduped or capped without
+reading every support row.
 When a research-review row has a canonical CoreOpportunity, the Telegram body
 should display the canonical core card basename and `agg:...` feedback target.
 Hypothesis/watchlist ids remain in the local artifacts for audit, but they
@@ -1568,6 +1574,9 @@ Source coverage and the daily brief should link the readiness artifact and show
 the activation order: Coinalyze derivatives/OI/funding, Bybit/Binance official
 announcements, Tokenomist/Messari unlocks, GeckoTerminal/DefiLlama DEX/on-chain,
 protocol fundamentals, then context/news.
+See `research/EVENT_ALPHA_LIVE_PROVIDER_ACTIVATION_RUNBOOK.md` for the
+no-call activation workflow, fixture/smoke proof expectations, and stale
+namespace handling.
 
 For Pro-model handoffs, use `make export-src-with-artifacts`. The exporter
 overwrites `crypto_rsi_scanner_source_with_artifacts.zip`, excludes secrets and
@@ -1637,6 +1646,21 @@ before using it for operator review. Research-review previews should also show
 rendered candidates, eligible candidates, skipped candidates, and skip reasons
 such as `max_items`, `lower_rank`, `duplicate_family`, `quality_blocked`, or
 `already_represented`.
+
+If a whole namespace is superseded by a newer rehearsal, mark it explicitly
+instead of letting old rows fail current readiness checks:
+
+```bash
+make event-alpha-mark-namespace-stale \
+  ARTIFACT_NAMESPACE=notify_llm_deep \
+  SUPERSEDED_BY=notify_llm_deep_rehearsal \
+  REASON='superseded by latest no-send rehearsal'
+make event-alpha-prune-or-archive-stale-namespace ARTIFACT_NAMESPACE=notify_llm_deep
+```
+
+The prune/archive command is a dry-run plan by default. Strict artifact doctor
+skips `stale_deprecated` namespaces unless `--event-alpha-include-stale-artifacts`
+is passed for a deliberate legacy audit.
 
 It uses the `notify_llm_deep` profile with bounded run/day LLM budgets, source
 enrichment, optional CryptoPanic when the key is present, run locks, and the
