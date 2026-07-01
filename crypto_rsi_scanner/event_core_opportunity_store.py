@@ -13,7 +13,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import config, event_alpha_router, event_core_opportunities, event_opportunity_verdict, event_watchlist
+from . import (
+    config,
+    event_alpha_router,
+    event_core_opportunities,
+    event_market_reaction,
+    event_opportunity_verdict,
+    event_watchlist,
+)
 
 
 EVENT_CORE_OPPORTUNITY_STORE_SCHEMA_VERSION = "event_core_opportunity_store_v1"
@@ -881,6 +888,13 @@ def _row_from_core_opportunity(
     if route_adjustment_reason and not (live_policy.required and not live_policy.confirmed):
         final_verdict_reason = _canonical_route_adjusted_verdict_reason(final_level)
     acquisition_confirmation = event_opportunity_verdict.classify_acquisition_confirmation(live_policy_input)
+    reaction = event_market_reaction.evaluate_market_reaction({
+        **live_policy_input,
+        "market_snapshot": market_snapshot,
+        "market_confirmation_level": market_level,
+        "market_confirmation_score": market_after,
+        "market_context_freshness_status": market_context.get("market_context_freshness_status"),
+    })
     return {
         "schema_version": EVENT_CORE_OPPORTUNITY_STORE_SCHEMA_VERSION,
         "row_type": "event_core_opportunity",
@@ -928,6 +942,20 @@ def _row_from_core_opportunity(
         "market_refresh_success": _any_truthy(all_rows, ("market_refresh_success", "targeted_market_refresh_success")),
         "market_snapshot": market_snapshot,
         "latest_market_snapshot": market_snapshot,
+        "market_state_snapshot": reaction.market_state_snapshot.to_dict(),
+        "market_state": reaction.market_state,
+        "opportunity_type": reaction.opportunity_type,
+        "opportunity_type_why_now": reaction.why_now,
+        "opportunity_type_evidence": list(reaction.evidence_summary),
+        "opportunity_type_what_confirms": list(reaction.what_confirms),
+        "opportunity_type_what_invalidates": list(reaction.what_invalidates),
+        "opportunity_type_why_not_alertable": list(reaction.why_not_alertable),
+        "opportunity_type_source_requirements_met": reaction.source_requirements_met,
+        "opportunity_type_market_requirements_met": reaction.market_requirements_met,
+        "opportunity_type_fade_requirements_met": reaction.fade_requirements_met,
+        "opportunity_type_source_strength": reaction.source_strength,
+        "opportunity_type_warnings": list(reaction.warnings),
+        "opportunity_type_reason_codes": list(reaction.reason_codes),
         "market_context_freshness_status": market_context.get("market_context_freshness_status"),
         "market_context_source": market_context.get("market_context_source"),
         "market_context_observed_at": market_context.get("market_context_observed_at"),

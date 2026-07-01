@@ -37249,6 +37249,194 @@ def test_research_card_source_coverage_uses_authoritative_json():
     assert "Provider/source gaps: none" not in text
 
 
+def test_market_reaction_official_listing_no_reaction_is_early_long_research():
+    from crypto_rsi_scanner import event_market_reaction
+
+    result = event_market_reaction.evaluate_market_reaction({
+        "source_class": "official_exchange",
+        "source_pack": "listing_liquidity_pack",
+        "impact_path_type": "listing_liquidity_event",
+        "evidence_quality_score": 92,
+        "accepted_evidence_count": 1,
+        "market_snapshot": {
+            "return_24h": 0.01,
+            "volume_zscore_24h": 0.1,
+            "event_age_hours": -8,
+            "market_context_freshness_status": "fresh",
+        },
+    })
+
+    assert result.market_state == "no_reaction"
+    assert result.opportunity_type == "EARLY_LONG_RESEARCH"
+    assert result.source_requirements_met is True
+    assert result.market_requirements_met is False
+
+
+def test_market_reaction_official_listing_breakout_is_confirmed_long_research():
+    from crypto_rsi_scanner import event_market_reaction
+
+    result = event_market_reaction.evaluate_market_reaction({
+        "source_class": "official_exchange",
+        "source_pack": "listing_liquidity_pack",
+        "impact_path_type": "listing_liquidity_event",
+        "evidence_quality_score": 94,
+        "accepted_evidence_count": 1,
+        "market_confirmation_level": "moderate",
+        "market_confirmation_score": 72,
+        "market_snapshot": {
+            "return_1h": 0.08,
+            "return_24h": 0.18,
+            "relative_return_vs_btc": 0.11,
+            "volume_zscore_24h": 3.4,
+            "event_age_hours": -2,
+            "market_context_freshness_status": "fresh",
+        },
+    })
+
+    assert result.market_state == "confirmed_breakout"
+    assert result.opportunity_type == "CONFIRMED_LONG_RESEARCH"
+    assert result.source_requirements_met is True
+    assert result.market_requirements_met is True
+
+
+def test_market_reaction_listing_pump_crowding_is_fade_short_review():
+    from crypto_rsi_scanner import event_market_reaction
+
+    result = event_market_reaction.evaluate_market_reaction({
+        "source_class": "official_exchange",
+        "source_pack": "listing_liquidity_pack",
+        "impact_path_type": "listing_liquidity_event",
+        "evidence_quality_score": 91,
+        "accepted_evidence_count": 1,
+        "market_snapshot": {
+            "return_4h": 0.32,
+            "return_24h": 0.72,
+            "volume_zscore_24h": 5.0,
+            "event_age_hours": 2,
+            "market_context_freshness_status": "fresh",
+        },
+        "derivatives_snapshot": {
+            "open_interest_24h_change_pct": 0.48,
+            "funding_rate_8h": 0.0012,
+            "liquidation_imbalance": 2.1,
+        },
+    })
+
+    assert result.market_state == "post_event_fade_setup"
+    assert result.opportunity_type == "FADE_SHORT_REVIEW"
+    assert result.fade_requirements_met is True
+
+
+def test_market_reaction_cryptopanic_fan_narrative_stays_risk_only_without_market():
+    from crypto_rsi_scanner import event_market_reaction
+
+    result = event_market_reaction.evaluate_market_reaction({
+        "source_class": "cryptopanic_tagged",
+        "source_pack": "fan_sports_pack",
+        "impact_path_type": "fan_token_attention",
+        "evidence_quality_score": 82,
+        "accepted_evidence_count": 1,
+        "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match"],
+        "market_snapshot": {
+            "return_24h": 0.02,
+            "volume_zscore_24h": 0.4,
+            "market_context_freshness_status": "fresh",
+        },
+    })
+
+    assert result.market_state == "no_reaction"
+    assert result.opportunity_type == "RISK_ONLY"
+    assert "cryptopanic_only_narrative_not_confirmed" in result.why_not_alertable
+    assert result.market_requirements_met is False
+
+
+def test_market_reaction_unlock_structured_source_risk_or_fade_depends_on_market():
+    from crypto_rsi_scanner import event_market_reaction
+
+    no_reaction = event_market_reaction.evaluate_market_reaction({
+        "source_class": "structured_unlock",
+        "source_pack": "unlock_supply_pack",
+        "impact_path_type": "unlock_supply_event",
+        "evidence_quality_score": 90,
+        "accepted_evidence_count": 1,
+        "market_snapshot": {
+            "return_24h": 0.0,
+            "volume_zscore_24h": 0.2,
+            "event_age_hours": -12,
+            "market_context_freshness_status": "fresh",
+        },
+    })
+    crowded = event_market_reaction.evaluate_market_reaction({
+        "source_class": "structured_unlock",
+        "source_pack": "unlock_supply_pack",
+        "impact_path_type": "unlock_supply_event",
+        "evidence_quality_score": 90,
+        "accepted_evidence_count": 1,
+        "market_snapshot": {
+            "return_24h": 0.46,
+            "volume_zscore_24h": 4.5,
+            "event_age_hours": 4,
+            "market_context_freshness_status": "fresh",
+        },
+        "derivatives_snapshot": {
+            "open_interest_24h_change_pct": 0.36,
+            "funding_rate_8h": 0.001,
+        },
+    })
+
+    assert no_reaction.opportunity_type == "RISK_ONLY"
+    assert crowded.opportunity_type == "FADE_SHORT_REVIEW"
+
+
+def test_artifact_doctor_flags_invalid_opportunity_lanes():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    rows = [
+        {
+            "core_opportunity_id": "core_bad_confirmed",
+            "opportunity_type": "CONFIRMED_LONG_RESEARCH",
+            "market_state": "no_reaction",
+            "market_state_snapshot": {"observed_fields": 1},
+            "opportunity_type_source_requirements_met": True,
+            "opportunity_type_market_requirements_met": False,
+        },
+        {
+            "core_opportunity_id": "core_bad_fade",
+            "opportunity_type": "FADE_SHORT_REVIEW",
+            "market_state": "late_momentum",
+            "market_state_snapshot": {"return_24h": 45},
+            "opportunity_type_fade_requirements_met": False,
+        },
+        {
+            "core_opportunity_id": "core_missing_snapshot",
+            "opportunity_type": "EARLY_LONG_RESEARCH",
+            "market_state": "no_reaction",
+            "opportunity_type_source_strength": "weak",
+        },
+        {
+            "core_opportunity_id": "core_bad_crypto",
+            "opportunity_type": "CONFIRMED_LONG_RESEARCH",
+            "market_state": "confirmed_breakout",
+            "market_state_snapshot": {"return_24h": 20},
+            "opportunity_type_source_requirements_met": True,
+            "opportunity_type_market_requirements_met": True,
+            "source_class": "cryptopanic_tagged",
+            "source_pack": "fan_sports_pack",
+            "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match"],
+            "accepted_evidence_count": 1,
+            "market_confirmation_level": "strong",
+            "market_context_freshness_status": "fresh",
+        },
+    ]
+    conflicts = event_alpha_artifact_doctor._opportunity_lane_conflicts(rows)
+
+    assert conflicts["confirmed_long_without_source_market"] == 1
+    assert conflicts["fade_short_without_crowding_exhaustion"] == 1
+    assert conflicts["early_long_without_fresh_strong_source"] == 1
+    assert conflicts["cryptopanic_only_narrative_confirmed_lane"] == 1
+    assert conflicts["core_missing_market_state_snapshot"] == 1
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

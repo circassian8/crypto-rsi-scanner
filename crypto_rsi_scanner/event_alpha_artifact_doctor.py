@@ -74,6 +74,11 @@ class EventAlphaArtifactDoctorResult:
     raw_core_source_only_narrative_validated: int = 0
     raw_core_cryptopanic_tag_only_direct_path_confirmed: int = 0
     raw_core_suppressed_duplicate_validated_stale: int = 0
+    confirmed_long_without_source_market: int = 0
+    fade_short_without_crowding_exhaustion: int = 0
+    early_long_without_fresh_strong_source: int = 0
+    cryptopanic_only_narrative_confirmed_lane: int = 0
+    core_missing_market_state_snapshot: int = 0
     source_coverage_report_missing: int = 0
     source_coverage_provider_status_unknown: int = 0
     source_coverage_provider_marked_healthy_without_observation: int = 0
@@ -564,6 +569,7 @@ def diagnose_artifacts(
         profile=profile,
         artifact_namespace=artifact_namespace,
     )
+    opportunity_lane_conflicts = _opportunity_lane_conflicts(core_rows)
     source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
     source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
@@ -754,6 +760,18 @@ def diagnose_artifacts(
         "raw_core_suppressed_duplicate_validated_stale",
     ):
         count = raw_core_conflicts.get(key, 0)
+        if not count:
+            continue
+        message = f"{key}={count}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    for key in (
+        "confirmed_long_without_source_market",
+        "fade_short_without_crowding_exhaustion",
+        "early_long_without_fresh_strong_source",
+        "cryptopanic_only_narrative_confirmed_lane",
+        "core_missing_market_state_snapshot",
+    ):
+        count = opportunity_lane_conflicts.get(key, 0)
         if not count:
             continue
         message = f"{key}={count}"
@@ -1340,6 +1358,11 @@ def diagnose_artifacts(
         raw_core_source_only_narrative_validated=raw_core_conflicts["raw_core_source_only_narrative_validated"],
         raw_core_cryptopanic_tag_only_direct_path_confirmed=raw_core_conflicts["raw_core_cryptopanic_tag_only_direct_path_confirmed"],
         raw_core_suppressed_duplicate_validated_stale=raw_core_conflicts["raw_core_suppressed_duplicate_validated_stale"],
+        confirmed_long_without_source_market=opportunity_lane_conflicts["confirmed_long_without_source_market"],
+        fade_short_without_crowding_exhaustion=opportunity_lane_conflicts["fade_short_without_crowding_exhaustion"],
+        early_long_without_fresh_strong_source=opportunity_lane_conflicts["early_long_without_fresh_strong_source"],
+        cryptopanic_only_narrative_confirmed_lane=opportunity_lane_conflicts["cryptopanic_only_narrative_confirmed_lane"],
+        core_missing_market_state_snapshot=opportunity_lane_conflicts["core_missing_market_state_snapshot"],
         source_coverage_report_missing=source_coverage_report_conflicts["source_coverage_report_missing"],
         source_coverage_provider_status_unknown=source_coverage_report_conflicts["source_coverage_provider_status_unknown"],
         source_coverage_provider_marked_healthy_without_observation=source_coverage_report_conflicts["source_coverage_provider_marked_healthy_without_observation"],
@@ -2153,6 +2176,61 @@ def _raw_core_live_confirmation_conflicts(
     return out
 
 
+def _opportunity_lane_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    out = {
+        "confirmed_long_without_source_market": 0,
+        "fade_short_without_crowding_exhaustion": 0,
+        "early_long_without_fresh_strong_source": 0,
+        "cryptopanic_only_narrative_confirmed_lane": 0,
+        "core_missing_market_state_snapshot": 0,
+    }
+    for row in rows:
+        lane = str(row.get("opportunity_type") or "").strip()
+        if not lane:
+            continue
+        snapshot = row.get("market_state_snapshot")
+        if not isinstance(snapshot, Mapping) or not snapshot:
+            out["core_missing_market_state_snapshot"] += 1
+        source_met = _truthy(row.get("opportunity_type_source_requirements_met"))
+        market_met = _truthy(row.get("opportunity_type_market_requirements_met"))
+        fade_met = _truthy(row.get("opportunity_type_fade_requirements_met"))
+        source_strength = str(row.get("opportunity_type_source_strength") or "").casefold()
+        market_state = str(row.get("market_state") or "").casefold()
+        if lane == "CONFIRMED_LONG_RESEARCH" and (not source_met or not market_met):
+            out["confirmed_long_without_source_market"] += 1
+        if lane == "FADE_SHORT_REVIEW" and (not fade_met or market_state not in {"blowoff_crowded", "post_event_fade_setup"}):
+            out["fade_short_without_crowding_exhaustion"] += 1
+        if lane == "EARLY_LONG_RESEARCH" and (source_strength not in {"strong", "official_structured"} or market_state != "no_reaction"):
+            out["early_long_without_fresh_strong_source"] += 1
+        if lane == "CONFIRMED_LONG_RESEARCH" and _opportunity_lane_cryptopanic_only_narrative(row):
+            out["cryptopanic_only_narrative_confirmed_lane"] += 1
+    return out
+
+
+def _opportunity_lane_cryptopanic_only_narrative(row: Mapping[str, Any]) -> bool:
+    source_class = str(row.get("source_class") or "").casefold()
+    reason_codes = {str(item).casefold() for item in row.get("accepted_evidence_reason_codes") or row.get("reason_codes") or ()}
+    if source_class != "cryptopanic_tagged" and "cryptopanic_currency_tag_match" not in reason_codes:
+        return False
+    if _raw_core_has_official_or_structured_evidence(row):
+        return False
+    text = " ".join(
+        str(value or "")
+        for value in (
+            row.get("source_pack"),
+            row.get("evidence_acquisition_source_pack"),
+            row.get("impact_path_type"),
+            row.get("primary_impact_path"),
+            row.get("candidate_role"),
+            row.get("playbook_type"),
+            row.get("effective_playbook_type"),
+            " ".join(str(item) for item in row.get("supporting_categories") or ()),
+            " ".join(str(item) for item in row.get("supporting_impact_paths") or ()),
+        )
+    ).casefold()
+    return any(token in text for token in ("fan", "sports", "proxy", "preipo", "pre-ipo", "rwa", "political_meme"))
+
+
 def _raw_core_source_only_narrative(row: Mapping[str, Any]) -> bool:
     text = " ".join(
         str(value or "")
@@ -2241,6 +2319,14 @@ def _raw_float_value(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().casefold() in {"1", "true", "yes", "y"}
+    return bool(value)
 
 
 def _source_coverage_metadata_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
@@ -3887,6 +3973,11 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"raw_core_source_only_narrative_validated={result.raw_core_source_only_narrative_validated} "
             f"raw_core_cryptopanic_tag_only_direct_path_confirmed={result.raw_core_cryptopanic_tag_only_direct_path_confirmed} "
             f"raw_core_suppressed_duplicate_validated_stale={result.raw_core_suppressed_duplicate_validated_stale} "
+            f"confirmed_long_without_source_market={result.confirmed_long_without_source_market} "
+            f"fade_short_without_crowding_exhaustion={result.fade_short_without_crowding_exhaustion} "
+            f"early_long_without_fresh_strong_source={result.early_long_without_fresh_strong_source} "
+            f"cryptopanic_only_narrative_confirmed_lane={result.cryptopanic_only_narrative_confirmed_lane} "
+            f"core_missing_market_state_snapshot={result.core_missing_market_state_snapshot} "
             f"source_coverage_report_missing={result.source_coverage_report_missing} "
             f"source_coverage_provider_status_unknown={result.source_coverage_provider_status_unknown} "
             f"source_coverage_provider_marked_healthy_without_observation={result.source_coverage_provider_marked_healthy_without_observation} "

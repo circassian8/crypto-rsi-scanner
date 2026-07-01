@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-01 - Event Alpha opportunity lanes are research metadata only
+**Status:** accepted
+**Decision:** Event Alpha may classify canonical CoreOpportunity rows into
+research opportunity lanes (`EARLY_LONG_RESEARCH`,
+`CONFIRMED_LONG_RESEARCH`, `FADE_SHORT_REVIEW`, and `RISK_ONLY`) using a pure
+market-reaction snapshot and source-pack requirements. These lanes can improve
+cards, previews, doctor checks, and review artifacts, but they cannot write
+normal RSI signal rows, paper trades, live trades, or create `TRIGGERED_FADE`.
+`FADE_SHORT_REVIEW` is not a trigger; only `event_fade.py` plus `proxy_fade`
+can produce a fade trigger. CryptoPanic-only narratives are not sufficient for
+confirmed lanes.
+**Why:** The radar needs to distinguish early catalyst research, confirmed
+market reaction, crowded fade review, and risk-only rows without turning source
+evidence or market movement into automated trading authority.
+**Revisit when:** A reviewed validation sample proves a specific lane has
+positive edge and the human explicitly approves a separate notification or
+paper-tracking promotion.
+
 ## 2026-07-01 - CoreOpportunity final fields are post-policy truth
 **Status:** accepted
 **Decision:** Raw `event_core_opportunities.jsonl` rows must persist final

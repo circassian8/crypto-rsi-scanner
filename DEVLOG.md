@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Add Event Alpha market reaction opportunity lanes · Codex
+**Why:** Event Alpha was still mostly setup-specific catalyst detection, while
+live rehearsals need explicit research lanes that separate early long ideas,
+confirmed long ideas, fade review, and risk-only rows without weakening strict
+confirmation gates.
+**Changes:**
+- Added a pure `event_market_reaction.py` engine that builds market-state
+  snapshots, classifies reaction states, and assigns research-only opportunity
+  types: `EARLY_LONG_RESEARCH`, `CONFIRMED_LONG_RESEARCH`,
+  `FADE_SHORT_REVIEW`, and `RISK_ONLY`.
+- Persisted opportunity-lane fields on canonical CoreOpportunity rows, including
+  market snapshot, market state, source/market/fade requirement flags, why-now,
+  evidence, confirmation, invalidation, and non-alertable reasons.
+- Added an Opportunity Lane section to research cards so operator-facing cards
+  show why a row is or is not actionable research without exposing it as a trade
+  signal.
+- Added artifact-doctor checks for invalid lane promotion, including confirmed
+  long without source+market confirmation, fade review without completed
+  move/crowding evidence, early long without fresh strong source, CryptoPanic-only
+  narratives in confirmed lanes, and missing market snapshots.
+- Added deterministic fixture tests for official-listing early/confirmed lanes,
+  crowded fade review, CryptoPanic-only fan narratives, and structured unlock
+  risk/fade behavior.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (607/607 passed);
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** CHZ/VELVET rehearsal rows remain exploratory/store-only or
+research-review/local, with CryptoPanic-only narratives blocked from confirmed
+lanes. `FADE_SHORT_REVIEW` is review metadata only and does not create
+`TRIGGERED_FADE`.
+
 ## 2026-07-01 — Make CryptoPanic rehearsal artifacts post-policy truthful · Codex
 **Why:** The `notify_llm_deep_cryptopanic_rehearsal` artifacts still had raw
 CoreOpportunity rows and lower report sections that could imply source-only
