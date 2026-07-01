@@ -158,8 +158,6 @@ def build_integrated_radar_calibration_priors(rows: Iterable[Mapping[str, Any]])
         validated = sum(1 for row in lane_rows if _validation_label(row) == "validated")
         invalidated = sum(1 for row in lane_rows if _validation_label(row) == "invalidated/noise")
         inconclusive = sum(1 for row in lane_rows if _validation_label(row) == "inconclusive")
-        useful = validated
-        junk = invalidated
         sample_size = len(lane_rows)
         thesis_moves = [
             float(row.get("thesis_favorable_excursion") or 0.0)
@@ -176,9 +174,12 @@ def build_integrated_radar_calibration_priors(rows: Iterable[Mapping[str, Any]])
             "inconclusive_count": inconclusive,
             "validation_rate": round(validated / max(1, validated + invalidated), 4),
             "median_thesis_favorable_move": median(thesis_moves) if thesis_moves else None,
-            "useful": useful,
-            "junk": junk,
-            "suggested_prior": round(useful / max(1, useful + junk), 4),
+            "legacy_aliases": {
+                "useful_deprecated_alias": validated,
+                "junk_deprecated_alias": invalidated,
+                "suggested_prior_deprecated_alias": round(validated / max(1, validated + invalidated), 4),
+            },
+            "suggested_prior": round(validated / max(1, validated + invalidated), 4),
             "confidence": "low" if sample_size < min_sample else "medium",
             "recommendation_only": True,
             "eligible_for_auto_apply": False,

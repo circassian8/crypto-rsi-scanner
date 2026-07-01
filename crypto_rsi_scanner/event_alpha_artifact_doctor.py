@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_artifact_paths, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -180,6 +180,7 @@ class EventAlphaArtifactDoctorResult:
     integrated_outcome_diagnostic_in_performance: int = 0
     integrated_calibration_diagnostic_in_main_priors: int = 0
     integrated_calibration_prior_safety_missing: int = 0
+    integrated_calibration_legacy_alias_top_level: int = 0
     integrated_outcome_return_double_scaled: int = 0
     integrated_outcome_missing_data_unlabeled: int = 0
     integrated_outcome_thesis_move_missing: int = 0
@@ -191,7 +192,12 @@ class EventAlphaArtifactDoctorResult:
     source_coverage_provider_status_unknown: int = 0
     source_coverage_provider_marked_healthy_without_observation: int = 0
     source_coverage_category_priority_missing: int = 0
+    source_coverage_readiness_link_missing: int = 0
     source_coverage_context_provider_ranked_above_lane_critical: int = 0
+    live_provider_readiness_missing: int = 0
+    live_provider_readiness_secret_leak: int = 0
+    live_provider_readiness_live_calls_allowed_in_smoke: int = 0
+    live_provider_readiness_configured_missing_env: int = 0
     source_pack_provider_status_missing: int = 0
     missing_provider_recommendations_missing: int = 0
     degraded_provider_absence_marked_meaningful: int = 0
@@ -252,6 +258,7 @@ class EventAlphaArtifactDoctorResult:
     research_review_digest_contains_hard_gated_candidate: int = 0
     research_review_digest_too_many_items: int = 0
     research_review_digest_missing_feedback_target: int = 0
+    research_review_digest_skipped_without_reason: int = 0
     research_review_digest_absolute_path: int = 0
     notification_body_card_mismatch_canonical: int = 0
     notification_body_feedback_mismatch_canonical: int = 0
@@ -877,6 +884,7 @@ def diagnose_artifacts(
     )
     source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
     source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
+    live_provider_readiness_conflicts = _live_provider_readiness_conflicts(namespace_dir)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
         acquisition_rows=acquisition_rows,
         core_rows=core_rows,
@@ -1231,6 +1239,7 @@ def diagnose_artifacts(
         "integrated_outcome_diagnostic_in_performance",
         "integrated_calibration_diagnostic_in_main_priors",
         "integrated_calibration_prior_safety_missing",
+        "integrated_calibration_legacy_alias_top_level",
         "integrated_outcome_return_double_scaled",
         "integrated_outcome_missing_data_unlabeled",
         "integrated_outcome_thesis_move_missing",
@@ -1264,11 +1273,31 @@ def diagnose_artifacts(
             "source_coverage_category_priority_missing="
             f"{source_coverage_report_conflicts['source_coverage_category_priority_missing']}"
         )
+    if source_coverage_report_conflicts.get("source_coverage_readiness_link_missing", 0):
+        warnings.append(
+            "source_coverage_readiness_link_missing="
+            f"{source_coverage_report_conflicts['source_coverage_readiness_link_missing']}"
+        )
     if source_coverage_report_conflicts["source_coverage_context_provider_ranked_above_lane_critical"]:
         message = (
             "source_coverage_context_provider_ranked_above_lane_critical="
             f"{source_coverage_report_conflicts['source_coverage_context_provider_ranked_above_lane_critical']}"
         )
+        (blockers if strict else warnings).append(message)
+    if live_provider_readiness_conflicts["live_provider_readiness_missing"]:
+        warnings.append(
+            "live_provider_readiness_missing="
+            f"{live_provider_readiness_conflicts['live_provider_readiness_missing']}"
+        )
+    for key in (
+        "live_provider_readiness_secret_leak",
+        "live_provider_readiness_live_calls_allowed_in_smoke",
+        "live_provider_readiness_configured_missing_env",
+    ):
+        count = live_provider_readiness_conflicts.get(key, 0)
+        if not count:
+            continue
+        message = f"{key}={count}"
         (blockers if strict else warnings).append(message)
     if source_coverage_conflicts["source_pack_provider_status_missing"]:
         warnings.append(
@@ -1531,6 +1560,7 @@ def diagnose_artifacts(
         "research_review_digest_contains_hard_gated_candidate",
         "research_review_digest_too_many_items",
         "research_review_digest_missing_feedback_target",
+        "research_review_digest_skipped_without_reason",
         "research_review_digest_absolute_path",
     ):
         if delivery_conflicts[key]:
@@ -1539,6 +1569,7 @@ def diagnose_artifacts(
                 "research_review_digest_contains_strict_alertable",
                 "research_review_digest_contains_hard_gated_candidate",
                 "research_review_digest_missing_feedback_target",
+                "research_review_digest_skipped_without_reason",
                 "research_review_digest_absolute_path",
             }:
                 (blockers if strict else warnings).append(message)
@@ -1947,6 +1978,7 @@ def diagnose_artifacts(
         integrated_outcome_diagnostic_in_performance=integrated_conflicts["integrated_outcome_diagnostic_in_performance"],
         integrated_calibration_diagnostic_in_main_priors=integrated_conflicts["integrated_calibration_diagnostic_in_main_priors"],
         integrated_calibration_prior_safety_missing=integrated_conflicts["integrated_calibration_prior_safety_missing"],
+        integrated_calibration_legacy_alias_top_level=integrated_conflicts["integrated_calibration_legacy_alias_top_level"],
         integrated_outcome_return_double_scaled=integrated_conflicts["integrated_outcome_return_double_scaled"],
         integrated_outcome_missing_data_unlabeled=integrated_conflicts["integrated_outcome_missing_data_unlabeled"],
         integrated_outcome_thesis_move_missing=integrated_conflicts["integrated_outcome_thesis_move_missing"],
@@ -1962,8 +1994,19 @@ def diagnose_artifacts(
         source_coverage_category_priority_missing=source_coverage_report_conflicts[
             "source_coverage_category_priority_missing"
         ],
+        source_coverage_readiness_link_missing=source_coverage_report_conflicts[
+            "source_coverage_readiness_link_missing"
+        ],
         source_coverage_context_provider_ranked_above_lane_critical=source_coverage_report_conflicts[
             "source_coverage_context_provider_ranked_above_lane_critical"
+        ],
+        live_provider_readiness_missing=live_provider_readiness_conflicts["live_provider_readiness_missing"],
+        live_provider_readiness_secret_leak=live_provider_readiness_conflicts["live_provider_readiness_secret_leak"],
+        live_provider_readiness_live_calls_allowed_in_smoke=live_provider_readiness_conflicts[
+            "live_provider_readiness_live_calls_allowed_in_smoke"
+        ],
+        live_provider_readiness_configured_missing_env=live_provider_readiness_conflicts[
+            "live_provider_readiness_configured_missing_env"
         ],
         source_pack_provider_status_missing=source_coverage_conflicts["source_pack_provider_status_missing"],
         missing_provider_recommendations_missing=source_coverage_conflicts["missing_provider_recommendations_missing"],
@@ -2029,6 +2072,7 @@ def diagnose_artifacts(
         research_review_digest_contains_hard_gated_candidate=delivery_conflicts["research_review_digest_contains_hard_gated_candidate"],
         research_review_digest_too_many_items=delivery_conflicts["research_review_digest_too_many_items"],
         research_review_digest_missing_feedback_target=delivery_conflicts["research_review_digest_missing_feedback_target"],
+        research_review_digest_skipped_without_reason=delivery_conflicts["research_review_digest_skipped_without_reason"],
         research_review_digest_absolute_path=delivery_conflicts["research_review_digest_absolute_path"],
         notification_body_card_mismatch_canonical=delivery_conflicts["notification_body_card_mismatch_canonical"],
         notification_body_feedback_mismatch_canonical=delivery_conflicts["notification_body_feedback_mismatch_canonical"],
@@ -2244,11 +2288,6 @@ def _expected_card_group_for_store_core(
             primary.get("opportunity_type")
             or primary.get("opportunity_lane")
         )
-        if (
-            str(primary.get("source_row_type") or "") == "event_integrated_radar_candidate"
-            or bool(primary.get("integrated_candidate_id"))
-        )
-        else None
     )
     if lane_group is not None:
         return lane_group
@@ -3177,6 +3216,7 @@ def _integrated_radar_artifact_conflicts(
         "integrated_outcome_diagnostic_in_performance": 0,
         "integrated_calibration_diagnostic_in_main_priors": 0,
         "integrated_calibration_prior_safety_missing": 0,
+        "integrated_calibration_legacy_alias_top_level": 0,
         "integrated_outcome_return_double_scaled": 0,
         "integrated_outcome_missing_data_unlabeled": 0,
         "integrated_outcome_thesis_move_missing": 0,
@@ -3449,6 +3489,7 @@ def _integrated_calibration_conflicts(path: str | Path | None) -> dict[str, int]
     out = {
         "integrated_calibration_diagnostic_in_main_priors": 0,
         "integrated_calibration_prior_safety_missing": 0,
+        "integrated_calibration_legacy_alias_top_level": 0,
     }
     if path is None or not Path(path).exists():
         return out
@@ -3469,6 +3510,8 @@ def _integrated_calibration_conflicts(path: str | Path | None) -> dict[str, int]
         if not isinstance(value, Mapping):
             out["integrated_calibration_prior_safety_missing"] += 1
             continue
+        if ("useful" in value or "junk" in value) and not isinstance(value.get("legacy_aliases"), Mapping):
+            out["integrated_calibration_legacy_alias_top_level"] += 1
         sample_size = _safe_float(value.get("sample_size"))
         min_sample_size = _safe_float(value.get("min_sample_size"))
         has_warning = bool(str(value.get("min_sample_warning") or "").strip())
@@ -3982,6 +4025,7 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
         "source_coverage_provider_status_unknown": 0,
         "source_coverage_provider_marked_healthy_without_observation": 0,
         "source_coverage_category_priority_missing": 0,
+        "source_coverage_readiness_link_missing": 0,
         "source_coverage_context_provider_ranked_above_lane_critical": 0,
     }
     if path is None:
@@ -4018,7 +4062,14 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
             out["source_coverage_provider_marked_healthy_without_observation"] += len(healthy & unknown)
     if "Most useful next data source categories:" not in text:
         out["source_coverage_category_priority_missing"] = 1
-    else:
+    if (
+        event_alpha_source_coverage.LIVE_PROVIDER_READINESS_MD not in text
+        or "Live-provider activation readiness:" not in text
+    ):
+        out["source_coverage_readiness_link_missing"] = 1
+    if "Recommended next activation order" not in text and "Most useful next data source categories:" not in text:
+        out["source_coverage_readiness_link_missing"] = 1
+    if "Most useful next data source categories:" in text:
         category_section = text.split("Most useful next data source categories:", 1)[1]
         category_section = category_section.split("Most useful next data source:", 1)[0]
         category_lower = category_section.casefold()
@@ -4063,6 +4114,61 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
         if coinalyze_gap and "coinalyze" not in full_ranked_section.casefold():
             out["source_coverage_context_provider_ranked_above_lane_critical"] = 1
     return out
+
+
+def _live_provider_readiness_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
+    out = {
+        "live_provider_readiness_missing": 0,
+        "live_provider_readiness_secret_leak": 0,
+        "live_provider_readiness_live_calls_allowed_in_smoke": 0,
+        "live_provider_readiness_configured_missing_env": 0,
+    }
+    if namespace_dir is None:
+        return out
+    base = Path(namespace_dir)
+    json_path = base / event_live_provider_readiness.READINESS_JSON
+    md_path = base / event_live_provider_readiness.READINESS_MD
+    if not json_path.exists() and not md_path.exists():
+        out["live_provider_readiness_missing"] = 1
+        return out
+    texts: list[str] = []
+    for path in (json_path, md_path):
+        if not path.exists():
+            continue
+        try:
+            texts.append(path.read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            out["live_provider_readiness_missing"] = 1
+    joined = "\n".join(texts)
+    if _text_has_secret_like_value(joined):
+        out["live_provider_readiness_secret_leak"] = 1
+    if json_path.exists():
+        try:
+            data = json.loads(json_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        if isinstance(data, Mapping):
+            smoke = bool(data.get("smoke_mode"))
+            if smoke and bool(data.get("live_calls_allowed")):
+                out["live_provider_readiness_live_calls_allowed_in_smoke"] += 1
+            for provider in data.get("providers") or ():
+                if not isinstance(provider, Mapping):
+                    continue
+                if smoke and bool(provider.get("live_call_allowed")):
+                    out["live_provider_readiness_live_calls_allowed_in_smoke"] += 1
+                if bool(provider.get("configured")) and str(provider.get("preflight_status") or "") == "missing_config":
+                    out["live_provider_readiness_configured_missing_env"] += 1
+    return out
+
+
+def _text_has_secret_like_value(text: str) -> bool:
+    patterns = (
+        r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}",
+        r"\bghp_[A-Za-z0-9_]{20,}",
+        r"(?i)(api[_-]?key|secret|token)\s*[=:]\s*['\"][A-Za-z0-9._-]{20,}['\"]",
+        r"(?i)(api[_-]?key|secret|token)\s+[A-Za-z0-9._-]{24,}",
+    )
+    return any(re.search(pattern, text) for pattern in patterns)
 
 
 def _cryptopanic_artifact_conflicts(
@@ -4586,6 +4692,7 @@ def _notification_delivery_conflicts(
         "research_review_digest_contains_hard_gated_candidate": 0,
         "research_review_digest_too_many_items": 0,
         "research_review_digest_missing_feedback_target": 0,
+        "research_review_digest_skipped_without_reason": 0,
         "research_review_digest_absolute_path": 0,
         "notification_body_card_mismatch_canonical": 0,
         "notification_body_feedback_mismatch_canonical": 0,
@@ -4665,6 +4772,24 @@ def _notification_delivery_conflicts(
                 out["research_review_digest_too_many_items"] += 1
             if not str(row.get("feedback_target") or "").strip():
                 out["research_review_digest_missing_feedback_target"] += 1
+            summary = row.get("channel_summary") if isinstance(row.get("channel_summary"), Mapping) else {}
+            skipped_count = _as_int(summary.get("skipped_candidate_count") if isinstance(summary, Mapping) else 0)
+            if skipped_count > 0:
+                reason_counts = summary.get("skip_reason_counts") if isinstance(summary, Mapping) else {}
+                skipped_items = summary.get("skipped_candidates") if isinstance(summary, Mapping) else []
+                has_reason_counts = isinstance(reason_counts, Mapping) and any(str(key).strip() for key in reason_counts)
+                has_item_reasons = isinstance(skipped_items, list) and all(
+                    isinstance(item, Mapping) and str(item.get("skip_reason") or "").strip()
+                    for item in skipped_items
+                )
+                body_has_skipped_reasons = "Skipped candidates" in telegram_body and bool(
+                    re.search(
+                        r"(?im)^\s*-\s*.+:\s*(max_items|lower_rank|duplicate_family|cooldown|stale|missing_card|hard_gated|quality_blocked|suppressed_duplicate|already_represented)",
+                        telegram_body,
+                    )
+                )
+                if not (has_reason_counts or has_item_reasons or body_has_skipped_reasons):
+                    out["research_review_digest_skipped_without_reason"] += 1
             if core_ids:
                 body_lower = telegram_body.casefold()
                 card_paths = _tuple_value(row.get("canonical_card_paths")) or _tuple_value(row.get("canonical_card_path"))
@@ -4729,8 +4854,9 @@ def _delivery_status_field_conflicts(row: Mapping[str, Any]) -> dict[str, int]:
     }
     delivery_mode = str(row.get("delivery_mode") or "").strip()
     delivery_state = str(row.get("delivery_state") or "").strip()
+    status = str(row.get("status") or "").strip()
     status_detail = str(row.get("status_detail") or "").strip()
-    if not delivery_state:
+    if not delivery_state or not status:
         out["delivery_status_missing"] += 1
     if not status_detail:
         out["delivery_status_detail_missing"] += 1
@@ -4797,8 +4923,11 @@ def _notification_preview_consistency_conflicts(
     except OSError:
         return out
     summary = _parse_notification_preview_summary(text)
-    if _notification_preview_legacy_alerts_wording(text, latest_run=latest_run):
-        out["notification_preview_legacy_alerts_wording"] += 1
+    out["notification_preview_legacy_alerts_wording"] += _active_preview_legacy_alerts_wording_count(
+        delivery_rows,
+        latest_run=latest_run,
+        latest_run_id=latest_run_id,
+    )
     if not summary:
         return out
     if "completed" in summary:
@@ -4848,6 +4977,33 @@ def _notification_preview_consistency_conflicts(
     ):
         out["notification_preview_no_send_status_unclear"] += 1
     return out
+
+
+def _active_preview_legacy_alerts_wording_count(
+    delivery_rows: Iterable[Mapping[str, Any]],
+    *,
+    latest_run: Mapping[str, Any] | None,
+    latest_run_id: str | None,
+) -> int:
+    paths: set[Path] = set()
+    for row in _delivery.latest_rows_by_delivery(delivery_rows):
+        if latest_run_id and str(row.get("run_id") or "") != str(latest_run_id):
+            continue
+        path, _source = _delivery.resolve_notification_preview_path(
+            row,
+            artifact_namespace=row.get("artifact_namespace") or row.get("namespace"),
+        )
+        if path is not None:
+            paths.add(path)
+    count = 0
+    for path in paths:
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if _notification_preview_legacy_alerts_wording(text, latest_run=latest_run):
+            count += 1
+    return count
 
 
 def _notification_preview_legacy_alerts_wording(text: str, *, latest_run: Mapping[str, Any] | None) -> bool:
@@ -5784,6 +5940,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"integrated_outcome_diagnostic_in_performance={result.integrated_outcome_diagnostic_in_performance} "
             f"integrated_calibration_diagnostic_in_main_priors={result.integrated_calibration_diagnostic_in_main_priors} "
             f"integrated_calibration_prior_safety_missing={result.integrated_calibration_prior_safety_missing} "
+            f"integrated_calibration_legacy_alias_top_level={result.integrated_calibration_legacy_alias_top_level} "
             f"integrated_outcome_return_double_scaled={result.integrated_outcome_return_double_scaled} "
             f"integrated_outcome_missing_data_unlabeled={result.integrated_outcome_missing_data_unlabeled} "
             f"integrated_outcome_thesis_move_missing={result.integrated_outcome_thesis_move_missing} "
@@ -5796,7 +5953,12 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"source_coverage_provider_status_unknown={result.source_coverage_provider_status_unknown} "
             f"source_coverage_provider_marked_healthy_without_observation={result.source_coverage_provider_marked_healthy_without_observation} "
             f"source_coverage_category_priority_missing={result.source_coverage_category_priority_missing} "
+            f"source_coverage_readiness_link_missing={result.source_coverage_readiness_link_missing} "
             f"source_coverage_context_provider_ranked_above_lane_critical={result.source_coverage_context_provider_ranked_above_lane_critical} "
+            f"live_provider_readiness_missing={result.live_provider_readiness_missing} "
+            f"live_provider_readiness_secret_leak={result.live_provider_readiness_secret_leak} "
+            f"live_provider_readiness_live_calls_allowed_in_smoke={result.live_provider_readiness_live_calls_allowed_in_smoke} "
+            f"live_provider_readiness_configured_missing_env={result.live_provider_readiness_configured_missing_env} "
             f"source_pack_provider_status_missing={result.source_pack_provider_status_missing} "
             f"missing_provider_recommendations_missing={result.missing_provider_recommendations_missing} "
             f"degraded_provider_absence_marked_meaningful={result.degraded_provider_absence_marked_meaningful} "
@@ -5879,6 +6041,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"research_review_hard_gated={result.research_review_digest_contains_hard_gated_candidate} "
             f"research_review_too_many={result.research_review_digest_too_many_items} "
             f"research_review_feedback_missing={result.research_review_digest_missing_feedback_target} "
+            f"research_review_skipped_without_reason={result.research_review_digest_skipped_without_reason} "
             f"research_review_absolute_path={result.research_review_digest_absolute_path} "
             f"body_card_mismatch={result.notification_body_card_mismatch_canonical} "
             f"body_feedback_mismatch={result.notification_body_feedback_mismatch_canonical} "

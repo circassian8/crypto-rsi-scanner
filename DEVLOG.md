@@ -17,6 +17,60 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Add live-provider activation readiness and final preview cleanup · Codex
+**Why:** Event Alpha was ready for operator rehearsal, but normal notification
+previews still used legacy broad `Alerts` wording, some command summaries
+printed machine-local paths, and source coverage did not yet include a no-call
+activation plan for the next live provider families.
+**Changes:**
+- Added a research-only live-provider activation readiness report/artifact for
+  Coinalyze, official exchange announcements, Tokenomist/Messari unlocks,
+  GeckoTerminal/DefiLlama, and context/news sources; smoke mode never performs
+  provider network calls or Telegram sends and redacts secret values.
+- Updated source coverage and daily brief output with readiness artifact links
+  and a recommended activation order covering derivatives, official exchange,
+  structured unlock/calendar, DEX/on-chain, protocol fundamentals, and context
+  news.
+- Reworked normal notification preview/heartbeat copy to distinguish strict
+  alerts from research/raw candidates, write a fresh preview file from the
+  latest run summary, and include research-review eligible/skipped counts with
+  skip reasons.
+- Normalized latest delivery status fields and operator-facing path labels in
+  notification, sidecar scan, daily brief, and final-check command output.
+- Clamped future-dated file mtimes when writing
+  `crypto_rsi_scanner_source_with_artifacts.zip` so review zips do not make
+  extracted Makefiles emit clock-skew warnings.
+- Tightened artifact doctor checks for stale legacy preview wording, missing
+  delivery statuses, missing research-review skip reasons, source-coverage
+  readiness links, and unsafe live-provider readiness artifacts.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (650/650 passed);
+`make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`;
+`make event-alpha-integrated-radar-outcome-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-outcome-report PYTHON=python3`;
+`make event-alpha-integrated-radar-calibration-report PYTHON=python3`;
+`make event-alpha-live-provider-readiness-smoke PYTHON=python3`;
+`make event-alpha-live-provider-readiness PYTHON=python3`;
+`make event-alpha-market-anomaly-smoke PYTHON=python3`;
+`make event-alpha-official-exchange-smoke PYTHON=python3`;
+`make event-alpha-scheduled-catalyst-smoke PYTHON=python3`;
+`make event-alpha-unlock-risk-smoke PYTHON=python3`;
+`make event-alpha-derivatives-smoke PYTHON=python3`;
+`make event-alpha-fade-review-smoke PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`;
+`make event-alpha-notify-preview PROFILE=notify_llm_deep PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** `make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep STRICT=1` still blocks, by design, because
+that old namespace contains stale pre-canonical artifacts; use rehearsal
+namespaces for send-readiness. No live providers, Telegram sends, normal RSI
+rows, paper/live trades, execution, or Event Alpha-created `TRIGGERED_FADE`.
+
 ## 2026-07-01 — Polish Event Alpha artifact portability and thesis outcomes · Codex
 **Why:** Event Alpha operator artifacts still had stale absolute paths in
 structured JSONL rows, ambiguous heartbeat alert wording, and raw asset

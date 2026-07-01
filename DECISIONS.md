@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-01 - Live-provider activation readiness is no-call and no-send by default
+**Status:** accepted
+**Decision:** Event Alpha live-provider activation readiness artifacts may
+inspect configuration, provider health, request-ledger paths, source-pack
+coverage, quota policy, and required environment variable names, but they must
+not call live providers, send Telegram messages, write normal RSI signal rows,
+trade, paper trade, execute orders, print secret values, or claim Telegram send
+readiness. Source coverage and daily briefs may link these readiness artifacts
+and recommend an activation order, but enabling any provider still requires an
+explicit guarded profile/config change and a no-send rehearsal.
+**Why:** The next useful operational step is knowing which high-value providers
+are safe to turn on and what credentials/quotas are missing, without letting a
+readiness report silently become a live data or notification path.
+**Revisit when:** A specific provider has a reviewed no-send burn-in sample,
+bounded request ledger, quota policy, source-pack tests, and explicit human
+approval to promote it into a live-style research profile.
+
 ## 2026-07-01 - Integrated radar preview and outcome artifacts are research truth only
 **Status:** accepted
 **Decision:** Integrated Event Alpha radar operator output should use portable

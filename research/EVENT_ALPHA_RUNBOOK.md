@@ -1548,6 +1548,7 @@ configured live providers, may hit public-provider backoff/403/429 errors, and
 may take several minutes:
 
 ```bash
+make event-alpha-live-provider-readiness PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-notify-llm-deep-real-no-send-rehearsal PYTHON=python3
 make event-alpha-telegram-one-cycle-send-preflight PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal PYTHON=python3
@@ -1556,6 +1557,22 @@ make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal PYTHON=pyt
 make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal BURN_IN_REVIEW=1 PYTHON=python3
 make event-alpha-daily-brief PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 ```
+
+The live-provider readiness command is config/fixture inspection only. It writes
+`event_live_provider_activation_readiness.json` and
+`event_live_provider_activation_readiness.md`, names required env vars without
+printing values, and keeps `live_calls_allowed=false` unless a future explicit
+activation changes the policy. Use `make event-alpha-live-provider-readiness-smoke
+PYTHON=python3` to prove this path without API keys, network calls, or sends.
+Source coverage and the daily brief should link the readiness artifact and show
+the activation order: Coinalyze derivatives/OI/funding, Bybit/Binance official
+announcements, Tokenomist/Messari unlocks, GeckoTerminal/DefiLlama DEX/on-chain,
+protocol fundamentals, then context/news.
+
+For Pro-model handoffs, use `make export-src-with-artifacts`. The exporter
+overwrites `crypto_rsi_scanner_source_with_artifacts.zip`, excludes secrets and
+machine-local noise, and clamps future-dated file mtimes to archive creation
+time so extracted review copies do not trigger Makefile clock-skew warnings.
 
 Use `make event-alpha-notify-llm-deep-real-no-send-rehearsal-fast PYTHON=python3`
 for a capped preview/readiness smoke before the longer rehearsal. Before any
@@ -1611,6 +1628,15 @@ make event-alpha-telegram-no-send-final-check PROFILE=notify_llm_deep_rehearsal 
 That target runs the capped live-provider no-send rehearsal, strict artifact doctor,
 send-readiness, compact final check, compact inbox, and daily brief, and prints
 the local `event_alpha_notification_preview.md` path for inspection.
+
+Normal heartbeat previews should use strict/research wording:
+`Alertable decisions`, `Strict alerts`, `Research candidates`, and
+`Raw source candidates`. If a preview shows legacy `Alertable decisions: 0 ·
+Alerts: N` wording, treat the namespace as stale and rerun the preview/rehearsal
+before using it for operator review. Research-review previews should also show
+rendered candidates, eligible candidates, skipped candidates, and skip reasons
+such as `max_items`, `lower_rank`, `duplicate_family`, `quality_blocked`, or
+`already_represented`.
 
 It uses the `notify_llm_deep` profile with bounded run/day LLM budgets, source
 enrichment, optional CryptoPanic when the key is present, run locks, and the

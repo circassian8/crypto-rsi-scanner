@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
+from . import event_artifact_paths
 from . import event_alpha_notification_delivery as delivery
 from . import event_alpha_notification_go_no_go as go_no_go
 
@@ -79,7 +80,8 @@ def build_final_check(
         f"enrichment={go_no_go_result.provider_ready_enrichment_sources} "
         f"backoff={go_no_go_result.provider_backoff_count}"
     )
-    inspect = f"sed -n '1,180p' {preview_path}" if preview_path else "run the fixture final check to create a preview"
+    preview_label = event_artifact_paths.artifact_display_path(preview_path) if preview_path else ""
+    inspect = f"sed -n '1,180p' {preview_label}" if preview_label else "run the fixture final check to create a preview"
     real_send = _real_send_command(go_no_go_result.profile)
     return EventAlphaTelegramFinalCheckResult(
         profile=go_no_go_result.profile,
@@ -107,7 +109,7 @@ def format_final_check(result: EventAlphaTelegramFinalCheckResult) -> str:
         f"- status: {result.status}",
         f"- profile: {result.profile}",
         f"- artifact namespace: {result.artifact_namespace}",
-        f"- preview: {result.preview_path or 'missing'}",
+        f"- preview: {event_artifact_paths.artifact_display_path(result.preview_path) if result.preview_path else 'missing'}",
         f"- doctor: {result.doctor_status}",
         f"- candidate count: {len(result.core_ids)}",
         f"- would-send lanes: {_join(result.would_send_lanes)}",

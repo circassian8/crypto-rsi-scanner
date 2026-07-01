@@ -128,7 +128,11 @@ def test_state_features_volatility_state_rules():
 
 
 def test_makefile_has_clean_export_and_bootstrap_targets():
+    import importlib.util
     import subprocess
+    import time
+    import zipfile
+    from datetime import datetime
     from pathlib import Path
 
     root = Path(__file__).resolve().parent.parent
@@ -340,6 +344,28 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
         capture_output=True,
     )
     assert "python3 scripts/export_source_with_artifacts.py" in export_artifacts_dry.stdout
+
+    spec = importlib.util.spec_from_file_location(
+        "export_source_with_artifacts",
+        root / "scripts" / "export_source_with_artifacts.py",
+    )
+    assert spec and spec.loader
+    export_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(export_module)
+    with TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        future_file = tmp_path / "Makefile"
+        future_file.write_text("all:\n\t@true\n", encoding="utf-8")
+        now_ts = time.time()
+        future_ts = now_ts + 86400
+        os.utime(future_file, (future_ts, future_ts))
+        out_zip = tmp_path / "out.zip"
+        with zipfile.ZipFile(out_zip, "w") as zf:
+            export_module._write_file_to_zip(zf, future_file, "Makefile", now_ts=now_ts)
+        with zipfile.ZipFile(out_zip) as zf:
+            zipped_ts = datetime(*zf.getinfo("Makefile").date_time).timestamp()
+        assert zipped_ts <= now_ts + 2
+        assert zipped_ts < future_ts - 3600
 
     verify_dry = subprocess.run(
         ["make", "-n", "verify", "PYTHON=python3"],
@@ -807,6 +833,9 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert "Most useful next data source categories:" in text
     assert "1. Derivatives/OI/funding" in text
     assert "2. Official exchange announcements" in text
+    assert "Live-provider activation readiness:" in text
+    assert "event_live_provider_activation_readiness.md" in text
+    assert "next activation plan" in text
     assert "Most useful next data source:" in text
     assert event_alpha_source_coverage._provider_lane_priority("coinalyze") > event_alpha_source_coverage._provider_lane_priority("gdelt")  # noqa: SLF001
     assert event_alpha_source_coverage._provider_lane_priority("binance_announcements") > event_alpha_source_coverage._provider_lane_priority("project_blog_rss")  # noqa: SLF001
@@ -1052,6 +1081,7 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
         assert source_report_doctor.source_coverage_report_missing == 0
         assert source_report_doctor.source_coverage_provider_status_unknown > 0
         assert source_report_doctor.source_coverage_provider_marked_healthy_without_observation == 0
+        assert source_report_doctor.source_coverage_readiness_link_missing == 0
         bad_rank_path = Path(tmp) / "bad_rank_source_coverage.md"
         bad_rank_path.write_text(
             "Most useful next data source:\n"
@@ -1153,6 +1183,70 @@ def test_config_load_url_list_dedupes_comments_and_inline_notes():
         urls = config._load_url_list(path)
 
     assert urls == ("https://example.test/rss", "https://example.test/atom")
+
+
+def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor_checked():
+    import json
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_live_provider_readiness
+
+    source_coverage_text = "\n".join([
+        "EVENT ALPHA SOURCE COVERAGE",
+        "Most useful next data source categories:",
+        "1. Derivatives/OI/funding",
+        "2. Official exchange announcements",
+        "3. Structured unlock/calendar",
+        "6. Context/news",
+        "Live-provider activation readiness:",
+        "- readiness report: event_live_provider_activation_readiness.md",
+        "Most useful next data source:",
+        "- coinalyze: missing derivatives confirmation",
+    ])
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        source_path = base / "event_alpha_source_coverage.md"
+        source_path.write_text(source_coverage_text, encoding="utf-8")
+        report = event_live_provider_readiness.build_readiness_report(
+            profile="fixture",
+            artifact_namespace="live_provider_readiness_smoke",
+            smoke_mode=True,
+            now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+        )
+        json_path, md_path = event_live_provider_readiness.write_readiness_artifacts(report, base)
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        assert payload["live_calls_allowed"] is False
+        assert payload["smoke_mode"] is True
+        assert all(provider["live_call_allowed"] is False for provider in payload["providers"])
+        assert not event_alpha_artifact_doctor._text_has_secret_like_value(md_path.read_text(encoding="utf-8"))
+        clean = event_alpha_artifact_doctor.diagnose_artifacts(
+            source_coverage_report_path=source_path,
+            profile="fixture",
+            artifact_namespace="live_provider_readiness_smoke",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert clean.live_provider_readiness_missing == 0
+        assert clean.live_provider_readiness_live_calls_allowed_in_smoke == 0
+        assert clean.live_provider_readiness_configured_missing_env == 0
+        assert clean.live_provider_readiness_secret_leak == 0
+
+        payload["live_calls_allowed"] = True
+        payload["providers"][0]["live_call_allowed"] = True
+        payload["providers"][0]["configured"] = True
+        payload["providers"][0]["preflight_status"] = "missing_config"
+        payload["providers"][0]["last_error_safe"] = "api_key='THIS_IS_A_TEST_SECRET_VALUE_123456'"
+        json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        unsafe = event_alpha_artifact_doctor.diagnose_artifacts(
+            source_coverage_report_path=source_path,
+            profile="fixture",
+            artifact_namespace="live_provider_readiness_smoke",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert unsafe.live_provider_readiness_live_calls_allowed_in_smoke >= 1
+        assert unsafe.live_provider_readiness_configured_missing_env == 1
+        assert unsafe.live_provider_readiness_secret_leak == 1
+        assert unsafe.status == "BLOCKED"
 
 
 def test_public_rss_make_target_does_not_inject_fixture_aliases():
@@ -26031,21 +26125,35 @@ def test_event_alpha_research_review_digest_surfaces_near_misses_without_alertin
         storage = _NotifyFakeStorage()
         now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
         decision = _research_review_decision("DOGE", score=66)
+        skipped_decision = _research_review_decision("VELVET", score=65)
         cfg = notif.EventAlphaNotificationConfig(
             enabled=False,
             research_review_digest_enabled=True,
             research_review_digest_min_score=60,
-            research_review_digest_max_items=3,
+            research_review_digest_max_items=1,
         )
-        plan = notif.build_notification_plan([decision], storage=storage, cfg=cfg, now=now)
+        plan = notif.build_notification_plan([decision, skipped_decision], storage=storage, cfg=cfg, now=now)
         assert plan.decision_count == 0
         assert plan.lane_counts[notif.LANE_RESEARCH_REVIEW_DIGEST] == 1
         assert plan.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 0
         assert plan.would_send_count == 1
-        text = notif.format_research_review_telegram_digest(plan.research_review_items, profile="notify_llm_deep", cfg=cfg)
+        assert plan.research_review_eligible_count == 2
+        assert len(plan.research_review_skipped_items) == 1
+        assert plan.research_review_skipped_items[0].skip_reason == "max_items"
+        text = notif.format_research_review_telegram_digest(
+            plan.research_review_items,
+            profile="notify_llm_deep",
+            cfg=cfg,
+            eligible_count=plan.research_review_eligible_count,
+            skipped_items=plan.research_review_skipped_items,
+        )
         assert "Event Alpha Research Review" in text
         assert "Not alertable. Missing confirmation. Not a trade signal." in text
         assert "DOGE / doge" in text
+        assert "Eligible candidates: 2" in text
+        assert "Skipped candidates: 1" in text
+        assert "VELVET / velvet" in text
+        assert "max_items" in text
         assert "Why not alertable: missing confirmation" in text
         assert "What would upgrade: find independent catalyst" in text
         assert "alert_id=" not in text
@@ -26055,7 +26163,7 @@ def test_event_alpha_research_review_digest_surfaces_near_misses_without_alertin
         assert "{" not in text
 
         result = notif.send_notifications(
-            [decision],
+            [decision, skipped_decision],
             storage=storage,
             cfg=cfg,
             now=now,
@@ -26075,6 +26183,11 @@ def test_event_alpha_research_review_digest_surfaces_near_misses_without_alertin
         rows = delivery.load_delivery_records(dcfg.path)
         assert rows[-1]["lane"] == notif.LANE_RESEARCH_REVIEW_DIGEST
         assert rows[-1]["state"] == delivery.STATE_BLOCKED
+        assert rows[-1]["status"] == "would_send_but_guard_disabled"
+        assert rows[-1]["no_send_rehearsal"] is True
+        assert rows[-1]["channel_summary"]["rendered_candidate_count"] == 1
+        assert rows[-1]["channel_summary"]["eligible_candidate_count"] == 2
+        assert rows[-1]["channel_summary"]["skip_reason_counts"]["max_items"] == 1
 
 
 def test_event_alpha_research_review_digest_policy_excludes_controls_and_strict_alerts():
@@ -34279,10 +34392,10 @@ def test_research_cards_use_canonical_core_store_groups():
         local_section = index_text.split("## Local-Only / Quality-Capped Cards", 1)[1].split("## Diagnostic", 1)[0]
         assert "RUNE" in "".join(path.read_text(encoding="utf-8") for path in core_paths)
         assert "card_core_aa617f5bc943" in promoted_sections
-        assert "memecore" in local_section.casefold() or any(
+        assert any(
             "memecore" in path.read_text(encoding="utf-8").casefold()
             for path, group in groups.items()
-            if group == "Local-Only / Quality-Capped Cards"
+            if group == "Unconfirmed Research Cards"
         )
         link_update = event_core_opportunity_store.update_core_opportunity_card_links(
             store_path,
@@ -34293,6 +34406,21 @@ def test_research_cards_use_canonical_core_store_groups():
         assert link_update.rows_updated == len(store_ids)
         linked_rows = event_core_opportunity_store.load_core_opportunities(store_path, latest_run=True).rows
         assert all(row.get("card_path") for row in linked_rows)
+
+
+def test_research_card_index_groups_normal_unconfirmed_lane_before_near_miss_fallback():
+    from crypto_rsi_scanner import event_research_cards
+
+    with TemporaryDirectory() as tmp:
+        card_path = Path(tmp) / "card_chz.md"
+        card_path.write_text(
+            "# CHZ Event Research Card\n\n"
+            "- Opportunity type: UNCONFIRMED_RESEARCH\n"
+            "- Quality: exploratory\n",
+            encoding="utf-8",
+        )
+        groups = event_research_cards.card_index_group_map([card_path])
+        assert groups[card_path] == "Unconfirmed Research Cards"
 
 
 def test_research_cards_backfill_aggregated_support_core_rows():
@@ -38861,6 +38989,9 @@ def test_integrated_radar_outcomes_and_calibration_are_research_only():
         assert "validated_count" in priors["opportunity_type_priors"]["FADE_SHORT_REVIEW"]
         assert "invalidated_count" in priors["opportunity_type_priors"]["FADE_SHORT_REVIEW"]
         assert "validation_rate" in priors["opportunity_type_priors"]["FADE_SHORT_REVIEW"]
+        assert "useful" not in priors["opportunity_type_priors"]["FADE_SHORT_REVIEW"]
+        assert "junk" not in priors["opportunity_type_priors"]["FADE_SHORT_REVIEW"]
+        assert "legacy_aliases" in priors["opportunity_type_priors"]["FADE_SHORT_REVIEW"]
         calibration = (context.namespace_dir / "event_integrated_radar_calibration_report.md").read_text(encoding="utf-8")
         assert "validated=" in calibration
         assert "invalidated/noise=" in calibration
@@ -39170,6 +39301,7 @@ def test_event_alpha_notification_delivery_status_fallback_and_legacy_preview_wo
     import json
 
     from crypto_rsi_scanner import event_alpha_artifact_doctor
+    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
     from crypto_rsi_scanner.event_alpha_notification_delivery import NotificationDeliveryRecord
 
     record = NotificationDeliveryRecord(
@@ -39192,6 +39324,12 @@ def test_event_alpha_notification_delivery_status_fallback_and_legacy_preview_wo
     row = record.to_row()
     assert row["status"] == "would_send_but_guard_disabled"
     assert row["status_detail"] == "would_send_but_guard_disabled"
+    legacy_row = dict(row)
+    legacy_row.pop("status", None)
+    assert event_alpha_artifact_doctor._delivery_status_field_conflicts(legacy_row)["delivery_status_missing"] == 1  # noqa: SLF001
+    normalized = delivery.normalize_delivery_row(legacy_row)
+    assert normalized["status"] == "would_send_but_guard_disabled"
+    assert event_alpha_artifact_doctor._delivery_status_field_conflicts(normalized)["delivery_status_missing"] == 0  # noqa: SLF001
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)

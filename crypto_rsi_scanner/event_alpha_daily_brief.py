@@ -24,6 +24,7 @@ from . import (
     event_near_miss,
     event_alpha_run_ledger,
     event_alpha_router,
+    event_alpha_source_coverage,
     event_opportunity_verdict,
     event_alpha_reason_text,
     event_market_units,
@@ -949,7 +950,7 @@ def format_daily_brief_result(result: EventAlphaDailyBriefResult) -> str:
         "=" * 76,
         "EVENT ALPHA DAILY BRIEF WRITTEN (research artifact only)",
         "=" * 76,
-        f"path: {result.path}",
+        f"path: {event_artifact_paths.artifact_display_path(result.path)}",
         f"cards_linked: {len(result.cards)}",
         "No live RSI alerts, paper trades, live DB rows, or execution were changed.",
     ])
@@ -1249,6 +1250,7 @@ def _source_coverage_summary_lines(
         f"- Source enrichment article quality: {article_quality_text}",
         f"- Source coverage gaps: {len(gaps)} candidate(s) need healthier or more specific source coverage.",
         f"- What data source would most improve next run: {next_source}",
+        *_source_activation_plan_lines(source_coverage_report_path),
         "- Evidence absence rule: broad/degraded RSS/GDELT/Polymarket gaps are not treated as strong negative proof.",
     ]
 
@@ -1299,9 +1301,42 @@ def _source_coverage_json_summary_lines(
     lines.append(f"- Source coverage gaps: {blocked} candidate(s) need healthier or more specific source coverage.")
     next_source = _source_coverage_json_next_source(packs, coverage)
     lines.append(f"- What data source would most improve next run: {next_source}")
-    lines.append(f"- Source coverage JSON: {json_path if json_path and json_path.exists() else 'not written yet'}")
+    lines.append(
+        "- Source coverage JSON: "
+        + (event_artifact_paths.artifact_display_path(json_path) if json_path and json_path.exists() else "not written yet")
+    )
+    lines.extend(_source_activation_plan_lines(source_coverage_report_path, coverage=coverage))
     lines.append("- Evidence absence rule: broad/degraded RSS/GDELT/Polymarket gaps are not treated as strong negative proof.")
     return lines
+
+
+def _source_activation_plan_lines(
+    source_coverage_report_path: str | Path | None,
+    *,
+    coverage: Mapping[str, Any] | None = None,
+) -> list[str]:
+    base = Path(source_coverage_report_path).parent if source_coverage_report_path is not None else None
+    readiness_md = base / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_MD if base is not None else None
+    readiness_label = (
+        event_artifact_paths.artifact_display_path(readiness_md)
+        if readiness_md is not None
+        else event_alpha_source_coverage.LIVE_PROVIDER_READINESS_MD
+    )
+    priorities = []
+    if coverage is not None:
+        priorities = [item for item in coverage.get("category_priorities") or [] if isinstance(item, Mapping)]
+    if not priorities:
+        priorities = list(event_alpha_source_coverage.SOURCE_COVERAGE_CATEGORY_PRIORITIES)
+    top = []
+    for item in priorities[:3]:
+        category = str(item.get("category") or "").strip()
+        providers = item.get("providers") or ()
+        if category:
+            top.append(f"{category} ({', '.join(str(provider) for provider in providers if str(provider)) or 'providers TBD'})")
+    return [
+        f"- Live-provider activation readiness: {readiness_label}",
+        "- Recommended next activation order: " + ("; ".join(top) if top else "none"),
+    ]
 
 
 def _source_coverage_json_next_source(packs: Iterable[Mapping[str, Any]], coverage: Mapping[str, Any]) -> str:

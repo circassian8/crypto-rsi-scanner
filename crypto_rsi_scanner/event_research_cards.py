@@ -1382,7 +1382,7 @@ def _card_index_group_for_entry(
 ) -> str:
     components = dict(entry.latest_score_components or {})
     lane = str(components.get("opportunity_type") or "").strip().upper()
-    lane_group = _lane_card_group(lane) if _components_are_integrated_radar(components) else None
+    lane_group = _lane_card_group(lane)
     if lane_group is not None:
         return lane_group
     text = " ".join(str(value or "") for value in (
@@ -1419,7 +1419,7 @@ def _card_index_group_for_entry(
 
 def _card_index_group_for_text(text: str) -> str | None:
     match = re.search(r"opportunity type:\s*([a-z0-9_/-]+)", text, flags=re.IGNORECASE)
-    if match and _text_is_integrated_radar_card(text):
+    if match:
         lane_group = _lane_card_group(match.group(1))
         if lane_group is not None:
             return lane_group

@@ -138,6 +138,9 @@ SOURCE_COVERAGE_CATEGORY_PRIORITIES: tuple[dict[str, Any], ...] = (
     },
 )
 
+LIVE_PROVIDER_READINESS_JSON = "event_live_provider_activation_readiness.json"
+LIVE_PROVIDER_READINESS_MD = "event_live_provider_activation_readiness.md"
+
 
 @dataclass(frozen=True)
 class EventAlphaSourceCoveragePack:
@@ -248,6 +251,11 @@ class EventAlphaSourceCoverageReport:
                 }
                 for idx, item in enumerate(self.category_priorities)
             ],
+            "live_provider_activation_readiness_artifacts": {
+                "json": LIVE_PROVIDER_READINESS_JSON,
+                "markdown": LIVE_PROVIDER_READINESS_MD,
+                "note": "write with make event-alpha-live-provider-readiness before enabling live providers",
+            },
             "packs": [pack.to_dict() for pack in self.packs],
         }
 
@@ -472,6 +480,17 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
             f"   enables: {_join(category.get('enabled_lanes') or ())}",
             f"   reason: {category.get('reason') or 'none'}",
         ])
+    lines.extend(
+        [
+            "",
+            "Live-provider activation readiness:",
+            f"- readiness report: {LIVE_PROVIDER_READINESS_MD}",
+            f"- readiness JSON: {LIVE_PROVIDER_READINESS_JSON}",
+            "- command: make event-alpha-live-provider-readiness PROFILE="
+            f"{report.profile} ARTIFACT_NAMESPACE={report.artifact_namespace}",
+            "- next activation plan: use the ranked source categories above; rehearse no-send before enabling live calls.",
+        ]
+    )
     recs = _recommendation_lines(report)
     lines.extend(["", "Most useful next data source:"])
     lines.extend(recs)

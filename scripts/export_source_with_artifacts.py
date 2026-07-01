@@ -8,7 +8,9 @@ The archive intentionally overwrites the same filename every run:
 from __future__ import annotations
 
 import subprocess
+import time
 import zipfile
+from datetime import datetime
 from pathlib import Path
 
 
@@ -104,6 +106,26 @@ def _validate(names: list[str]) -> list[str]:
     return bad
 
 
+def _zipinfo_for_path(path: Path, arcname: str, *, now_ts: float) -> zipfile.ZipInfo:
+    """Create a zip entry while clamping future mtimes to export time."""
+
+    stat = path.stat()
+    # Zip timestamps cannot represent dates before 1980. More importantly for
+    # review zips, do not preserve future-dated mtimes from host/archive clock
+    # skew because extracted Makefiles can make every `make` command warn.
+    mtime = min(max(stat.st_mtime, 315532800.0), now_ts)
+    info = zipfile.ZipInfo(arcname, datetime.fromtimestamp(mtime).timetuple()[:6])
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = (stat.st_mode & 0xFFFF) << 16
+    return info
+
+
+def _write_file_to_zip(zf: zipfile.ZipFile, path: Path, arcname: str, *, now_ts: float) -> None:
+    info = _zipinfo_for_path(path, arcname, now_ts=now_ts)
+    with path.open("rb") as src, zf.open(info, "w") as dst:
+        dst.write(src.read())
+
+
 def main() -> int:
     paths = _tracked_paths() | _artifact_paths()
     entries = [
@@ -114,9 +136,10 @@ def main() -> int:
 
     if OUT.exists():
         OUT.unlink()
+    now_ts = time.time()
     with zipfile.ZipFile(OUT, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         for path in entries:
-            zf.write(path, path.relative_to(ROOT).as_posix())
+            _write_file_to_zip(zf, path, path.relative_to(ROOT).as_posix(), now_ts=now_ts)
 
     with zipfile.ZipFile(OUT) as zf:
         names = zf.namelist()

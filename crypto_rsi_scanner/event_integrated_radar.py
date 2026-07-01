@@ -533,10 +533,15 @@ def format_integrated_daily_brief(
             lines.append(f"- Diagnostics excluded from performance: {len(diagnostics)}")
         lines.extend(["", "## Calibration Snapshot"])
         for lane, lane_rows in sorted(_group_by(performance_rows, "opportunity_type").items()):
-            useful = sum(1 for row in lane_rows if _outcome_truth(row) == "useful")
-            junk = sum(1 for row in lane_rows if _outcome_truth(row) == "junk")
-            rate = useful / max(1, useful + junk)
-            lines.append(f"- {lane}: rows={len(lane_rows)} useful_rate={rate:.2f}")
+            validated = sum(1 for row in lane_rows if _outcome_truth(row) == "validated")
+            invalidated = sum(1 for row in lane_rows if _outcome_truth(row) == "invalidated/noise")
+            inconclusive = sum(1 for row in lane_rows if _outcome_truth(row) == "inconclusive")
+            rate = validated / max(1, validated + invalidated)
+            lines.append(
+                f"- {lane}: rows={len(lane_rows)} validated={validated} "
+                f"invalidated/noise={invalidated} inconclusive={inconclusive} "
+                f"validation_rate={rate:.2f}"
+            )
         lines.append("- Small-sample warning: recommendations only; no automatic threshold or routing changes were applied.")
     else:
         lines.append("- No integrated radar outcomes filled yet.")
@@ -1897,10 +1902,10 @@ def _group_by(rows: Iterable[Mapping[str, Any]], key: str) -> dict[str, list[dic
 def _outcome_truth(row: Mapping[str, Any]) -> str:
     label = str(row.get("outcome_label") or "")
     if label in {"useful", "early_good", "continuation_good", "fade_review_good", "risk_validated", "watch"}:
-        return "useful"
+        return "validated"
     if label in {"junk", "remained_noise"}:
-        return "junk"
-    return "neutral"
+        return "invalidated/noise"
+    return "inconclusive"
 
 
 def _truthy(value: Any) -> bool:

@@ -166,6 +166,11 @@ class NotificationDeliveryRecord:
                 status_value = DELIVERY_STATE_PREVIEW
             else:
                 status_value = "not_due"
+        no_send_rehearsal = (
+            self.delivery_mode == DELIVERY_MODE_NO_SEND_REHEARSAL
+            or status_value == STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED
+            or (self.would_send is True and self.send_guard_enabled is False)
+        )
         row = {
             "schema_version": DELIVERY_SCHEMA_VERSION,
             "row_type": "event_alpha_notification_delivery",
@@ -202,6 +207,7 @@ class NotificationDeliveryRecord:
             "delivery_state": self.delivery_state,
             "status_detail": status_value,
             "send_guard_enabled": self.send_guard_enabled,
+            "no_send_rehearsal": bool(no_send_rehearsal),
             "would_send": self.would_send,
             "sent": self.sent,
             "failed": self.failed,
@@ -517,6 +523,85 @@ def normalize_delivery_status(
     }
 
 
+def normalize_delivery_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a backward-compatible row with explicit delivery status fields."""
+
+    out = dict(row)
+    normalized = normalize_delivery_status(
+        state=str(out.get("state") or ""),
+        profile=str(out.get("profile") or "") or None,
+        namespace=str(out.get("artifact_namespace") or out.get("namespace") or "") or None,
+        error_class=str(out.get("error_class") or "") or None,
+        error_message=str(out.get("error_message_safe") or "") or None,
+        delivery_mode=str(out.get("delivery_mode") or "") or None,
+        delivery_state=str(out.get("delivery_state") or "") or None,
+        status_detail=str(out.get("status_detail") or out.get("status") or "") or None,
+        send_guard_enabled=_maybe_bool(out.get("send_guard_enabled")),
+        would_send=_maybe_bool(out.get("would_send")),
+        sent=_maybe_bool(out.get("sent")),
+        failed=_maybe_bool(out.get("failed")),
+    )
+    out["delivery_mode"] = normalized["delivery_mode"]
+    out["delivery_state"] = normalized["delivery_state"]
+    out["status_detail"] = normalized["status_detail"]
+    out["status"] = str(out.get("status") or normalized["status_detail"] or normalized["delivery_state"] or out.get("state") or "")
+    out["send_guard_enabled"] = normalized["send_guard_enabled"]
+    out["would_send"] = normalized["would_send"]
+    out["sent"] = normalized["sent"]
+    out["failed"] = normalized["failed"]
+    out["no_send_rehearsal"] = bool(
+        out.get("no_send_rehearsal")
+        or normalized["delivery_mode"] == DELIVERY_MODE_NO_SEND_REHEARSAL
+        or normalized["status_detail"] == STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED
+        or (normalized["would_send"] and normalized["send_guard_enabled"] is False)
+    )
+    if not str(out.get("artifact_namespace") or "").strip() and str(out.get("namespace") or "").strip():
+        out["artifact_namespace"] = out.get("namespace")
+    if not str(out.get("notification_preview_relpath") or "").strip():
+        relpath = notification_preview_relpath_for_path(out.get("notification_preview_path"))
+        if relpath:
+            out["notification_preview_relpath"] = relpath
+    return event_artifact_paths.normalize_operator_path_fields(out)
+
+
+def rewrite_normalized_delivery_records(path: str | Path) -> int:
+    """Rewrite a local delivery ledger with normalized rows; returns changed rows."""
+
+    p = Path(path).expanduser()
+    if not p.exists():
+        return 0
+    raw_rows: list[dict[str, Any]] = []
+    try:
+        with p.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(row, dict):
+                    raw_rows.append(row)
+    except OSError:
+        return 0
+    normalized_rows = [
+        normalize_delivery_row(row) if row.get("row_type") == "event_alpha_notification_delivery" else row
+        for row in raw_rows
+    ]
+    changed = sum(1 for old, new in zip(raw_rows, normalized_rows, strict=False) if old != new)
+    if not changed:
+        return 0
+    try:
+        with p.open("w", encoding="utf-8") as fh:
+            for row in normalized_rows:
+                fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
+                fh.write("\n")
+    except OSError:
+        return 0
+    return changed
+
+
 def append_delivery_record(
     record: NotificationDeliveryRecord | Mapping[str, Any],
     *,
@@ -524,6 +609,8 @@ def append_delivery_record(
 ) -> dict[str, Any]:
     """Append one delivery event to the JSONL ledger; fail soft on I/O errors."""
     row = record.to_row() if isinstance(record, NotificationDeliveryRecord) else dict(record)
+    if row.get("row_type") == "event_alpha_notification_delivery":
+        row = normalize_delivery_row(row)
     p = Path(path).expanduser()
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -551,10 +638,27 @@ def load_delivery_records(path: str | Path) -> list[dict[str, Any]]:
                 except json.JSONDecodeError:
                     continue
                 if isinstance(row, dict) and row.get("row_type") == "event_alpha_notification_delivery":
-                    rows.append(row)
+                    rows.append(normalize_delivery_row(row))
     except OSError:
         return rows
     return rows
+
+
+def _maybe_bool(value: Any) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if isinstance(value, float) and math.isnan(value):
+            return None
+        return bool(value)
+    text = str(value).strip().casefold()
+    if text in {"1", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "no", "n", "off"}:
+        return False
+    return None
 
 
 def notification_preview_relpath_for_path(path: str | Path | None) -> str | None:
@@ -752,7 +856,7 @@ def format_delivery_report(
         "=" * 76,
         "EVENT ALPHA NOTIFICATION DELIVERIES REPORT (research artifact only)",
         "=" * 76,
-        f"path: {path}",
+        f"path: {event_artifact_paths.artifact_display_path(path)}",
         f"profile: {profile or 'default'} · namespace: {namespace or 'default'}",
         f"rows_read: {len(rows)} · deliveries: {summary.rows}",
         (

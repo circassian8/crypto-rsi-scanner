@@ -85,6 +85,7 @@ from . import event_impact_hypothesis_store
 from . import event_incident_store
 from . import event_integrated_radar
 from . import event_integrated_radar_outcomes
+from . import event_live_provider_readiness
 from . import event_alpha_missed
 from . import event_alpha_notifications
 from . import event_alpha_notification_checklist
@@ -3543,6 +3544,11 @@ def event_alpha_notify_preview(
     except ValueError as exc:
         print(str(exc))
         return
+    context = resolve_event_alpha_artifact_context_for_report(profile.name, config.EVENT_ALPHA_ARTIFACT_NAMESPACE or profile.name)
+    core_rows = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+    ).rows
     provider = event_provider_status.build_event_discovery_provider_status(config)
     watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
     routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
@@ -3556,9 +3562,45 @@ def event_alpha_notify_preview(
             cfg=_event_alpha_notification_config_from_runtime(profile.name),
             now=now,
             include_health_heartbeat=True,
+            core_opportunity_rows=core_rows,
         )
     finally:
         storage.close()
+    try:
+        run_rows = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=50).rows
+        latest_run = event_alpha_run_ledger.latest_run(run_rows, profile.name) or {}
+        preview_result = _event_alpha_preview_summary_result(latest_run, plan=plan, profile=profile.name)
+        delivery_cfg = event_alpha_notification_delivery.NotificationDeliveryConfig(
+            event_alpha_notification_delivery.deliveries_path_for_context(context)
+        )
+        event_alpha_notification_delivery.rewrite_normalized_delivery_records(delivery_cfg.path)
+        writer = event_alpha_notifications._DeliveryWriter(  # preview-only; does not append delivery rows.
+            delivery_cfg,
+            run_id=str(preview_result.get("run_id") or event_alpha_run_ledger.run_id_for(now, profile.name)),
+            profile=profile.name,
+            namespace=context.artifact_namespace,
+            now=now,
+        )
+        send_guard_status = (
+            "No-send rehearsal: would send, but send guard is disabled. This is expected in rehearsal mode."
+            if not config.EVENT_ALERTS_ENABLED and (plan.would_send_count or plan.heartbeat_due)
+            else ("Send guard enabled." if config.EVENT_ALERTS_ENABLED else "No-send rehearsal: send guard is disabled.")
+        )
+        event_alpha_notifications.write_notification_plan_preview(
+            plan,
+            writer=writer,
+            profile=profile.name,
+            cfg=_event_alpha_notification_config_from_runtime(profile.name),
+            pipeline_result=preview_result,
+            status=(
+                event_alpha_notification_delivery.STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED
+                if not config.EVENT_ALERTS_ENABLED
+                else "would_send"
+            ),
+            send_guard_status=send_guard_status,
+        )
+    except Exception as exc:
+        LOGGER.warning("Event Alpha notify preview file write skipped: %s", exc)
     print(event_alpha_notifications.format_preview(
         profile=profile.name,
         artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or profile.name,
@@ -3576,6 +3618,43 @@ def event_alpha_notify_preview(
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
         clock_status=clock_status,
     ))
+
+
+def _event_alpha_preview_summary_result(
+    latest_run: Mapping[str, object],
+    *,
+    plan: event_alpha_notifications.EventAlphaNotificationPlan,
+    profile: str,
+) -> dict[str, object]:
+    """Return a preview-safe run summary with strict-alert wording normalized."""
+    data = dict(latest_run or {})
+    strict_alerts = _event_alpha_preview_int(data.get("strict_alerts") or data.get("strict_alert_count") or data.get("alertable"))
+    research_candidates = _event_alpha_preview_int(data.get("candidates") or data.get("research_candidates") or data.get("alerts"))
+    raw_source_candidates = _event_alpha_preview_int(
+        data.get("raw_source_candidates")
+        or data.get("source_candidates")
+        or data.get("candidate_rows")
+        or research_candidates
+    )
+    data["profile"] = data.get("profile") or profile
+    data["cycle_completed"] = bool(data.get("cycle_completed", bool(latest_run)))
+    data["alerts"] = strict_alerts
+    data["candidates"] = research_candidates
+    data["raw_source_candidates"] = raw_source_candidates
+    data["send_lane_items_attempted"] = dict(plan.lane_counts)
+    data["send_lane_items_delivered"] = {lane: 0 for lane in event_alpha_notifications.LANES}
+    data["send_would_send_items"] = int(plan.would_send_count or 0)
+    data["send_heartbeat_due"] = bool(plan.heartbeat_due)
+    data["send_heartbeat_sent"] = False
+    data.setdefault("artifact_doctor_status", "not_run")
+    return data
+
+
+def _event_alpha_preview_int(value: object) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def event_alpha_notify_go_no_go(
@@ -4755,7 +4834,7 @@ def event_alpha_notification_retry_failed(
     print("EVENT ALPHA NOTIFICATION RETRY (research-only; dry-run scaffold)")
     print("=" * 76)
     print(f"profile: {context.profile} · namespace: {context.artifact_namespace}")
-    print(f"path: {path}")
+    print(f"path: {event_artifact_paths.artifact_display_path(path)}")
     print(f"failed deliveries: {len(failed)}")
     for row in failed[:20]:
         print(
@@ -4888,9 +4967,36 @@ def event_alpha_source_coverage_report(
     except OSError as exc:
         print(f"warning: source coverage artifact write failed: {exc}")
     print(_event_alpha_context_block(context))
-    print(f"source_coverage_report_path: {source_coverage_path}")
-    print(f"source_coverage_json_path: {source_coverage_json_path}")
+    print(f"source_coverage_report_path: {event_artifact_paths.artifact_display_path(source_coverage_path)}")
+    print(f"source_coverage_json_path: {event_artifact_paths.artifact_display_path(source_coverage_json_path)}")
     print(report_text)
+
+
+def event_alpha_live_provider_readiness_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    smoke_mode: bool = False,
+) -> None:
+    """Write provider activation readiness artifacts without live provider calls."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name or "notify_llm_deep", artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    report = event_live_provider_readiness.build_readiness_report(
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        smoke_mode=smoke_mode,
+        now=_event_research_now(),
+    )
+    json_path, md_path = event_live_provider_readiness.write_readiness_artifacts(report, context.namespace_dir)
+    print(_event_alpha_context_block(context))
+    print(f"live_provider_readiness_json: {event_artifact_paths.artifact_display_path(json_path)}")
+    print(f"live_provider_readiness_report: {event_artifact_paths.artifact_display_path(md_path)}")
+    print(event_live_provider_readiness.format_readiness_report(report))
 
 
 def event_alpha_provider_health_reset(
@@ -6497,17 +6603,17 @@ def event_alpha_notify_fixture_smoke(
         f"run_id: {run_id}",
         f"mode: {'no-send guarded preview' if no_send else 'fake sender'}",
         f"fake_sender_delivered: {len(delivered_messages)}",
-        f"delivery_path: {delivery_cfg.path}",
+        f"delivery_path: {event_artifact_paths.artifact_display_path(delivery_cfg.path)}",
         f"delivery_records_written: {send_result.delivery_records_written}",
         f"delivery_delivered: {send_result.deliveries_delivered}",
         f"delivery_partial_delivered: {send_result.deliveries_partial_delivered}",
-        f"notification_run_path: {context.notification_runs_path}",
+        f"notification_run_path: {event_artifact_paths.artifact_display_path(context.notification_runs_path)}",
         f"notification_would_send: {notification_row.get('would_send_count')}",
-        f"alert_snapshot_path: {snapshot_path}",
-        f"core_opportunity_store_path: {context.core_opportunity_store_path}",
+        f"alert_snapshot_path: {event_artifact_paths.artifact_display_path(snapshot_path)}",
+        f"core_opportunity_store_path: {event_artifact_paths.artifact_display_path(context.core_opportunity_store_path)}",
         f"core_opportunities_written: {core_write.rows_written}",
         f"research_card_count: {card_write.cards_written}",
-        f"research_card_index: {card_write.index_path}",
+        f"research_card_index: {event_artifact_paths.artifact_display_path(card_write.index_path)}",
         "feedback: make event-feedback-useful "
         f"FEEDBACK_TARGET='{canonical_core.get('core_opportunity_id') or decision.alert_id}'",
         "No live providers, Telegram sends, normal RSI alerts, paper trades, live DB rows, or execution were used.",
@@ -7647,9 +7753,10 @@ def event_alpha_integrated_radar_cycle_report(
     print(
         "integrated_radar_cycle: "
         f"candidates={result.candidates} cores={result.core_opportunity_rows_written} "
-        f"cards={len(result.research_card_paths)} preview={result.notification_preview_path}"
+        f"cards={len(result.research_card_paths)} "
+        f"preview={event_artifact_paths.artifact_display_path(result.notification_preview_path)}"
     )
-    print(f"report: {result.integrated_report_path}")
+    print(f"report: {event_artifact_paths.artifact_display_path(result.integrated_report_path)}")
     print("No Telegram sends, paper trades, normal RSI signal rows, execution, or Event Alpha TRIGGERED_FADE were created.")
 
 
@@ -7712,7 +7819,11 @@ def event_alpha_integrated_radar_fill_outcomes_report(
         encoding="utf-8",
     )
     print(_event_alpha_context_block(context))
-    print(f"integrated_radar_outcomes_filled: rows={len(rows)} path={context.namespace_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME}")
+    print(
+        "integrated_radar_outcomes_filled: "
+        f"rows={len(rows)} "
+        f"path={event_artifact_paths.artifact_display_path(context.namespace_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME)}"
+    )
     print("Research-only outcome artifacts written. No trades, paper trades, normal RSI rows, or sends were created.")
 
 
@@ -7825,7 +7936,9 @@ def event_alpha_market_anomaly_scan_report(
     print(
         "market_anomaly_scan: "
         f"rows={len(rows)} snapshots={result.snapshot_count} anomalies={result.anomaly_count} "
-        f"snapshots_path={result.snapshots_path} anomalies_path={result.anomalies_path} report_path={result.report_path}"
+        f"snapshots_path={event_artifact_paths.artifact_display_path(result.snapshots_path)} "
+        f"anomalies_path={event_artifact_paths.artifact_display_path(result.anomalies_path)} "
+        f"report_path={event_artifact_paths.artifact_display_path(result.report_path)}"
     )
     print(event_market_anomaly_scanner.format_market_anomaly_report(
         result.anomalies,
@@ -7936,8 +8049,10 @@ def event_alpha_official_exchange_report(
     print(
         "official_exchange_scan: "
         f"announcements={result.announcement_count} events={result.event_count} candidates={result.candidate_count} "
-        f"announcements_path={result.announcements_path} events_path={result.events_path} "
-        f"candidates_path={result.candidates_path} report_path={result.report_path}"
+        f"announcements_path={event_artifact_paths.artifact_display_path(result.announcements_path)} "
+        f"events_path={event_artifact_paths.artifact_display_path(result.events_path)} "
+        f"candidates_path={event_artifact_paths.artifact_display_path(result.candidates_path)} "
+        f"report_path={event_artifact_paths.artifact_display_path(result.report_path)}"
     )
     print(event_official_exchange.format_official_exchange_report(
         result.events,
@@ -8094,8 +8209,10 @@ def event_alpha_scheduled_catalyst_report(
     print(
         "scheduled_catalyst_scan: "
         f"scheduled={result.scheduled_count} unlocks={result.unlock_count} "
-        f"scheduled_path={result.scheduled_path} unlock_path={result.unlock_path} "
-        f"scheduled_report={result.scheduled_report_path} unlock_report={result.unlock_report_path}"
+        f"scheduled_path={event_artifact_paths.artifact_display_path(result.scheduled_path)} "
+        f"unlock_path={event_artifact_paths.artifact_display_path(result.unlock_path)} "
+        f"scheduled_report={event_artifact_paths.artifact_display_path(result.scheduled_report_path)} "
+        f"unlock_report={event_artifact_paths.artifact_display_path(result.unlock_report_path)}"
     )
     print(event_scheduled_catalysts.format_scheduled_catalyst_report(
         result.scheduled_events,
@@ -8160,8 +8277,9 @@ def event_alpha_derivatives_report(
         "derivatives_crowding_scan: "
         f"state_rows={result.derivatives_state_count} candidates={result.evaluated_candidate_count} "
         f"fade_review={result.fade_review_candidate_count} "
-        f"state_path={result.derivatives_state_path} "
-        f"fade_path={result.fade_review_candidates_path} report_path={result.report_path}"
+        f"state_path={event_artifact_paths.artifact_display_path(result.derivatives_state_path)} "
+        f"fade_path={event_artifact_paths.artifact_display_path(result.fade_review_candidates_path)} "
+        f"report_path={event_artifact_paths.artifact_display_path(result.report_path)}"
     )
     print(event_derivatives_crowding.format_derivatives_crowding_report(
         state_rows=result.derivatives_state_rows,
@@ -10688,6 +10806,16 @@ def cli() -> None:
         help="Print source-pack provider/evidence coverage for Event Alpha research artifacts.",
     )
     parser.add_argument(
+        "--event-alpha-live-provider-readiness",
+        action="store_true",
+        help="Write live-provider activation readiness artifacts without live provider calls.",
+    )
+    parser.add_argument(
+        "--event-alpha-live-provider-readiness-smoke",
+        action="store_true",
+        help="Write fixture/config-only live-provider readiness artifacts; no network, keys, or sends required.",
+    )
+    parser.add_argument(
         "--event-alpha-provider-health-reset",
         action="store_true",
         help="Clear selected profile-scoped provider health backoff state. Requires --confirm.",
@@ -11710,6 +11838,14 @@ def cli() -> None:
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_alpha_live_provider_readiness or args.event_alpha_live_provider_readiness_smoke:
+        event_alpha_live_provider_readiness_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            smoke_mode=bool(args.event_alpha_live_provider_readiness_smoke),
         )
         return
     if args.event_alpha_provider_health_reset:

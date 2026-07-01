@@ -104,6 +104,28 @@ class EventAlphaResearchReviewDigestItem:
 
 
 @dataclass(frozen=True)
+class EventAlphaResearchReviewSkippedItem:
+    symbol: str
+    coin_id: str
+    core_opportunity_id: str | None
+    score: float
+    rank_score: float
+    skip_reason: str
+    detail: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "symbol": self.symbol,
+            "coin_id": self.coin_id,
+            "core_opportunity_id": self.core_opportunity_id,
+            "score": self.score,
+            "rank_score": self.rank_score,
+            "skip_reason": self.skip_reason,
+            "detail": self.detail,
+        }
+
+
+@dataclass(frozen=True)
 class EventAlphaNotificationPlan:
     all_decisions: tuple[event_alpha_router.EventAlphaRouteDecision, ...] = ()
     decisions_by_lane: dict[str, list[event_alpha_router.EventAlphaRouteDecision]] = field(default_factory=dict)
@@ -112,6 +134,8 @@ class EventAlphaNotificationPlan:
     heartbeat_reason: str = "heartbeat disabled"
     exploratory_items: tuple[EventAlphaExploratoryDigestItem, ...] = ()
     research_review_items: tuple[EventAlphaResearchReviewDigestItem, ...] = ()
+    research_review_eligible_count: int = 0
+    research_review_skipped_items: tuple[EventAlphaResearchReviewSkippedItem, ...] = ()
     cooldown_status: dict[str, dict[str, Any]] = field(default_factory=dict)
     notification_scope: str = NOTIFICATION_SCOPE_GLOBAL
     scope_value: str = NOTIFICATION_SCOPE_GLOBAL
@@ -255,7 +279,7 @@ def build_notification_plan(
     )
     strict_core_ids = _strict_lane_core_ids(by_lane, core_index)
     if cfg.research_review_digest_enabled:
-        selected = select_research_review_candidates(
+        selected, eligible_count, skipped_items = select_research_review_candidates_with_diagnostics(
             all_decisions,
             cfg=cfg,
             now=observed,
@@ -278,6 +302,9 @@ def build_notification_plan(
                     research_review_items = selected
                 else:
                     blocked[LANE_RESEARCH_REVIEW_DIGEST] = reason
+    else:
+        eligible_count = 0
+        skipped_items = ()
 
     if cfg.exploratory_digest_enabled and quality_mode == "exploratory_only":
         selected = select_exploratory_candidates(all_decisions, cfg=cfg, now=observed)
@@ -304,6 +331,8 @@ def build_notification_plan(
         heartbeat_reason=heartbeat_reason,
         exploratory_items=exploratory_items,
         research_review_items=research_review_items,
+        research_review_eligible_count=eligible_count,
+        research_review_skipped_items=skipped_items,
         cooldown_status=cooldown_status_by_lane(storage, cfg=cfg, now=observed),
         notification_scope=_clean_scope(cfg.notification_scope),
         scope_value=_scope_value(cfg),
@@ -679,41 +708,96 @@ def select_research_review_candidates(
     core_row_by_alert_id: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> tuple[EventAlphaResearchReviewDigestItem, ...]:
     """Pick near-miss/local research candidates without making them alertable."""
+    selected, _eligible_count, _skipped = select_research_review_candidates_with_diagnostics(
+        decisions,
+        cfg=cfg,
+        now=now,
+        excluded_core_ids=excluded_core_ids,
+        core_row_by_alert_id=core_row_by_alert_id,
+    )
+    return selected
+
+
+def select_research_review_candidates_with_diagnostics(
+    decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
+    *,
+    cfg: EventAlphaNotificationConfig,
+    now: datetime | None = None,
+    excluded_core_ids: Iterable[str] = (),
+    core_row_by_alert_id: Mapping[str, Mapping[str, Any]] | None = None,
+) -> tuple[
+    tuple[EventAlphaResearchReviewDigestItem, ...],
+    int,
+    tuple[EventAlphaResearchReviewSkippedItem, ...],
+]:
+    """Pick research-review rows plus explicit non-rendered candidate reasons."""
     _ = now
     if not cfg.research_review_digest_enabled or cfg.research_review_digest_max_items <= 0:
-        return ()
+        return (), 0, ()
     min_score = float(cfg.research_review_digest_min_score or 0.0)
     items: list[EventAlphaResearchReviewDigestItem] = []
+    skipped: list[EventAlphaResearchReviewSkippedItem] = []
     excluded = {str(item).strip() for item in excluded_core_ids if str(item).strip()}
     core_index = core_row_by_alert_id or {}
     seen_core_ids: set[str] = set()
+
+    def add_skipped(
+        decision: event_alpha_router.EventAlphaRouteDecision,
+        reason: str,
+        *,
+        detail: str | None = None,
+        rank_score: float | None = None,
+    ) -> None:
+        entry = decision.entry
+        core = _core_row_for_decision(decision, core_index) or {}
+        components = dict(getattr(entry, "latest_score_components", {}) or {})
+        symbol = str(core.get("symbol") or core.get("validated_symbol") or entry.symbol or components.get("validated_symbol") or "UNKNOWN")
+        coin_id = str(core.get("coin_id") or core.get("validated_coin_id") or entry.coin_id or components.get("validated_coin_id") or "unknown")
+        skipped.append(EventAlphaResearchReviewSkippedItem(
+            symbol=symbol,
+            coin_id=coin_id,
+            core_opportunity_id=_core_id_for_decision(decision, core_index),
+            score=_research_review_score(decision),
+            rank_score=float(rank_score if rank_score is not None else _research_review_score(decision)),
+            skip_reason=reason,
+            detail=detail,
+        ))
+
     for decision in decisions:
         if bool(getattr(decision, "alertable", False)) or event_alpha_router.alertable_after_quality_gate(decision):
             continue
         core_id = _core_id_for_decision(decision, core_index)
         core = _core_row_for_decision(decision, core_index) or {}
         if core_id and (core_id in excluded or core_id in seen_core_ids):
+            add_skipped(decision, "already_represented" if core_id in excluded else "duplicate_family")
             continue
         if _core_row_is_research_alertable(core):
+            add_skipped(decision, "already_represented", detail="core opportunity already has a promoted route")
             continue
         entry = decision.entry
         components = dict(getattr(entry, "latest_score_components", {}) or {})
         symbol = str(getattr(entry, "symbol", "") or components.get("validated_symbol") or "").strip()
         coin_id = str(getattr(entry, "coin_id", "") or components.get("validated_coin_id") or "").strip()
         if not symbol or not coin_id:
+            add_skipped(decision, "hard_gated", detail="missing validated asset identity")
             continue
         if _research_review_is_sector(symbol, coin_id) and not cfg.research_review_digest_include_sector:
+            add_skipped(decision, "hard_gated", detail="sector-only candidate excluded from review digest")
             continue
         level = _research_review_level(decision)
         if level == "local_only" and not cfg.research_review_digest_include_local_only:
+            add_skipped(decision, "quality_blocked", detail="local-only candidates are hidden by digest config")
             continue
         if level not in {"exploratory", "local_only"}:
+            add_skipped(decision, "quality_blocked", detail=f"level={level or 'unknown'}")
             continue
         score = _research_review_score(decision)
         if score < min_score:
+            add_skipped(decision, "lower_rank", detail=f"score below min {min_score:g}")
             continue
         hard_gate = _research_review_hard_gate_reason(decision)
         if hard_gate:
+            add_skipped(decision, "hard_gated", detail=hard_gate)
             continue
         rank, why = _research_review_rank(entry, components, score)
         why_not = _research_review_not_alertable_reasons(decision, components)
@@ -738,7 +822,19 @@ def select_research_review_candidates(
         ),
         reverse=True,
     )
-    return tuple(items[: max(0, int(cfg.research_review_digest_max_items or 0))])
+    max_items = max(0, int(cfg.research_review_digest_max_items or 0))
+    selected = tuple(items[:max_items])
+    for item in items[max_items:]:
+        skipped.append(EventAlphaResearchReviewSkippedItem(
+            symbol=str(item.decision.entry.symbol or "UNKNOWN"),
+            coin_id=str(item.decision.entry.coin_id or "unknown"),
+            core_opportunity_id=_core_id_for_decision(item.decision, core_index),
+            score=_research_review_score(item.decision),
+            rank_score=item.rank_score,
+            skip_reason="max_items",
+            detail=f"ranked below top {max_items}",
+        ))
+    return selected, len(items), tuple(skipped)
 
 
 def _is_promoted_or_validated_exploratory(
@@ -976,16 +1072,21 @@ def format_research_review_telegram_digest(
     card_path_by_alert_id: Mapping[str, str | Path] | None = None,
     core_row_by_alert_id: Mapping[str, Mapping[str, Any]] | None = None,
     cfg: EventAlphaNotificationConfig | None = None,
+    eligible_count: int | None = None,
+    skipped_items: Iterable[EventAlphaResearchReviewSkippedItem] = (),
 ) -> str:
     """Render near-miss research-review candidates for Telegram burn-in."""
     cfg = cfg or EventAlphaNotificationConfig()
     _ = cfg  # Kept for API compatibility; all review items are rendered.
     keep = list(items)
+    skipped = list(skipped_items)
     lines = [
         "<b>Event Alpha Research Review</b>",
         "<i>Not alertable. Missing confirmation. Not a trade signal.</i>",
         f"Profile: {_esc(profile or 'unknown')}",
         f"Items: {len(keep)}",
+        f"Eligible candidates: {int(eligible_count if eligible_count is not None else len(keep))}",
+        f"Skipped candidates: {len(skipped)}",
     ]
     if not keep:
         lines.append("No research-review candidates.")
@@ -1019,8 +1120,165 @@ def format_research_review_telegram_digest(
         lines.extend(block)
         displayed += 1
     lines.append("")
+    if skipped:
+        lines.append("<b>Skipped candidates</b>")
+        for row in skipped[:10]:
+            label = f"{row.symbol} / {row.coin_id}"
+            detail = f" · {row.detail}" if row.detail else ""
+            lines.append(
+                f"- {_esc(label)}: {_esc(row.skip_reason)}{_esc(detail)}"
+            )
+        if len(skipped) > 10:
+            lines.append(f"- +{len(skipped) - 10} more skipped candidates in local artifacts/inbox.")
+        lines.append("")
     lines.append("Research cards and feedback commands are available in local artifacts/inbox.")
     return "\n".join(lines)
+
+
+def _research_review_channel_summary(plan: EventAlphaNotificationPlan) -> dict[str, Any]:
+    reason_counts: dict[str, int] = {}
+    for item in plan.research_review_skipped_items:
+        reason = str(item.skip_reason or "unknown")
+        reason_counts[reason] = reason_counts.get(reason, 0) + 1
+    return {
+        "rendered_candidate_count": len(plan.research_review_items),
+        "eligible_candidate_count": int(plan.research_review_eligible_count or 0),
+        "skipped_candidate_count": len(plan.research_review_skipped_items),
+        "skip_reason_counts": dict(sorted(reason_counts.items())),
+        "skipped_candidates": [item.to_dict() for item in plan.research_review_skipped_items[:20]],
+    }
+
+
+def write_notification_plan_preview(
+    plan: EventAlphaNotificationPlan,
+    *,
+    writer: "_DeliveryWriter",
+    profile: str | None,
+    cfg: EventAlphaNotificationConfig,
+    pipeline_result: Any | None = None,
+    card_path_by_alert_id: Mapping[str, str | Path] | None = None,
+    status: str | None = None,
+    send_guard_status: str | None = None,
+) -> None:
+    """Write a full read-only preview for every due lane in ``plan``."""
+
+    card_map = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
+    wrote_section = False
+    section_status = status or "would_send"
+    for lane in (
+        LANE_TRIGGERED_FADE,
+        LANE_INSTANT_ESCALATION,
+        LANE_DAILY_DIGEST,
+        LANE_RESEARCH_REVIEW_DIGEST,
+        LANE_EXPLORATORY_DIGEST,
+    ):
+        research_review = lane == LANE_RESEARCH_REVIEW_DIGEST
+        exploratory = lane == LANE_EXPLORATORY_DIGEST
+        if research_review:
+            items = list(plan.research_review_items)
+        else:
+            items = list(plan.exploratory_items if exploratory else plan.decisions_by_lane.get(lane, []))
+        if not items:
+            continue
+        if research_review:
+            message = format_research_review_telegram_digest(
+                items,
+                profile=profile,
+                card_path_by_alert_id=card_map,
+                core_row_by_alert_id=plan.core_row_by_alert_id,
+                cfg=cfg,
+                eligible_count=plan.research_review_eligible_count,
+                skipped_items=plan.research_review_skipped_items,
+            )
+            identity = _delivery_identity_for_decisions(
+                [item.decision for item in items],
+                core_row_by_alert_id=plan.core_row_by_alert_id,
+                card_path_by_alert_id=card_map,
+                lane=lane,
+                preview_path=writer.preview_path,
+            )
+            route_label = "RESEARCH_REVIEW_DIGEST"
+        elif exploratory:
+            message = format_exploratory_telegram_digest(
+                items,
+                profile=profile,
+                card_path_by_alert_id=card_map,
+                cfg=cfg,
+            )
+            identity = _delivery_identity_for_decisions(
+                [item.decision for item in items],
+                core_row_by_alert_id=plan.core_row_by_alert_id,
+                card_path_by_alert_id=card_map,
+                lane=lane,
+                preview_path=writer.preview_path,
+            )
+            route_label = "EXPLORATORY_DIGEST"
+        else:
+            message = format_core_opportunity_telegram_digest(
+                items,
+                profile=profile,
+                card_path_by_alert_id=card_map,
+                core_row_by_alert_id=plan.core_row_by_alert_id,
+                pipeline_result=pipeline_result,
+                max_items=cfg.daily_digest_max_items if lane == LANE_DAILY_DIGEST else None,
+            )
+            identity = _delivery_identity_for_decisions(
+                items,
+                core_row_by_alert_id=plan.core_row_by_alert_id,
+                card_path_by_alert_id=card_map,
+                lane=lane,
+                preview_path=writer.preview_path,
+            )
+            route_label = _route_label(items)
+        writer.write_preview(
+            message=message,
+            lane=lane,
+            route=route_label,
+            identity=identity,
+            would_send=True,
+            sent=False,
+            status=section_status,
+        )
+        wrote_section = True
+
+    if plan.heartbeat_due:
+        heartbeat_identity = DeliveryIdentity(
+            notification_item_ids=("heartbeat",),
+            source_alert_ids=("heartbeat",),
+            requested_alert_id="heartbeat",
+            alert_id="heartbeat",
+            identity_reconciled=False,
+            identity_reconciliation_reason="heartbeat",
+            notification_preview_path=str(writer.preview_path),
+            notification_preview_relpath=delivery.notification_preview_relpath_for_path(writer.preview_path),
+        )
+        writer.write_preview(
+            message=format_health_heartbeat(
+                profile=profile,
+                result=_notification_preview_result(
+                    pipeline_result,
+                    plan=plan,
+                    delivered_by_lane={lane: 0 for lane in LANES},
+                ),
+                now=writer.now,
+                send_guard_status=send_guard_status,
+            ),
+            lane=LANE_HEALTH_HEARTBEAT,
+            route="HEALTH_HEARTBEAT",
+            identity=heartbeat_identity,
+            would_send=True,
+            sent=False,
+            status=section_status,
+        )
+        wrote_section = True
+
+    if not wrote_section:
+        reason = "; ".join(plan.blocked_by_lane.values()) or plan.heartbeat_reason or "no due notifications"
+        writer.write_no_digest_preview(
+            profile=profile,
+            pipeline_result=_notification_preview_result(pipeline_result, plan=plan, block_reason=reason),
+            reason=reason,
+        )
 
 
 def format_exploratory_telegram_digest(
@@ -1308,6 +1566,8 @@ def send_notifications(
                 card_path_by_alert_id=card_map,
                 core_row_by_alert_id=plan.core_row_by_alert_id,
                 cfg=cfg,
+                eligible_count=plan.research_review_eligible_count,
+                skipped_items=plan.research_review_skipped_items,
             )
             identity = _delivery_identity_for_decisions(
                 [item.decision for item in items],
@@ -2512,6 +2772,8 @@ class _DeliveryWriter:
                     card_path_by_alert_id=card_map,
                     core_row_by_alert_id=plan.core_row_by_alert_id,
                     cfg=EventAlphaNotificationConfig(),
+                    eligible_count=plan.research_review_eligible_count,
+                    skipped_items=plan.research_review_skipped_items,
                 )
                 identity = _delivery_identity_for_decisions(
                     [item.decision for item in items],
@@ -2570,6 +2832,7 @@ class _DeliveryWriter:
                 identity=identity,
                 error_class=error_class,
                 error_message=reason,
+                channel_summary=_research_review_channel_summary(plan) if research_review else None,
             )
         if plan.heartbeat_due:
             message = format_health_heartbeat(
@@ -2710,8 +2973,12 @@ class _DeliveryWriter:
             f"Completed: {_yes_no(bool(_value(pipeline_result, 'cycle_completed', pipeline_result is not None)))}",
             f"Raw events: {_num(pipeline_result, 'raw_events')} · Core opportunities: {_num(pipeline_result, 'core_opportunities')}",
             f"Extraction rows: {_num(pipeline_result, 'extraction_rows')}",
-            f"Alertable decisions: {_num(pipeline_result, 'alertable')} · Strict alerts: {_num(pipeline_result, 'alerts')}",
-            f"Research candidates: {_num(pipeline_result, 'candidates')}",
+            (
+                f"Alertable decisions: {_num(pipeline_result, 'alertable')} · "
+                f"Strict alerts: {_num(pipeline_result, 'alerts')} · "
+                f"Research candidates: {_num(pipeline_result, 'candidates')} · "
+                f"Raw source candidates: {_raw_source_candidate_count(pipeline_result)}"
+            ),
             f"Delivery lanes: due={lanes_due} · sent={lanes_sent} · blocked={max(0, _num(pipeline_result, 'send_would_send_items') - lanes_sent)}",
             f"Provider issues: {_provider_failure_count(warnings)}",
             f"LLM calls/skips: {_num(pipeline_result, 'llm_calls_attempted')}/{_num(pipeline_result, 'llm_skipped_due_budget')}",
@@ -3217,7 +3484,12 @@ def format_health_heartbeat(
         f"Completed: {_yes_no(bool(_value(result, 'cycle_completed', result is not None)))}",
         f"Raw events: {_num(result, 'raw_events')} · Core opportunities: {_num(result, 'core_opportunities')}",
         f"Extraction rows: {_num(result, 'extraction_rows')}",
-        f"Alertable decisions: {_num(result, 'alertable')} · Strict alerts: {_num(result, 'alerts')} · Research candidates: {_num(result, 'candidates')}",
+        (
+            f"Alertable decisions: {_num(result, 'alertable')} · "
+            f"Strict alerts: {_num(result, 'alerts')} · "
+            f"Research candidates: {_num(result, 'candidates')} · "
+            f"Raw source candidates: {_raw_source_candidate_count(result)}"
+        ),
         (
             "Delivery lanes: "
             f"due={lanes_due} · sent={lanes_sent} · "
@@ -3519,6 +3791,14 @@ def _num(result: Any | None, attr: str) -> int:
     return _safe_int(_value(result, attr, 0))
 
 
+def _raw_source_candidate_count(result: Any | None) -> int:
+    for attr in ("raw_source_candidates", "source_candidates", "candidate_rows", "candidates"):
+        value = _num(result, attr)
+        if value:
+            return value
+    return 0
+
+
 def _notification_preview_result(
     result: Any | None,
     *,
@@ -3536,9 +3816,11 @@ def _notification_preview_result(
         "warnings": warnings,
         "raw_events": _num(result, "raw_events"),
         "extraction_rows": _num(result, "extraction_rows"),
-        "core_opportunity_rows_written": _num(result, "core_opportunities"),
+        "core_opportunity_rows_written": _num(result, "core_opportunities") or _num(result, "core_opportunity_rows_written"),
         "alertable": _num(result, "alertable"),
         "alerts": _num(result, "alerts"),
+        "candidates": _num(result, "candidates") or _num(result, "research_candidates"),
+        "raw_source_candidates": _raw_source_candidate_count(result),
         "send_lane_items_attempted": dict(plan.lane_counts),
         "send_lane_items_delivered": delivered,
         "send_would_send_items": int(plan.would_send_count or 0),
