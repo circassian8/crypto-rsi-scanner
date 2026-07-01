@@ -449,6 +449,12 @@ def evaluate_pack_evidence(
     if selected.supply_refresh_required and not _has_field(row, ("supply_pressure", "unlock_pct_circulating", "supply_event")):
         missing.append("supply_confirmation")
     if selected.name == "unlock_supply_pack":
+        if not _has_structured_unlock_proof(row, assessment):
+            missing.append("structured_unlock_source_required")
+        if _datetime_from_row(row, ("unlock_time", "unlock_date", "event_time", "timestamp")) is None:
+            missing.append("unlock_time_missing")
+        if not _has_field(row, ("source_url", "url")):
+            missing.append("source_url_missing")
         if _unlock_pct_normalized(row) is None:
             missing.append("needs_supply_materiality")
         elif not _unlock_is_material(row):
@@ -464,6 +470,9 @@ def evaluate_pack_evidence(
     digest_blockers = {
         "source_is_context_only",
         "impact_path_validating_source",
+        "structured_unlock_source_required",
+        "unlock_time_missing",
+        "source_url_missing",
         "needs_supply_materiality",
         "unlock_not_material",
         "stale_unlock_data",
@@ -672,6 +681,31 @@ def _requirements_met(requirements: Iterable[str], tokens: set[str]) -> bool:
     if not reqs:
         return False
     return all(req in tokens for req in reqs)
+
+
+def _has_structured_unlock_proof(
+    row: Mapping[str, Any],
+    assessment: event_source_registry.SourceRegistryAssessment,
+) -> bool:
+    source_class = assessment.source_class
+    if source_class in {
+        event_source_registry.SourceClass.STRUCTURED_UNLOCK.value,
+        event_source_registry.SourceClass.SUPPLY_DATA.value,
+        event_source_registry.SourceClass.OFFICIAL_PROJECT.value,
+        event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value,
+    }:
+        return True
+    if source_class == event_source_registry.SourceClass.STRUCTURED_CALENDAR.value:
+        text = " ".join(
+            str(row.get(key) or "")
+            for key in ("event_type", "impact_path_type", "title", "body", "event_name", "description")
+        ).casefold()
+        return (
+            ("unlock" in text or "vesting" in text or "emission" in text)
+            and _datetime_from_row(row, ("unlock_time", "unlock_date", "event_time", "timestamp")) is not None
+            and (_unlock_pct_normalized(row) is not None or _has_field(row, ("unlock_amount", "tokens_unlocked", "unlock_usd")))
+        )
+    return False
 
 
 def _iter_values(value: object) -> tuple[object, ...]:

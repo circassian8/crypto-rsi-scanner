@@ -133,6 +133,7 @@ from . import event_provider_health
 from . import event_provider_status
 from . import event_price_history
 from . import event_research_cards
+from . import event_scheduled_catalysts
 from . import event_source_enrichment
 from . import event_validation
 from . import event_watchlist
@@ -4065,6 +4066,8 @@ def event_alpha_notification_checklist_report(
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         market_anomaly_rows=event_market_anomaly_scanner.load_market_anomaly_rows(context.namespace_dir),
         official_exchange_candidate_rows=event_official_exchange.load_official_listing_candidates(context.namespace_dir),
+        scheduled_catalyst_rows=event_scheduled_catalysts.load_scheduled_catalysts(context.namespace_dir),
+        unlock_candidate_rows=event_scheduled_catalysts.load_unlock_candidates(context.namespace_dir),
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         source_coverage_report_path=context.namespace_dir / "event_alpha_source_coverage.md",
@@ -6915,6 +6918,9 @@ def event_alpha_artifact_doctor_report(
         incident_rows=artifacts["incidents"].rows,
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         market_anomaly_rows=event_market_anomaly_scanner.load_market_anomaly_rows(context.namespace_dir),
+        official_exchange_candidate_rows=event_official_exchange.load_official_listing_candidates(context.namespace_dir),
+        scheduled_catalyst_rows=event_scheduled_catalysts.load_scheduled_catalysts(context.namespace_dir),
+        unlock_candidate_rows=event_scheduled_catalysts.load_unlock_candidates(context.namespace_dir),
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         source_coverage_report_path=context.namespace_dir / "event_alpha_source_coverage.md",
@@ -7575,6 +7581,8 @@ def event_alpha_daily_brief_report(
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         market_anomaly_rows=event_market_anomaly_scanner.load_market_anomaly_rows(context.namespace_dir),
         official_exchange_candidate_rows=event_official_exchange.load_official_listing_candidates(context.namespace_dir),
+        scheduled_catalyst_rows=event_scheduled_catalysts.load_scheduled_catalysts(context.namespace_dir),
+        unlock_candidate_rows=event_scheduled_catalysts.load_unlock_candidates(context.namespace_dir),
         watchlist_entries=watchlist.entries,
         router_result=router_result,
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
@@ -7844,6 +7852,171 @@ def _append_official_exchange_run_ledger_row(
         "extraction_rows": 0,
         "extraction_hints_applied": 0,
         "candidates": int(candidate_count),
+        "clusters": 0,
+        "alerts": 0,
+        "watchlist_entries": 0,
+        "watchlist_escalations": 0,
+        "routed": 0,
+        "alertable": 0,
+        "sent": False,
+        "provider_fetch_count": 0,
+        "provider_cache_hits": 0,
+        "provider_cache_misses": 0,
+        "llm_cache_hits": 0,
+        "llm_cache_misses": 0,
+        "llm_calls_attempted": 0,
+        "llm_skipped_due_budget": 0,
+        "warnings": tuple(str(warning) for warning in warnings if str(warning)),
+        "success": True,
+        "failure": None,
+    }
+    context.run_ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    with context.run_ledger_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, sort_keys=True, default=str, separators=(",", ":")))
+        fh.write("\n")
+
+
+def event_alpha_scheduled_catalyst_report(
+    verbose: bool = False,
+    profile_name: str | None = None,
+    *,
+    artifact_namespace: str | None = None,
+    tokenomist_path: str | None = None,
+    coinmarketcal_path: str | None = None,
+    include_test_artifacts: bool = False,
+) -> None:
+    """Run the research-only scheduled catalyst/unlock normalizer."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "fixture"
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            selected_profile,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    started_at = datetime.now(timezone.utc)
+    run_id = event_alpha_run_ledger.run_id_for(started_at, context.profile)
+    provider_paths = {
+        "tokenomist": Path(tokenomist_path).expanduser() if tokenomist_path else Path(config.EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH),
+        "coinmarketcal": Path(coinmarketcal_path).expanduser() if coinmarketcal_path else Path(config.EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH),
+    }
+    result = event_scheduled_catalysts.run_scheduled_catalyst_scan(
+        namespace_dir=context.namespace_dir,
+        provider_paths=provider_paths,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        run_mode=context.run_mode,
+        run_id=run_id,
+        observed_at=_event_research_now(),
+    )
+    finished_at = datetime.now(timezone.utc)
+    _record_scheduled_catalyst_provider_health(context, result=result, run_id=run_id, now=finished_at)
+    _append_scheduled_catalyst_run_ledger_row(
+        context,
+        run_id=run_id,
+        started_at=started_at,
+        finished_at=finished_at,
+        scheduled_count=result.scheduled_count,
+        unlock_count=result.unlock_count,
+        warnings=result.warnings,
+    )
+    print(_event_alpha_context_block(context))
+    print(
+        "scheduled_catalyst_scan: "
+        f"scheduled={result.scheduled_count} unlocks={result.unlock_count} "
+        f"scheduled_path={result.scheduled_path} unlock_path={result.unlock_path} "
+        f"scheduled_report={result.scheduled_report_path} unlock_report={result.unlock_report_path}"
+    )
+    print(event_scheduled_catalysts.format_scheduled_catalyst_report(
+        result.scheduled_events,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        warnings=result.warnings,
+    ))
+    print(event_scheduled_catalysts.format_unlock_risk_report(
+        result.unlock_candidates,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        warnings=result.warnings,
+    ))
+
+
+def _record_scheduled_catalyst_provider_health(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    *,
+    result: event_scheduled_catalysts.ScheduledCatalystScanResult,
+    run_id: str,
+    now: datetime,
+) -> None:
+    cfg = _event_provider_health_config_from_runtime()
+    provider_counts: dict[str, int] = {}
+    for row in result.scheduled_events:
+        provider = str(row.get("provider") or "")
+        if provider:
+            provider_counts[provider] = provider_counts.get(provider, 0) + 1
+    roles = {
+        "tokenomist": "structured_unlock_calendar",
+        "coinmarketcal": "structured_event_calendar",
+    }
+    for provider, role in roles.items():
+        if provider_counts.get(provider, 0) > 0:
+            event_provider_health.record_provider_success(
+                provider,
+                cfg=cfg,
+                run_id=run_id,
+                now=now,
+                provider_kind="event_source",
+                provider_service=provider,
+                provider_role=role,
+            )
+        else:
+            event_provider_health.record_provider_failure(
+                provider,
+                "scheduled_catalyst_fixture_no_rows",
+                cfg=cfg,
+                run_id=run_id,
+                now=now,
+                provider_kind="event_source",
+                provider_service=provider,
+                provider_role=role,
+            )
+
+
+def _append_scheduled_catalyst_run_ledger_row(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    *,
+    run_id: str,
+    started_at: datetime,
+    finished_at: datetime,
+    scheduled_count: int,
+    unlock_count: int,
+    warnings: Iterable[str] = (),
+) -> None:
+    row = {
+        "schema_version": event_alpha_run_ledger.RUN_LEDGER_SCHEMA_VERSION,
+        "row_type": "event_alpha_run",
+        "run_id": run_id,
+        "profile": context.profile,
+        "run_mode": context.run_mode,
+        "artifact_namespace": context.artifact_namespace,
+        "started_at": started_at.astimezone(timezone.utc).isoformat(),
+        "finished_at": finished_at.astimezone(timezone.utc).isoformat(),
+        "runtime_seconds": max(0.0, (finished_at - started_at).total_seconds()),
+        "with_llm": False,
+        "send_requested": False,
+        "raw_events": int(scheduled_count),
+        "scheduled_catalysts": int(scheduled_count),
+        "unlock_candidates": int(unlock_count),
+        "market_anomalies": 0,
+        "catalyst_queries": 0,
+        "catalyst_results_accepted": 0,
+        "catalyst_results_rejected": 0,
+        "extraction_rows": 0,
+        "extraction_hints_applied": 0,
+        "candidates": int(scheduled_count + unlock_count),
         "clusters": 0,
         "alerts": 0,
         "watchlist_entries": 0,
@@ -10063,6 +10236,11 @@ def cli() -> None:
         help="Run a day-1 Event Alpha notification burn-in cycle with lane-specific guarded sends.",
     )
     parser.add_argument(
+        "--event-alpha-scheduled-catalyst-report",
+        action="store_true",
+        help="Normalize scheduled catalyst/unlock fixtures into research-only Event Alpha artifacts.",
+    )
+    parser.add_argument(
         "--ignore-provider-backoff",
         action="store_true",
         help="With --event-alpha-notify-cycle, attempt providers even if local provider health is in backoff for this run only.",
@@ -10486,6 +10664,16 @@ def cli() -> None:
         "--event-alpha-official-exchange-bybit",
         default=None,
         help="Optional Bybit announcement fixture path for --event-alpha-official-exchange-report.",
+    )
+    parser.add_argument(
+        "--event-alpha-scheduled-catalyst-tokenomist",
+        default=None,
+        help="Optional Tokenomist unlock fixture path for --event-alpha-scheduled-catalyst-report.",
+    )
+    parser.add_argument(
+        "--event-alpha-scheduled-catalyst-coinmarketcal",
+        default=None,
+        help="Optional CoinMarketCal/event-calendar fixture path for --event-alpha-scheduled-catalyst-report.",
     )
     parser.add_argument(
         "--event-alpha-replay",
@@ -11457,6 +11645,16 @@ def cli() -> None:
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             binance_path=args.event_alpha_official_exchange_binance,
             bybit_path=args.event_alpha_official_exchange_bybit,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+        )
+        return
+    if args.event_alpha_scheduled_catalyst_report:
+        event_alpha_scheduled_catalyst_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+            tokenomist_path=args.event_alpha_scheduled_catalyst_tokenomist,
+            coinmarketcal_path=args.event_alpha_scheduled_catalyst_coinmarketcal,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
         )
         return

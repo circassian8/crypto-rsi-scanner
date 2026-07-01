@@ -1,0 +1,90 @@
+{
+  "events": [
+    {
+      "id": "cmc-testup-upgrade",
+      "title": "Test Upgrade protocol upgrade in 24 hours",
+      "description": "Test Upgrade (TESTUP) schedules a confirmed protocol upgrade.",
+      "event_type": "protocol_upgrade",
+      "date_event": "2026-06-16T16:00:00Z",
+      "created_at": "2026-06-14T09:00:00Z",
+      "source_url": "https://testup.example/blog/protocol-upgrade",
+      "source_class": "official_project",
+      "event_status": "confirmed",
+      "coins": [
+        {"id": "test-upgrade", "name": "Test Upgrade", "symbol": "TESTUP"}
+      ],
+      "source_confidence": 0.92,
+      "market_snapshot": {
+        "return_24h": 0.01,
+        "volume_zscore_24h": 0.2,
+        "event_age_hours": -24,
+        "market_context_freshness_status": "fresh"
+      }
+    },
+    {
+      "id": "cmc-testbreak-mainnet",
+      "title": "Test Breakout mainnet launch",
+      "description": "Test Breakout (TESTBREAK) mainnet launch has fresh market confirmation.",
+      "event_type": "mainnet",
+      "date_event": "2026-06-15T20:00:00Z",
+      "created_at": "2026-06-14T11:00:00Z",
+      "source_url": "https://testbreak.example/blog/mainnet",
+      "source_class": "official_project",
+      "event_status": "confirmed",
+      "coins": [
+        {"id": "test-breakout", "name": "Test Breakout", "symbol": "TESTBREAK"}
+      ],
+      "source_confidence": 0.93,
+      "market_snapshot": {
+        "return_1h": 0.08,
+        "return_24h": 0.18,
+        "relative_return_vs_btc": 0.11,
+        "volume_zscore_24h": 3.4,
+        "event_age_hours": -4,
+        "market_context_freshness_status": "fresh"
+      }
+    },
+    {
+      "id": "cmc-testrumor-airdrop",
+      "title": "Test Rumor airdrop window rumored",
+      "description": "Rumored airdrop window for Test Rumor (TESTRUMOR).",
+      "event_type": "airdrop",
+      "date_event": "2026-06-17T12:00:00Z",
+      "created_at": "2026-06-14T12:00:00Z",
+      "source_url": "https://calendar.example/testrumor-airdrop",
+      "source_class": "media_calendar",
+      "event_status": "rumored",
+      "coins": [
+        {"id": "test-rumor", "name": "Test Rumor", "symbol": "TESTRUMOR"}
+      ],
+      "source_confidence": 0.52,
+      "market_snapshot": {
+        "return_24h": 0.03,
+        "volume_zscore_24h": 0.8,
+        "event_age_hours": -44,
+        "market_context_freshness_status": "fresh"
+      }
+    },
+    {
+      "id": "cmc-testcancel-upgrade",
+      "title": "Test Cancel upgrade canceled",
+      "description": "Canceled protocol upgrade for Test Cancel (TESTCANCEL).",
+      "event_type": "protocol_upgrade",
+      "date_event": "2026-06-16T18:00:00Z",
+      "created_at": "2026-06-14T13:00:00Z",
+      "source_url": "https://testcancel.example/blog/upgrade-canceled",
+      "source_class": "official_project",
+      "event_status": "canceled",
+      "coins": [
+        {"id": "test-cancel", "name": "Test Cancel", "symbol": "TESTCANCEL"}
+      ],
+      "source_confidence": 0.91,
+      "market_snapshot": {
+        "return_24h": 0.0,
+        "volume_zscore_24h": 0.1,
+        "event_age_hours": -50,
+        "market_context_freshness_status": "fresh"
+      }
+    }
+  ]
+}

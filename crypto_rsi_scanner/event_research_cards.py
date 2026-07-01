@@ -210,6 +210,10 @@ def render_research_card(
     if official_exchange_lines:
         lines.extend(["", "## Official Exchange Evidence"])
         lines.extend(official_exchange_lines)
+    scheduled_lines = _scheduled_catalyst_lines(entry, alert)
+    if scheduled_lines:
+        lines.extend(["", "## Scheduled Catalyst / Unlock Details"])
+        lines.extend(scheduled_lines)
     lines.extend(["", "## Source Coverage / Evidence Acquisition"])
     lines.extend(_source_acquisition_lines(entry, alert, card_path=card_path, lineage_context=lineage_context))
     lines.extend([
@@ -1829,6 +1833,52 @@ def _official_exchange_evidence_lines(
         )
     if components.get("source_url"):
         lines.append(f"- Official source: {components.get('source_url')}")
+    return lines
+
+
+def _scheduled_catalyst_lines(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> list[str]:
+    components = _card_components(entry, alert)
+    row_type = str(components.get("row_type") or "")
+    source_pack = str(components.get("source_pack") or "")
+    impact = str(components.get("impact_path_type") or "")
+    if not (
+        row_type in {"scheduled_catalyst_event", "unlock_event"}
+        or "unlock" in source_pack
+        or "project_event" in source_pack
+        or "unlock" in impact
+    ):
+        return []
+    lines = [
+        f"- Event type: {_display_text(components.get('event_type')) or 'unknown'}",
+        f"- Event status: {_display_text(components.get('event_status')) or 'unknown'}",
+        f"- Source class: {_display_text(components.get('source_class')) or 'unknown'}",
+        f"- Source pack: {source_pack or 'unknown'}",
+        f"- Event start: {_display_text(components.get('event_start_time') or components.get('unlock_time')) or 'unknown'}",
+        f"- Market state: {_display_text(components.get('market_state')) or 'unknown'}",
+        f"- Opportunity type: {_display_text(components.get('opportunity_type')) or 'unknown'}",
+    ]
+    if components.get("unlock_time") or components.get("unlock_pct_circulating_supply") is not None:
+        lines.extend([
+            f"- Unlock time: {_display_text(components.get('unlock_time')) or 'unknown'}",
+            f"- Unlock type: {_display_text(components.get('unlock_type')) or 'unknown'}",
+            f"- Unlock pct circulating: {_display_text(components.get('unlock_pct_circulating_supply')) or 'n/a'}",
+            f"- Unlock vs 30d ADV: {_display_text(components.get('unlock_vs_30d_adv')) or 'n/a'}",
+            f"- Structured unlock proof: {str(bool(components.get('structured_unlock_evidence'))).lower()}",
+        ])
+    confirms = _list_strings(components.get("what_confirms"))
+    invalidates = _list_strings(components.get("what_invalidates"))
+    why_not = _list_strings(components.get("why_not_alertable"))
+    if confirms:
+        lines.append("- What confirms: " + "; ".join(confirms[:4]))
+    if invalidates:
+        lines.append("- What invalidates: " + "; ".join(invalidates[:4]))
+    if why_not:
+        lines.append("- Why not alertable: " + "; ".join(why_not[:5]))
+    if components.get("source_url"):
+        lines.append(f"- Source: {components.get('source_url')}")
     return lines
 
 

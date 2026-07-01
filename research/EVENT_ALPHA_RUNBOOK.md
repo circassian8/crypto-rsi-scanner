@@ -77,6 +77,23 @@ identity. Unlock/supply source packs require material, non-stale supply pressure
 before a row can support digest/watchlist promotion; small, missing-size, or
 stale unlock rows explain what is missing but should not become confirming
 evidence by themselves.
+The scheduled catalyst/unlock pack writes these local research artifacts under
+the selected Event Alpha namespace:
+
+- `event_scheduled_catalysts.jsonl`
+- `event_unlock_candidates.jsonl`
+- `event_scheduled_catalyst_report.md`
+- `event_unlock_risk_report.md`
+
+Use `make event-alpha-scheduled-catalyst-smoke PYTHON=python3` to prove
+fixture normalization, source coverage, daily brief output, and strict artifact
+doctor checks for project events and unlock rows. Use
+`make event-alpha-unlock-risk-smoke PYTHON=python3` when the focus is unlock
+supply risk. Use `make event-alpha-scheduled-catalyst-report PROFILE=<profile>
+ARTIFACT_NAMESPACE=<namespace> PYTHON=python3` to inspect a configured
+namespace. Media-only CryptoPanic/RSS/GDELT text that merely says a token has an
+unlock is not structured unlock proof; strict unlock/supply lanes require
+structured/official/supply evidence, event time, source URL, and materiality.
 Source-pack acquisition rows now persist the attempted plan, execution results,
 query execution statuses, provider coverage statuses, accepted/rejected samples,
 and source-pack sufficiency booleans. Treat these rows as audit evidence; they

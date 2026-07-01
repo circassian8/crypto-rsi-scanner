@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-01 - Scheduled catalyst and unlock rows are research artifacts only
+**Status:** accepted
+**Decision:** Event Alpha may normalize scheduled project events and
+Tokenomist-style unlocks into profile-scoped research artifacts, daily-brief
+sections, source-coverage rows, cards, audits, and artifact-doctor checks. These
+rows must not create Telegram sends, normal RSI signal rows, paper trades, live
+trades, execution, or Event Alpha-created `TRIGGERED_FADE`. Unlock/supply
+strict lanes require structured/official/supply evidence, known event time,
+source URL, and materiality; media-only CryptoPanic/RSS/GDELT text that merely
+mentions an unlock is context only and cannot satisfy structured unlock proof.
+**Why:** Scheduled catalysts and supply events are useful for early research
+and risk review, but false unlock proof from broad media would make the radar
+look more certain than the evidence supports.
+**Revisit when:** A reviewed validation sample proves a scheduled/unlock lane
+deserves notification or paper-tracking promotion and the human approves a
+separate promotion path.
+
 ## 2026-07-01 - Official exchange announcements are first-class research evidence only
 **Status:** accepted
 **Decision:** Event Alpha may normalize official exchange announcements into

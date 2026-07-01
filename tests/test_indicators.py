@@ -32140,6 +32140,7 @@ def test_event_source_packs_and_feed_coverage_semantics():
             "playbook_type": "unlock_supply_pressure",
             "symbol": "TESTUNLOCK",
             "coin_id": "testunlock",
+            "source_url": "https://tokenomist.ai/testunlock",
             "unlock_pct_circulating": 0.12,
             "event_time": "2026-07-01T00:00:00Z",
             "as_of": "2026-06-20T00:00:00Z",
@@ -37858,6 +37859,216 @@ def test_makefile_exposes_official_exchange_targets():
     assert "event-alpha-official-exchange-report" in text
     assert "event-alpha-official-exchange-smoke" in text
     assert "--event-alpha-official-exchange-report" in text
+
+
+def test_scheduled_catalyst_fixture_lanes_and_unlock_artifacts():
+    from crypto_rsi_scanner import event_scheduled_catalysts
+
+    with TemporaryDirectory() as tmp:
+        result = event_scheduled_catalysts.run_scheduled_catalyst_scan(
+            namespace_dir=tmp,
+            provider_paths={
+                "tokenomist": "fixtures/event_discovery/scheduled_tokenomist_unlocks.json",
+                "coinmarketcal": "fixtures/event_discovery/scheduled_coinmarketcal_events.json",
+            },
+            profile="fixture",
+            artifact_namespace="scheduled_catalyst_smoke",
+            run_mode="fixture",
+            run_id="run-scheduled-fixture",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        scheduled = event_scheduled_catalysts.load_scheduled_catalysts(tmp)
+        unlocks = event_scheduled_catalysts.load_unlock_candidates(tmp)
+
+    by_symbol = {str(row.get("symbol") or ""): row for row in scheduled}
+    unlock_by_symbol = {str(row.get("symbol") or ""): row for row in unlocks}
+
+    assert result.scheduled_count == 6
+    assert result.unlock_count == 2
+    assert by_symbol["TESTUP"]["opportunity_type"] == "EARLY_LONG_RESEARCH"
+    assert by_symbol["TESTBREAK"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH"
+    assert by_symbol["TESTRUMOR"]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+    assert by_symbol["TESTCANCEL"]["opportunity_type"] == "DIAGNOSTIC"
+    assert unlock_by_symbol["TESTUNLOCK"]["opportunity_type"] == "RISK_ONLY"
+    assert unlock_by_symbol["TESTRALLY"]["opportunity_type"] == "FADE_SHORT_REVIEW"
+    assert all(row["created_alert"] is False for row in [*scheduled, *unlocks])
+    assert all(row["research_only"] is True for row in [*scheduled, *unlocks])
+
+
+def test_cryptopanic_fan_narrative_is_not_structured_unlock_proof():
+    from crypto_rsi_scanner import event_market_reaction, event_source_packs
+
+    row = {
+        "provider": "cryptopanic",
+        "source_class": "cryptopanic_tagged",
+        "source_pack": "unlock_supply_pack",
+        "symbol": "CHZ",
+        "coin_id": "chiliz",
+        "title": "CHZ fan token narrative before World Cup",
+        "currency_tags": ["CHZ"],
+        "source_url": "https://cryptopanic.com/news/chz-world-cup",
+        "event_time": "2026-06-16T16:00:00Z",
+        "unlock_pct_circulating": 0.10,
+        "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match"],
+        "market_snapshot": {
+            "return_24h": 0.20,
+            "volume_zscore_24h": 3.0,
+            "market_context_freshness_status": "fresh",
+        },
+    }
+    pack_result = event_source_packs.evaluate_pack_evidence(row, pack=event_source_packs.get_source_pack("unlock_supply_pack"))
+    reaction = event_market_reaction.evaluate_market_reaction({
+        **row,
+        "impact_path_type": "unlock_supply_event",
+        "evidence_quality_score": 86,
+        "accepted_evidence_count": 1,
+    })
+
+    assert pack_result["source_pack_validated_digest_sufficient"] is False
+    assert "structured_unlock_source_required" in pack_result["source_pack_missing_evidence"]
+    assert reaction.opportunity_type == "UNCONFIRMED_RESEARCH"
+    assert "structured_unlock_source_required" in reaction.why_not_alertable
+
+
+def test_scheduled_catalyst_artifact_doctor_conflicts():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    rows = [
+        {
+            "row_type": "unlock_event",
+            "symbol": "MEDIA",
+            "coin_id": "media",
+            "event_type": "token_unlock",
+            "impact_path_type": "unlock_supply_event",
+            "source_class": "cryptopanic_tagged",
+            "source_url": "https://cryptopanic.com/news/media",
+            "unlock_time": "2026-06-16T16:00:00Z",
+            "unlock_pct_circulating_supply": 0.12,
+            "opportunity_type": "RISK_ONLY",
+        },
+        {
+            "row_type": "unlock_event",
+            "symbol": "MISS",
+            "coin_id": "missing",
+            "event_type": "token_unlock",
+            "source_class": "structured_unlock",
+            "source_url": "https://tokenomist.ai/miss",
+            "opportunity_type": "RISK_ONLY",
+        },
+        {
+            "row_type": "unlock_event",
+            "symbol": "SIZE",
+            "coin_id": "size",
+            "event_type": "token_unlock",
+            "source_class": "structured_unlock",
+            "source_url": "https://tokenomist.ai/size",
+            "unlock_time": "2026-06-16T16:00:00Z",
+            "opportunity_type": "FADE_SHORT_REVIEW",
+        },
+        {
+            "row_type": "scheduled_catalyst_event",
+            "symbol": "STALE",
+            "coin_id": "stale",
+            "event_type": "protocol_upgrade",
+            "event_status": "completed",
+            "event_age_hours": 48,
+            "source_url": "https://project.test/stale",
+            "opportunity_type": "EARLY_LONG_RESEARCH",
+        },
+        {
+            "row_type": "scheduled_catalyst_event",
+            "symbol": "NOSRC",
+            "coin_id": "nosrc",
+            "event_type": "protocol_upgrade",
+            "opportunity_type": "EARLY_LONG_RESEARCH",
+        },
+        {
+            "row_type": "scheduled_catalyst_event",
+            "symbol": "ALRT",
+            "coin_id": "alert",
+            "event_type": "protocol_upgrade",
+            "source_url": "https://project.test/alert",
+            "created_alert": True,
+        },
+    ]
+    conflicts = event_alpha_artifact_doctor._scheduled_catalyst_artifact_conflicts(rows)
+
+    assert conflicts["unlock_without_structured_evidence"] == 1
+    assert conflicts["media_unlock_promoted_structured"] == 1
+    assert conflicts["cryptopanic_unlock_proof"] == 1
+    assert conflicts["unlock_missing_event_time"] == 1
+    assert conflicts["unlock_promoted_without_size_metrics"] == 2
+    assert conflicts["stale_completed_catalyst_upcoming"] == 1
+    assert conflicts["calendar_event_missing_source_url"] == 1
+    assert conflicts["scheduled_catalyst_created_alert_rows"] == 1
+
+
+def test_daily_brief_renders_scheduled_catalyst_sections():
+    from crypto_rsi_scanner import event_alpha_daily_brief, event_scheduled_catalysts
+
+    with TemporaryDirectory() as tmp:
+        result = event_scheduled_catalysts.run_scheduled_catalyst_scan(
+            namespace_dir=tmp,
+            provider_paths={
+                "tokenomist": "fixtures/event_discovery/scheduled_tokenomist_unlocks.json",
+                "coinmarketcal": "fixtures/event_discovery/scheduled_coinmarketcal_events.json",
+            },
+            profile="fixture",
+            artifact_namespace="scheduled_catalyst_smoke",
+            run_mode="fixture",
+            run_id="run-scheduled-fixture",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        brief = event_alpha_daily_brief.build_daily_brief(
+            run_rows=[],
+            scheduled_catalyst_rows=result.scheduled_events,
+            unlock_candidate_rows=result.unlock_candidates,
+            requested_profile="fixture",
+            artifact_namespace="scheduled_catalyst_smoke",
+            include_test_artifacts=True,
+        )
+
+    assert "## Upcoming Scheduled Catalysts" in brief
+    assert "## Unlock / Supply Risk" in brief
+    assert "## Catalyst Calendar Gaps" in brief
+    assert "## Near-Term Events Needing Market Watch" in brief
+    assert "TESTUP/test-upgrade" in brief
+    assert "TESTUNLOCK/test-unlock" in brief
+
+
+def test_research_card_renders_scheduled_unlock_details():
+    from crypto_rsi_scanner import event_research_cards, event_scheduled_catalysts
+
+    with TemporaryDirectory() as tmp:
+        result = event_scheduled_catalysts.run_scheduled_catalyst_scan(
+            namespace_dir=tmp,
+            provider_paths={
+                "tokenomist": "fixtures/event_discovery/scheduled_tokenomist_unlocks.json",
+                "coinmarketcal": "fixtures/event_discovery/scheduled_coinmarketcal_events.json",
+            },
+            profile="fixture",
+            artifact_namespace="unlock_risk_smoke",
+            run_mode="fixture",
+            run_id="run-scheduled-fixture",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+    row = next(item for item in result.unlock_candidates if item["symbol"] == "TESTUNLOCK")
+    row = {**row, "alert_id": "TESTUNLOCK", "tier": "STORE_ONLY"}
+    card = event_research_cards.render_research_card("TESTUNLOCK", alert_rows=[row])
+
+    assert card.found is True
+    assert "## Scheduled Catalyst / Unlock Details" in card.markdown
+    assert "- Unlock time: 2026-06-16T08:00:00+00:00" in card.markdown
+    assert "- Structured unlock proof: true" in card.markdown
+
+
+def test_makefile_exposes_scheduled_catalyst_targets():
+    text = Path("Makefile").read_text(encoding="utf-8")
+
+    assert "event-alpha-scheduled-catalyst-report" in text
+    assert "event-alpha-scheduled-catalyst-smoke" in text
+    assert "event-alpha-unlock-risk-smoke" in text
+    assert "--event-alpha-scheduled-catalyst-report" in text
 
 
 def _run_all():

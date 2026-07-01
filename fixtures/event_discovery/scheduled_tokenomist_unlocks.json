@@ -1,0 +1,62 @@
+{
+  "unlocks": [
+    {
+      "id": "tokenomist-testunlock-cliff",
+      "token_id": "test-unlock",
+      "token_name": "Test Unlock",
+      "token_symbol": "TESTUNLOCK",
+      "title": "Test Unlock team cliff unlock",
+      "description": "Team and investor cliff unlock for Test Unlock (TESTUNLOCK).",
+      "unlock_date": "2026-06-16T08:00:00Z",
+      "published_at": "2026-06-12T08:00:00Z",
+      "unlock_type": "cliff",
+      "unlock_amount": 2500000,
+      "unlock_usd": 3750000,
+      "unlock_pct_circulating": 0.12,
+      "unlock_pct_total_supply": 0.04,
+      "unlock_vs_30d_adv": 2.4,
+      "vesting_category": "team_investor",
+      "source_url": "https://tokenomist.ai/testunlock",
+      "source_class": "structured_unlock",
+      "source_confidence": 0.93,
+      "market_snapshot": {
+        "return_24h": 0.02,
+        "volume_zscore_24h": 0.4,
+        "event_age_hours": -16,
+        "market_context_freshness_status": "fresh"
+      }
+    },
+    {
+      "id": "tokenomist-testrally-linear",
+      "token_id": "test-rally",
+      "token_name": "Test Rally",
+      "token_symbol": "TESTRALLY",
+      "title": "Test Rally linear unlock after pre-event rally",
+      "description": "Linear unlock for Test Rally (TESTRALLY) after a sharp pre-unlock move.",
+      "unlock_date": "2026-06-15T12:00:00Z",
+      "published_at": "2026-06-12T09:00:00Z",
+      "unlock_type": "linear",
+      "unlock_amount": 1400000,
+      "unlock_usd": 2800000,
+      "unlock_pct_circulating": 0.08,
+      "unlock_pct_total_supply": 0.03,
+      "unlock_vs_30d_adv": 1.8,
+      "vesting_category": "ecosystem_rewards",
+      "source_url": "https://tokenomist.ai/testrally",
+      "source_class": "structured_unlock",
+      "source_confidence": 0.91,
+      "market_snapshot": {
+        "return_4h": 0.24,
+        "return_24h": 0.48,
+        "volume_zscore_24h": 4.8,
+        "event_age_hours": 4,
+        "market_context_freshness_status": "fresh"
+      },
+      "derivatives_snapshot": {
+        "open_interest_24h_change_pct": 0.42,
+        "funding_rate_8h": 0.0011,
+        "funding_rate_zscore": 2.8
+      }
+    }
+  ]
+}

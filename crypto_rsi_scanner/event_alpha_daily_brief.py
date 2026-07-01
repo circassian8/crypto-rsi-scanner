@@ -27,6 +27,7 @@ from . import (
     event_market_anomaly_scanner,
     event_research_cards,
     event_official_exchange,
+    event_scheduled_catalysts,
     event_source_packs,
     event_source_registry,
     event_source_reliability,
@@ -54,6 +55,8 @@ def build_daily_brief(
     evidence_acquisition_rows: Iterable[Mapping[str, Any]] = (),
     market_anomaly_rows: Iterable[Mapping[str, Any]] | None = None,
     official_exchange_candidate_rows: Iterable[Mapping[str, Any]] | None = None,
+    scheduled_catalyst_rows: Iterable[Mapping[str, Any]] | None = None,
+    unlock_candidate_rows: Iterable[Mapping[str, Any]] | None = None,
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
     router_result: event_alpha_router.EventAlphaRouterResult | None = None,
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
@@ -147,6 +150,30 @@ def build_daily_brief(
     )
     official_exchange_candidates = event_alpha_artifacts.filter_artifact_rows(
         raw_official_exchange_candidates,
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    raw_scheduled_catalysts = (
+        [dict(row) for row in scheduled_catalyst_rows if isinstance(row, Mapping)]
+        if scheduled_catalyst_rows is not None
+        else list(event_scheduled_catalysts.load_scheduled_catalysts(Path(run_ledger_path).parent if run_ledger_path else None))
+    )
+    scheduled_catalysts = event_alpha_artifacts.filter_artifact_rows(
+        raw_scheduled_catalysts,
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    raw_unlock_candidates = (
+        [dict(row) for row in unlock_candidate_rows if isinstance(row, Mapping)]
+        if unlock_candidate_rows is not None
+        else list(event_scheduled_catalysts.load_unlock_candidates(Path(run_ledger_path).parent if run_ledger_path else None))
+    )
+    unlock_candidates = event_alpha_artifacts.filter_artifact_rows(
+        raw_unlock_candidates,
         profile=requested_profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -325,6 +352,18 @@ def build_daily_brief(
         "",
         "## Fresh Official Exchange Catalysts",
         *_official_exchange_daily_lines(official_exchange_candidates, limit=10),
+        "",
+        "## Upcoming Scheduled Catalysts",
+        *_scheduled_catalyst_daily_lines(scheduled_catalysts, limit=10),
+        "",
+        "## Unlock / Supply Risk",
+        *_unlock_risk_daily_lines(unlock_candidates, limit=10),
+        "",
+        "## Catalyst Calendar Gaps",
+        *_calendar_gap_daily_lines([*scheduled_catalysts, *unlock_candidates], limit=10),
+        "",
+        "## Near-Term Events Needing Market Watch",
+        *_scheduled_market_watch_lines([*scheduled_catalysts, *unlock_candidates], limit=10),
         "",
         "## Canonical Incidents",
         *_canonical_incident_lines(incidents),
@@ -1942,6 +1981,148 @@ def _official_exchange_daily_lines(
     return lines
 
 
+def _scheduled_catalyst_daily_lines(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    limit: int,
+) -> list[str]:
+    candidates = [
+        dict(row)
+        for row in rows
+        if isinstance(row, Mapping)
+        and str(row.get("row_type") or "") == "scheduled_catalyst_event"
+        and str(row.get("event_type") or "") not in {"token_unlock", "vesting_cliff", "linear_emission"}
+    ]
+    if not candidates:
+        return ["- None."]
+    candidates.sort(key=lambda row: (str(row.get("event_start_time") or ""), str(row.get("symbol") or "")))
+    lines: list[str] = []
+    for row in candidates[: max(0, limit)]:
+        lines.append(
+            f"- {row.get('symbol') or 'UNRESOLVED'}/{row.get('coin_id') or 'unresolved'}: "
+            f"{row.get('event_type') or 'unknown'} "
+            f"status={row.get('event_status') or 'unknown'} "
+            f"lane={row.get('opportunity_type') or 'unknown'} "
+            f"market_state={row.get('market_state') or 'unknown'} "
+            f"source_class={row.get('source_class') or 'unknown'}"
+        )
+        lines.append(f"  timing: start={row.get('event_start_time') or 'unknown'}")
+        why_not = [str(item) for item in row.get("why_not_alertable") or () if str(item)]
+        if why_not:
+            lines.append("  why_not_alertable: " + "; ".join(why_not[:4]))
+        if row.get("source_url"):
+            lines.append(f"  source: {row.get('source_url')}")
+    remaining = max(0, len(candidates) - limit)
+    if remaining:
+        lines.append(f"- +{remaining} more scheduled catalysts in local artifacts.")
+    return lines
+
+
+def _unlock_risk_daily_lines(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    limit: int,
+) -> list[str]:
+    candidates = [
+        dict(row)
+        for row in rows
+        if isinstance(row, Mapping)
+        and str(row.get("row_type") or "") == "unlock_event"
+    ]
+    if not candidates:
+        return ["- None."]
+    priority = {
+        "FADE_SHORT_REVIEW": 0,
+        "RISK_ONLY": 1,
+        "UNCONFIRMED_RESEARCH": 2,
+        "DIAGNOSTIC": 3,
+    }
+    candidates.sort(key=lambda row: (priority.get(str(row.get("opportunity_type") or ""), 9), str(row.get("unlock_time") or "")))
+    lines: list[str] = []
+    for row in candidates[: max(0, limit)]:
+        lines.append(
+            f"- {row.get('symbol') or 'UNRESOLVED'}/{row.get('coin_id') or 'unresolved'}: "
+            f"unlock={row.get('unlock_type') or 'unknown'} "
+            f"pct_circ={_format_pct(row.get('unlock_pct_circulating_supply'))} "
+            f"vs_adv={_format_float(row.get('unlock_vs_30d_adv'))} "
+            f"lane={row.get('opportunity_type') or 'unknown'} "
+            f"market_state={row.get('market_state') or 'unknown'}"
+        )
+        lines.append(f"  timing: unlock_time={row.get('unlock_time') or 'unknown'}")
+        why_not = [str(item) for item in row.get("why_not_alertable") or () if str(item)]
+        if why_not:
+            lines.append("  why_not_alertable: " + "; ".join(why_not[:4]))
+        if row.get("source_url"):
+            lines.append(f"  source: {row.get('source_url')}")
+    remaining = max(0, len(candidates) - limit)
+    if remaining:
+        lines.append(f"- +{remaining} more unlock rows in local artifacts.")
+    return lines
+
+
+def _calendar_gap_daily_lines(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    limit: int,
+) -> list[str]:
+    gaps: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        why_not = {str(item) for item in row.get("why_not_alertable") or ()}
+        if (
+            "source_url_missing" in why_not
+            or "unlock_time_missing" in why_not
+            or "structured_unlock_proof_missing" in why_not
+            or not row.get("source_url")
+        ):
+            gaps.append(dict(row))
+    if not gaps:
+        return ["- None."]
+    lines: list[str] = []
+    for row in gaps[: max(0, limit)]:
+        why_not = [str(item) for item in row.get("why_not_alertable") or () if str(item)]
+        lines.append(
+            f"- {row.get('symbol') or 'UNRESOLVED'}/{row.get('coin_id') or 'unresolved'}: "
+            f"{row.get('event_type') or 'unknown'} missing={'; '.join(why_not[:3]) or 'source confirmation'}"
+        )
+    remaining = max(0, len(gaps) - limit)
+    if remaining:
+        lines.append(f"- +{remaining} more calendar gaps in local artifacts.")
+    return lines
+
+
+def _scheduled_market_watch_lines(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    limit: int,
+) -> list[str]:
+    watch_rows: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        lane = str(row.get("opportunity_type") or "")
+        state = str(row.get("market_state") or "")
+        if lane in {"EARLY_LONG_RESEARCH", "UNCONFIRMED_RESEARCH"} and state in {"no_reaction", "stealth_accumulation"}:
+            watch_rows.append(dict(row))
+    if not watch_rows:
+        return ["- None."]
+    watch_rows.sort(key=lambda row: (str(row.get("event_start_time") or row.get("unlock_time") or ""), str(row.get("symbol") or "")))
+    lines: list[str] = []
+    for row in watch_rows[: max(0, limit)]:
+        lines.append(
+            f"- {row.get('symbol') or 'UNRESOLVED'}/{row.get('coin_id') or 'unresolved'}: "
+            f"{row.get('event_type') or 'unknown'} "
+            f"lane={row.get('opportunity_type') or 'unknown'} "
+            f"market_state={row.get('market_state') or 'unknown'} "
+            f"next={row.get('event_start_time') or row.get('unlock_time') or 'unknown'}"
+        )
+    remaining = max(0, len(watch_rows) - limit)
+    if remaining:
+        lines.append(f"- +{remaining} more near-term events needing market watch.")
+    return lines
+
+
 def _format_signed_pct(value: object) -> str:
     parsed = _optional_float(value)
     return "n/a" if parsed is None else f"{parsed:+.1f}%"
@@ -1950,6 +2131,15 @@ def _format_signed_pct(value: object) -> str:
 def _format_float(value: object) -> str:
     parsed = _optional_float(value)
     return "n/a" if parsed is None else f"{parsed:.1f}"
+
+
+def _format_pct(value: object) -> str:
+    parsed = _optional_float(value)
+    if parsed is None:
+        return "n/a"
+    if abs(parsed) <= 3.0:
+        parsed *= 100.0
+    return f"{parsed:.1f}%"
 
 
 def _optional_float(value: object) -> float | None:

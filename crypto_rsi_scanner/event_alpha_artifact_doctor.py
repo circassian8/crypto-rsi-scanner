@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_market_anomaly_scanner, event_official_exchange, event_opportunity_verdict, event_research_cards, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_market_anomaly_scanner, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -96,6 +96,16 @@ class EventAlphaArtifactDoctorResult:
     official_exchange_delisting_long_research: int = 0
     official_exchange_quote_asset_misclassified: int = 0
     official_exchange_created_alert_rows: int = 0
+    scheduled_catalyst_rows: int = 0
+    unlock_candidate_rows: int = 0
+    unlock_without_structured_evidence: int = 0
+    unlock_missing_event_time: int = 0
+    unlock_promoted_without_size_metrics: int = 0
+    media_unlock_promoted_structured: int = 0
+    stale_completed_catalyst_upcoming: int = 0
+    calendar_event_missing_source_url: int = 0
+    cryptopanic_unlock_proof: int = 0
+    scheduled_catalyst_created_alert_rows: int = 0
     source_coverage_report_missing: int = 0
     source_coverage_provider_status_unknown: int = 0
     source_coverage_provider_marked_healthy_without_observation: int = 0
@@ -253,6 +263,8 @@ def diagnose_artifacts(
     evidence_acquisition_rows: Iterable[Mapping[str, Any]] = (),
     market_anomaly_rows: Iterable[Mapping[str, Any]] | None = None,
     official_exchange_candidate_rows: Iterable[Mapping[str, Any]] | None = None,
+    scheduled_catalyst_rows: Iterable[Mapping[str, Any]] | None = None,
+    unlock_candidate_rows: Iterable[Mapping[str, Any]] | None = None,
     card_paths: Iterable[str | Path] = (),
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     source_coverage_report_path: str | Path | None = None,
@@ -296,6 +308,24 @@ def diagnose_artifacts(
         raw_official_exchange_candidates = list(event_official_exchange.load_official_listing_candidates(default_official_exchange_path))
     else:
         raw_official_exchange_candidates = [dict(row) for row in official_exchange_candidate_rows if isinstance(row, Mapping)]
+    if scheduled_catalyst_rows is None:
+        default_scheduled_path = None
+        if inspected_alert_store_path is not None:
+            default_scheduled_path = Path(inspected_alert_store_path).parent
+        elif source_coverage_report_path is not None:
+            default_scheduled_path = Path(source_coverage_report_path).parent
+        raw_scheduled_catalysts = list(event_scheduled_catalysts.load_scheduled_catalysts(default_scheduled_path))
+    else:
+        raw_scheduled_catalysts = [dict(row) for row in scheduled_catalyst_rows if isinstance(row, Mapping)]
+    if unlock_candidate_rows is None:
+        default_unlock_path = None
+        if inspected_alert_store_path is not None:
+            default_unlock_path = Path(inspected_alert_store_path).parent
+        elif source_coverage_report_path is not None:
+            default_unlock_path = Path(source_coverage_report_path).parent
+        raw_unlock_candidates = list(event_scheduled_catalysts.load_unlock_candidates(default_unlock_path))
+    else:
+        raw_unlock_candidates = [dict(row) for row in unlock_candidate_rows if isinstance(row, Mapping)]
     raw_legacy = sum(
         1 for row in (*raw_runs, *raw_alerts, *raw_feedback, *raw_outcomes)
         if event_alpha_artifacts.is_legacy_row(row)
@@ -372,6 +402,20 @@ def diagnose_artifacts(
     )
     official_exchange_candidates = event_alpha_artifacts.filter_artifact_rows(
         raw_official_exchange_candidates,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    scheduled_catalysts = event_alpha_artifacts.filter_artifact_rows(
+        raw_scheduled_catalysts,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    unlock_candidates = event_alpha_artifacts.filter_artifact_rows(
+        raw_unlock_candidates,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -623,6 +667,7 @@ def diagnose_artifacts(
     opportunity_lane_conflicts = _opportunity_lane_conflicts(core_rows)
     market_anomaly_conflicts = _market_anomaly_artifact_conflicts(market_anomalies)
     official_exchange_conflicts = _official_exchange_artifact_conflicts(official_exchange_candidates)
+    scheduled_conflicts = _scheduled_catalyst_artifact_conflicts((*scheduled_catalysts, *unlock_candidates))
     source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
     source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
@@ -864,6 +909,25 @@ def diagnose_artifacts(
                 blockers.append(message)
             else:
                 warnings.append(message)
+    for key in (
+        "unlock_without_structured_evidence",
+        "unlock_missing_event_time",
+        "unlock_promoted_without_size_metrics",
+        "media_unlock_promoted_structured",
+        "stale_completed_catalyst_upcoming",
+        "cryptopanic_unlock_proof",
+        "scheduled_catalyst_created_alert_rows",
+    ):
+        count = scheduled_conflicts.get(key, 0)
+        if count:
+            message = f"{key}={count}"
+            if strict:
+                blockers.append(message)
+            else:
+                warnings.append(message)
+    if scheduled_conflicts.get("calendar_event_missing_source_url", 0):
+        message = f"calendar_event_missing_source_url={scheduled_conflicts['calendar_event_missing_source_url']}"
+        (blockers if strict else warnings).append(message)
     if source_coverage_report_conflicts["source_coverage_report_missing"]:
         warnings.append(
             "source_coverage_report_missing="
@@ -1467,6 +1531,16 @@ def diagnose_artifacts(
         official_exchange_delisting_long_research=official_exchange_conflicts["official_exchange_delisting_long_research"],
         official_exchange_quote_asset_misclassified=official_exchange_conflicts["official_exchange_quote_asset_misclassified"],
         official_exchange_created_alert_rows=official_exchange_conflicts["official_exchange_created_alert_rows"],
+        scheduled_catalyst_rows=len(scheduled_catalysts),
+        unlock_candidate_rows=len(unlock_candidates),
+        unlock_without_structured_evidence=scheduled_conflicts["unlock_without_structured_evidence"],
+        unlock_missing_event_time=scheduled_conflicts["unlock_missing_event_time"],
+        unlock_promoted_without_size_metrics=scheduled_conflicts["unlock_promoted_without_size_metrics"],
+        media_unlock_promoted_structured=scheduled_conflicts["media_unlock_promoted_structured"],
+        stale_completed_catalyst_upcoming=scheduled_conflicts["stale_completed_catalyst_upcoming"],
+        calendar_event_missing_source_url=scheduled_conflicts["calendar_event_missing_source_url"],
+        cryptopanic_unlock_proof=scheduled_conflicts["cryptopanic_unlock_proof"],
+        scheduled_catalyst_created_alert_rows=scheduled_conflicts["scheduled_catalyst_created_alert_rows"],
         source_coverage_report_missing=source_coverage_report_conflicts["source_coverage_report_missing"],
         source_coverage_provider_status_unknown=source_coverage_report_conflicts["source_coverage_provider_status_unknown"],
         source_coverage_provider_marked_healthy_without_observation=source_coverage_report_conflicts["source_coverage_provider_marked_healthy_without_observation"],
@@ -2419,6 +2493,79 @@ def _official_exchange_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) -> 
         tier = str(row.get("tier") or row.get("alert_tier") or "").upper()
         if bool(row.get("created_alert")) or bool(row.get("alert_id")) or route in alertable_routes or tier in alertable_tiers:
             out["official_exchange_created_alert_rows"] += 1
+    return out
+
+
+def _scheduled_catalyst_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    out = {
+        "unlock_without_structured_evidence": 0,
+        "unlock_missing_event_time": 0,
+        "unlock_promoted_without_size_metrics": 0,
+        "media_unlock_promoted_structured": 0,
+        "stale_completed_catalyst_upcoming": 0,
+        "calendar_event_missing_source_url": 0,
+        "cryptopanic_unlock_proof": 0,
+        "scheduled_catalyst_created_alert_rows": 0,
+    }
+    strict_lanes = {"EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH", "FADE_SHORT_REVIEW", "RISK_ONLY"}
+    promoted_risk_lanes = {"FADE_SHORT_REVIEW", "RISK_ONLY"}
+    media_classes = {"cryptopanic_tagged", "crypto_news", "broad_news", "media_calendar", "social_or_unknown"}
+    trusted_unlock_classes = {
+        "structured_unlock",
+        "supply_data",
+        "official_project",
+        "official_exchange",
+        "structured_calendar",
+    }
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        row_type = str(row.get("row_type") or "")
+        if row_type not in {"scheduled_catalyst_event", "unlock_event"}:
+            continue
+        event_type = str(row.get("event_type") or "")
+        impact = str(row.get("impact_path_type") or "")
+        source_class = str(row.get("source_class") or "").strip()
+        lane = str(row.get("opportunity_type") or "").strip().upper()
+        is_unlock = row_type == "unlock_event" or event_type in {"token_unlock", "vesting_cliff", "linear_emission"} or impact == "unlock_supply_event"
+        if is_unlock:
+            structured = bool(row.get("structured_unlock_evidence")) or source_class in trusted_unlock_classes
+            if not structured and lane in strict_lanes:
+                out["unlock_without_structured_evidence"] += 1
+            if source_class in media_classes and lane in strict_lanes:
+                out["media_unlock_promoted_structured"] += 1
+            if source_class == "cryptopanic_tagged" and (
+                bool(row.get("structured_unlock_evidence"))
+                or "structured_unlock_source" in {str(item) for item in row.get("reason_codes") or ()}
+                or lane in strict_lanes
+            ):
+                out["cryptopanic_unlock_proof"] += 1
+            if not str(row.get("unlock_time") or row.get("event_start_time") or "").strip():
+                out["unlock_missing_event_time"] += 1
+            size_fields = (
+                row.get("unlock_pct_circulating_supply"),
+                row.get("unlock_pct_circulating"),
+                row.get("unlock_pct_total_supply"),
+                row.get("unlock_vs_30d_adv"),
+                row.get("tokens_unlocked"),
+                row.get("unlock_usd"),
+            )
+            if lane in promoted_risk_lanes and all(value in (None, "", [], {}, ()) for value in size_fields):
+                out["unlock_promoted_without_size_metrics"] += 1
+        if row_type == "scheduled_catalyst_event":
+            if not str(row.get("source_url") or row.get("url") or "").strip():
+                out["calendar_event_missing_source_url"] += 1
+            status = str(row.get("event_status") or "").strip()
+            age = _safe_float(row.get("event_age_hours"))
+            if status == "completed" and age is not None and age > 24 and lane in {
+                "EARLY_LONG_RESEARCH",
+                "CONFIRMED_LONG_RESEARCH",
+            }:
+                out["stale_completed_catalyst_upcoming"] += 1
+        route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").upper()
+        tier = str(row.get("tier") or row.get("alert_tier") or "").upper()
+        if bool(row.get("created_alert")) or bool(row.get("alert_id")) or route in {"RESEARCH_DIGEST", "HIGH_PRIORITY_RESEARCH", "WATCHLIST", "TRIGGERED_FADE_RESEARCH"} or tier in {"RADAR_DIGEST", "WATCHLIST", "HIGH_PRIORITY", "TRIGGERED_FADE"}:
+            out["scheduled_catalyst_created_alert_rows"] += 1
     return out
 
 
@@ -4262,6 +4409,16 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"official_exchange_delisting_long_research={result.official_exchange_delisting_long_research} "
             f"official_exchange_quote_asset_misclassified={result.official_exchange_quote_asset_misclassified} "
             f"official_exchange_created_alert_rows={result.official_exchange_created_alert_rows} "
+            f"scheduled_catalyst_rows={result.scheduled_catalyst_rows} "
+            f"unlock_candidate_rows={result.unlock_candidate_rows} "
+            f"unlock_without_structured_evidence={result.unlock_without_structured_evidence} "
+            f"unlock_missing_event_time={result.unlock_missing_event_time} "
+            f"unlock_promoted_without_size_metrics={result.unlock_promoted_without_size_metrics} "
+            f"media_unlock_promoted_structured={result.media_unlock_promoted_structured} "
+            f"stale_completed_catalyst_upcoming={result.stale_completed_catalyst_upcoming} "
+            f"calendar_event_missing_source_url={result.calendar_event_missing_source_url} "
+            f"cryptopanic_unlock_proof={result.cryptopanic_unlock_proof} "
+            f"scheduled_catalyst_created_alert_rows={result.scheduled_catalyst_created_alert_rows} "
             f"source_coverage_report_missing={result.source_coverage_report_missing} "
             f"source_coverage_provider_status_unknown={result.source_coverage_provider_status_unknown} "
             f"source_coverage_provider_marked_healthy_without_observation={result.source_coverage_provider_marked_healthy_without_observation} "

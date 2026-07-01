@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Add Event Alpha scheduled catalyst and unlock pack · Codex
+**Why:** Event Alpha needs a structured dated-catalyst lane for upcoming project
+events and unlock/supply risk, while preventing media-only unlock narratives
+from satisfying strict source-pack proof.
+**Changes:**
+- Added `event_scheduled_catalysts.py` to normalize Tokenomist-style unlocks
+  and CoinMarketCal-style calendar events into profile-scoped research
+  artifacts: `event_scheduled_catalysts.jsonl`,
+  `event_unlock_candidates.jsonl`, `event_scheduled_catalyst_report.md`, and
+  `event_unlock_risk_report.md`.
+- Added fixture scheduled/unlock data, CLI and Make targets for
+  scheduled-catalyst reports/smokes, run-ledger/provider-health rows, daily
+  brief sections, research-card details, and strict artifact-doctor checks for
+  missing source/time/size, stale/canceled rows, and accidental alert creation.
+- Tightened unlock/supply source-pack validation so CryptoPanic/RSS/GDELT text
+  that merely mentions an unlock cannot act as structured unlock proof; strict
+  unlock lanes require structured/official/supply evidence, event time, source
+  URL, and materiality.
+**Verify:** `python3 tests/test_indicators.py` (627/627 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-scheduled-catalyst-smoke PYTHON=python3`;
+`make event-alpha-unlock-risk-smoke PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`.
+**Notes/risks:** This is artifact-only and research-only. It sends no
+Telegram messages, opens no paper/live trades, writes no normal RSI rows, and
+cannot create `TRIGGERED_FADE`.
+
 ## 2026-07-01 — Add Event Alpha official exchange announcement pack · Codex
 **Why:** Event Alpha needs first-class official exchange evidence for listings,
 perp launches, delistings, launchpool/product notices, and trading-risk events

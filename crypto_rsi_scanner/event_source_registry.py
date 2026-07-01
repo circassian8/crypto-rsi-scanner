@@ -241,7 +241,12 @@ def source_descriptor_for(
     domain = clean_text(parsed.netloc)
     payload = raw_json or {}
     origin = clean_text(payload.get("source_origin") or payload.get("provider") or "")
+    source_class_hint = clean_text(payload.get("source_class") or "")
+    source_kind_hint = clean_text(payload.get("kind") or "")
     joined = " ".join(part for part in (provider_text, domain, origin, clean_text(text or "")) if part)
+    source_identity_joined = " ".join(
+        part for part in (provider_text, domain, origin, source_class_hint, source_kind_hint) if part
+    )
     reasons: list[str] = []
 
     if any(hint in joined for hint in _OFFICIAL_EXCHANGE_HINTS):
@@ -276,7 +281,7 @@ def source_descriptor_for(
             can_validate_event_time=True,
             reason_codes=tuple(reasons),
         )
-    if any(hint in joined for hint in _UNLOCK_HINTS):
+    if source_class_hint == SourceClass.STRUCTURED_UNLOCK.value or any(hint in source_identity_joined for hint in _UNLOCK_HINTS):
         reasons.append("structured_unlock_source")
         return SourceDescriptor(
             provider=provider_text or "unknown",
