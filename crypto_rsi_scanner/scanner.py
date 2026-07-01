@@ -120,6 +120,7 @@ from . import event_source_reliability
 from . import event_catalyst_search
 from . import event_clock
 from . import event_core_opportunity_store
+from . import event_derivatives_crowding
 from . import event_evidence_acquisition
 from . import event_feedback
 from . import event_llm_analyzer
@@ -4068,6 +4069,8 @@ def event_alpha_notification_checklist_report(
         official_exchange_candidate_rows=event_official_exchange.load_official_listing_candidates(context.namespace_dir),
         scheduled_catalyst_rows=event_scheduled_catalysts.load_scheduled_catalysts(context.namespace_dir),
         unlock_candidate_rows=event_scheduled_catalysts.load_unlock_candidates(context.namespace_dir),
+        derivatives_state_rows=event_derivatives_crowding.load_derivatives_state(context.namespace_dir),
+        fade_review_candidate_rows=event_derivatives_crowding.load_fade_review_candidates(context.namespace_dir),
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         source_coverage_report_path=context.namespace_dir / "event_alpha_source_coverage.md",
@@ -7583,6 +7586,8 @@ def event_alpha_daily_brief_report(
         official_exchange_candidate_rows=event_official_exchange.load_official_listing_candidates(context.namespace_dir),
         scheduled_catalyst_rows=event_scheduled_catalysts.load_scheduled_catalysts(context.namespace_dir),
         unlock_candidate_rows=event_scheduled_catalysts.load_unlock_candidates(context.namespace_dir),
+        derivatives_state_rows=event_derivatives_crowding.load_derivatives_state(context.namespace_dir),
+        fade_review_candidate_rows=event_derivatives_crowding.load_fade_review_candidates(context.namespace_dir),
         watchlist_entries=watchlist.entries,
         router_result=router_result,
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
@@ -7942,6 +7947,161 @@ def event_alpha_scheduled_catalyst_report(
         artifact_namespace=context.artifact_namespace,
         warnings=result.warnings,
     ))
+
+
+def event_alpha_derivatives_report(
+    verbose: bool = False,
+    profile_name: str | None = None,
+    *,
+    artifact_namespace: str | None = None,
+    derivatives_path: str | None = None,
+    include_test_artifacts: bool = False,
+) -> None:
+    """Run the research-only derivatives crowding/fade-review normalizer."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "fixture"
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            selected_profile,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    started_at = datetime.now(timezone.utc)
+    run_id = event_alpha_run_ledger.run_id_for(started_at, context.profile)
+    path = Path(derivatives_path).expanduser() if derivatives_path else Path(config.EVENT_ALPHA_DERIVATIVES_CROWDING_PATH)
+    result = event_derivatives_crowding.run_derivatives_crowding_scan(
+        namespace_dir=context.namespace_dir,
+        derivatives_path=path,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        run_mode=context.run_mode,
+        run_id=run_id,
+        observed_at=_event_research_now(),
+    )
+    finished_at = datetime.now(timezone.utc)
+    _record_derivatives_provider_health(context, result=result, run_id=run_id, now=finished_at)
+    _append_derivatives_run_ledger_row(
+        context,
+        run_id=run_id,
+        started_at=started_at,
+        finished_at=finished_at,
+        derivatives_state_count=result.derivatives_state_count,
+        evaluated_candidate_count=result.evaluated_candidate_count,
+        fade_review_candidate_count=result.fade_review_candidate_count,
+        warnings=result.warnings,
+    )
+    print(_event_alpha_context_block(context))
+    print(
+        "derivatives_crowding_scan: "
+        f"state_rows={result.derivatives_state_count} candidates={result.evaluated_candidate_count} "
+        f"fade_review={result.fade_review_candidate_count} "
+        f"state_path={result.derivatives_state_path} "
+        f"fade_path={result.fade_review_candidates_path} report_path={result.report_path}"
+    )
+    print(event_derivatives_crowding.format_derivatives_crowding_report(
+        state_rows=result.derivatives_state_rows,
+        candidate_rows=result.candidate_rows,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        warnings=result.warnings,
+    ))
+
+
+def _record_derivatives_provider_health(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    *,
+    result: event_derivatives_crowding.DerivativesCrowdingScanResult,
+    run_id: str,
+    now: datetime,
+) -> None:
+    cfg = _event_provider_health_config_from_runtime()
+    providers = {
+        str(row.get("provider") or "coinalyze")
+        for row in result.derivatives_state_rows
+        if isinstance(row, dict)
+    } or {"coinalyze"}
+    for provider in sorted(providers):
+        if result.derivatives_state_count > 0:
+            event_provider_health.record_provider_success(
+                provider,
+                cfg=cfg,
+                run_id=run_id,
+                now=now,
+                provider_kind="enrichment",
+                provider_service=provider,
+                provider_role="derivatives_crowding",
+            )
+        else:
+            event_provider_health.record_provider_failure(
+                provider,
+                "derivatives_crowding_fixture_no_rows",
+                cfg=cfg,
+                run_id=run_id,
+                now=now,
+                provider_kind="enrichment",
+                provider_service=provider,
+                provider_role="derivatives_crowding",
+            )
+
+
+def _append_derivatives_run_ledger_row(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    *,
+    run_id: str,
+    started_at: datetime,
+    finished_at: datetime,
+    derivatives_state_count: int,
+    evaluated_candidate_count: int,
+    fade_review_candidate_count: int,
+    warnings: Iterable[str] = (),
+) -> None:
+    row = {
+        "schema_version": event_alpha_run_ledger.RUN_LEDGER_SCHEMA_VERSION,
+        "row_type": "event_alpha_run",
+        "run_id": run_id,
+        "profile": context.profile,
+        "run_mode": context.run_mode,
+        "artifact_namespace": context.artifact_namespace,
+        "started_at": started_at.astimezone(timezone.utc).isoformat(),
+        "finished_at": finished_at.astimezone(timezone.utc).isoformat(),
+        "runtime_seconds": max(0.0, (finished_at - started_at).total_seconds()),
+        "with_llm": False,
+        "send_requested": False,
+        "raw_events": 0,
+        "market_anomalies": 0,
+        "derivatives_state_rows": int(derivatives_state_count),
+        "fade_review_candidates": int(fade_review_candidate_count),
+        "catalyst_queries": 0,
+        "catalyst_results_accepted": 0,
+        "catalyst_results_rejected": 0,
+        "extraction_rows": 0,
+        "extraction_hints_applied": 0,
+        "candidates": int(evaluated_candidate_count),
+        "clusters": 0,
+        "alerts": 0,
+        "watchlist_entries": 0,
+        "watchlist_escalations": 0,
+        "routed": 0,
+        "alertable": 0,
+        "sent": False,
+        "provider_fetch_count": 0,
+        "provider_cache_hits": 0,
+        "provider_cache_misses": 0,
+        "llm_cache_hits": 0,
+        "llm_cache_misses": 0,
+        "llm_calls_attempted": 0,
+        "llm_skipped_due_budget": 0,
+        "warnings": tuple(str(warning) for warning in warnings if str(warning)),
+        "success": True,
+        "failure": None,
+    }
+    context.run_ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    with context.run_ledger_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, sort_keys=True, default=str, separators=(",", ":")))
+        fh.write("\n")
 
 
 def _record_scheduled_catalyst_provider_health(
@@ -10241,6 +10401,11 @@ def cli() -> None:
         help="Normalize scheduled catalyst/unlock fixtures into research-only Event Alpha artifacts.",
     )
     parser.add_argument(
+        "--event-alpha-derivatives-report",
+        action="store_true",
+        help="Normalize derivatives crowding fixtures into research-only fade/short-review artifacts.",
+    )
+    parser.add_argument(
         "--ignore-provider-backoff",
         action="store_true",
         help="With --event-alpha-notify-cycle, attempt providers even if local provider health is in backoff for this run only.",
@@ -10674,6 +10839,11 @@ def cli() -> None:
         "--event-alpha-scheduled-catalyst-coinmarketcal",
         default=None,
         help="Optional CoinMarketCal/event-calendar fixture path for --event-alpha-scheduled-catalyst-report.",
+    )
+    parser.add_argument(
+        "--event-alpha-derivatives-crowding-path",
+        default=None,
+        help="Optional derivatives crowding fixture path for --event-alpha-derivatives-report.",
     )
     parser.add_argument(
         "--event-alpha-replay",
@@ -11655,6 +11825,15 @@ def cli() -> None:
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             tokenomist_path=args.event_alpha_scheduled_catalyst_tokenomist,
             coinmarketcal_path=args.event_alpha_scheduled_catalyst_coinmarketcal,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+        )
+        return
+    if args.event_alpha_derivatives_report:
+        event_alpha_derivatives_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+            derivatives_path=args.event_alpha_derivatives_crowding_path,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
         )
         return

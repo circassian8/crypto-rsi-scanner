@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_market_anomaly_scanner, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_market_anomaly_scanner, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -98,6 +98,8 @@ class EventAlphaArtifactDoctorResult:
     official_exchange_created_alert_rows: int = 0
     scheduled_catalyst_rows: int = 0
     unlock_candidate_rows: int = 0
+    derivatives_state_rows: int = 0
+    fade_review_candidate_rows: int = 0
     unlock_without_structured_evidence: int = 0
     unlock_missing_event_time: int = 0
     unlock_promoted_without_size_metrics: int = 0
@@ -106,6 +108,14 @@ class EventAlphaArtifactDoctorResult:
     calendar_event_missing_source_url: int = 0
     cryptopanic_unlock_proof: int = 0
     scheduled_catalyst_created_alert_rows: int = 0
+    fade_review_without_completed_move: int = 0
+    fade_review_without_crowding_exhaustion: int = 0
+    fade_review_created_triggered_fade: int = 0
+    fade_review_created_normal_rsi_signal: int = 0
+    fade_review_notification_missing_disclaimer: int = 0
+    derivatives_artifact_secret_leak: int = 0
+    derivatives_state_missing_freshness_status: int = 0
+    confirmed_long_crowded_without_warning: int = 0
     source_coverage_report_missing: int = 0
     source_coverage_provider_status_unknown: int = 0
     source_coverage_provider_marked_healthy_without_observation: int = 0
@@ -265,6 +275,8 @@ def diagnose_artifacts(
     official_exchange_candidate_rows: Iterable[Mapping[str, Any]] | None = None,
     scheduled_catalyst_rows: Iterable[Mapping[str, Any]] | None = None,
     unlock_candidate_rows: Iterable[Mapping[str, Any]] | None = None,
+    derivatives_state_rows: Iterable[Mapping[str, Any]] | None = None,
+    fade_review_candidate_rows: Iterable[Mapping[str, Any]] | None = None,
     card_paths: Iterable[str | Path] = (),
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     source_coverage_report_path: str | Path | None = None,
@@ -326,6 +338,24 @@ def diagnose_artifacts(
         raw_unlock_candidates = list(event_scheduled_catalysts.load_unlock_candidates(default_unlock_path))
     else:
         raw_unlock_candidates = [dict(row) for row in unlock_candidate_rows if isinstance(row, Mapping)]
+    if derivatives_state_rows is None:
+        default_derivatives_path = None
+        if inspected_alert_store_path is not None:
+            default_derivatives_path = Path(inspected_alert_store_path).parent
+        elif source_coverage_report_path is not None:
+            default_derivatives_path = Path(source_coverage_report_path).parent
+        raw_derivatives_state = list(event_derivatives_crowding.load_derivatives_state(default_derivatives_path))
+    else:
+        raw_derivatives_state = [dict(row) for row in derivatives_state_rows if isinstance(row, Mapping)]
+    if fade_review_candidate_rows is None:
+        default_fade_review_path = None
+        if inspected_alert_store_path is not None:
+            default_fade_review_path = Path(inspected_alert_store_path).parent
+        elif source_coverage_report_path is not None:
+            default_fade_review_path = Path(source_coverage_report_path).parent
+        raw_fade_review_candidates = list(event_derivatives_crowding.load_fade_review_candidates(default_fade_review_path))
+    else:
+        raw_fade_review_candidates = [dict(row) for row in fade_review_candidate_rows if isinstance(row, Mapping)]
     raw_legacy = sum(
         1 for row in (*raw_runs, *raw_alerts, *raw_feedback, *raw_outcomes)
         if event_alpha_artifacts.is_legacy_row(row)
@@ -416,6 +446,20 @@ def diagnose_artifacts(
     )
     unlock_candidates = event_alpha_artifacts.filter_artifact_rows(
         raw_unlock_candidates,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    derivatives_state = event_alpha_artifacts.filter_artifact_rows(
+        raw_derivatives_state,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    fade_review_candidates = event_alpha_artifacts.filter_artifact_rows(
+        raw_fade_review_candidates,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -668,6 +712,7 @@ def diagnose_artifacts(
     market_anomaly_conflicts = _market_anomaly_artifact_conflicts(market_anomalies)
     official_exchange_conflicts = _official_exchange_artifact_conflicts(official_exchange_candidates)
     scheduled_conflicts = _scheduled_catalyst_artifact_conflicts((*scheduled_catalysts, *unlock_candidates))
+    derivatives_conflicts = _derivatives_crowding_artifact_conflicts((*derivatives_state, *fade_review_candidates))
     source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
     source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
@@ -928,6 +973,28 @@ def diagnose_artifacts(
     if scheduled_conflicts.get("calendar_event_missing_source_url", 0):
         message = f"calendar_event_missing_source_url={scheduled_conflicts['calendar_event_missing_source_url']}"
         (blockers if strict else warnings).append(message)
+    for key in (
+        "fade_review_without_completed_move",
+        "fade_review_without_crowding_exhaustion",
+        "fade_review_created_triggered_fade",
+        "fade_review_created_normal_rsi_signal",
+        "fade_review_notification_missing_disclaimer",
+        "derivatives_artifact_secret_leak",
+    ):
+        count = derivatives_conflicts.get(key, 0)
+        if count:
+            message = f"{key}={count}"
+            if strict:
+                blockers.append(message)
+            else:
+                warnings.append(message)
+    for key in (
+        "derivatives_state_missing_freshness_status",
+        "confirmed_long_crowded_without_warning",
+    ):
+        count = derivatives_conflicts.get(key, 0)
+        if count:
+            warnings.append(f"{key}={count}")
     if source_coverage_report_conflicts["source_coverage_report_missing"]:
         warnings.append(
             "source_coverage_report_missing="
@@ -1533,6 +1600,8 @@ def diagnose_artifacts(
         official_exchange_created_alert_rows=official_exchange_conflicts["official_exchange_created_alert_rows"],
         scheduled_catalyst_rows=len(scheduled_catalysts),
         unlock_candidate_rows=len(unlock_candidates),
+        derivatives_state_rows=len(derivatives_state),
+        fade_review_candidate_rows=len(fade_review_candidates),
         unlock_without_structured_evidence=scheduled_conflicts["unlock_without_structured_evidence"],
         unlock_missing_event_time=scheduled_conflicts["unlock_missing_event_time"],
         unlock_promoted_without_size_metrics=scheduled_conflicts["unlock_promoted_without_size_metrics"],
@@ -1541,6 +1610,14 @@ def diagnose_artifacts(
         calendar_event_missing_source_url=scheduled_conflicts["calendar_event_missing_source_url"],
         cryptopanic_unlock_proof=scheduled_conflicts["cryptopanic_unlock_proof"],
         scheduled_catalyst_created_alert_rows=scheduled_conflicts["scheduled_catalyst_created_alert_rows"],
+        fade_review_without_completed_move=derivatives_conflicts["fade_review_without_completed_move"],
+        fade_review_without_crowding_exhaustion=derivatives_conflicts["fade_review_without_crowding_exhaustion"],
+        fade_review_created_triggered_fade=derivatives_conflicts["fade_review_created_triggered_fade"],
+        fade_review_created_normal_rsi_signal=derivatives_conflicts["fade_review_created_normal_rsi_signal"],
+        fade_review_notification_missing_disclaimer=derivatives_conflicts["fade_review_notification_missing_disclaimer"],
+        derivatives_artifact_secret_leak=derivatives_conflicts["derivatives_artifact_secret_leak"],
+        derivatives_state_missing_freshness_status=derivatives_conflicts["derivatives_state_missing_freshness_status"],
+        confirmed_long_crowded_without_warning=derivatives_conflicts["confirmed_long_crowded_without_warning"],
         source_coverage_report_missing=source_coverage_report_conflicts["source_coverage_report_missing"],
         source_coverage_provider_status_unknown=source_coverage_report_conflicts["source_coverage_provider_status_unknown"],
         source_coverage_provider_marked_healthy_without_observation=source_coverage_report_conflicts["source_coverage_provider_marked_healthy_without_observation"],
@@ -2567,6 +2644,67 @@ def _scheduled_catalyst_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) ->
         if bool(row.get("created_alert")) or bool(row.get("alert_id")) or route in {"RESEARCH_DIGEST", "HIGH_PRIORITY_RESEARCH", "WATCHLIST", "TRIGGERED_FADE_RESEARCH"} or tier in {"RADAR_DIGEST", "WATCHLIST", "HIGH_PRIORITY", "TRIGGERED_FADE"}:
             out["scheduled_catalyst_created_alert_rows"] += 1
     return out
+
+
+def _derivatives_crowding_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    out = {
+        "fade_review_without_completed_move": 0,
+        "fade_review_without_crowding_exhaustion": 0,
+        "fade_review_created_triggered_fade": 0,
+        "fade_review_created_normal_rsi_signal": 0,
+        "fade_review_notification_missing_disclaimer": 0,
+        "derivatives_artifact_secret_leak": 0,
+        "derivatives_state_missing_freshness_status": 0,
+        "confirmed_long_crowded_without_warning": 0,
+    }
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        row_type = str(row.get("row_type") or "")
+        text = json.dumps(row, sort_keys=True, default=str).casefold()
+        if _derivatives_row_has_secret_leak(row) or any(token in text for token in ("bearer ", "sk-proj-")):
+            out["derivatives_artifact_secret_leak"] += 1
+        if row_type == "derivatives_state_snapshot":
+            if not str(row.get("freshness_status") or "").strip():
+                out["derivatives_state_missing_freshness_status"] += 1
+            continue
+        if row_type != "fade_short_review_candidate":
+            continue
+        opportunity = str(row.get("opportunity_type") or "").upper()
+        crowding = str(row.get("crowding_class") or "").casefold()
+        evidence = [str(item) for item in row.get("crowding_exhaustion_evidence") or () if str(item)]
+        warnings = [str(item) for item in row.get("warnings") or () if str(item)]
+        disclaimer = str(row.get("research_only_disclaimer") or "")
+        if opportunity == "FADE_SHORT_REVIEW":
+            if not bool(row.get("completed_move")):
+                out["fade_review_without_completed_move"] += 1
+            if not bool(row.get("fade_requirements_met")) or not evidence:
+                out["fade_review_without_crowding_exhaustion"] += 1
+            if "Research-only" not in disclaimer or "Not a trade signal" not in disclaimer:
+                out["fade_review_notification_missing_disclaimer"] += 1
+        if bool(row.get("triggered_fade_created")) or str(row.get("signal_type") or "").upper() == "TRIGGERED_FADE":
+            out["fade_review_created_triggered_fade"] += 1
+        if bool(row.get("normal_rsi_signal_written")):
+            out["fade_review_created_normal_rsi_signal"] += 1
+        if opportunity == "CONFIRMED_LONG_RESEARCH" and crowding in {"high", "extreme"}:
+            if not any("crowding" in warning.casefold() for warning in warnings):
+                out["confirmed_long_crowded_without_warning"] += 1
+    return out
+
+
+def _derivatives_row_has_secret_leak(value: object) -> bool:
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            lower = str(key).casefold()
+            if any(token in lower for token in ("api_key", "auth_token", "secret", "token")):
+                text = str(nested).strip()
+                if text and text not in {"<redacted>", "redacted", "***", "none", "null"}:
+                    return True
+            if _derivatives_row_has_secret_leak(nested):
+                return True
+    elif isinstance(value, (list, tuple, set)):
+        return any(_derivatives_row_has_secret_leak(item) for item in value)
+    return False
 
 
 def _safe_float(value: object) -> float | None:
@@ -4411,6 +4549,8 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"official_exchange_created_alert_rows={result.official_exchange_created_alert_rows} "
             f"scheduled_catalyst_rows={result.scheduled_catalyst_rows} "
             f"unlock_candidate_rows={result.unlock_candidate_rows} "
+            f"derivatives_state_rows={result.derivatives_state_rows} "
+            f"fade_review_candidate_rows={result.fade_review_candidate_rows} "
             f"unlock_without_structured_evidence={result.unlock_without_structured_evidence} "
             f"unlock_missing_event_time={result.unlock_missing_event_time} "
             f"unlock_promoted_without_size_metrics={result.unlock_promoted_without_size_metrics} "
@@ -4419,6 +4559,14 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"calendar_event_missing_source_url={result.calendar_event_missing_source_url} "
             f"cryptopanic_unlock_proof={result.cryptopanic_unlock_proof} "
             f"scheduled_catalyst_created_alert_rows={result.scheduled_catalyst_created_alert_rows} "
+            f"fade_review_without_completed_move={result.fade_review_without_completed_move} "
+            f"fade_review_without_crowding_exhaustion={result.fade_review_without_crowding_exhaustion} "
+            f"fade_review_created_triggered_fade={result.fade_review_created_triggered_fade} "
+            f"fade_review_created_normal_rsi_signal={result.fade_review_created_normal_rsi_signal} "
+            f"fade_review_notification_missing_disclaimer={result.fade_review_notification_missing_disclaimer} "
+            f"derivatives_artifact_secret_leak={result.derivatives_artifact_secret_leak} "
+            f"derivatives_state_missing_freshness_status={result.derivatives_state_missing_freshness_status} "
+            f"confirmed_long_crowded_without_warning={result.confirmed_long_crowded_without_warning} "
             f"source_coverage_report_missing={result.source_coverage_report_missing} "
             f"source_coverage_provider_status_unknown={result.source_coverage_provider_status_unknown} "
             f"source_coverage_provider_marked_healthy_without_observation={result.source_coverage_provider_marked_healthy_without_observation} "

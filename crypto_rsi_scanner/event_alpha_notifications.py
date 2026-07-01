@@ -1686,6 +1686,11 @@ def format_core_opportunity_telegram_digest(
     title = "Event Alpha Research Digest"
     if any(event_alpha_router.final_route_value(item) == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value for item in keep):
         title = "Event Alpha High-Priority Research"
+    if any(
+        str((_core_row_for_decision(item, core_map) or {}).get("opportunity_type") or "").upper() == "FADE_SHORT_REVIEW"
+        for item in keep
+    ):
+        title = "Event Alpha Fade / Short-Review Research"
     if any(event_alpha_router.final_route_value(item) == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value for item in keep):
         title = "Event Alpha Triggered Fade Research"
     lines = [
@@ -1752,6 +1757,11 @@ def format_core_opportunity_telegram_digest(
                 f"Check next: {_esc(verify)}",
             ]
         )
+        if str(core.get("opportunity_type") or "").upper() == "FADE_SHORT_REVIEW":
+            lines.extend([
+                "Fade review: move already happened; crowding/exhaustion evidence is present.",
+                "Risk: review invalidation and liquidity manually. Research-only. Not a trade signal.",
+            ])
         card = core.get("card_path") or core.get("research_card_path") or _first_card_path(card_paths, (core_id, decision.alert_id))
         if card:
             lines.append(f"Card: {_esc(Path(str(card)).name)}")

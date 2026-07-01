@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-01 - Derivatives crowding is fade-review evidence, not a trigger
+**Status:** accepted
+**Decision:** Event Alpha may normalize derivatives crowding evidence such as
+open-interest change, funding, liquidation imbalance, long/short ratio, basis,
+and perp/spot volume into profile-scoped research artifacts, daily-brief
+sections, cards, notification copy, run ledgers, and artifact-doctor checks.
+`FADE_SHORT_REVIEW` rows are manual research review metadata only. They must
+not create Telegram sends, normal RSI signal rows, paper trades, live trades,
+execution, or Event Alpha-created `TRIGGERED_FADE`; only deterministic
+`event_fade.py` plus `proxy_fade` can produce a fade trigger.
+**Why:** Derivatives crowding is useful for spotting post-move exhaustion and
+risk, but it is not source evidence for a catalyst and is not enough to justify
+an automated short signal.
+**Revisit when:** A reviewed validation sample proves a derivatives-crowding
+fade-review lane has reliable edge and the human approves a separate
+notification or paper-tracking promotion.
+
 ## 2026-07-01 - Scheduled catalyst and unlock rows are research artifacts only
 **Status:** accepted
 **Decision:** Event Alpha may normalize scheduled project events and

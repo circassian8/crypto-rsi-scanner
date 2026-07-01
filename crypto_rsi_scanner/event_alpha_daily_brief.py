@@ -18,6 +18,7 @@ from . import (
     event_alpha_explain,
     event_core_opportunities,
     event_core_opportunity_store,
+    event_derivatives_crowding,
     event_evidence_acquisition,
     event_near_miss,
     event_alpha_run_ledger,
@@ -57,6 +58,8 @@ def build_daily_brief(
     official_exchange_candidate_rows: Iterable[Mapping[str, Any]] | None = None,
     scheduled_catalyst_rows: Iterable[Mapping[str, Any]] | None = None,
     unlock_candidate_rows: Iterable[Mapping[str, Any]] | None = None,
+    derivatives_state_rows: Iterable[Mapping[str, Any]] | None = None,
+    fade_review_candidate_rows: Iterable[Mapping[str, Any]] | None = None,
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
     router_result: event_alpha_router.EventAlphaRouterResult | None = None,
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
@@ -174,6 +177,30 @@ def build_daily_brief(
     )
     unlock_candidates = event_alpha_artifacts.filter_artifact_rows(
         raw_unlock_candidates,
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    raw_derivatives_state = (
+        [dict(row) for row in derivatives_state_rows if isinstance(row, Mapping)]
+        if derivatives_state_rows is not None
+        else list(event_derivatives_crowding.load_derivatives_state(Path(run_ledger_path).parent if run_ledger_path else None))
+    )
+    derivatives_state = event_alpha_artifacts.filter_artifact_rows(
+        raw_derivatives_state,
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    raw_fade_review_candidates = (
+        [dict(row) for row in fade_review_candidate_rows if isinstance(row, Mapping)]
+        if fade_review_candidate_rows is not None
+        else list(event_derivatives_crowding.load_fade_review_candidates(Path(run_ledger_path).parent if run_ledger_path else None))
+    )
+    fade_review_candidates = event_alpha_artifacts.filter_artifact_rows(
+        raw_fade_review_candidates,
         profile=requested_profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -358,6 +385,9 @@ def build_daily_brief(
         "",
         "## Unlock / Supply Risk",
         *_unlock_risk_daily_lines(unlock_candidates, limit=10),
+        "",
+        "## Derivatives Crowding / Fade-Review Research",
+        *_derivatives_fade_review_daily_lines(fade_review_candidates, derivatives_state, limit=10),
         "",
         "## Catalyst Calendar Gaps",
         *_calendar_gap_daily_lines([*scheduled_catalysts, *unlock_candidates], limit=10),
@@ -2058,6 +2088,76 @@ def _unlock_risk_daily_lines(
     if remaining:
         lines.append(f"- +{remaining} more unlock rows in local artifacts.")
     return lines
+
+
+def _derivatives_fade_review_daily_lines(
+    fade_rows: Iterable[Mapping[str, Any]],
+    state_rows: Iterable[Mapping[str, Any]],
+    *,
+    limit: int,
+) -> list[str]:
+    candidates = [dict(row) for row in fade_rows if isinstance(row, Mapping)]
+    states = [dict(row) for row in state_rows if isinstance(row, Mapping)]
+    lines = [
+        "Research-only. Not a trade signal. FADE_SHORT_REVIEW means manual review of crowding/exhaustion risk after a completed move.",
+        f"- Derivatives state rows: {len(states)}",
+    ]
+    if not candidates:
+        lines.append("- Fade / short-review candidates: none.")
+        return lines
+    priority = {"extreme": 0, "high": 1, "moderate": 2, "none": 3}
+    candidates.sort(
+        key=lambda row: (
+            priority.get(str(row.get("crowding_class") or "none"), 9),
+            str(row.get("symbol") or ""),
+        )
+    )
+    displayed = 0
+    for row in candidates[: max(0, limit)]:
+        lines.append(
+            f"- {row.get('symbol') or 'UNKNOWN'}/{row.get('coin_id') or 'unknown'}: "
+            f"lane={row.get('opportunity_type') or 'unknown'} "
+            f"market_state={row.get('market_state') or 'unknown'} "
+            f"crowding={row.get('crowding_class') or 'unknown'} "
+            f"fade_ready={row.get('fade_readiness') or 'unknown'}"
+        )
+        lines.append(f"  move: {_derivatives_move_summary(row)}")
+        evidence = [str(item) for item in row.get("crowding_exhaustion_evidence") or () if str(item)]
+        lines.append("  crowding/exhaustion: " + ("; ".join(evidence[:6]) if evidence else "none"))
+        invalidates = [str(item) for item in row.get("what_invalidates_fade_review") or () if str(item)]
+        if invalidates:
+            lines.append("  invalidates: " + "; ".join(invalidates[:4]))
+        warnings = [str(item) for item in row.get("warnings") or () if str(item)]
+        if warnings:
+            lines.append("  warnings: " + "; ".join(warnings[:4]))
+        displayed += 1
+    remaining = max(0, len(candidates) - displayed)
+    if remaining:
+        lines.append(f"- +{remaining} more derivatives fade-review rows in local artifacts.")
+    return lines
+
+
+def _derivatives_move_summary(row: Mapping[str, Any]) -> str:
+    snapshot = row.get("market_state_snapshot")
+    if not isinstance(snapshot, Mapping):
+        snapshot = {}
+    return (
+        f"4h={_format_pct(snapshot.get('return_4h'))} "
+        f"24h={_format_pct(snapshot.get('return_24h'))} "
+        f"liquidity={_format_compact_number(snapshot.get('liquidity_usd'))} "
+        f"spread_bps={_format_float(snapshot.get('spread_bps'))}"
+    )
+
+
+def _format_compact_number(value: object) -> str:
+    parsed = _optional_float(value)
+    if parsed is None:
+        return "n/a"
+    if abs(parsed) >= 1_000_000:
+        return f"{parsed / 1_000_000:.1f}m"
+    if abs(parsed) >= 1_000:
+        return f"{parsed / 1_000:.1f}k"
+    return f"{parsed:.1f}".rstrip("0").rstrip(".")
 
 
 def _calendar_gap_daily_lines(

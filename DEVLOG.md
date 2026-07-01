@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Add Event Alpha derivatives crowding review lane · Codex
+**Why:** Event Alpha needs derivatives context for crowded post-pump fade
+review without allowing open interest, funding, or liquidation data to create
+trading signals or bypass deterministic event-fade gates.
+**Changes:**
+- Added `event_derivatives_crowding.py` to normalize Coinalyze-style
+  derivatives fixture rows into `event_derivatives_state.jsonl`,
+  `event_fade_short_review_candidates.jsonl`, and
+  `event_derivatives_crowding_report.md` under the selected Event Alpha
+  namespace.
+- Added `main.py --event-alpha-derivatives-report`,
+  `make event-alpha-derivatives-smoke`, and
+  `make event-alpha-fade-review-smoke`, plus fixture rows that demonstrate
+  healthy confirmed-long, crowded confirmed-long warning, fade short-review,
+  and risk-only/liquidity-blocked outcomes.
+- Surfaced derivatives crowding/fade-review context in daily briefs, research
+  cards, notification digest copy, provider/run-ledger observations, and strict
+  artifact-doctor checks for missing completed-move/crowding proof, secret
+  leakage, stale/freshness gaps, missing research disclaimers, and accidental
+  alert/trade creation.
+**Verify:** `python3 tests/test_indicators.py` (633/633 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-derivatives-smoke PYTHON=python3`;
+`make event-alpha-fade-review-smoke PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** The derivatives lane is artifact-only and research-only.
+`FADE_SHORT_REVIEW` is manual review metadata, not a short trigger; it cannot
+create `TRIGGERED_FADE`, normal RSI rows, Telegram sends, paper trades, live
+trades, or execution.
+
 ## 2026-07-01 — Add Event Alpha scheduled catalyst and unlock pack · Codex
 **Why:** Event Alpha needs a structured dated-catalyst lane for upcoming project
 events and unlock/supply risk, while preventing media-only unlock narratives

@@ -214,6 +214,10 @@ def render_research_card(
     if scheduled_lines:
         lines.extend(["", "## Scheduled Catalyst / Unlock Details"])
         lines.extend(scheduled_lines)
+    derivatives_lines = _derivatives_crowding_lines(entry, alert)
+    if derivatives_lines:
+        lines.extend(["", "## Derivatives / Crowding"])
+        lines.extend(derivatives_lines)
     lines.extend(["", "## Source Coverage / Evidence Acquisition"])
     lines.extend(_source_acquisition_lines(entry, alert, card_path=card_path, lineage_context=lineage_context))
     lines.extend([
@@ -1880,6 +1884,57 @@ def _scheduled_catalyst_lines(
     if components.get("source_url"):
         lines.append(f"- Source: {components.get('source_url')}")
     return lines
+
+
+def _derivatives_crowding_lines(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> list[str]:
+    components = _card_components(entry, alert)
+    state = components.get("derivatives_state_snapshot")
+    if not isinstance(state, Mapping):
+        state = {}
+    opportunity = str(components.get("opportunity_type") or components.get("opportunity_type_original") or "")
+    crowding = str(components.get("crowding_class") or "").strip()
+    has_derivatives = bool(state) or opportunity == "FADE_SHORT_REVIEW" or bool(crowding)
+    if not has_derivatives:
+        return []
+    evidence = _list_strings(components.get("crowding_exhaustion_evidence"))
+    confirms = _list_strings(components.get("what_confirms_fade_review") or components.get("what_confirms"))
+    invalidates = _list_strings(components.get("what_invalidates_fade_review") or components.get("what_invalidates"))
+    lines = [
+        "- Research-only. Not a trade signal.",
+        f"- Provider: {_display_text(state.get('provider')) or 'unknown'}",
+        f"- Market: {_display_text(state.get('market')) or 'unknown'}",
+        f"- OI delta: 1h={_display_pct(state.get('open_interest_delta_1h'))} "
+        f"4h={_display_pct(state.get('open_interest_delta_4h'))} "
+        f"24h={_display_pct(state.get('open_interest_delta_24h'))}",
+        f"- Funding: current={_display_pct(state.get('funding_rate'))} "
+        f"predicted={_display_pct(state.get('predicted_funding_rate'))} "
+        f"z={_display_text(state.get('funding_zscore')) or 'n/a'}",
+        f"- Liquidation imbalance: {_display_text(state.get('liquidation_imbalance')) or 'n/a'}",
+        f"- Crowding class: {crowding or 'unknown'}",
+        f"- Fade readiness: {_display_text(components.get('fade_readiness')) or 'unknown'}",
+    ]
+    if evidence:
+        lines.append("- Crowding / exhaustion evidence: " + "; ".join(evidence[:8]))
+    if confirms:
+        lines.append("- What confirms fade review: " + "; ".join(confirms[:5]))
+    if invalidates:
+        lines.append("- What invalidates fade review: " + "; ".join(invalidates[:5]))
+    warnings = _list_strings(components.get("warnings"))
+    if warnings:
+        lines.append("- Warnings: " + "; ".join(warnings[:6]))
+    return lines
+
+
+def _display_pct(value: Any) -> str:
+    parsed = _float(value)
+    if parsed is None:
+        return "n/a"
+    if abs(parsed) <= 3.0:
+        parsed *= 100.0
+    return f"{parsed:+.2f}%"
 
 
 def _list_strings(value: Any) -> list[str]:

@@ -38071,6 +38071,227 @@ def test_makefile_exposes_scheduled_catalyst_targets():
     assert "--event-alpha-scheduled-catalyst-report" in text
 
 
+def test_derivatives_crowding_fixture_lanes_and_artifacts():
+    from crypto_rsi_scanner import event_derivatives_crowding
+
+    with TemporaryDirectory() as tmp:
+        result = event_derivatives_crowding.run_derivatives_crowding_scan(
+            namespace_dir=tmp,
+            derivatives_path="fixtures/event_derivatives_crowding/derivatives_crowding_rows.json",
+            profile="fixture",
+            artifact_namespace="derivatives_crowding_smoke",
+            run_mode="fixture",
+            run_id="run-derivatives-fixture",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        states = event_derivatives_crowding.load_derivatives_state(tmp)
+        fade_rows = event_derivatives_crowding.load_fade_review_candidates(tmp)
+        report = result.report_path.read_text(encoding="utf-8")
+
+    by_symbol = {str(row.get("symbol") or ""): row for row in result.candidate_rows}
+
+    assert result.derivatives_state_count == 4
+    assert result.evaluated_candidate_count == 5
+    assert result.fade_review_candidate_count == 1
+    assert len(states) == 4
+    assert len(fade_rows) == 1
+    assert by_symbol["TESTLIST"]["opportunity_type"] == "FADE_SHORT_REVIEW"
+    assert by_symbol["TESTLIST"]["completed_move"] is True
+    assert by_symbol["TESTLIST"]["fade_requirements_met"] is True
+    assert by_symbol["TESTBREAK"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH"
+    assert by_symbol["TESTCROWD"]["opportunity_type"] in {"FADE_SHORT_REVIEW", "CONFIRMED_LONG_RESEARCH"}
+    if by_symbol["TESTCROWD"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH":
+        assert "confirmed_long_derivatives_crowding_warning" in by_symbol["TESTCROWD"]["warnings"]
+    assert by_symbol["TESTILLIQ"]["opportunity_type"] == "RISK_ONLY"
+    assert by_symbol["TESTRISK"]["opportunity_type"] == "RISK_ONLY"
+    assert all(row["created_alert"] is False for row in result.candidate_rows)
+    assert all(row["normal_rsi_signal_written"] is False for row in result.candidate_rows)
+    assert all(row["triggered_fade_created"] is False for row in result.candidate_rows)
+    assert all(row["paper_trade_created"] is False for row in result.candidate_rows)
+    assert "Research-only. Not a trade signal" in report
+
+
+def test_derivatives_crowding_artifact_doctor_conflicts():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    rows = [
+        {
+            "row_type": "derivatives_state_snapshot",
+            "symbol": "MISS",
+            "raw_payload_redacted": {"api_key": "should_not_show"},
+        },
+        {
+            "row_type": "fade_short_review_candidate",
+            "symbol": "NOMOVE",
+            "opportunity_type": "FADE_SHORT_REVIEW",
+            "completed_move": False,
+            "fade_requirements_met": True,
+            "crowding_exhaustion_evidence": ["funding_zscore_elevated"],
+            "research_only_disclaimer": "Research-only. Not a trade signal.",
+        },
+        {
+            "row_type": "fade_short_review_candidate",
+            "symbol": "NOCROWD",
+            "opportunity_type": "FADE_SHORT_REVIEW",
+            "completed_move": True,
+            "fade_requirements_met": False,
+            "crowding_exhaustion_evidence": [],
+            "research_only_disclaimer": "Research-only. Not a trade signal.",
+        },
+        {
+            "row_type": "fade_short_review_candidate",
+            "symbol": "LEAK",
+            "opportunity_type": "FADE_SHORT_REVIEW",
+            "completed_move": True,
+            "fade_requirements_met": True,
+            "crowding_exhaustion_evidence": ["funding_zscore_elevated"],
+            "research_only_disclaimer": "fade review",
+            "triggered_fade_created": True,
+            "normal_rsi_signal_written": True,
+            "raw_payload_redacted": {"auth_token": "abc"},
+        },
+        {
+            "row_type": "fade_short_review_candidate",
+            "symbol": "CROWDLONG",
+            "opportunity_type": "CONFIRMED_LONG_RESEARCH",
+            "crowding_class": "high",
+            "warnings": [],
+            "research_only_disclaimer": "Research-only. Not a trade signal.",
+        },
+    ]
+    conflicts = event_alpha_artifact_doctor._derivatives_crowding_artifact_conflicts(rows)
+
+    assert conflicts["fade_review_without_completed_move"] == 1
+    assert conflicts["fade_review_without_crowding_exhaustion"] == 1
+    assert conflicts["fade_review_created_triggered_fade"] == 1
+    assert conflicts["fade_review_created_normal_rsi_signal"] == 1
+    assert conflicts["fade_review_notification_missing_disclaimer"] == 1
+    assert conflicts["derivatives_artifact_secret_leak"] == 2
+    assert conflicts["derivatives_state_missing_freshness_status"] == 1
+    assert conflicts["confirmed_long_crowded_without_warning"] == 1
+
+
+def test_daily_brief_renders_derivatives_fade_review_section():
+    from crypto_rsi_scanner import event_alpha_daily_brief, event_derivatives_crowding
+
+    with TemporaryDirectory() as tmp:
+        result = event_derivatives_crowding.run_derivatives_crowding_scan(
+            namespace_dir=tmp,
+            derivatives_path="fixtures/event_derivatives_crowding/derivatives_crowding_rows.json",
+            profile="fixture",
+            artifact_namespace="derivatives_crowding_smoke",
+            run_mode="fixture",
+            run_id="run-derivatives-fixture",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        brief = event_alpha_daily_brief.build_daily_brief(
+            run_rows=[],
+            derivatives_state_rows=result.derivatives_state_rows,
+            fade_review_candidate_rows=result.fade_review_candidates,
+            requested_profile="fixture",
+            artifact_namespace="derivatives_crowding_smoke",
+            include_test_artifacts=True,
+        )
+
+    assert "## Derivatives Crowding / Fade-Review Research" in brief
+    assert "Research-only. Not a trade signal" in brief
+    assert "TESTLIST/testlist" in brief
+    assert "crowding=extreme" in brief
+
+
+def test_research_card_renders_derivatives_crowding_section():
+    from crypto_rsi_scanner import event_derivatives_crowding, event_research_cards
+
+    with TemporaryDirectory() as tmp:
+        result = event_derivatives_crowding.run_derivatives_crowding_scan(
+            namespace_dir=tmp,
+            derivatives_path="fixtures/event_derivatives_crowding/derivatives_crowding_rows.json",
+            profile="fixture",
+            artifact_namespace="fade_review_smoke",
+            run_mode="fixture",
+            run_id="run-derivatives-fixture",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+    row = next(item for item in result.fade_review_candidates if item["symbol"] == "TESTLIST")
+    row = {**row, "alert_id": "TESTLIST", "tier": "STORE_ONLY"}
+    card = event_research_cards.render_research_card("TESTLIST", alert_rows=[row])
+
+    assert card.found is True
+    assert "## Derivatives / Crowding" in card.markdown
+    assert "- Research-only. Not a trade signal." in card.markdown
+    assert "- Crowding class: extreme" in card.markdown
+    assert "What invalidates fade review" in card.markdown
+
+
+def test_notification_digest_labels_fade_short_review_lane():
+    from crypto_rsi_scanner import event_alpha_notifications as notif, event_alpha_router, event_watchlist
+
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="TESTLIST|fade",
+        cluster_id="cluster-testlist",
+        event_id="evt-testlist",
+        coin_id="testlist",
+        symbol="TESTLIST",
+        relationship_type="listing_liquidity_event",
+        external_asset=None,
+        event_time="2026-06-15T13:00:00+00:00",
+        state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        previous_state="WATCHLIST",
+        first_seen_at="2026-06-15T12:00:00+00:00",
+        last_seen_at="2026-06-15T16:00:00+00:00",
+        latest_event_name="TESTLIST official listing pump",
+        opportunity_level="high_priority",
+    )
+    decision = event_alpha_router.EventAlphaRouteDecision(
+        entry=entry,
+        route=event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH,
+        alertable=True,
+        reason="fade review escalation",
+        lane=event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION,
+        final_route_after_quality_gate=event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        opportunity_level="high_priority",
+        opportunity_score_final=88,
+    )
+    message = notif.format_core_opportunity_telegram_digest(
+        [decision],
+        profile="fixture",
+        card_path_by_alert_id={},
+        core_row_by_alert_id={
+            decision.alert_id: {
+                "core_opportunity_id": "core-testlist",
+                "symbol": "TESTLIST",
+                "coin_id": "testlist",
+                "canonical_incident_name": "TESTLIST official listing pump",
+                "opportunity_type": "FADE_SHORT_REVIEW",
+                "market_state": "blowoff_crowded",
+                "final_opportunity_level": "high_priority",
+                "final_route_after_quality_gate": "HIGH_PRIORITY_RESEARCH",
+                "impact_path_type": "listing_liquidity_event",
+                "candidate_role": "direct_beneficiary",
+                "evidence_acquisition_status": "accepted_evidence_found",
+                "accepted_evidence_count": 1,
+                "source_pack": "listing_liquidity_pack",
+                "why_opportunity_visible": "Move already happened and derivatives are crowded.",
+            }
+        },
+    )
+
+    assert "Event Alpha Fade / Short-Review Research" in message
+    assert "move already happened" in message
+    assert "Research-only. Not a trade signal." in message
+
+
+def test_makefile_exposes_derivatives_targets():
+    text = Path("Makefile").read_text(encoding="utf-8")
+
+    assert "event-alpha-derivatives-report" in text
+    assert "event-alpha-derivatives-smoke" in text
+    assert "event-alpha-fade-review-smoke" in text
+    assert "--event-alpha-derivatives-report" in text
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

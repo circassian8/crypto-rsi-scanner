@@ -94,6 +94,23 @@ ARTIFACT_NAMESPACE=<namespace> PYTHON=python3` to inspect a configured
 namespace. Media-only CryptoPanic/RSS/GDELT text that merely says a token has an
 unlock is not structured unlock proof; strict unlock/supply lanes require
 structured/official/supply evidence, event time, source URL, and materiality.
+The derivatives crowding pack is a market-risk review lane, not catalyst proof
+and not a trigger. It normalizes Coinalyze-style open interest, funding,
+liquidation imbalance, long/short ratio, basis, perp/spot volume, exchange,
+market, provider, and freshness fields into:
+
+- `event_derivatives_state.jsonl`
+- `event_fade_short_review_candidates.jsonl`
+- `event_derivatives_crowding_report.md`
+
+Use `make event-alpha-derivatives-smoke PYTHON=python3` to prove fixture
+normalization, daily-brief/card output, and strict artifact-doctor checks. Use
+`make event-alpha-fade-review-smoke PYTHON=python3` when the focus is the
+manual fade/short-review lane. A `FADE_SHORT_REVIEW` row requires evidence that
+the move already happened plus crowding/exhaustion and liquidity sanity; poor
+liquidity stays `RISK_ONLY`. The lane is research-only metadata and cannot
+create `TRIGGERED_FADE`, normal RSI rows, Telegram sends, paper trades, live
+trades, or execution.
 Source-pack acquisition rows now persist the attempted plan, execution results,
 query execution statuses, provider coverage statuses, accepted/rejected samples,
 and source-pack sufficiency booleans. Treat these rows as audit evidence; they
