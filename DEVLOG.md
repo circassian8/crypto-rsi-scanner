@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Harden semantic CryptoPanic narrative gates · Codex
+**Why:** A live rehearsal still exposed a CHZ/fan-token-style opportunity that
+could look like an unlock/direct-event digest row because lower-level support
+metadata carried a direct source pack while canonical categories showed a
+source-only narrative. Cards could also prefer row-local coverage over the
+authoritative source-coverage artifact.
+**Changes:**
+- Made live confirmation detect fan/proxy/political narrative semantics from
+  supporting categories, impact paths, roles, and incident/source text even when
+  a stale support row has a direct-event source pack.
+- Prevented CryptoPanic tag-only evidence from confirming direct unlock-style
+  paths unless official/structured evidence is also present, while preserving
+  structured unlock/listing confirmation.
+- Passed canonical incident/source/category context into CoreOpportunity verdict
+  normalization so stale stored rows are capped consistently when read.
+- Made daily brief evidence-acquisition lines display the canonical post-policy
+  core verdict instead of stale acquisition-row verdict fields, and made
+  research-review delivery lines show all canonical core identities for grouped
+  rows.
+- Made research cards prefer the namespace `event_alpha_source_coverage.json`
+  source-pack view so cards no longer claim complete coverage/no gaps when the
+  canonical coverage report says partial or degraded.
+**Verify:** `python3 tests/test_indicators.py` (595/595 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`
+(WARN only, blockers none);
+`make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-notify-llm-deep-research-review-no-send-smoke PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-notify-llm-deep-no-send-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** No live provider run or Telegram send was performed in this
+pass. The source-coverage and evidence-acquisition fixture smokes still warn
+about intentionally incomplete provider coverage, but strict doctor reports no
+blockers for the inspected rehearsal namespace.
+
 ## 2026-07-01 — Finish CryptoPanic source-coverage consistency · Codex
 **Why:** The first successful Growth Weekly rehearsal proved CryptoPanic could
 return usable evidence, but the operator surfaces still mixed that success with

@@ -36612,6 +36612,51 @@ def test_live_confirmation_caps_source_only_narrative_digest_without_market():
     assert confirmed.confirmed is True
     assert confirmed.capped_level is None
 
+    mispacked_unlock = event_opportunity_verdict.apply_live_confirmation_policy(
+        {
+            "profile": "notify_llm_deep",
+            "artifact_namespace": "notify_llm_deep_cryptopanic_rehearsal",
+            "symbol": "CHZ",
+            "coin_id": "chiliz",
+            "source_pack": "unlock_supply_pack",
+            "source_class": "cryptopanic_tagged",
+            "final_opportunity_level": "validated_digest",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 72,
+            "impact_path_type": "unlock_supply_event",
+            "supporting_categories": ["sports_fan_proxy"],
+            "supporting_impact_paths": ["fan_token_attention"],
+            "evidence_acquisition_status": "not_executed",
+            "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match"],
+            "market_confirmation_level": "none",
+            "market_context_freshness_status": "missing",
+        }
+    )
+    assert mispacked_unlock.confirmed is False
+    assert mispacked_unlock.reason == "source_only_narrative_without_market_confirmation"
+
+    structured_unlock = event_opportunity_verdict.apply_live_confirmation_policy(
+        {
+            "profile": "notify_llm_deep",
+            "artifact_namespace": "notify_llm_deep_cryptopanic_rehearsal",
+            "symbol": "UNLK",
+            "coin_id": "unlock-token",
+            "source_pack": "unlock_supply_pack",
+            "source_class": "structured_unlock",
+            "final_opportunity_level": "validated_digest",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 78,
+            "impact_path_type": "unlock_supply_event",
+            "evidence_acquisition_status": "accepted_evidence_found",
+            "evidence_acquisition_accepted_count": 1,
+            "accepted_provider_counts": {"tokenomist": 1},
+            "accepted_evidence_reason_codes": ["structured_unlock_evidence", "tokenomist_unlock_match"],
+            "market_context_freshness_status": "missing",
+        }
+    )
+    assert structured_unlock.confirmed is True
+    assert structured_unlock.capped_level is None
+
 
 def test_core_store_load_normalizes_stale_source_only_narrative_digest():
     from crypto_rsi_scanner import event_alpha_router, event_core_opportunity_store
@@ -36645,6 +36690,25 @@ def test_core_store_load_normalizes_stale_source_only_narrative_digest():
     assert opportunity.opportunity_level == "exploratory"
     assert opportunity.final_route_after_quality_gate == event_alpha_router.EventAlphaRoute.STORE_ONLY.value
     assert opportunity.primary_row["live_confirmation_reason"] == "source_only_narrative_without_market_confirmation"
+
+    stale_mispacked = {
+        **stale,
+        "core_opportunity_id": "core_chz_mispacked_unlock",
+        "primary_impact_path": "unlock_supply_event",
+        "impact_path_type": "unlock_supply_event",
+        "source_pack": "unlock_supply_pack",
+        "source_class": "cryptopanic_tagged",
+        "evidence_acquisition_status": "not_executed",
+        "evidence_acquisition_accepted_count": 0,
+        "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match"],
+        "supporting_categories": ["sports_fan_proxy"],
+        "supporting_impact_paths": ["fan_token_attention"],
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE.value,
+    }
+    mispacked = event_core_opportunity_store.core_opportunities_from_rows([stale_mispacked])[0]
+    assert mispacked.opportunity_level == "exploratory"
+    assert mispacked.is_validated_digest is False
+    assert mispacked.primary_row["live_confirmation_reason"] == "source_only_narrative_without_market_confirmation"
 
 
 def test_daily_brief_source_coverage_uses_json_effective_provider_health():
@@ -36714,9 +36778,9 @@ def test_daily_brief_reflects_planned_research_review_delivery_without_decisions
                 "delivery_state": "blocked",
                 "would_send": True,
                 "core_opportunity_id": "core_velvet_review",
-                "core_opportunity_ids": ["core_velvet_review"],
-                "canonical_symbol": "VELVET",
-                "canonical_coin_id": "velvet",
+                "core_opportunity_ids": ["core_chz_review", "core_velvet_review"],
+                "canonical_symbols": ["CHZ", "VELVET"],
+                "canonical_coin_ids": ["chiliz", "velvet"],
                 "attempted_at": "2026-07-01T00:01:00+00:00",
                 "mode": "no_send_rehearsal",
             }) + "\n",
@@ -36739,8 +36803,157 @@ def test_daily_brief_reflects_planned_research_review_delivery_without_decisions
             run_ledger_path=base / "event_alpha_runs.jsonl",
         )
     assert "### Research Review Digest" in brief
-    assert "VELVET/velvet core=core_velvet_review" in brief
+    assert "CHZ + VELVET/2 coin(s) core=2 core(s): core_chz_review, core_velvet_review" in brief
     assert "would_send=true" in brief
+
+
+def test_daily_brief_evidence_acquisition_uses_canonical_post_policy_verdict():
+    import json
+
+    from crypto_rsi_scanner import event_alpha_daily_brief
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        core_row = {
+            "row_type": "event_core_opportunity",
+            "schema_version": "event_core_opportunity_store_v1",
+            "run_id": "run-1",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "ns",
+            "core_opportunity_id": "core_chz_review",
+            "symbol": "CHZ",
+            "coin_id": "chiliz",
+            "incident_id": "world-cup-chz",
+            "candidate_role": "proxy_instrument",
+            "primary_impact_path": "unlock_supply_event",
+            "impact_path_type": "unlock_supply_event",
+            "opportunity_level": "validated_digest",
+            "final_opportunity_level": "validated_digest",
+            "opportunity_score_final": 72,
+            "final_route_after_quality_gate": "RESEARCH_DIGEST",
+            "final_state_after_quality_gate": "RADAR",
+            "source_pack": "unlock_supply_pack",
+            "source_class": "cryptopanic_tagged",
+            "evidence_acquisition_status": "accepted_evidence_found",
+            "evidence_acquisition_accepted_count": 1,
+            "accepted_provider_counts": {"cryptopanic": 1},
+            "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match"],
+            "market_confirmation_level": "none",
+            "market_context_freshness_status": "missing",
+            "supporting_categories": ["sports_fan_proxy"],
+            "supporting_impact_paths": ["fan_token_attention"],
+            "generated_at": "2026-07-01T00:00:00+00:00",
+        }
+        acquisition = {
+            "row_type": "event_evidence_acquisition",
+            "run_id": "run-1",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "ns",
+            "core_opportunity_id": "core_chz_review",
+            "symbol": "CHZ",
+            "coin_id": "chiliz",
+            "source_pack": "fan_sports_pack",
+            "status": "accepted_evidence_found",
+            "accepted_evidence": [{"provider": "cryptopanic", "source_class": "cryptopanic_tagged"}],
+            "rejected_evidence_samples": [],
+            "opportunity_score_before": 64,
+            "opportunity_score_after": 72,
+            "acquisition_evidence_status": "accepted_evidence_found",
+            "final_upgrade_status": "unchanged",
+            "final_opportunity_level": "validated_digest",
+            "final_verdict_source": "evidence_acquisition",
+        }
+        brief = event_alpha_daily_brief.build_daily_brief(
+            run_rows=[{
+                "row_type": "event_alpha_run",
+                "run_id": "run-1",
+                "profile": "notify_llm_deep",
+                "run_mode": "notification_burn_in",
+                "artifact_namespace": "ns",
+                "started_at": "2026-07-01T00:00:00+00:00",
+                "success": True,
+            }],
+            core_opportunity_rows=[core_row],
+            evidence_acquisition_rows=[acquisition],
+            requested_profile="notify_llm_deep",
+            artifact_namespace="ns",
+            run_ledger_path=base / "event_alpha_runs.jsonl",
+        )
+    assert "## Validated Digest Core Opportunities\n- None." in brief
+    assert "## Live Confirmation Gated Candidates" in brief
+    assert "source_only_narrative_without_market_confirmation" in brief
+    assert "verdict=exploratory source=core_opportunity_merge" in brief
+
+
+def test_research_card_source_coverage_uses_authoritative_json():
+    import json
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner import event_research_cards
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        cards_dir = base / "research_cards"
+        (base / "event_alpha_source_coverage.json").write_text(
+            json.dumps({
+                "packs": [{
+                    "source_pack": "fan_sports_pack",
+                    "provider_coverage_status": "partial",
+                    "evidence_absence_meaningful": True,
+                    "providers_missing_for_confirmation": ["sports_fixtures"],
+                    "providers_degraded_for_confirmation": ["gdelt", "project_blog_rss"],
+                    "missing_providers": ["sports_fixtures"],
+                    "degraded_or_backoff_providers": ["gdelt", "project_blog_rss"],
+                    "coverage_gap_reason": "source_pack_coverage_partial;missing:sports_fixtures;degraded:gdelt,project_blog_rss",
+                }]
+            }),
+            encoding="utf-8",
+        )
+        core_row = {
+            "row_type": "event_core_opportunity",
+            "schema_version": "event_core_opportunity_store_v1",
+            "run_id": "run-1",
+            "profile": "notify_llm_deep",
+            "artifact_namespace": "ns",
+            "core_opportunity_id": "core_chz_review",
+            "symbol": "CHZ",
+            "coin_id": "chiliz",
+            "incident_id": "world-cup-chz",
+            "canonical_incident_name": "World Cup fan token attention",
+            "candidate_role": "proxy_instrument",
+            "primary_impact_path": "fan_token_event",
+            "impact_path_type": "fan_token_event",
+            "opportunity_level": "exploratory",
+            "final_opportunity_level": "exploratory",
+            "opportunity_score_final": 64,
+            "final_route_after_quality_gate": "STORE_ONLY",
+            "final_state_after_quality_gate": "RADAR",
+            "source_pack": "fan_sports_pack",
+            "provider_coverage_status": "complete",
+            "evidence_acquisition_status": "accepted_evidence_found",
+            "evidence_acquisition_accepted_count": 1,
+            "evidence_acquisition_accepted_evidence": [{
+                "provider": "cryptopanic",
+                "source_class": "cryptopanic_tagged",
+                "title": "CHZ fan token demand builds into World Cup",
+            }],
+            "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match"],
+            "generated_at": "2026-07-01T00:00:00+00:00",
+        }
+        result = event_research_cards.write_research_cards(
+            cards_dir,
+            watchlist_entries=[],
+            alert_rows=[core_row],
+            now=datetime(2026, 7, 1, tzinfo=timezone.utc),
+        )
+        assert result.cards_written == 1
+        text = result.card_paths[0].read_text(encoding="utf-8")
+    assert "- Coverage status: partial" in text
+    assert "missing:sports_fixtures" in text
+    assert "degraded:gdelt" in text
+    assert "Provider/source gaps: none" not in text
 
 
 def _run_all():

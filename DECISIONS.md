@@ -28,10 +28,14 @@ narrative source packs such as fan/sports, proxy/pre-IPO RWA, and political meme
 packs still need stronger daily-digest confirmation than a single source-only
 row: official/structured evidence, multiple accepted evidence rows, matching
 CryptoPanic tag evidence plus market confirmation, or an explicit operator opt-in
-via `RSI_EVENT_ALPHA_ALLOW_SOURCE_ONLY_NARRATIVE_DIGEST=1`. Operator-facing
-research-card indexes and artifact-doctor card checks should use the normalized
-canonical CoreOpportunity verdict rather than stale lower-level support-row
-metadata.
+via `RSI_EVENT_ALPHA_ALLOW_SOURCE_ONLY_NARRATIVE_DIGEST=1`. Narrative/proxy
+semantics from supporting categories, impact paths, roles, and source/incident
+text override stale lower-level source-pack labels, so a fan/proxy row cannot
+escape as a direct unlock/listing-style digest just because a support row is
+mispacked. Operator-facing research-card indexes, evidence-acquisition summaries,
+and artifact-doctor card checks should use the normalized canonical
+CoreOpportunity verdict and source-coverage JSON rather than stale lower-level
+support-row metadata.
 **Why:** The first successful Growth Weekly rehearsal proved CryptoPanic was
 working, but stale backoff diagnostics and source-only narrative digest rows made
 operator-facing artifacts look both broken and too permissive.

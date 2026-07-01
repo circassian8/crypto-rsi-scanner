@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+import json
 import re
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
@@ -183,7 +184,7 @@ def render_research_card(
     ])
     lines.extend(_source_lines(entry, alert))
     lines.extend(["", "## Source Coverage / Evidence Acquisition"])
-    lines.extend(_source_acquisition_lines(entry, alert))
+    lines.extend(_source_acquisition_lines(entry, alert, card_path=card_path, lineage_context=lineage_context))
     lines.extend([
         "",
         "## Accepted / Rejected Asset Links",
@@ -1638,6 +1639,9 @@ def _display_text(value: Any) -> str | None:
 def _source_acquisition_lines(
     entry: event_watchlist.EventWatchlistEntry | None,
     alert: Mapping[str, Any] | None,
+    *,
+    card_path: str | Path | None = None,
+    lineage_context: Mapping[str, Any] | None = None,
 ) -> list[str]:
     components = _card_components(entry, alert)
     if not components and entry is None:
@@ -1680,10 +1684,27 @@ def _source_acquisition_lines(
         evidence_rows=tuple(item for item in accepted_evidence if isinstance(item, Mapping)),
         assessment=assessment,
     )
+    coverage_pack = _source_coverage_pack_for_card(
+        pack_name,
+        card_path=card_path,
+        lineage_context=lineage_context,
+    )
+    if coverage_pack:
+        failures = _coverage_pack_gap_lines(coverage_pack) or failures
+    coverage_status = (
+        coverage_pack.get("provider_coverage_status")
+        if coverage_pack
+        else (components.get("provider_coverage_status") or assessment.provider_coverage_status)
+    )
+    absence_meaningful = (
+        coverage_pack.get("evidence_absence_meaningful")
+        if coverage_pack and coverage_pack.get("evidence_absence_meaningful") is not None
+        else components.get("evidence_absence_is_meaningful", assessment.evidence_absence_is_meaningful)
+    )
     lines = [
         f"- Source pack: {pack_name}",
-        f"- Coverage status: {components.get('provider_coverage_status') or assessment.provider_coverage_status}",
-        f"- Evidence absence meaningful: {str(bool(components.get('evidence_absence_is_meaningful', assessment.evidence_absence_is_meaningful))).lower()}",
+        f"- Coverage status: {coverage_status or 'unknown'}",
+        f"- Evidence absence meaningful: {str(bool(absence_meaningful)).lower()}",
         f"- Source quality prior/cap: {components.get('source_quality_prior') or assessment.source_quality_prior}/{components.get('source_confidence_cap') or assessment.confidence_cap}",
         "- Source can prove: " + _source_contract_text(contract.get("source_can_prove")),
         "- Source cannot prove: " + _source_contract_text(contract.get("source_cannot_prove")),
@@ -1721,6 +1742,56 @@ def _source_acquisition_lines(
         "- What source would downgrade this: " + verdict_copy.downgrade_text,
     ]
     return lines
+
+
+def _source_coverage_pack_for_card(
+    pack_name: str,
+    *,
+    card_path: str | Path | None,
+    lineage_context: Mapping[str, Any] | None,
+) -> Mapping[str, Any] | None:
+    json_paths: list[Path] = []
+    if lineage_context:
+        for key in ("source_coverage_json_path", "event_alpha_source_coverage_json_path"):
+            value = lineage_context.get(key)
+            if value:
+                json_paths.append(Path(str(value)).expanduser())
+    if card_path:
+        path = Path(card_path).expanduser()
+        json_paths.append(path.parent.parent / "event_alpha_source_coverage.json")
+    seen: set[Path] = set()
+    for path in json_paths:
+        if path in seen or not path.exists():
+            continue
+        seen.add(path)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        for pack in data.get("packs") or ():
+            if isinstance(pack, Mapping) and str(pack.get("source_pack") or "") == str(pack_name or ""):
+                return pack
+    return None
+
+
+def _coverage_pack_gap_lines(pack: Mapping[str, Any]) -> list[str]:
+    items: list[str] = []
+    for label, key in (
+        ("missing", "providers_missing_for_confirmation"),
+        ("degraded", "providers_degraded_for_confirmation"),
+        ("missing", "missing_providers"),
+        ("degraded", "degraded_or_backoff_providers"),
+    ):
+        values = pack.get(key)
+        if isinstance(values, Iterable) and not isinstance(values, (str, bytes, Mapping)):
+            for value in values:
+                text = str(value or "").strip()
+                if text:
+                    items.append(f"{label}:{text}")
+    reason = str(pack.get("coverage_gap_reason") or "").strip()
+    if reason and reason not in {"none", "unknown"}:
+        items.append(reason)
+    return list(dict.fromkeys(items))
 
 
 def _analyst_summary_lines(

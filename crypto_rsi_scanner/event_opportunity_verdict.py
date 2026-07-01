@@ -838,7 +838,7 @@ def _strong_live_confirmation_reason(data: Mapping[str, Any]) -> str | None:
         return "official_or_structured_source_confirmation"
     if (
         "cryptopanic_tagged" in source_classes or "cryptopanic_currency_tag_match" in reason_codes
-    ) and not _narrative_source_pack(data):
+    ) and not _narrative_source_pack(data) and not _cryptopanic_tag_only_cannot_confirm_direct_path(data):
         return "cryptopanic_tagged_token_catalyst_confirmation"
     if (
         market_score >= 75
@@ -860,6 +860,10 @@ def _strong_live_confirmation_reason(data: Mapping[str, Any]) -> str | None:
         and source_class not in {"", "broad_news", "prediction_market", "seo_or_affiliate", "social_or_unknown", "insufficient_data"}
         and evidence_score >= 70
     ):
+        if impact_path == "unlock_supply_event" and not _has_official_or_structured_evidence(data):
+            return None
+        if _cryptopanic_tag_only_cannot_confirm_direct_path(data):
+            return None
         return "explicit_deterministic_direct_event_source"
     return None
 
@@ -880,15 +884,7 @@ def _source_only_narrative_without_market_confirmation(
     """
     if allow_source_only_narrative_digest or not _narrative_source_pack(data):
         return False
-    source_class = str(data.get("source_class") or "").strip().casefold()
-    official_or_structured = source_class in {
-        "official_project",
-        "official_exchange",
-        "structured_calendar",
-        "structured_unlock",
-        "exchange_announcement",
-    }
-    if official_or_structured:
+    if _has_official_or_structured_evidence(data):
         return False
     accepted_count = _count_value(
         data.get("evidence_acquisition_accepted_count"),
@@ -916,11 +912,143 @@ def _source_only_narrative_without_market_confirmation(
 
 
 def _narrative_source_pack(data: Mapping[str, Any]) -> bool:
-    return str(data.get("source_pack") or "").strip().casefold() in {
+    if str(data.get("source_pack") or "").strip().casefold() in {
         "fan_sports_pack",
         "proxy_preipo_rwa_pack",
         "political_meme_pack",
+    }:
+        return True
+    return _has_narrative_or_proxy_semantics(data)
+
+
+def _has_narrative_or_proxy_semantics(data: Mapping[str, Any]) -> bool:
+    values = _lower_values(
+        data,
+        "supporting_categories",
+        "supporting_impact_paths",
+        "impact_category",
+        "impact_path_type",
+        "primary_impact_path",
+        "impact_path_reason",
+        "playbook_type",
+        "effective_playbook_type",
+        "latest_playbook_type",
+        "relationship_type",
+        "candidate_role",
+    )
+    narrative_tokens = {
+        "sports_fan_proxy",
+        "fan_sports_proxy",
+        "fan_token_attention",
+        "fan_token_event",
+        "fan_token",
+        "sports_proxy",
+        "proxy_attention",
+        "proxy_exposure",
+        "proxy_instrument",
+        "proxy_venue",
+        "venue_value_capture",
+        "rwa_preipo_proxy",
+        "rwa_preipo",
+        "preipo_proxy",
+        "pre_ipo_proxy",
+        "tokenized_stock_venue",
+        "political_meme",
+        "political_meme_proxy",
+        "meme_attention",
     }
+    if values.intersection(narrative_tokens):
+        return True
+    text = _lower_text_blob(
+        data,
+        "canonical_incident_name",
+        "incident_canonical_name",
+        "latest_event_name",
+        "event_name",
+        "latest_source_title",
+        "source_title",
+        "why_opportunity_visible",
+        "final_verdict_reason",
+    )
+    return any(
+        term in text
+        for term in (
+            "fan token",
+            "world cup",
+            "champions league",
+            "proxy narrative",
+            "pre-ipo",
+            "pre ipo",
+            "tokenized stock",
+            "synthetic exposure",
+            "political meme",
+            "election meme",
+        )
+    )
+
+
+def _has_official_or_structured_evidence(data: Mapping[str, Any]) -> bool:
+    source_classes = _lower_values(data, "source_class", "source_classes")
+    reason_codes = _lower_values(
+        data,
+        "accepted_evidence_reason_codes",
+        "accepted_reason_codes",
+        "source_registry_reasons",
+        "reason_codes",
+    )
+    provider_counts = {
+        str(key or "").strip().casefold()
+        for key in (
+            data.get("accepted_provider_counts").keys()
+            if isinstance(data.get("accepted_provider_counts"), Mapping)
+            else ()
+        )
+    }
+    official_or_structured = {
+        "official_project",
+        "official_exchange",
+        "structured_calendar",
+        "structured_unlock",
+        "exchange_announcement",
+    }
+    if source_classes.intersection(official_or_structured):
+        return True
+    if provider_counts.intersection({"tokenomist", "coinmarketcal", "binance_announcements", "bybit_announcements"}):
+        return True
+    return bool(
+        reason_codes.intersection(
+            {
+                "official_project_source",
+                "official_exchange_announcement",
+                "official_exchange_identity_match",
+                "structured_unlock_evidence",
+                "structured_calendar_evidence",
+                "tokenomist_unlock_match",
+                "unlock_schedule_match",
+                "direct_token_unlock_fact",
+            }
+        )
+    )
+
+
+def _cryptopanic_tag_only_cannot_confirm_direct_path(data: Mapping[str, Any]) -> bool:
+    source_classes = _lower_values(data, "source_class", "source_classes")
+    reason_codes = _lower_values(
+        data,
+        "accepted_evidence_reason_codes",
+        "accepted_reason_codes",
+        "source_registry_reasons",
+        "reason_codes",
+    )
+    cryptopanic_tagged = "cryptopanic_tagged" in source_classes or "cryptopanic_currency_tag_match" in reason_codes
+    if not cryptopanic_tagged:
+        return False
+    if _has_narrative_or_proxy_semantics(data):
+        return True
+    impact_path = str(data.get("impact_path_type") or data.get("primary_impact_path") or "").strip().casefold()
+    if impact_path == "unlock_supply_event" and not _has_official_or_structured_evidence(data):
+        return True
+    return False
 
 
 def _has_fresh_market_confirmation(data: Mapping[str, Any]) -> bool:
@@ -943,6 +1071,24 @@ def _has_fresh_market_confirmation(data: Mapping[str, Any]) -> bool:
     ).strip().casefold()
     fresh_context = freshness in {"fresh", "fixture_allowed_stale"}
     return fresh_context and (market_score >= 40 or market_level in {"moderate", "strong", "confirmed", "fresh"})
+
+
+def _lower_values(data: Mapping[str, Any], *keys: str) -> set[str]:
+    out: set[str] = set()
+    for key in keys:
+        for value in _as_values(data.get(key)):
+            text = str(value or "").strip().casefold()
+            if text:
+                out.add(text)
+    return out
+
+
+def _lower_text_blob(data: Mapping[str, Any], *keys: str) -> str:
+    return " ".join(
+        str(data.get(key) or "")
+        for key in keys
+        if str(data.get(key) or "").strip()
+    ).casefold()
 
 
 def _non_generic_impact_path(path: str, strength: str) -> bool:

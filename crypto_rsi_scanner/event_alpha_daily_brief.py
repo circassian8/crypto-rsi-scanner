@@ -288,7 +288,12 @@ def build_daily_brief(
         ),
         "",
         "### Evidence Acquisition Results",
-        *_evidence_acquisition_result_lines((*near_miss_candidates, *upgrade_candidates), acquisition_rows=acquisition_rows, limit=8),
+        *_evidence_acquisition_result_lines(
+            (*near_miss_candidates, *upgrade_candidates),
+            acquisition_rows=acquisition_rows,
+            core_opportunities=core_opportunities,
+            limit=8,
+        ),
         "",
         "### Candidates Blocked by Source Coverage",
         *_coverage_blocked_candidate_lines((*near_miss_candidates, *upgrade_candidates), limit=8),
@@ -1215,9 +1220,15 @@ def _evidence_acquisition_result_lines(
     candidates: Iterable[event_near_miss.EventNearMissCandidate],
     *,
     acquisition_rows: Iterable[Mapping[str, Any]] = (),
+    core_opportunities: Iterable[event_core_opportunities.CoreOpportunity] = (),
     limit: int,
 ) -> list[str]:
     executed = [dict(row) for row in acquisition_rows if isinstance(row, Mapping)]
+    core_by_id = {
+        item.core_opportunity_id: item
+        for item in core_opportunities
+        if item.core_opportunity_id
+    }
     if executed:
         lines: list[str] = []
         status_counts: dict[str, int] = {}
@@ -1231,6 +1242,16 @@ def _evidence_acquisition_result_lines(
         for row in executed[:limit]:
             accepted = row.get("accepted_evidence") if isinstance(row.get("accepted_evidence"), list) else ()
             rejected = row.get("rejected_evidence_samples") if isinstance(row.get("rejected_evidence_samples"), list) else ()
+            core = core_by_id.get(str(row.get("core_opportunity_id") or ""))
+            core_row = core.primary_row if core is not None else {}
+            canonical_level = (
+                core_row.get("final_opportunity_level")
+                or (core.opportunity_level if core is not None else None)
+                or row.get("final_opportunity_level")
+                or row.get("opportunity_level_after")
+                or "unknown"
+            )
+            canonical_source = core_row.get("final_verdict_source") or row.get("final_verdict_source") or "canonical_core"
             lines.append(
                 f"- {row.get('symbol') or row.get('coin_id') or row.get('hypothesis_id') or 'UNKNOWN'}: "
                 f"pack={row.get('source_pack') or 'unknown'} status={row.get('status') or 'unknown'} "
@@ -1238,8 +1259,8 @@ def _evidence_acquisition_result_lines(
                 f"score={row.get('opportunity_score_before')}->{row.get('opportunity_score_after')} "
                 f"evidence={row.get('acquisition_evidence_status') or 'unknown'} "
                 f"final={row.get('final_upgrade_status') or row.get('acquisition_upgrade_status') or 'unchanged'} "
-                f"verdict={row.get('final_opportunity_level') or row.get('opportunity_level_after') or 'unknown'} "
-                f"source={row.get('final_verdict_source') or 'initial'}"
+                f"verdict={canonical_level} "
+                f"source={canonical_source}"
             )
         if len(executed) > limit:
             lines.append(f"- +{len(executed) - limit} more acquisition rows in local artifacts")
@@ -1633,9 +1654,16 @@ def _research_review_delivery_line(row: Mapping[str, Any]) -> str:
     symbols = row.get("canonical_symbols") if isinstance(row.get("canonical_symbols"), list) else []
     coins = row.get("canonical_coin_ids") if isinstance(row.get("canonical_coin_ids"), list) else []
     core_ids = row.get("core_opportunity_ids") if isinstance(row.get("core_opportunity_ids"), list) else []
-    label = str(row.get("canonical_symbol") or (symbols[0] if symbols else "") or row.get("symbol") or "UNKNOWN")
-    coin = str(row.get("canonical_coin_id") or (coins[0] if coins else "") or row.get("coin_id") or "unknown")
-    core_id = str(row.get("core_opportunity_id") or (core_ids[0] if core_ids else "") or row.get("alert_id") or "unknown")
+    if len(symbols) > 1:
+        label = " + ".join(str(value) for value in symbols[:6])
+        if len(symbols) > 6:
+            label += f" +{len(symbols) - 6} more"
+        coin = f"{len(coins)} coin(s)" if coins else "multiple"
+        core_id = f"{len(core_ids)} core(s): " + ", ".join(str(value) for value in core_ids[:4])
+    else:
+        label = str(row.get("canonical_symbol") or (symbols[0] if symbols else "") or row.get("symbol") or "UNKNOWN")
+        coin = str(row.get("canonical_coin_id") or (coins[0] if coins else "") or row.get("coin_id") or "unknown")
+        core_id = str(row.get("core_opportunity_id") or (core_ids[0] if core_ids else "") or row.get("alert_id") or "unknown")
     state = str(row.get("delivery_state") or row.get("state") or "planned")
     mode = str(row.get("mode") or row.get("send_mode") or "")
     return (
