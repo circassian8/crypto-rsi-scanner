@@ -873,7 +873,14 @@ def _recommendation_lines(report: EventAlphaSourceCoverageReport) -> list[str]:
         provider: provider_missing_counts.get(provider, 0) + provider_gap_counts.get(provider, 0)
         for provider in set(provider_missing_counts) | set(provider_gap_counts)
     }
-    top = sorted(combined, key=lambda item: (-combined[item], item))[:5]
+    top = sorted(
+        combined,
+        key=lambda item: (
+            -_provider_lane_priority(item),
+            -combined[item],
+            item,
+        ),
+    )[:5]
     lines: list[str] = []
     for provider in top:
         reason = []
@@ -883,6 +890,25 @@ def _recommendation_lines(report: EventAlphaSourceCoverageReport) -> list[str]:
             reason.append(f"degraded_or_backoff_in_packs={provider_gap_counts[provider]}")
         lines.append(f"- {provider}: " + ", ".join(reason))
     return lines
+
+
+def _provider_lane_priority(provider: str) -> int:
+    text = str(provider or "").casefold()
+    if any(token in text for token in ("binance", "bybit", "coinbase", "kucoin", "okx")):
+        return 700
+    if any(token in text for token in ("coinalyze", "futures", "derivatives", "funding")):
+        return 650
+    if any(token in text for token in ("tokenomist", "coinmarketcal", "coindar", "messari")):
+        return 600
+    if any(token in text for token in ("geckoterminal", "arkham", "dune", "etherscan")):
+        return 500
+    if any(token in text for token in ("defillama",)):
+        return 450
+    if "cryptopanic" in text:
+        return 350
+    if any(token in text for token in ("rss", "gdelt", "project_blog")):
+        return 100
+    return 200
 
 
 def _pack_recommended_actions(

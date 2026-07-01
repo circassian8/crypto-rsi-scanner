@@ -799,6 +799,8 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert "accepted=1" in text
     assert "article quality: good=1" in text
     assert "Most useful next data source:" in text
+    assert event_alpha_source_coverage._provider_lane_priority("coinalyze") > event_alpha_source_coverage._provider_lane_priority("gdelt")  # noqa: SLF001
+    assert event_alpha_source_coverage._provider_lane_priority("binance_announcements") > event_alpha_source_coverage._provider_lane_priority("project_blog_rss")  # noqa: SLF001
     assert "recommended actions:" in text
     assert "configure CryptoPanic token/news coverage" in text
     assert "RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN" in text
@@ -1041,6 +1043,27 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
         assert source_report_doctor.source_coverage_report_missing == 0
         assert source_report_doctor.source_coverage_provider_status_unknown > 0
         assert source_report_doctor.source_coverage_provider_marked_healthy_without_observation == 0
+        bad_rank_path = Path(tmp) / "bad_rank_source_coverage.md"
+        bad_rank_path.write_text(
+            "Most useful next data source:\n"
+            "- gdelt: broad context\n"
+            "- coinalyze: derivatives/OI/funding\n",
+            encoding="utf-8",
+        )
+        bad_rank_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "source-coverage-rank-test",
+                "profile": "notify_llm_deep",
+                "artifact_namespace": "notify_llm_deep",
+                "run_mode": "test",
+            }],
+            source_coverage_report_path=bad_rank_path,
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert bad_rank_doctor.source_coverage_context_provider_ranked_above_lane_critical == 1
 
         parse_report_path = Path(tmp) / "event_alpha_source_coverage.md"
         parse_report_path.write_text(
@@ -24364,7 +24387,7 @@ def test_event_alpha_daily_brief_replay_retention_and_unmatched_feedback():
         }],
         monitor_rows=[monitor_row],
     )
-    assert "## Trade-Readiness Checklist" in card.markdown
+    assert "## Research Review Checklist" in card.markdown
     assert "## Latest Monitor Update" in card.markdown
     assert "MARKET_SCORE_JUMP" in card.markdown
     assert "DERIVATIVES_HEATED" in card.markdown
@@ -34203,13 +34226,26 @@ def test_research_cards_use_canonical_core_store_groups():
         )
         store_ids = {row["core_opportunity_id"] for row in store_rows}
         groups = event_research_cards.card_index_group_map(result.card_paths)
-        core_paths = [path for path in result.card_paths if groups[path] == "Core Opportunity Cards"]
+        reviewable_core_groups = {
+            "Early Long Research Cards",
+            "Confirmed Long Research Cards",
+            "Fade / Short-Review Cards",
+            "Risk Only Cards",
+            "Unconfirmed Research Cards",
+            "Core Opportunity Cards",
+        }
+        core_paths = [path for path in result.card_paths if groups[path] in reviewable_core_groups]
         assert core_paths
         assert all(event_research_cards.card_core_opportunity_id(path) in store_ids for path in core_paths)
         index_text = result.index_path.read_text(encoding="utf-8")
-        core_section = index_text.split("## Core Opportunity Cards", 1)[1].split("## Near-Miss Cards", 1)[0]
+        promoted_sections = "\n".join(
+            index_text.split(f"## {group_name}", 1)[1].split("\n## ", 1)[0]
+            for group_name in reviewable_core_groups
+            if f"## {group_name}" in index_text
+        )
         local_section = index_text.split("## Local-Only / Quality-Capped Cards", 1)[1].split("## Diagnostic", 1)[0]
         assert "RUNE" in "".join(path.read_text(encoding="utf-8") for path in core_paths)
+        assert "card_core_aa617f5bc943" in promoted_sections
         assert "memecore" in local_section.casefold() or any(
             "memecore" in path.read_text(encoding="utf-8").casefold()
             for path, group in groups.items()
@@ -38535,7 +38571,7 @@ def test_makefile_exposes_derivatives_targets():
 def test_integrated_radar_fixture_lanes_and_merge():
     import json
 
-    from crypto_rsi_scanner import event_alpha_artifacts, event_integrated_radar
+    from crypto_rsi_scanner import event_alpha_artifacts, event_core_opportunity_store, event_integrated_radar, event_research_cards
 
     with TemporaryDirectory() as tmp:
         context = event_alpha_artifacts.context_from_profile(
@@ -38564,14 +38600,25 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert by_symbol["SECTOR"]["opportunity_type"] == "DIAGNOSTIC"
         assert by_symbol["BTC"]["opportunity_type"] != "EARLY_LONG_RESEARCH"
         assert by_symbol["BTC"]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+        assert by_symbol["BTC"]["why_now"] == "simple major-pair announcement capped as unconfirmed research"
+        assert "major_pair_simple_announcement_capped" in by_symbol["BTC"]["warnings"]
+        assert "major_pair_simple_announcement_not_alpha" in by_symbol["BTC"]["why_not_alertable"]
         assert by_symbol["BTC"]["source_url"]
         assert by_symbol["BTC"]["official_exchange_event"]["event_type"] == "new_trading_pair"
 
         assert set(by_symbol["TESTPERP"]["source_origins"]) >= {"official_exchange", "market_anomaly", "derivatives"}
         assert set(by_symbol["TESTFADE"]["source_origins"]) >= {"official_exchange", "market_anomaly", "derivatives"}
         assert by_symbol["TESTFADE"]["derivatives_snapshot"]
+        assert by_symbol["TESTFADE"]["crowding_class"] == "extreme"
+        assert by_symbol["TESTFADE"]["fade_readiness"] == "ready_for_review"
+        assert "open_interest_delta_24h_high" in by_symbol["TESTFADE"]["crowding_exhaustion_evidence"]
+        assert by_symbol["TESTFADE"]["integrated_market_confirmation_level"] == "post_event_fade_setup"
         assert by_symbol["TESTFADE"]["triggered_fade_created"] is False
         assert by_symbol["TESTFADE"]["normal_rsi_signal_written"] is False
+        assert by_symbol["TESTPERP"]["crowding_class"] == "moderate"
+        assert by_symbol["TESTPERP"]["fade_readiness"] == "not_ready"
+        assert "confirmed_long_derivatives_crowding_warning" in by_symbol["TESTPERP"]["warnings"]
+        assert by_symbol["TESTPERP"]["integrated_market_confirmation_level"] == "confirmed_breakout"
 
         cores = [
             json.loads(line)
@@ -38586,19 +38633,49 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert core_by_symbol["BTC"]["official_exchange_event"]["event_type"] == "new_trading_pair"
         assert core_by_symbol["TESTLIST"]["official_exchange_event_type"] == "spot_listing"
         assert core_by_symbol["TESTPERP"]["official_exchange_event_type"] == "perp_listing"
+        assert core_by_symbol["TESTPERP"]["crowding_class"] == "moderate"
+        assert "confirmed_long_derivatives_crowding_warning" in core_by_symbol["TESTPERP"]["warnings"]
+        assert core_by_symbol["TESTFADE"]["crowding_class"] == "extreme"
+        assert core_by_symbol["TESTFADE"]["fade_readiness"] == "ready_for_review"
+        assert "liquidation_imbalance_extreme" in core_by_symbol["TESTFADE"]["crowding_exhaustion_evidence"]
         assert core_by_symbol["TESTUNLOCK"]["scheduled_catalyst_event"]["event_type"] == "token_unlock"
         assert core_by_symbol["TESTUNLOCK"]["unlock_event"]["event_type"] == "token_unlock"
+        loaded_cores = event_core_opportunity_store.core_opportunities_from_rows(cores)
+        loaded_btc = next(item for item in loaded_cores if item.symbol == "BTC")
+        assert loaded_btc.primary_row["opportunity_type"] == "UNCONFIRMED_RESEARCH"
 
-        card_text = "\n".join(
-            path.read_text(encoding="utf-8")
-            for path in result.research_card_paths
-            if "index.md" not in str(path)
-        )
+        card_text_by_symbol = {}
+        for path in result.research_card_paths:
+            if "index.md" in str(path):
+                continue
+            text = path.read_text(encoding="utf-8")
+            for symbol in ("BTC", "TESTFADE", "TESTPERP"):
+                if f"# {symbol} Event Research Card" in text:
+                    card_text_by_symbol[symbol] = text
+        card_text = "\n".join(card_text_by_symbol.values())
         assert "Opportunity type: UNCONFIRMED_RESEARCH" in card_text
         assert "## Official Exchange Evidence" in card_text
         assert "Exchange: binance" in card_text
         assert "Event type: new_trading_pair" in card_text
         assert by_symbol["BTC"]["source_url"] in card_text
+        assert "- Opportunity type: UNCONFIRMED_RESEARCH" in card_text_by_symbol["BTC"]
+        assert "- Why now: simple major-pair announcement capped as unconfirmed research" in card_text_by_symbol["BTC"]
+        assert "major_pair_simple_announcement_capped" in card_text_by_symbol["BTC"]
+        assert "- Opportunity type: EARLY_LONG_RESEARCH" not in card_text_by_symbol["BTC"]
+        assert "- Crowding class: extreme" in card_text_by_symbol["TESTFADE"]
+        assert "- Fade readiness: ready_for_review" in card_text_by_symbol["TESTFADE"]
+        assert "Derivatives crowding: n/a" not in card_text_by_symbol["TESTFADE"]
+        assert "- Integrated market state: post_event_fade_setup" in card_text_by_symbol["TESTFADE"]
+        assert "- Crowding class: moderate" in card_text_by_symbol["TESTPERP"]
+        assert "confirmed_long_derivatives_crowding_warning" in card_text_by_symbol["TESTPERP"]
+        assert "- Integrated market state: confirmed_breakout" in card_text_by_symbol["TESTPERP"]
+        assert "Market confirmation: none" not in card_text_by_symbol["TESTPERP"]
+        card_groups = event_research_cards.card_index_group_map(result.research_card_paths)
+        group_names = set(card_groups.values())
+        assert "Early Long Research Cards" in group_names
+        assert "Confirmed Long Research Cards" in group_names
+        assert "Fade / Short-Review Cards" in group_names
+        assert "Unconfirmed Research Cards" in group_names
 
         daily = result.daily_brief_path.read_text(encoding="utf-8")
         before_diagnostics = daily.split("## Diagnostics Appendix", 1)[0]
@@ -38609,6 +38686,12 @@ def test_integrated_radar_fixture_lanes_and_merge():
         manifest = json.loads(result.input_manifest_path.read_text(encoding="utf-8"))
         assert manifest["input_mode"] == "auto"
         assert manifest["row_counts"]["official_exchange"] >= 4
+        for sidecar in manifest["sidecars"]:
+            assert sidecar["sidecar_research_observed_at"] == "2026-06-15T16:00:00+00:00"
+            assert sidecar["sidecar_wall_started_at"] != sidecar["sidecar_research_observed_at"]
+            assert sidecar["sidecar_wall_finished_at"] != sidecar["sidecar_research_observed_at"]
+            assert sidecar["started_at"] == sidecar["sidecar_wall_started_at"]
+            assert sidecar["finished_at"] == sidecar["sidecar_wall_finished_at"]
         assert result.source_coverage_json_path.exists()
         source_coverage = json.loads(result.source_coverage_json_path.read_text(encoding="utf-8"))
         assert source_coverage["candidate_count"] == len(rows)
@@ -38691,6 +38774,8 @@ def test_integrated_doctor_catches_core_and_card_mismatches():
         "market_state_class": "no_reaction",
         "source_url": "https://example.com/btc",
         "reason_codes": ["major_pair_simple_announcement_capped"],
+        "major_pair_simple_announcement": True,
+        "why_now": "simple major-pair announcement capped as unconfirmed research",
         "official_exchange_event": {"event_type": "new_trading_pair", "exchange": "binance", "source_url": "https://example.com/btc"},
     }
     core = {
@@ -38713,6 +38798,71 @@ def test_integrated_doctor_catches_core_and_card_mismatches():
     assert conflicts["integrated_candidate_core_source_url_loss"] == 1
     assert conflicts["integrated_candidate_core_official_event_loss"] == 1
     assert conflicts["integrated_core_silent_upgrade"] == 1
+
+    with TemporaryDirectory() as tmp:
+        bad_card = Path(tmp) / "card_core_btc.md"
+        bad_card.write_text(
+            "\n".join([
+                "# BTC Event Research Card",
+                "",
+                "## Opportunity Lane",
+                "- Opportunity type: EARLY_LONG_RESEARCH",
+                "- Why now: strong source with no reaction; monitor before the move is crowded",
+                "",
+                "## Artifact Lineage",
+                "- Core opportunity ID: core-btc",
+            ]),
+            encoding="utf-8",
+        )
+        card_conflicts = event_alpha_artifact_doctor._integrated_radar_artifact_conflicts(  # noqa: SLF001
+            [candidate],
+            core_rows=[{**candidate, "row_type": "event_core_opportunity"}],
+            research_card_paths=(bad_card,),
+        )
+    assert card_conflicts["integrated_candidate_card_opportunity_type_mismatch"] == 1
+    assert card_conflicts["card_opportunity_lane_core_mismatch"] == 1
+    assert card_conflicts["integrated_candidate_card_why_now_mismatch"] == 1
+    assert card_conflicts["integrated_major_pair_card_early_long"] == 1
+    assert card_conflicts["integrated_card_generic_lane_override"] == 1
+
+    fade_candidate = {
+        "row_type": "event_integrated_radar_candidate",
+        "symbol": "TESTFADE",
+        "core_opportunity_id": "core-fade",
+        "opportunity_type": "FADE_SHORT_REVIEW",
+        "market_state_class": "post_event_fade_setup",
+        "market_requirements_met": True,
+        "derivatives_state_snapshot": {"funding_rate": 0.12},
+        "crowding_class": "extreme",
+        "fade_readiness": "ready_for_review",
+        "crowding_exhaustion_evidence": ["open_interest_delta_24h_high"],
+    }
+    with TemporaryDirectory() as tmp:
+        bad_fade_card = Path(tmp) / "card_core_fade.md"
+        bad_fade_card.write_text(
+            "\n".join([
+                "# TESTFADE Event Research Card",
+                "",
+                "## Opportunity Lane",
+                "- Opportunity type: FADE_SHORT_REVIEW",
+                "- Why now: completed move with derivatives crowding/exhaustion evidence",
+                "",
+                "## Derivatives / Crowding",
+                "- Crowding class: unknown",
+                "- Fade readiness: unknown",
+                "",
+                "## Artifact Lineage",
+                "- Core opportunity ID: core-fade",
+            ]),
+            encoding="utf-8",
+        )
+        fade_conflicts = event_alpha_artifact_doctor._integrated_radar_artifact_conflicts(  # noqa: SLF001
+            [fade_candidate],
+            core_rows=[{**fade_candidate, "row_type": "event_core_opportunity"}],
+            research_card_paths=(bad_fade_card,),
+        )
+    assert fade_conflicts["integrated_fade_card_missing_disclaimer"] == 1
+    assert fade_conflicts["integrated_fade_card_crowding_unknown"] == 1
 
 
 def test_event_alpha_heartbeat_uses_strict_alert_and_research_candidate_copy():

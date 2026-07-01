@@ -144,8 +144,19 @@ class EventAlphaArtifactDoctorResult:
     integrated_candidate_core_unlock_event_loss: int = 0
     integrated_candidate_core_derivatives_loss: int = 0
     integrated_candidate_card_opportunity_type_mismatch: int = 0
+    integrated_candidate_card_why_now_mismatch: int = 0
+    integrated_major_pair_card_early_long: int = 0
+    integrated_card_generic_lane_override: int = 0
+    card_opportunity_lane_core_mismatch: int = 0
     integrated_candidate_card_official_event_missing: int = 0
     integrated_candidate_card_source_url_missing: int = 0
+    integrated_candidate_core_crowding_metadata_loss: int = 0
+    integrated_fade_card_crowding_unknown: int = 0
+    integrated_fade_card_missing_disclaimer: int = 0
+    integrated_confirmed_long_crowding_warning_hidden: int = 0
+    integrated_market_confirmation_display_contradiction: int = 0
+    integrated_derivatives_display_contradiction: int = 0
+    integrated_manifest_mixed_timestamp_pair: int = 0
     integrated_core_silent_upgrade: int = 0
     integrated_diagnostic_visible_in_default_operator_section: int = 0
     integrated_preview_missing_disclaimer: int = 0
@@ -154,6 +165,7 @@ class EventAlphaArtifactDoctorResult:
     source_coverage_report_missing: int = 0
     source_coverage_provider_status_unknown: int = 0
     source_coverage_provider_marked_healthy_without_observation: int = 0
+    source_coverage_context_provider_ranked_above_lane_critical: int = 0
     source_pack_provider_status_missing: int = 0
     missing_provider_recommendations_missing: int = 0
     degraded_provider_absence_marked_meaningful: int = 0
@@ -1111,8 +1123,19 @@ def diagnose_artifacts(
         "integrated_candidate_core_unlock_event_loss",
         "integrated_candidate_core_derivatives_loss",
         "integrated_candidate_card_opportunity_type_mismatch",
+        "integrated_candidate_card_why_now_mismatch",
+        "integrated_major_pair_card_early_long",
+        "integrated_card_generic_lane_override",
+        "card_opportunity_lane_core_mismatch",
         "integrated_candidate_card_official_event_missing",
         "integrated_candidate_card_source_url_missing",
+        "integrated_candidate_core_crowding_metadata_loss",
+        "integrated_fade_card_crowding_unknown",
+        "integrated_fade_card_missing_disclaimer",
+        "integrated_confirmed_long_crowding_warning_hidden",
+        "integrated_market_confirmation_display_contradiction",
+        "integrated_derivatives_display_contradiction",
+        "integrated_manifest_mixed_timestamp_pair",
         "integrated_core_silent_upgrade",
         "integrated_diagnostic_visible_in_default_operator_section",
         "integrated_preview_missing_disclaimer",
@@ -1137,6 +1160,12 @@ def diagnose_artifacts(
         message = (
             "source_coverage_provider_marked_healthy_without_observation="
             f"{source_coverage_report_conflicts['source_coverage_provider_marked_healthy_without_observation']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if source_coverage_report_conflicts["source_coverage_context_provider_ranked_above_lane_critical"]:
+        message = (
+            "source_coverage_context_provider_ranked_above_lane_critical="
+            f"{source_coverage_report_conflicts['source_coverage_context_provider_ranked_above_lane_critical']}"
         )
         (blockers if strict else warnings).append(message)
     if source_coverage_conflicts["source_pack_provider_status_missing"]:
@@ -1774,8 +1803,19 @@ def diagnose_artifacts(
         integrated_candidate_core_unlock_event_loss=integrated_conflicts["integrated_candidate_core_unlock_event_loss"],
         integrated_candidate_core_derivatives_loss=integrated_conflicts["integrated_candidate_core_derivatives_loss"],
         integrated_candidate_card_opportunity_type_mismatch=integrated_conflicts["integrated_candidate_card_opportunity_type_mismatch"],
+        integrated_candidate_card_why_now_mismatch=integrated_conflicts["integrated_candidate_card_why_now_mismatch"],
+        integrated_major_pair_card_early_long=integrated_conflicts["integrated_major_pair_card_early_long"],
+        integrated_card_generic_lane_override=integrated_conflicts["integrated_card_generic_lane_override"],
+        card_opportunity_lane_core_mismatch=integrated_conflicts["card_opportunity_lane_core_mismatch"],
         integrated_candidate_card_official_event_missing=integrated_conflicts["integrated_candidate_card_official_event_missing"],
         integrated_candidate_card_source_url_missing=integrated_conflicts["integrated_candidate_card_source_url_missing"],
+        integrated_candidate_core_crowding_metadata_loss=integrated_conflicts["integrated_candidate_core_crowding_metadata_loss"],
+        integrated_fade_card_crowding_unknown=integrated_conflicts["integrated_fade_card_crowding_unknown"],
+        integrated_fade_card_missing_disclaimer=integrated_conflicts["integrated_fade_card_missing_disclaimer"],
+        integrated_confirmed_long_crowding_warning_hidden=integrated_conflicts["integrated_confirmed_long_crowding_warning_hidden"],
+        integrated_market_confirmation_display_contradiction=integrated_conflicts["integrated_market_confirmation_display_contradiction"],
+        integrated_derivatives_display_contradiction=integrated_conflicts["integrated_derivatives_display_contradiction"],
+        integrated_manifest_mixed_timestamp_pair=integrated_conflicts["integrated_manifest_mixed_timestamp_pair"],
         integrated_core_silent_upgrade=integrated_conflicts["integrated_core_silent_upgrade"],
         integrated_diagnostic_visible_in_default_operator_section=integrated_conflicts["integrated_diagnostic_visible_in_default_operator_section"],
         integrated_preview_missing_disclaimer=integrated_conflicts["integrated_preview_missing_disclaimer"],
@@ -1784,6 +1824,9 @@ def diagnose_artifacts(
         source_coverage_report_missing=source_coverage_report_conflicts["source_coverage_report_missing"],
         source_coverage_provider_status_unknown=source_coverage_report_conflicts["source_coverage_provider_status_unknown"],
         source_coverage_provider_marked_healthy_without_observation=source_coverage_report_conflicts["source_coverage_provider_marked_healthy_without_observation"],
+        source_coverage_context_provider_ranked_above_lane_critical=source_coverage_report_conflicts[
+            "source_coverage_context_provider_ranked_above_lane_critical"
+        ],
         source_pack_provider_status_missing=source_coverage_conflicts["source_pack_provider_status_missing"],
         missing_provider_recommendations_missing=source_coverage_conflicts["missing_provider_recommendations_missing"],
         degraded_provider_absence_marked_meaningful=source_coverage_conflicts["degraded_provider_absence_marked_meaningful"],
@@ -2056,6 +2099,20 @@ def _expected_card_group_for_store_core(
 ) -> str | None:
     if opportunity is None:
         return None
+    primary = opportunity.primary_row
+    lane_group = (
+        event_research_cards.card_group_for_opportunity_lane(
+            primary.get("opportunity_type")
+            or primary.get("opportunity_lane")
+        )
+        if (
+            str(primary.get("source_row_type") or "") == "event_integrated_radar_candidate"
+            or bool(primary.get("integrated_candidate_id"))
+        )
+        else None
+    )
+    if lane_group is not None:
+        return lane_group
     if opportunity.is_high_priority or opportunity.is_watchlist or opportunity.is_validated_digest or opportunity.alertable:
         return "Core Opportunity Cards"
     if (
@@ -2943,8 +3000,19 @@ def _integrated_radar_artifact_conflicts(
         "integrated_candidate_core_unlock_event_loss": 0,
         "integrated_candidate_core_derivatives_loss": 0,
         "integrated_candidate_card_opportunity_type_mismatch": 0,
+        "integrated_candidate_card_why_now_mismatch": 0,
+        "integrated_major_pair_card_early_long": 0,
+        "integrated_card_generic_lane_override": 0,
+        "card_opportunity_lane_core_mismatch": 0,
         "integrated_candidate_card_official_event_missing": 0,
         "integrated_candidate_card_source_url_missing": 0,
+        "integrated_candidate_core_crowding_metadata_loss": 0,
+        "integrated_fade_card_crowding_unknown": 0,
+        "integrated_fade_card_missing_disclaimer": 0,
+        "integrated_confirmed_long_crowding_warning_hidden": 0,
+        "integrated_market_confirmation_display_contradiction": 0,
+        "integrated_derivatives_display_contradiction": 0,
+        "integrated_manifest_mixed_timestamp_pair": 0,
         "integrated_core_silent_upgrade": 0,
         "integrated_diagnostic_visible_in_default_operator_section": 0,
         "integrated_preview_missing_disclaimer": 0,
@@ -3014,6 +3082,8 @@ def _integrated_radar_artifact_conflicts(
         _integrated_candidate_core_card_conflicts(row, core_by_id, card_text_by_core, out)
     if row_count and manifest_path is not None and not Path(manifest_path).exists():
         out["integrated_input_manifest_missing"] += 1
+    elif row_count and manifest_path is not None:
+        out["integrated_manifest_mixed_timestamp_pair"] += _integrated_manifest_mixed_timestamp_pairs(manifest_path)
     if row_count and source_coverage_json_path is not None and not Path(source_coverage_json_path).exists():
         out["integrated_source_coverage_json_missing"] += 1
     if row_count and daily_brief_path is not None:
@@ -3080,11 +3150,48 @@ def _integrated_candidate_core_card_conflicts(
         out["integrated_candidate_core_unlock_event_loss"] += 1
     if isinstance(candidate.get("derivatives_state_snapshot"), Mapping) and not isinstance(core.get("derivatives_state_snapshot"), Mapping):
         out["integrated_candidate_core_derivatives_loss"] += 1
+    if str(candidate_lane).upper() == "FADE_SHORT_REVIEW":
+        if not str(core.get("crowding_class") or "").strip() or not str(core.get("fade_readiness") or "").strip():
+            out["integrated_candidate_core_crowding_metadata_loss"] += 1
+        if not _tuple_value(core.get("crowding_exhaustion_evidence")):
+            out["integrated_candidate_core_crowding_metadata_loss"] += 1
     card_text = card_text_by_core.get(core_id, "")
     if not card_text:
         return
-    if candidate_lane and candidate_lane not in card_text:
+    card_lane = _markdown_bullet_value(card_text, "Opportunity type", section="Opportunity Lane")
+    core_lane_lit = str(core.get("opportunity_type") or "").strip()
+    if candidate_lane and card_lane and card_lane != candidate_lane:
         out["integrated_candidate_card_opportunity_type_mismatch"] += 1
+    if core_lane_lit and card_lane and card_lane != core_lane_lit:
+        out["card_opportunity_lane_core_mismatch"] += 1
+    if (
+        str(candidate.get("symbol") or "").upper() in {"BTC", "ETH", "USDT", "USDC", "FDUSD"}
+        and _truthy(candidate.get("major_pair_simple_announcement"))
+        and card_lane in {"EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH"}
+    ):
+        out["integrated_major_pair_card_early_long"] += 1
+    card_why = _markdown_bullet_value(card_text, "Why now", section="Opportunity Lane")
+    candidate_why = str(candidate.get("why_now") or "").strip()
+    if candidate_why and card_why and candidate_why != card_why:
+        out["integrated_candidate_card_why_now_mismatch"] += 1
+    if card_why and "strong source with no reaction" in card_why.casefold() and candidate_why and candidate_why != card_why:
+        out["integrated_card_generic_lane_override"] += 1
+    if candidate_lane and not card_lane and candidate_lane not in card_text:
+        out["integrated_candidate_card_opportunity_type_mismatch"] += 1
+    if str(candidate_lane).upper() == "FADE_SHORT_REVIEW":
+        if "Research-only" not in card_text or "Not a trade signal" not in card_text:
+            out["integrated_fade_card_missing_disclaimer"] += 1
+        if "Crowding class: unknown" in card_text or "Fade readiness: unknown" in card_text:
+            out["integrated_fade_card_crowding_unknown"] += 1
+        if "Derivatives crowding: n/a" in card_text or "Derivatives crowding: not available" in card_text:
+            out["integrated_derivatives_display_contradiction"] += 1
+    if str(candidate_lane).upper() == "CONFIRMED_LONG_RESEARCH":
+        if "confirmed_long_derivatives_crowding_warning" in _tuple_value(candidate.get("warnings")) and "confirmed_long_derivatives_crowding_warning" not in card_text:
+            out["integrated_confirmed_long_crowding_warning_hidden"] += 1
+        if "Market confirmation: none" in card_text and "Integrated market state:" not in card_text:
+            out["integrated_market_confirmation_display_contradiction"] += 1
+    if _truthy(candidate.get("market_requirements_met")) and "Market confirmation: none" in card_text and "Integrated market state:" not in card_text:
+        out["integrated_market_confirmation_display_contradiction"] += 1
     official_event = candidate.get("official_exchange_event")
     if isinstance(official_event, Mapping):
         expected = [
@@ -3109,6 +3216,45 @@ def _integrated_opportunity_rank(value: object) -> int:
         "FADE_SHORT_REVIEW": 3,
     }
     return ranks.get(text, 0)
+
+
+def _markdown_bullet_value(text: str, label: str, *, section: str | None = None) -> str | None:
+    body = text
+    if section:
+        marker = f"## {section}"
+        idx = body.find(marker)
+        if idx >= 0:
+            body = body[idx + len(marker):]
+            next_section = body.find("\n## ")
+            if next_section >= 0:
+                body = body[:next_section]
+    pattern = re.compile(rf"^\s*-\s*{re.escape(label)}:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
+    match = pattern.search(body)
+    return match.group(1).strip() if match else None
+
+
+def _integrated_manifest_mixed_timestamp_pairs(path: str | Path) -> int:
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0
+    if not isinstance(data, Mapping):
+        return 0
+    rows = data.get("sidecars")
+    if not isinstance(rows, list):
+        return 0
+    conflicts = 0
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        if row.get("sidecar_research_observed_at") and row.get("sidecar_wall_started_at") and row.get("sidecar_wall_finished_at"):
+            continue
+        started = str(row.get("started_at") or "")
+        finished = str(row.get("finished_at") or "")
+        research = str(data.get("research_observed_at") or row.get("research_observed_at") or "")
+        if started and finished and research and started == research and finished != research:
+            conflicts += 1
+    return conflicts
 
 
 def _daily_brief_has_integrated_diagnostic_leak(text: str, rows: Iterable[Mapping[str, Any]]) -> bool:
@@ -3340,6 +3486,7 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
         "source_coverage_report_missing": 0,
         "source_coverage_provider_status_unknown": 0,
         "source_coverage_provider_marked_healthy_without_observation": 0,
+        "source_coverage_context_provider_ranked_above_lane_critical": 0,
     }
     if path is None:
         return out
@@ -3373,6 +3520,19 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
         unknown = set(_split_provider_line(unknown_line))
         if healthy & unknown:
             out["source_coverage_provider_marked_healthy_without_observation"] += len(healthy & unknown)
+    if "Most useful next data source:" in text:
+        top_section = text.split("Most useful next data source:", 1)[1]
+        ranked = [line.strip() for line in top_section.splitlines() if line.strip().startswith("- ")][:5]
+        broad_idx = [
+            idx for idx, line in enumerate(ranked)
+            if any(token in line.casefold() for token in ("gdelt", "rss", "project_blog"))
+        ]
+        critical_idx = [
+            idx for idx, line in enumerate(ranked)
+            if any(token in line.casefold() for token in ("coinalyze", "tokenomist", "binance", "bybit", "coinbase", "kucoin", "okx"))
+        ]
+        if broad_idx and critical_idx and min(broad_idx) < min(critical_idx):
+            out["source_coverage_context_provider_ranked_above_lane_critical"] = 1
     return out
 
 
@@ -3741,8 +3901,15 @@ def _card_text_by_core(paths: Iterable[Path]) -> dict[str, str]:
     out: dict[str, str] = {}
     for path in paths:
         text = _read_card_text(path)
-        for match in re.finditer(r"core_opportunity_id:\s*([^\s]+)", text):
-            out[str(match.group(1)).strip()] = text
+        patterns = (
+            r"core_opportunity_id:\s*([^\s]+)",
+            r"^-\s*Core opportunity ID:\s*(.+?)\s*$",
+        )
+        for pattern in patterns:
+            for match in re.finditer(pattern, text, flags=re.MULTILINE):
+                core_id = str(match.group(1)).strip()
+                if core_id and core_id.lower() != "none":
+                    out[core_id] = text
     return out
 
 
@@ -5036,8 +5203,19 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"integrated_candidate_core_unlock_event_loss={result.integrated_candidate_core_unlock_event_loss} "
             f"integrated_candidate_core_derivatives_loss={result.integrated_candidate_core_derivatives_loss} "
             f"integrated_candidate_card_opportunity_type_mismatch={result.integrated_candidate_card_opportunity_type_mismatch} "
+            f"integrated_candidate_card_why_now_mismatch={result.integrated_candidate_card_why_now_mismatch} "
+            f"integrated_major_pair_card_early_long={result.integrated_major_pair_card_early_long} "
+            f"integrated_card_generic_lane_override={result.integrated_card_generic_lane_override} "
+            f"card_opportunity_lane_core_mismatch={result.card_opportunity_lane_core_mismatch} "
             f"integrated_candidate_card_official_event_missing={result.integrated_candidate_card_official_event_missing} "
             f"integrated_candidate_card_source_url_missing={result.integrated_candidate_card_source_url_missing} "
+            f"integrated_candidate_core_crowding_metadata_loss={result.integrated_candidate_core_crowding_metadata_loss} "
+            f"integrated_fade_card_crowding_unknown={result.integrated_fade_card_crowding_unknown} "
+            f"integrated_fade_card_missing_disclaimer={result.integrated_fade_card_missing_disclaimer} "
+            f"integrated_confirmed_long_crowding_warning_hidden={result.integrated_confirmed_long_crowding_warning_hidden} "
+            f"integrated_market_confirmation_display_contradiction={result.integrated_market_confirmation_display_contradiction} "
+            f"integrated_derivatives_display_contradiction={result.integrated_derivatives_display_contradiction} "
+            f"integrated_manifest_mixed_timestamp_pair={result.integrated_manifest_mixed_timestamp_pair} "
             f"integrated_core_silent_upgrade={result.integrated_core_silent_upgrade} "
             f"integrated_diagnostic_visible_in_default_operator_section={result.integrated_diagnostic_visible_in_default_operator_section} "
             f"integrated_preview_missing_disclaimer={result.integrated_preview_missing_disclaimer} "
@@ -5046,6 +5224,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"source_coverage_report_missing={result.source_coverage_report_missing} "
             f"source_coverage_provider_status_unknown={result.source_coverage_provider_status_unknown} "
             f"source_coverage_provider_marked_healthy_without_observation={result.source_coverage_provider_marked_healthy_without_observation} "
+            f"source_coverage_context_provider_ranked_above_lane_critical={result.source_coverage_context_provider_ranked_above_lane_critical} "
             f"source_pack_provider_status_missing={result.source_pack_provider_status_missing} "
             f"missing_provider_recommendations_missing={result.missing_provider_recommendations_missing} "
             f"degraded_provider_absence_marked_meaningful={result.degraded_provider_absence_marked_meaningful} "

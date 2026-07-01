@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-01 - Canonical integrated lane truth wins operator presentation
+**Status:** accepted
+**Decision:** For integrated Event Alpha radar artifacts, canonical integrated
+candidate/CoreOpportunity fields are the source of truth for research cards,
+card indexes, daily briefs, and artifact-doctor validation. Generic recomputed
+market-reaction or score-component fallback may fill missing fields only; it
+must not upgrade or rewrite a canonical lane, why-now explanation, market
+state, derivatives crowding/fade metadata, source URL, warning, or reason code.
+Lane-first card groups are authoritative for integrated radar cards.
+**Why:** Operator output must not tell a different story from the canonical
+row. In particular, simple BTC/ETH/stable major-pair announcements stay
+unconfirmed/diagnostic by default, and fade/confirmed research rows must show
+their actual market/derivatives context rather than generic `n/a` or
+source-only fallback text.
+**Revisit when:** Integrated radar moves to a typed artifact schema that can
+enforce canonical presentation fields at serialization time.
+
 ## 2026-07-01 - Integrated Event Alpha radar cycle is an artifact orchestrator
 **Status:** accepted
 **Decision:** Event Alpha may run an integrated research cycle that collects

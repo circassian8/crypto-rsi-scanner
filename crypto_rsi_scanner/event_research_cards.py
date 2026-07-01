@@ -42,6 +42,11 @@ class EventResearchCardWriteResult:
 
 
 CARD_INDEX_GROUPS = (
+    "Early Long Research Cards",
+    "Confirmed Long Research Cards",
+    "Fade / Short-Review Cards",
+    "Risk Only Cards",
+    "Unconfirmed Research Cards",
     "Core Opportunity Cards",
     "Near-Miss Cards",
     "Local-Only / Quality-Capped Cards",
@@ -53,6 +58,11 @@ CARD_INDEX_GROUPS = (
 def card_index_group(path: Path, *, card_groups: Mapping[Path | str, str] | None = None) -> str:
     """Return the operator-facing research-card group for an existing card file."""
     return _card_index_group(Path(path), card_groups=card_groups)
+
+
+def card_group_for_opportunity_lane(value: object) -> str | None:
+    """Return the lane-first card group for an Event Alpha opportunity lane."""
+    return _lane_card_group(value)
 
 
 def card_index_group_map(paths: Iterable[str | Path]) -> dict[Path, str]:
@@ -266,18 +276,9 @@ def render_research_card(
     lines.extend([
         "",
         "## Derivatives / Supply / Liquidity",
-        f"- Derivatives crowding: {_score(entry, alert, 'derivatives_crowding')}",
-        f"- Derivatives confirmation: {_score(entry, alert, 'derivatives_confirmation_level')} / {_score(entry, alert, 'derivatives_confirmation_score')} "
-        f"(freshness={_score(entry, alert, 'derivatives_freshness_status')})",
-        f"- DEX liquidity confirmation: {_score(entry, alert, 'dex_liquidity_level')} / {_score(entry, alert, 'dex_liquidity_score')} "
-        f"(freshness={_score(entry, alert, 'dex_freshness_status')})",
-        f"- Protocol metrics confirmation: {_score(entry, alert, 'protocol_metrics_level')} / {_score(entry, alert, 'protocol_metrics_score')} "
-        f"(freshness={_score(entry, alert, 'protocol_metrics_freshness_status')})",
-        f"- Supply pressure: {_score(entry, alert, 'supply_pressure')}",
-        f"- Cluster confidence: {_score(entry, alert, 'cluster_confidence')}",
-        "",
-        "## Latest Monitor Update",
     ])
+    lines.extend(_derivatives_supply_liquidity_lines(entry, alert))
+    lines.extend(["", "## Latest Monitor Update"])
     lines.extend(_monitor_lines(monitor_row))
     lines.extend([
         "",
@@ -294,7 +295,7 @@ def render_research_card(
     lines.extend(_verify_lines(alert, playbook))
     lines.extend([
         "",
-        "## Trade-Readiness Checklist",
+        "## Research Review Checklist",
     ])
     lines.extend(_trade_readiness_lines(entry, alert, playbook, state))
     lines.extend([
@@ -459,6 +460,8 @@ def _lineage_lines(
     raw_ids = _lineage_values("source_raw_ids", "raw_ids", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     event_ids = _lineage_values("source_event_ids", "event_ids", "event_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     core_id = (core.core_opportunity_id if core is not None else _lineage_value("core_opportunity_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context))
+    source_row_type = _lineage_value("source_row_type", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    integrated_candidate_id = _lineage_value("integrated_candidate_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     feedback_target, feedback_target_type = _feedback_target_for_card(
         core_id=core_id,
         alert_id=alert_id,
@@ -482,6 +485,8 @@ def _lineage_lines(
         f"- Core opportunity ID: {core_id or 'none'}",
         f"- Alert ID: {alert_id or 'none'}",
         f"- Snapshot ID: {snapshot_id or 'none'}",
+        f"- Source row type: {source_row_type or 'none'}",
+        f"- Integrated candidate ID: {integrated_candidate_id or 'none'}",
         f"- Source raw/event IDs: raw={_list_label(raw_ids)} events={_list_label(event_ids)}",
         f"- Card path: {card_path_label}",
         f"- Feedback target: {feedback_target}",
@@ -956,6 +961,9 @@ def _core_score_components(opportunity: event_core_opportunities.CoreOpportunity
         "market_confirmation_level",
         "market_confirmation_after",
         "market_state_snapshot",
+        "source_row_type",
+        "integrated_candidate_id",
+        "integrated_candidate_family_id",
         "market_state",
         "market_state_class",
         "opportunity_type",
@@ -1003,6 +1011,17 @@ def _core_score_components(opportunity: event_core_opportunities.CoreOpportunity
         "unlock_event",
         "derivatives_state_snapshot",
         "derivatives_snapshot",
+        "crowding_class",
+        "fade_readiness",
+        "crowding_exhaustion_evidence",
+        "what_confirms_fade_review",
+        "what_invalidates_fade_review",
+        "derivatives_warning_codes",
+        "integrated_market_confirmation_level",
+        "integrated_market_confirmation_score",
+        "integrated_market_reaction_confirmation",
+        "integrated_market_context_source",
+        "integrated_market_freshness_status",
         "evidence_acquisition_source_pack",
         "evidence_acquisition_attempted",
         "evidence_acquisition_status",
@@ -1128,6 +1147,11 @@ def _render_index(
     card_groups: Mapping[Path | str, str] | None = None,
 ) -> str:
     grouped: dict[str, list[Path]] = {
+        "Early Long Research Cards": [],
+        "Confirmed Long Research Cards": [],
+        "Fade / Short-Review Cards": [],
+        "Risk Only Cards": [],
+        "Unconfirmed Research Cards": [],
         "Core Opportunity Cards": [],
         "Near-Miss Cards": [],
         "Local-Only / Quality-Capped Cards": [],
@@ -1360,6 +1384,10 @@ def _card_index_group_for_entry(
     decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
 ) -> str:
     components = dict(entry.latest_score_components or {})
+    lane = str(components.get("opportunity_type") or "").strip().upper()
+    lane_group = _lane_card_group(lane) if _components_are_integrated_radar(components) else None
+    if lane_group is not None:
+        return lane_group
     text = " ".join(str(value or "") for value in (
         entry.latest_effective_playbook_type,
         entry.latest_playbook_type,
@@ -1393,6 +1421,11 @@ def _card_index_group_for_entry(
 
 
 def _card_index_group_for_text(text: str) -> str | None:
+    match = re.search(r"opportunity type:\s*([a-z0-9_/-]+)", text, flags=re.IGNORECASE)
+    if match and _text_is_integrated_radar_card(text):
+        lane_group = _lane_card_group(match.group(1))
+        if lane_group is not None:
+            return lane_group
     if (
         "source_noise_control" in text
         or "ticker_word_collision" in text
@@ -1402,6 +1435,8 @@ def _card_index_group_for_text(text: str) -> str | None:
     ):
         return "Diagnostic / Source-Noise / Control Cards"
     if "local-only after quality/state gate" in text or "quality_blocked" in text:
+        return "Local-Only / Quality-Capped Cards"
+    if "final opportunity verdict: local_only" in text:
         return "Local-Only / Quality-Capped Cards"
     if "final opportunity verdict: exploratory" in text:
         return "Near-Miss Cards"
@@ -1419,6 +1454,38 @@ def _card_index_group_for_text(text: str) -> str | None:
     ):
         return "Core Opportunity Cards"
     return None
+
+
+def _lane_card_group(value: object) -> str | None:
+    lane = str(value or "").strip().upper()
+    mapping = {
+        "EARLY_LONG_RESEARCH": "Early Long Research Cards",
+        "CONFIRMED_LONG_RESEARCH": "Confirmed Long Research Cards",
+        "FADE_SHORT_REVIEW": "Fade / Short-Review Cards",
+        "RISK_ONLY": "Risk Only Cards",
+        "UNCONFIRMED_RESEARCH": "Unconfirmed Research Cards",
+        "DIAGNOSTIC": "Diagnostic / Source-Noise / Control Cards",
+    }
+    return mapping.get(lane)
+
+
+def _components_are_integrated_radar(components: Mapping[str, Any]) -> bool:
+    return (
+        str(components.get("source_row_type") or "") == "event_integrated_radar_candidate"
+        or bool(components.get("integrated_candidate_id"))
+    )
+
+
+def _text_is_integrated_radar_card(text: str) -> bool:
+    lowered = text.casefold()
+    candidate_match = re.search(r"(?im)^-\s*integrated candidate id:\s*(.+?)\s*$", text)
+    return (
+        "source row type: event_integrated_radar_candidate" in lowered
+        or (
+            candidate_match is not None
+            and candidate_match.group(1).strip().casefold() not in {"", "none"}
+        )
+    )
 
 
 def _strip_sensitive(markdown: str) -> str:
@@ -2305,27 +2372,49 @@ def _market_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapp
         for key in ("latest_market_snapshot", "market_snapshot"):
             if isinstance(components.get(key), Mapping):
                 snapshot.update(dict(components[key]))
+        if isinstance(components.get("market_state_snapshot"), Mapping):
+            snapshot.setdefault("market_state_snapshot", dict(components["market_state_snapshot"]))
         for key in ("market_price", "return_24h", "return_72h", "return_7d", "volume_24h", "market_cap"):
             if alert.get(key) is not None:
                 snapshot[key] = alert.get(key)
     else:
         components = _card_components(entry, alert)
+    integrated_level = components.get("integrated_market_confirmation_level")
+    integrated_score = components.get("integrated_market_confirmation_score")
+    integrated_reaction = components.get("integrated_market_reaction_confirmation")
+    integrated_source = components.get("integrated_market_context_source")
+    integrated_freshness = components.get("integrated_market_freshness_status")
+    market_state = components.get("market_state_class") or components.get("market_state")
+    market_requirements_met = components.get("market_requirements_met")
     market_level = components.get("market_confirmation_level") or components.get("market_reaction_confirmation")
     market_score = components.get("market_confirmation_score")
     freshness = components.get("market_data_freshness") or components.get("market_context_freshness_status")
     context_source = components.get("market_context_source")
     context_age = _format_market_context_age(components)
+    lines: list[str] = []
+    if integrated_level or integrated_reaction or market_state:
+        lines.append(
+            "- Integrated market state: "
+            f"{market_state or integrated_reaction or 'unknown'} "
+            f"(confirmation={integrated_level or integrated_reaction or 'not applicable'}, "
+            f"score={integrated_score if integrated_score is not None else 'n/a'}, "
+            f"requirements_met={str(bool(market_requirements_met)).lower() if market_requirements_met is not None else 'unknown'}, "
+            f"freshness={integrated_freshness or 'unknown'}, source={integrated_source or 'integrated_market_state'})"
+        )
     if not snapshot and (market_level or market_score is not None or freshness or context_source):
-        return [
-            f"- Market confirmation: {market_level or 'not available'} / {market_score if market_score is not None else 'n/a'}",
+        if not (str(market_level or "").casefold() in {"", "none", "missing", "unknown"} and lines):
+            lines.append(f"- Market confirmation: {market_level or 'not available'} / {market_score if market_score is not None else 'n/a'}")
+        lines.extend([
             f"- Market freshness: {freshness or 'not available'}",
             f"- Market context source: {context_source or 'not available'} (age={context_age})",
             "- Market snapshot: computed from refresh summary; raw snapshot not stored.",
-        ]
+        ])
+        return lines
     if not snapshot:
-        return ["- Market data: not available."]
-    lines = []
-    if market_level or market_score is not None:
+        return lines or ["- Market data: not available."]
+    if (market_level or market_score is not None) and not (
+        str(market_level or "").casefold() in {"", "none", "missing", "unknown"} and lines
+    ):
         lines.append(f"- Market confirmation: {market_level or 'not available'} / {market_score if market_score is not None else 'n/a'}")
     if freshness or context_source:
         lines.append(f"- Market freshness/source: {freshness or 'not available'} / {context_source or 'not available'} (age={context_age})")
@@ -2339,6 +2428,53 @@ def _market_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapp
             else:
                 lines.append(f"- {key}: {snapshot.get(key)}")
     return lines or ["- Market data: not available."]
+
+
+def _derivatives_supply_liquidity_lines(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> list[str]:
+    components = _card_components(entry, alert)
+    derivatives_state = components.get("derivatives_state_snapshot")
+    if not isinstance(derivatives_state, Mapping):
+        derivatives_state = components.get("derivatives_snapshot") if isinstance(components.get("derivatives_snapshot"), Mapping) else {}
+    unlock_event = components.get("unlock_event") if isinstance(components.get("unlock_event"), Mapping) else {}
+    crowding = components.get("crowding_class") or components.get("derivatives_crowding")
+    fade_readiness = components.get("fade_readiness")
+    lines: list[str] = []
+    if derivatives_state or crowding or fade_readiness:
+        lines.append(f"- Derivatives crowding: {_display_text(crowding) or 'not classified'}")
+        lines.append(f"- Fade readiness: {_display_text(fade_readiness) or 'not fade-ready'}")
+        lines.append(
+            "- Derivatives confirmation: "
+            f"{components.get('derivatives_confirmation_level') or derivatives_state.get('freshness_status') or 'classified'} / "
+            f"{components.get('derivatives_confirmation_score') if components.get('derivatives_confirmation_score') is not None else 'n/a'} "
+            f"(freshness={components.get('derivatives_freshness_status') or derivatives_state.get('freshness_status') or 'unknown'})"
+        )
+        if components.get("derivatives_warning_codes") or components.get("warnings"):
+            warnings = _list_strings(components.get("derivatives_warning_codes") or components.get("warnings"))
+            if warnings:
+                lines.append("- Derivatives warnings: " + "; ".join(warnings[:6]))
+    else:
+        lines.append("- Derivatives crowding: not available.")
+        lines.append("- Derivatives confirmation: not available / n/a (freshness=unknown)")
+    lines.extend([
+        f"- DEX liquidity confirmation: {_score(entry, alert, 'dex_liquidity_level')} / {_score(entry, alert, 'dex_liquidity_score')} "
+        f"(freshness={_score(entry, alert, 'dex_freshness_status')})",
+        f"- Protocol metrics confirmation: {_score(entry, alert, 'protocol_metrics_level')} / {_score(entry, alert, 'protocol_metrics_score')} "
+        f"(freshness={_score(entry, alert, 'protocol_metrics_freshness_status')})",
+    ])
+    if unlock_event:
+        lines.append(
+            "- Supply pressure: structured unlock evidence "
+            f"type={unlock_event.get('unlock_type') or unlock_event.get('event_type') or 'unknown'} "
+            f"pct_circ={unlock_event.get('unlock_pct_circulating_supply') if unlock_event.get('unlock_pct_circulating_supply') is not None else 'n/a'} "
+            f"vs_adv={unlock_event.get('unlock_vs_30d_adv') if unlock_event.get('unlock_vs_30d_adv') is not None else 'n/a'}"
+        )
+    else:
+        lines.append(f"- Supply pressure: {_score(entry, alert, 'supply_pressure')}")
+    lines.append(f"- Cluster confidence: {_score(entry, alert, 'cluster_confidence')}")
+    return lines
 
 
 def _opportunity_lane_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str, Any] | None) -> list[str]:
@@ -2481,6 +2617,19 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     market_data_freshness = components.get("market_data_freshness") or components.get("market_context_freshness_status") or "not available"
     market_reaction_confirmation = components.get("market_reaction_confirmation") or market_confirmation_level
     market_confirmation_summary = components.get("market_confirmation_summary") or _canonical_market_summary_from_components(components) or "not available"
+    integrated_market_level = components.get("integrated_market_confirmation_level")
+    if integrated_market_level:
+        market_confirmation_level = integrated_market_level
+        market_confirmation_score = components.get("integrated_market_confirmation_score")
+        market_reaction_confirmation = components.get("integrated_market_reaction_confirmation") or integrated_market_level
+        market_context_source = components.get("integrated_market_context_source") or market_context_source
+        market_data_freshness = components.get("integrated_market_freshness_status") or market_data_freshness
+        market_context_quality = components.get("integrated_market_freshness_status") or market_context_quality
+        market_confirmation_summary = (
+            f"{integrated_market_level} / "
+            f"{market_confirmation_score if market_confirmation_score is not None else 'n/a'}; "
+            f"freshness={market_data_freshness} source={market_context_source}"
+        )
     opportunity_score_final = components.get("opportunity_score_final")
     opportunity_level = components.get("opportunity_level") or "unknown"
     final_opportunity_score = components.get("final_opportunity_score") or opportunity_score_final
@@ -3047,16 +3196,39 @@ def _trade_readiness_lines(
     state: str,
 ) -> list[str]:
     components = alert.get("score_components") if alert is not None and isinstance(alert.get("score_components"), Mapping) else {}
+    rich_components = _card_components(entry, alert)
     timing = _value(entry, alert, "event_time", "event_time") or "unknown"
     direction = _value(None, alert, "", "expected_direction") or _playbook_direction(playbook)
     horizon = _value(None, alert, "", "primary_horizon") or "manual"
     invalidation = _value(None, alert, "", "playbook_invalidation") or _default_invalidation(playbook, alert, entry)
+    market_confirmation = (
+        rich_components.get("integrated_market_confirmation_level")
+        or rich_components.get("market_state_class")
+        or _check_value(components, "market_move_volume")
+    )
+    crowding_class = _display_text(rich_components.get("crowding_class"))
+    fade_readiness = _display_text(rich_components.get("fade_readiness"))
+    if crowding_class or fade_readiness:
+        derivatives_crowding = crowding_class or "classified"
+        if fade_readiness:
+            derivatives_crowding += f" / fade_readiness={fade_readiness}"
+    else:
+        derivatives_crowding = _score(entry, alert, "derivatives_crowding")
+    unlock_event = rich_components.get("unlock_event")
+    if isinstance(unlock_event, Mapping) and unlock_event:
+        supply_risk = (
+            "structured_unlock "
+            f"pct_circ={unlock_event.get('unlock_pct_circulating_supply') if unlock_event.get('unlock_pct_circulating_supply') is not None else 'n/a'} "
+            f"vs_adv={unlock_event.get('unlock_vs_30d_adv') if unlock_event.get('unlock_vs_30d_adv') is not None else 'n/a'}"
+        )
+    else:
+        supply_risk = _score(entry, alert, "supply_pressure")
     lines = [
         f"- Catalyst clarity: {_check_value(components, 'external_catalyst')}",
         f"- Event timing quality: {timing} / {_check_value(components, 'event_time_quality')}",
-        f"- Market confirmation: {_check_value(components, 'market_move_volume')}",
-        f"- Derivatives crowding: {_score(entry, alert, 'derivatives_crowding')}",
-        f"- Liquidity/supply risk: supply={_score(entry, alert, 'supply_pressure')} liquidity=manual review",
+        f"- Market confirmation: {market_confirmation}",
+        f"- Derivatives crowding: {derivatives_crowding}",
+        f"- Liquidity/supply risk: supply={supply_risk} liquidity=manual review",
         f"- Current lifecycle state: {state}",
         f"- Primary playbook: {playbook}",
         f"- Expected direction / horizon: {direction} / {horizon}",
@@ -3105,8 +3277,20 @@ def _card_components(
         raw = alert.get("score_components")
         if isinstance(raw, Mapping):
             components.update({key: value for key, value in raw.items() if value not in (None, "")})
+        latest = alert.get("latest_score_components")
+        if isinstance(latest, Mapping):
+            components.update({key: value for key, value in latest.items() if value not in (None, "")})
         for key, value in alert.items():
-            if key not in components and value not in (None, "", [], {}):
+            if value not in (None, "", [], {}):
+                existing = components.get(key)
+                if (
+                    key == "opportunity_type"
+                    and existing not in (None, "", value)
+                    and "card_component_conflict:opportunity_type" not in _list_value(components.get("warnings"))
+                ):
+                    warnings = _list_value(components.get("warnings"))
+                    warnings.append("card_component_conflict:opportunity_type")
+                    components["warnings"] = warnings
                 components[key] = value
     return components
 

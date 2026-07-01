@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Make integrated radar operator truth canonical · Codex
+**Why:** Integrated radar candidates and core rows were correct, but some
+operator-facing paths could still render stale generic lane text, lose
+derivatives crowding metadata, or compare lane-first cards against legacy card
+groups. BTC simple major-pair evidence must stay unconfirmed everywhere, and
+fade/confirmed research cards need to display the same market/derivatives
+context as the canonical row.
+**Changes:**
+- Made stored CoreOpportunity rows with `source_row_type=event_integrated_radar_candidate`
+  reload as integrated rows, preventing generic recomputation from silently
+  upgrading canonical lanes.
+- Cross-filled integrated market confirmation and derivatives crowding/fade
+  metadata into canonical candidates, core rows, research cards, checklist
+  copy, and strict artifact-doctor checks.
+- Added lane-first card grouping helpers and aligned artifact-doctor
+  expectations with the card index/daily brief grouping model.
+- Hardened card-section parsing and strict doctor checks for visible
+  opportunity-lane mismatches, major-pair card upgrades, missing fade-review
+  disclaimers, hidden derivatives warnings, market-confirmation contradictions,
+  and mixed sidecar research/wall timestamps.
+- Prioritized lane-critical source recommendations over broad RSS/GDELT
+  context in source coverage.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+focused regression tests for source coverage, integrated radar, doctor
+mismatches, and heartbeat copy; `make event-alpha-integrated-radar-smoke
+PYTHON=python3`.
+**Notes/risks:** This is presentation/artifact consistency only. It does not
+change alert scoring, sends, normal RSI routing, paper/live writes, execution,
+or Event Alpha-created `TRIGGERED_FADE`.
+
 ## 2026-07-01 — Harden integrated radar artifact propagation · Codex
 **Why:** The integrated Event Alpha radar could classify candidates correctly
 but then lose structured source evidence or silently upgrade lanes when rows

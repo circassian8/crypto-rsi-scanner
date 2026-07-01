@@ -568,8 +568,9 @@ def _run_or_load_sidecars(
                 namespace_dir=namespace_dir,
                 rows=value,
                 configured=True,
-                started_at=observed_at,
-                finished_at=datetime.now(timezone.utc),
+                sidecar_research_observed_at=observed_at,
+                wall_started_at=datetime.now(timezone.utc),
+                wall_finished_at=datetime.now(timezone.utc),
             )
             for name, value in rows.items()
         )
@@ -588,8 +589,9 @@ def _run_or_load_sidecars(
                 namespace_dir=namespace_dir,
                 rows=value,
                 configured=False,
-                started_at=observed_at,
-                finished_at=datetime.now(timezone.utc),
+                sidecar_research_observed_at=observed_at,
+                wall_started_at=datetime.now(timezone.utc),
+                wall_finished_at=datetime.now(timezone.utc),
                 warnings=("configured sidecar execution is not enabled in this research-only integrated path",),
             )
             for name, value in rows.items()
@@ -612,8 +614,9 @@ def _run_or_load_sidecars(
             namespace_dir=namespace_dir,
             rows=value,
             configured=bool(value),
-            started_at=observed_at,
-            finished_at=datetime.now(timezone.utc),
+            sidecar_research_observed_at=observed_at,
+            wall_started_at=datetime.now(timezone.utc),
+            wall_finished_at=datetime.now(timezone.utc),
             warnings=() if value else (f"{name} sidecar artifact missing or empty",),
         )
         for name, value in rows.items()
@@ -776,7 +779,7 @@ def _merge_family(
     symbol = _text(_first_value(rows, "symbol", "validated_symbol")) or "UNKNOWN"
     coin_id = _text(_first_value(rows, "coin_id", "validated_coin_id")) or symbol.casefold()
     market_snapshot = _best_market_snapshot(rows)
-    derivatives_row = _best_row(rows, lambda row: bool(row.get("derivatives_state_snapshot")))
+    derivatives_row = _best_derivatives_row(rows)
     official_row = _best_row(
         rows,
         lambda row: str(row.get("row_type")) in {
@@ -814,6 +817,8 @@ def _merge_family(
     reason_codes = tuple(dict.fromkeys((*_merged_list(rows, "reason_codes"), *raw_reaction.reason_codes)))
     warnings = tuple(dict.fromkeys((*_merged_list(rows, "warnings"), *_policy_warnings(opportunity, rows, raw_reaction))))
     candidate_id = f"iar:{_digest(key)}"
+    derivatives_metadata = _derivatives_metadata(derivatives_row)
+    integrated_market = _integrated_market_confirmation(opportunity, raw_reaction)
     candidate = {
         "schema_version": 1,
         "row_type": "event_integrated_radar_candidate",
@@ -853,11 +858,22 @@ def _merge_family(
         "market_requirements_met": _market_requirements_met(opportunity, raw_reaction),
         "fade_requirements_met": _fade_requirements_met(opportunity, rows),
         "risk_requirements_met": _risk_requirements_met(opportunity, rows),
+        "integrated_market_confirmation_level": integrated_market["level"],
+        "integrated_market_confirmation_score": integrated_market["score"],
+        "integrated_market_reaction_confirmation": integrated_market["reaction"],
+        "integrated_market_context_source": integrated_market["source"],
+        "integrated_market_freshness_status": integrated_market["freshness"],
         "market_state_snapshot": raw_reaction.market_state_snapshot.to_dict(),
         "latest_market_snapshot": market_snapshot,
         "market_snapshot": market_snapshot,
         "derivatives_state_snapshot": dict(derivatives_row.get("derivatives_state_snapshot") or {}) if derivatives_row else None,
         "derivatives_snapshot": dict(derivatives_row.get("derivatives_state_snapshot") or {}) if derivatives_row else None,
+        "crowding_class": derivatives_metadata.get("crowding_class"),
+        "fade_readiness": derivatives_metadata.get("fade_readiness"),
+        "crowding_exhaustion_evidence": derivatives_metadata.get("crowding_exhaustion_evidence") or [],
+        "what_confirms_fade_review": derivatives_metadata.get("what_confirms_fade_review") or [],
+        "what_invalidates_fade_review": derivatives_metadata.get("what_invalidates_fade_review") or [],
+        "derivatives_warning_codes": derivatives_metadata.get("derivatives_warning_codes") or [],
         "official_exchange_event": _compact_event(official_row) if official_row else None,
         "scheduled_catalyst_event": _compact_event(scheduled_row) if scheduled_row else None,
         "unlock_event": _compact_event(unlock_row) if unlock_row else None,
@@ -1183,6 +1199,89 @@ def _best_row(rows: list[dict[str, Any]], predicate: Any) -> dict[str, Any] | No
     return None
 
 
+def _best_derivatives_row(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    classified = [
+        row for row in rows
+        if isinstance(row.get("derivatives_state_snapshot"), Mapping)
+        and (
+            row.get("crowding_class")
+            or row.get("fade_readiness")
+            or row.get("crowding_exhaustion_evidence")
+            or row.get("derivatives_warning_codes")
+            or row.get("what_confirms_fade_review")
+        )
+    ]
+    if classified:
+        return sorted(
+            classified,
+            key=lambda row: _opportunity_rank(str(row.get("opportunity_type") or "")),
+            reverse=True,
+        )[0]
+    return _best_row(rows, lambda row: bool(row.get("derivatives_state_snapshot")))
+
+
+def _derivatives_metadata(row: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(row, Mapping):
+        return {}
+    warnings = list(dict.fromkeys((*_list_values(row.get("derivatives_warning_codes")), *_list_values(row.get("warnings")))))
+    return {
+        "crowding_class": row.get("crowding_class"),
+        "fade_readiness": row.get("fade_readiness"),
+        "crowding_exhaustion_evidence": _list_values(row.get("crowding_exhaustion_evidence")),
+        "what_confirms_fade_review": _list_values(row.get("what_confirms_fade_review")),
+        "what_invalidates_fade_review": _list_values(row.get("what_invalidates_fade_review")),
+        "derivatives_warning_codes": warnings,
+    }
+
+
+def _integrated_market_confirmation(
+    opportunity: str,
+    reaction: event_market_reaction.MarketReactionResult,
+) -> dict[str, Any]:
+    market_state = str(reaction.market_state or "")
+    if opportunity == event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value:
+        return {
+            "level": market_state or "confirmed",
+            "score": 80.0 if reaction.market_requirements_met else 0.0,
+            "reaction": market_state or "confirmed_breakout",
+            "source": "integrated_market_state",
+            "freshness": reaction.market_state_snapshot.freshness_status or "fresh",
+        }
+    if opportunity == event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value:
+        return {
+            "level": market_state or "fade_review_market_state",
+            "score": 75.0 if reaction.fade_requirements_met else 0.0,
+            "reaction": market_state or "post_event_fade_setup",
+            "source": "integrated_market_state",
+            "freshness": reaction.market_state_snapshot.freshness_status or "fresh",
+        }
+    if opportunity == event_market_reaction.EventOpportunityType.RISK_ONLY.value and market_state:
+        return {
+            "level": market_state,
+            "score": 55.0,
+            "reaction": market_state,
+            "source": "integrated_market_state",
+            "freshness": reaction.market_state_snapshot.freshness_status or "fresh",
+        }
+    return {
+        "level": None,
+        "score": None,
+        "reaction": market_state or None,
+        "source": "integrated_market_state" if market_state else None,
+        "freshness": reaction.market_state_snapshot.freshness_status if reaction.market_state_snapshot else None,
+    }
+
+
+def _list_values(value: Any) -> list[str]:
+    if value in (None, "", [], (), {}):
+        return []
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(";") if item.strip()]
+    if isinstance(value, Iterable) and not isinstance(value, (str, bytes, Mapping)):
+        return [str(item) for item in value if str(item or "")]
+    return [str(value)]
+
+
 def _best_source_strength(rows: list[dict[str, Any]]) -> str:
     values = [str(row.get("source_strength") or "") for row in rows]
     if "official_structured" in values:
@@ -1415,8 +1514,9 @@ def _manifest_item(
     namespace_dir: Path,
     rows: Iterable[Mapping[str, Any]],
     configured: bool,
-    started_at: datetime,
-    finished_at: datetime,
+    sidecar_research_observed_at: datetime,
+    wall_started_at: datetime,
+    wall_finished_at: datetime,
     warnings: Iterable[str] = (),
     errors: Iterable[str] = (),
 ) -> dict[str, Any]:
@@ -1437,8 +1537,11 @@ def _manifest_item(
         "freshness_status": freshness,
         "warnings": tuple(dict.fromkeys(item_warnings)),
         "errors": tuple(str(error) for error in errors if str(error)),
-        "started_at": started_at,
-        "finished_at": finished_at,
+        "sidecar_research_observed_at": sidecar_research_observed_at,
+        "sidecar_wall_started_at": wall_started_at,
+        "sidecar_wall_finished_at": wall_finished_at,
+        "started_at": wall_started_at,
+        "finished_at": wall_finished_at,
     }
 
 

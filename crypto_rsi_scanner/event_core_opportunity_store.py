@@ -899,6 +899,15 @@ def _row_from_core_opportunity(
     scheduled_event = _first_mapping(all_rows, ("scheduled_catalyst_event",))
     unlock_event = _first_mapping(all_rows, ("unlock_event",))
     derivatives_state_snapshot = _first_mapping(all_rows, ("derivatives_state_snapshot", "derivatives_snapshot"))
+    crowding_class = _first_text(all_rows, ("crowding_class",))
+    fade_readiness = _first_text(all_rows, ("fade_readiness",))
+    crowding_exhaustion_evidence = _first_list(all_rows, ("crowding_exhaustion_evidence",))
+    what_confirms_fade_review = _first_list(all_rows, ("what_confirms_fade_review",))
+    what_invalidates_fade_review = _first_list(all_rows, ("what_invalidates_fade_review",))
+    derivatives_warning_codes = list(dict.fromkeys((
+        *_first_list(all_rows, ("derivatives_warning_codes",)),
+        *_first_list(all_rows, ("warnings",)),
+    )))
     latest_source_url = (
         accepted_source.get("source_url")
         or _first_text(all_rows, ("latest_source_url", "source_url", "official_exchange_url"))
@@ -967,6 +976,12 @@ def _row_from_core_opportunity(
         "scheduled_catalyst_event": scheduled_event,
         "unlock_event": unlock_event,
         "derivatives_state_snapshot": derivatives_state_snapshot,
+        "crowding_class": crowding_class,
+        "fade_readiness": fade_readiness,
+        "crowding_exhaustion_evidence": crowding_exhaustion_evidence,
+        "what_confirms_fade_review": what_confirms_fade_review,
+        "what_invalidates_fade_review": what_invalidates_fade_review,
+        "derivatives_warning_codes": derivatives_warning_codes,
         "supporting_row_ids": support_ids,
         "diagnostic_row_ids": diagnostic_ids,
         "diagnostic_row_count": item.diagnostic_row_count,
@@ -1009,6 +1024,11 @@ def _row_from_core_opportunity(
         "market_context_age_hours": market_context.get("market_context_age_hours"),
         "market_context_freshness_cap_applied": bool(market_context.get("market_context_freshness_cap_applied")),
         "market_context_data_quality": market_context.get("market_context_data_quality"),
+        "integrated_market_confirmation_level": _first_text(all_rows, ("integrated_market_confirmation_level",)),
+        "integrated_market_confirmation_score": _first_float(all_rows, ("integrated_market_confirmation_score",)),
+        "integrated_market_reaction_confirmation": _first_text(all_rows, ("integrated_market_reaction_confirmation",)),
+        "integrated_market_context_source": _first_text(all_rows, ("integrated_market_context_source",)),
+        "integrated_market_freshness_status": _first_text(all_rows, ("integrated_market_freshness_status",)),
         "market_confirmation_score": market_after,
         "market_confirmation_level": market_level,
         "market_confirmation_summary": market_summary,
@@ -1218,6 +1238,13 @@ def _apply_integrated_candidate_truth(
         "market_requirements_met",
         "fade_requirements_met",
         "risk_requirements_met",
+        "integrated_market_confirmation_level",
+        "integrated_market_confirmation_score",
+        "integrated_market_reaction_confirmation",
+        "integrated_market_context_source",
+        "integrated_market_freshness_status",
+        "crowding_class",
+        "fade_readiness",
         "why_now",
         "source_origin",
         "source_origins",
@@ -1238,6 +1265,10 @@ def _apply_integrated_candidate_truth(
         ("why_not_alertable", "why_not_alertable"),
         ("reason_codes", "reason_codes"),
         ("warnings", "warnings"),
+        ("crowding_exhaustion_evidence", "crowding_exhaustion_evidence"),
+        ("what_confirms_fade_review", "what_confirms_fade_review"),
+        ("what_invalidates_fade_review", "what_invalidates_fade_review"),
+        ("derivatives_warning_codes", "derivatives_warning_codes"),
     ):
         value = integrated.get(src_key)
         if value not in (None, "", [], {}, ()):
@@ -1283,10 +1314,16 @@ def _first_integrated_candidate(
     primary: Mapping[str, Any],
     rows: Iterable[Mapping[str, Any]],
 ) -> Mapping[str, Any] | None:
-    if str(primary.get("row_type") or "") == "event_integrated_radar_candidate":
+    if (
+        str(primary.get("row_type") or "") == "event_integrated_radar_candidate"
+        or str(primary.get("source_row_type") or "") == "event_integrated_radar_candidate"
+    ):
         return primary
     for row in rows:
-        if str(row.get("row_type") or "") == "event_integrated_radar_candidate":
+        if (
+            str(row.get("row_type") or "") == "event_integrated_radar_candidate"
+            or str(row.get("source_row_type") or "") == "event_integrated_radar_candidate"
+        ):
             return row
     return None
 
