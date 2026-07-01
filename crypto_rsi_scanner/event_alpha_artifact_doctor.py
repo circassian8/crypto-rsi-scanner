@@ -455,6 +455,11 @@ def diagnose_artifacts(
     )
     visible_core_ids = {item.core_opportunity_id for item in visible_core}
     visible_core_by_id = {item.core_opportunity_id: item for item in visible_core}
+    normalized_core_rows_by_id = {
+        item.core_opportunity_id: dict(item.primary_row)
+        for item in visible_core
+        if item.core_opportunity_id
+    }
     store_core_ids = {
         str(row.get("core_opportunity_id") or "").strip()
         for row in core_rows
@@ -525,23 +530,23 @@ def diagnose_artifacts(
         and str(row.get("core_opportunity_id") or "").strip() not in store_core_ids
         and str(row.get("core_opportunity_id_status") or "") not in {"diagnostic_support", "canonical"}
     )
-    card_primary_mismatches = _card_primary_mismatches(research_card_paths, core_rows_by_id)
+    card_primary_mismatches = _card_primary_mismatches(research_card_paths, normalized_core_rows_by_id)
     card_acquisition_mismatches = _card_acquisition_count_mismatches(
         research_card_paths,
-        core_rows_by_id,
+        normalized_core_rows_by_id,
         acquisition_rows,
     )
     card_source_pack_mismatches = _card_source_pack_mismatches(
         research_card_paths,
-        core_rows_by_id,
+        normalized_core_rows_by_id,
         acquisition_rows,
     )
-    card_support_blockers = _card_primary_section_contains_support_row_blockers(research_card_paths, core_rows_by_id)
-    card_upgrade_inconsistent = _card_upgrade_text_inconsistent_with_final_level(research_card_paths, core_rows_by_id)
-    card_market_missing = _card_market_confirmation_missing_but_core_has_market_confirmation(research_card_paths, core_rows_by_id)
+    card_support_blockers = _card_primary_section_contains_support_row_blockers(research_card_paths, normalized_core_rows_by_id)
+    card_upgrade_inconsistent = _card_upgrade_text_inconsistent_with_final_level(research_card_paths, normalized_core_rows_by_id)
+    card_market_missing = _card_market_confirmation_missing_but_core_has_market_confirmation(research_card_paths, normalized_core_rows_by_id)
     card_source_unknown = _card_latest_source_unknown_but_accepted_evidence_exists(
         research_card_paths,
-        core_rows_by_id,
+        normalized_core_rows_by_id,
         acquisition_rows,
     )
     audit_impact_mismatch = 0

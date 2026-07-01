@@ -37,21 +37,29 @@ too loosely.
 - Deduped research-review candidates by canonical core opportunity, excluded
   strict-lane cores, allowed live-confirmation-blocked daily candidates to show
   as research-review, and hid sector-only core rows from the default core view.
+- Made research-card indexes follow the rendered final verdict/group instead of
+  stale pre-normalization entry metadata, and aligned artifact-doctor card/core
+  checks with the normalized canonical CoreOpportunity view.
 - Added artifact-doctor checks for unconfirmed narrative digest rows,
   single-source/no-market fan-token digest rows, visible sector cores, duplicate
   proxy cores, CryptoPanic stale-backoff recommendation drift, and
   evidence-count mismatches.
 - Documented `RSI_EVENT_ALPHA_ALLOW_SOURCE_ONLY_NARRATIVE_DIGEST` and updated
   `ROADMAP.md`, `DECISIONS.md`, and the Event Alpha runbook.
-**Verify:** `python3 tests/test_indicators.py` (589/589 passed);
+**Verify:** `python3 tests/test_indicators.py` (593/593 passed);
 `python3 -m compileall -q crypto_rsi_scanner tests`;
 `make event-alpha-signal-quality-eval PYTHON=python3` (36/36 passed);
 `make event-alpha-cryptopanic-preflight PYTHON=python3` (READY, token redacted);
 `make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal PYTHON=python3`
+(strict doctor WARN only, blockers none);
 `make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`
 (WARN only, blockers none);
 `make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-notify-llm-deep-research-review-no-send-smoke PYTHON=python3`;
 `make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-notify-llm-deep-no-send-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
 `make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
 `make verify PYTHON=python3`.
 **Notes/risks:** The latest rehearsal stayed no-send guarded. GDELT timeouts and

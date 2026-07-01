@@ -188,8 +188,12 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
                 f"results={int(row.get('cryptopanic_results') or 0)} "
                 f"accepted={int(row.get('cryptopanic_accepted_evidence') or 0)} "
                 f"rejected={int(row.get('cryptopanic_rejected_evidence') or 0)} "
-                f"status={row.get('cryptopanic_provider_status') or 'not_observed'} "
-                f"skip={row.get('cryptopanic_skip_reason') or 'none'}"
+                f"status={row.get('cryptopanic_effective_provider_status') or row.get('cryptopanic_provider_status') or 'not_observed'} "
+                f"skip={row.get('cryptopanic_skip_reason') or 'none'} "
+                f"raw_status={row.get('cryptopanic_raw_provider_status') or row.get('cryptopanic_provider_status') or 'not_observed'} "
+                f"successes={int(row.get('cryptopanic_successful_requests') or 0)} "
+                f"failures={int(row.get('cryptopanic_failed_requests') or 0)} "
+                f"stale_backoff_reconciled={str(bool(row.get('cryptopanic_stale_backoff_reconciled_after_success'))).lower()}"
             )
         rows.append(
             "  "

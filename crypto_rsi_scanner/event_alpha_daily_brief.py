@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -132,6 +133,11 @@ def build_daily_brief(
         core_opportunities = event_core_opportunities.aggregate_core_opportunities([*decisions, *hypotheses])
         core_source_rows = [*(decision.entry for decision in decisions), *hypotheses]
     core_sections = _core_opportunity_sections(core_opportunities)
+    source_coverage_report_path = (
+        Path(run_ledger_path).parent / "event_alpha_source_coverage.md"
+        if run_ledger_path
+        else None
+    )
     core_alertable_count = _core_alertable_count(core_opportunities)
     diagnostic_core_rows = sum(item.diagnostic_row_count for item in core_opportunities)
     diagnostic_control_rows = sum(item.source_noise_control_count for item in core_opportunities)
@@ -272,15 +278,14 @@ def build_daily_brief(
             near_miss_candidates,
             upgrade_candidates,
             acquisition_rows=acquisition_rows,
-            source_coverage_report_path=(
-                Path(run_ledger_path).parent / "event_alpha_source_coverage.md"
-                if run_ledger_path
-                else None
-            ),
+            source_coverage_report_path=source_coverage_report_path,
         ),
         "",
         "### Provider Health by Source Pack",
-        *_provider_health_by_pack_lines(provider_health_rows or {}),
+        *_provider_health_by_pack_lines(
+            provider_health_rows or {},
+            source_coverage_report_path=source_coverage_report_path,
+        ),
         "",
         "### Evidence Acquisition Results",
         *_evidence_acquisition_result_lines((*near_miss_candidates, *upgrade_candidates), acquisition_rows=acquisition_rows, limit=8),
@@ -623,6 +628,7 @@ def build_daily_brief(
         )
     lines.append(f"- Lane count sent/due: {review_sent}/{review_due}")
     lines.append("- Near-miss research review only; not alertable, missing confirmation, and not a trade signal.")
+    planned_review_deliveries = _research_review_delivery_rows(run_ledger_path)
     if research_review:
         for item in research_review[:5]:
             entry = item.decision.entry
@@ -631,6 +637,11 @@ def build_daily_brief(
                 f"score={event_alpha_notifications._research_review_score(item.decision):g} "
                 f"why_not_alertable={'; '.join(item.why_not_alertable) or 'missing confirmation'}"
             )
+    elif planned_review_deliveries:
+        for row in planned_review_deliveries[:5]:
+            lines.append(_research_review_delivery_line(row))
+        if len(planned_review_deliveries) > 5:
+            lines.append(f"- +{len(planned_review_deliveries) - 5} more research-review delivery candidates")
     else:
         lines.append("- None.")
     exploratory = event_alpha_notifications.select_exploratory_candidates(
@@ -939,6 +950,9 @@ def _source_coverage_summary_lines(
     acquisition_rows: Iterable[Mapping[str, Any]] = (),
     source_coverage_report_path: str | Path | None = None,
 ) -> list[str]:
+    coverage = _load_source_coverage_json(source_coverage_report_path)
+    if coverage:
+        return _source_coverage_json_summary_lines(coverage, source_coverage_report_path=source_coverage_report_path)
     row_maps = [_row_mapping(row) for row in rows]
     row_maps = [row for row in row_maps if row]
     summary = event_source_registry.format_source_coverage_summary(row_maps)
@@ -1013,6 +1027,105 @@ def _source_coverage_summary_lines(
     ]
 
 
+def _source_coverage_json_summary_lines(
+    coverage: Mapping[str, Any],
+    *,
+    source_coverage_report_path: str | Path | None,
+) -> list[str]:
+    report_path = Path(source_coverage_report_path) if source_coverage_report_path else None
+    json_path = _source_coverage_json_path(source_coverage_report_path)
+    report_status = "not written yet"
+    if report_path is not None:
+        report_status = str(report_path) if report_path.exists() else f"{report_path} (not written yet)"
+    lines = [
+        f"- Detailed source coverage report: {report_status}",
+        (
+            "- CryptoPanic effective coverage: "
+            f"configured={str(bool(coverage.get('cryptopanic_configured'))).lower()} "
+            f"status={coverage.get('cryptopanic_health_status') or 'unknown'} "
+            f"coverage={coverage.get('cryptopanic_coverage_status') or 'unknown'} "
+            f"observed={str(bool(coverage.get('cryptopanic_observed'))).lower()} "
+            f"successful_requests={int(coverage.get('cryptopanic_successful_requests') or 0)} "
+            f"failed_requests={int(coverage.get('cryptopanic_failed_requests') or 0)} "
+            f"accepted={int(coverage.get('cryptopanic_accepted_evidence') or 0)} "
+            f"rejected={int(coverage.get('cryptopanic_rejected_evidence') or 0)} "
+            f"stale_backoff_reconciled={str(bool(coverage.get('cryptopanic_backoff_reconciled_after_success'))).lower()}"
+        ),
+    ]
+    recommendation = str(coverage.get("cryptopanic_recommendation") or "none")
+    if recommendation and recommendation != "none":
+        lines.append(f"- CryptoPanic recommendation: {recommendation}")
+    packs = [pack for pack in coverage.get("packs") or [] if isinstance(pack, Mapping)]
+    blocked = sum(int(pack.get("candidates_blocked_by_coverage_gap") or 0) for pack in packs)
+    accepted = sum(int(pack.get("accepted_evidence_count") or 0) for pack in packs)
+    rejected_only = sum(int(pack.get("rejected_only_count") or 0) for pack in packs)
+    skipped_budget = sum(int(pack.get("skipped_budget_count") or 0) for pack in packs)
+    provider_unavailable = sum(int(pack.get("provider_unavailable_count") or 0) for pack in packs)
+    lines.append(
+        "- Evidence acquisition funnel: "
+        f"acquisition_requests_executed={int(coverage.get('acquisition_rows') or 0)}, "
+        f"accepted_evidence_found={accepted}, "
+        f"rejected_only={rejected_only}, "
+        f"skipped_budget={skipped_budget}, "
+        f"provider_unavailable={provider_unavailable}"
+    )
+    lines.append(f"- Source coverage gaps: {blocked} candidate(s) need healthier or more specific source coverage.")
+    next_source = _source_coverage_json_next_source(packs, coverage)
+    lines.append(f"- What data source would most improve next run: {next_source}")
+    lines.append(f"- Source coverage JSON: {json_path if json_path and json_path.exists() else 'not written yet'}")
+    lines.append("- Evidence absence rule: broad/degraded RSS/GDELT/Polymarket gaps are not treated as strong negative proof.")
+    return lines
+
+
+def _source_coverage_json_next_source(packs: Iterable[Mapping[str, Any]], coverage: Mapping[str, Any]) -> str:
+    candidates: list[tuple[int, str, str]] = []
+    for pack in packs:
+        actions = pack.get("recommended_actions")
+        action_text = "; ".join(str(item) for item in actions[:2]) if isinstance(actions, list) else ""
+        if not action_text:
+            continue
+        # If CryptoPanic is already observed healthy, avoid recommending it as
+        # the "missing" next source. The pack action may still mention another
+        # corroborating source, which remains useful.
+        if (
+            bool(coverage.get("cryptopanic_successful_requests"))
+            and "cryptopanic" in action_text.casefold()
+            and not any(
+                token in action_text.casefold()
+                for token in ("official", "sports", "coinalyze", "tokenomist", "binance", "bybit", "defillama")
+            )
+        ):
+            continue
+        priority = int(pack.get("candidates_blocked_by_coverage_gap") or 0)
+        if priority <= 0:
+            priority = int(pack.get("skipped_budget_count") or 0) + int(pack.get("provider_unavailable_count") or 0)
+        candidates.append((priority, str(pack.get("source_pack") or "unknown"), action_text))
+    if not candidates:
+        return "none; current source-pack evidence is not the main blocker"
+    _, pack_name, action = sorted(candidates, key=lambda item: (-item[0], item[1]))[0]
+    return f"{pack_name}: {action}"
+
+
+def _load_source_coverage_json(source_coverage_report_path: str | Path | None) -> Mapping[str, Any]:
+    path = _source_coverage_json_path(source_coverage_report_path)
+    if path is None or not path.exists():
+        return {}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, Mapping) else {}
+
+
+def _source_coverage_json_path(source_coverage_report_path: str | Path | None) -> Path | None:
+    if source_coverage_report_path is None:
+        return None
+    path = Path(source_coverage_report_path)
+    if path.suffix == ".json":
+        return path
+    return path.with_suffix(".json")
+
+
 def _source_coverage_next_source(
     gaps: Iterable[event_near_miss.EventNearMissCandidate],
     acquisition_rows: Iterable[Mapping[str, Any]],
@@ -1051,7 +1164,28 @@ def _evidence_items(value: object) -> tuple[Mapping[str, Any], ...]:
     return ()
 
 
-def _provider_health_by_pack_lines(provider_health_rows: Mapping[str, Mapping[str, Any]]) -> list[str]:
+def _provider_health_by_pack_lines(
+    provider_health_rows: Mapping[str, Mapping[str, Any]],
+    *,
+    source_coverage_report_path: str | Path | None = None,
+) -> list[str]:
+    coverage = _load_source_coverage_json(source_coverage_report_path)
+    if coverage:
+        packs = [pack for pack in coverage.get("packs") or [] if isinstance(pack, Mapping)]
+        if not packs:
+            return ["- Source coverage JSON had no pack rows."]
+        lines: list[str] = []
+        for pack in packs:
+            lines.append(
+                f"- {pack.get('source_pack') or 'unknown'}: "
+                f"coverage={pack.get('provider_coverage_status') or pack.get('source_pack_coverage_status') or 'unknown'} "
+                f"healthy={_join_json_values(pack.get('healthy_providers'))} "
+                f"unknown={_join_json_values(pack.get('unknown_or_unobserved_providers'))} "
+                f"degraded={_join_json_values(pack.get('degraded_or_backoff_providers'))} "
+                f"missing={_join_json_values(pack.get('missing_providers'))} "
+                f"blocked={int(pack.get('candidates_blocked_by_coverage_gap') or 0)}"
+            )
+        return lines
     if not provider_health_rows:
         return ["- No provider health rows found."]
     lines: list[str] = []
@@ -1066,6 +1200,15 @@ def _provider_health_by_pack_lines(provider_health_rows: Mapping[str, Mapping[st
             statuses.append(f"{provider}={status}")
         lines.append(f"- {pack.name}: " + ", ".join(statuses))
     return lines
+
+
+def _join_json_values(value: object) -> str:
+    if isinstance(value, str):
+        return value or "none"
+    if isinstance(value, Iterable) and not isinstance(value, (str, bytes, Mapping)):
+        items = [str(item) for item in value if str(item)]
+        return ", ".join(items) if items else "none"
+    return "none"
 
 
 def _evidence_acquisition_result_lines(
@@ -1375,7 +1518,7 @@ def _core_opportunity_lines(
     *,
     limit: int,
 ) -> list[str]:
-    rows = list(opportunities)
+    rows, collapsed_counts = _collapse_core_display_rows(opportunities)
     if not rows:
         return ["- None."]
     lines: list[str] = []
@@ -1388,6 +1531,9 @@ def _core_opportunity_lines(
                 f" diagnostics_hidden={item.diagnostic_row_count}"
                 f" quality_capped_support={item.quality_capped_supporting_rows}"
             )
+        family_count = collapsed_counts.get(_core_display_family_key(item), 1)
+        if family_count > 1:
+            diagnostics += f" collapsed_family_rows={family_count - 1}"
         lines.append(
             f"- {item.core_opportunity_id} {item.symbol}/{item.coin_id}: "
             f"level={item.opportunity_level} route={item.final_route_after_quality_gate or 'local'} "
@@ -1419,6 +1565,84 @@ def _core_opportunity_lines(
     if len(rows) > limit:
         lines.append(f"- +{len(rows) - limit} more core opportunities")
     return lines
+
+
+def _collapse_core_display_rows(
+    opportunities: Iterable[event_core_opportunities.CoreOpportunity],
+) -> tuple[list[event_core_opportunities.CoreOpportunity], dict[tuple[str, str], int]]:
+    grouped: dict[tuple[str, str], list[event_core_opportunities.CoreOpportunity]] = {}
+    for item in opportunities:
+        if _hide_core_from_default_display(item):
+            continue
+        grouped.setdefault(_core_display_family_key(item), []).append(item)
+    rows: list[event_core_opportunities.CoreOpportunity] = []
+    counts: dict[tuple[str, str], int] = {}
+    for key, items in grouped.items():
+        counts[key] = len(items)
+        rows.append(sorted(items, key=_core_display_rank, reverse=True)[0])
+    return rows, counts
+
+
+def _core_display_rank(item: event_core_opportunities.CoreOpportunity) -> tuple[int, float, str]:
+    if item.is_high_priority:
+        route_rank = 5
+    elif item.is_watchlist:
+        route_rank = 4
+    elif item.is_validated_digest:
+        route_rank = 3
+    elif item.alertable:
+        route_rank = 2
+    else:
+        route_rank = 1
+    return route_rank, item.opportunity_score_final, item.core_opportunity_id
+
+
+def _core_display_family_key(item: event_core_opportunities.CoreOpportunity) -> tuple[str, str]:
+    asset = event_core_opportunities.asset_key_for_opportunity(item)
+    path = str(item.primary_impact_path or "").casefold()
+    family = "proxy" if path in {"venue_value_capture", "proxy_attention", "proxy_exposure"} else path or "unknown"
+    return asset, family
+
+
+def _hide_core_from_default_display(item: event_core_opportunities.CoreOpportunity) -> bool:
+    if str(item.symbol or "").upper() != "SECTOR":
+        return False
+    return not (item.alertable or item.is_high_priority or item.is_watchlist or item.is_validated_digest)
+
+
+def _research_review_delivery_rows(run_ledger_path: str | Path | None) -> list[Mapping[str, Any]]:
+    if run_ledger_path is None:
+        return []
+    path = Path(run_ledger_path).parent / "event_alpha_notification_deliveries.jsonl"
+    if not path.exists():
+        return []
+    rows: list[Mapping[str, Any]] = []
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if isinstance(row, Mapping) and str(row.get("lane") or "") == event_alpha_notifications.LANE_RESEARCH_REVIEW_DIGEST:
+                rows.append(row)
+    except (OSError, json.JSONDecodeError):
+        return rows
+    return sorted(rows, key=lambda row: str(row.get("attempted_at") or row.get("created_at") or ""), reverse=True)
+
+
+def _research_review_delivery_line(row: Mapping[str, Any]) -> str:
+    symbols = row.get("canonical_symbols") if isinstance(row.get("canonical_symbols"), list) else []
+    coins = row.get("canonical_coin_ids") if isinstance(row.get("canonical_coin_ids"), list) else []
+    core_ids = row.get("core_opportunity_ids") if isinstance(row.get("core_opportunity_ids"), list) else []
+    label = str(row.get("canonical_symbol") or (symbols[0] if symbols else "") or row.get("symbol") or "UNKNOWN")
+    coin = str(row.get("canonical_coin_id") or (coins[0] if coins else "") or row.get("coin_id") or "unknown")
+    core_id = str(row.get("core_opportunity_id") or (core_ids[0] if core_ids else "") or row.get("alert_id") or "unknown")
+    state = str(row.get("delivery_state") or row.get("state") or "planned")
+    mode = str(row.get("mode") or row.get("send_mode") or "")
+    return (
+        f"- {label}/{coin} core={core_id} "
+        f"delivery={state} would_send={str(bool(row.get('would_send'))).lower()} "
+        f"mode={mode or 'unknown'}"
+    )
 
 
 def _live_confirmation_gated_core_lines(

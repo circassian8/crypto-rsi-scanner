@@ -110,6 +110,9 @@ class CoreEvidenceAcquisitionView:
     rejected_evidence_count: int = 0
     accepted_reason_codes: tuple[str, ...] = ()
     rejected_reason_codes: tuple[str, ...] = ()
+    accepted_provider_counts: Mapping[str, int] | None = None
+    rejected_provider_counts: Mapping[str, int] | None = None
+    accepted_reason_code_counts: Mapping[str, int] | None = None
     accepted_evidence_samples: tuple[dict[str, Any], ...] = ()
     rejected_evidence_samples: tuple[dict[str, Any], ...] = ()
     provider_failures: tuple[str, ...] = ()
@@ -131,6 +134,9 @@ class CoreEvidenceAcquisitionView:
             "rejected": self.rejected_evidence_count,
             "accepted_reason_codes": self.accepted_reason_codes,
             "rejected_reason_codes": self.rejected_reason_codes,
+            "accepted_provider_counts": dict(self.accepted_provider_counts or {}),
+            "rejected_provider_counts": dict(self.rejected_provider_counts or {}),
+            "accepted_reason_code_counts": dict(self.accepted_reason_code_counts or {}),
             "provider_failures": self.provider_failures,
             "evidence_quality_before": self.evidence_quality_before,
             "evidence_quality_after": self.evidence_quality_after,
@@ -541,7 +547,20 @@ def canonical_core_opportunity_view_from_rows(
 
 def core_opportunities_from_rows(rows: Iterable[Mapping[str, Any]]) -> tuple[event_core_opportunities.CoreOpportunity, ...]:
     """Convert stored canonical rows back into CoreOpportunity objects."""
-    return event_core_opportunities.aggregate_core_opportunities(rows)
+    opportunities = event_core_opportunities.aggregate_core_opportunities(rows)
+    normalized_rows = [
+        _row_from_core_opportunity(
+            item,
+            generated_at=str(item.primary_row.get("generated_at") or datetime.now(timezone.utc).isoformat()),
+            run_id=_first_text([item.primary_row], ("run_id",)),
+            profile=_first_text([item.primary_row], ("profile",)),
+            run_mode=_first_text([item.primary_row], ("run_mode",)),
+            artifact_namespace=_first_text([item.primary_row], ("artifact_namespace", "namespace")),
+            card_path=_first_text([item.primary_row], ("card_path", "research_card_path")),
+        )
+        for item in opportunities
+    ]
+    return event_core_opportunities.aggregate_core_opportunities(normalized_rows)
 
 
 def merge_core_opportunity_verdict(
@@ -693,7 +712,12 @@ def _row_from_core_opportunity(
         "evidence_acquisition_status": acquisition.acquisition_status,
         "evidence_acquisition_accepted_count": acquisition.accepted_evidence_count,
         "evidence_acquisition_rejected_count": acquisition.rejected_evidence_count,
+        "accepted_evidence_count": acquisition.accepted_evidence_count,
+        "rejected_evidence_count": acquisition.rejected_evidence_count,
         "accepted_evidence_reason_codes": list(acquisition.accepted_reason_codes),
+        "accepted_provider_counts": dict(acquisition.accepted_provider_counts or {}),
+        "rejected_provider_counts": dict(acquisition.rejected_provider_counts or {}),
+        "accepted_reason_code_counts": dict(acquisition.accepted_reason_code_counts or {}),
         "source_pack": source_pack,
     }
     live_policy = event_opportunity_verdict.apply_live_confirmation_policy(
@@ -702,6 +726,7 @@ def _row_from_core_opportunity(
         run_mode=run_mode,
         artifact_namespace=artifact_namespace,
         allow_sector_digest=bool(config.EVENT_ALPHA_ALLOW_SECTOR_DIGEST),
+        allow_source_only_narrative_digest=bool(config.EVENT_ALPHA_ALLOW_SOURCE_ONLY_NARRATIVE_DIGEST),
     )
     final_level = live_policy.capped_level or item.opportunity_level
     final_score = live_policy.capped_score if live_policy.capped_score is not None else item.opportunity_score_final
@@ -811,6 +836,11 @@ def _row_from_core_opportunity(
         "source_pack": source_pack,
         "evidence_acquisition_accepted_count": acquisition.accepted_evidence_count,
         "evidence_acquisition_rejected_count": acquisition.rejected_evidence_count,
+        "accepted_evidence_count": acquisition.accepted_evidence_count,
+        "rejected_evidence_count": acquisition.rejected_evidence_count,
+        "accepted_provider_counts": dict(acquisition.accepted_provider_counts or {}),
+        "rejected_provider_counts": dict(acquisition.rejected_provider_counts or {}),
+        "accepted_reason_code_counts": dict(acquisition.accepted_reason_code_counts or {}),
         "evidence_acquisition_accepted_evidence": list(acquisition.accepted_evidence_samples),
         "evidence_acquisition_rejected_samples": list(acquisition.rejected_evidence_samples),
         "accepted_evidence_reason_codes": list(acquisition.accepted_reason_codes),
@@ -1227,6 +1257,9 @@ def _build_core_evidence_acquisition_view(
             ),
         ]
     )
+    accepted_provider_counts = _merge_count_maps(row.get("accepted_provider_counts") for row in primary)
+    rejected_provider_counts = _merge_count_maps(row.get("rejected_provider_counts") for row in primary)
+    accepted_reason_code_counts = _merge_count_maps(row.get("accepted_reason_code_counts") for row in primary)
     provider_failures = _unique_strings(
         failure
         for row in primary
@@ -1247,6 +1280,9 @@ def _build_core_evidence_acquisition_view(
         rejected_evidence_count=rejected_count,
         accepted_reason_codes=tuple(accepted_reasons),
         rejected_reason_codes=tuple(rejected_reasons),
+        accepted_provider_counts=accepted_provider_counts,
+        rejected_provider_counts=rejected_provider_counts,
+        accepted_reason_code_counts=accepted_reason_code_counts,
         accepted_evidence_samples=tuple(accepted_samples[:5]),
         rejected_evidence_samples=tuple(rejected_samples[:5]),
         provider_failures=tuple(provider_failures),
@@ -1270,6 +1306,23 @@ def _row_with_score_components(row: Mapping[str, Any]) -> dict[str, Any]:
             merged.update(dict(value))
     merged.update(dict(row))
     return merged
+
+
+def _merge_count_maps(values: Iterable[object]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        if not isinstance(value, Mapping):
+            continue
+        for key, raw in value.items():
+            text = str(key or "").strip()
+            if not text:
+                continue
+            try:
+                number = int(raw or 0)
+            except (TypeError, ValueError):
+                continue
+            counts[text] = counts.get(text, 0) + max(0, number)
+    return counts
 
 
 def _row_has_acquisition_metadata(row: Mapping[str, Any]) -> bool:

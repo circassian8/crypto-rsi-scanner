@@ -2349,13 +2349,13 @@ def _cryptopanic_stats_for_pipeline_result(
             )
         )
     ]
-    provider_status = "not_observed"
+    raw_provider_status = "not_observed"
     if "backoff" in statuses:
-        provider_status = "backoff"
+        raw_provider_status = "backoff"
     elif "degraded" in statuses:
-        provider_status = "degraded"
+        raw_provider_status = "degraded"
     elif statuses:
-        provider_status = "healthy"
+        raw_provider_status = "healthy"
     usage = cryptopanic_provider.cryptopanic_usage_summary(
         _cryptopanic_request_ledger_path(),
         now=datetime.now(timezone.utc),
@@ -2371,6 +2371,23 @@ def _cryptopanic_stats_for_pipeline_result(
     duplicate_requests = max(0, len(normalized_keys) - len(set(normalized_keys)))
     invalid_currency_requests = sum(1 for row in ledger_rows if _cryptopanic_row_has_invalid_currencies(row))
     requests_used = int(usage.today_requests or 0)
+    successful_requests = sum(
+        1
+        for row in ledger_rows
+        if not str(row.get("error_class") or "").strip()
+        and _status_code_ok(row.get("status_code"))
+    )
+    failed_requests = sum(
+        1
+        for row in ledger_rows
+        if str(row.get("error_class") or "").strip()
+        or _status_code_failed(row.get("status_code"))
+    )
+    provider_status = raw_provider_status
+    stale_backoff_reconciled = False
+    if successful_requests:
+        provider_status = "degraded" if failed_requests else "healthy"
+        stale_backoff_reconciled = raw_provider_status == "backoff"
     if requests_used > 0:
         attempted = True
         if provider_status == "not_observed" and usage.last_status_code:
@@ -2401,9 +2418,30 @@ def _cryptopanic_stats_for_pipeline_result(
         "cryptopanic_results": max(results_seen, accepted + rejected),
         "cryptopanic_accepted_evidence": accepted,
         "cryptopanic_rejected_evidence": rejected,
+        "cryptopanic_raw_provider_status": raw_provider_status,
         "cryptopanic_provider_status": provider_status,
+        "cryptopanic_effective_provider_status": provider_status,
+        "cryptopanic_successful_requests": successful_requests,
+        "cryptopanic_failed_requests": failed_requests,
+        "cryptopanic_stale_backoff_reconciled_after_success": stale_backoff_reconciled,
         "cryptopanic_skip_reason": skip_reason,
     }
+
+
+def _status_code_ok(value: Any) -> bool:
+    try:
+        code = int(value)
+    except (TypeError, ValueError):
+        return False
+    return 200 <= code < 400
+
+
+def _status_code_failed(value: Any) -> bool:
+    try:
+        code = int(value)
+    except (TypeError, ValueError):
+        return False
+    return code >= 400
 
 
 def _recent_cryptopanic_request_rows(path: str | Path | None, *, since: datetime | None = None) -> list[Mapping[str, Any]]:

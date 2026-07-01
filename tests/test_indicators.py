@@ -3484,6 +3484,7 @@ def test_cryptopanic_live_provider_records_safe_parse_and_http_diagnostics():
             return self._body
 
     observed = datetime(2026, 6, 15, 12, tzinfo=timezone.utc)
+    fake_token = "0123456789abcdef0123456789abcdef01234567"
 
     def run_once(opener):
         with TemporaryDirectory() as tmp:
@@ -3491,7 +3492,7 @@ def test_cryptopanic_live_provider_records_safe_parse_and_http_diagnostics():
             provider = CryptoPanicProvider(
                 None,
                 live_enabled=True,
-                api_token="02391c483204eb24f783dd55d61b2e76f727c67c",
+                api_token=fake_token,
                 base_url="https://cryptopanic.test/api/growth_weekly/v2",
                 currencies="CHZ",
                 opener=opener,
@@ -3508,11 +3509,11 @@ def test_cryptopanic_live_provider_records_safe_parse_and_http_diagnostics():
     assert empty_rows[0]["parse_error_message"] == "empty response body"
     assert empty_rows[0]["response_bytes"] == 0
 
-    html_provider, html_rows = run_once(lambda request, timeout: TextResponse(b"<html>bad token 02391c483204eb24f783dd55d61b2e76f727c67c</html>", "text/html"))
+    html_provider, html_rows = run_once(lambda request, timeout: TextResponse(f"<html>bad token {fake_token}</html>".encode(), "text/html"))
     assert html_provider.last_error_class == "json_parse_error"
     assert html_rows[0]["content_type"] == "text/html"
     assert html_rows[0]["error_class"] == "json_parse_error"
-    assert "02391c483204eb24f783dd55d61b2e76f727c67c" not in html_rows[0]["body_excerpt_redacted"]
+    assert fake_token not in html_rows[0]["body_excerpt_redacted"]
     assert "<redacted>" in html_rows[0]["body_excerpt_redacted"]
 
     def http_error(request, timeout):
@@ -3521,7 +3522,7 @@ def test_cryptopanic_live_provider_records_safe_parse_and_http_diagnostics():
             403,
             "Forbidden",
             FakeHeaders({"Content-Type": "text/html"}),
-            io.BytesIO(b"<html>forbidden auth_token=02391c483204eb24f783dd55d61b2e76f727c67c</html>"),
+            io.BytesIO(f"<html>forbidden auth_token={fake_token}</html>".encode()),
         )
 
     http_provider, http_rows = run_once(http_error)
@@ -3531,7 +3532,7 @@ def test_cryptopanic_live_provider_records_safe_parse_and_http_diagnostics():
     assert http_rows[0]["content_type"] == "text/html"
     assert http_rows[0]["provider_health_effect"] == "degraded_backoff"
     assert http_rows[0]["quota_counted"] is True
-    assert "02391c483204eb24f783dd55d61b2e76f727c67c" not in http_rows[0]["body_excerpt_redacted"]
+    assert fake_token not in http_rows[0]["body_excerpt_redacted"]
 
 
 def test_cryptopanic_catalyst_search_currency_filter_uses_validated_identity_or_empty():
@@ -36559,6 +36560,187 @@ def test_event_operator_surfaces_show_asset_identity_metadata():
     )
     assert "asset kind: tokenized_equity_venue" in audit
     assert "role capabilities: can_be_market_anomaly, can_be_proxy_venue" in audit
+
+
+def test_live_confirmation_caps_source_only_narrative_digest_without_market():
+    from crypto_rsi_scanner import event_opportunity_verdict
+
+    verdict = event_opportunity_verdict.apply_live_confirmation_policy(
+        {
+            "profile": "notify_llm_deep",
+            "artifact_namespace": "notify_llm_deep_cryptopanic_rehearsal",
+            "symbol": "CHZ",
+            "coin_id": "chiliz",
+            "source_pack": "fan_sports_pack",
+            "final_opportunity_level": "validated_digest",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 72,
+            "impact_path_type": "fan_token_event",
+            "evidence_acquisition_status": "accepted_evidence_found",
+            "evidence_acquisition_accepted_count": 1,
+            "accepted_provider_counts": {"cryptopanic": 1},
+            "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match", "direct_token_mechanism"],
+            "market_confirmation_level": "none",
+            "market_context_freshness_status": "missing",
+        }
+    )
+    assert verdict.required is True
+    assert verdict.confirmed is False
+    assert verdict.capped_level == "exploratory"
+    assert verdict.reason == "source_only_narrative_without_market_confirmation"
+
+    confirmed = event_opportunity_verdict.apply_live_confirmation_policy(
+        {
+            "profile": "notify_llm_deep",
+            "artifact_namespace": "notify_llm_deep_cryptopanic_rehearsal",
+            "symbol": "CHZ",
+            "coin_id": "chiliz",
+            "source_pack": "fan_sports_pack",
+            "final_opportunity_level": "validated_digest",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 72,
+            "impact_path_type": "fan_token_event",
+            "evidence_acquisition_status": "accepted_evidence_found",
+            "evidence_acquisition_accepted_count": 1,
+            "accepted_provider_counts": {"cryptopanic": 1},
+            "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match"],
+            "market_confirmation_level": "moderate",
+            "market_confirmation_score": 55,
+            "market_context_freshness_status": "fresh",
+        }
+    )
+    assert confirmed.confirmed is True
+    assert confirmed.capped_level is None
+
+
+def test_core_store_load_normalizes_stale_source_only_narrative_digest():
+    from crypto_rsi_scanner import event_alpha_router, event_core_opportunity_store
+
+    stale = {
+        "row_type": "event_core_opportunity",
+        "schema_version": "event_core_opportunity_store_v1",
+        "profile": "notify_llm_deep",
+        "artifact_namespace": "notify_llm_deep_cryptopanic_rehearsal",
+        "core_opportunity_id": "core_chz_source_only",
+        "symbol": "CHZ",
+        "coin_id": "chiliz",
+        "incident_id": "world-cup-chz",
+        "candidate_role": "direct_subject",
+        "primary_impact_path": "fan_token_event",
+        "impact_path_type": "fan_token_event",
+        "opportunity_level": "validated_digest",
+        "final_opportunity_level": "validated_digest",
+        "opportunity_score_final": 72,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+        "final_state_after_quality_gate": "RADAR",
+        "source_pack": "fan_sports_pack",
+        "evidence_acquisition_status": "accepted_evidence_found",
+        "evidence_acquisition_accepted_count": 1,
+        "accepted_provider_counts": {"cryptopanic": 1},
+        "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match"],
+        "market_confirmation_level": "none",
+        "market_context_freshness_status": "missing",
+    }
+    opportunity = event_core_opportunity_store.core_opportunities_from_rows([stale])[0]
+    assert opportunity.opportunity_level == "exploratory"
+    assert opportunity.final_route_after_quality_gate == event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+    assert opportunity.primary_row["live_confirmation_reason"] == "source_only_narrative_without_market_confirmation"
+
+
+def test_daily_brief_source_coverage_uses_json_effective_provider_health():
+    import json
+
+    from crypto_rsi_scanner import event_alpha_daily_brief
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        (base / "event_alpha_source_coverage.json").write_text(
+            json.dumps({
+                "cryptopanic_configured": True,
+                "cryptopanic_health_status": "healthy",
+                "cryptopanic_coverage_status": "observed_healthy",
+                "cryptopanic_observed": True,
+                "cryptopanic_successful_requests": 2,
+                "cryptopanic_failed_requests": 0,
+                "cryptopanic_accepted_evidence": 1,
+                "cryptopanic_rejected_evidence": 0,
+                "cryptopanic_backoff_reconciled_after_success": True,
+                "packs": [{
+                    "source_pack": "fan_sports_pack",
+                    "provider_coverage_status": "partial",
+                    "healthy_providers": ["cryptopanic"],
+                    "unknown_or_unobserved_providers": ["sports_fixtures"],
+                    "degraded_or_backoff_providers": [],
+                    "missing_providers": ["project_blog_rss"],
+                    "candidates_blocked_by_coverage_gap": 1,
+                    "accepted_evidence_count": 1,
+                    "rejected_only_count": 0,
+                    "skipped_budget_count": 0,
+                    "provider_unavailable_count": 0,
+                    "recommended_actions": ["add sports fixture confirmation"],
+                }],
+            }),
+            encoding="utf-8",
+        )
+        brief = event_alpha_daily_brief.build_daily_brief(
+            run_rows=[{
+                "row_type": "event_alpha_run",
+                "run_id": "run-1",
+                "profile": "notify_llm_deep",
+                "artifact_namespace": "ns",
+                "started_at": "2026-07-01T00:00:00+00:00",
+                "success": True,
+            }],
+            requested_profile="notify_llm_deep",
+            artifact_namespace="ns",
+            run_ledger_path=base / "event_alpha_runs.jsonl",
+        )
+    assert "CryptoPanic effective coverage" in brief
+    assert "status=healthy" in brief
+    assert "fan_sports_pack: coverage=partial healthy=cryptopanic" in brief
+    assert "What data source would most improve next run: fan_sports_pack: add sports fixture confirmation" in brief
+
+
+def test_daily_brief_reflects_planned_research_review_delivery_without_decisions():
+    import json
+
+    from crypto_rsi_scanner import event_alpha_daily_brief
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        (base / "event_alpha_notification_deliveries.jsonl").write_text(
+            json.dumps({
+                "lane": "research_review_digest",
+                "delivery_state": "blocked",
+                "would_send": True,
+                "core_opportunity_id": "core_velvet_review",
+                "core_opportunity_ids": ["core_velvet_review"],
+                "canonical_symbol": "VELVET",
+                "canonical_coin_id": "velvet",
+                "attempted_at": "2026-07-01T00:01:00+00:00",
+                "mode": "no_send_rehearsal",
+            }) + "\n",
+            encoding="utf-8",
+        )
+        brief = event_alpha_daily_brief.build_daily_brief(
+            run_rows=[{
+                "row_type": "event_alpha_run",
+                "run_id": "run-1",
+                "profile": "notify_llm_deep",
+                "artifact_namespace": "ns",
+                "started_at": "2026-07-01T00:00:00+00:00",
+                "success": True,
+                "research_review_digest_enabled": True,
+                "research_review_digest_candidates": 1,
+                "research_review_digest_would_send": 1,
+            }],
+            requested_profile="notify_llm_deep",
+            artifact_namespace="ns",
+            run_ledger_path=base / "event_alpha_runs.jsonl",
+        )
+    assert "### Research Review Digest" in brief
+    assert "VELVET/velvet core=core_velvet_review" in brief
+    assert "would_send=true" in brief
 
 
 def _run_all():

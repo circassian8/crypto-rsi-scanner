@@ -227,8 +227,12 @@ def build_source_coverage_report(
         daily_soft_limit=cryptopanic_daily_soft_limit,
         now=observed,
     )
+    cryptopanic_effectively_healthy = cryptopanic_stats["coverage_status"] in {
+        "observed_healthy",
+        "observed_partial_success",
+    }
     provider_status_overrides: dict[str, str] = {}
-    if cryptopanic_stats["successful_requests"]:
+    if cryptopanic_stats["successful_requests"] or cryptopanic_effectively_healthy:
         provider_status_overrides["cryptopanic"] = (
             "degraded" if cryptopanic_stats["failed_requests"] else "healthy"
         )
@@ -293,7 +297,7 @@ def build_source_coverage_report(
             skipped_budget=skipped_budget,
             rejected_only=rejected_only,
             provider_unavailable=unavailable,
-            satisfied_providers={"cryptopanic"} if cryptopanic_stats["successful_requests"] else (),
+            satisfied_providers={"cryptopanic"} if cryptopanic_effectively_healthy else (),
         )
         packs.append(
             EventAlphaSourceCoveragePack(
@@ -560,10 +564,14 @@ def _cryptopanic_stats(
     )
     successful_requests = int(getattr(usage, "successful_requests", 0) or 0)
     failed_requests = int(getattr(usage, "failed_requests", 0) or 0)
-    backoff_reconciled_after_success = bool(successful_requests and health_status == "backoff")
+    backoff_reconciled_after_success = bool(
+        health_status == "backoff" and (successful_requests or accepted > 0)
+    )
     effective_health_status = health_status
     if successful_requests:
         effective_health_status = "partial_success" if failed_requests else "healthy"
+    elif accepted > 0 and health_status in {"backoff", "degraded", "unavailable", "unknown"}:
+        effective_health_status = "healthy"
     if usage.today_requests > 0:
         observed = True
     coverage_status = _cryptopanic_coverage_status(

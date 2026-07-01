@@ -155,7 +155,12 @@ class EventAlphaPipelineResult:
     cryptopanic_results: int = 0
     cryptopanic_accepted_evidence: int = 0
     cryptopanic_rejected_evidence: int = 0
+    cryptopanic_raw_provider_status: str = "not_observed"
     cryptopanic_provider_status: str = "not_observed"
+    cryptopanic_effective_provider_status: str = "not_observed"
+    cryptopanic_successful_requests: int = 0
+    cryptopanic_failed_requests: int = 0
+    cryptopanic_stale_backoff_reconciled_after_success: bool = False
     cryptopanic_skip_reason: str | None = None
 
     @property

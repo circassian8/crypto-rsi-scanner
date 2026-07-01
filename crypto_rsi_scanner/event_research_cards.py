@@ -372,7 +372,8 @@ def write_research_cards(
             continue
         path.write_text(_strip_sensitive(card.markdown), encoding="utf-8")
         card_paths.append(path)
-        card_groups[path] = _card_index_group_for_entry(entry, route_decisions)
+        rendered_group = _card_index_group_for_text(card.markdown.casefold())
+        card_groups[path] = rendered_group or _card_index_group_for_entry(entry, route_decisions)
     index = _render_index(card_paths, observed, card_groups=card_groups)
     index_path = target / "index.md"
     index_path.write_text(index, encoding="utf-8")

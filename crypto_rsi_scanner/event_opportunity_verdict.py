@@ -406,6 +406,7 @@ def apply_live_confirmation_policy(
     run_mode: str | None = None,
     artifact_namespace: str | None = None,
     allow_sector_digest: bool = False,
+    allow_source_only_narrative_digest: bool = False,
 ) -> LiveConfirmationVerdict:
     """Return a live/no-send promotion cap for one canonical opportunity row.
 
@@ -429,6 +430,12 @@ def apply_live_confirmation_policy(
     acquisition = classify_acquisition_confirmation(data)
     if _is_sector_only_row(data) and not allow_sector_digest:
         return _live_cap(data, "sector_only_digest_not_allowed", acquisition)
+    if _source_only_narrative_without_market_confirmation(
+        data,
+        acquisition,
+        allow_source_only_narrative_digest=allow_source_only_narrative_digest,
+    ):
+        return _live_cap(data, "source_only_narrative_without_market_confirmation", acquisition)
     if acquisition.confirms_candidate and acquisition.confirms_impact_path:
         return LiveConfirmationVerdict(required=True, confirmed=True, status="confirmed", reason="accepted_evidence_found")
     confirmation_reason = _strong_live_confirmation_reason(data)
@@ -829,7 +836,9 @@ def _strong_live_confirmation_reason(data: Mapping[str, Any]) -> str | None:
     }
     if source_classes.intersection(official_or_structured) and evidence_score >= 65:
         return "official_or_structured_source_confirmation"
-    if "cryptopanic_tagged" in source_classes or "cryptopanic_currency_tag_match" in reason_codes:
+    if (
+        "cryptopanic_tagged" in source_classes or "cryptopanic_currency_tag_match" in reason_codes
+    ) and not _narrative_source_pack(data):
         return "cryptopanic_tagged_token_catalyst_confirmation"
     if (
         market_score >= 75
@@ -853,6 +862,87 @@ def _strong_live_confirmation_reason(data: Mapping[str, Any]) -> str | None:
     ):
         return "explicit_deterministic_direct_event_source"
     return None
+
+
+def _source_only_narrative_without_market_confirmation(
+    data: Mapping[str, Any],
+    acquisition: AcquisitionConfirmation,
+    *,
+    allow_source_only_narrative_digest: bool,
+) -> bool:
+    """Return true for narrative-pack rows where one news source is not enough.
+
+    Token-tagged CryptoPanic evidence is valuable context, but for fan-token,
+    pre-IPO/RWA proxy, and political-meme narratives it should not be the sole
+    reason a live-style row stays validated digest or higher. Those rows need
+    official/structured corroboration, a second accepted source, or fresh market
+    confirmation unless the operator explicitly opts in.
+    """
+    if allow_source_only_narrative_digest or not _narrative_source_pack(data):
+        return False
+    source_class = str(data.get("source_class") or "").strip().casefold()
+    official_or_structured = source_class in {
+        "official_project",
+        "official_exchange",
+        "structured_calendar",
+        "structured_unlock",
+        "exchange_announcement",
+    }
+    if official_or_structured:
+        return False
+    accepted_count = _count_value(
+        data.get("evidence_acquisition_accepted_count"),
+        data.get("accepted_evidence_count"),
+        data.get("accepted_evidence"),
+        data.get("evidence_acquisition_accepted_evidence"),
+    )
+    if accepted_count >= 2:
+        return False
+    if _has_fresh_market_confirmation(data):
+        return False
+    if accepted_count > 0 or acquisition.confirms_candidate:
+        return True
+    reason_codes = {
+        str(value)
+        for value in (
+            *_as_values(data.get("accepted_evidence_reason_codes")),
+            *_as_values(data.get("accepted_reason_codes")),
+            *_as_values(data.get("source_registry_reasons")),
+            *_as_values(data.get("reason_codes")),
+        )
+        if str(value or "").strip()
+    }
+    return "cryptopanic_currency_tag_match" in {item.casefold() for item in reason_codes}
+
+
+def _narrative_source_pack(data: Mapping[str, Any]) -> bool:
+    return str(data.get("source_pack") or "").strip().casefold() in {
+        "fan_sports_pack",
+        "proxy_preipo_rwa_pack",
+        "political_meme_pack",
+    }
+
+
+def _has_fresh_market_confirmation(data: Mapping[str, Any]) -> bool:
+    market_score = _score(
+        data.get("market_confirmation_score"),
+        data.get("market_confirmation_after"),
+        data.get("market_move_volume"),
+    )
+    market_level = str(
+        data.get("market_confirmation_level")
+        or data.get("market_confirmation")
+        or data.get("market_reaction_confirmation")
+        or ""
+    ).strip().casefold()
+    freshness = str(
+        data.get("market_context_freshness_status")
+        or data.get("market_data_freshness")
+        or data.get("market_freshness_status")
+        or ""
+    ).strip().casefold()
+    fresh_context = freshness in {"fresh", "fixture_allowed_stale"}
+    return fresh_context and (market_score >= 40 or market_level in {"moderate", "strong", "confirmed", "fresh"})
 
 
 def _non_generic_impact_path(path: str, strength: str) -> bool:
