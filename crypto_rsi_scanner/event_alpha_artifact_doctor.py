@@ -121,6 +121,19 @@ class EventAlphaArtifactDoctorResult:
     derivatives_artifact_secret_leak: int = 0
     derivatives_state_missing_freshness_status: int = 0
     confirmed_long_crowded_without_warning: int = 0
+    integrated_radar_candidate_rows: int = 0
+    integrated_candidate_missing_opportunity_type: int = 0
+    integrated_candidate_missing_market_state_snapshot: int = 0
+    integrated_confirmed_long_without_source_market: int = 0
+    integrated_early_long_without_fresh_strong_source: int = 0
+    integrated_fade_without_crowding_exhaustion: int = 0
+    integrated_risk_without_evidence: int = 0
+    integrated_market_anomaly_confirmed: int = 0
+    integrated_cryptopanic_confirmed: int = 0
+    integrated_major_pair_early_long: int = 0
+    integrated_preview_missing_disclaimer: int = 0
+    integrated_created_normal_rsi_signal: int = 0
+    integrated_created_triggered_fade: int = 0
     source_coverage_report_missing: int = 0
     source_coverage_provider_status_unknown: int = 0
     source_coverage_provider_marked_healthy_without_observation: int = 0
@@ -363,6 +376,12 @@ def diagnose_artifacts(
             raw_fade_review_candidates = list(event_derivatives_crowding.load_fade_review_candidates(default_fade_review_path))
     else:
         raw_fade_review_candidates = [dict(row) for row in fade_review_candidate_rows if isinstance(row, Mapping)]
+    default_integrated_path = None
+    if inspected_alert_store_path is not None:
+        default_integrated_path = Path(inspected_alert_store_path).parent / "event_integrated_radar_candidates.jsonl"
+    elif source_coverage_report_path is not None:
+        default_integrated_path = Path(source_coverage_report_path).parent / "event_integrated_radar_candidates.jsonl"
+    raw_integrated_candidates = _read_jsonl(default_integrated_path) if default_integrated_path is not None else []
     raw_legacy = sum(
         1 for row in (*raw_runs, *raw_alerts, *raw_feedback, *raw_outcomes)
         if event_alpha_artifacts.is_legacy_row(row)
@@ -467,6 +486,13 @@ def diagnose_artifacts(
     )
     fade_review_candidates = event_alpha_artifacts.filter_artifact_rows(
         raw_fade_review_candidates,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    integrated_candidates = event_alpha_artifacts.filter_artifact_rows(
+        raw_integrated_candidates,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -720,6 +746,18 @@ def diagnose_artifacts(
     official_exchange_conflicts = _official_exchange_artifact_conflicts(official_exchange_candidates)
     scheduled_conflicts = _scheduled_catalyst_artifact_conflicts((*scheduled_catalysts, *unlock_candidates))
     derivatives_conflicts = _derivatives_crowding_artifact_conflicts((*derivatives_state, *fade_review_candidates))
+    integrated_conflicts = _integrated_radar_artifact_conflicts(
+        integrated_candidates,
+        preview_path=(
+            Path(inspected_alert_store_path).parent / "event_alpha_notification_preview.md"
+            if inspected_alert_store_path is not None
+            else (
+                Path(source_coverage_report_path).parent / "event_alpha_notification_preview.md"
+                if source_coverage_report_path is not None
+                else None
+            )
+        ),
+    )
     source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
     source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
@@ -1017,6 +1055,24 @@ def diagnose_artifacts(
         count = derivatives_conflicts.get(key, 0)
         if count:
             warnings.append(f"{key}={count}")
+    for key in (
+        "integrated_candidate_missing_opportunity_type",
+        "integrated_candidate_missing_market_state_snapshot",
+        "integrated_confirmed_long_without_source_market",
+        "integrated_early_long_without_fresh_strong_source",
+        "integrated_fade_without_crowding_exhaustion",
+        "integrated_risk_without_evidence",
+        "integrated_market_anomaly_confirmed",
+        "integrated_cryptopanic_confirmed",
+        "integrated_major_pair_early_long",
+        "integrated_preview_missing_disclaimer",
+        "integrated_created_normal_rsi_signal",
+        "integrated_created_triggered_fade",
+    ):
+        count = integrated_conflicts.get(key, 0)
+        if count:
+            message = f"{key}={count}"
+            (blockers if strict else warnings).append(message)
     if source_coverage_report_conflicts["source_coverage_report_missing"]:
         warnings.append(
             "source_coverage_report_missing="
@@ -1645,6 +1701,19 @@ def diagnose_artifacts(
         derivatives_artifact_secret_leak=derivatives_conflicts["derivatives_artifact_secret_leak"],
         derivatives_state_missing_freshness_status=derivatives_conflicts["derivatives_state_missing_freshness_status"],
         confirmed_long_crowded_without_warning=derivatives_conflicts["confirmed_long_crowded_without_warning"],
+        integrated_radar_candidate_rows=len(integrated_candidates),
+        integrated_candidate_missing_opportunity_type=integrated_conflicts["integrated_candidate_missing_opportunity_type"],
+        integrated_candidate_missing_market_state_snapshot=integrated_conflicts["integrated_candidate_missing_market_state_snapshot"],
+        integrated_confirmed_long_without_source_market=integrated_conflicts["integrated_confirmed_long_without_source_market"],
+        integrated_early_long_without_fresh_strong_source=integrated_conflicts["integrated_early_long_without_fresh_strong_source"],
+        integrated_fade_without_crowding_exhaustion=integrated_conflicts["integrated_fade_without_crowding_exhaustion"],
+        integrated_risk_without_evidence=integrated_conflicts["integrated_risk_without_evidence"],
+        integrated_market_anomaly_confirmed=integrated_conflicts["integrated_market_anomaly_confirmed"],
+        integrated_cryptopanic_confirmed=integrated_conflicts["integrated_cryptopanic_confirmed"],
+        integrated_major_pair_early_long=integrated_conflicts["integrated_major_pair_early_long"],
+        integrated_preview_missing_disclaimer=integrated_conflicts["integrated_preview_missing_disclaimer"],
+        integrated_created_normal_rsi_signal=integrated_conflicts["integrated_created_normal_rsi_signal"],
+        integrated_created_triggered_fade=integrated_conflicts["integrated_created_triggered_fade"],
         source_coverage_report_missing=source_coverage_report_conflicts["source_coverage_report_missing"],
         source_coverage_provider_status_unknown=source_coverage_report_conflicts["source_coverage_provider_status_unknown"],
         source_coverage_provider_marked_healthy_without_observation=source_coverage_report_conflicts["source_coverage_provider_marked_healthy_without_observation"],
@@ -1808,6 +1877,29 @@ def _row(value: Mapping[str, Any] | object) -> dict[str, Any]:
     if is_dataclass(value):
         return asdict(value)
     return dict(getattr(value, "__dict__", {}) or {})
+
+
+def _read_jsonl(path: str | Path | None) -> list[dict[str, Any]]:
+    if path is None:
+        return []
+    source = Path(path)
+    if not source.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    try:
+        for line in source.read_text(encoding="utf-8").splitlines():
+            text = line.strip()
+            if not text:
+                continue
+            try:
+                item = json.loads(text)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(item, Mapping):
+                rows.append(dict(item))
+    except OSError:
+        return []
+    return rows
 
 
 def _alert_has_feedback_target(row: Mapping[str, Any]) -> bool:
@@ -2749,6 +2841,94 @@ def _derivatives_row_has_secret_leak(value: object) -> bool:
     elif isinstance(value, (list, tuple, set)):
         return any(_derivatives_row_has_secret_leak(item) for item in value)
     return False
+
+
+def _integrated_radar_artifact_conflicts(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    preview_path: str | Path | None = None,
+) -> dict[str, int]:
+    out = {
+        "integrated_candidate_missing_opportunity_type": 0,
+        "integrated_candidate_missing_market_state_snapshot": 0,
+        "integrated_confirmed_long_without_source_market": 0,
+        "integrated_early_long_without_fresh_strong_source": 0,
+        "integrated_fade_without_crowding_exhaustion": 0,
+        "integrated_risk_without_evidence": 0,
+        "integrated_market_anomaly_confirmed": 0,
+        "integrated_cryptopanic_confirmed": 0,
+        "integrated_major_pair_early_long": 0,
+        "integrated_preview_missing_disclaimer": 0,
+        "integrated_created_normal_rsi_signal": 0,
+        "integrated_created_triggered_fade": 0,
+    }
+    row_count = 0
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        row_count += 1
+        lane = str(row.get("opportunity_type") or "").strip().upper()
+        if not lane:
+            out["integrated_candidate_missing_opportunity_type"] += 1
+            continue
+        source_origins = {str(item).strip().casefold() for item in row.get("source_origins") or () if str(item).strip()}
+        source_packs = {str(item).strip().casefold() for item in row.get("source_packs") or () if str(item).strip()}
+        if not source_origins:
+            source_origin = str(row.get("source_origin") or "").strip().casefold()
+            if source_origin:
+                source_origins.add(source_origin)
+        if not source_packs:
+            source_pack = str(row.get("source_pack") or "").strip().casefold()
+            if source_pack:
+                source_packs.add(source_pack)
+        snapshot = row.get("market_state_snapshot")
+        if lane not in {"UNCONFIRMED_RESEARCH", "DIAGNOSTIC"} and (not isinstance(snapshot, Mapping) or not snapshot):
+            out["integrated_candidate_missing_market_state_snapshot"] += 1
+        source_met = _truthy(row.get("source_requirements_met"))
+        market_met = _truthy(row.get("market_requirements_met"))
+        fade_met = _truthy(row.get("fade_requirements_met"))
+        risk_met = _truthy(row.get("risk_requirements_met"))
+        source_strength = str(row.get("source_strength") or "").casefold()
+        market_state = str(row.get("market_state_class") or row.get("market_state") or "").casefold()
+        if lane == "CONFIRMED_LONG_RESEARCH" and (not source_met or not market_met):
+            out["integrated_confirmed_long_without_source_market"] += 1
+        if lane == "EARLY_LONG_RESEARCH" and (
+            source_strength not in {"strong", "official_structured"}
+            or market_state != "no_reaction"
+        ):
+            out["integrated_early_long_without_fresh_strong_source"] += 1
+        if lane == "FADE_SHORT_REVIEW" and (
+            not fade_met
+            or market_state not in {"blowoff_crowded", "post_event_fade_setup", "late_momentum"}
+        ):
+            out["integrated_fade_without_crowding_exhaustion"] += 1
+        if lane == "RISK_ONLY" and not (
+            risk_met
+            or row.get("unlock_event")
+            or "unlock_supply_pack" in source_packs
+            or str(row.get("event_type") or "").casefold() in {"unlock", "delisting", "exploit"}
+        ):
+            out["integrated_risk_without_evidence"] += 1
+        if lane == "CONFIRMED_LONG_RESEARCH" and source_origins == {"market_anomaly"}:
+            out["integrated_market_anomaly_confirmed"] += 1
+        if lane == "CONFIRMED_LONG_RESEARCH" and any("cryptopanic" in item for item in source_packs) and not (
+            source_origins - {"source_news", "news", "cryptopanic"}
+        ):
+            out["integrated_cryptopanic_confirmed"] += 1
+        if lane == "EARLY_LONG_RESEARCH" and _truthy(row.get("major_pair_simple_announcement")):
+            out["integrated_major_pair_early_long"] += 1
+        if _truthy(row.get("normal_rsi_signal_written")):
+            out["integrated_created_normal_rsi_signal"] += 1
+        if _truthy(row.get("triggered_fade_created")) or str(row.get("signal_type") or "").upper() == "TRIGGERED_FADE":
+            out["integrated_created_triggered_fade"] += 1
+    if row_count and preview_path is not None:
+        try:
+            preview_text = Path(preview_path).read_text(encoding="utf-8")
+        except OSError:
+            preview_text = ""
+        if "Research-only" not in preview_text or "Not a trade signal" not in preview_text:
+            out["integrated_preview_missing_disclaimer"] += 1
+    return out
 
 
 def _safe_float(value: object) -> float | None:
@@ -4639,6 +4819,19 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"derivatives_artifact_secret_leak={result.derivatives_artifact_secret_leak} "
             f"derivatives_state_missing_freshness_status={result.derivatives_state_missing_freshness_status} "
             f"confirmed_long_crowded_without_warning={result.confirmed_long_crowded_without_warning} "
+            f"integrated_radar_candidate_rows={result.integrated_radar_candidate_rows} "
+            f"integrated_candidate_missing_opportunity_type={result.integrated_candidate_missing_opportunity_type} "
+            f"integrated_candidate_missing_market_state_snapshot={result.integrated_candidate_missing_market_state_snapshot} "
+            f"integrated_confirmed_long_without_source_market={result.integrated_confirmed_long_without_source_market} "
+            f"integrated_early_long_without_fresh_strong_source={result.integrated_early_long_without_fresh_strong_source} "
+            f"integrated_fade_without_crowding_exhaustion={result.integrated_fade_without_crowding_exhaustion} "
+            f"integrated_risk_without_evidence={result.integrated_risk_without_evidence} "
+            f"integrated_market_anomaly_confirmed={result.integrated_market_anomaly_confirmed} "
+            f"integrated_cryptopanic_confirmed={result.integrated_cryptopanic_confirmed} "
+            f"integrated_major_pair_early_long={result.integrated_major_pair_early_long} "
+            f"integrated_preview_missing_disclaimer={result.integrated_preview_missing_disclaimer} "
+            f"integrated_created_normal_rsi_signal={result.integrated_created_normal_rsi_signal} "
+            f"integrated_created_triggered_fade={result.integrated_created_triggered_fade} "
             f"source_coverage_report_missing={result.source_coverage_report_missing} "
             f"source_coverage_provider_status_unknown={result.source_coverage_provider_status_unknown} "
             f"source_coverage_provider_marked_healthy_without_observation={result.source_coverage_provider_marked_healthy_without_observation} "

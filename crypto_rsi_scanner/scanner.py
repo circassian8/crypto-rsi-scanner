@@ -83,6 +83,7 @@ from . import event_alpha_health_guard
 from . import event_alpha_cryptopanic
 from . import event_impact_hypothesis_store
 from . import event_incident_store
+from . import event_integrated_radar
 from . import event_alpha_missed
 from . import event_alpha_notifications
 from . import event_alpha_notification_checklist
@@ -7611,6 +7612,40 @@ def event_alpha_daily_brief_report(
     print(report)
 
 
+def event_alpha_integrated_radar_cycle_report(
+    verbose: bool = False,
+    profile_name: str | None = None,
+    *,
+    artifact_namespace: str | None = None,
+    fixture: bool = False,
+) -> None:
+    """Run the research-only integrated Event Alpha radar cycle and print a summary."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or ("fixture" if fixture else config.EVENT_ALPHA_PROFILE or "notify_llm_deep")
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            selected_profile,
+            artifact_namespace,
+            include_test_artifacts=fixture,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    result = event_integrated_radar.run_integrated_radar_cycle(
+        context=context,
+        fixture=fixture,
+        observed_at=_event_research_now(),
+    )
+    print(_event_alpha_context_block(context))
+    print(
+        "integrated_radar_cycle: "
+        f"candidates={result.candidates} cores={result.core_opportunity_rows_written} "
+        f"cards={len(result.research_card_paths)} preview={result.notification_preview_path}"
+    )
+    print(f"report: {result.integrated_report_path}")
+    print("No Telegram sends, paper trades, normal RSI signal rows, execution, or Event Alpha TRIGGERED_FADE were created.")
+
+
 def event_alpha_market_anomaly_scan_report(
     verbose: bool = False,
     profile_name: str | None = None,
@@ -10811,6 +10846,16 @@ def cli() -> None:
         help="Write research-only market-state/anomaly artifacts from cached or fixture market rows.",
     )
     parser.add_argument(
+        "--event-alpha-integrated-radar-cycle",
+        action="store_true",
+        help="Run the research-only integrated Event Alpha radar cycle and write local artifacts.",
+    )
+    parser.add_argument(
+        "--event-alpha-integrated-radar-fixture",
+        action="store_true",
+        help="Use deterministic fixture sidecar inputs for --event-alpha-integrated-radar-cycle.",
+    )
+    parser.add_argument(
         "--event-alpha-market-anomaly-rows",
         default=None,
         help="Optional JSON/JSONL market rows path for --event-alpha-market-anomaly-scan.",
@@ -11797,6 +11842,14 @@ def cli() -> None:
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
             include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+        )
+        return
+    if args.event_alpha_integrated_radar_cycle:
+        event_alpha_integrated_radar_cycle_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+            fixture=args.event_alpha_integrated_radar_fixture,
         )
         return
     if args.event_alpha_market_anomaly_scan:

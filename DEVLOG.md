@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Add integrated Event Alpha radar cycle · Codex
+**Why:** Event Alpha had useful sidecar scans for market anomalies, official
+exchange events, scheduled/unlock catalysts, and derivatives crowding, but no
+single fixture-backed cycle that merged those artifacts into canonical
+opportunity candidates, cards, previews, daily briefs, and strict doctor checks.
+**Changes:**
+- Added `event_integrated_radar.py` to orchestrate sidecar rows into
+  `event_integrated_radar_candidates.jsonl`, a Markdown report, canonical
+  CoreOpportunity rows, research cards, source coverage, a no-send notification
+  preview, a daily brief, and a run-ledger row.
+- Added `main.py --event-alpha-integrated-radar-cycle` with a fixture mode plus
+  `make event-alpha-integrated-radar-smoke` and an optional
+  `event-alpha-integrated-radar-cycle` runtime target.
+- Added strict artifact-doctor counters for integrated-radar lane invariants,
+  including source+market requirements, fade crowding/exhaustion evidence,
+  major-pair capping, CryptoPanic/market-only confirmation blocking, and
+  no-created-alert/no-RSI/no-trigger safety flags.
+- Added fixture tests proving TESTLIST early-long, TESTPERP confirmed-long,
+  TESTFADE fade short-review, TESTUNLOCK risk-only, TESTRUMOR unconfirmed,
+  SECTOR diagnostic, and BTC simple pair capped behavior.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (640/640 passed);
+`make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-market-anomaly-smoke PYTHON=python3`;
+`make event-alpha-official-exchange-smoke PYTHON=python3`;
+`make event-alpha-scheduled-catalyst-smoke PYTHON=python3`;
+`make event-alpha-unlock-risk-smoke PYTHON=python3`;
+`make event-alpha-derivatives-smoke PYTHON=python3`;
+`make event-alpha-fade-review-smoke PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** The integrated cycle is research-only and no-send guarded. It
+does not write normal RSI signal rows, paper rows, live trades, execution
+orders, or Event Alpha-created `TRIGGERED_FADE`.
+
 ## 2026-07-01 — Stabilize Event Alpha market units and artifact gates · Codex
 **Why:** Live-style Event Alpha artifacts were mixing fractional raw returns
 with percentage-point market-state values, which could double-scale short-horizon

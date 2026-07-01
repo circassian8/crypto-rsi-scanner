@@ -38532,6 +38532,95 @@ def test_makefile_exposes_derivatives_targets():
     assert "--event-alpha-derivatives-report" in text
 
 
+def test_integrated_radar_fixture_lanes_and_merge():
+    from crypto_rsi_scanner import event_alpha_artifacts, event_integrated_radar
+
+    with TemporaryDirectory() as tmp:
+        context = event_alpha_artifacts.context_from_profile(
+            "fixture",
+            run_mode="fixture",
+            base_dir=tmp,
+            artifact_namespace="integrated_test",
+        )
+        result = event_integrated_radar.run_integrated_radar_cycle(
+            context=context,
+            fixture=True,
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        rows = [
+            __import__("json").loads(line)
+            for line in result.integrated_candidates_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        by_symbol = {row["symbol"]: row for row in rows}
+
+        assert by_symbol["TESTLIST"]["opportunity_type"] == "EARLY_LONG_RESEARCH"
+        assert by_symbol["TESTPERP"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH"
+        assert by_symbol["TESTFADE"]["opportunity_type"] == "FADE_SHORT_REVIEW"
+        assert by_symbol["TESTUNLOCK"]["opportunity_type"] == "RISK_ONLY"
+        assert by_symbol["TESTRUMOR"]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+        assert by_symbol["SECTOR"]["opportunity_type"] == "DIAGNOSTIC"
+        assert by_symbol["BTC"]["opportunity_type"] != "EARLY_LONG_RESEARCH"
+
+        assert set(by_symbol["TESTPERP"]["source_origins"]) >= {"official_exchange", "market_anomaly", "derivatives"}
+        assert set(by_symbol["TESTFADE"]["source_origins"]) >= {"official_exchange", "market_anomaly", "derivatives"}
+        assert by_symbol["TESTFADE"]["derivatives_snapshot"]
+        assert by_symbol["TESTFADE"]["triggered_fade_created"] is False
+        assert by_symbol["TESTFADE"]["normal_rsi_signal_written"] is False
+
+        preview = result.notification_preview_path.read_text(encoding="utf-8")
+        assert "Early Long Research" in preview
+        assert "Confirmed Long Research" in preview
+        assert "Fade / Short-Review" in preview
+        assert "Skip reasons:" in preview
+        assert "Research-only / unvalidated. Not a trade signal." in preview
+        assert "Alerts:" not in preview
+
+
+def test_integrated_market_anomaly_alone_does_not_confirm():
+    from crypto_rsi_scanner import event_integrated_radar
+
+    rows = event_integrated_radar.build_integrated_candidates(
+        sidecar_rows={
+            "market_anomaly": [
+                {
+                    "row_type": "event_market_anomaly",
+                    "symbol": "ONLYMOVE",
+                    "coin_id": "only-move",
+                    "market_state": "confirmed_breakout",
+                    "market_state_class": "confirmed_breakout",
+                    "market_state_snapshot": {
+                        "return_unit": "percent_points",
+                        "return_4h": 12.0,
+                        "return_24h": 20.0,
+                        "volume_turnover_zscore": 3.0,
+                        "liquidity_usd": 2_000_000,
+                    },
+                    "source_pack": "market_anomaly_pack",
+                }
+            ]
+        },
+        profile="fixture",
+        artifact_namespace="integrated_test",
+        run_mode="fixture",
+        run_id="run",
+        observed_at="2026-06-15T16:00:00Z",
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+    assert rows[0]["created_alert"] is False
+    assert rows[0]["triggered_fade_created"] is False
+
+
+def test_makefile_exposes_integrated_radar_target():
+    text = Path("Makefile").read_text(encoding="utf-8")
+
+    assert "event-alpha-integrated-radar-smoke" in text
+    assert "--event-alpha-integrated-radar-cycle" in text
+    assert "--event-alpha-integrated-radar-fixture" in text
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

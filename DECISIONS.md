@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-01 - Integrated Event Alpha radar cycle is an artifact orchestrator
+**Status:** accepted
+**Decision:** Event Alpha may run an integrated research cycle that collects
+configured sidecar artifacts, merges market anomalies, official exchange
+events, scheduled/unlock catalysts, and derivatives/fade-review evidence into
+canonical integrated candidates and CoreOpportunity rows, then writes cards,
+source coverage, daily brief, run ledger, and a no-send notification preview.
+The integrated cycle must remain artifact-only and research-only: no normal RSI
+signal rows, paper trades, live trades, execution, Telegram sends in tests, or
+Event Alpha-created `TRIGGERED_FADE`.
+**Why:** Operators need one coherent radar view instead of separate sidecar
+reports, but the sidecar evidence types are still validation inputs rather than
+trade decisions. Strict artifact-doctor checks must enforce lane/source/market
+requirements and keep price-only, source-only, CryptoPanic-only, and simple
+major-pair rows out of confirmed lanes.
+**Revisit when:** A reviewed validation sample proves a specific integrated
+lane should be promoted beyond local/no-send research artifacts and the human
+approves that promotion explicitly.
+
 ## 2026-07-01 - Event Alpha market-state returns use explicit units
 **Status:** accepted
 **Decision:** Raw/latest market snapshots use fractional returns by default
