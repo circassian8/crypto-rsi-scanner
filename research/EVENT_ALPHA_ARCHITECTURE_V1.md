@@ -17,8 +17,9 @@ layout gives new code a home while old import paths continue to work.
 - `crypto_rsi_scanner/event_alpha/notifications/`: notification preview,
   no-send delivery, send-readiness, go/no-go, inbox, pack, SLO, pause,
   Telegram final-check, recipient-check, sender, and formatting helpers.
-- `crypto_rsi_scanner/event_alpha/outcomes/`: integrated outcomes and
-  calibration wrappers.
+- `crypto_rsi_scanner/event_alpha/outcomes/`: integrated outcomes,
+  calibration, feedback readiness/eval export, burn-in, quality review,
+  signal-quality, priors, and policy simulation.
 - `crypto_rsi_scanner/event_alpha/doctor/`: schema doctor, check registry, and
   compatibility doctor layers.
 - `crypto_rsi_scanner/event_alpha/namespace/`: namespace status and lifecycle
@@ -148,6 +149,34 @@ heartbeat wording (`Strict alerts`, `Research candidates`, `Raw source
 candidates`) remain behavior-freeze gates. Current size gate after this
 notification move: `125` top-level `event_*.py` files, `42` compatibility shims,
 and `83` remaining top-level implementation files.
+
+## Outcomes Implementation Move
+
+Event Alpha outcome, calibration, feedback, burn-in, quality, priors, and
+policy-simulation code now lives in package modules:
+
+- `event_alpha.outcomes.integrated_radar_outcomes` for integrated radar outcome
+  fill, outcome reports, calibration reports, and cross-run performance
+  dashboards.
+- `event_alpha.outcomes.calibration` for artifact-backed calibration reports and
+  recommendation-only calibration priors.
+- `event_alpha.outcomes.feedback` for feedback-readiness checks and proposed
+  eval-case exports from feedback/missed artifacts.
+- `event_alpha.outcomes.burn_in` for burn-in scorecards, burn-in readiness, and
+  burn-in export packs.
+- `event_alpha.outcomes.quality` for quality review, quality coverage,
+  signal-quality fixture evals, signal-quality export, and tuning worksheets.
+- `event_alpha.outcomes.priors` for opt-in calibration-prior loading, shadow
+  comparison, and guarded score adjustment.
+- `event_alpha.outcomes.policy_simulator` for offline policy-threshold
+  simulation over local artifacts.
+
+The old top-level modules remain quiet compatibility shims. Output artifact
+paths and schemas remain unchanged, and outcome terminology such as
+`validation_rate`, `validated`, `invalidated/noise`, and `inconclusive` remains
+research-only review language. Current size gate after this outcomes move:
+`125` top-level `event_*.py` files, `56` compatibility shims, and `69`
+remaining top-level implementation files.
 
 ## Future Code Placement
 

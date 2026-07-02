@@ -11,12 +11,12 @@ from typing import Any, Iterable, Mapping
 
 from . import (
     event_alerts,
-    event_alpha_priors,
     event_alpha_router,
     event_discovery,
     event_llm_analyzer,
     event_watchlist,
 )
+from .event_alpha.outcomes import priors as event_alpha_priors
 from .event_models import DiscoveredAsset, RawDiscoveredEvent
 from .event_providers.coingecko_universe import assets_from_markets
 from .event_providers.manual_json import parse_datetime

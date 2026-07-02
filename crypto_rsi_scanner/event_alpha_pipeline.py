@@ -11,7 +11,6 @@ from typing import Any, Iterable
 from . import (
     event_alerts,
     event_alpha_router,
-    event_alpha_priors,
     event_anomaly_state,
     event_catalyst_frames,
     event_catalyst_frame_validator,
@@ -29,6 +28,7 @@ from . import (
     event_watchlist_market,
     event_watchlist_monitor,
 )
+from .event_alpha.outcomes import priors as event_alpha_priors
 from .event_models import EventDiscoveryResult, RawDiscoveredEvent
 
 RawEventTransform = Callable[[tuple[RawDiscoveredEvent, ...]], Iterable[RawDiscoveredEvent]]

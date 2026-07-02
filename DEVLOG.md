@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Move Event Alpha outcome modules into package homes · Codex
+**Why:** The outcome/calibration refactor slice needed integrated radar
+outcomes, calibration, feedback readiness, burn-in, quality, priors, and policy
+simulation code to live under `crypto_rsi_scanner.event_alpha.outcomes` while
+preserving old imports, output artifact schemas, and research-only terminology.
+**Changes:**
+- Moved integrated radar outcomes, calibration, eval export, feedback
+  readiness, burn-in scorecard/readiness/pack, quality review/coverage,
+  signal-quality/export/tuning, priors, and policy simulation implementations
+  into `crypto_rsi_scanner/event_alpha/outcomes/`.
+- Replaced the old top-level outcome/calibration/feedback/burn-in/quality
+  modules with quiet compatibility shims and updated high-confidence scanner,
+  pipeline, replay, daily-brief, burn-in checklist, and v1 readiness imports to
+  use the package modules directly.
+- Preserved outcome artifact names and research-only terminology including
+  `validation_rate`, `validated`, `invalidated`, `noise`, and `inconclusive`.
+- Added focused outcome pytest coverage for old/new import equivalence,
+  integrated outcome smoke behavior, calibration report terminology, and
+  feedback readiness no-send output.
+- Refreshed `crypto_rsi_scanner/event_alpha/MODULE_MAP.md` and
+  `research/EVENT_ALPHA_ARCHITECTURE_V1.md`; current size gate is 125 top-level
+  `event_*.py` files, 56 shims, and 69 remaining top-level implementation
+  files.
+**Verify:** `python3 tests/test_indicators.py` (686/686); `python3 -m pytest
+tests/event_alpha/test_outcomes.py` (4/4); `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make event-alpha-integrated-radar-outcome-smoke
+PYTHON=python3`; `make event-alpha-integrated-radar-outcome-report
+PYTHON=python3`; `make event-alpha-integrated-radar-calibration-report
+PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** The moved modules are package-home refactors only. No live
+provider calls by default, Telegram sends, trades, paper rows, normal RSI rows,
+or Event Alpha-created `TRIGGERED_FADE` behavior were added.
+
 ## 2026-07-02 — Move Event Alpha notification modules into package homes · Codex
 **Why:** The notification refactor slice needed preview, delivery, send
 readiness, no-send final checks, and Telegram formatting code to live under

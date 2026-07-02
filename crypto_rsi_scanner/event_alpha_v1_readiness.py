@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_artifacts, event_alpha_burn_in, event_alpha_burn_in_checklist, event_alpha_profiles
+from . import event_alpha_artifacts, event_alpha_burn_in_checklist, event_alpha_profiles
+from .event_alpha.outcomes import burn_in as event_alpha_burn_in
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import event_alpha_burn_in
+from .event_alpha.outcomes import burn_in as event_alpha_burn_in
 
 
 @dataclass(frozen=True)
