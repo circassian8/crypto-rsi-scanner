@@ -2445,6 +2445,7 @@ def test_event_discovery_forces_no_trade_on_low_classifier_confidence():
     from dataclasses import replace
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_alpha.radar import discovery as discovery_impl
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
     from crypto_rsi_scanner.event_resolver import load_asset_aliases
@@ -2455,7 +2456,7 @@ def test_event_discovery_forces_no_trade_on_low_classifier_confidence():
         datetime(2026, 6, 17, tzinfo=timezone.utc),
     )
     assets = load_asset_aliases(aliases_path)
-    original_classifier = event_discovery.classify_event_asset
+    original_classifier = discovery_impl.classify_event_asset
 
     def low_confidence_classifier(event, asset, link):
         classification = original_classifier(event, asset, link)
@@ -2463,7 +2464,7 @@ def test_event_discovery_forces_no_trade_on_low_classifier_confidence():
             return replace(classification, confidence=0.79)
         return classification
 
-    event_discovery.classify_event_asset = low_confidence_classifier
+    discovery_impl.classify_event_asset = low_confidence_classifier
     try:
         candidate = event_discovery.run_discovery(
             [raw[0]],
@@ -2471,7 +2472,7 @@ def test_event_discovery_forces_no_trade_on_low_classifier_confidence():
             now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
         ).candidates[0]
     finally:
-        event_discovery.classify_event_asset = original_classifier
+        discovery_impl.classify_event_asset = original_classifier
 
     assert candidate.fade_signal.fade_score >= 80
     assert candidate.data_quality["has_technical_snapshot"] is True

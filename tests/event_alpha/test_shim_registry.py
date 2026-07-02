@@ -100,8 +100,56 @@ def test_recently_migrated_old_and_new_import_paths_share_key_callables():
         ("crypto_rsi_scanner.event_catalyst_search", "crypto_rsi_scanner.event_alpha.radar.catalyst_search", "run_catalyst_search"),
         ("crypto_rsi_scanner.event_source_enrichment", "crypto_rsi_scanner.event_alpha.radar.source_enrichment", "enrich_source_text"),
         ("crypto_rsi_scanner.event_opportunity_audit", "crypto_rsi_scanner.event_alpha.artifacts.opportunity_audit", "format_opportunity_audit"),
+        ("crypto_rsi_scanner.event_validation", "crypto_rsi_scanner.event_alpha.radar.validation", "ValidationOutcomeCandle"),
+        ("crypto_rsi_scanner.event_discovery", "crypto_rsi_scanner.event_alpha.radar.discovery", "EventDiscoveryConfig"),
+        ("crypto_rsi_scanner.event_near_miss", "crypto_rsi_scanner.event_alpha.radar.near_miss", "EventNearMissCandidate"),
+        ("crypto_rsi_scanner.event_classification", "crypto_rsi_scanner.event_alpha.radar.classification", "classify_event_asset"),
+        ("crypto_rsi_scanner.event_catalyst_frames", "crypto_rsi_scanner.event_alpha.radar.catalyst_frames", "build_catalyst_frames"),
+        ("crypto_rsi_scanner.event_claim_semantics", "crypto_rsi_scanner.event_alpha.radar.claim_semantics", "extract_event_claims"),
+        ("crypto_rsi_scanner.event_playbooks", "crypto_rsi_scanner.event_alpha.radar.playbooks", "assess_event_playbook"),
+        ("crypto_rsi_scanner.event_impact_path_validator", "crypto_rsi_scanner.event_alpha.radar.impact_path_validator", "validate_impact_path"),
+        ("crypto_rsi_scanner.event_evidence_quality", "crypto_rsi_scanner.event_alpha.radar.evidence_quality", "evaluate_evidence_quality"),
+        ("crypto_rsi_scanner.event_market_enrichment", "crypto_rsi_scanner.event_alpha.radar.market_enrichment", "load_market_enrichment_rows"),
+        ("crypto_rsi_scanner.event_llm_extractor", "crypto_rsi_scanner.event_alpha.radar.llm.extractor", "analyze_raw_events"),
+        ("crypto_rsi_scanner.event_llm_analyzer", "crypto_rsi_scanner.event_alpha.radar.llm.analyzer", "analyze_event_candidates"),
+        ("crypto_rsi_scanner.event_llm_evidence_planner", "crypto_rsi_scanner.event_alpha.radar.llm.evidence_planner", "EvidencePlannerRequest"),
+        ("crypto_rsi_scanner.event_llm_catalyst_frames", "crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames", "EventLLMCatalystFrameConfig"),
+        ("crypto_rsi_scanner.event_llm_extract_eval", "crypto_rsi_scanner.event_alpha.radar.llm.extract_eval", "run_fixture_eval"),
+        ("crypto_rsi_scanner.event_llm_eval", "crypto_rsi_scanner.event_alpha.radar.llm.eval", "run_fixture_eval"),
+        ("crypto_rsi_scanner.event_llm_models", "crypto_rsi_scanner.event_alpha.radar.llm.models", "EventLLMAssetRole"),
+        ("crypto_rsi_scanner.event_llm_extraction_models", "crypto_rsi_scanner.event_alpha.radar.llm.extraction_models", "EventLLMCatalystType"),
+        ("crypto_rsi_scanner.event_alpha_alert_store", "crypto_rsi_scanner.event_alpha.artifacts.alert_store", "write_alert_snapshots"),
+        ("crypto_rsi_scanner.event_alerts", "crypto_rsi_scanner.event_alpha.artifacts.alerts", "build_event_alert_candidates"),
+        ("crypto_rsi_scanner.event_alpha_router", "crypto_rsi_scanner.event_alpha.notifications.router", "EventAlphaRoute"),
+        ("crypto_rsi_scanner.event_alpha_pipeline", "crypto_rsi_scanner.event_alpha.radar.pipeline", "run_event_alpha_pipeline"),
+        ("crypto_rsi_scanner.event_watchlist", "crypto_rsi_scanner.event_alpha.radar.watchlist", "EventWatchlistState"),
+        ("crypto_rsi_scanner.event_watchlist_monitor", "crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor", "monitor_watchlist"),
+        ("crypto_rsi_scanner.event_watchlist_enrichment", "crypto_rsi_scanner.event_alpha.radar.watchlist_enrichment", "EventWatchlistEnrichmentResult"),
+        ("crypto_rsi_scanner.event_watchlist_market", "crypto_rsi_scanner.event_alpha.radar.watchlist_market", "market_rows_for_watchlist"),
+        ("crypto_rsi_scanner.event_alpha_replay", "crypto_rsi_scanner.event_alpha.artifacts.replay", "replay_from_artifacts"),
+        ("crypto_rsi_scanner.event_feedback", "crypto_rsi_scanner.event_alpha.outcomes.feedback_labels", "mark_feedback"),
     )
     for old_name, new_name, attr in pairs:
         old_module = importlib.import_module(old_name)
         new_module = importlib.import_module(new_name)
         assert getattr(old_module, attr) is getattr(new_module, attr)
+
+
+def test_remaining_event_module_classification_documents_fade_boundary():
+    import json
+
+    report_path = Path("research/REMAINING_EVENT_MODULE_CLASSIFICATION.json")
+    markdown_path = Path("research/REMAINING_EVENT_MODULE_CLASSIFICATION.md")
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    rows = {row["module_name"]: row for row in report["modules"]}
+
+    assert report["not_every_event_module_belongs_under_event_alpha"] is True
+    assert report["recommended_status_counts"]["intentionally_outside_event_alpha"] == 1
+    assert rows["crypto_rsi_scanner.event_fade"]["recommended_status"] == "intentionally_outside_event_alpha"
+    assert rows["crypto_rsi_scanner.event_fade"]["must_remain_outside_event_alpha_for_safety"] is True
+    assert rows["crypto_rsi_scanner.event_validation"]["recommended_status"] == "active_shim"
+    assert rows["crypto_rsi_scanner.event_llm_extractor"]["new_proposed_package_path"] == "crypto_rsi_scanner.event_alpha.radar.llm.extractor"
+    text = markdown_path.read_text(encoding="utf-8")
+    assert "Event Alpha may produce `FADE_SHORT_REVIEW` research artifacts" in text
+    assert "must not create `TRIGGERED_FADE`" in text

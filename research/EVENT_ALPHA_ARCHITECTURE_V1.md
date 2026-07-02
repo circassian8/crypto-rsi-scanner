@@ -62,6 +62,10 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
   writes.
 - Event Alpha does not create `TRIGGERED_FADE`; that remains owned by
   `event_fade.py` plus proxy-fade eligibility.
+- Event Alpha may write `FADE_SHORT_REVIEW` research candidates for manual
+  crowding/exhaustion review, but those rows are not `TRIGGERED_FADE` and must
+  not become triggers without deterministic `event_fade.py` + `proxy_fade`
+  output.
 - Provider calls and Telegram sends stay opt-in and guarded; tests and CI run
   no live provider calls and no live Telegram sends by default.
 - Tests and smokes require no API keys and must not print secrets.

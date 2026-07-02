@@ -17,6 +17,49 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Migrate remaining Event Alpha module batch · Codex
+**Why:** The next refactor continuation needed to reduce top-level
+`event_*.py` implementation sprawl while keeping Event Alpha behavior frozen
+and explicitly documenting the remaining scanner, CLI service, and doctor
+blockers.
+**Changes:**
+- Added `research/REMAINING_EVENT_MODULE_CLASSIFICATION.md/json`, classifying
+  the remaining implementation modules, migration homes, risk levels, and the
+  explicit `event_fade.py` boundary outside Event Alpha.
+- Migrated 28 Event Alpha radar, LLM/catalyst, watchlist, alert-store, router,
+  replay, and feedback modules into package homes under
+  `crypto_rsi_scanner/event_alpha/`, keeping old top-level import paths as
+  active compatibility shims.
+- Updated `crypto_rsi_scanner/event_alpha/MODULE_MAP.md`, shim/import tests,
+  and `research/EVENT_ALPHA_ARCHITECTURE_V1.md` to preserve the rule that Event
+  Alpha may produce `FADE_SHORT_REVIEW` research rows but must not create
+  `TRIGGERED_FADE`.
+- Refreshed `research/REFACTOR_FINAL_REPORT.md/json` and
+  `research/REFACTOR_RELEASE_CANDIDATE_REPORT.md/json` with 95 active shims, 30
+  unmigrated modules, 28 modules migrated this pass, nonzero doctor plugin
+  counts, and documented blockers for `scanner.py`, `cli/services/event_alpha.py`,
+  `bind_scanner_globals`, and `legacy_unregistered`.
+- Updated provider-readiness monkeypatch coverage so tests patch the new
+  implementation module rather than assigning through an old shim.
+**Verify:** `python3 tests/test_indicators.py` (734/734);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py` (740/740); `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make test-pytest-safe PYTHON=python3`;
+`make test-pytest-timed PYTHON=python3`; `make event-alpha-shim-report
+PYTHON=python3`; `make refactor-final-report PYTHON=python3`; `make
+event-alpha-namespace-lifecycle-report PYTHON=python3`; integrated radar
+smoke/doctor, live-provider readiness smoke, Coinalyze preflight smoke,
+Coinalyze normal preflight, Coinalyze no-send rehearsal, market anomaly,
+official exchange, scheduled catalyst, unlock risk, derivatives, fade-review,
+source coverage, daily brief, notify-preview, strict CryptoPanic rehearsal
+doctor, and `make verify PYTHON=python3`.
+**Notes/risks:** Refactor gates remain pending by design: `scanner.py` is 7,744
+lines against the <6,500 target, `cli/services/event_alpha.py` is 3,938 lines
+against the <1,500 split target with 26 service bind sites, and
+`legacy_unregistered=15` remains above the <=5 doctor-plugin target. These were
+left as documented blockers instead of risking CLI or strict doctor behavior
+drift.
+
 ## 2026-07-02 — Continue Event Alpha refactor blocker burn-down · Codex
 **Why:** The first refactor v1 release candidate still left `scanner.py` and
 the top-level artifact doctor as real implementation blockers. This pass makes

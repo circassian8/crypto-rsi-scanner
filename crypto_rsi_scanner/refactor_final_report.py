@@ -27,7 +27,7 @@ REPORT_JSON = "REFACTOR_FINAL_REPORT.json"
 REPORT_MD = "REFACTOR_FINAL_REPORT.md"
 MAJOR_TARGETS = {
     "crypto_rsi_scanner/scanner.py": {
-        "target_lines_lt": 8000,
+        "target_lines_lt": 6500,
         "next_migration_module": "crypto_rsi_scanner/cli/commands_event_alpha.py plus service modules for remaining scanner-bound command bodies",
         "risk": "Broad scanner command extraction can change CLI defaults, Make target behavior, provider guardrails, or research-only side-effect gates if moved without command snapshots.",
         "blocker_reason": "scanner.py still contains many historical Event Alpha command bodies and runtime config adapters that were only partially routed through cli/dispatch.py.",
@@ -45,19 +45,44 @@ MAJOR_TARGETS = {
         "blocker_reason": "event_alpha_artifact_doctor.py should remain a small compatibility shim only.",
     },
 }
-TRACKED_LINE_COUNT_PATHS = tuple(dict.fromkeys((*MAJOR_TARGETS, "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py")))
+TRACKED_LINE_COUNT_PATHS = tuple(
+    dict.fromkeys(
+        (
+            *MAJOR_TARGETS,
+            "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py",
+            "crypto_rsi_scanner/cli/services/event_alpha.py",
+        )
+    )
+)
 MIGRATED_MODULES_THIS_RUN = (
-    "crypto_rsi_scanner.event_alpha_artifact_doctor",
-    "crypto_rsi_scanner.event_research_cards",
-    "crypto_rsi_scanner.event_alpha_daily_brief",
-    "crypto_rsi_scanner.event_derivatives_crowding",
-    "crypto_rsi_scanner.event_scheduled_catalysts",
-    "crypto_rsi_scanner.event_asset_registry",
-    "crypto_rsi_scanner.event_instrument_resolver",
-    "crypto_rsi_scanner.event_market_confirmation",
-    "crypto_rsi_scanner.event_catalyst_search",
-    "crypto_rsi_scanner.event_source_enrichment",
-    "crypto_rsi_scanner.event_opportunity_audit",
+    "crypto_rsi_scanner.event_validation",
+    "crypto_rsi_scanner.event_discovery",
+    "crypto_rsi_scanner.event_near_miss",
+    "crypto_rsi_scanner.event_classification",
+    "crypto_rsi_scanner.event_catalyst_frames",
+    "crypto_rsi_scanner.event_claim_semantics",
+    "crypto_rsi_scanner.event_playbooks",
+    "crypto_rsi_scanner.event_impact_path_validator",
+    "crypto_rsi_scanner.event_evidence_quality",
+    "crypto_rsi_scanner.event_market_enrichment",
+    "crypto_rsi_scanner.event_llm_extractor",
+    "crypto_rsi_scanner.event_llm_analyzer",
+    "crypto_rsi_scanner.event_llm_evidence_planner",
+    "crypto_rsi_scanner.event_llm_catalyst_frames",
+    "crypto_rsi_scanner.event_llm_extract_eval",
+    "crypto_rsi_scanner.event_llm_eval",
+    "crypto_rsi_scanner.event_llm_models",
+    "crypto_rsi_scanner.event_llm_extraction_models",
+    "crypto_rsi_scanner.event_alpha_alert_store",
+    "crypto_rsi_scanner.event_alerts",
+    "crypto_rsi_scanner.event_alpha_router",
+    "crypto_rsi_scanner.event_alpha_pipeline",
+    "crypto_rsi_scanner.event_watchlist",
+    "crypto_rsi_scanner.event_watchlist_monitor",
+    "crypto_rsi_scanner.event_watchlist_enrichment",
+    "crypto_rsi_scanner.event_watchlist_market",
+    "crypto_rsi_scanner.event_alpha_replay",
+    "crypto_rsi_scanner.event_feedback",
 )
 
 
@@ -119,6 +144,30 @@ def _scanner_bind_scanner_globals_call_sites(root: Path) -> int:
     return total
 
 
+def _cli_service_bind_scanner_globals_call_sites(root: Path) -> int:
+    service_dir = root / "crypto_rsi_scanner" / "cli" / "services"
+    total = 0
+    if not service_dir.exists():
+        return total
+    for path in sorted(service_dir.glob("*.py")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for line in text.splitlines():
+            if line.lstrip().startswith("def bind_scanner_globals"):
+                continue
+            total += len(re.findall(r"\bbind_scanner_globals\(", line))
+    return total
+
+
+def _cli_service_line_counts(root: Path) -> dict[str, int]:
+    service_dir = root / "crypto_rsi_scanner" / "cli" / "services"
+    if not service_dir.exists():
+        return {}
+    return {
+        path.relative_to(root).as_posix(): int(_line_count(path) or 0)
+        for path in sorted(service_dir.glob("*.py"))
+    }
+
+
 def _scanner_command_body_functions(root: Path) -> list[str]:
     path = root / "crypto_rsi_scanner" / "scanner.py"
     if not path.exists():
@@ -156,7 +205,10 @@ def _doctor_plugin_check_counts(root: Path) -> dict[str, int]:
         if path.name.startswith("_") or path.name == "__init__.py":
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
-        counts[path.stem] = len(re.findall(r"check_registry\.format_check_message\(", text))
+        registry_messages = len(re.findall(r"check_registry\.format_check_message\(", text))
+        exported_apply_functions = len(re.findall(r"(?m)^def apply_(?!checks\()[a-zA-Z0-9_]*\(", text))
+        generic_apply = len(re.findall(r"(?m)^def apply_checks\(", text))
+        counts[path.stem] = max(registry_messages, exported_apply_functions + generic_apply)
     return counts
 
 
@@ -197,6 +249,33 @@ def _ci_static_safety(root: Path) -> dict[str, Any]:
         "status": "pass" if not findings else "blocked",
         "workflow_files": [path.relative_to(root).as_posix() for path in sorted(workflow_dir.glob("*.yml")) + sorted(workflow_dir.glob("*.yaml"))],
         "findings": findings,
+    }
+
+
+def _remaining_module_classification(root: Path) -> dict[str, Any]:
+    data = _load_json(root / "research" / "REMAINING_EVENT_MODULE_CLASSIFICATION.json")
+    modules = data.get("modules")
+    if not isinstance(modules, list):
+        modules = []
+    remaining_by_home: dict[str, int] = {}
+    intentionally_outside: list[str] = []
+    for row in modules:
+        if not isinstance(row, dict):
+            continue
+        status = str(row.get("recommended_status") or "")
+        home = str(row.get("likely_package_home") or "unknown")
+        if status == "not_migrated":
+            remaining_by_home[home] = remaining_by_home.get(home, 0) + 1
+        if status == "intentionally_outside_event_alpha":
+            module_name = str(row.get("module_name") or "")
+            if module_name:
+                intentionally_outside.append(module_name)
+    return {
+        "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json" if data else None,
+        "module_count": int(data.get("module_count") or len(modules)) if data else 0,
+        "recommended_status_counts": data.get("recommended_status_counts", {}) if data else {},
+        "remaining_implementation_modules_by_package_target": dict(sorted(remaining_by_home.items())),
+        "intentionally_outside_event_alpha_modules": intentionally_outside,
     }
 
 
@@ -265,6 +344,10 @@ def build_refactor_final_report(
     scanner_command_bodies = _scanner_command_body_functions(root)
     namespace_inventory = _namespace_inventory(root)
     ci_static_safety = _ci_static_safety(root)
+    classification = _remaining_module_classification(root)
+    cli_service_line_counts = _cli_service_line_counts(root)
+    cli_event_alpha_service_lines = cli_service_line_counts.get("crypto_rsi_scanner/cli/services/event_alpha.py")
+    cli_service_bind_calls = _cli_service_bind_scanner_globals_call_sites(root)
     legacy_unregistered = int(registry_summary.get("legacy_unregistered") or 0)
     doctor_plugin_migration = {
         "plugin_check_counts": _doctor_plugin_check_counts(root),
@@ -282,6 +365,24 @@ def build_refactor_final_report(
                 "blocker_reason": "legacy_unregistered doctor append sites remain above the requested <=5 target.",
                 "next_migration_module": "crypto_rsi_scanner/event_alpha/doctor/checks/safety.py and integrated_radar.py",
                 "risk": "Moving the last imperative checks without enough fixtures can change blocker/WARN semantics.",
+            }
+        )
+    if cli_event_alpha_service_lines is not None and cli_event_alpha_service_lines >= 1500:
+        extra_blockers.append(
+            {
+                "path": "crypto_rsi_scanner/cli/services/event_alpha.py",
+                "blocker_reason": "event_alpha CLI service remains above the requested <1500 split target.",
+                "next_migration_module": "crypto_rsi_scanner/cli/services/event_alpha_notifications.py, event_alpha_integrated.py, provider_preflights.py, reports.py, namespace.py, and outcomes.py",
+                "risk": "Splitting service bodies before replacing scanner-bound globals can change CLI dispatch behavior or provider/send guardrails.",
+            }
+        )
+    if cli_service_bind_calls > 13:
+        extra_blockers.append(
+            {
+                "path": "crypto_rsi_scanner/cli/services/event_alpha.py",
+                "blocker_reason": "cli service bind_scanner_globals call sites were not reduced by the requested 50%.",
+                "next_migration_module": "Replace scanner-global dependencies in the split Event Alpha service modules with explicit imports and focused dispatch monkeypatch tests.",
+                "risk": "Removing the runtime binding too early can break historical helper/config resolution for Makefile-backed commands.",
             }
         )
     return {
@@ -315,10 +416,16 @@ def build_refactor_final_report(
         "shim_status_counts": shim_report.get("shim_status_counts", {}),
         "active_shim_modules_with_implementation_logic": int(shim_report.get("active_shim_modules_with_implementation_logic") or 0),
         "scanner_bind_scanner_globals_call_sites": _scanner_bind_scanner_globals_call_sites(root),
+        "cli_service_bind_scanner_globals_call_sites": cli_service_bind_calls,
+        "cli_event_alpha_service_lines": cli_event_alpha_service_lines,
+        "cli_service_line_counts": cli_service_line_counts,
         "scanner_command_body_functions_remaining": len(scanner_command_bodies),
         "scanner_command_body_function_names": scanner_command_bodies,
         "migrated_modules_this_run": list(MIGRATED_MODULES_THIS_RUN),
         "migrated_modules_this_run_count": len(MIGRATED_MODULES_THIS_RUN),
+        "remaining_module_classification": classification,
+        "remaining_implementation_modules_by_package_target": classification["remaining_implementation_modules_by_package_target"],
+        "intentionally_outside_event_alpha_modules": classification["intentionally_outside_event_alpha_modules"],
         "doctor_plugin_migration": doctor_plugin_migration,
         "plugin_check_counts": doctor_plugin_migration["plugin_check_counts"],
         "legacy_unregistered": legacy_unregistered,
@@ -403,7 +510,20 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             f"- active_shim_modules_with_implementation_logic: `{data['active_shim_modules_with_implementation_logic']}`",
             f"- migrated_modules_this_run_count: `{data['migrated_modules_this_run_count']}`",
             f"- scanner_bind_scanner_globals_call_sites: `{data['scanner_bind_scanner_globals_call_sites']}`",
+            f"- cli_service_bind_scanner_globals_call_sites: `{data['cli_service_bind_scanner_globals_call_sites']}`",
+            f"- cli_event_alpha_service_lines: `{data['cli_event_alpha_service_lines']}`",
             f"- scanner_command_body_functions_remaining: `{data['scanner_command_body_functions_remaining']}`",
+            f"- remaining_implementation_modules_by_package_target: `{json.dumps(data.get('remaining_implementation_modules_by_package_target', {}), sort_keys=True)}`",
+            f"- intentionally_outside_event_alpha_modules: `{json.dumps(data.get('intentionally_outside_event_alpha_modules', []), sort_keys=True)}`",
+            "",
+            "## Newly Migrated Modules",
+            "",
+        ]
+    )
+    for module in data.get("migrated_modules_this_run", []):
+        lines.append(f"- `{module}`")
+    lines.extend(
+        [
             "",
             "## Doctor Plugin Migration",
             "",

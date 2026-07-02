@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Event Alpha module migration accepted with final gates pending
+**Status:** accepted
+**Decision:** The 28-module Event Alpha migration batch is accepted as a
+behavior-preserving refactor continuation: old top-level imports remain active
+shims, `event_fade.py` remains explicitly outside Event Alpha, the remaining
+implementation modules are classified, and no research-only safety gates were
+changed. The final refactor gate remains pending for the documented scanner,
+CLI-service, and doctor-plugin blockers rather than forcing risky movement in
+this pass.
+**Why:** Verification passed across the standalone runner, safe pytest,
+compileall, shim report, refactor final report, namespace lifecycle, integrated
+radar smoke/doctor, provider readiness, Coinalyze preflight/rehearsal, market
+anomaly, official exchange, scheduled catalyst, unlock risk, derivatives,
+fade-review, source coverage, daily brief, no-send preview, strict CryptoPanic
+rehearsal doctor, and `make verify`. Current measured state: active shims 95,
+partial shims 0, unmigrated modules 30, active-shim logic violations 0,
+`scanner.py` 7,744 lines, `cli/services/event_alpha.py` 3,938 lines with 26
+service bind sites, and `legacy_unregistered=15`.
+**Revisit when:** `scanner.py` drops below 6,500 lines, Event Alpha CLI service
+modules are split below the requested target with explicit-import dispatch
+tests, `legacy_unregistered` drops to <=5, or any old/new import compatibility
+or safety invariant regresses.
+
 ## 2026-07-02 - Event Alpha refactor blocker burn-down accepted with doctor-plugin follow-up
 **Status:** accepted
 **Decision:** The current refactor continuation is accepted for the

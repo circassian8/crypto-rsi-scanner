@@ -639,14 +639,22 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["pytest_runtime_seconds"] == 12.34
     assert payload["standalone_runner_runtime_seconds"] == 56.78
     assert payload["line_counts"]["tests/test_indicators.py"] < 2000
-    assert payload["line_counts"]["crypto_rsi_scanner/scanner.py"] < 8000
+    assert payload["line_counts"]["crypto_rsi_scanner/scanner.py"] > 6500
     assert payload["line_counts"]["crypto_rsi_scanner/event_alpha_artifact_doctor.py"] < 100
     assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"] > 1500
-    assert payload["active_shims"] >= 50
+    assert payload["line_counts"]["crypto_rsi_scanner/cli/services/event_alpha.py"] > 1500
+    assert payload["active_shims"] >= 90
     assert payload["partial_shims"] == 0
     assert payload["unmigrated_modules"] >= 1
+    assert payload["unmigrated_modules"] <= 35
     assert payload["active_shim_modules_with_implementation_logic"] == 0
-    assert not any(row["path"] == "crypto_rsi_scanner/scanner.py" for row in payload["blockers"])
+    assert payload["cli_event_alpha_service_lines"] == payload["line_counts"]["crypto_rsi_scanner/cli/services/event_alpha.py"]
+    assert payload["cli_service_bind_scanner_globals_call_sites"] >= 1
+    assert "crypto_rsi_scanner.event_fade" in payload["intentionally_outside_event_alpha_modules"]
+    assert payload["remaining_implementation_modules_by_package_target"]
+    assert payload["remaining_module_classification"]["path"] == "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json"
+    assert any(row["path"] == "crypto_rsi_scanner/scanner.py" for row in payload["blockers"])
+    assert any(row["path"] == "crypto_rsi_scanner/cli/services/event_alpha.py" for row in payload["blockers"])
     assert not any(row["path"] == "crypto_rsi_scanner/event_alpha_artifact_doctor.py" for row in payload["blockers"])
     assert any(row["path"] == "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py" for row in payload["blockers"])
     phases = {row["phase"]: row["policy"] for row in payload["deprecation_plan"]}
@@ -654,6 +662,7 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert "v2" in phases and "warn in development mode only" in phases["v2"]
     assert "v3" in phases and "removed" in phases["v3"]
     assert "Refactor Final Report" in markdown
+    assert "Newly Migrated Modules" in markdown
     assert "Blockers" in markdown
     assert "Deprecation Plan" in markdown
 
