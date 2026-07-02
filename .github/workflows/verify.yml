@@ -1,0 +1,29 @@
+name: Verify
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      RSI_EVENT_ALERTS_ENABLED: "0"
+      RSI_EVENT_RESEARCH_NOW: "2026-06-15T16:00:00Z"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements.txt pytest
+      - name: Standalone tests
+        run: python3 tests/test_indicators.py
+      - name: Compile
+        run: python3 -m compileall -q crypto_rsi_scanner tests
+      - name: Make verify
+        run: make verify PYTHON=python3
+      - name: Pytest
+        run: python3 -m pytest

@@ -88,6 +88,7 @@ from . import event_integrated_radar_outcomes
 from . import event_live_provider_readiness
 from . import event_alpha_missed
 from . import event_alpha_namespace_status
+from .event_alpha.namespace import lifecycle as event_alpha_namespace_lifecycle
 from . import event_alpha_notifications
 from . import event_alpha_notification_checklist
 from . import event_alpha_notification_delivery
@@ -5526,6 +5527,33 @@ def event_alpha_prune_or_archive_stale_namespace(
     print(_event_alpha_context_block(context))
     print(event_alpha_namespace_status.format_namespace_status(status))
     print("stale_namespace_prune_archive_plan:")
+    print(json.dumps(plan, indent=2, sort_keys=True))
+    print("dry_run_only: true")
+
+
+def event_alpha_namespace_lifecycle_report(verbose: bool = False) -> None:
+    """Write and print the Event Alpha namespace lifecycle inventory."""
+    _setup_event_discovery_logging(verbose)
+    report = event_alpha_namespace_lifecycle.write_namespace_lifecycle_report()
+    print("event_alpha_namespace_lifecycle_report:")
+    print(f"registry_path: {report.get('registry_path')}")
+    print(f"report_path: {report.get('report_path')}")
+    print(event_alpha_namespace_lifecycle.format_namespace_lifecycle_report(report))
+
+
+def event_alpha_list_active_namespaces(verbose: bool = False) -> None:
+    """Print active Event Alpha artifact namespaces from lifecycle inventory."""
+    _setup_event_discovery_logging(verbose)
+    rows = event_alpha_namespace_lifecycle.list_active_namespaces()
+    print("event_alpha_active_namespaces:")
+    print(json.dumps(list(rows), indent=2, sort_keys=True))
+
+
+def event_alpha_archive_stale_namespaces(verbose: bool = False) -> None:
+    """Print a dry-run archive plan for stale Event Alpha namespaces."""
+    _setup_event_discovery_logging(verbose)
+    plan = event_alpha_namespace_lifecycle.archive_stale_namespaces_plan(dry_run=True)
+    print("event_alpha_archive_stale_namespaces_plan:")
     print(json.dumps(plan, indent=2, sort_keys=True))
     print("dry_run_only: true")
 
@@ -11507,6 +11535,21 @@ def cli() -> None:
         help="Print a dry-run prune/archive plan for a stale Event Alpha artifact namespace.",
     )
     parser.add_argument(
+        "--event-alpha-namespace-lifecycle-report",
+        action="store_true",
+        help="Write and print the Event Alpha namespace lifecycle inventory report.",
+    )
+    parser.add_argument(
+        "--event-alpha-list-active-namespaces",
+        action="store_true",
+        help="Print active Event Alpha artifact namespaces from lifecycle inventory.",
+    )
+    parser.add_argument(
+        "--event-alpha-archive-stale-namespaces",
+        action="store_true",
+        help="Print a dry-run archive plan for stale Event Alpha artifact namespaces.",
+    )
+    parser.add_argument(
         "--event-alpha-stale-superseded-by",
         default=None,
         help="Optional replacement namespace for --event-alpha-mark-namespace-stale.",
@@ -12672,6 +12715,15 @@ def cli() -> None:
             archive=args.event_alpha_stale_archive,
         )
         return
+    if args.event_alpha_namespace_lifecycle_report:
+        event_alpha_namespace_lifecycle_report(verbose=args.verbose)
+        return
+    if args.event_alpha_list_active_namespaces:
+        event_alpha_list_active_namespaces(verbose=args.verbose)
+        return
+    if args.event_alpha_archive_stale_namespaces:
+        event_alpha_archive_stale_namespaces(verbose=args.verbose)
+        return
     if args.event_alpha_provider_health_reset:
         event_alpha_provider_health_reset(
             verbose=args.verbose,
@@ -13315,3 +13367,7 @@ def cli() -> None:
         telegram.listen()
         return
     run(top_n=args.top_n, dry_run=args.dry_run, verbose=args.verbose)
+
+
+if __name__ == "__main__":
+    cli()

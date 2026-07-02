@@ -1,0 +1,3 @@
+"""Event Alpha CLI grouping package."""
+
+from __future__ import annotations

@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Event Alpha consolidation is compatibility-first
+**Status:** accepted
+**Decision:** Event Alpha moves toward `crypto_rsi_scanner/event_alpha/` and
+`crypto_rsi_scanner/cli/` through wrappers, schema declarations, and focused
+tests before any broad physical module moves. Old import paths and commands
+remain supported until a later tested migration explicitly removes a shim.
+Artifact doctor checks that depend on fields must reference schema v1, and
+namespace lifecycle status must be explicit before a namespace is used for
+send-readiness, burn-in, or calibration.
+**Why:** Event Alpha has many mature provider, radar, notification, outcome,
+and doctor paths. A big-bang move would risk behavior drift in research-only
+safety gates, while wrappers and schema-first validation give future moves a
+stable map.
+**Revisit when:** The high-traffic Event Alpha modules have been migrated in
+small slices with old/new import tests, CLI snapshot tests, schema validation,
+and unchanged smoke/doctor results.
+
 ## 2026-07-02 - Radar performance learning is recommendation-only
 **Status:** accepted
 **Decision:** Cross-run Event Alpha radar performance artifacts may summarize

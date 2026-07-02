@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_dex_onchain_readiness, event_integrated_radar, event_instrument_resolver, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_official_exchange_activation, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_unlock_calendar_preflight, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
+from .event_alpha.doctor import schema_doctor
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
     "This namespace contains pre-canonical notification delivery rows. Do not use it "
@@ -409,6 +410,13 @@ class EventAlphaArtifactDoctorResult:
     namespace_superseded_by: str | None = None
     strict_legacy: bool = False
     strict: bool = False
+    schema_rows_validated: int = 0
+    schema_validation_errors: int = 0
+    missing_required_fields: int = 0
+    invalid_enum_fields: int = 0
+    invalid_path_fields: int = 0
+    invalid_safety_fields: int = 0
+    deprecated_field_usage: int = 0
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
 
@@ -975,6 +983,7 @@ def diagnose_artifacts(
             strict_legacy=strict_legacy,
             warnings=(event_alpha_namespace_status.format_namespace_status(namespace_status),),
         )
+    schema_result = schema_doctor.validate_namespace_artifacts(namespace_dir)
     structured_path_conflicts = _structured_operator_path_conflicts(
         (
             *runs,
@@ -2083,6 +2092,8 @@ def diagnose_artifacts(
         (blockers if strict else warnings).append(message)
     if incident_linkage["garbage_primary_subject_incidents"]:
         warnings.append(f"garbage_primary_subject_incidents={incident_linkage['garbage_primary_subject_incidents']}")
+    if schema_result.schema_validation_errors:
+        warnings.append(f"schema_validation_errors={schema_result.schema_validation_errors}")
     if incident_linkage["invalid_canonical_incident_rows"]:
         message = f"invalid_canonical_incident_rows={incident_linkage['invalid_canonical_incident_rows']}"
         (blockers if strict else warnings).append(message)
@@ -2591,6 +2602,13 @@ def diagnose_artifacts(
         namespace_superseded_by=namespace_status.superseded_by if namespace_status else None,
         strict_legacy=bool(strict_legacy),
         strict=bool(strict),
+        schema_rows_validated=schema_result.schema_rows_validated,
+        schema_validation_errors=schema_result.schema_validation_errors,
+        missing_required_fields=schema_result.missing_required_fields,
+        invalid_enum_fields=schema_result.invalid_enum_fields,
+        invalid_path_fields=schema_result.invalid_path_fields,
+        invalid_safety_fields=schema_result.invalid_safety_fields,
+        deprecated_field_usage=schema_result.deprecated_field_usage,
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
     )
@@ -6688,6 +6706,16 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"research_card_index_present={str(result.research_card_index_present).lower()} "
             f"cards_missing_lineage={result.cards_missing_lineage} "
             f"cards_missing_feedback_target={result.cards_missing_feedback_target}"
+        ),
+        (
+            "schema validation: "
+            f"rows_validated={result.schema_rows_validated} "
+            f"errors={result.schema_validation_errors} "
+            f"missing_required_fields={result.missing_required_fields} "
+            f"invalid_enum_fields={result.invalid_enum_fields} "
+            f"invalid_path_fields={result.invalid_path_fields} "
+            f"invalid_safety_fields={result.invalid_safety_fields} "
+            f"deprecated_field_usage={result.deprecated_field_usage}"
         ),
         (
             "core opportunity coverage: "

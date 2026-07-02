@@ -1,0 +1,1 @@
+"""CLI pytest package."""

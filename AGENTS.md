@@ -448,6 +448,13 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-alpha-artifact-doctor` / `make event-alpha-artifact-doctor`
   to diagnose mixed namespaces, orphan snapshots, missing provider/budget rows,
   and missing snapshot writes before treating burn-in artifacts as evidence.
+- Event Alpha consolidation is compatibility-first. New Event Alpha code should
+  prefer `crypto_rsi_scanner/event_alpha/` and `crypto_rsi_scanner/cli/`, while
+  old top-level import paths stay available through shims until a tested move
+  removes them explicitly. Artifact doctor checks that depend on fields must
+  reference `event_alpha/artifacts/schema_v1.py` first, and namespace lifecycle
+  status should be inspected with `make event-alpha-namespace-lifecycle-report`
+  before using a namespace for send-readiness, burn-in, or calibration.
 - Live Coinalyze enrichment may auto-resolve futures symbols. When
   `RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, explicit
   `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` still wins; otherwise

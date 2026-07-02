@@ -17,6 +17,57 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Add Event Alpha consolidation scaffolding · Codex
+**Why:** Event Alpha needed maintainable package boundaries, schema-first
+artifact validation, pytest-compatible test organization, CI verification, and
+first-class namespace lifecycle reporting without changing provider, routing,
+delivery, scoring, or research-only safety behavior.
+**Changes:**
+- Added `crypto_rsi_scanner/event_alpha/` package skeleton with compatibility
+  wrappers, `MODULE_MAP.md`, schema v1, schema-doctor/check-registry modules,
+  and namespace lifecycle inventory/reporting.
+- Added `crypto_rsi_scanner/cli/` facade and command snapshot helpers while
+  preserving `main.py`, `scanner.cli()`, existing flags, and
+  `python3 -m crypto_rsi_scanner.scanner --help`.
+- Wired schema validation counters into the existing artifact doctor; default
+  stale/deprecated namespace reports now skip schema validation so old artifacts
+  are not shown as current regressions.
+- Added pytest package scaffolding, `pytest.ini`, Make pytest targets, GitHub
+  Actions verification/smoke workflows, and tests for imports, schema policy,
+  lifecycle reporting, CLI snapshots, and safe workflow text.
+- Added architecture/schema/lifecycle/consolidation docs and updated
+  `AGENTS.md`, `ROADMAP.md`, `DECISIONS.md`, and the Event Alpha runbook.
+**Verify:** `python3 tests/test_indicators.py` (682/682);
+`python3 -m pytest` (685/685); `python3 -m compileall -q crypto_rsi_scanner
+tests`; `make test-pytest PYTHON=python3`; `make test-pytest-parallel
+PYTHON=python3` (xdist missing, fell back to pytest); `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make
+event-alpha-live-provider-readiness-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-preflight PYTHON=python3`; `make
+event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`; `make
+event-alpha-source-coverage-report PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1
+PYTHON=python3` (WARN, no blockers, schema errors 0); `make
+event-alpha-namespace-lifecycle-report PYTHON=python3`; `make
+event-alpha-mark-known-stale-namespaces PYTHON=python3`; `make
+event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep STRICT=1 PYTHON=python3` (STALE, schema
+errors 0 in default stale view); `make event-alpha-list-active-namespaces
+PYTHON=python3`; `make event-alpha-archive-stale-namespaces PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** This is a compatibility-first slice, not a full physical move
+of all Event Alpha modules or a full `scanner.py` extraction. No live provider
+calls, Telegram sends, trades, paper trades, normal RSI writes, or
+Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-02 — Add cross-run radar performance dashboard · Codex
 **Why:** Integrated radar outcomes were useful for fixture calibration, but
 real no-send rehearsal artifacts needed a cross-run research dashboard that can

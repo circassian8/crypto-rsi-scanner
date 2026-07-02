@@ -42221,6 +42221,157 @@ def test_event_alpha_source_coverage_coinalyze_links_only_existing_artifacts():
         assert result.status == "BLOCKED"
 
 
+def test_event_alpha_consolidation_import_shims_and_schema_registry():
+    import crypto_rsi_scanner.event_integrated_radar as old_integrated_radar
+    import crypto_rsi_scanner.event_market_anomaly_scanner as old_market_anomaly
+    from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+    from crypto_rsi_scanner.event_alpha.artifacts import paths as new_paths
+    from crypto_rsi_scanner.event_alpha.doctor import schema_doctor
+    from crypto_rsi_scanner.event_alpha.radar import integrated_radar as new_integrated_radar
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner as new_market_anomaly
+    from crypto_rsi_scanner.event_artifact_paths import artifact_display_path
+
+    assert new_integrated_radar.run_integrated_radar_cycle is old_integrated_radar.run_integrated_radar_cycle
+    assert new_market_anomaly.scan_market_rows is old_market_anomaly.scan_market_rows
+    assert new_paths.artifact_display_path is artifact_display_path
+    required = {
+        "core_opportunity_v1",
+        "integrated_radar_candidate_v1",
+        "notification_delivery_v1",
+        "integrated_notification_delivery_v1",
+        "source_coverage_v1",
+        "provider_readiness_v1",
+        "provider_preflight_v1",
+        "coinalyze_request_ledger_v1",
+        "derivatives_state_snapshot_v1",
+        "derivatives_crowding_candidate_v1",
+        "fade_review_candidate_v1",
+        "market_state_snapshot_v1",
+        "market_anomaly_v1",
+        "official_exchange_event_v1",
+        "scheduled_catalyst_event_v1",
+        "unlock_event_v1",
+        "outcome_row_v1",
+        "calibration_prior_v1",
+        "namespace_status_v1",
+        "run_ledger_v1",
+    }
+    assert required.issubset(schema_v1.SCHEMAS)
+    assert schema_v1.EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION == "event_alpha_schema_v1"
+    assert schema_doctor.check_registry_schema_dependency_errors() == ()
+
+
+def test_event_alpha_schema_v1_validation_policy():
+    from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+
+    schema = schema_v1.get_schema("integrated_radar_candidate_v1")
+    valid = {
+        "row_type": "event_integrated_radar_candidate",
+        "candidate_id": "iar:test",
+        "symbol": "TEST",
+        "opportunity_type": "CONFIRMED_LONG_RESEARCH",
+        "research_only": True,
+        "normal_rsi_signal_written": False,
+        "triggered_fade_created": False,
+    }
+    assert schema_v1.validate_row_against_schema(valid, schema) == []
+
+    missing = dict(valid)
+    missing.pop("candidate_id")
+    assert "missing_required_field:candidate_id" in schema_v1.validate_row_against_schema(missing, schema)
+
+    invalid_enum = dict(valid, opportunity_type="BUY_NOW")
+    assert any(error.startswith("invalid_enum:opportunity_type") for error in schema_v1.validate_row_against_schema(invalid_enum, schema))
+
+    path_schema = schema_v1.get_schema("core_opportunity_v1")
+    bad_path = {
+        "row_type": "event_core_opportunity",
+        "core_opportunity_id": "agg:test",
+        "symbol": "TEST",
+        "opportunity_type": "UNCONFIRMED_RESEARCH",
+        "research_card_path": "/tmp/local-card.md",
+    }
+    assert "absolute_non_debug_path:research_card_path" in schema_v1.validate_row_against_schema(bad_path, path_schema)
+    debug_abs = dict(bad_path, research_card_path="event_fade_cache/unit/card.md", research_card_path_abs_debug="/tmp/local-card.md")
+    assert "absolute_non_debug_path:research_card_path" not in schema_v1.validate_row_against_schema(debug_abs, path_schema)
+
+
+def test_event_alpha_namespace_lifecycle_inventory_and_archive_plan():
+    from crypto_rsi_scanner.event_alpha.namespace import lifecycle
+    from crypto_rsi_scanner import event_alpha_namespace_status
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        integrated = base / "integrated_radar_smoke"
+        integrated.mkdir()
+        for name in (
+            "event_integrated_radar_candidates.jsonl",
+            "event_core_opportunities.jsonl",
+            "event_alpha_source_coverage.json",
+        ):
+            (integrated / name).write_text("{}\n", encoding="utf-8")
+        stale = base / "notify_llm_deep"
+        stale.mkdir()
+        event_alpha_namespace_status.mark_namespace_stale(
+            stale,
+            namespace="notify_llm_deep",
+            reason="unit stale namespace",
+            superseded_by="integrated_radar_smoke",
+        )
+
+        report = lifecycle.write_namespace_lifecycle_report(base, out_dir=base)
+        assert (base / lifecycle.REGISTRY_FILENAME).exists()
+        assert (base / lifecycle.REPORT_FILENAME).exists()
+        rows = {row["namespace"]: row for row in report["namespaces"]}
+        assert rows["integrated_radar_smoke"]["status"] == "active_integrated_smoke"
+        assert rows["integrated_radar_smoke"]["missing_key_artifacts"] == []
+        assert rows["notify_llm_deep"]["status"] == "stale_deprecated"
+        assert rows["notify_llm_deep"]["safe_for_send_readiness"] is False
+        plan = lifecycle.archive_stale_namespaces_plan(base)
+        assert plan["dry_run"] is True
+        assert plan["archive_performed"] is False
+        assert plan["stale_namespace_count"] == 1
+
+
+def test_event_alpha_cli_package_and_make_targets_are_available():
+    from crypto_rsi_scanner.cli.dispatch import dispatch_command_name
+    from crypto_rsi_scanner.cli.main import main as cli_main
+
+    root = Path(__file__).resolve().parent.parent
+    makefile = (root / "Makefile").read_text(encoding="utf-8")
+    assert callable(cli_main)
+    assert dispatch_command_name(["--event-alpha-integrated-radar-smoke"]) == "event_alpha_integrated_radar_smoke"
+    assert dispatch_command_name(["--event-alpha-namespace-lifecycle-report"]) == "event_alpha_namespace_lifecycle_report"
+    assert "test-pytest:" in makefile
+    assert "test-pytest-parallel:" in makefile
+    assert "event-alpha-namespace-lifecycle-report:" in makefile
+    assert "event-alpha-list-active-namespaces:" in makefile
+    assert "event-alpha-archive-stale-namespaces:" in makefile
+
+
+def test_github_actions_are_safe_fixture_verification_only():
+    root = Path(__file__).resolve().parent.parent
+    verify = root / ".github" / "workflows" / "verify.yml"
+    smoke = root / ".github" / "workflows" / "event-alpha-smoke.yml"
+    assert verify.exists()
+    assert smoke.exists()
+    text = (verify.read_text(encoding="utf-8") + "\n" + smoke.read_text(encoding="utf-8")).casefold()
+    forbidden = (
+        "allow_live",
+        "allow-live",
+        "rsi_event_alerts_enabled=1",
+        "event-alert-send",
+        "event-alpha-cycle-send",
+        "event-alpha-telegram-send-one-cycle",
+        "telegram_bot_token",
+        "coinalyze_api_key",
+    )
+    for item in forbidden:
+        assert item not in text
+    assert "make verify python=python3" in text
+    assert "event-alpha-integrated-radar-smoke" in text
+
+
 def test_export_source_with_artifacts_fallback_and_archive_validation():
     import importlib.util
     import time

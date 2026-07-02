@@ -79,7 +79,7 @@ Cron (daily at 00:05 UTC):
   5 0 * * *  cd /path/to/project && python main.py >> scan.log 2>&1
 """
 
-from crypto_rsi_scanner.scanner import cli
+from crypto_rsi_scanner.cli.main import main as cli
 
 if __name__ == "__main__":
     cli()

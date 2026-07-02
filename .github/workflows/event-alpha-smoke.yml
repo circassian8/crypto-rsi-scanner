@@ -1,0 +1,28 @@
+name: Event Alpha Smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  event-alpha-smoke:
+    runs-on: ubuntu-latest
+    env:
+      RSI_EVENT_ALERTS_ENABLED: "0"
+      RSI_EVENT_RESEARCH_NOW: "2026-06-15T16:00:00Z"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements.txt pytest
+      - name: Integrated radar smoke
+        run: make event-alpha-integrated-radar-smoke PYTHON=python3
+      - name: Integrated radar doctor
+        run: make event-alpha-integrated-radar-doctor PYTHON=python3
+      - name: Live provider readiness smoke
+        run: make event-alpha-live-provider-readiness-smoke PYTHON=python3
+      - name: Coinalyze preflight smoke
+        run: make event-alpha-coinalyze-preflight-smoke PYTHON=python3

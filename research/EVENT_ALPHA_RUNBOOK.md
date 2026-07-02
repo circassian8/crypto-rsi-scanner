@@ -5,6 +5,27 @@ refresh watchlist rows, route research digests, write review artifacts, and
 export proposed eval cases. It must not trade, paper trade, write normal RSI
 signal rows, or let LLM/search/watchlist output create `TRIGGERED_FADE`.
 
+## Consolidation Surfaces
+
+Event Alpha package shims now live under `crypto_rsi_scanner/event_alpha/`.
+Old top-level imports remain supported while future code moves into the
+subpackage in small, tested slices. CLI facade code lives under
+`crypto_rsi_scanner/cli/`, with the root `main.py` delegating through that
+facade.
+
+Useful consolidation checks:
+
+- `make test-pytest PYTHON=python3`
+- `make test-pytest-parallel PYTHON=python3`
+- `make event-alpha-namespace-lifecycle-report PYTHON=python3`
+- `make event-alpha-list-active-namespaces PYTHON=python3`
+- `make event-alpha-archive-stale-namespaces PYTHON=python3`
+
+When adding an artifact row, update schema v1 first, then the writer, doctor
+validation, tests, and docs. When adding a doctor check, register its schema
+field dependencies before adding enforcement. When adding a namespace, declare
+its lifecycle status, key artifacts, retention policy, and send/burn-in safety.
+
 ## Integrated Radar Artifact Review
 
 The integrated radar cycle merges sidecar evidence from market anomalies,
