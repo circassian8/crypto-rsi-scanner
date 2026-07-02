@@ -124,6 +124,7 @@ from . import event_artifact_paths
 from . import event_source_reliability
 from . import event_catalyst_search
 from . import event_clock
+from . import event_coinalyze_preflight
 from . import event_core_opportunity_store
 from . import event_derivatives_crowding
 from . import event_evidence_acquisition
@@ -3621,6 +3622,88 @@ def event_alpha_notify_preview(
     ))
 
 
+def event_alpha_notify_preview_from_artifacts(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Regenerate notification preview and structured preview delivery rows from local artifacts only."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "notify_no_key"
+    try:
+        profile = _apply_event_alpha_profile(selected_profile)
+        context = resolve_event_alpha_artifact_context_for_report(profile.name, artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or profile.name)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    core_rows = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+        include_legacy=True,
+    ).rows
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
+    routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
+    now = _event_research_now()
+    storage = Storage(config.DB_PATH)
+    try:
+        notif_cfg = _event_alpha_notification_config_from_runtime(profile.name)
+        plan = event_alpha_notifications.build_notification_plan(
+            routed.decisions,
+            storage=storage,
+            cfg=notif_cfg,
+            now=now,
+            include_health_heartbeat=True,
+            core_opportunity_rows=core_rows,
+        )
+    finally:
+        storage.close()
+    run_rows = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=50).rows
+    latest_run = event_alpha_run_ledger.latest_run(run_rows, profile.name) or {}
+    preview_result = _event_alpha_preview_summary_result(latest_run, plan=plan, profile=profile.name)
+    delivery_cfg = event_alpha_notification_delivery.NotificationDeliveryConfig(
+        event_alpha_notification_delivery.deliveries_path_for_context(context)
+    )
+    event_alpha_notification_delivery.rewrite_normalized_delivery_records(delivery_cfg.path)
+    writer = event_alpha_notifications._DeliveryWriter(
+        delivery_cfg,
+        run_id=str(preview_result.get("run_id") or event_alpha_run_ledger.run_id_for(now, profile.name)),
+        profile=profile.name,
+        namespace=context.artifact_namespace,
+        now=now,
+    )
+    send_guard_status = (
+        "No-send rehearsal: would send, but send guard is disabled. This is expected in rehearsal mode."
+        if not config.EVENT_ALERTS_ENABLED and (plan.would_send_count or plan.heartbeat_due)
+        else ("Send guard enabled." if config.EVENT_ALERTS_ENABLED else "No-send rehearsal: send guard is disabled.")
+    )
+    event_alpha_notifications.write_notification_plan_preview(
+        plan,
+        writer=writer,
+        profile=profile.name,
+        cfg=notif_cfg,
+        pipeline_result=preview_result,
+        status=(
+            event_alpha_notification_delivery.STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED
+            if not config.EVENT_ALERTS_ENABLED
+            else "would_send"
+        ),
+        send_guard_status=send_guard_status,
+        record_delivery_rows=True,
+        delivery_row_not_written_reason="preview_command",
+    )
+    print(_event_alpha_context_block(context))
+    print("notification_preview_from_artifacts: true")
+    print(f"notification_preview_path: {event_artifact_paths.artifact_display_path(writer.preview_path)}")
+    print(f"delivery_rows_backfilled: {writer.counts.get('records', 0)}")
+    print(
+        "research_review_skip_telemetry: "
+        f"eligible={plan.research_review_eligible_count} "
+        f"rendered={len(plan.research_review_items)} "
+        f"skipped={len(plan.research_review_skipped_items)}"
+    )
+
+
 def _event_alpha_preview_summary_result(
     latest_run: Mapping[str, object],
     *,
@@ -5000,6 +5083,69 @@ def event_alpha_live_provider_readiness_report(
     print(event_live_provider_readiness.format_readiness_report(report))
 
 
+def event_alpha_coinalyze_preflight_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    smoke_mode: bool = False,
+    allow_live_preflight: bool = False,
+) -> None:
+    """Write Coinalyze no-call preflight artifacts."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name or "notify_llm_deep", artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    report = event_coinalyze_preflight.build_preflight_report(
+        namespace_dir=context.namespace_dir,
+        smoke_mode=smoke_mode,
+        allow_live_preflight=allow_live_preflight,
+        now=_event_research_now(),
+    )
+    json_path, md_path = event_coinalyze_preflight.write_preflight_artifacts(report, context.namespace_dir)
+    print(_event_alpha_context_block(context))
+    print(f"coinalyze_preflight_json: {event_artifact_paths.artifact_display_path(json_path)}")
+    print(f"coinalyze_preflight_report: {event_artifact_paths.artifact_display_path(md_path)}")
+    print(event_coinalyze_preflight.format_preflight_report(report))
+
+
+def event_alpha_coinalyze_no_send_rehearsal(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    allow_live_preflight: bool = False,
+) -> None:
+    """Guarded Coinalyze no-send rehearsal stub; no live calls by default."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name or "notify_llm_deep", artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    report = event_coinalyze_preflight.build_preflight_report(
+        namespace_dir=context.namespace_dir,
+        smoke_mode=False,
+        allow_live_preflight=allow_live_preflight,
+        now=_event_research_now(),
+    )
+    json_path, md_path = event_coinalyze_preflight.write_preflight_artifacts(report, context.namespace_dir)
+    rehearsal_path = event_coinalyze_preflight.write_rehearsal_report(report, context.namespace_dir)
+    status = (
+        "missing_config"
+        if not report.configured
+        else ("ready_for_future_bounded_no_send_rehearsal" if report.live_call_allowed else "live_call_blocked_by_default")
+    )
+    print(_event_alpha_context_block(context))
+    print(f"coinalyze_preflight_json: {event_artifact_paths.artifact_display_path(json_path)}")
+    print(f"coinalyze_preflight_report: {event_artifact_paths.artifact_display_path(md_path)}")
+    print(f"coinalyze_rehearsal_report: {event_artifact_paths.artifact_display_path(rehearsal_path)}")
+    print(f"coinalyze_no_send_rehearsal_status: {status}")
+    print("No Coinalyze network calls, Telegram sends, trades, paper trades, normal RSI rows, or Event Alpha TRIGGERED_FADE were performed.")
+
+
 def event_alpha_mark_namespace_stale(
     verbose: bool = False,
     *,
@@ -5020,12 +5166,42 @@ def event_alpha_mark_namespace_stale(
         namespace=context.artifact_namespace,
         reason=reason or "operator marked stale/deprecated",
         superseded_by=superseded_by,
+        safe_for_send_readiness=False,
         now=_event_research_now(),
     )
     status = event_alpha_namespace_status.load_namespace_status(context.namespace_dir)
     print(_event_alpha_context_block(context))
     print(f"namespace_status_marker: {event_artifact_paths.artifact_display_path(marker)}")
     print(event_alpha_namespace_status.format_namespace_status(status))
+
+
+def event_alpha_mark_known_stale_namespaces(verbose: bool = False) -> None:
+    """Idempotently mark known pre-canonical namespaces stale/deprecated."""
+    _setup_event_discovery_logging(verbose)
+    known = (
+        {
+            "profile": "notify_llm_deep",
+            "namespace": "notify_llm_deep",
+            "reason": "pre-canonical notify_llm_deep artifacts; superseded by current rehearsal namespaces",
+            "superseded_by": "notify_llm_deep_cryptopanic_rehearsal, notify_llm_deep_fixture_rehearsal, integrated_radar_smoke",
+        },
+    )
+    for item in known:
+        context = resolve_event_alpha_artifact_context_for_report(
+            str(item["profile"]),
+            str(item["namespace"]),
+        )
+        marker = event_alpha_namespace_status.mark_namespace_stale(
+            context.namespace_dir,
+            namespace=context.artifact_namespace,
+            reason=str(item["reason"]),
+            superseded_by=str(item["superseded_by"]),
+            safe_for_send_readiness=False,
+            now=_event_research_now(),
+        )
+        print(_event_alpha_context_block(context))
+        print(f"namespace_status_marker: {event_artifact_paths.artifact_display_path(marker)}")
+        print(event_alpha_namespace_status.format_namespace_status(event_alpha_namespace_status.load_namespace_status(context.namespace_dir)))
 
 
 def event_alpha_prune_or_archive_stale_namespace(
@@ -10750,6 +10926,11 @@ def cli() -> None:
         help="Preview Event Alpha notification readiness, would-send counts, and lane cooldowns.",
     )
     parser.add_argument(
+        "--event-alpha-notify-preview-from-artifacts",
+        action="store_true",
+        help="Regenerate Event Alpha notification preview and structured preview delivery telemetry from local artifacts only.",
+    )
+    parser.add_argument(
         "--event-alpha-notify-go-no-go",
         action="store_true",
         help="Print Event Alpha notification preview/send go-no-go readiness.",
@@ -10870,9 +11051,34 @@ def cli() -> None:
         help="Write fixture/config-only live-provider readiness artifacts; no network, keys, or sends required.",
     )
     parser.add_argument(
+        "--event-alpha-coinalyze-preflight",
+        action="store_true",
+        help="Write Coinalyze derivatives/OI/funding no-call preflight artifacts.",
+    )
+    parser.add_argument(
+        "--event-alpha-coinalyze-preflight-smoke",
+        action="store_true",
+        help="Write fixture-only Coinalyze preflight artifacts; no key or network required.",
+    )
+    parser.add_argument(
+        "--event-alpha-coinalyze-no-send-rehearsal",
+        action="store_true",
+        help="Run guarded Coinalyze no-send rehearsal stub; no live calls unless explicitly allowed.",
+    )
+    parser.add_argument(
+        "--event-alpha-coinalyze-allow-live-preflight",
+        action="store_true",
+        help="Allow future bounded Coinalyze live preflight path. Tests and smokes must leave this off.",
+    )
+    parser.add_argument(
         "--event-alpha-mark-namespace-stale",
         action="store_true",
         help="Mark the selected Event Alpha artifact namespace stale/deprecated so default reports skip it.",
+    )
+    parser.add_argument(
+        "--event-alpha-mark-known-stale-namespaces",
+        action="store_true",
+        help="Mark known pre-canonical Event Alpha artifact namespaces stale/deprecated.",
     )
     parser.add_argument(
         "--event-alpha-prune-or-archive-stale-namespace",
@@ -11834,6 +12040,13 @@ def cli() -> None:
     if args.event_alpha_notification_checklist:
         event_alpha_notification_checklist_report(verbose=args.verbose, profile_name=args.event_alpha_profile)
         return
+    if args.event_alpha_notify_preview_from_artifacts:
+        event_alpha_notify_preview_from_artifacts(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
     if args.event_alpha_send_readiness:
         event_alpha_send_readiness_report(
             verbose=args.verbose,
@@ -11927,6 +12140,23 @@ def cli() -> None:
             smoke_mode=bool(args.event_alpha_live_provider_readiness_smoke),
         )
         return
+    if args.event_alpha_coinalyze_preflight or args.event_alpha_coinalyze_preflight_smoke:
+        event_alpha_coinalyze_preflight_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            smoke_mode=bool(args.event_alpha_coinalyze_preflight_smoke),
+            allow_live_preflight=bool(args.event_alpha_coinalyze_allow_live_preflight),
+        )
+        return
+    if args.event_alpha_coinalyze_no_send_rehearsal:
+        event_alpha_coinalyze_no_send_rehearsal(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            allow_live_preflight=bool(args.event_alpha_coinalyze_allow_live_preflight),
+        )
+        return
     if args.event_alpha_mark_namespace_stale:
         event_alpha_mark_namespace_stale(
             verbose=args.verbose,
@@ -11935,6 +12165,9 @@ def cli() -> None:
             reason=args.reason,
             superseded_by=args.event_alpha_stale_superseded_by,
         )
+        return
+    if args.event_alpha_mark_known_stale_namespaces:
+        event_alpha_mark_known_stale_namespaces(verbose=args.verbose)
         return
     if args.event_alpha_prune_or_archive_stale_namespace:
         event_alpha_prune_or_archive_stale_namespace(

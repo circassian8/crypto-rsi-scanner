@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Coinalyze activation starts with a no-call preflight
+**Status:** accepted
+**Decision:** Coinalyze derivatives/OI/funding activation must start with a
+provider-specific no-call preflight artifact. The preflight may report whether
+`RSI_EVENT_DISCOVERY_COINALYZE_API_KEY` is configured, parser/mapping readiness,
+provider-health key, request-ledger path, timeout/cache/budget policy,
+supported metrics, and the research lanes/source packs enabled if healthy. It
+must not print API key values, call Coinalyze, send Telegram messages, write
+normal RSI rows, trade, paper trade, execute orders, or create
+`TRIGGERED_FADE`. A no-send rehearsal remains blocked by default even when a key
+exists unless a future explicitly bounded live-preflight flag is supplied.
+**Why:** Derivatives evidence is high-value but quota- and side-effect-sensitive.
+Operators need a repeatable way to prove local configuration and fixture parser
+readiness before any live provider request is considered.
+**Revisit when:** Coinalyze has a reviewed bounded request ledger, quota policy,
+provider-health integration, no-send burn-in output, and human approval for a
+specific live rehearsal.
+
 ## 2026-07-02 - Stale Event Alpha namespaces are explicit markers, not silent failures
 **Status:** accepted
 **Decision:** Superseded Event Alpha artifact namespaces may be marked with an

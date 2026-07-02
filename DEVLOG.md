@@ -17,6 +17,66 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Add Coinalyze preflight and research-review telemetry backfill · Codex
+**Why:** The active CryptoPanic rehearsal still needed structured
+research-review skip telemetry on normal delivery rows, fixture-only notification
+smokes should not warn about live-provider readiness they do not claim, stale
+`notify_llm_deep` artifacts needed a shipped marker, and Coinalyze needed a
+safe no-call activation preflight before any derivatives live rehearsal.
+**Changes:**
+- Added an artifact-backed notification preview/backfill command and Make target
+  that writes structured `research_review_digest` delivery telemetry from local
+  artifacts only: rendered/eligible/skipped counts, skip reason counts, diverse
+  skipped samples, skipped family summaries, rendered candidate/core ids, and
+  preview-only metadata.
+- Made research-review skipped-candidate rendering family-first with a diverse
+  raw sample so one duplicate-heavy asset family cannot hide another material
+  skipped family.
+- Scoped source-coverage/live-provider readiness doctor warnings to namespaces
+  that actually claim provider/source coverage, and kept stale namespaces
+  explicitly blocked for send-readiness via `safe_for_send_readiness=false`.
+- Added `event_coinalyze_preflight.py`, CLI/Make targets for no-call Coinalyze
+  preflight, fixture smoke, and a guarded no-send rehearsal stub; artifacts
+  report env var names, parser/mapping status, request-ledger path, budgets,
+  supported metrics, enabled lanes/source packs, and safety notes without
+  printing secrets or calling Coinalyze by default.
+- Updated live-provider readiness, source coverage, daily brief, artifact
+  doctor, and the activation runbook to link and validate Coinalyze preflight
+  artifacts.
+- Hardened source-with-artifacts export timestamps with `SOURCE_DATE_EPOCH`
+  support and conservative mtime clamping to avoid review-side Make clock-skew
+  warnings.
+**Verify:** `python3 tests/test_indicators.py`;
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`;
+`make event-alpha-integrated-radar-outcome-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-outcome-report PYTHON=python3`;
+`make event-alpha-integrated-radar-calibration-report PYTHON=python3`;
+`make event-alpha-live-provider-readiness-smoke PYTHON=python3`;
+`make event-alpha-live-provider-readiness PROFILE=fixture ARTIFACT_NAMESPACE=integrated_radar_smoke PYTHON=python3`;
+`make event-alpha-coinalyze-preflight-smoke PYTHON=python3`;
+`make event-alpha-coinalyze-preflight PYTHON=python3`;
+`make event-alpha-market-anomaly-smoke PYTHON=python3`;
+`make event-alpha-official-exchange-smoke PYTHON=python3`;
+`make event-alpha-scheduled-catalyst-smoke PYTHON=python3`;
+`make event-alpha-unlock-risk-smoke PYTHON=python3`;
+`make event-alpha-derivatives-smoke PYTHON=python3`;
+`make event-alpha-fade-review-smoke PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make event-alpha-mark-known-stale-namespaces PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep STRICT=1 PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Coinalyze preflight remains no-call unless an explicit future
+operator flag is passed. No Telegram sends, live provider calls by default,
+trading, paper trading, normal RSI rows, order logic, or Event Alpha-created
+`TRIGGERED_FADE` were added.
+
 ## 2026-07-02 — Harden live-provider readiness telemetry and stale namespace handling · Codex
 **Why:** Integrated radar source coverage needed to carry its own no-call
 provider-readiness evidence, research-review previews needed clearer skip

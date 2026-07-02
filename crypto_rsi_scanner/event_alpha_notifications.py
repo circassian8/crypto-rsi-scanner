@@ -529,9 +529,12 @@ def _core_id_for_decision(
 ) -> str:
     core = _core_row_for_decision(decision, core_row_by_alert_id) or {}
     entry = _decision_entry(decision)
+    components = getattr(entry, "latest_score_components", None) or {}
     return str(
         core.get("core_opportunity_id")
         or getattr(entry, "core_opportunity_id", None)
+        or (components.get("core_opportunity_id") if isinstance(components, Mapping) else None)
+        or (components.get("canonical_core_opportunity_id") if isinstance(components, Mapping) else None)
         or ""
     ).strip()
 
@@ -1196,14 +1199,15 @@ def format_research_review_telegram_digest(
     if skipped:
         family_summary = _research_review_skipped_family_summary(skipped)
         lines.append("<b>Skipped candidate families</b>")
-        for family in family_summary[:8]:
+        family_display = _research_review_skipped_family_display(family_summary, limit=8)
+        for family in family_display:
             lines.append(
                 "- "
                 f"{_esc(family['label'])}: {_esc(str(family['skipped_count']))} skipped · "
                 f"reasons: {_esc(_format_counts(family.get('skip_reason_counts') or {}))}"
             )
-        if len(family_summary) > 8:
-            lines.append(f"- +{len(family_summary) - 8} more skipped families in local artifacts/inbox.")
+        if len(family_summary) > len(family_display):
+            lines.append(f"- +{len(family_summary) - len(family_display)} more skipped families in local artifacts/inbox.")
         lines.append("")
         lines.append("<b>Skipped raw sample</b>")
         sample = _diverse_skipped_sample(skipped, limit=5)
@@ -1228,6 +1232,18 @@ def _research_review_channel_summary(plan: EventAlphaNotificationPlan) -> dict[s
     family_summary = _research_review_skipped_family_summary(plan.research_review_skipped_items)
     sample = _diverse_skipped_sample(plan.research_review_skipped_items, limit=20)
     rendered = len(plan.research_review_items)
+    rendered_decisions = [item.decision for item in plan.research_review_items]
+    rendered_candidate_ids = [
+        decision.alert_id
+        for decision in rendered_decisions
+        if str(decision.alert_id or "").strip()
+    ]
+    rendered_core_ids = [
+        core_id
+        for decision in rendered_decisions
+        for core_id in (_core_id_for_decision(decision, plan.core_row_by_alert_id),)
+        if str(core_id or "").strip()
+    ]
     return {
         "rendered_candidate_count": rendered,
         "eligible_candidate_count": int(plan.research_review_eligible_count or 0),
@@ -1237,10 +1253,13 @@ def _research_review_channel_summary(plan: EventAlphaNotificationPlan) -> dict[s
         "skipped_candidates": [item.to_dict() for item in sample],
         "skipped_candidates_sample": [item.to_dict() for item in sample],
         "skipped_family_summary": family_summary,
+        "skipped_family_count": len(family_summary),
         "selection_policy": "rank by research-review score, source quality, market confirmation, and recency; render top max_items",
         "max_items": rendered,
         "ranking_policy": "rank_score_desc_then_score_recency_symbol",
         "cooldown_policy": "research_review_digest lane cooldown",
+        "rendered_candidate_ids": list(dict.fromkeys(rendered_candidate_ids)),
+        "rendered_core_opportunity_ids": list(dict.fromkeys(rendered_core_ids)),
     }
 
 
@@ -1274,6 +1293,53 @@ def _research_review_skipped_family_summary(
         key=lambda row: (int(row.get("skipped_count") or 0), float(row.get("max_score") or 0.0), str(row.get("label") or "")),
         reverse=True,
     )
+
+
+def _research_review_skipped_family_display(
+    family_summary: Iterable[Mapping[str, Any]],
+    *,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Return family-first display rows while preserving high-score small families."""
+
+    rows = [dict(row) for row in family_summary]
+    if limit <= 0:
+        return []
+    by_count = sorted(
+        rows,
+        key=lambda row: (
+            int(row.get("skipped_count") or 0),
+            float(row.get("max_score") or 0.0),
+            str(row.get("label") or ""),
+        ),
+        reverse=True,
+    )
+    by_score = sorted(
+        rows,
+        key=lambda row: (
+            float(row.get("max_score") or 0.0),
+            int(row.get("skipped_count") or 0),
+            str(row.get("label") or ""),
+        ),
+        reverse=True,
+    )
+    selected: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def add(row: Mapping[str, Any]) -> None:
+        key = str(row.get("candidate_family_id") or row.get("label") or "").strip()
+        if not key or key in seen or len(selected) >= limit:
+            return
+        selected.append(dict(row))
+        seen.add(key)
+
+    for row in by_count[: max(1, limit // 2)]:
+        add(row)
+    for row in by_score:
+        add(row)
+    for row in by_count:
+        add(row)
+    return selected
 
 
 def _format_counts(values: Mapping[str, Any]) -> str:
@@ -1318,6 +1384,8 @@ def write_notification_plan_preview(
     card_path_by_alert_id: Mapping[str, str | Path] | None = None,
     status: str | None = None,
     send_guard_status: str | None = None,
+    record_delivery_rows: bool = False,
+    delivery_row_not_written_reason: str | None = "preview_command",
 ) -> None:
     """Write a full read-only preview for every due lane in ``plan``."""
 
@@ -1397,7 +1465,32 @@ def write_notification_plan_preview(
             would_send=True,
             sent=False,
             status=section_status,
+            preview_only=not record_delivery_rows,
+            delivery_row_not_written_reason=delivery_row_not_written_reason if not record_delivery_rows else None,
         )
+        if record_delivery_rows:
+            alert_ids = list(identity.notification_item_ids)
+            dedupe_key, dedupe_bucket = writer._dedupe_key(message, lane, alert_ids)
+            writer._append(
+                alert_ids=alert_ids,
+                lane=lane,
+                route=route_label,
+                content_hash=writer._hash(message, lane, alert_ids),
+                dedupe_key=dedupe_key,
+                dedupe_bucket=dedupe_bucket,
+                state=delivery.STATE_BLOCKED,
+                identity=identity,
+                error_class="preview_only",
+                error_message=delivery_row_not_written_reason or "preview_command",
+                delivery_mode=delivery.DELIVERY_MODE_PREVIEW_ONLY,
+                delivery_state=delivery.DELIVERY_STATE_PREVIEW,
+                status_detail=delivery.STATUS_DETAIL_PREVIEW_ONLY,
+                send_guard_enabled=False,
+                would_send=True,
+                sent=False,
+                failed=False,
+                channel_summary=_research_review_channel_summary(plan) if research_review else None,
+            )
         wrote_section = True
 
     if plan.heartbeat_due:
@@ -1428,7 +1521,40 @@ def write_notification_plan_preview(
             would_send=True,
             sent=False,
             status=section_status,
+            preview_only=not record_delivery_rows,
+            delivery_row_not_written_reason=delivery_row_not_written_reason if not record_delivery_rows else None,
         )
+        if record_delivery_rows:
+            message = format_health_heartbeat(
+                profile=profile,
+                result=_notification_preview_result(
+                    pipeline_result,
+                    plan=plan,
+                    delivered_by_lane={lane: 0 for lane in LANES},
+                ),
+                now=writer.now,
+                send_guard_status=send_guard_status,
+            )
+            dedupe_key, dedupe_bucket = writer._dedupe_key(message, LANE_HEALTH_HEARTBEAT, ["heartbeat"])
+            writer._append(
+                alert_ids=["heartbeat"],
+                lane=LANE_HEALTH_HEARTBEAT,
+                route="HEALTH_HEARTBEAT",
+                content_hash=writer._hash(message, LANE_HEALTH_HEARTBEAT, ["heartbeat"]),
+                dedupe_key=dedupe_key,
+                dedupe_bucket=dedupe_bucket,
+                state=delivery.STATE_BLOCKED,
+                identity=heartbeat_identity,
+                error_class="preview_only",
+                error_message=delivery_row_not_written_reason or "preview_command",
+                delivery_mode=delivery.DELIVERY_MODE_PREVIEW_ONLY,
+                delivery_state=delivery.DELIVERY_STATE_PREVIEW,
+                status_detail=delivery.STATUS_DETAIL_PREVIEW_ONLY,
+                send_guard_enabled=False,
+                would_send=True,
+                sent=False,
+                failed=False,
+            )
         wrote_section = True
 
     if not wrote_section:
@@ -2740,13 +2866,17 @@ class _DeliveryWriter:
                 "eligible_candidate_count",
                 "rendered_candidate_count",
                 "skipped_candidate_count",
+                "skip_reason_counts",
                 "skipped_candidates_sample",
                 "skipped_family_summary",
                 "skipped_reason_counts",
+                "skipped_family_count",
                 "selection_policy",
                 "max_items",
                 "ranking_policy",
                 "cooldown_policy",
+                "rendered_candidate_ids",
+                "rendered_core_opportunity_ids",
             ):
                 if key in channel_summary:
                     extra_delivery_fields[key] = channel_summary.get(key)
@@ -3064,6 +3194,8 @@ class _DeliveryWriter:
         would_send: bool,
         sent: bool,
         status: str | None = None,
+        preview_only: bool = False,
+        delivery_row_not_written_reason: str | None = None,
     ) -> None:
         """Write operator-visible Telegram bodies for all lanes in this run."""
         section_status = str(status or ("sent" if sent else "would_send"))
@@ -3076,6 +3208,8 @@ class _DeliveryWriter:
                 "status": section_status,
                 "identity": identity,
                 "message": message,
+                "preview_only": bool(preview_only),
+                "delivery_row_not_written_reason": delivery_row_not_written_reason,
             }
         )
         body = [
@@ -3118,6 +3252,8 @@ class _DeliveryWriter:
                     "notification_item_ids: " + ", ".join(item_identity.notification_item_ids or ("none",)),
                     f"identity_reconciled: {str(item_identity.identity_reconciled).lower()}",
                     f"identity_reconciliation_reason: {item_identity.identity_reconciliation_reason or 'none'}",
+                    f"preview_only: {str(bool(section.get('preview_only'))).lower()}",
+                    f"delivery_row_not_written_reason: {section.get('delivery_row_not_written_reason') or 'none'}",
                     "",
                     "### Telegram Body",
                     "",

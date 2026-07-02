@@ -38,6 +38,57 @@ fields, request-ledger requirements, provider health key, source-pack impacts,
 and the source packs or research lanes that remain blocked without market or
 provider confirmation.
 
+## Coinalyze Derivatives Preflight
+
+Coinalyze is the first derivatives/OI/funding activation lane. Start with the
+provider-specific no-call preflight:
+
+```bash
+make event-alpha-coinalyze-preflight PROFILE=notify_llm_deep PYTHON=python3
+```
+
+For fixture proof without a key or network:
+
+```bash
+make event-alpha-coinalyze-preflight-smoke PYTHON=python3
+```
+
+The preflight writes:
+
+- `event_coinalyze_preflight.json`
+- `event_coinalyze_preflight.md`
+
+The report may mention only the required environment variable name,
+`RSI_EVENT_DISCOVERY_COINALYZE_API_KEY`. It must not print a key value. Normal
+preflight reports `missing_config` when the key is absent. If a key is present,
+live calls are still blocked unless an operator explicitly passes the live
+preflight flag through the CLI after reviewing quota and doctor output.
+
+The guarded rehearsal stub is:
+
+```bash
+make event-alpha-coinalyze-no-send-rehearsal PROFILE=notify_llm_deep PYTHON=python3
+```
+
+Current behavior:
+
+- no key: exits gracefully with `missing_config`
+- key configured but no explicit live flag: `live_call_blocked_by_default`
+- no Telegram sends, trades, paper trades, normal RSI rows, or
+  Event Alpha-created `TRIGGERED_FADE`
+
+Expected artifacts after a future bounded live rehearsal:
+
+- `event_coinalyze_request_ledger.jsonl`
+- `event_derivatives_state.jsonl`
+- `event_derivatives_crowding_candidates.jsonl`
+- `event_fade_short_review_candidates.jsonl`
+- `event_coinalyze_rehearsal_report.md`
+
+Abort if the request ledger is missing, provider health is in backoff, a secret
+value appears in artifacts, live calls happen without the explicit flag, or
+artifact doctor reports blockers.
+
 ## Provider Activation Order
 
 Use the readiness report and source coverage together. The default activation
@@ -86,6 +137,12 @@ Strict artifact doctor skips stale namespaces by default and reports the stale
 marker. To inspect them deliberately, pass `--event-alpha-include-stale-artifacts`
 through the CLI or use a direct diagnostic command.
 
+Known pre-canonical namespaces can be marked idempotently:
+
+```bash
+make event-alpha-mark-known-stale-namespaces PYTHON=python3
+```
+
 Before deleting or archiving anything, run the dry-run plan:
 
 ```bash
@@ -105,3 +162,19 @@ make export-src-with-artifacts PYTHON=python3
 The exporter overwrites `crypto_rsi_scanner_source_with_artifacts.zip`, excludes
 secrets and machine-local noise, and normalizes future-dated mtimes so extracted
 archives do not produce clock-skew warnings.
+
+## Artifact-Backed Preview Refresh
+
+When the artifacts already exist and the operator only needs a fresh preview or
+delivery-row skip telemetry, regenerate it without live providers or sends:
+
+```bash
+make event-alpha-notify-preview-from-artifacts \
+  PROFILE=notify_llm_deep \
+  ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal \
+  PYTHON=python3
+```
+
+The resulting `research_review_digest` delivery rows should include rendered,
+eligible, and skipped counts, skipped reason counts, skipped family summaries,
+rendered alert/core ids, and a `preview_only` marker in the preview body.

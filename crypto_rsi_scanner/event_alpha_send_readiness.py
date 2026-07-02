@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_artifact_doctor, event_alpha_artifacts, event_alpha_notification_delivery as delivery
+from . import event_alpha_artifact_doctor, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_delivery as delivery
 
 
 @dataclass(frozen=True)
@@ -92,6 +92,16 @@ def build_send_readiness(
     resolved_preview = str(resolved_preview_path) if resolved_preview_path else None
     blockers: list[str] = []
     warnings: list[str] = []
+    namespace_dir = None
+    if preview_path:
+        namespace_dir = Path(preview_path).expanduser().parent
+    elif artifact_namespace:
+        namespace_dir = Path("event_fade_cache") / str(artifact_namespace)
+    namespace_status = event_alpha_namespace_status.load_namespace_status(namespace_dir)
+    if event_alpha_namespace_status.is_stale_deprecated(namespace_status):
+        blockers.append("artifact namespace is stale/deprecated and blocked for send-readiness")
+    elif namespace_status and not namespace_status.safe_for_send_readiness:
+        blockers.append("artifact namespace is marked unsafe for send-readiness")
 
     if latest_run is None:
         blockers.append("no latest Event Alpha run found for this profile/namespace")

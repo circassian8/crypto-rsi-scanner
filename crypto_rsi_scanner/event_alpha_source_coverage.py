@@ -486,6 +486,10 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
             "Live-provider activation readiness:",
             f"- readiness report: {LIVE_PROVIDER_READINESS_MD}",
             f"- readiness JSON: {LIVE_PROVIDER_READINESS_JSON}",
+            "- Coinalyze preflight report: event_coinalyze_preflight.md",
+            "- Coinalyze preflight JSON: event_coinalyze_preflight.json",
+            "- Coinalyze command: make event-alpha-coinalyze-preflight PROFILE="
+            f"{report.profile} ARTIFACT_NAMESPACE={report.artifact_namespace}",
             "- command: make event-alpha-live-provider-readiness PROFILE="
             f"{report.profile} ARTIFACT_NAMESPACE={report.artifact_namespace}",
             "- next activation plan: use the ranked source categories above; rehearse no-send before enabling live calls.",
@@ -1026,6 +1030,8 @@ def _pack_recommended_actions(
 
 def _provider_setup_action(provider: str, *, status: str) -> str:
     prefix = "configure" if status == "missing" else "restore"
+    if provider == "cryptopanic" and status != "missing":
+        return "inspect CryptoPanic provider health, backoff/quota, and token-specific query quality"
     guidance = {
         "cryptopanic": "CryptoPanic token/news coverage with RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN",
         "gdelt": "GDELT broad-news coverage and provider backoff health",

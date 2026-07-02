@@ -17,6 +17,7 @@ from . import (
     event_alpha_notification_runs,
     event_alpha_explain,
     event_artifact_paths,
+    event_coinalyze_preflight,
     event_core_opportunities,
     event_core_opportunity_store,
     event_derivatives_crowding,
@@ -1337,6 +1338,21 @@ def _source_activation_plan_lines(
         f"- Live-provider activation readiness: {readiness_label}",
         "- Recommended next activation order: " + ("; ".join(top) if top else "none"),
     ]
+    if base is not None:
+        coinalyze_json = base / event_coinalyze_preflight.PREFLIGHT_JSON
+        coinalyze_md = base / event_coinalyze_preflight.PREFLIGHT_MD
+        if coinalyze_json.exists():
+            try:
+                payload = json.loads(coinalyze_json.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                payload = {}
+            status = str(payload.get("preflight_status") or "unreadable")
+            lines.append(
+                "- Coinalyze preflight: "
+                f"{status} ({event_artifact_paths.artifact_display_path(coinalyze_md)})"
+            )
+        else:
+            lines.append("- Coinalyze preflight: not written yet (make event-alpha-coinalyze-preflight PROFILE=notify_llm_deep)")
     if readiness_md is None or not readiness_md.exists():
         lines.append("- Readiness command: make event-alpha-live-provider-readiness PROFILE=notify_llm_deep")
     return lines

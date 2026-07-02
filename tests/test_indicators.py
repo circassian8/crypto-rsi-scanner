@@ -308,6 +308,42 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "RSI_EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_RUN_LIMIT=8" in cryptopanic_rehearsal_dry
     assert "RSI_EVENT_DISCOVERY_CRYPTOPANIC_MAX_PAGES_PER_QUERY=1" in cryptopanic_rehearsal_dry
     assert "event-alpha-telegram-send-one-cycle" not in cryptopanic_rehearsal_dry
+    coinalyze_preflight_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-coinalyze-preflight", "PROFILE=notify_llm_deep", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-coinalyze-preflight --event-alpha-profile notify_llm_deep" in coinalyze_preflight_dry
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in coinalyze_preflight_dry
+    assert "--event-alpha-coinalyze-allow-live-preflight" not in coinalyze_preflight_dry
+    coinalyze_smoke_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-coinalyze-preflight-smoke", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-coinalyze-preflight-smoke --event-alpha-profile fixture" in coinalyze_smoke_dry
+    assert "RSI_EVENT_DISCOVERY_COINALYZE_API_KEY=" in coinalyze_smoke_dry
+    assert "--event-alpha-coinalyze-allow-live-preflight" not in coinalyze_smoke_dry
+    notify_preview_from_artifacts_dry = subprocess.check_output(
+        [
+            "make",
+            "-n",
+            "event-alpha-notify-preview-from-artifacts",
+            "PROFILE=notify_llm_deep",
+            "ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal",
+            "PYTHON=python3",
+        ],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-notify-preview-from-artifacts --event-alpha-profile notify_llm_deep" in notify_preview_from_artifacts_dry
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in notify_preview_from_artifacts_dry
+    known_stale_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-mark-known-stale-namespaces", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-mark-known-stale-namespaces" in known_stale_dry
     assert "check-python:" in makefile
     assert "bootstrap:" in makefile
     assert "python3 -m venv .venv" in makefile
@@ -366,6 +402,16 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
             zipped_ts = datetime(*zf.getinfo("Makefile").date_time).timestamp()
         assert zipped_ts <= now_ts + 2
         assert zipped_ts < future_ts - 3600
+        original_epoch = os.environ.get("SOURCE_DATE_EPOCH")
+        os.environ["SOURCE_DATE_EPOCH"] = "315619200"
+        try:
+            safe_ts = export_module._safe_export_timestamp(now_ts=now_ts)
+        finally:
+            if original_epoch is None:
+                os.environ.pop("SOURCE_DATE_EPOCH", None)
+            else:
+                os.environ["SOURCE_DATE_EPOCH"] = original_epoch
+        assert safe_ts == 315619200
 
     verify_dry = subprocess.run(
         ["make", "-n", "verify", "PYTHON=python3"],
@@ -1256,6 +1302,101 @@ def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor
         assert unsafe.live_provider_readiness_live_calls_allowed_in_smoke >= 1
         assert unsafe.live_provider_readiness_configured_missing_env == 1
         assert unsafe.live_provider_readiness_secret_leak == 1
+        assert unsafe.status == "BLOCKED"
+
+
+def test_event_alpha_artifact_doctor_scopes_readiness_to_claimed_provider_namespaces():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        no_claim = event_alpha_artifact_doctor.diagnose_artifacts(
+            source_coverage_report_path=base / "event_alpha_source_coverage.md",
+            profile="fixture",
+            artifact_namespace="notification_format_smoke",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert no_claim.source_coverage_report_missing == 0
+        assert no_claim.live_provider_readiness_missing == 0
+
+        (base / "event_integrated_radar_candidates.jsonl").write_text("", encoding="utf-8")
+        claimed = event_alpha_artifact_doctor.diagnose_artifacts(
+            source_coverage_report_path=base / "event_alpha_source_coverage.md",
+            profile="fixture",
+            artifact_namespace="integrated_radar_smoke",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert claimed.source_coverage_report_missing == 1
+        assert claimed.live_provider_readiness_missing == 1
+
+
+def test_event_alpha_coinalyze_preflight_smoke_artifacts_are_safe_and_doctor_checked():
+    import json
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_coinalyze_preflight
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        report = event_coinalyze_preflight.build_preflight_report(
+            namespace_dir=base,
+            smoke_mode=True,
+            allow_live_preflight=False,
+            now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+        )
+        json_path, md_path = event_coinalyze_preflight.write_preflight_artifacts(report, base)
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        assert payload["provider"] == "coinalyze"
+        assert payload["category"] == "derivatives_oi_funding"
+        assert payload["smoke_mode"] is True
+        assert payload["live_call_allowed"] is False
+        assert payload["env_vars_required"] == ["RSI_EVENT_DISCOVERY_COINALYZE_API_KEY"]
+        assert payload["fixture_parser_status"] == "pass"
+        assert payload["fixture_symbol_mapping_status"] == "pass"
+        assert "open_interest" in payload["supported_metrics"]
+        assert "FADE_SHORT_REVIEW" in ", ".join(payload["lanes_enabled_if_healthy"])
+        assert "No provider network calls" in md_path.read_text(encoding="utf-8")
+        assert event_coinalyze_preflight.artifact_conflicts(base) == {
+            "coinalyze_preflight_secret_leak": 0,
+            "coinalyze_preflight_live_call_allowed_in_smoke": 0,
+            "coinalyze_preflight_configured_missing_env": 0,
+            "coinalyze_preflight_ready_without_request_ledger": 0,
+            "coinalyze_preflight_missing_fixture_parser_status": 0,
+            "coinalyze_preflight_forbidden_side_effect_claim": 0,
+        }
+        clean = event_alpha_artifact_doctor.diagnose_artifacts(
+            profile="fixture",
+            artifact_namespace="coinalyze_preflight_smoke",
+            source_coverage_report_path=base / "event_alpha_source_coverage.md",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert clean.coinalyze_preflight_live_call_allowed_in_smoke == 0
+        assert clean.coinalyze_preflight_missing_fixture_parser_status == 0
+
+        payload["live_call_allowed"] = True
+        payload["configured"] = True
+        payload["fixture_parser_status"] = ""
+        payload["safety_notes"] = ["send Telegram and execute order"]
+        json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        with md_path.open("a", encoding="utf-8") as fh:
+            fh.write("api_key='THIS_IS_A_TEST_SECRET_VALUE_123456'\n")
+        conflicts = event_coinalyze_preflight.artifact_conflicts(base)
+        assert conflicts["coinalyze_preflight_secret_leak"] == 1
+        assert conflicts["coinalyze_preflight_live_call_allowed_in_smoke"] == 1
+        assert conflicts["coinalyze_preflight_missing_fixture_parser_status"] == 1
+        assert conflicts["coinalyze_preflight_forbidden_side_effect_claim"] == 1
+        unsafe = event_alpha_artifact_doctor.diagnose_artifacts(
+            profile="fixture",
+            artifact_namespace="coinalyze_preflight_smoke",
+            source_coverage_report_path=base / "event_alpha_source_coverage.md",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert unsafe.coinalyze_preflight_secret_leak == 1
+        assert unsafe.coinalyze_preflight_live_call_allowed_in_smoke == 1
+        assert unsafe.coinalyze_preflight_missing_fixture_parser_status == 1
         assert unsafe.status == "BLOCKED"
 
 
@@ -26225,6 +26366,36 @@ def test_event_alpha_research_review_digest_surfaces_near_misses_without_alertin
         assert rows[-1]["skipped_reason_counts"]["max_items"] == 1
         assert rows[-1]["skipped_candidates_sample"][0]["skip_reason"] == "max_items"
         assert rows[-1]["skipped_family_summary"][0]["skipped_count"] == 1
+        assert rows[-1]["rendered_candidate_ids"] == [decision.alert_id]
+        assert rows[-1]["rendered_core_opportunity_ids"] == ["agg:doge-research-review"]
+        assert rows[-1]["skipped_family_count"] == 1
+
+        preview_writer = notif._DeliveryWriter(  # noqa: SLF001
+            dcfg,
+            run_id="run-preview-from-artifacts",
+            profile="notify_llm_deep",
+            namespace=namespace,
+            now=now,
+        )
+        notif.write_notification_plan_preview(
+            plan,
+            writer=preview_writer,
+            profile="notify_llm_deep",
+            cfg=cfg,
+            record_delivery_rows=True,
+            delivery_row_not_written_reason="preview_command",
+        )
+        preview_rows = delivery.load_delivery_records(dcfg.path)
+        preview_row = preview_rows[-1]
+        assert preview_row["run_id"] == "run-preview-from-artifacts"
+        assert preview_row["lane"] == notif.LANE_RESEARCH_REVIEW_DIGEST
+        assert preview_row["delivery_mode"] == delivery.DELIVERY_MODE_PREVIEW_ONLY
+        assert preview_row["channel_summary"]["skipped_reason_counts"]["max_items"] == 1
+        assert preview_row["skipped_candidate_count"] == 1
+        assert preview_writer.preview_path.exists()
+        preview_text = preview_writer.preview_path.read_text(encoding="utf-8")
+        assert "preview_only: false" in preview_text
+        assert "delivery_row_not_written_reason: none" in preview_text
 
 
 def test_event_alpha_research_review_digest_policy_excludes_controls_and_strict_alerts():
@@ -26299,6 +26470,8 @@ def test_event_alpha_research_review_skipped_sample_dedupes_by_family():
     by_family = {row["candidate_family_id"]: row for row in summary}
     assert by_family["world-cup:chiliz"]["skipped_count"] == 8
     assert by_family["spacex:velvet"]["skipped_count"] == 1
+    display = notif._research_review_skipped_family_display(summary, limit=2)  # noqa: SLF001
+    assert {row["candidate_family_id"] for row in display} == {"world-cup:chiliz", "spacex:velvet"}
 
 
 def test_event_alpha_research_review_digest_inbox_and_doctor_checks():
@@ -26511,14 +26684,50 @@ def test_event_alpha_research_review_digest_inbox_and_doctor_checks():
         assert missing_family_result.research_review_digest_missing_family_summary == 1
         assert missing_family_result.status == "BLOCKED"
 
+        missing_reason_counts = {
+            **rows[-1],
+            "run_id": "run-missing-reason-counts",
+            "channel_summary": {
+                "rendered_candidate_count": 1,
+                "eligible_candidate_count": 2,
+                "skipped_candidate_count": 1,
+                "skipped_candidates_sample": [{"symbol": "VELVET", "coin_id": "velvet", "skip_reason": "max_items"}],
+                "skipped_family_summary": [{"candidate_family_id": "spacex:velvet", "skipped_count": 1}],
+            },
+            "skipped_candidate_count": 1,
+            "skipped_reason_counts": {},
+            "skipped_candidates_sample": [{"symbol": "VELVET", "coin_id": "velvet", "skip_reason": "max_items"}],
+            "skipped_family_summary": [{"candidate_family_id": "spacex:velvet", "skipped_count": 1}],
+        }
+        missing_reason_result = doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-missing-reason-counts",
+                "profile": "fixture",
+                "artifact_namespace": namespace,
+                "run_mode": "test",
+            }],
+            delivery_rows=[missing_reason_counts],
+            core_opportunity_rows=[core_row],
+            profile="fixture",
+            artifact_namespace=namespace,
+            include_test_artifacts=True,
+            strict=True,
+            delivery_strict_scope="latest_run",
+        )
+        assert missing_reason_result.research_review_digest_skipped_without_reason == 1
+        assert missing_reason_result.status == "BLOCKED"
+
 
 def test_event_alpha_artifact_doctor_short_circuits_stale_namespace_marker():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_namespace_status
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_namespace_status, event_alpha_send_readiness
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
         namespace_dir = base / "notify_llm_deep"
+        preview = namespace_dir / "event_alpha_notification_preview.md"
+        preview.parent.mkdir(parents=True, exist_ok=True)
+        preview.write_text("send guard: no-send rehearsal\n", encoding="utf-8")
         marker = event_alpha_namespace_status.mark_namespace_stale(
             namespace_dir,
             namespace="notify_llm_deep",
@@ -26537,6 +26746,7 @@ def test_event_alpha_artifact_doctor_short_circuits_stale_namespace_marker():
         assert result.status == "STALE"
         assert result.namespace_stale_deprecated == 1
         assert result.namespace_superseded_by == "notify_llm_deep_rehearsal"
+        assert "safe_for_send_readiness: false" in "\n".join(result.warnings)
         included = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=[{"run_id": "old", "profile": "notify_llm_deep", "artifact_namespace": "notify_llm_deep", "run_mode": "burn_in"}],
             source_coverage_report_path=namespace_dir / "event_alpha_source_coverage.md",
@@ -26549,6 +26759,28 @@ def test_event_alpha_artifact_doctor_short_circuits_stale_namespace_marker():
         plan = event_alpha_namespace_status.stale_namespace_plan(namespace_dir)
         assert plan["dry_run_only"] is True
         assert plan["file_count"] >= 1
+        readiness = event_alpha_send_readiness.build_send_readiness(
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep",
+            run_rows=[{
+                "run_id": "old",
+                "profile": "notify_llm_deep",
+                "artifact_namespace": "notify_llm_deep",
+                "run_mode": "burn_in",
+                "cycle_completed": True,
+                "success": True,
+            }],
+            core_opportunity_rows=[],
+            alert_rows=[],
+            delivery_rows=[],
+            artifact_doctor=included,
+            send_guard_enabled=False,
+            telegram_ready=False,
+            preview_path=preview,
+            include_legacy_artifacts=True,
+        )
+        assert readiness.ready is False
+        assert any("stale/deprecated" in item for item in readiness.blockers)
 
 
 def test_event_alpha_artifact_doctor_blocks_research_review_body_not_using_canonical_core():

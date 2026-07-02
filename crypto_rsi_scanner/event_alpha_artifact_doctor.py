@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -198,6 +198,12 @@ class EventAlphaArtifactDoctorResult:
     live_provider_readiness_secret_leak: int = 0
     live_provider_readiness_live_calls_allowed_in_smoke: int = 0
     live_provider_readiness_configured_missing_env: int = 0
+    coinalyze_preflight_secret_leak: int = 0
+    coinalyze_preflight_live_call_allowed_in_smoke: int = 0
+    coinalyze_preflight_configured_missing_env: int = 0
+    coinalyze_preflight_ready_without_request_ledger: int = 0
+    coinalyze_preflight_missing_fixture_parser_status: int = 0
+    coinalyze_preflight_forbidden_side_effect_claim: int = 0
     source_pack_provider_status_missing: int = 0
     missing_provider_recommendations_missing: int = 0
     degraded_provider_absence_marked_meaningful: int = 0
@@ -908,6 +914,7 @@ def diagnose_artifacts(
     source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
     source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
     live_provider_readiness_conflicts = _live_provider_readiness_conflicts(namespace_dir)
+    coinalyze_preflight_conflicts = event_coinalyze_preflight.artifact_conflicts(namespace_dir)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
         acquisition_rows=acquisition_rows,
         core_rows=core_rows,
@@ -1318,6 +1325,19 @@ def diagnose_artifacts(
         "live_provider_readiness_configured_missing_env",
     ):
         count = live_provider_readiness_conflicts.get(key, 0)
+        if not count:
+            continue
+        message = f"{key}={count}"
+        (blockers if strict else warnings).append(message)
+    for key in (
+        "coinalyze_preflight_secret_leak",
+        "coinalyze_preflight_live_call_allowed_in_smoke",
+        "coinalyze_preflight_configured_missing_env",
+        "coinalyze_preflight_ready_without_request_ledger",
+        "coinalyze_preflight_missing_fixture_parser_status",
+        "coinalyze_preflight_forbidden_side_effect_claim",
+    ):
+        count = coinalyze_preflight_conflicts.get(key, 0)
         if not count:
             continue
         message = f"{key}={count}"
@@ -2032,6 +2052,22 @@ def diagnose_artifacts(
         ],
         live_provider_readiness_configured_missing_env=live_provider_readiness_conflicts[
             "live_provider_readiness_configured_missing_env"
+        ],
+        coinalyze_preflight_secret_leak=coinalyze_preflight_conflicts["coinalyze_preflight_secret_leak"],
+        coinalyze_preflight_live_call_allowed_in_smoke=coinalyze_preflight_conflicts[
+            "coinalyze_preflight_live_call_allowed_in_smoke"
+        ],
+        coinalyze_preflight_configured_missing_env=coinalyze_preflight_conflicts[
+            "coinalyze_preflight_configured_missing_env"
+        ],
+        coinalyze_preflight_ready_without_request_ledger=coinalyze_preflight_conflicts[
+            "coinalyze_preflight_ready_without_request_ledger"
+        ],
+        coinalyze_preflight_missing_fixture_parser_status=coinalyze_preflight_conflicts[
+            "coinalyze_preflight_missing_fixture_parser_status"
+        ],
+        coinalyze_preflight_forbidden_side_effect_claim=coinalyze_preflight_conflicts[
+            "coinalyze_preflight_forbidden_side_effect_claim"
         ],
         source_pack_provider_status_missing=source_coverage_conflicts["source_pack_provider_status_missing"],
         missing_provider_recommendations_missing=source_coverage_conflicts["missing_provider_recommendations_missing"],
@@ -4061,7 +4097,8 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
         return out
     report_path = Path(path)
     if not report_path.exists():
-        out["source_coverage_report_missing"] = 1
+        if _source_coverage_report_required(report_path.parent):
+            out["source_coverage_report_missing"] = 1
         return out
     try:
         text = report_path.read_text(encoding="utf-8")
@@ -4166,7 +4203,8 @@ def _live_provider_readiness_conflicts(namespace_dir: str | Path | None) -> dict
     json_path = base / event_live_provider_readiness.READINESS_JSON
     md_path = base / event_live_provider_readiness.READINESS_MD
     if not json_path.exists() and not md_path.exists():
-        out["live_provider_readiness_missing"] = 1
+        if _live_provider_readiness_required(base):
+            out["live_provider_readiness_missing"] = 1
         return out
     texts: list[str] = []
     for path in (json_path, md_path):
@@ -4206,6 +4244,37 @@ def _text_has_secret_like_value(text: str) -> bool:
         r"(?i)(api[_-]?key|secret|token)\s+[A-Za-z0-9._-]{24,}",
     )
     return any(re.search(pattern, text) for pattern in patterns)
+
+
+def _source_coverage_report_required(namespace_dir: Path) -> bool:
+    """Return true for namespaces that claim source/evidence/provider coverage."""
+
+    required_markers = (
+        "event_integrated_radar_candidates.jsonl",
+        "event_evidence_acquisition.jsonl",
+        "event_live_provider_activation_readiness.json",
+        "event_live_provider_activation_readiness.md",
+        "event_coinalyze_preflight.json",
+        "event_coinalyze_preflight.md",
+        "cryptopanic_request_ledger.jsonl",
+    )
+    return any((namespace_dir / name).exists() for name in required_markers)
+
+
+def _live_provider_readiness_required(namespace_dir: Path) -> bool:
+    """Pure notification-format smoke namespaces do not claim live-provider readiness."""
+
+    if (namespace_dir / "event_live_provider_activation_readiness.json").exists():
+        return True
+    if (namespace_dir / "event_live_provider_activation_readiness.md").exists():
+        return True
+    required_markers = (
+        "event_alpha_source_coverage.json",
+        "event_integrated_radar_candidates.jsonl",
+        "event_coinalyze_preflight.json",
+        "event_coinalyze_preflight.md",
+    )
+    return any((namespace_dir / name).exists() for name in required_markers)
 
 
 def _cryptopanic_artifact_conflicts(
@@ -4835,17 +4904,7 @@ def _notification_delivery_conflicts(
                     else []
                 )
                 has_reason_counts = isinstance(reason_counts, Mapping) and any(str(key).strip() for key in reason_counts)
-                has_item_reasons = isinstance(skipped_items, list) and all(
-                    isinstance(item, Mapping) and str(item.get("skip_reason") or "").strip()
-                    for item in skipped_items
-                )
-                body_has_skipped_reasons = ("Skipped candidate families" in telegram_body or "Skipped raw sample" in telegram_body) and bool(
-                    re.search(
-                        r"(?im)^\s*-\s*.+:\s*(max_items|lower_rank|duplicate_family|cooldown|stale|missing_card|hard_gated|quality_blocked|suppressed_duplicate|already_represented)",
-                        telegram_body,
-                    )
-                )
-                if not (has_reason_counts or has_item_reasons or body_has_skipped_reasons):
+                if not has_reason_counts:
                     out["research_review_digest_skipped_without_reason"] += 1
                 has_family_summary = isinstance(family_summary, list) and any(
                     isinstance(item, Mapping) and str(item.get("candidate_family_id") or item.get("label") or "").strip()
@@ -4853,6 +4912,34 @@ def _notification_delivery_conflicts(
                 )
                 if skipped_count > 10 and not has_family_summary:
                     out["research_review_digest_missing_family_summary"] += 1
+                if re.search(r"(?im)\+\d+\s+more skipped candidates", telegram_body) and not has_family_summary:
+                    out["research_review_digest_missing_family_summary"] += 1
+                if has_family_summary:
+                    family_keys = {
+                        str(item.get("candidate_family_id") or item.get("label") or "").strip()
+                        for item in family_summary
+                        if isinstance(item, Mapping)
+                    }
+                    material_missing = [
+                        item for item in skipped_items
+                        if isinstance(item, Mapping)
+                        and (
+                            _as_int(item.get("skipped_count")) >= 10
+                            or _as_float(item.get("score") or item.get("rank_score")) >= 60
+                        )
+                        and str(
+                            item.get("candidate_family_id")
+                            or f"{item.get('symbol')}/{item.get('coin_id')}"
+                            or ""
+                        ).strip()
+                        and str(
+                            item.get("candidate_family_id")
+                            or f"{item.get('symbol')}/{item.get('coin_id')}"
+                            or ""
+                        ).strip() not in family_keys
+                    ]
+                    if material_missing:
+                        out["research_review_digest_missing_family_summary"] += 1
             if core_ids:
                 body_lower = telegram_body.casefold()
                 card_paths = _tuple_value(row.get("canonical_card_paths")) or _tuple_value(row.get("canonical_card_path"))
@@ -5154,6 +5241,13 @@ def _as_int(value: Any) -> int:
         return int(value or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def _as_float(value: Any) -> float:
+    try:
+        return float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _normalize_delivery_strict_scope(
@@ -6028,6 +6122,12 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"live_provider_readiness_secret_leak={result.live_provider_readiness_secret_leak} "
             f"live_provider_readiness_live_calls_allowed_in_smoke={result.live_provider_readiness_live_calls_allowed_in_smoke} "
             f"live_provider_readiness_configured_missing_env={result.live_provider_readiness_configured_missing_env} "
+            f"coinalyze_preflight_secret_leak={result.coinalyze_preflight_secret_leak} "
+            f"coinalyze_preflight_live_call_allowed_in_smoke={result.coinalyze_preflight_live_call_allowed_in_smoke} "
+            f"coinalyze_preflight_configured_missing_env={result.coinalyze_preflight_configured_missing_env} "
+            f"coinalyze_preflight_ready_without_request_ledger={result.coinalyze_preflight_ready_without_request_ledger} "
+            f"coinalyze_preflight_missing_fixture_parser_status={result.coinalyze_preflight_missing_fixture_parser_status} "
+            f"coinalyze_preflight_forbidden_side_effect_claim={result.coinalyze_preflight_forbidden_side_effect_claim} "
             f"source_pack_provider_status_missing={result.source_pack_provider_status_missing} "
             f"missing_provider_recommendations_missing={result.missing_provider_recommendations_missing} "
             f"degraded_provider_absence_marked_meaningful={result.degraded_provider_absence_marked_meaningful} "
