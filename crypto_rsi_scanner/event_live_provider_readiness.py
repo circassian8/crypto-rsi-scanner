@@ -289,6 +289,7 @@ def format_readiness_report(report: LiveProviderReadinessReport) -> str:
 
 def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[LiveProviderReadinessProvider]:
     coinalyze_history = _coinalyze_history(artifact_namespace)
+    bybit_history = _bybit_announcements_history(artifact_namespace)
     rows = (
         _row(
             "coinalyze",
@@ -335,27 +336,44 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
             category="official_exchange",
             priority_rank=2,
             env_vars=(),
-            configured=bool(config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE),
+            configured=True,
             live_enabled=bool(config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE),
             fixture_path=getattr(config, "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH", None),
-            source_packs=("official_perp_listing_pack", "listing_liquidity_pack"),
+            source_packs=("official_exchange_listing_pack", "official_perp_listing_pack", "official_exchange_risk_pack", "listing_liquidity_pack"),
             lanes=("EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH", "RISK_ONLY"),
-            quota="public endpoint; per-run limit and timeout; disabled in smoke",
-            outputs=("event_official_exchange_candidates.jsonl",),
-            ledger=None,
-            status_if_missing="disabled",
+            quota="public endpoint; explicit allow flag/env, no-send mode, max page/limit budget, and request ledger required",
+            outputs=(
+                "event_bybit_announcements_preflight.json",
+                "event_bybit_announcements_preflight.md",
+                "event_bybit_announcements_request_ledger.jsonl",
+                "event_bybit_announcements_rehearsal_report.json",
+                "event_bybit_announcements_rehearsal_report.md",
+                "event_exchange_announcements.jsonl",
+                "event_official_exchange_events.jsonl",
+                "event_official_listing_candidates.jsonl",
+            ),
+            ledger=bybit_history["latest_request_ledger_path"],
+            status_if_missing="config_ready_no_live",
             smoke_mode=smoke_mode,
             sidecar_fixture_available=True,
-            smoke_targets=("event-alpha-official-exchange-smoke",),
-            fixture_artifacts=("event_official_exchange_events.jsonl", "event_official_listing_candidates.jsonl"),
-            next_safe_command="make event-alpha-official-exchange-smoke PYTHON=python3",
-            no_send_rehearsal_command="make event-alpha-official-exchange-smoke PYTHON=python3",
-            max_requests_per_run=20,
-            weekly_or_daily_budget="public endpoint; bounded per-run requests",
-            timeout_seconds=20,
+            smoke_targets=("event-alpha-bybit-announcements-preflight-smoke", "event-alpha-official-exchange-smoke"),
+            fixture_artifacts=("event_bybit_announcements_preflight.json", "event_official_exchange_events.jsonl", "event_official_listing_candidates.jsonl"),
+            next_safe_command="make event-alpha-bybit-announcements-preflight PROFILE=notify_llm_deep PYTHON=python3",
+            no_send_rehearsal_command="make event-alpha-bybit-announcements-no-send-rehearsal PROFILE=notify_llm_deep PYTHON=python3",
+            max_requests_per_run=3,
+            weekly_or_daily_budget="bounded public endpoint rehearsal; default no-call; ledger mandatory when live_call_allowed=true",
+            timeout_seconds=int(config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_TIMEOUT or 10),
             cache_ttl_seconds=900,
             provider_health_key="bybit_announcements",
             lanes_blocked_without_market=("CONFIRMED_LONG_RESEARCH",),
+            latest_preflight_status=bybit_history["latest_preflight_status"],
+            latest_rehearsal_status=bybit_history["latest_rehearsal_status"],
+            latest_request_ledger_path=bybit_history["latest_request_ledger_path"],
+            latest_provider_health_status=bybit_history["latest_provider_health_status"],
+            latest_rehearsal_generated_at=bybit_history["latest_rehearsal_generated_at"],
+            latest_snapshots_written=bybit_history["latest_snapshots_written"],
+            latest_budget_used=bybit_history["latest_budget_used"],
+            activation_phase_override=bybit_history["activation_phase"],
         ),
         _row(
             "binance_announcements_public_or_fixture",
@@ -648,6 +666,41 @@ def _coinalyze_history(artifact_namespace: str) -> dict[str, Any]:
         "latest_provider_health_status": str(rehearsal.get("provider_health_status") or "not_observed"),
         "latest_rehearsal_generated_at": str(rehearsal.get("generated_at") or "") or None,
         "latest_snapshots_written": int(rehearsal.get("snapshots_written") or 0),
+        "latest_budget_used": int(rehearsal.get("requests_used") or 0),
+        "activation_phase": activation_phase,
+    }
+
+
+def _bybit_announcements_history(artifact_namespace: str) -> dict[str, Any]:
+    from . import event_bybit_announcements_preflight
+
+    base = Path(getattr(config, "EVENT_ALPHA_ARTIFACT_BASE_DIR", "event_fade_cache")).expanduser()
+    namespace_dir = base / str(artifact_namespace or "default")
+    preflight = _read_json(namespace_dir / event_bybit_announcements_preflight.PREFLIGHT_JSON)
+    rehearsal = _read_json(namespace_dir / event_bybit_announcements_preflight.REHEARSAL_JSON)
+    ledger = namespace_dir / event_bybit_announcements_preflight.REQUEST_LEDGER
+    status = str(rehearsal.get("status") or "not_generated")
+    if status == "live_call_blocked_by_default":
+        activation_phase = "config_ready_no_live"
+    elif status == "live_rehearsal_success":
+        activation_phase = "live_rehearsal_success"
+    elif status == "live_rehearsal_no_results":
+        activation_phase = "observed_no_results"
+    elif status == "live_rehearsal_partial":
+        activation_phase = "live_rehearsal_partial"
+    elif status in {"auth_or_access_error", "rate_limited", "provider_unavailable"}:
+        activation_phase = status
+    elif status and status != "not_generated" and status.startswith("blocked"):
+        activation_phase = "blocked"
+    else:
+        activation_phase = str(preflight.get("preflight_status") or "config_ready_no_live")
+    return {
+        "latest_preflight_status": str(preflight.get("preflight_status") or "not_generated"),
+        "latest_rehearsal_status": activation_phase if status == "not_generated" else status,
+        "latest_request_ledger_path": event_artifact_paths.artifact_display_path(ledger) if ledger.exists() else None,
+        "latest_provider_health_status": str(rehearsal.get("provider_health_status") or "not_observed"),
+        "latest_rehearsal_generated_at": str(rehearsal.get("generated_at") or "") or None,
+        "latest_snapshots_written": int(rehearsal.get("official_events_written") or rehearsal.get("announcements_inspected") or 0),
         "latest_budget_used": int(rehearsal.get("requests_used") or 0),
         "activation_phase": activation_phase,
     }

@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_artifact_paths, event_coinalyze_preflight, event_provider_health, event_provider_status, event_source_packs
+from . import event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_provider_health, event_provider_status, event_source_packs
 from .event_providers import cryptopanic as cryptopanic_provider
 
 
@@ -227,6 +227,16 @@ class EventAlphaSourceCoverageReport:
     coinalyze_requests_used: int = 0
     coinalyze_snapshots_written: int = 0
     coinalyze_supported_metric_status: Mapping[str, str] | None = None
+    bybit_announcements_preflight_status: str = "not_generated"
+    bybit_announcements_preflight_json_path: str | None = None
+    bybit_announcements_preflight_report_path: str | None = None
+    bybit_announcements_rehearsal_status: str = "not_generated"
+    bybit_announcements_rehearsal_report_path: str | None = None
+    bybit_announcements_request_ledger_path: str | None = None
+    bybit_announcements_provider_health_status: str = "not_observed"
+    bybit_announcements_requests_used: int = 0
+    bybit_announcements_official_events_written: int = 0
+    bybit_announcements_official_listing_candidates_written: int = 0
     category_priorities: tuple[Mapping[str, Any], ...] = SOURCE_COVERAGE_CATEGORY_PRIORITIES
 
     def to_dict(self) -> dict[str, Any]:
@@ -263,6 +273,16 @@ class EventAlphaSourceCoverageReport:
             "coinalyze_requests_used": self.coinalyze_requests_used,
             "coinalyze_snapshots_written": self.coinalyze_snapshots_written,
             "coinalyze_supported_metric_status": dict(self.coinalyze_supported_metric_status or {}),
+            "bybit_announcements_preflight_status": self.bybit_announcements_preflight_status,
+            "bybit_announcements_preflight_json_path": self.bybit_announcements_preflight_json_path,
+            "bybit_announcements_preflight_report_path": self.bybit_announcements_preflight_report_path,
+            "bybit_announcements_rehearsal_status": self.bybit_announcements_rehearsal_status,
+            "bybit_announcements_rehearsal_report_path": self.bybit_announcements_rehearsal_report_path,
+            "bybit_announcements_request_ledger_path": self.bybit_announcements_request_ledger_path,
+            "bybit_announcements_provider_health_status": self.bybit_announcements_provider_health_status,
+            "bybit_announcements_requests_used": self.bybit_announcements_requests_used,
+            "bybit_announcements_official_events_written": self.bybit_announcements_official_events_written,
+            "bybit_announcements_official_listing_candidates_written": self.bybit_announcements_official_listing_candidates_written,
             "category_priorities": [
                 {
                     "category_priority_rank": idx + 1,
@@ -318,8 +338,18 @@ def build_source_coverage_report(
         artifact_namespace=artifact_namespace,
         health_by_provider=raw_health_by_provider,
     )
+    bybit_stats = _bybit_announcements_artifact_stats(
+        artifact_namespace_dir=artifact_namespace_dir,
+        artifact_namespace=artifact_namespace,
+        health_by_provider=raw_health_by_provider,
+    )
     cryptopanic_effectively_healthy = cryptopanic_stats["coverage_status"] in {
         "observed_healthy",
+        "observed_partial_success",
+    }
+    bybit_effectively_healthy = bybit_stats["provider_health_status"] in {
+        "observed_healthy",
+        "observed_no_results",
         "observed_partial_success",
     }
     provider_status_overrides: dict[str, str] = {}
@@ -328,6 +358,10 @@ def build_source_coverage_report(
             "degraded" if cryptopanic_stats["failed_requests"] else "healthy"
         )
         health_by_provider["cryptopanic"] = provider_status_overrides["cryptopanic"]
+    if bybit_effectively_healthy:
+        provider_status_overrides["bybit_announcements"] = "healthy"
+        health_by_provider["bybit_announcements"] = "healthy"
+        configured.add("bybit_announcements")
 
     packs: list[EventAlphaSourceCoveragePack] = []
     for pack_name in SOURCE_COVERAGE_PACK_ORDER:
@@ -447,6 +481,16 @@ def build_source_coverage_report(
         coinalyze_requests_used=int(coinalyze_stats["requests_used"]),
         coinalyze_snapshots_written=int(coinalyze_stats["snapshots_written"]),
         coinalyze_supported_metric_status=coinalyze_stats["supported_metric_status"],
+        bybit_announcements_preflight_status=bybit_stats["preflight_status"],
+        bybit_announcements_preflight_json_path=bybit_stats["preflight_json_path"],
+        bybit_announcements_preflight_report_path=bybit_stats["preflight_report_path"],
+        bybit_announcements_rehearsal_status=bybit_stats["rehearsal_status"],
+        bybit_announcements_rehearsal_report_path=bybit_stats["rehearsal_report_path"],
+        bybit_announcements_request_ledger_path=bybit_stats["request_ledger_path"],
+        bybit_announcements_provider_health_status=bybit_stats["provider_health_status"],
+        bybit_announcements_requests_used=int(bybit_stats["requests_used"]),
+        bybit_announcements_official_events_written=int(bybit_stats["official_events_written"]),
+        bybit_announcements_official_listing_candidates_written=int(bybit_stats["official_listing_candidates_written"]),
     )
 
 
@@ -545,6 +589,29 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         )
     else:
         lines.append("- Coinalyze rehearsal: not generated")
+    if report.bybit_announcements_preflight_report_path and report.bybit_announcements_preflight_json_path:
+        lines.append(f"- Bybit announcements preflight: {report.bybit_announcements_preflight_status}")
+        lines.append(f"- Bybit announcements preflight report: {report.bybit_announcements_preflight_report_path}")
+        lines.append(f"- Bybit announcements preflight JSON: {report.bybit_announcements_preflight_json_path}")
+    else:
+        lines.append("- Bybit announcements preflight: not generated")
+        lines.append(
+            "- command: make event-alpha-bybit-announcements-preflight ARTIFACT_NAMESPACE="
+            f"{report.artifact_namespace} PROFILE={report.profile} PYTHON=python3"
+        )
+    if report.bybit_announcements_rehearsal_report_path:
+        lines.append(f"- Bybit announcements rehearsal: {report.bybit_announcements_rehearsal_status}")
+        lines.append(f"- Bybit announcements rehearsal report: {report.bybit_announcements_rehearsal_report_path}")
+        if report.bybit_announcements_request_ledger_path:
+            lines.append(f"- Bybit announcements request ledger: {report.bybit_announcements_request_ledger_path}")
+        lines.append(f"- Bybit announcements provider health: {report.bybit_announcements_provider_health_status}")
+        lines.append(
+            f"- Bybit announcements rehearsal counters: requests_used={report.bybit_announcements_requests_used} "
+            f"official_events_written={report.bybit_announcements_official_events_written} "
+            f"official_listing_candidates_written={report.bybit_announcements_official_listing_candidates_written}"
+        )
+    else:
+        lines.append("- Bybit announcements rehearsal: not generated")
     lines.extend(
         [
             "- command: make event-alpha-live-provider-readiness PROFILE="
@@ -613,6 +680,34 @@ def _coinalyze_metric_status_line(status: Mapping[str, str] | None) -> str:
     )
     parts = [f"{metric}={status.get(metric)}" for metric in metrics if status.get(metric)]
     return ", ".join(parts) if parts else "none"
+
+
+def _bybit_announcements_artifact_stats(
+    *,
+    artifact_namespace_dir: str | Path | None,
+    artifact_namespace: str,
+    health_by_provider: Mapping[str, str],
+) -> dict[str, Any]:
+    base = Path(artifact_namespace_dir).expanduser() if artifact_namespace_dir is not None else _namespace_dir(artifact_namespace)
+    preflight_json = base / event_bybit_announcements_preflight.PREFLIGHT_JSON
+    preflight_md = base / event_bybit_announcements_preflight.PREFLIGHT_MD
+    rehearsal_json = base / event_bybit_announcements_preflight.REHEARSAL_JSON
+    rehearsal_md = base / event_bybit_announcements_preflight.REHEARSAL_MD
+    ledger = base / event_bybit_announcements_preflight.REQUEST_LEDGER
+    preflight_payload = _read_json(preflight_json)
+    rehearsal_payload = _read_json(rehearsal_json)
+    return {
+        "preflight_status": str(preflight_payload.get("preflight_status") or "generated" if preflight_json.exists() else "not_generated"),
+        "preflight_json_path": event_artifact_paths.artifact_display_path(preflight_json) if preflight_json.exists() else None,
+        "preflight_report_path": event_artifact_paths.artifact_display_path(preflight_md) if preflight_md.exists() else None,
+        "rehearsal_status": str(rehearsal_payload.get("status") or "generated" if rehearsal_json.exists() or rehearsal_md.exists() else "not_generated"),
+        "rehearsal_report_path": event_artifact_paths.artifact_display_path(rehearsal_md) if rehearsal_md.exists() else None,
+        "request_ledger_path": event_artifact_paths.artifact_display_path(ledger) if ledger.exists() else None,
+        "provider_health_status": str(rehearsal_payload.get("provider_health_status") or health_by_provider.get("bybit_announcements") or "not_observed"),
+        "requests_used": int(rehearsal_payload.get("requests_used") or 0),
+        "official_events_written": int(rehearsal_payload.get("official_events_written") or 0),
+        "official_listing_candidates_written": int(rehearsal_payload.get("official_listing_candidates_written") or 0),
+    }
 
 
 def _namespace_dir(artifact_namespace: str) -> Path:

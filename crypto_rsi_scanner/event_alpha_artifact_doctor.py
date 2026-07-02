@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -101,6 +101,7 @@ class EventAlphaArtifactDoctorResult:
     official_exchange_secret_leak: int = 0
     official_exchange_delisting_long_research: int = 0
     official_exchange_quote_asset_misclassified: int = 0
+    official_exchange_major_pair_noise_promoted_early_long: int = 0
     official_exchange_created_alert_rows: int = 0
     scheduled_catalyst_rows: int = 0
     unlock_candidate_rows: int = 0
@@ -205,6 +206,7 @@ class EventAlphaArtifactDoctorResult:
     source_coverage_readiness_link_missing: int = 0
     source_coverage_context_provider_ranked_above_lane_critical: int = 0
     source_coverage_coinalyze_missing_linked_artifact: int = 0
+    source_coverage_bybit_announcements_missing_linked_artifact: int = 0
     live_provider_readiness_missing: int = 0
     live_provider_readiness_secret_leak: int = 0
     live_provider_readiness_live_calls_allowed_in_smoke: int = 0
@@ -225,6 +227,14 @@ class EventAlphaArtifactDoctorResult:
     coinalyze_provider_health_healthy_without_successful_ledger: int = 0
     coinalyze_rehearsal_forbidden_side_effect_claim: int = 0
     coinalyze_supported_metric_implemented_missing_state: int = 0
+    bybit_announcements_preflight_secret_leak: int = 0
+    bybit_announcements_preflight_live_call_allowed_in_smoke: int = 0
+    bybit_announcements_preflight_missing_fixture_parser_status: int = 0
+    bybit_announcements_rehearsal_secret_leak: int = 0
+    bybit_announcements_rehearsal_live_without_ledger: int = 0
+    bybit_announcements_rehearsal_live_without_explicit_allow: int = 0
+    bybit_announcements_rehearsal_unsupported_params: int = 0
+    bybit_announcements_rehearsal_forbidden_side_effect_claim: int = 0
     source_pack_provider_status_missing: int = 0
     missing_provider_recommendations_missing: int = 0
     degraded_provider_absence_marked_meaningful: int = 0
@@ -937,6 +947,7 @@ def diagnose_artifacts(
     source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
     live_provider_readiness_conflicts = _live_provider_readiness_conflicts(namespace_dir)
     coinalyze_preflight_conflicts = event_coinalyze_preflight.artifact_conflicts(namespace_dir)
+    bybit_announcements_conflicts = event_bybit_announcements_preflight.artifact_conflicts(namespace_dir)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
         acquisition_rows=acquisition_rows,
         core_rows=core_rows,
@@ -1183,6 +1194,7 @@ def diagnose_artifacts(
         "official_exchange_secret_leak",
         "official_exchange_delisting_long_research",
         "official_exchange_quote_asset_misclassified",
+        "official_exchange_major_pair_noise_promoted_early_long",
         "official_exchange_created_alert_rows",
     ):
         count = official_exchange_conflicts.get(key, 0)
@@ -1352,6 +1364,12 @@ def diagnose_artifacts(
             f"{source_coverage_report_conflicts['source_coverage_coinalyze_missing_linked_artifact']}"
         )
         (blockers if strict else warnings).append(message)
+    if source_coverage_report_conflicts["source_coverage_bybit_announcements_missing_linked_artifact"]:
+        message = (
+            "source_coverage_bybit_announcements_missing_linked_artifact="
+            f"{source_coverage_report_conflicts['source_coverage_bybit_announcements_missing_linked_artifact']}"
+        )
+        (blockers if strict else warnings).append(message)
     if live_provider_readiness_conflicts["live_provider_readiness_missing"]:
         warnings.append(
             "live_provider_readiness_missing="
@@ -1386,6 +1404,21 @@ def diagnose_artifacts(
         "coinalyze_supported_metric_implemented_missing_state",
     ):
         count = coinalyze_preflight_conflicts.get(key, 0)
+        if not count:
+            continue
+        message = f"{key}={count}"
+        (blockers if strict else warnings).append(message)
+    for key in (
+        "bybit_announcements_preflight_secret_leak",
+        "bybit_announcements_preflight_live_call_allowed_in_smoke",
+        "bybit_announcements_preflight_missing_fixture_parser_status",
+        "bybit_announcements_rehearsal_secret_leak",
+        "bybit_announcements_rehearsal_live_without_ledger",
+        "bybit_announcements_rehearsal_live_without_explicit_allow",
+        "bybit_announcements_rehearsal_unsupported_params",
+        "bybit_announcements_rehearsal_forbidden_side_effect_claim",
+    ):
+        count = bybit_announcements_conflicts.get(key, 0)
         if not count:
             continue
         message = f"{key}={count}"
@@ -1996,6 +2029,9 @@ def diagnose_artifacts(
         official_exchange_secret_leak=official_exchange_conflicts["official_exchange_secret_leak"],
         official_exchange_delisting_long_research=official_exchange_conflicts["official_exchange_delisting_long_research"],
         official_exchange_quote_asset_misclassified=official_exchange_conflicts["official_exchange_quote_asset_misclassified"],
+        official_exchange_major_pair_noise_promoted_early_long=official_exchange_conflicts[
+            "official_exchange_major_pair_noise_promoted_early_long"
+        ],
         official_exchange_created_alert_rows=official_exchange_conflicts["official_exchange_created_alert_rows"],
         scheduled_catalyst_rows=len(scheduled_catalysts),
         unlock_candidate_rows=len(unlock_candidates),
@@ -2110,6 +2146,9 @@ def diagnose_artifacts(
         source_coverage_coinalyze_missing_linked_artifact=source_coverage_report_conflicts[
             "source_coverage_coinalyze_missing_linked_artifact"
         ],
+        source_coverage_bybit_announcements_missing_linked_artifact=source_coverage_report_conflicts[
+            "source_coverage_bybit_announcements_missing_linked_artifact"
+        ],
         live_provider_readiness_missing=live_provider_readiness_conflicts["live_provider_readiness_missing"],
         live_provider_readiness_secret_leak=live_provider_readiness_conflicts["live_provider_readiness_secret_leak"],
         live_provider_readiness_live_calls_allowed_in_smoke=live_provider_readiness_conflicts[
@@ -2161,6 +2200,30 @@ def diagnose_artifacts(
         ],
         coinalyze_supported_metric_implemented_missing_state=coinalyze_preflight_conflicts[
             "coinalyze_supported_metric_implemented_missing_state"
+        ],
+        bybit_announcements_preflight_secret_leak=bybit_announcements_conflicts[
+            "bybit_announcements_preflight_secret_leak"
+        ],
+        bybit_announcements_preflight_live_call_allowed_in_smoke=bybit_announcements_conflicts[
+            "bybit_announcements_preflight_live_call_allowed_in_smoke"
+        ],
+        bybit_announcements_preflight_missing_fixture_parser_status=bybit_announcements_conflicts[
+            "bybit_announcements_preflight_missing_fixture_parser_status"
+        ],
+        bybit_announcements_rehearsal_secret_leak=bybit_announcements_conflicts[
+            "bybit_announcements_rehearsal_secret_leak"
+        ],
+        bybit_announcements_rehearsal_live_without_ledger=bybit_announcements_conflicts[
+            "bybit_announcements_rehearsal_live_without_ledger"
+        ],
+        bybit_announcements_rehearsal_live_without_explicit_allow=bybit_announcements_conflicts[
+            "bybit_announcements_rehearsal_live_without_explicit_allow"
+        ],
+        bybit_announcements_rehearsal_unsupported_params=bybit_announcements_conflicts[
+            "bybit_announcements_rehearsal_unsupported_params"
+        ],
+        bybit_announcements_rehearsal_forbidden_side_effect_claim=bybit_announcements_conflicts[
+            "bybit_announcements_rehearsal_forbidden_side_effect_claim"
         ],
         source_pack_provider_status_missing=source_coverage_conflicts["source_pack_provider_status_missing"],
         missing_provider_recommendations_missing=source_coverage_conflicts["missing_provider_recommendations_missing"],
@@ -3123,6 +3186,7 @@ def _official_exchange_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) -> 
         "official_exchange_secret_leak": 0,
         "official_exchange_delisting_long_research": 0,
         "official_exchange_quote_asset_misclassified": 0,
+        "official_exchange_major_pair_noise_promoted_early_long": 0,
         "official_exchange_created_alert_rows": 0,
     }
     quote_assets = {"USD", "USDT", "USDC", "FDUSD", "TUSD", "BUSD", "DAI", "BTC", "ETH", "BNB", "EUR", "TRY", "BRL"}
@@ -3167,6 +3231,8 @@ def _official_exchange_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) -> 
             out["official_exchange_quote_asset_misclassified"] += 1
         route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").upper()
         tier = str(row.get("tier") or row.get("alert_tier") or "").upper()
+        if bool(row.get("major_pair_simple_announcement")) and opportunity_type == "EARLY_LONG_RESEARCH":
+            out["official_exchange_major_pair_noise_promoted_early_long"] += 1
         if bool(row.get("created_alert")) or bool(row.get("alert_id")) or route in alertable_routes or tier in alertable_tiers:
             out["official_exchange_created_alert_rows"] += 1
     return out
@@ -4347,6 +4413,7 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
         "source_coverage_readiness_link_missing": 0,
         "source_coverage_context_provider_ranked_above_lane_critical": 0,
         "source_coverage_coinalyze_missing_linked_artifact": 0,
+        "source_coverage_bybit_announcements_missing_linked_artifact": 0,
     }
     if path is None:
         return out
@@ -4392,6 +4459,15 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
     ):
         if artifact_name in text and not (report_path.parent / artifact_name).exists():
             out["source_coverage_coinalyze_missing_linked_artifact"] += 1
+    for artifact_name in (
+        event_bybit_announcements_preflight.PREFLIGHT_JSON,
+        event_bybit_announcements_preflight.PREFLIGHT_MD,
+        event_bybit_announcements_preflight.REHEARSAL_JSON,
+        event_bybit_announcements_preflight.REHEARSAL_MD,
+        event_bybit_announcements_preflight.REQUEST_LEDGER,
+    ):
+        if artifact_name in text and not (report_path.parent / artifact_name).exists():
+            out["source_coverage_bybit_announcements_missing_linked_artifact"] += 1
     readiness_present = "Live-provider activation readiness:" in text
     readiness_md_path = report_path.parent / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_MD
     readiness_json_path = report_path.parent / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_JSON
@@ -4523,6 +4599,11 @@ def _source_coverage_report_required(namespace_dir: Path) -> bool:
         "event_coinalyze_rehearsal_report.json",
         "event_coinalyze_rehearsal_report.md",
         "event_coinalyze_request_ledger.jsonl",
+        "event_bybit_announcements_preflight.json",
+        "event_bybit_announcements_preflight.md",
+        "event_bybit_announcements_rehearsal_report.json",
+        "event_bybit_announcements_rehearsal_report.md",
+        "event_bybit_announcements_request_ledger.jsonl",
         "cryptopanic_request_ledger.jsonl",
     )
     return any((namespace_dir / name).exists() for name in required_markers)
@@ -4542,6 +4623,10 @@ def _live_provider_readiness_required(namespace_dir: Path) -> bool:
         "event_coinalyze_preflight.md",
         "event_coinalyze_rehearsal_report.json",
         "event_coinalyze_rehearsal_report.md",
+        "event_bybit_announcements_preflight.json",
+        "event_bybit_announcements_preflight.md",
+        "event_bybit_announcements_rehearsal_report.json",
+        "event_bybit_announcements_rehearsal_report.md",
     )
     return any((namespace_dir / name).exists() for name in required_markers)
 
@@ -6339,6 +6424,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"official_exchange_secret_leak={result.official_exchange_secret_leak} "
             f"official_exchange_delisting_long_research={result.official_exchange_delisting_long_research} "
             f"official_exchange_quote_asset_misclassified={result.official_exchange_quote_asset_misclassified} "
+            f"official_exchange_major_pair_noise_promoted_early_long={result.official_exchange_major_pair_noise_promoted_early_long} "
             f"official_exchange_created_alert_rows={result.official_exchange_created_alert_rows} "
             f"scheduled_catalyst_rows={result.scheduled_catalyst_rows} "
             f"unlock_candidate_rows={result.unlock_candidate_rows} "
@@ -6447,6 +6533,8 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"source_coverage_context_provider_ranked_above_lane_critical={result.source_coverage_context_provider_ranked_above_lane_critical} "
             "source_coverage_coinalyze_missing_linked_artifact="
             f"{result.source_coverage_coinalyze_missing_linked_artifact} "
+            "source_coverage_bybit_announcements_missing_linked_artifact="
+            f"{result.source_coverage_bybit_announcements_missing_linked_artifact} "
             f"live_provider_readiness_missing={result.live_provider_readiness_missing} "
             f"live_provider_readiness_secret_leak={result.live_provider_readiness_secret_leak} "
             f"live_provider_readiness_live_calls_allowed_in_smoke={result.live_provider_readiness_live_calls_allowed_in_smoke} "
@@ -6474,6 +6562,20 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"{result.coinalyze_rehearsal_forbidden_side_effect_claim} "
             "coinalyze_supported_metric_implemented_missing_state="
             f"{result.coinalyze_supported_metric_implemented_missing_state} "
+            f"bybit_announcements_preflight_secret_leak={result.bybit_announcements_preflight_secret_leak} "
+            "bybit_announcements_preflight_live_call_allowed_in_smoke="
+            f"{result.bybit_announcements_preflight_live_call_allowed_in_smoke} "
+            "bybit_announcements_preflight_missing_fixture_parser_status="
+            f"{result.bybit_announcements_preflight_missing_fixture_parser_status} "
+            f"bybit_announcements_rehearsal_secret_leak={result.bybit_announcements_rehearsal_secret_leak} "
+            "bybit_announcements_rehearsal_live_without_ledger="
+            f"{result.bybit_announcements_rehearsal_live_without_ledger} "
+            "bybit_announcements_rehearsal_live_without_explicit_allow="
+            f"{result.bybit_announcements_rehearsal_live_without_explicit_allow} "
+            "bybit_announcements_rehearsal_unsupported_params="
+            f"{result.bybit_announcements_rehearsal_unsupported_params} "
+            "bybit_announcements_rehearsal_forbidden_side_effect_claim="
+            f"{result.bybit_announcements_rehearsal_forbidden_side_effect_claim} "
             f"source_pack_provider_status_missing={result.source_pack_provider_status_missing} "
             f"missing_provider_recommendations_missing={result.missing_provider_recommendations_missing} "
             f"degraded_provider_absence_marked_meaningful={result.degraded_provider_absence_marked_meaningful} "

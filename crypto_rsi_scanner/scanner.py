@@ -124,6 +124,7 @@ from . import event_artifact_paths
 from . import event_source_reliability
 from . import event_catalyst_search
 from . import event_clock
+from . import event_bybit_announcements_preflight
 from . import event_coinalyze_preflight
 from . import event_core_opportunity_store
 from . import event_derivatives_crowding
@@ -5149,10 +5150,84 @@ def event_alpha_coinalyze_no_send_rehearsal(
     print(event_coinalyze_preflight.format_rehearsal_report(report))
 
 
-def _coinalyze_namespace_write_blocked(
+def event_alpha_bybit_announcements_preflight_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    smoke_mode: bool = False,
+    allow_live_preflight: bool = False,
+) -> None:
+    """Write Bybit official-announcements no-call preflight artifacts."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name or "notify_llm_deep", artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    if _event_alpha_namespace_write_blocked(
+        context,
+        suggested_namespace=event_bybit_announcements_preflight.DEFAULT_PREFLIGHT_NAMESPACE,
+        artifact_label="Bybit announcements preflight/rehearsal",
+    ):
+        return
+    report = event_bybit_announcements_preflight.build_preflight_report(
+        namespace_dir=context.namespace_dir,
+        smoke_mode=smoke_mode,
+        allow_live_preflight=allow_live_preflight,
+        now=_event_research_now(),
+    )
+    json_path, md_path = event_bybit_announcements_preflight.write_preflight_artifacts(report, context.namespace_dir)
+    print(_event_alpha_context_block(context))
+    print(f"bybit_announcements_preflight_json: {event_artifact_paths.artifact_display_path(json_path)}")
+    print(f"bybit_announcements_preflight_report: {event_artifact_paths.artifact_display_path(md_path)}")
+    print(event_bybit_announcements_preflight.format_preflight_report(report))
+
+
+def event_alpha_bybit_announcements_no_send_rehearsal(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    allow_live_preflight: bool = False,
+) -> None:
+    """Run guarded Bybit official-announcements no-send rehearsal; no live calls by default."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name or "notify_llm_deep", artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    if _event_alpha_namespace_write_blocked(
+        context,
+        suggested_namespace=event_bybit_announcements_preflight.DEFAULT_REHEARSAL_NAMESPACE,
+        artifact_label="Bybit announcements preflight/rehearsal",
+    ):
+        return
+    _preflight, report, paths = event_bybit_announcements_preflight.run_no_send_rehearsal(
+        namespace_dir=context.namespace_dir,
+        provider_health_path=context.provider_health_path,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        allow_live_preflight=allow_live_preflight,
+        no_send_rehearsal=True,
+        now=_event_research_now(),
+    )
+    preflight_json, preflight_md, rehearsal_json, rehearsal_md = paths
+    print(_event_alpha_context_block(context))
+    print(f"bybit_announcements_preflight_json: {event_artifact_paths.artifact_display_path(preflight_json)}")
+    print(f"bybit_announcements_preflight_report: {event_artifact_paths.artifact_display_path(preflight_md)}")
+    print(f"bybit_announcements_rehearsal_json: {event_artifact_paths.artifact_display_path(rehearsal_json)}")
+    print(f"bybit_announcements_rehearsal_report: {event_artifact_paths.artifact_display_path(rehearsal_md)}")
+    print(f"bybit_announcements_no_send_rehearsal_status: {report.status}")
+    print(event_bybit_announcements_preflight.format_rehearsal_report(report))
+
+
+def _event_alpha_namespace_write_blocked(
     context: event_alpha_artifacts.EventAlphaArtifactContext,
     *,
     suggested_namespace: str,
+    artifact_label: str,
 ) -> bool:
     status = event_alpha_namespace_status.load_namespace_status(context.namespace_dir)
     allow = str(os.getenv("ALLOW_STALE_NAMESPACE_WRITE", "")).strip().casefold() in {"1", "true", "yes", "on"} or str(
@@ -5165,8 +5240,20 @@ def _coinalyze_namespace_write_blocked(
     print("status=blocked_stale_namespace")
     print(f"active_suggested_namespace={suggested}")
     print(event_alpha_namespace_status.format_namespace_status(status))
-    print("No Coinalyze preflight/rehearsal artifacts were written to the stale namespace.")
+    print(f"No {artifact_label} artifacts were written to the stale namespace.")
     return True
+
+
+def _coinalyze_namespace_write_blocked(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    *,
+    suggested_namespace: str,
+) -> bool:
+    return _event_alpha_namespace_write_blocked(
+        context,
+        suggested_namespace=suggested_namespace,
+        artifact_label="Coinalyze preflight/rehearsal",
+    )
 
 
 def event_alpha_mark_namespace_stale(
@@ -11096,6 +11183,26 @@ def cli() -> None:
         help="Allow future bounded Coinalyze live preflight path. Tests and smokes must leave this off.",
     )
     parser.add_argument(
+        "--event-alpha-bybit-announcements-preflight",
+        action="store_true",
+        help="Write Bybit official-announcements no-call preflight artifacts.",
+    )
+    parser.add_argument(
+        "--event-alpha-bybit-announcements-preflight-smoke",
+        action="store_true",
+        help="Write fixture/parser-only Bybit announcement preflight artifacts; no network or key required.",
+    )
+    parser.add_argument(
+        "--event-alpha-bybit-announcements-no-send-rehearsal",
+        action="store_true",
+        help="Run guarded Bybit announcements no-send rehearsal; no live calls unless explicitly allowed.",
+    )
+    parser.add_argument(
+        "--event-alpha-bybit-announcements-allow-live-preflight",
+        action="store_true",
+        help="Allow bounded Bybit announcements live preflight/no-send rehearsal. Tests and smokes must leave this off.",
+    )
+    parser.add_argument(
         "--event-alpha-mark-namespace-stale",
         action="store_true",
         help="Mark the selected Event Alpha artifact namespace stale/deprecated so default reports skip it.",
@@ -12185,6 +12292,23 @@ def cli() -> None:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
             allow_live_preflight=bool(args.event_alpha_coinalyze_allow_live_preflight),
+        )
+        return
+    if args.event_alpha_bybit_announcements_preflight or args.event_alpha_bybit_announcements_preflight_smoke:
+        event_alpha_bybit_announcements_preflight_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            smoke_mode=bool(args.event_alpha_bybit_announcements_preflight_smoke),
+            allow_live_preflight=bool(args.event_alpha_bybit_announcements_allow_live_preflight),
+        )
+        return
+    if args.event_alpha_bybit_announcements_no_send_rehearsal:
+        event_alpha_bybit_announcements_no_send_rehearsal(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            allow_live_preflight=bool(args.event_alpha_bybit_announcements_allow_live_preflight),
         )
         return
     if args.event_alpha_mark_namespace_stale:

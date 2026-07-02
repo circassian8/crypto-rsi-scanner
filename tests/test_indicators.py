@@ -334,6 +334,32 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=coinalyze_no_send_rehearsal" in coinalyze_rehearsal_dry
     assert "--event-alpha-artifact-namespace coinalyze_no_send_rehearsal" in coinalyze_rehearsal_dry
     assert "--event-alpha-coinalyze-allow-live-preflight" not in coinalyze_rehearsal_dry
+    bybit_preflight_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-bybit-announcements-preflight", "PROFILE=notify_llm_deep", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-bybit-announcements-preflight --event-alpha-profile notify_llm_deep" in bybit_preflight_dry
+    assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=bybit_announcements_preflight" in bybit_preflight_dry
+    assert "--event-alpha-artifact-namespace bybit_announcements_preflight" in bybit_preflight_dry
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in bybit_preflight_dry
+    assert "--event-alpha-bybit-announcements-allow-live-preflight" not in bybit_preflight_dry
+    bybit_smoke_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-bybit-announcements-preflight-smoke", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-bybit-announcements-preflight-smoke --event-alpha-profile fixture" in bybit_smoke_dry
+    assert "RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH=fixtures/event_discovery/official_exchange_bybit_announcements.json" in bybit_smoke_dry
+    assert "--event-alpha-bybit-announcements-allow-live-preflight" not in bybit_smoke_dry
+    bybit_rehearsal_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-bybit-announcements-no-send-rehearsal", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=bybit_announcements_no_send_rehearsal" in bybit_rehearsal_dry
+    assert "--event-alpha-artifact-namespace bybit_announcements_no_send_rehearsal" in bybit_rehearsal_dry
+    assert "--event-alpha-bybit-announcements-allow-live-preflight" not in bybit_rehearsal_dry
     notify_preview_from_artifacts_dry = subprocess.check_output(
         [
             "make",
@@ -1279,6 +1305,11 @@ def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor
         assert by_provider["coinalyze"]["smoke_target_available"] is True
         assert "event-alpha-derivatives-smoke" in by_provider["coinalyze"]["smoke_targets"]
         assert "event-alpha-fade-review-smoke" in by_provider["coinalyze"]["smoke_targets"]
+        assert by_provider["bybit_announcements"]["env_vars_required"] == []
+        assert by_provider["bybit_announcements"]["request_ledger_required"] is True
+        assert "event-alpha-bybit-announcements-preflight-smoke" in by_provider["bybit_announcements"]["smoke_targets"]
+        assert by_provider["bybit_announcements"]["next_safe_command"].startswith("make event-alpha-bybit-announcements-preflight")
+        assert by_provider["bybit_announcements"]["no_send_rehearsal_command"].startswith("make event-alpha-bybit-announcements-no-send-rehearsal")
         assert by_provider["binance_announcements_public_or_fixture"]["env_vars_required"] == []
         assert by_provider["binance_announcements_public_or_fixture"]["preflight_status"] == "fixture_ready"
         assert by_provider["binance_announcements_signed_listener"]["env_vars_required"]
@@ -38671,6 +38702,281 @@ def test_bybit_announcement_provider_supports_documented_query_params():
     assert "limit=50" in url
 
 
+def test_event_alpha_bybit_announcements_preflight_fixture_and_default_no_network():
+    import json
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner import config, event_bybit_announcements_preflight
+
+    fixture_path = Path("fixtures/event_discovery/official_exchange_bybit_announcements.json")
+    original_path = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
+    original_allow = os.environ.get(event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT)
+    try:
+        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = fixture_path
+        os.environ.pop(event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT, None)
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            report = event_bybit_announcements_preflight.build_preflight_report(
+                namespace_dir=base,
+                smoke_mode=True,
+                now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+            )
+            json_path, md_path = event_bybit_announcements_preflight.write_preflight_artifacts(report, base)
+
+            def forbidden_opener(_request, _timeout):
+                raise AssertionError("Bybit opener must not be called without explicit allow")
+
+            _preflight, rehearsal, _paths = event_bybit_announcements_preflight.run_no_send_rehearsal(
+                namespace_dir=base,
+                provider_health_path=base / "event_provider_health.json",
+                profile="fixture",
+                artifact_namespace="bybit_announcements_no_send_rehearsal",
+                allow_live_preflight=False,
+                opener=forbidden_opener,
+                now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+            )
+
+            assert json.loads(json_path.read_text(encoding="utf-8"))["provider"] == "bybit_announcements"
+            assert "No provider network calls" in md_path.read_text(encoding="utf-8")
+            assert report.configured is True
+            assert report.env_vars_required == ()
+            assert report.live_call_allowed is False
+            assert report.fixture_parser_status == "pass"
+            assert report.fixture_rows_observed >= 1
+            assert rehearsal.status == "live_call_blocked_by_default"
+            assert rehearsal.requests_used == 0
+            assert rehearsal.telegram_sends == 0
+            assert rehearsal.trades_created == 0
+            assert rehearsal.paper_trades_created == 0
+            assert rehearsal.normal_rsi_signal_rows_written == 0
+            assert rehearsal.triggered_fade_created == 0
+            assert not (base / event_bybit_announcements_preflight.REQUEST_LEDGER).exists()
+            assert event_bybit_announcements_preflight.artifact_conflicts(base)[
+                "bybit_announcements_preflight_live_call_allowed_in_smoke"
+            ] == 0
+    finally:
+        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = original_path
+        if original_allow is None:
+            os.environ.pop(event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT, None)
+        else:
+            os.environ[event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT] = original_allow
+
+
+def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_coverage_and_integrated_radar():
+    import json
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner import (
+        config,
+        event_alpha_artifacts,
+        event_alpha_source_coverage,
+        event_bybit_announcements_preflight,
+        event_integrated_radar,
+        event_official_exchange,
+        event_provider_health,
+        event_provider_status,
+    )
+
+    class MockBybitResponse:
+        status = 200
+
+        def __init__(self, payload):
+            self.payload = json.dumps(payload).encode("utf-8")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, _exc_type, _exc, _tb):
+            return False
+
+        def read(self):
+            return self.payload
+
+    original_max_pages = os.environ.get(event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES)
+    original_limit = os.environ.get(event_bybit_announcements_preflight.ENV_PREFLIGHT_LIMIT)
+    try:
+        os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES] = "1"
+        os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_LIMIT] = "20"
+        fixture_payload = json.loads(Path("fixtures/event_discovery/official_exchange_bybit_announcements.json").read_text(encoding="utf-8"))
+        fixture_payload["result"]["list"] = fixture_payload["result"]["list"][:2]
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            namespace = "bybit_live_mock"
+            namespace_dir = root / namespace
+            calls: list[str] = []
+
+            def opener(request, _timeout):
+                calls.append(request.full_url)
+                return MockBybitResponse(fixture_payload)
+
+            _preflight, report, _paths = event_bybit_announcements_preflight.run_no_send_rehearsal(
+                namespace_dir=namespace_dir,
+                provider_health_path=namespace_dir / "event_provider_health.json",
+                profile="fixture",
+                artifact_namespace=namespace,
+                allow_live_preflight=True,
+                opener=opener,
+                now=datetime(2026, 6, 15, 16, tzinfo=timezone.utc),
+            )
+            candidates = event_official_exchange.load_official_listing_candidates(namespace_dir)
+            by_symbol = {str(row.get("symbol") or ""): row for row in candidates}
+            ledger_rows = [
+                json.loads(line)
+                for line in (namespace_dir / event_bybit_announcements_preflight.REQUEST_LEDGER).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            health_rows = event_provider_health.load_provider_health(namespace_dir / "event_provider_health.json")
+            coverage = event_alpha_source_coverage.build_source_coverage_report(
+                provider_status_report=event_provider_status.build_event_discovery_provider_status(config),
+                provider_health_rows=health_rows,
+                profile="fixture",
+                artifact_namespace=namespace,
+                artifact_namespace_dir=namespace_dir,
+            )
+            official_pack = next(pack for pack in coverage.packs if pack.source_pack == "official_exchange_listing_pack")
+            context = event_alpha_artifacts.context_from_profile(
+                "fixture",
+                run_mode="fixture",
+                base_dir=root,
+                artifact_namespace=namespace,
+            )
+            integrated = event_integrated_radar.run_integrated_radar_cycle(
+                context=context,
+                fixture=False,
+                input_mode=event_integrated_radar.INPUT_MODE_LOAD_EXISTING,
+                observed_at="2026-06-15T16:00:00Z",
+            )
+            integrated_rows = [
+                json.loads(line)
+                for line in integrated.integrated_candidates_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            integrated_symbols = {str(row.get("symbol") or "") for row in integrated_rows}
+
+            assert len(calls) == 1
+            assert "type=new_crypto" in calls[0]
+            assert report.status == "live_rehearsal_success"
+            assert report.provider_health_status == "observed_healthy"
+            assert report.requests_used == 1
+            assert report.http_successes == 1
+            assert report.announcements_inspected == 2
+            assert report.official_events_written == 2
+            assert report.official_listing_candidates_written == 2
+            assert report.telegram_sends == 0
+            assert report.trades_created == 0
+            assert report.paper_trades_created == 0
+            assert report.normal_rsi_signal_rows_written == 0
+            assert report.triggered_fade_created == 0
+            assert ledger_rows[0]["success"] is True
+            assert ledger_rows[0]["live_call_allowed"] is True
+            assert ledger_rows[0]["no_send_rehearsal"] is True
+            assert ledger_rows[0]["unsupported_query_params"] == []
+            assert set(ledger_rows[0]["query_params"]) <= set(event_bybit_announcements_preflight.SUPPORTED_PARAMS)
+            assert by_symbol["TESTSPOT"]["source_url"]
+            assert by_symbol["TESTSPOT"]["published_at"]
+            assert by_symbol["TESTPERP"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH"
+            assert "bybit_announcements" in official_pack.healthy_providers
+            assert coverage.bybit_announcements_provider_health_status == "observed_healthy"
+            assert coverage.bybit_announcements_official_events_written == 2
+            assert "TESTPERP" in integrated_symbols
+            assert "TESTSPOT" in integrated_symbols
+            assert event_bybit_announcements_preflight.artifact_conflicts(namespace_dir)[
+                "bybit_announcements_rehearsal_live_without_ledger"
+            ] == 0
+    finally:
+        if original_max_pages is None:
+            os.environ.pop(event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES, None)
+        else:
+            os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES] = original_max_pages
+        if original_limit is None:
+            os.environ.pop(event_bybit_announcements_preflight.ENV_PREFLIGHT_LIMIT, None)
+        else:
+            os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_LIMIT] = original_limit
+
+
+def test_event_alpha_bybit_announcements_rehearsal_mocked_429_403_and_doctor_conflicts_are_safe():
+    import json
+    from datetime import datetime, timezone
+    from urllib.error import HTTPError
+
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_bybit_announcements_preflight
+
+    original_max_pages = os.environ.get(event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES)
+    try:
+        os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES] = "1"
+
+        def raising_opener(code):
+            def opener(request, _timeout):
+                raise HTTPError(request.full_url, code, "blocked", None, None)
+
+            return opener
+
+        for code, expected_status, expected_health in (
+            (429, "rate_limited", "rate_limited"),
+            (403, "auth_or_access_error", "auth_or_access_error"),
+        ):
+            with TemporaryDirectory() as tmp:
+                base = Path(tmp)
+                _preflight, report, _paths = event_bybit_announcements_preflight.run_no_send_rehearsal(
+                    namespace_dir=base,
+                    provider_health_path=base / "event_provider_health.json",
+                    profile="fixture",
+                    artifact_namespace="bybit_error_mock",
+                    allow_live_preflight=True,
+                    opener=raising_opener(code),
+                    now=datetime(2026, 6, 15, 16, tzinfo=timezone.utc),
+                )
+                ledger_text = (base / event_bybit_announcements_preflight.REQUEST_LEDGER).read_text(encoding="utf-8")
+                ledger_rows = [json.loads(line) for line in ledger_text.splitlines() if line.strip()]
+                assert report.status == expected_status
+                assert report.provider_health_status == expected_health
+                assert ledger_rows[0]["status_code"] == code
+                assert ledger_rows[0]["success"] is False
+                assert "Authorization" not in ledger_text
+                assert "api_key" not in ledger_text.casefold()
+
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / event_bybit_announcements_preflight.REHEARSAL_JSON).write_text(
+                json.dumps({
+                    "provider": "bybit_announcements",
+                    "live_call_allowed": True,
+                    "allow_live_preflight": False,
+                    "telegram_sends": 1,
+                }),
+                encoding="utf-8",
+            )
+            (base / event_bybit_announcements_preflight.REQUEST_LEDGER).write_text(
+                json.dumps({
+                    "provider": "bybit_announcements",
+                    "live_call_allowed": True,
+                    "unsupported_query_params": ["category"],
+                })
+                + "\n",
+                encoding="utf-8",
+            )
+            conflicts = event_bybit_announcements_preflight.artifact_conflicts(base)
+            assert conflicts["bybit_announcements_rehearsal_live_without_explicit_allow"] == 1
+            assert conflicts["bybit_announcements_rehearsal_unsupported_params"] == 1
+            assert conflicts["bybit_announcements_rehearsal_forbidden_side_effect_claim"] == 1
+            doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+                inspected_alert_store_path=base / "event_alpha_alerts.jsonl",
+                profile="fixture",
+                artifact_namespace="bybit_error_mock",
+                include_test_artifacts=True,
+                strict=True,
+            )
+            assert doctor.bybit_announcements_rehearsal_live_without_explicit_allow == 1
+            assert doctor.bybit_announcements_rehearsal_unsupported_params == 1
+            assert doctor.bybit_announcements_rehearsal_forbidden_side_effect_claim == 1
+            assert doctor.status == "BLOCKED"
+    finally:
+        if original_max_pages is None:
+            os.environ.pop(event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES, None)
+        else:
+            os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES] = original_max_pages
+
+
 def test_official_exchange_fixture_lanes_and_quote_filtering():
     from crypto_rsi_scanner import config, event_official_exchange
 
@@ -38804,6 +39110,19 @@ def test_official_exchange_artifact_doctor_conflicts():
             "source_url": "https://www.binance.com/en/support/announcement/alrt",
             "created_alert": True,
         },
+        {
+            "row_type": "official_listing_candidate",
+            "symbol": "BTC",
+            "coin_id": "bitcoin",
+            "event_type": "spot_listing",
+            "source_class": "official_exchange",
+            "source_pack": "official_exchange_listing_pack",
+            "title": "Bybit Adds BTC/USDT",
+            "published_at": "2026-06-15T12:00:00Z",
+            "source_url": "https://announcements.bybit.com/article/btc-usdt",
+            "major_pair_simple_announcement": True,
+            "opportunity_type": "EARLY_LONG_RESEARCH",
+        },
     ]
     conflicts = event_alpha_artifact_doctor._official_exchange_artifact_conflicts(rows)
 
@@ -38812,6 +39131,7 @@ def test_official_exchange_artifact_doctor_conflicts():
     assert conflicts["official_exchange_delisting_long_research"] == 1
     assert conflicts["official_exchange_candidate_missing_source_fields"] == 1
     assert conflicts["official_exchange_secret_leak"] == 1
+    assert conflicts["official_exchange_major_pair_noise_promoted_early_long"] == 1
     assert conflicts["official_exchange_created_alert_rows"] == 1
 
 

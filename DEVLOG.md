@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Add Bybit announcement preflight and no-send rehearsal · Codex
+**Why:** Bybit official announcements had fixture/provider parsing but no
+provider-specific readiness, request ledger, bounded no-send rehearsal, or
+source-coverage/readiness linkage for live-capable operator review.
+**Changes:**
+- Added research-only Bybit announcement preflight and bounded no-send
+  rehearsal artifacts: `event_bybit_announcements_preflight.json/md`,
+  `event_bybit_announcements_request_ledger.jsonl`, and
+  `event_bybit_announcements_rehearsal_report.json/md`.
+- Added guarded CLI and Make targets for Bybit announcement preflight, smoke,
+  and no-send rehearsal; default behavior remains fixture/parser status only
+  with no live call, and live rehearsal requires the explicit allow flag/env.
+- Normalized live/mocked Bybit rows through the official exchange pipeline so
+  rehearsals write `event_exchange_announcements.jsonl`,
+  `event_official_exchange_events.jsonl`, and
+  `event_official_listing_candidates.jsonl` when a bounded mocked/live response
+  succeeds.
+- Linked Bybit artifacts into live-provider readiness and source coverage, with
+  provider health statuses for observed healthy/no-results, rate limit, auth, or
+  provider unavailable outcomes.
+- Extended artifact doctor checks for Bybit ledger/unsupported-param/secret/
+  side-effect conflicts and for simple major-pair noise promoted to early-long.
+**Verify:** `python3 tests/test_indicators.py` (666/666); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-bybit-announcements-preflight-smoke PYTHON=python3`; `make
+event-alpha-bybit-announcements-preflight PYTHON=python3`; `make
+event-alpha-bybit-announcements-no-send-rehearsal PYTHON=python3`; `make
+event-alpha-official-exchange-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** No live calls occur by default. The normal no-send rehearsal
+reports `live_call_blocked_by_default` with zero requests and zero Telegram,
+trade, paper, normal RSI, or Event Alpha `TRIGGERED_FADE` side effects.
+
 ## 2026-07-02 — Load Coinalyze artifacts into integrated radar · Codex
 **Why:** Integrated radar could mention Coinalyze readiness but could not reuse
 bounded preflight/rehearsal derivatives artifacts for same-run candidate

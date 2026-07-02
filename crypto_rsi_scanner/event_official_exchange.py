@@ -175,6 +175,86 @@ def run_official_exchange_scan(
     )
 
 
+def run_official_exchange_scan_from_items(
+    *,
+    namespace_dir: str | Path,
+    provider_items: Mapping[str, Iterable[Mapping[str, Any]]],
+    profile: str | None = None,
+    artifact_namespace: str | None = None,
+    run_mode: str | None = None,
+    run_id: str | None = None,
+    observed_at: datetime | str | None = None,
+    warnings: Iterable[str] = (),
+) -> OfficialExchangeScanResult:
+    """Normalize already-fetched official exchange announcement items."""
+    directory = Path(namespace_dir).expanduser()
+    directory.mkdir(parents=True, exist_ok=True)
+    observed = _as_utc(_parse_time(observed_at) or datetime.now(timezone.utc)).isoformat()
+    warning_rows = [str(item) for item in warnings if str(item)]
+    announcement_rows: list[dict[str, Any]] = []
+    event_rows: list[dict[str, Any]] = []
+    candidate_rows: list[dict[str, Any]] = []
+
+    for provider, items in provider_items.items():
+        materialized = [dict(item) for item in items if isinstance(item, Mapping)]
+        if not materialized:
+            warning_rows.append(f"{provider}:no_live_rows")
+            continue
+        for item in materialized:
+            announcement = _announcement_row(
+                item,
+                provider=provider,
+                observed_at=observed,
+                profile=profile,
+                artifact_namespace=artifact_namespace,
+                run_mode=run_mode,
+                run_id=run_id,
+            )
+            announcement_rows.append(announcement)
+            event = normalize_official_exchange_event(
+                item,
+                provider=provider,
+                observed_at=observed,
+                profile=profile,
+                artifact_namespace=artifact_namespace,
+                run_mode=run_mode,
+                run_id=run_id,
+            )
+            event_rows.append(event)
+            candidate_rows.extend(_candidate_rows_for_event(event, item))
+
+    announcements_path = directory / EXCHANGE_ANNOUNCEMENTS_FILENAME
+    events_path = directory / OFFICIAL_EXCHANGE_EVENTS_FILENAME
+    candidates_path = directory / OFFICIAL_LISTING_CANDIDATES_FILENAME
+    report_path = directory / OFFICIAL_EXCHANGE_REPORT_FILENAME
+    _write_jsonl(announcements_path, announcement_rows)
+    _write_jsonl(events_path, event_rows)
+    _write_jsonl(candidates_path, candidate_rows)
+    report_path.write_text(
+        format_official_exchange_report(
+            event_rows,
+            candidate_rows,
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+            warnings=warning_rows,
+        ),
+        encoding="utf-8",
+    )
+    return OfficialExchangeScanResult(
+        namespace_dir=directory,
+        announcements_path=announcements_path,
+        events_path=events_path,
+        candidates_path=candidates_path,
+        report_path=report_path,
+        announcement_count=len(announcement_rows),
+        event_count=len(event_rows),
+        candidate_count=len(candidate_rows),
+        events=tuple(event_rows),
+        candidates=tuple(candidate_rows),
+        warnings=tuple(warning_rows),
+    )
+
+
 def normalize_official_exchange_event(
     item: Mapping[str, Any],
     *,
