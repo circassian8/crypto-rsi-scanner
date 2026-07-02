@@ -145,6 +145,7 @@ from . import event_price_history
 from . import event_research_cards
 from . import event_scheduled_catalysts
 from . import event_source_enrichment
+from . import event_unlock_calendar_preflight
 from . import event_validation
 from . import event_watchlist
 from . import event_watchlist_enrichment
@@ -5087,6 +5088,44 @@ def event_alpha_live_provider_readiness_report(
     print(event_live_provider_readiness.format_readiness_report(report))
 
 
+def event_alpha_unlock_calendar_preflight_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    provider: str | None = None,
+    smoke_mode: bool = False,
+    include_test_artifacts: bool = False,
+) -> None:
+    """Write structured unlock/calendar preflight artifacts without live calls."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name or "fixture",
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    report = event_unlock_calendar_preflight.build_preflight_report(
+        namespace_dir=context.namespace_dir,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        provider_filter=provider,
+        tokenomist_path=config.EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH,
+        messari_path=config.EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH,
+        coinmarketcal_path=config.EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH,
+        smoke_mode=smoke_mode,
+        now=_event_research_now(),
+    )
+    json_path, md_path = event_unlock_calendar_preflight.write_preflight_artifacts(report, context.namespace_dir)
+    print(_event_alpha_context_block(context))
+    print(f"unlock_calendar_preflight_json: {event_artifact_paths.artifact_display_path(json_path)}")
+    print(f"unlock_calendar_preflight_report: {event_artifact_paths.artifact_display_path(md_path)}")
+    print(event_unlock_calendar_preflight.format_preflight_report(report))
+
+
 def event_alpha_coinalyze_preflight_report(
     verbose: bool = False,
     *,
@@ -8546,6 +8585,7 @@ def event_alpha_scheduled_catalyst_report(
     *,
     artifact_namespace: str | None = None,
     tokenomist_path: str | None = None,
+    messari_path: str | None = None,
     coinmarketcal_path: str | None = None,
     include_test_artifacts: bool = False,
 ) -> None:
@@ -8565,8 +8605,20 @@ def event_alpha_scheduled_catalyst_report(
     run_id = event_alpha_run_ledger.run_id_for(started_at, context.profile)
     provider_paths = {
         "tokenomist": Path(tokenomist_path).expanduser() if tokenomist_path else Path(config.EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH),
+        "messari_unlocks": Path(messari_path).expanduser() if messari_path else Path(config.EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH),
         "coinmarketcal": Path(coinmarketcal_path).expanduser() if coinmarketcal_path else Path(config.EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH),
     }
+    preflight = event_unlock_calendar_preflight.build_preflight_report(
+        namespace_dir=context.namespace_dir,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        tokenomist_path=provider_paths["tokenomist"],
+        messari_path=provider_paths["messari_unlocks"],
+        coinmarketcal_path=provider_paths["coinmarketcal"],
+        smoke_mode=include_test_artifacts,
+        now=_event_research_now(),
+    )
+    event_unlock_calendar_preflight.write_preflight_artifacts(preflight, context.namespace_dir)
     result = event_scheduled_catalysts.run_scheduled_catalyst_scan(
         namespace_dir=context.namespace_dir,
         provider_paths=provider_paths,
@@ -11063,6 +11115,26 @@ def cli() -> None:
         help="Normalize scheduled catalyst/unlock fixtures into research-only Event Alpha artifacts.",
     )
     parser.add_argument(
+        "--event-alpha-unlock-calendar-preflight",
+        action="store_true",
+        help="Write structured unlock/calendar provider preflight artifacts without live calls.",
+    )
+    parser.add_argument(
+        "--event-alpha-tokenomist-preflight",
+        action="store_true",
+        help="Write Tokenomist unlock provider preflight artifacts without live calls.",
+    )
+    parser.add_argument(
+        "--event-alpha-messari-unlocks-preflight",
+        action="store_true",
+        help="Write Messari unlock provider preflight artifacts without live calls.",
+    )
+    parser.add_argument(
+        "--event-alpha-coinmarketcal-preflight",
+        action="store_true",
+        help="Write CoinMarketCal provider preflight artifacts without live calls.",
+    )
+    parser.add_argument(
         "--event-alpha-derivatives-report",
         action="store_true",
         help="Normalize derivatives crowding fixtures into research-only fade/short-review artifacts.",
@@ -11638,9 +11710,20 @@ def cli() -> None:
         help="Optional Tokenomist unlock fixture path for --event-alpha-scheduled-catalyst-report.",
     )
     parser.add_argument(
+        "--event-alpha-scheduled-catalyst-messari",
+        default=None,
+        help="Optional Messari unlock fixture path for --event-alpha-scheduled-catalyst-report.",
+    )
+    parser.add_argument(
         "--event-alpha-scheduled-catalyst-coinmarketcal",
         default=None,
         help="Optional CoinMarketCal/event-calendar fixture path for --event-alpha-scheduled-catalyst-report.",
+    )
+    parser.add_argument(
+        "--event-alpha-unlock-calendar-provider",
+        default=None,
+        choices=("tokenomist", "messari_unlocks", "coinmarketcal"),
+        help="Optional provider filter for --event-alpha-unlock-calendar-preflight.",
     )
     parser.add_argument(
         "--event-alpha-derivatives-crowding-path",
@@ -12327,6 +12410,28 @@ def cli() -> None:
             smoke_mode=bool(args.event_alpha_live_provider_readiness_smoke),
         )
         return
+    if (
+        args.event_alpha_unlock_calendar_preflight
+        or args.event_alpha_tokenomist_preflight
+        or args.event_alpha_messari_unlocks_preflight
+        or args.event_alpha_coinmarketcal_preflight
+    ):
+        provider_filter = args.event_alpha_unlock_calendar_provider
+        if args.event_alpha_tokenomist_preflight:
+            provider_filter = "tokenomist"
+        elif args.event_alpha_messari_unlocks_preflight:
+            provider_filter = "messari_unlocks"
+        elif args.event_alpha_coinmarketcal_preflight:
+            provider_filter = "coinmarketcal"
+        event_alpha_unlock_calendar_preflight_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            provider=provider_filter,
+            smoke_mode=bool(args.event_alpha_include_test_artifacts),
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+        )
+        return
     if args.event_alpha_coinalyze_preflight or args.event_alpha_coinalyze_preflight_smoke:
         event_alpha_coinalyze_preflight_report(
             verbose=args.verbose,
@@ -12753,6 +12858,7 @@ def cli() -> None:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             tokenomist_path=args.event_alpha_scheduled_catalyst_tokenomist,
+            messari_path=args.event_alpha_scheduled_catalyst_messari,
             coinmarketcal_path=args.event_alpha_scheduled_catalyst_coinmarketcal,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
         )

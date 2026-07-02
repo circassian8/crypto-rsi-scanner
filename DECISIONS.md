@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Structured unlock/calendar activation is fixture-first
+**Status:** accepted
+**Decision:** Tokenomist, Messari unlocks, and CoinMarketCal activation starts
+with fixture/parser preflight rows and provider-specific no-send stubs. Rows may
+list required env var names, request-ledger paths, request budgets, supported
+event types, source packs, and fixture status, but `live_call_allowed` remains
+false by default and no live fetcher is claimed until a bounded provider-specific
+request path is implemented and explicitly enabled. Unlock promotion requires a
+structured source, event time, and materiality fields such as circulating
+percentage, USD size, ADV comparison, vesting category, cliff/linear distinction,
+and timestamp confidence.
+**Why:** Unlock/calendar feeds are useful source evidence, but missing event
+time or size can turn ordinary calendar rows into misleading risk/fade
+research. Fixture-first activation proves parser/readiness contracts without
+network or credential risk.
+**Revisit when:** A specific provider has a reviewed bounded live rehearsal with
+redacted request ledger rows, no-send artifacts, and human approval to enable an
+explicit live preflight flag.
+
 ## 2026-07-02 - Market anomalies are catalyst-search queue inputs until sourced
 **Status:** accepted
 **Decision:** Broad market anomaly scanning may rank cached/fixture market rows,

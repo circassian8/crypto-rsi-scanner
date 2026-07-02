@@ -1,0 +1,34 @@
+{
+  "data": [
+    {
+      "id": "messari-testvest-cliff",
+      "asset": {
+        "id": "test-vesting",
+        "name": "Test Vesting",
+        "symbol": "TESTVEST"
+      },
+      "title": "Test Vesting investor cliff unlock",
+      "description": "Messari-style unlock row for Test Vesting (TESTVEST).",
+      "event_type": "token_unlock",
+      "timestamp": "2026-06-16T12:00:00Z",
+      "published_at": "2026-06-12T10:00:00Z",
+      "unlock_type": "cliff",
+      "tokens_unlocked": 900000,
+      "unlock_usd": 1260000,
+      "unlock_pct_circulating": 0.055,
+      "unlock_pct_total_supply": 0.018,
+      "unlock_vs_30d_adv": 1.1,
+      "vesting_category": "investors",
+      "source_url": "https://messari.io/testvesting/unlocks",
+      "source_class": "structured_unlock",
+      "source_confidence": 0.9,
+      "event_time_confidence": "confirmed",
+      "market_snapshot": {
+        "return_24h": 0.04,
+        "volume_zscore_24h": 1.2,
+        "event_age_hours": -20,
+        "market_context_freshness_status": "fresh"
+      }
+    }
+  ]
+}

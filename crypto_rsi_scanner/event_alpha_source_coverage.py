@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_official_exchange_activation, event_provider_health, event_provider_status, event_source_packs
+from . import event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_official_exchange_activation, event_provider_health, event_provider_status, event_source_packs, event_unlock_calendar_preflight
 from .event_providers import cryptopanic as cryptopanic_provider
 
 
@@ -40,8 +40,11 @@ _READY_PROVIDER_ALIASES = {
     "bybit_announcements": "bybit_announcements_public",
     "bybit_announcements_public": "bybit_announcements_public",
     "coinmarketcal_calendar": "coinmarketcal",
+    "coinmarketcal": "coinmarketcal",
     "tokenomist_unlocks": "tokenomist",
     "tokenomist_supply": "tokenomist",
+    "tokenomist": "tokenomist",
+    "messari_unlocks": "messari_unlocks",
     "cryptopanic_news": "cryptopanic",
     "gdelt_news": "gdelt",
     "project_blog_rss": "project_blog_rss",
@@ -64,6 +67,9 @@ _HEALTH_PROVIDER_ALIASES = {
     "coinalyze": "coinalyze",
     "coingecko": "coingecko",
     "tokenomist": "tokenomist",
+    "messari_unlocks": "messari_unlocks",
+    "messari": "messari_unlocks",
+    "coinmarketcal": "coinmarketcal",
     "coinmarketcal": "coinmarketcal",
     "sports_fixtures": "sports_fixtures",
     "defillama": "defillama",
@@ -75,6 +81,7 @@ _HIGH_SPECIFICITY_PROVIDERS = {
     "bybit_announcements_public",
     "coinmarketcal",
     "tokenomist",
+    "messari_unlocks",
     "cryptopanic",
     "project_blog_rss",
     "coinalyze",
@@ -249,6 +256,10 @@ class EventAlphaSourceCoverageReport:
     bybit_announcements_requests_used: int = 0
     bybit_announcements_official_events_written: int = 0
     bybit_announcements_official_listing_candidates_written: int = 0
+    unlock_calendar_preflight_status: str = "not_generated"
+    unlock_calendar_preflight_json_path: str | None = None
+    unlock_calendar_preflight_report_path: str | None = None
+    unlock_calendar_preflight_provider_rows: tuple[Mapping[str, Any], ...] = ()
     official_exchange_activation_status: str = "not_generated"
     official_exchange_activation_json_path: str | None = None
     official_exchange_activation_report_path: str | None = None
@@ -299,6 +310,12 @@ class EventAlphaSourceCoverageReport:
             "bybit_announcements_requests_used": self.bybit_announcements_requests_used,
             "bybit_announcements_official_events_written": self.bybit_announcements_official_events_written,
             "bybit_announcements_official_listing_candidates_written": self.bybit_announcements_official_listing_candidates_written,
+            "unlock_calendar_preflight_status": self.unlock_calendar_preflight_status,
+            "unlock_calendar_preflight_json_path": self.unlock_calendar_preflight_json_path,
+            "unlock_calendar_preflight_report_path": self.unlock_calendar_preflight_report_path,
+            "unlock_calendar_preflight_provider_rows": [
+                dict(row) for row in self.unlock_calendar_preflight_provider_rows
+            ],
             "official_exchange_activation_status": self.official_exchange_activation_status,
             "official_exchange_activation_json_path": self.official_exchange_activation_json_path,
             "official_exchange_activation_report_path": self.official_exchange_activation_report_path,
@@ -365,6 +382,10 @@ def build_source_coverage_report(
         artifact_namespace=artifact_namespace,
         health_by_provider=raw_health_by_provider,
     )
+    unlock_calendar_stats = _unlock_calendar_artifact_stats(
+        artifact_namespace_dir=artifact_namespace_dir,
+        artifact_namespace=artifact_namespace,
+    )
     activation_stats = event_official_exchange_activation.activation_artifact_stats(
         artifact_namespace_dir if artifact_namespace_dir is not None else _namespace_dir(artifact_namespace)
     )
@@ -396,6 +417,12 @@ def build_source_coverage_report(
         if event_official_exchange_activation.row_is_healthy(activation_row):
             provider_status_overrides[provider] = "healthy"
             health_by_provider[provider] = "healthy"
+            configured.add(provider)
+    for unlock_row in unlock_calendar_stats["provider_rows"]:
+        provider = str(unlock_row.get("provider") or "")
+        if not provider:
+            continue
+        if bool(unlock_row.get("configured")) or str(unlock_row.get("fixture_parser_status") or "") == "pass":
             configured.add(provider)
 
     packs: list[EventAlphaSourceCoveragePack] = []
@@ -526,6 +553,10 @@ def build_source_coverage_report(
         bybit_announcements_requests_used=int(bybit_stats["requests_used"]),
         bybit_announcements_official_events_written=int(bybit_stats["official_events_written"]),
         bybit_announcements_official_listing_candidates_written=int(bybit_stats["official_listing_candidates_written"]),
+        unlock_calendar_preflight_status=str(unlock_calendar_stats["preflight_status"]),
+        unlock_calendar_preflight_json_path=unlock_calendar_stats["preflight_json_path"],
+        unlock_calendar_preflight_report_path=unlock_calendar_stats["preflight_report_path"],
+        unlock_calendar_preflight_provider_rows=tuple(unlock_calendar_stats["provider_rows"]),
         official_exchange_activation_status=str(activation_stats["status"]),
         official_exchange_activation_json_path=activation_stats["json_path"],
         official_exchange_activation_report_path=activation_stats["report_path"],
@@ -651,6 +682,27 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         )
     else:
         lines.append("- Bybit announcements rehearsal: not generated")
+    if report.unlock_calendar_preflight_report_path and report.unlock_calendar_preflight_json_path:
+        lines.append(f"- Unlock/calendar preflight: {report.unlock_calendar_preflight_status}")
+        lines.append(f"- Unlock/calendar preflight report: {report.unlock_calendar_preflight_report_path}")
+        lines.append(f"- Unlock/calendar preflight JSON: {report.unlock_calendar_preflight_json_path}")
+        if report.unlock_calendar_preflight_provider_rows:
+            lines.append("- Unlock/calendar provider rows:")
+            for row in report.unlock_calendar_preflight_provider_rows:
+                lines.append(
+                    "  - "
+                    f"{row.get('provider') or 'unknown'} "
+                    f"configured={str(bool(row.get('configured'))).lower()} "
+                    f"fixture_parser_status={row.get('fixture_parser_status') or 'unknown'} "
+                    f"live_call_allowed={str(bool(row.get('live_call_allowed'))).lower()} "
+                    f"source_packs={_join(row.get('source_packs_enabled') or ())}"
+                )
+    else:
+        lines.append("- Unlock/calendar preflight: not generated")
+        lines.append(
+            "- command: make event-alpha-tokenomist-preflight ARTIFACT_NAMESPACE="
+            f"{report.artifact_namespace} PROFILE={report.profile} PYTHON=python3"
+        )
     lines.append(f"- Official exchange activation: {report.official_exchange_activation_status}")
     if report.official_exchange_activation_report_path:
         lines.append(f"- Official exchange activation report: {report.official_exchange_activation_report_path}")
@@ -773,6 +825,26 @@ def _bybit_announcements_artifact_stats(
         "requests_used": int(rehearsal_payload.get("requests_used") or 0),
         "official_events_written": int(rehearsal_payload.get("official_events_written") or 0),
         "official_listing_candidates_written": int(rehearsal_payload.get("official_listing_candidates_written") or 0),
+    }
+
+
+def _unlock_calendar_artifact_stats(
+    *,
+    artifact_namespace_dir: str | Path | None,
+    artifact_namespace: str,
+) -> dict[str, Any]:
+    base = Path(artifact_namespace_dir).expanduser() if artifact_namespace_dir is not None else _namespace_dir(artifact_namespace)
+    preflight_json = base / event_unlock_calendar_preflight.PREFLIGHT_JSON
+    preflight_md = base / event_unlock_calendar_preflight.PREFLIGHT_MD
+    preflight_payload = _read_json(preflight_json)
+    provider_rows = preflight_payload.get("providers") or preflight_payload.get("provider_rows") or ()
+    if not isinstance(provider_rows, Iterable) or isinstance(provider_rows, (str, bytes, Mapping)):
+        provider_rows = ()
+    return {
+        "preflight_status": str(preflight_payload.get("preflight_status") or "generated" if preflight_json.exists() else "not_generated"),
+        "preflight_json_path": event_artifact_paths.artifact_display_path(preflight_json) if preflight_json.exists() else None,
+        "preflight_report_path": event_artifact_paths.artifact_display_path(preflight_md) if preflight_md.exists() else None,
+        "provider_rows": tuple(dict(row) for row in provider_rows if isinstance(row, Mapping)),
     }
 
 
@@ -1329,6 +1401,7 @@ def _provider_setup_action(provider: str, *, status: str) -> str:
         "bybit_announcements_public": "official Bybit public announcement coverage for listing/perp events; no API key required",
         "coinmarketcal": "structured event calendar coverage",
         "tokenomist": "Tokenomist unlock/supply coverage",
+        "messari_unlocks": "Messari structured unlock coverage",
         "sports_fixtures": "sports fixture coverage for fan-token packs",
         "polymarket": "Polymarket context coverage for external catalysts",
         "coinalyze": "Coinalyze derivatives/OI/funding coverage",

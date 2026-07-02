@@ -1314,6 +1314,21 @@ def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor
         assert by_provider["binance_announcements_public_or_fixture"]["preflight_status"] == "fixture_ready"
         assert by_provider["binance_announcements_signed_listener"]["env_vars_required"]
         assert by_provider["binance_announcements_signed_listener"]["activation_phase"] == "blocked"
+        assert by_provider["tokenomist"]["env_vars_required"] == [
+            "RSI_EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH",
+            "TOKENOMIST_API_KEY",
+        ]
+        assert by_provider["messari_unlocks"]["env_vars_required"] == [
+            "RSI_EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH",
+            "MESSARI_API_KEY",
+        ]
+        assert by_provider["coinmarketcal"]["env_vars_required"] == [
+            "RSI_EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH",
+            "COINMARKETCAL_API_KEY",
+        ]
+        assert "event-alpha-tokenomist-preflight" in by_provider["tokenomist"]["smoke_targets"]
+        assert "event-alpha-messari-unlocks-preflight" in by_provider["messari_unlocks"]["smoke_targets"]
+        assert "event-alpha-coinmarketcal-preflight" in by_provider["coinmarketcal"]["smoke_targets"]
         assert not event_alpha_artifact_doctor._text_has_secret_like_value(md_path.read_text(encoding="utf-8"))
         clean = event_alpha_artifact_doctor.diagnose_artifacts(
             source_coverage_report_path=source_path,
@@ -39490,6 +39505,127 @@ def test_scheduled_catalyst_fixture_lanes_and_unlock_artifacts():
     assert all(row["research_only"] is True for row in [*scheduled, *unlocks])
 
 
+def test_scheduled_catalyst_messari_fixture_shape_and_materiality():
+    from crypto_rsi_scanner import event_scheduled_catalysts
+
+    with TemporaryDirectory() as tmp:
+        result = event_scheduled_catalysts.run_scheduled_catalyst_scan(
+            namespace_dir=tmp,
+            provider_paths={
+                "messari_unlocks": "fixtures/event_discovery/scheduled_messari_unlocks.json",
+            },
+            profile="fixture",
+            artifact_namespace="scheduled_catalyst_smoke",
+            run_mode="fixture",
+            run_id="run-messari-fixture",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+
+    assert result.scheduled_count == 1
+    assert result.unlock_count == 1
+    row = result.unlock_candidates[0]
+    assert row["source_provider"] == "messari_unlocks"
+    assert row["symbol"] == "TESTVEST"
+    assert row["coin_id"] == "test-vesting"
+    assert row["unlock_pct_circulating"] == 0.055
+    assert row["unlock_usd"] == 1260000
+    assert row["unlock_vs_30d_adv"] == 1.1
+    assert row["vesting_category"] == "investors"
+    assert row["cliff_or_linear"] == "cliff"
+    assert row["event_timestamp_confidence"] == "confirmed"
+    assert row["structured_unlock_evidence"] is True
+    assert row["created_alert"] is False
+    assert row["research_only"] is True
+
+
+def test_unlock_calendar_preflight_provider_rows_and_doctor_conflicts():
+    import json
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_unlock_calendar_preflight
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        report = event_unlock_calendar_preflight.build_preflight_report(
+            namespace_dir=base,
+            profile="fixture",
+            artifact_namespace="unlock_calendar_preflight",
+            tokenomist_path="fixtures/event_discovery/scheduled_tokenomist_unlocks.json",
+            messari_path="fixtures/event_discovery/scheduled_messari_unlocks.json",
+            coinmarketcal_path="fixtures/event_discovery/scheduled_coinmarketcal_events.json",
+            smoke_mode=True,
+            now=datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc),
+        )
+        json_path, _md_path = event_unlock_calendar_preflight.write_preflight_artifacts(report, base)
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        by_provider = {row["provider"]: row for row in payload["providers"]}
+        clean = event_unlock_calendar_preflight.artifact_conflicts(base)
+
+        assert payload["preflight_status"] == "fixture_ready"
+        assert payload["live_call_allowed"] is False
+        assert payload["research_only"] is True
+        assert set(by_provider) == {"tokenomist", "messari_unlocks", "coinmarketcal"}
+        assert by_provider["tokenomist"]["fixture_parser_status"] == "pass"
+        assert by_provider["messari_unlocks"]["fixture_parser_status"] == "pass"
+        assert by_provider["coinmarketcal"]["fixture_parser_status"] == "pass"
+        assert by_provider["messari_unlocks"]["env_vars_required"] == [
+            "RSI_EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH",
+            "MESSARI_API_KEY",
+        ]
+        assert all(row["live_call_allowed"] is False for row in by_provider.values())
+        assert all(row["telegram_sends"] == 0 for row in by_provider.values())
+        assert clean["unlock_calendar_preflight_secret_leak"] == 0
+        assert clean["unlock_calendar_preflight_live_without_ledger"] == 0
+        assert clean["unlock_calendar_preflight_forbidden_side_effect_claim"] == 0
+
+        payload["live_call_allowed"] = True
+        payload["providers"][0]["live_call_allowed"] = True
+        json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        unsafe = event_alpha_artifact_doctor.diagnose_artifacts(
+            source_coverage_report_path=base / "event_alpha_source_coverage.md",
+            profile="fixture",
+            artifact_namespace="unlock_calendar_preflight",
+            include_test_artifacts=True,
+            strict=True,
+        )
+
+    assert unsafe.unlock_calendar_preflight_live_without_ledger >= 1
+    assert unsafe.status == "BLOCKED"
+
+
+def test_source_coverage_links_unlock_calendar_preflight_artifacts():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_source_coverage, event_provider_status, event_unlock_calendar_preflight
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        preflight = event_unlock_calendar_preflight.build_preflight_report(
+            namespace_dir=base,
+            profile="fixture",
+            artifact_namespace="scheduled_catalyst_smoke",
+            tokenomist_path="fixtures/event_discovery/scheduled_tokenomist_unlocks.json",
+            messari_path="fixtures/event_discovery/scheduled_messari_unlocks.json",
+            coinmarketcal_path="fixtures/event_discovery/scheduled_coinmarketcal_events.json",
+            smoke_mode=True,
+            now=datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc),
+        )
+        event_unlock_calendar_preflight.write_preflight_artifacts(preflight, base)
+        provider_status = event_provider_status.build_event_discovery_provider_status(_event_provider_status_cfg())
+        report = event_alpha_source_coverage.build_source_coverage_report(
+            provider_status_report=provider_status,
+            profile="fixture",
+            artifact_namespace="scheduled_catalyst_smoke",
+            artifact_namespace_dir=base,
+            now=datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc),
+        )
+        text = event_alpha_source_coverage.format_source_coverage_report(report)
+
+    assert report.unlock_calendar_preflight_status == "fixture_ready"
+    assert report.unlock_calendar_preflight_report_path.endswith("event_unlock_calendar_preflight.md")
+    assert "Unlock/calendar preflight: fixture_ready" in text
+    assert "event_unlock_calendar_preflight.md" in text
+    assert "messari_unlocks configured=true fixture_parser_status=pass" in text
+
+
 def test_cryptopanic_fan_narrative_is_not_structured_unlock_proof():
     from crypto_rsi_scanner import event_market_reaction, event_source_packs
 
@@ -39663,7 +39799,13 @@ def test_makefile_exposes_scheduled_catalyst_targets():
     assert "event-alpha-scheduled-catalyst-report" in text
     assert "event-alpha-scheduled-catalyst-smoke" in text
     assert "event-alpha-unlock-risk-smoke" in text
+    assert "event-alpha-tokenomist-preflight" in text
+    assert "event-alpha-messari-unlocks-preflight" in text
+    assert "event-alpha-coinmarketcal-preflight" in text
     assert "--event-alpha-scheduled-catalyst-report" in text
+    assert "--event-alpha-tokenomist-preflight" in text
+    assert "--event-alpha-messari-unlocks-preflight" in text
+    assert "--event-alpha-coinmarketcal-preflight" in text
 
 
 def test_derivatives_crowding_fixture_lanes_and_artifacts():

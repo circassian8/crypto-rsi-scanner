@@ -300,6 +300,7 @@ def format_readiness_report(report: LiveProviderReadinessReport) -> str:
 def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[LiveProviderReadinessProvider]:
     coinalyze_history = _coinalyze_history(artifact_namespace)
     bybit_history = _bybit_announcements_history(artifact_namespace)
+    unlock_history = _unlock_calendar_history(artifact_namespace)
     rows = (
         _row(
             "coinalyze",
@@ -461,36 +462,114 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
             lanes_blocked_without_market=("CONFIRMED_LONG_RESEARCH",),
         ),
         _row(
-            "tokenomist_messari_unlocks",
+            "tokenomist",
             category="structured_unlock_calendar",
             priority_rank=5,
-            env_vars=("RSI_EVENT_DISCOVERY_TOKENOMIST_PATH", "MESSARI_API_KEY"),
-            configured=bool(getattr(config, "EVENT_DISCOVERY_TOKENOMIST_PATH", None)),
+            env_vars=("RSI_EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH", "TOKENOMIST_API_KEY"),
+            configured=Path(config.EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH).exists(),
             live_enabled=False,
-            fixture_path=getattr(config, "EVENT_DISCOVERY_TOKENOMIST_PATH", None),
+            fixture_path=getattr(config, "EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH", None),
             source_packs=("unlock_supply_pack",),
             lanes=("RISK_ONLY", "FADE_SHORT_REVIEW"),
-            quota="structured-calendar providers must stay bounded by event date window and request ledger",
-            outputs=("event_scheduled_catalysts.jsonl", "event_unlock_risk_candidates.jsonl"),
-            ledger=None,
-            status_if_missing="missing_config",
+            quota="fixture/parser ready by default; any future live call requires explicit allow flag, request ledger, and event-window request cap",
+            outputs=("event_unlock_calendar_preflight.json", "event_unlock_calendar_preflight.md", "event_scheduled_catalysts.jsonl", "event_unlock_candidates.jsonl"),
+            ledger=unlock_history["latest_request_ledger_path"],
+            status_if_missing="fixture_ready",
             smoke_mode=smoke_mode,
             sidecar_fixture_available=True,
-            smoke_targets=("event-alpha-scheduled-catalyst-smoke", "event-alpha-unlock-risk-smoke"),
-            fixture_artifacts=("event_scheduled_catalysts.jsonl", "event_unlock_candidates.jsonl"),
-            next_safe_command="make event-alpha-live-provider-readiness PROFILE=notify_llm_deep",
-            no_send_rehearsal_command="make event-alpha-scheduled-catalyst-smoke PYTHON=python3 && make event-alpha-unlock-risk-smoke PYTHON=python3",
-            max_requests_per_run=20,
-            weekly_or_daily_budget="calendar lookback/lookahead bounded by event window",
+            smoke_targets=("event-alpha-tokenomist-preflight", "event-alpha-scheduled-catalyst-smoke", "event-alpha-unlock-risk-smoke"),
+            fixture_artifacts=("event_unlock_calendar_preflight.json", "event_scheduled_catalysts.jsonl", "event_unlock_candidates.jsonl"),
+            next_safe_command="make event-alpha-tokenomist-preflight PROFILE=notify_llm_deep PYTHON=python3",
+            no_send_rehearsal_command="make event-alpha-tokenomist-preflight PYTHON=python3",
+            max_requests_per_run=10,
+            weekly_or_daily_budget="event-window bounded; no live call implemented by default",
             timeout_seconds=20,
             cache_ttl_seconds=3600,
             provider_health_key="tokenomist",
             lanes_blocked_without_market=("CONFIRMED_LONG_RESEARCH", "FADE_SHORT_REVIEW"),
+            latest_preflight_status=unlock_history["latest_preflight_status"],
+            latest_rehearsal_status=unlock_history["latest_rehearsal_status"],
+            latest_request_ledger_path=unlock_history["latest_request_ledger_path"],
+            latest_provider_health_status=unlock_history["latest_provider_health_status"],
+            latest_rehearsal_generated_at=unlock_history["latest_rehearsal_generated_at"],
+            latest_snapshots_written=unlock_history["latest_snapshots_written"],
+            latest_budget_used=unlock_history["latest_budget_used"],
+            activation_phase_override=unlock_history["activation_phase"],
+        ),
+        _row(
+            "messari_unlocks",
+            category="structured_unlock_calendar",
+            priority_rank=6,
+            env_vars=("RSI_EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH", "MESSARI_API_KEY"),
+            configured=Path(config.EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH).exists(),
+            live_enabled=False,
+            fixture_path=getattr(config, "EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH", None),
+            source_packs=("unlock_supply_pack",),
+            lanes=("RISK_ONLY", "FADE_SHORT_REVIEW"),
+            quota="fixture/parser ready by default; any future live call requires explicit allow flag, request ledger, and event-window request cap",
+            outputs=("event_unlock_calendar_preflight.json", "event_unlock_calendar_preflight.md", "event_scheduled_catalysts.jsonl", "event_unlock_candidates.jsonl"),
+            ledger=unlock_history["latest_request_ledger_path"],
+            status_if_missing="fixture_ready",
+            smoke_mode=smoke_mode,
+            sidecar_fixture_available=True,
+            smoke_targets=("event-alpha-messari-unlocks-preflight", "event-alpha-scheduled-catalyst-smoke", "event-alpha-unlock-risk-smoke"),
+            fixture_artifacts=("event_unlock_calendar_preflight.json", "event_scheduled_catalysts.jsonl", "event_unlock_candidates.jsonl"),
+            next_safe_command="make event-alpha-messari-unlocks-preflight PROFILE=notify_llm_deep PYTHON=python3",
+            no_send_rehearsal_command="make event-alpha-messari-unlocks-preflight PYTHON=python3",
+            max_requests_per_run=10,
+            weekly_or_daily_budget="event-window bounded; no live call implemented by default",
+            timeout_seconds=20,
+            cache_ttl_seconds=3600,
+            provider_health_key="messari_unlocks",
+            lanes_blocked_without_market=("CONFIRMED_LONG_RESEARCH", "FADE_SHORT_REVIEW"),
+            latest_preflight_status=unlock_history["latest_preflight_status"],
+            latest_rehearsal_status=unlock_history["latest_rehearsal_status"],
+            latest_request_ledger_path=unlock_history["latest_request_ledger_path"],
+            latest_provider_health_status=unlock_history["latest_provider_health_status"],
+            latest_rehearsal_generated_at=unlock_history["latest_rehearsal_generated_at"],
+            latest_snapshots_written=unlock_history["latest_snapshots_written"],
+            latest_budget_used=unlock_history["latest_budget_used"],
+            activation_phase_override=unlock_history["activation_phase"],
+        ),
+        _row(
+            "coinmarketcal",
+            category="structured_unlock_calendar",
+            priority_rank=7,
+            env_vars=("RSI_EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH", "COINMARKETCAL_API_KEY"),
+            configured=Path(config.EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH).exists(),
+            live_enabled=False,
+            fixture_path=getattr(config, "EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH", None),
+            source_packs=("project_event_pack", "unlock_supply_pack"),
+            lanes=("EARLY_LONG_RESEARCH", "RISK_ONLY"),
+            quota="fixture/parser ready by default; any future live call requires explicit allow flag, request ledger, and page/limit cap",
+            outputs=("event_unlock_calendar_preflight.json", "event_unlock_calendar_preflight.md", "event_scheduled_catalysts.jsonl", "event_unlock_candidates.jsonl"),
+            ledger=unlock_history["latest_request_ledger_path"],
+            status_if_missing="fixture_ready",
+            smoke_mode=smoke_mode,
+            sidecar_fixture_available=True,
+            smoke_targets=("event-alpha-coinmarketcal-preflight", "event-alpha-scheduled-catalyst-smoke"),
+            fixture_artifacts=("event_unlock_calendar_preflight.json", "event_scheduled_catalysts.jsonl", "event_unlock_candidates.jsonl"),
+            next_safe_command="make event-alpha-coinmarketcal-preflight PROFILE=notify_llm_deep PYTHON=python3",
+            no_send_rehearsal_command="make event-alpha-coinmarketcal-preflight PYTHON=python3",
+            max_requests_per_run=10,
+            weekly_or_daily_budget="event-window bounded; no live call implemented by default",
+            timeout_seconds=20,
+            cache_ttl_seconds=3600,
+            provider_health_key="coinmarketcal",
+            lanes_blocked_without_market=("CONFIRMED_LONG_RESEARCH", "FADE_SHORT_REVIEW"),
+            latest_preflight_status=unlock_history["latest_preflight_status"],
+            latest_rehearsal_status=unlock_history["latest_rehearsal_status"],
+            latest_request_ledger_path=unlock_history["latest_request_ledger_path"],
+            latest_provider_health_status=unlock_history["latest_provider_health_status"],
+            latest_rehearsal_generated_at=unlock_history["latest_rehearsal_generated_at"],
+            latest_snapshots_written=unlock_history["latest_snapshots_written"],
+            latest_budget_used=unlock_history["latest_budget_used"],
+            activation_phase_override=unlock_history["activation_phase"],
         ),
         _row(
             "geckoterminal_defillama",
             category="dex_onchain",
-            priority_rank=6,
+            priority_rank=8,
             env_vars=(),
             configured=False,
             live_enabled=False,
@@ -517,7 +596,7 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
         _row(
             "cryptopanic_rss_gdelt_context",
             category="news_context",
-            priority_rank=7,
+            priority_rank=9,
             env_vars=("RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN",),
             configured=bool(config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN),
             live_enabled=bool(config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE),
@@ -726,6 +805,38 @@ def _bybit_announcements_history(artifact_namespace: str) -> dict[str, Any]:
         "latest_rehearsal_generated_at": str(rehearsal.get("generated_at") or "") or None,
         "latest_snapshots_written": int(rehearsal.get("official_events_written") or rehearsal.get("announcements_inspected") or 0),
         "latest_budget_used": int(rehearsal.get("requests_used") or 0),
+        "activation_phase": activation_phase,
+    }
+
+
+def _unlock_calendar_history(artifact_namespace: str) -> dict[str, Any]:
+    from . import event_unlock_calendar_preflight
+
+    base = Path(getattr(config, "EVENT_ALPHA_ARTIFACT_BASE_DIR", "event_fade_cache")).expanduser()
+    namespace_dir = base / str(artifact_namespace or "default")
+    preflight = _read_json(namespace_dir / event_unlock_calendar_preflight.PREFLIGHT_JSON)
+    ledger = namespace_dir / event_unlock_calendar_preflight.REQUEST_LEDGER
+    status = str(preflight.get("preflight_status") or "not_generated")
+    provider_rows = preflight.get("providers") or preflight.get("provider_rows") or ()
+    if not isinstance(provider_rows, Iterable) or isinstance(provider_rows, (str, bytes, Mapping)):
+        provider_rows = ()
+    fixture_rows = 0
+    for row in provider_rows:
+        if not isinstance(row, Mapping):
+            continue
+        try:
+            fixture_rows += int(row.get("scheduled_events_previewed") or row.get("fixture_rows_observed") or 0)
+        except (TypeError, ValueError):
+            pass
+    activation_phase = "fixture_ready" if status in {"fixture_ready", "fixture_partial"} else status
+    return {
+        "latest_preflight_status": status,
+        "latest_rehearsal_status": status,
+        "latest_request_ledger_path": event_artifact_paths.artifact_display_path(ledger) if ledger.exists() else None,
+        "latest_provider_health_status": "not_observed",
+        "latest_rehearsal_generated_at": str(preflight.get("generated_at") or "") or None,
+        "latest_snapshots_written": fixture_rows,
+        "latest_budget_used": 0,
         "activation_phase": activation_phase,
     }
 

@@ -103,6 +103,28 @@ def run_scheduled_catalyst_scan(
             scheduled_rows.append(event)
             unlock_rows.append(_unlock_candidate_for_event(event, item))
 
+    messari_path = provider_paths.get("messari_unlocks")
+    if messari_path is None:
+        warnings.append("messari_unlocks:not_configured")
+    else:
+        unlock_items = tuple(_normalize_messari_unlock_item(item) for item in _load_messari_unlock_items(messari_path))
+        if not unlock_items:
+            warnings.append("messari_unlocks:no_fixture_rows")
+        for item in unlock_items:
+            event = normalize_scheduled_catalyst_event(
+                item,
+                provider="messari_unlocks",
+                observed_at=observed,
+                profile=profile,
+                artifact_namespace=artifact_namespace,
+                run_mode=run_mode,
+                run_id=run_id,
+                forced_event_type=_unlock_event_type(item),
+                forced_source_class=str(item.get("source_class") or "structured_unlock"),
+            )
+            scheduled_rows.append(event)
+            unlock_rows.append(_unlock_candidate_for_event(event, item))
+
     calendar_path = provider_paths.get("coinmarketcal")
     if calendar_path is None:
         warnings.append("coinmarketcal:not_configured")
@@ -242,9 +264,13 @@ def normalize_scheduled_catalyst_event(
         ),
         "unlock_time": event_start if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
         "unlock_type": _unlock_type(item) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
+        "cliff_or_linear": _cliff_or_linear(item) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
+        "vesting_category": _vesting_category(item) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
+        "event_timestamp_confidence": _event_timestamp_confidence(item, event_start=event_start, source_class=source_class),
         "tokens_unlocked": _optional_float(_first(item, "tokens_unlocked", "unlock_amount", "amount")) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
         "unlock_usd": _optional_float(_first(item, "unlock_usd", "unlock_value_usd", "value_usd")) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
         "unlock_pct_circulating_supply": _optional_float(_first(item, "unlock_pct_circulating_supply", "unlock_pct_circulating", "percent_of_circulating_supply")) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
+        "unlock_pct_circulating": _optional_float(_first(item, "unlock_pct_circulating_supply", "unlock_pct_circulating", "percent_of_circulating_supply")) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
         "unlock_pct_total_supply": _optional_float(_first(item, "unlock_pct_total_supply", "percent_of_total_supply")) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
         "unlock_vs_30d_adv": _optional_float(_first(item, "unlock_vs_30d_adv", "unlock_to_adv", "unlock_vs_adv")) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
         "observed_at": observed.isoformat(),
@@ -377,6 +403,8 @@ def format_unlock_risk_report(
             "- "
             f"{row.get('symbol') or 'UNRESOLVED'}/{row.get('coin_id') or 'unresolved'} "
             f"{row.get('unlock_type') or 'unknown'} "
+            f"vesting={row.get('vesting_category') or 'unknown'} "
+            f"timestamp_confidence={row.get('event_timestamp_confidence') or 'unknown'} "
             f"unlock_pct_circ={_format_pct(row.get('unlock_pct_circulating_supply'))} "
             f"unlock_vs_adv={_format_float(row.get('unlock_vs_30d_adv'))} "
             f"lane={row.get('opportunity_type') or 'unknown'} "
@@ -471,12 +499,16 @@ def _unlock_candidate_for_event(event: Mapping[str, Any], item: Mapping[str, Any
         "source_url": event.get("source_url"),
         "unlock_time": unlock_time or None,
         "unlock_type": _unlock_type(item),
+        "cliff_or_linear": _cliff_or_linear(item),
         "tokens_unlocked": _optional_float(_first(item, "tokens_unlocked", "unlock_amount", "amount")),
         "unlock_usd": _optional_float(_first(item, "unlock_usd", "unlock_value_usd", "value_usd")),
         "unlock_pct_circulating_supply": pct_circ,
+        "unlock_pct_circulating": pct_circ,
         "unlock_pct_total_supply": pct_total,
         "unlock_vs_30d_adv": unlock_vs_adv,
-        "recipient_category": _first_text(item, "recipient_category", "allocation_category", "vesting_category", "allocation"),
+        "vesting_category": _vesting_category(item),
+        "recipient_category": _vesting_category(item),
+        "event_timestamp_confidence": event.get("event_timestamp_confidence"),
         "source_confidence": event.get("confidence"),
         "confidence": event.get("confidence"),
         "reason_codes": tuple(dict.fromkeys(reason_codes)),
@@ -505,8 +537,27 @@ def _load_tokenomist_items(path: str | Path) -> tuple[Mapping[str, Any], ...]:
     return _load_items(path, "unlocks")
 
 
+def _load_messari_unlock_items(path: str | Path) -> tuple[Mapping[str, Any], ...]:
+    return _load_items(path, "unlocks")
+
+
 def _load_calendar_items(path: str | Path) -> tuple[Mapping[str, Any], ...]:
     return _load_items(path, "events")
+
+
+def _normalize_messari_unlock_item(item: Mapping[str, Any]) -> dict[str, Any]:
+    out = dict(item)
+    asset = out.get("asset")
+    if isinstance(asset, Mapping):
+        out.setdefault("token_id", asset.get("id"))
+        out.setdefault("token_name", asset.get("name"))
+        out.setdefault("token_symbol", asset.get("symbol"))
+        out.setdefault("coin_id", asset.get("id"))
+        out.setdefault("symbol", asset.get("symbol"))
+    out.setdefault("unlock_date", out.get("timestamp") or out.get("unlock_at") or out.get("event_time"))
+    out.setdefault("source_class", "structured_unlock")
+    out.setdefault("event_type", "token_unlock")
+    return out
 
 
 def _load_items(path: str | Path, key: str) -> tuple[Mapping[str, Any], ...]:
@@ -702,9 +753,43 @@ def _unlock_type(item: Mapping[str, Any]) -> str:
     return "unknown"
 
 
+def _cliff_or_linear(item: Mapping[str, Any]) -> str:
+    unlock_type = _unlock_type(item)
+    if unlock_type in {"cliff", "linear"}:
+        return unlock_type
+    return "unknown"
+
+
+def _vesting_category(item: Mapping[str, Any]) -> str | None:
+    return _first_text(item, "vesting_category", "recipient_category", "allocation_category", "allocation", "category")
+
+
+def _event_timestamp_confidence(
+    item: Mapping[str, Any],
+    *,
+    event_start: str | None,
+    source_class: str,
+) -> str:
+    raw = _first_text(item, "event_timestamp_confidence", "event_time_confidence", "timestamp_confidence", "time_confidence")
+    if raw:
+        clean = raw.strip().casefold().replace("-", "_").replace(" ", "_")
+        if clean in {"confirmed", "high", "exact"}:
+            return "confirmed"
+        if clean in {"estimated", "medium", "approximate", "date_only"}:
+            return "estimated"
+        if clean in {"low", "unknown", "missing"}:
+            return "unknown"
+        return clean
+    if not event_start:
+        return "unknown"
+    if source_class in {"structured_unlock", "structured_calendar", "official_project", "official_exchange", "supply_data"}:
+        return "confirmed"
+    return "estimated"
+
+
 def _source_class_for_provider(provider: str) -> str:
     text = str(provider or "").casefold()
-    if "tokenomist" in text or "unlock" in text:
+    if "tokenomist" in text or "messari" in text or "unlock" in text:
         return "structured_unlock"
     if "coinmarketcal" in text or "coindar" in text or "calendar" in text:
         return "structured_calendar"

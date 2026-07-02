@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Add fixture-first unlock calendar provider preflights · Codex
+**Why:** Structured scheduled catalyst and unlock providers needed
+provider-specific readiness artifacts and no-send activation stubs before any
+live calendar/unlock source is considered for radar-grade research.
+**Changes:**
+- Added fixture/no-call unlock calendar preflight artifacts for Tokenomist,
+  Messari unlocks, and CoinMarketCal, including configured status, required env
+  var names, request-ledger paths, request budgets, supported event types,
+  enabled source packs, parser status, and zeroed safety counters.
+- Added provider-specific CLI/Make stubs for
+  `event-alpha-tokenomist-preflight`,
+  `event-alpha-messari-unlocks-preflight`, and
+  `event-alpha-coinmarketcal-preflight`; all default to fixture-only/no-live
+  behavior.
+- Added a Messari-style unlock fixture and parser path, materiality aliases,
+  vesting/cliff metadata, event timestamp confidence, and richer unlock-risk
+  report fields while preserving structured-source gates.
+- Linked unlock calendar preflight artifacts into source coverage and live
+  provider readiness, split structured unlock providers into separate readiness
+  rows, and extended artifact doctor checks for missing structured evidence,
+  missing event time/size, live-without-ledger, secret leakage, and side-effect
+  claims.
+- Added tests for Tokenomist/Messari/CoinMarketCal fixture shapes, no-live
+  defaults, source coverage links, readiness rows, and doctor conflicts.
+**Verify:** `python3 tests/test_indicators.py` (674/674); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-scheduled-catalyst-smoke PYTHON=python3`; `make
+event-alpha-unlock-risk-smoke PYTHON=python3`; `make
+event-alpha-live-provider-readiness-smoke PYTHON=python3`; `make
+event-alpha-tokenomist-preflight PYTHON=python3`; `make
+event-alpha-messari-unlocks-preflight PYTHON=python3`; `make
+event-alpha-coinmarketcal-preflight PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** These activation paths remain research-only and fixture-first.
+No live calls, sends, trades, paper trades, normal RSI rows, execution, secrets,
+or Event Alpha-created `TRIGGERED_FADE` are introduced.
+
 ## 2026-07-02 — Promote market anomalies into catalyst-search queue artifacts · Codex
 **Why:** Market anomaly scanning needed to move beyond fixture sidecar seeds
 into a broad market-first research queue with canonical identity, richer

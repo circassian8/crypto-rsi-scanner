@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_instrument_resolver, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_official_exchange_activation, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_instrument_resolver, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_official_exchange_activation, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_unlock_calendar_preflight, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -215,6 +215,7 @@ class EventAlphaArtifactDoctorResult:
     source_coverage_context_provider_ranked_above_lane_critical: int = 0
     source_coverage_coinalyze_missing_linked_artifact: int = 0
     source_coverage_bybit_announcements_missing_linked_artifact: int = 0
+    source_coverage_unlock_calendar_missing_linked_artifact: int = 0
     live_provider_readiness_missing: int = 0
     live_provider_readiness_secret_leak: int = 0
     live_provider_readiness_live_calls_allowed_in_smoke: int = 0
@@ -243,6 +244,11 @@ class EventAlphaArtifactDoctorResult:
     bybit_announcements_rehearsal_live_without_explicit_allow: int = 0
     bybit_announcements_rehearsal_unsupported_params: int = 0
     bybit_announcements_rehearsal_forbidden_side_effect_claim: int = 0
+    unlock_calendar_preflight_secret_leak: int = 0
+    unlock_calendar_preflight_live_without_ledger: int = 0
+    unlock_calendar_preflight_live_call_allowed_in_smoke: int = 0
+    unlock_calendar_preflight_missing_fixture_parser_status: int = 0
+    unlock_calendar_preflight_forbidden_side_effect_claim: int = 0
     source_pack_provider_status_missing: int = 0
     missing_provider_recommendations_missing: int = 0
     degraded_provider_absence_marked_meaningful: int = 0
@@ -956,6 +962,7 @@ def diagnose_artifacts(
     live_provider_readiness_conflicts = _live_provider_readiness_conflicts(namespace_dir)
     coinalyze_preflight_conflicts = event_coinalyze_preflight.artifact_conflicts(namespace_dir)
     bybit_announcements_conflicts = event_bybit_announcements_preflight.artifact_conflicts(namespace_dir)
+    unlock_calendar_conflicts = event_unlock_calendar_preflight.artifact_conflicts(namespace_dir)
     official_exchange_activation_conflicts = event_official_exchange_activation.artifact_conflicts(namespace_dir)
     instrument_resolution_conflicts = event_instrument_resolver.artifact_conflicts(namespace_dir)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
@@ -1413,6 +1420,12 @@ def diagnose_artifacts(
             f"{source_coverage_report_conflicts['source_coverage_bybit_announcements_missing_linked_artifact']}"
         )
         (blockers if strict else warnings).append(message)
+    if source_coverage_report_conflicts["source_coverage_unlock_calendar_missing_linked_artifact"]:
+        message = (
+            "source_coverage_unlock_calendar_missing_linked_artifact="
+            f"{source_coverage_report_conflicts['source_coverage_unlock_calendar_missing_linked_artifact']}"
+        )
+        (blockers if strict else warnings).append(message)
     if live_provider_readiness_conflicts["live_provider_readiness_missing"]:
         warnings.append(
             "live_provider_readiness_missing="
@@ -1462,6 +1475,18 @@ def diagnose_artifacts(
         "bybit_announcements_rehearsal_forbidden_side_effect_claim",
     ):
         count = bybit_announcements_conflicts.get(key, 0)
+        if not count:
+            continue
+        message = f"{key}={count}"
+        (blockers if strict else warnings).append(message)
+    for key in (
+        "unlock_calendar_preflight_secret_leak",
+        "unlock_calendar_preflight_live_without_ledger",
+        "unlock_calendar_preflight_live_call_allowed_in_smoke",
+        "unlock_calendar_preflight_missing_fixture_parser_status",
+        "unlock_calendar_preflight_forbidden_side_effect_claim",
+    ):
+        count = unlock_calendar_conflicts.get(key, 0)
         if not count:
             continue
         message = f"{key}={count}"
@@ -2216,6 +2241,9 @@ def diagnose_artifacts(
         source_coverage_bybit_announcements_missing_linked_artifact=source_coverage_report_conflicts[
             "source_coverage_bybit_announcements_missing_linked_artifact"
         ],
+        source_coverage_unlock_calendar_missing_linked_artifact=source_coverage_report_conflicts[
+            "source_coverage_unlock_calendar_missing_linked_artifact"
+        ],
         live_provider_readiness_missing=live_provider_readiness_conflicts["live_provider_readiness_missing"],
         live_provider_readiness_secret_leak=live_provider_readiness_conflicts["live_provider_readiness_secret_leak"],
         live_provider_readiness_live_calls_allowed_in_smoke=live_provider_readiness_conflicts[
@@ -2291,6 +2319,21 @@ def diagnose_artifacts(
         ],
         bybit_announcements_rehearsal_forbidden_side_effect_claim=bybit_announcements_conflicts[
             "bybit_announcements_rehearsal_forbidden_side_effect_claim"
+        ],
+        unlock_calendar_preflight_secret_leak=unlock_calendar_conflicts[
+            "unlock_calendar_preflight_secret_leak"
+        ],
+        unlock_calendar_preflight_live_without_ledger=unlock_calendar_conflicts[
+            "unlock_calendar_preflight_live_without_ledger"
+        ],
+        unlock_calendar_preflight_live_call_allowed_in_smoke=unlock_calendar_conflicts[
+            "unlock_calendar_preflight_live_call_allowed_in_smoke"
+        ],
+        unlock_calendar_preflight_missing_fixture_parser_status=unlock_calendar_conflicts[
+            "unlock_calendar_preflight_missing_fixture_parser_status"
+        ],
+        unlock_calendar_preflight_forbidden_side_effect_claim=unlock_calendar_conflicts[
+            "unlock_calendar_preflight_forbidden_side_effect_claim"
         ],
         source_pack_provider_status_missing=source_coverage_conflicts["source_pack_provider_status_missing"],
         missing_provider_recommendations_missing=source_coverage_conflicts["missing_provider_recommendations_missing"],
@@ -4483,6 +4526,7 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
         "source_coverage_context_provider_ranked_above_lane_critical": 0,
         "source_coverage_coinalyze_missing_linked_artifact": 0,
         "source_coverage_bybit_announcements_missing_linked_artifact": 0,
+        "source_coverage_unlock_calendar_missing_linked_artifact": 0,
     }
     if path is None:
         return out
@@ -4537,6 +4581,13 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
     ):
         if artifact_name in text and not (report_path.parent / artifact_name).exists():
             out["source_coverage_bybit_announcements_missing_linked_artifact"] += 1
+    for artifact_name in (
+        event_unlock_calendar_preflight.PREFLIGHT_JSON,
+        event_unlock_calendar_preflight.PREFLIGHT_MD,
+        event_unlock_calendar_preflight.REQUEST_LEDGER,
+    ):
+        if artifact_name in text and not (report_path.parent / artifact_name).exists():
+            out["source_coverage_unlock_calendar_missing_linked_artifact"] += 1
     readiness_present = "Live-provider activation readiness:" in text
     readiness_md_path = report_path.parent / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_MD
     readiness_json_path = report_path.parent / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_JSON
@@ -4673,6 +4724,9 @@ def _source_coverage_report_required(namespace_dir: Path) -> bool:
         "event_bybit_announcements_rehearsal_report.json",
         "event_bybit_announcements_rehearsal_report.md",
         "event_bybit_announcements_request_ledger.jsonl",
+        "event_unlock_calendar_preflight.json",
+        "event_unlock_calendar_preflight.md",
+        "event_unlock_calendar_request_ledger.jsonl",
         "event_official_exchange_activation.json",
         "event_official_exchange_activation.md",
         "cryptopanic_request_ledger.jsonl",
@@ -4698,6 +4752,8 @@ def _live_provider_readiness_required(namespace_dir: Path) -> bool:
         "event_bybit_announcements_preflight.md",
         "event_bybit_announcements_rehearsal_report.json",
         "event_bybit_announcements_rehearsal_report.md",
+        "event_unlock_calendar_preflight.json",
+        "event_unlock_calendar_preflight.md",
         "event_official_exchange_activation.json",
         "event_official_exchange_activation.md",
     )
@@ -6624,6 +6680,8 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"{result.source_coverage_coinalyze_missing_linked_artifact} "
             "source_coverage_bybit_announcements_missing_linked_artifact="
             f"{result.source_coverage_bybit_announcements_missing_linked_artifact} "
+            "source_coverage_unlock_calendar_missing_linked_artifact="
+            f"{result.source_coverage_unlock_calendar_missing_linked_artifact} "
             f"live_provider_readiness_missing={result.live_provider_readiness_missing} "
             f"live_provider_readiness_secret_leak={result.live_provider_readiness_secret_leak} "
             f"live_provider_readiness_live_calls_allowed_in_smoke={result.live_provider_readiness_live_calls_allowed_in_smoke} "
@@ -6665,6 +6723,16 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"{result.bybit_announcements_rehearsal_unsupported_params} "
             "bybit_announcements_rehearsal_forbidden_side_effect_claim="
             f"{result.bybit_announcements_rehearsal_forbidden_side_effect_claim} "
+            "unlock_calendar_preflight_secret_leak="
+            f"{result.unlock_calendar_preflight_secret_leak} "
+            "unlock_calendar_preflight_live_without_ledger="
+            f"{result.unlock_calendar_preflight_live_without_ledger} "
+            "unlock_calendar_preflight_live_call_allowed_in_smoke="
+            f"{result.unlock_calendar_preflight_live_call_allowed_in_smoke} "
+            "unlock_calendar_preflight_missing_fixture_parser_status="
+            f"{result.unlock_calendar_preflight_missing_fixture_parser_status} "
+            "unlock_calendar_preflight_forbidden_side_effect_claim="
+            f"{result.unlock_calendar_preflight_forbidden_side_effect_claim} "
             f"source_pack_provider_status_missing={result.source_pack_provider_status_missing} "
             f"missing_provider_recommendations_missing={result.missing_provider_recommendations_missing} "
             f"degraded_provider_absence_marked_meaningful={result.degraded_provider_absence_marked_meaningful} "

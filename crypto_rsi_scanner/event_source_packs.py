@@ -175,7 +175,7 @@ SOURCE_PACKS: dict[str, SourcePack] = {
             event_source_registry.SourceClass.SUPPLY_DATA.value,
             event_source_registry.SourceClass.OFFICIAL_PROJECT.value,
         ),
-        preferred_providers=("tokenomist", "project_blog_rss", "etherscan", "arkham", "dune"),
+        preferred_providers=("tokenomist", "messari_unlocks", "coinmarketcal", "project_blog_rss", "etherscan", "arkham", "dune"),
         minimum_evidence=("unlock size", "unlock time", "circulating/float impact"),
         validation_requirements=("structured_unlock_source", "unlock_materiality", "token_identity"),
         sufficient_for_validated_digest=("structured_unlock_source", "token_identity", "material_unlock"),
