@@ -722,15 +722,10 @@ def diagnose_artifacts(
         namespace_dir,
         include_stale_artifacts=include_stale_artifacts,
     )
-    schema_result = schema_doctor.validate_namespace_artifacts(namespace_phase.namespace_dir)
-    safety_result = safety_doctor.validate_schema_safety(
-        schema_result,
-        strict=strict,
-        schema_only=schema_only,
-    )
     if namespace_phase.short_circuit:
+        phase_status = "BLOCKED" if namespace_phase.blockers else "STALE"
         return _phase_only_doctor_result(
-            status="STALE",
+            status=phase_status,
             profile=profile,
             artifact_namespace=artifact_namespace,
             runs=runs,
@@ -739,17 +734,25 @@ def diagnose_artifacts(
             outcomes=outcomes,
             card_paths=card_paths,
             namespace_phase=namespace_phase,
-            schema_result=schema_result,
+            schema_result=schema_doctor.SchemaDoctorResult(),
             strict=strict,
             strict_legacy=strict_legacy,
             schema_only=schema_only,
             legacy_checks_skipped=True,
-            blockers=(),
+            blockers=namespace_phase.blockers,
             warnings=namespace_phase.warnings,
         )
+    schema_result = schema_doctor.validate_namespace_artifacts(namespace_phase.namespace_dir)
+    safety_result = safety_doctor.validate_schema_safety(
+        schema_result,
+        strict=strict,
+        schema_only=schema_only,
+    )
     if schema_only or skip_legacy_checks:
-        phase_blockers: list[str] = list(safety_result.blockers)
-        phase_warnings: list[str] = list(safety_result.warnings)
+        phase_blockers: list[str] = list(namespace_phase.blockers)
+        phase_blockers.extend(safety_result.blockers)
+        phase_warnings: list[str] = list(namespace_phase.warnings)
+        phase_warnings.extend(safety_result.warnings)
         if schema_result.schema_validation_errors:
             message = check_registry.format_check_message(
                 "schema.validation_errors",
@@ -780,6 +783,8 @@ def diagnose_artifacts(
         )
     blockers: list[str] = []
     warnings: list[str] = []
+    blockers.extend(namespace_phase.blockers)
+    warnings.extend(namespace_phase.warnings)
     blockers.extend(safety_result.blockers)
     warnings.extend(safety_result.warnings)
     matching_snapshot_runs = 0

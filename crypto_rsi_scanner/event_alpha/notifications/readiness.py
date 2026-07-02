@@ -96,12 +96,14 @@ def build_send_readiness(
     blockers: list[str] = []
     warnings: list[str] = []
     namespace_dir = None
-    if preview_path:
+    if resolved_preview_path is not None:
+        namespace_dir = resolved_preview_path.expanduser().parent
+    elif preview_path:
         namespace_dir = Path(preview_path).expanduser().parent
     elif artifact_namespace:
         namespace_dir = Path("event_fade_cache") / str(artifact_namespace)
     namespace_status = event_alpha_namespace_status.load_namespace_status(namespace_dir)
-    if event_alpha_namespace_status.is_stale_deprecated(namespace_status):
+    if event_alpha_namespace_status.is_inactive(namespace_status):
         blockers.append("artifact namespace is stale/deprecated and blocked for send-readiness")
     elif namespace_status and not namespace_status.safe_for_send_readiness:
         blockers.append("artifact namespace is marked unsafe for send-readiness")

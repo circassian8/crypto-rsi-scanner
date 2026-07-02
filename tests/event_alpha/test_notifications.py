@@ -1336,6 +1336,7 @@ def test_event_alpha_send_readiness_accepts_clean_no_send_rehearsal():
             artifact_doctor=doctor,
             send_guard_enabled=False,
             telegram_ready=False,
+            preview_path=preview,
         )
         text = event_alpha_send_readiness.format_send_readiness(result)
 

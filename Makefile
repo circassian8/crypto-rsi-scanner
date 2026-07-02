@@ -1431,6 +1431,7 @@ event-alpha-list-active-namespaces:
 event-alpha-archive-stale-namespaces:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 	RSI_EVENT_ALERTS_ENABLED=0 \
+	RSI_EVENT_ALPHA_ARCHIVE_DRY_RUN=$(DRY_RUN) \
 	$(PYTHON) main.py --event-alpha-archive-stale-namespaces
 
 event-alpha-provider-health-reset: PROFILE = notify_no_key

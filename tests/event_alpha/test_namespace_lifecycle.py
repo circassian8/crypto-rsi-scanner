@@ -909,6 +909,8 @@ def test_event_alpha_artifact_doctor_short_circuits_stale_namespace_marker():
         assert result.status == "STALE"
         assert result.namespace_stale_deprecated == 1
         assert result.namespace_superseded_by == "notify_llm_deep_rehearsal"
+        assert result.schema_rows_validated == 0
+        assert result.schema_validation_errors == 0
         assert "safe_for_send_readiness: false" in "\n".join(result.warnings)
         included = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=[{"run_id": "old", "profile": "notify_llm_deep", "artifact_namespace": "notify_llm_deep", "run_mode": "burn_in"}],
@@ -1692,12 +1694,91 @@ def test_event_alpha_namespace_lifecycle_inventory_and_archive_plan():
         report = lifecycle.write_namespace_lifecycle_report(base, out_dir=base)
         assert (base / lifecycle.REGISTRY_FILENAME).exists()
         assert (base / lifecycle.REPORT_FILENAME).exists()
+        assert (integrated / event_alpha_namespace_status.NAMESPACE_STATUS_FILENAME).exists()
+        assert (stale / event_alpha_namespace_status.NAMESPACE_STATUS_FILENAME).exists()
         rows = {row["namespace"]: row for row in report["namespaces"]}
         assert rows["integrated_radar_smoke"]["status"] == "active_integrated_smoke"
         assert rows["integrated_radar_smoke"]["missing_key_artifacts"] == []
+        assert rows["integrated_radar_smoke"]["profile"] == "fixture"
+        assert rows["integrated_radar_smoke"]["readiness_required"] is True
+        assert rows["integrated_radar_smoke"]["readiness_present"] is True
         assert rows["notify_llm_deep"]["status"] == "stale_deprecated"
         assert rows["notify_llm_deep"]["safe_for_send_readiness"] is False
+        marker = event_alpha_namespace_status.load_namespace_status(integrated)
+        assert marker is not None
+        assert marker.status == "active_integrated_smoke"
+        assert marker.profile == "fixture"
+        assert marker.current_doctor_status == "not_run"
+        report_text = (base / lifecycle.REPORT_FILENAME).read_text(encoding="utf-8")
+        assert "Event Alpha Namespace Lifecycle" in report_text
+        assert "Active Doctor Status" in report_text
+        assert "Research artifact inventory only" in report_text
         plan = lifecycle.archive_stale_namespaces_plan(base)
         assert plan["dry_run"] is True
         assert plan["archive_performed"] is False
         assert plan["stale_namespace_count"] == 1
+        assert stale.exists()
+        requested = lifecycle.archive_stale_namespaces_plan(base, dry_run=False)
+        assert requested["dry_run"] is True
+        assert requested["requested_dry_run"] is False
+        assert requested["archive_performed"] is False
+        assert stale.exists()
+
+
+def test_event_alpha_namespace_lifecycle_doctor_policy_messages():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_namespace_status
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        unknown = base / "mystery_namespace"
+        event_alpha_namespace_status.write_namespace_status(
+            unknown,
+            {
+                "namespace": "mystery_namespace",
+                "status": "unknown",
+                "safe_for_send_readiness": False,
+                "current_doctor_status": "not_run",
+            },
+        )
+        unknown_result = event_alpha_artifact_doctor.diagnose_artifacts(
+            source_coverage_report_path=unknown / "event_alpha_source_coverage.md",
+            skip_legacy_checks=True,
+        )
+        assert unknown_result.status == "WARN"
+        assert any("unknown_namespace_status=unknown" in warning for warning in unknown_result.warnings)
+
+        unsafe = base / "unsafe_live"
+        event_alpha_namespace_status.write_namespace_status(
+            unsafe,
+            {
+                "namespace": "unsafe_live",
+                "status": "active_live_rehearsal",
+                "safe_for_send_readiness": True,
+                "current_doctor_status": "BLOCKED",
+            },
+        )
+        unsafe_result = event_alpha_artifact_doctor.diagnose_artifacts(
+            source_coverage_report_path=unsafe / "event_alpha_source_coverage.md",
+            skip_legacy_checks=True,
+        )
+        assert unsafe_result.status == "BLOCKED"
+        assert any("current_doctor_status=BLOCKED" in blocker for blocker in unsafe_result.blockers)
+
+        old_active = base / "old_active"
+        event_alpha_namespace_status.write_namespace_status(
+            old_active,
+            {
+                "namespace": "old_active",
+                "status": "active_live_rehearsal",
+                "safe_for_send_readiness": False,
+                "current_doctor_status": "OK",
+                "last_updated_at": "2000-01-01T00:00:00+00:00",
+                "archive_after_days": 1,
+            },
+        )
+        old_result = event_alpha_artifact_doctor.diagnose_artifacts(
+            source_coverage_report_path=old_active / "event_alpha_source_coverage.md",
+            skip_legacy_checks=True,
+        )
+        assert old_result.status == "WARN"
+        assert any("active_namespace_older_than_retention=old_active" in warning for warning in old_result.warnings)

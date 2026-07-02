@@ -14,16 +14,42 @@ from ..artifacts import schema_v1
 
 NAMESPACE_STATUS_FILENAME = "event_alpha_namespace_status.json"
 STATUS_ACTIVE = "active"
+STATUS_ACTIVE_LIVE_REHEARSAL = "active_live_rehearsal"
+STATUS_ACTIVE_FIXTURE_SMOKE = "active_fixture_smoke"
+STATUS_ACTIVE_PROVIDER_PREFLIGHT = "active_provider_preflight"
+STATUS_ACTIVE_PROVIDER_REHEARSAL = "active_provider_rehearsal"
+STATUS_ACTIVE_INTEGRATED_SMOKE = "active_integrated_smoke"
 STATUS_STALE_DEPRECATED = "stale_deprecated"
+STATUS_ARCHIVED = "archived"
+STATUS_QUARANTINE = "quarantine"
+STATUS_UNKNOWN = "unknown"
+
+INACTIVE_STATUSES = {STATUS_STALE_DEPRECATED, STATUS_ARCHIVED, STATUS_QUARANTINE}
 
 
 @dataclass(frozen=True)
 class EventAlphaNamespaceStatus:
     namespace: str
     status: str
+    profile: str | None = None
     reason: str | None = None
     superseded_by: str | None = None
     safe_for_send_readiness: bool = True
+    safe_for_burn_in_measurement: bool = False
+    safe_for_calibration: bool = False
+    created_at: str | None = None
+    last_updated_at: str | None = None
+    last_verified_at: str | None = None
+    retention_policy: str | None = None
+    archive_after_days: int | None = None
+    prune_after_days: int | None = None
+    current_doctor_status: str | None = None
+    latest_run_id: str | None = None
+    artifact_counts: Mapping[str, Any] | None = None
+    key_artifacts_present: tuple[str, ...] = ()
+    missing_key_artifacts: tuple[str, ...] = ()
+    readiness_required: bool = False
+    readiness_present: bool = False
     marked_at: str | None = None
     marker_path: str | None = None
 
@@ -39,9 +65,25 @@ class EventAlphaNamespaceStatus:
             "row_type": "event_alpha_namespace_status",
             "namespace": self.namespace,
             "status": self.status,
+            "profile": self.profile,
             "reason": self.reason,
             "superseded_by": superseded,
             "safe_for_send_readiness": bool(self.safe_for_send_readiness),
+            "safe_for_burn_in_measurement": bool(self.safe_for_burn_in_measurement),
+            "safe_for_calibration": bool(self.safe_for_calibration),
+            "created_at": self.created_at,
+            "last_updated_at": self.last_updated_at,
+            "last_verified_at": self.last_verified_at,
+            "retention_policy": self.retention_policy,
+            "archive_after_days": self.archive_after_days,
+            "prune_after_days": self.prune_after_days,
+            "current_doctor_status": self.current_doctor_status,
+            "latest_run_id": self.latest_run_id,
+            "artifact_counts": dict(self.artifact_counts or {}),
+            "key_artifacts_present": list(self.key_artifacts_present),
+            "missing_key_artifacts": list(self.missing_key_artifacts),
+            "readiness_required": bool(self.readiness_required),
+            "readiness_present": bool(self.readiness_present),
             "marked_at": self.marked_at,
             "marker_path": self.marker_path,
         }
@@ -68,10 +110,43 @@ def mark_namespace_stale(
         reason=reason,
         superseded_by=superseded_by,
         safe_for_send_readiness=bool(safe_for_send_readiness),
+        safe_for_burn_in_measurement=False,
+        safe_for_calibration=False,
+        retention_policy="audit_then_archive",
+        archive_after_days=30,
+        prune_after_days=180,
+        current_doctor_status="not_run",
         marked_at=ts,
         marker_path=event_artifact_paths.artifact_display_path(marker),
     )
     marker.write_text(json.dumps(status.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return marker
+
+
+def write_namespace_status(
+    namespace_dir: str | Path,
+    payload: Mapping[str, Any],
+    *,
+    now: datetime | None = None,
+) -> Path:
+    """Write a full lifecycle status marker for one namespace."""
+
+    base = Path(namespace_dir)
+    base.mkdir(parents=True, exist_ok=True)
+    marker = base / NAMESPACE_STATUS_FILENAME
+    ts = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
+    row = dict(payload)
+    row.setdefault("schema_id", "namespace_status_v1")
+    row.setdefault("schema_version", schema_v1.EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION)
+    row.setdefault("row_type", "event_alpha_namespace_status")
+    row.setdefault("namespace", base.name)
+    row.setdefault("status", STATUS_UNKNOWN)
+    row.setdefault("safe_for_send_readiness", False)
+    row.setdefault("safe_for_burn_in_measurement", False)
+    row.setdefault("safe_for_calibration", False)
+    row.setdefault("marked_at", ts)
+    row["marker_path"] = event_artifact_paths.artifact_display_path(marker)
+    marker.write_text(json.dumps(row, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return marker
 
 
@@ -103,13 +178,30 @@ def load_namespace_status(namespace_dir: str | Path | None) -> EventAlphaNamespa
     else:
         superseded_text = str(superseded or "")
     safe_value = payload.get("safe_for_send_readiness")
-    safe_for_send_readiness = bool(safe_value) if safe_value is not None else str(payload.get("status") or "") != STATUS_STALE_DEPRECATED
+    status = str(payload.get("status") or STATUS_ACTIVE)
+    safe_for_send_readiness = bool(safe_value) if safe_value is not None else status not in INACTIVE_STATUSES
     return EventAlphaNamespaceStatus(
         namespace=str(payload.get("namespace") or Path(namespace_dir).name),
-        status=str(payload.get("status") or STATUS_ACTIVE),
+        status=status,
+        profile=str(payload.get("profile") or "") or None,
         reason=str(payload.get("reason") or "") or None,
         superseded_by=superseded_text or None,
         safe_for_send_readiness=safe_for_send_readiness,
+        safe_for_burn_in_measurement=bool(payload.get("safe_for_burn_in_measurement", False)),
+        safe_for_calibration=bool(payload.get("safe_for_calibration", False)),
+        created_at=str(payload.get("created_at") or "") or None,
+        last_updated_at=str(payload.get("last_updated_at") or "") or None,
+        last_verified_at=str(payload.get("last_verified_at") or "") or None,
+        retention_policy=str(payload.get("retention_policy") or "") or None,
+        archive_after_days=_int_or_none(payload.get("archive_after_days")),
+        prune_after_days=_int_or_none(payload.get("prune_after_days")),
+        current_doctor_status=str(payload.get("current_doctor_status") or "") or None,
+        latest_run_id=str(payload.get("latest_run_id") or "") or None,
+        artifact_counts=payload.get("artifact_counts") if isinstance(payload.get("artifact_counts"), Mapping) else None,
+        key_artifacts_present=tuple(str(item) for item in payload.get("key_artifacts_present") or ()),
+        missing_key_artifacts=tuple(str(item) for item in payload.get("missing_key_artifacts") or ()),
+        readiness_required=bool(payload.get("readiness_required", False)),
+        readiness_present=bool(payload.get("readiness_present", False)),
         marked_at=str(payload.get("marked_at") or "") or None,
         marker_path=event_artifact_paths.artifact_display_path(marker),
     )
@@ -119,21 +211,37 @@ def is_stale_deprecated(status: EventAlphaNamespaceStatus | None) -> bool:
     return bool(status and status.status == STATUS_STALE_DEPRECATED)
 
 
+def is_inactive(status: EventAlphaNamespaceStatus | None) -> bool:
+    return bool(status and status.status in INACTIVE_STATUSES)
+
+
 def format_namespace_status(status: EventAlphaNamespaceStatus | None) -> str:
     if status is None:
         return "namespace_status: active (no marker)"
     lines = [
         f"namespace_status: {status.status}",
         f"namespace: {status.namespace}",
+        f"profile: {status.profile or 'unknown'}",
         f"reason: {status.reason or 'none'}",
         f"superseded_by: {status.superseded_by or 'none'}",
         f"safe_for_send_readiness: {str(status.safe_for_send_readiness).lower()}",
+        f"safe_for_burn_in_measurement: {str(status.safe_for_burn_in_measurement).lower()}",
+        f"safe_for_calibration: {str(status.safe_for_calibration).lower()}",
+        f"current_doctor_status: {status.current_doctor_status or 'unknown'}",
+        f"last_verified_at: {status.last_verified_at or 'unknown'}",
         f"marked_at: {status.marked_at or 'unknown'}",
         f"marker_path: {status.marker_path or 'none'}",
     ]
     if status.status == STATUS_STALE_DEPRECATED:
         lines.append("operator_note: stale/deprecated namespaces are ignored by default artifact doctor reports and blocked for send-readiness.")
     return "\n".join(lines)
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def stale_namespace_plan(namespace_dir: str | Path, *, archive: bool = False) -> dict[str, Any]:

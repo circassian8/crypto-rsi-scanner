@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Make Event Alpha namespace lifecycle first-class · Codex
+**Why:** Event Alpha now has many fixture, provider, rehearsal, and stale
+artifact namespaces. Operators and doctor checks need an explicit lifecycle
+contract so stale historical artifacts are not confused with current
+regressions or send-ready rehearsal state.
+**Changes:**
+- Expanded namespace lifecycle/status artifacts with first-class active,
+  provider, fixture, stale, archived, quarantine, and unknown statuses plus
+  profile, freshness, retention, doctor-status, safety, readiness, key-artifact,
+  and artifact-count fields.
+- `make event-alpha-namespace-lifecycle-report` now writes the registry,
+  lifecycle report, and per-namespace `event_alpha_namespace_status.json`
+  markers; archive planning remains dry-run only and honors `DRY_RUN`.
+- Artifact doctor now runs namespace lifecycle policy before schema/legacy
+  checks, warns on unknown lifecycle markers, blocks stale namespaces marked
+  send-ready, blocks send-ready namespaces with strict doctor blockers, and
+  short-circuits stale namespaces without validating legacy rows as current
+  regressions.
+- Send-readiness treats stale/archived/quarantine namespaces as inactive and
+  blocks them, while tests isolate clean no-send rehearsal fixtures from local
+  ignored cache markers.
+**Verify:** `python3 tests/test_indicators.py` (722/722);
+`python3 -m pytest tests/event_alpha/test_namespace_lifecycle.py` (29/29);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-namespace-lifecycle-report PYTHON=python3`;
+`make event-alpha-mark-known-stale-namespaces PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep STRICT=1 PYTHON=python3`
+(STALE/no blockers, schema rows validated=0);
+`make verify PYTHON=python3`.
+**Notes/risks:** Lifecycle archive remains a no-delete dry-run plan. The old
+`notify_llm_deep` namespace is explicitly `stale_deprecated` and blocked for
+send readiness; stale audit requires the existing include-stale path.
+
 ## 2026-07-02 — Move artifact doctor checks into plugins · Codex
 **Why:** The artifact doctor still had major consistency checks embedded in the
 top-level compatibility file. Moving high-value checks into focused plugins

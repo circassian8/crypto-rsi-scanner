@@ -5552,7 +5552,8 @@ def event_alpha_list_active_namespaces(verbose: bool = False) -> None:
 def event_alpha_archive_stale_namespaces(verbose: bool = False) -> None:
     """Print a dry-run archive plan for stale Event Alpha namespaces."""
     _setup_event_discovery_logging(verbose)
-    plan = event_alpha_namespace_lifecycle.archive_stale_namespaces_plan(dry_run=True)
+    dry_run = str(os.getenv("RSI_EVENT_ALPHA_ARCHIVE_DRY_RUN", "1")).strip().casefold() not in {"0", "false", "no", "off"}
+    plan = event_alpha_namespace_lifecycle.archive_stale_namespaces_plan(dry_run=dry_run)
     print("event_alpha_archive_stale_namespaces_plan:")
     print(json.dumps(plan, indent=2, sort_keys=True))
     print("dry_run_only: true")
