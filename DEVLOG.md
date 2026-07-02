@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Move Event Alpha radar modules into package homes · Codex
+**Why:** The next refactor slice was to move radar/core Event Alpha
+implementation code under `crypto_rsi_scanner.event_alpha.radar` while keeping
+old imports, Make targets, artifact schemas, and research-only behavior stable.
+**Changes:**
+- Moved integrated radar, market state/reaction/anomaly, CoreOpportunity
+  aggregation/store, evidence acquisition, source coverage, opportunity
+  verdict, impact hypotheses/store, and incident-store implementations into
+  `crypto_rsi_scanner/event_alpha/radar/`.
+- Replaced the old top-level radar modules with quiet compatibility shims that
+  preserve historical attributes without runtime warning spam.
+- Updated package-internal imports for the moved radar implementation path and
+  refreshed `crypto_rsi_scanner/event_alpha/MODULE_MAP.md` plus
+  `research/EVENT_ALPHA_ARCHITECTURE_V1.md`.
+- Added focused pytest coverage in `tests/event_alpha/test_integrated_radar.py`
+  and `tests/event_alpha/test_source_coverage.py` for old/new import
+  equivalence, fixture lane counts, core opportunity types, and readiness
+  source-coverage links.
+- Recorded the current size gate: 125 top-level `event_*.py` files, 18
+  compatibility shims, and 107 remaining implementation files.
+**Verify:** `python3 tests/test_indicators.py` (686/686); `python3 -m pytest
+tests/event_alpha/test_integrated_radar.py tests/event_alpha/test_source_coverage.py`
+(4/4); `python3 -m compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** `event_source_packs.py` remains provider-side per the module
+map. Artifact outputs, safety counters, sends, trades, paper trades, normal RSI
+rows, and Event Alpha-created `TRIGGERED_FADE` behavior were not changed.
+
 ## 2026-07-02 — Move Event Alpha artifact modules into package homes · Codex
 **Why:** The Event Alpha refactor plan called for artifact/path/run-ledger code
 to live under `crypto_rsi_scanner.event_alpha.artifacts` while old top-level

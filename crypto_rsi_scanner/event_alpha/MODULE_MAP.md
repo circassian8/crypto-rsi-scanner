@@ -13,6 +13,10 @@ Top-level imports remain supported until a later migration removes shims.
 | `crypto_rsi_scanner.event_core_opportunity_store` | `crypto_rsi_scanner.event_alpha.radar.core_opportunity_store` | radar |
 | `crypto_rsi_scanner.event_evidence_acquisition` | `crypto_rsi_scanner.event_alpha.radar.evidence_acquisition` | radar |
 | `crypto_rsi_scanner.event_alpha_source_coverage` | `crypto_rsi_scanner.event_alpha.radar.source_coverage` | radar |
+| `crypto_rsi_scanner.event_opportunity_verdict` | `crypto_rsi_scanner.event_alpha.radar.opportunity_verdict` | radar |
+| `crypto_rsi_scanner.event_impact_hypotheses` | `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses` | radar |
+| `crypto_rsi_scanner.event_impact_hypothesis_store` | `crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store` | radar |
+| `crypto_rsi_scanner.event_incident_store` | `crypto_rsi_scanner.event_alpha.radar.incidents` | radar |
 | `crypto_rsi_scanner.event_alpha_artifacts` | `crypto_rsi_scanner.event_alpha.artifacts.context` | artifacts |
 | `crypto_rsi_scanner.event_artifact_paths` | `crypto_rsi_scanner.event_alpha.artifacts.paths` | artifacts |
 | `crypto_rsi_scanner.event_alpha_run_ledger` | `crypto_rsi_scanner.event_alpha.artifacts.run_ledger` | artifacts |

@@ -1,3 +1,3 @@
-"""Radar-layer wrappers for Event Alpha modules."""
+"""Radar-layer package for Event Alpha research modules."""
 
 from __future__ import annotations

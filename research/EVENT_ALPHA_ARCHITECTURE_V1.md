@@ -7,8 +7,10 @@ layout gives new code a home while old import paths continue to work.
 
 - `crypto_rsi_scanner/event_alpha/providers/`: provider activation,
   readiness, preflight, and source-pack wrappers.
-- `crypto_rsi_scanner/event_alpha/radar/`: integrated radar, market anomaly,
-  source coverage, and core opportunity wrappers.
+- `crypto_rsi_scanner/event_alpha/radar/`: integrated radar, market state and
+  reaction logic, market anomaly scanning, source coverage, core opportunity
+  aggregation/store views, evidence acquisition, opportunity verdicts, impact
+  hypotheses, and incident artifacts.
 - `crypto_rsi_scanner/event_alpha/artifacts/`: artifact context, portable
   path helpers, run-ledger rows, retention, locks, and schema v1.
 - `crypto_rsi_scanner/event_alpha/notifications/`: no-send delivery and sender
@@ -57,6 +59,35 @@ Artifact implementation code now lives in package modules:
 The top-level imports remain compatibility shims with no runtime deprecation
 warnings. Artifact paths and output schemas must stay unchanged unless a
 separate migration explicitly updates schema v1 consumers.
+
+## Radar Implementation Move
+
+Radar/core implementation code now lives in package modules:
+
+- `event_alpha.radar.integrated_radar` for integrated radar orchestration.
+- `event_alpha.radar.market_state` and `event_alpha.radar.market_reaction` for
+  market snapshots, opportunity lanes, and reaction classification.
+- `event_alpha.radar.market_anomaly_scanner` for broad market anomaly seeds and
+  catalyst-search queue artifacts.
+- `event_alpha.radar.core_opportunities` and
+  `event_alpha.radar.core_opportunity_store` for canonical operator-facing
+  opportunity rows and read-side views.
+- `event_alpha.radar.evidence_acquisition` for source-pack search result
+  acquisition and reconciliation.
+- `event_alpha.radar.source_coverage` for provider/source-pack readiness and
+  coverage dashboards.
+- `event_alpha.radar.opportunity_verdict` for final research opportunity
+  verdict policy.
+- `event_alpha.radar.impact_hypotheses` and
+  `event_alpha.radar.impact_hypothesis_store` for impact-hypothesis generation
+  and artifact persistence.
+- `event_alpha.radar.incidents` for profile-scoped incident artifacts.
+
+The old top-level modules remain quiet compatibility shims. Current size gate
+after this pass: `125` top-level `event_*.py` files, `18` compatibility shims,
+and `107` remaining top-level implementation files. The moved radar targets
+are all shims at the top level. `event_source_packs.py` remains provider-side
+per `crypto_rsi_scanner/event_alpha/MODULE_MAP.md`.
 
 ## Future Code Placement
 
