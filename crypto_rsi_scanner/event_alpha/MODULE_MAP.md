@@ -3,6 +3,38 @@
 This map records the intended package home for existing top-level modules.
 Top-level imports remain supported until a later migration removes shims.
 
+## Shim Registry
+
+`crypto_rsi_scanner.event_alpha.shims` is the checked-in shim registry and audit
+tool. It reads this module map and emits one row per compatibility module with:
+
+- `old_module`
+- `new_module`
+- `shim_status`
+- `allowed_exports`
+
+Statuses:
+
+- `active_shim`: the old module is a compatibility wrapper only. It may contain
+  a docstring, imports, `globals().update(...)`, `__all__`, and comments. New
+  implementation logic belongs in the new package path.
+- `partial_shim`: the old module is a known migration bridge and may still
+  contain legacy implementation logic until a later phase.
+- `not_migrated`: the module has not been moved yet and should not be judged by
+  active-shim source rules.
+
+Current phase:
+
+- Most mapped modules are `active_shim`.
+- `crypto_rsi_scanner.event_alpha_artifact_doctor` is `partial_shim` because it
+  remains the compatibility doctor CLI/entrypoint while plugin migration
+  continues.
+
+Run `make event-alpha-shim-report PYTHON=python3` to write
+`event_alpha_shim_report.json` and `event_alpha_shim_report.md` under the
+`shim_report` Event Alpha artifact namespace. Artifact doctor warns if an
+`active_shim` module contains implementation logic.
+
 | Compatibility module | Implementation package path | Layer |
 |---|---|---|
 | `crypto_rsi_scanner.event_integrated_radar` | `crypto_rsi_scanner.event_alpha.radar.integrated_radar` | radar |

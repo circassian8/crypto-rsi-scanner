@@ -40,6 +40,9 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
 - Old top-level `crypto_rsi_scanner/event_*.py` shim modules should not gain
   new implementation logic. They may re-export symbols, hold compatibility
   comments, or contain temporary glue only when a tested migration requires it.
+- `crypto_rsi_scanner.event_alpha.shims` is the shim registry. It marks mapped
+  modules as `active_shim`, `partial_shim`, or `not_migrated`; active shims are
+  compatibility-only and `make event-alpha-shim-report` audits the boundary.
 - CLI parser construction belongs in `crypto_rsi_scanner/cli/parser.py`.
 - CLI dispatch belongs in `crypto_rsi_scanner/cli/dispatch.py`.
 - Command groups belong in `crypto_rsi_scanner/cli/commands_*.py`.

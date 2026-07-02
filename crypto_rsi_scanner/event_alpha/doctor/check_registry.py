@@ -467,6 +467,13 @@ CHECKS: tuple[DoctorCheck, ...] = (
         ("card_path", "research_card_path"),
         "Card path references must resolve to rendered research-card artifacts.",
     ),
+    _check(
+        "paths.active_shim_contains_logic",
+        CATEGORY_PATHS,
+        "warning",
+        (),
+        "Old top-level modules marked active_shim must not accumulate implementation logic.",
+    ),
 )
 
 CHECK_BY_ID: dict[str, DoctorCheck] = {check.check_id: check for check in CHECKS}

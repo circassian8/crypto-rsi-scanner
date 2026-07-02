@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Enforce Event Alpha compatibility shims · Codex
+**Why:** The v1 package migration keeps old imports working, but those old
+top-level modules need a measurable guard so new implementation logic does not
+drift back into compatibility shims.
+**Changes:**
+- Added `crypto_rsi_scanner/event_alpha/shims.py` with active/partial/
+  not-migrated shim registry rows derived from `MODULE_MAP.md`, AST-based
+  active-shim source auditing, report rendering, and a module CLI.
+- Added `make event-alpha-shim-report`, which writes
+  `event_fade_cache/shim_report/event_alpha_shim_report.json` and
+  `event_fade_cache/shim_report/event_alpha_shim_report.md`.
+- Registered `paths.active_shim_contains_logic` in the doctor check registry
+  and wired artifact doctor to warn when an `active_shim` contains
+  implementation logic.
+- Added `tests/event_alpha/test_shim_registry.py` and included it in the
+  standalone `tests/test_indicators.py` runner.
+- Updated `crypto_rsi_scanner/event_alpha/MODULE_MAP.md`, `AGENTS.md`,
+  `research/EVENT_ALPHA_ARCHITECTURE_V1.md`, `DECISIONS.md`, and `ROADMAP.md`
+  with the shim-status policy and report target.
+**Verify:** `python3 -m pytest tests/event_alpha/test_shim_registry.py -q`
+(5/5); `python3 -m pytest tests/event_alpha/test_shim_registry.py
+tests/event_alpha/test_artifact_schema.py tests/event_alpha/test_artifact_doctor.py
+tests/cli/test_make_targets.py -q` (68/68); `make event-alpha-shim-report
+PYTHON=python3` (57 registry rows, 0 active-shim violations);
+`make event-alpha-doctor-check-registry PYTHON=python3`; `python3
+tests/test_indicators.py` (728/728); `python3 -m pytest tests/event_alpha`
+(569/569); `python3 -m compileall -q crypto_rsi_scanner tests`;
+`make verify PYTHON=python3`.
+**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains
+`partial_shim` because it is still the compatibility doctor entrypoint. The shim
+report is a research artifact only and does not call providers, send, trade,
+paper trade, write RSI rows, or create `TRIGGERED_FADE`.
+
 ## 2026-07-02 — Document Event Alpha v1 architecture guardrails · Codex
 **Why:** Future Event Alpha refactor and provider/radar/notification passes need
 a clear package map and behavior-freeze rules so implementation does not drift

@@ -342,14 +342,18 @@ top-level `event_*.py` shims:
 
 Old import paths remain as v1 compatibility shims. New code should import the
 new package path, and old top-level shims should not gain new implementation
-logic. CLI parser construction belongs in `cli/parser.py`, dispatch in
-`cli/dispatch.py`, and command groups in `cli/commands_*.py`. New tests belong
-in `tests/event_alpha/`, `tests/rsi/`, or `tests/cli/`; `tests/test_indicators.py`
-is the compatibility umbrella runner. New artifact fields require schema v1
-updates, and new doctor checks require check-registry schema dependencies. Every
-new Event Alpha namespace needs lifecycle status, retention policy, and explicit
-`safe_for_send_readiness`. Preserve research-only/no-trading/no-paper/no-send
-guards in all Event Alpha package work.
+logic. `crypto_rsi_scanner.event_alpha.shims` is the shim registry: modules
+marked `active_shim` must stay compatibility-only, while `partial_shim` is
+reserved for explicit migration bridges. Run `make event-alpha-shim-report` to
+audit this boundary. CLI parser construction belongs in `cli/parser.py`,
+dispatch in `cli/dispatch.py`, and command groups in `cli/commands_*.py`. New
+tests belong in `tests/event_alpha/`, `tests/rsi/`, or `tests/cli/`;
+`tests/test_indicators.py` is the compatibility umbrella runner. New artifact
+fields require schema v1 updates, and new doctor checks require check-registry
+schema dependencies. Every new Event Alpha namespace needs lifecycle status,
+retention policy, and explicit `safe_for_send_readiness`. Preserve
+research-only/no-trading/no-paper/no-send guards in all Event Alpha package
+work.
 
 ---
 

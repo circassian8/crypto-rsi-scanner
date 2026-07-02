@@ -1669,6 +1669,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_notifications",
     "tests.event_alpha.test_outcomes",
     "tests.event_alpha.test_provider_readiness",
+    "tests.event_alpha.test_shim_registry",
     "tests.event_alpha.test_source_coverage",
 )
 

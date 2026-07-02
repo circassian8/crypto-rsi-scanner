@@ -28,6 +28,7 @@ from .event_alpha.doctor.checks import (
     provider_readiness as doctor_provider_readiness_checks,
     source_coverage as doctor_source_coverage_checks,
 )
+from .event_alpha import shims as event_alpha_shims
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
     "This namespace contains pre-canonical notification delivery rows. Do not use it "
@@ -435,6 +436,7 @@ class EventAlphaArtifactDoctorResult:
     invalid_path_fields: int = 0
     invalid_safety_fields: int = 0
     deprecated_field_usage: int = 0
+    active_shim_modules_with_implementation_logic: int = 0
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
 
@@ -787,6 +789,17 @@ def diagnose_artifacts(
     warnings.extend(namespace_phase.warnings)
     blockers.extend(safety_result.blockers)
     warnings.extend(safety_result.warnings)
+    active_shim_logic_count, active_shim_logic_modules = event_alpha_shims.active_shim_violation_summary()
+    if active_shim_logic_count:
+        modules = ", ".join(active_shim_logic_modules[:5])
+        warnings.append(
+            check_registry.format_check_message(
+                "paths.active_shim_contains_logic",
+                "active_shim_modules_with_implementation_logic="
+                f"{active_shim_logic_count}"
+                + (f" modules={modules}" if modules else ""),
+            )
+        )
     matching_snapshot_runs = 0
     missing_snapshot_runs = 0
     external_snapshot_runs = 0
@@ -1759,6 +1772,7 @@ def diagnose_artifacts(
         invalid_path_fields=schema_result.invalid_path_fields,
         invalid_safety_fields=schema_result.invalid_safety_fields,
         deprecated_field_usage=schema_result.deprecated_field_usage,
+        active_shim_modules_with_implementation_logic=active_shim_logic_count,
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
     )
@@ -5912,6 +5926,11 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
         ),
         doctor_report.schema_counter_line(result),
         *doctor_report.check_registry_lines(),
+        (
+            "shim hygiene: "
+            "active_shim_modules_with_implementation_logic="
+            f"{result.active_shim_modules_with_implementation_logic}"
+        ),
         (
             "core opportunity coverage: "
             f"visible_core_opportunities={result.visible_core_opportunities} "

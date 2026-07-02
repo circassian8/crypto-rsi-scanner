@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Active Event Alpha shims are compatibility-only
+**Status:** accepted
+**Decision:** Old top-level Event Alpha modules that have migrated package homes
+must be tracked by `crypto_rsi_scanner.event_alpha.shims` and marked as
+`active_shim`, `partial_shim`, or `not_migrated`. `active_shim` modules may only
+contain docstrings, imports, `globals().update(...)`, `__all__`, comments, and
+minimal compatibility glue; new implementation logic belongs in the new package
+path. `partial_shim` is allowed only for explicit migration bridges such as the
+current artifact doctor entrypoint. `make event-alpha-shim-report` writes the
+audit artifacts, and artifact doctor warns if active shims accumulate logic.
+**Why:** Compatibility wrappers keep old import paths stable during the v1
+migration, but leaving them unguarded would let new behavior drift back into the
+old top-level sprawl.
+**Revisit when:** v1 compatibility shims are retired through an explicit
+breaking migration, or a module is promoted from `partial_shim` to `active_shim`
+after its implementation is fully moved.
+
 ## 2026-07-02 - Event Alpha v1 architecture rules prevent renewed sprawl
 **Status:** accepted
 **Decision:** Event Alpha v1 uses the package map documented in
