@@ -1383,6 +1383,7 @@ def test_event_alpha_coinalyze_preflight_smoke_artifacts_are_safe_and_doctor_che
             "coinalyze_rehearsal_success_without_crowding_candidates": 0,
             "coinalyze_provider_health_healthy_without_successful_ledger": 0,
             "coinalyze_rehearsal_forbidden_side_effect_claim": 0,
+            "coinalyze_supported_metric_implemented_missing_state": 0,
         }
         clean = event_alpha_artifact_doctor.diagnose_artifacts(
             profile="fixture",
@@ -1440,6 +1441,7 @@ def test_event_alpha_coinalyze_rehearsal_doctor_blocks_missing_live_artifacts():
             "snapshots_written": 1,
             "crowding_candidates_written": 0,
             "fade_review_candidates_written": 0,
+            "supported_metric_status": {"basis": "implemented"},
             "max_requests_per_run": 6,
             "requests_used": 1,
             "strict_alerts_created": 0,
@@ -1472,6 +1474,7 @@ def test_event_alpha_coinalyze_rehearsal_doctor_blocks_missing_live_artifacts():
         assert conflicts["coinalyze_rehearsal_live_without_ledger"] == 1
         assert conflicts["coinalyze_rehearsal_success_without_crowding_candidates"] == 1
         assert conflicts["coinalyze_provider_health_healthy_without_successful_ledger"] == 1
+        assert conflicts["coinalyze_supported_metric_implemented_missing_state"] == 1
 
         doctor = event_alpha_artifact_doctor.diagnose_artifacts(
             source_coverage_report_path=base / "event_alpha_source_coverage.md",
@@ -1483,6 +1486,7 @@ def test_event_alpha_coinalyze_rehearsal_doctor_blocks_missing_live_artifacts():
         assert doctor.coinalyze_rehearsal_live_without_ledger == 1
         assert doctor.coinalyze_rehearsal_success_without_crowding_candidates == 1
         assert doctor.coinalyze_provider_health_healthy_without_successful_ledger == 1
+        assert doctor.coinalyze_supported_metric_implemented_missing_state == 1
         assert doctor.status == "BLOCKED"
 
 
@@ -3088,6 +3092,10 @@ def test_event_discovery_coinalyze_live_provider_parses_offline():
                 {"symbol": "TESTLISTUSDT_PERP.A", "value": 0.0012, "update": 1781513400},
                 {"symbol": "TESTPERPUSDT_PERP.A", "value": -0.0002, "update": 1781513400},
             ],
+            "predicted-funding-rate": [
+                {"symbol": "TESTLISTUSDT_PERP.A", "value": 0.0015, "update": 1781513400},
+                {"symbol": "TESTPERPUSDT_PERP.A", "value": -0.0001, "update": 1781513400},
+            ],
             "open-interest-history": [
                 {
                     "symbol": "TESTLISTUSDT_PERP.A",
@@ -3131,6 +3139,7 @@ def test_event_discovery_coinalyze_live_provider_parses_offline():
     assert [row[0] for row in seen] == [
         "open-interest",
         "funding-rate",
+        "predicted-funding-rate",
         "open-interest-history",
         "liquidation-history",
         "long-short-ratio-history",
@@ -3145,6 +3154,9 @@ def test_event_discovery_coinalyze_live_provider_parses_offline():
     assert listing["open_interest"] == 18000000.0
     assert listing["open_interest_24h_change_pct"] == 0.8
     assert listing["funding_rate_8h"] == 0.0012
+    assert listing["predicted_funding_rate"] == 0.0015
+    assert listing["funding_rate_unit"] == "decimal_rate"
+    assert listing["open_interest_unit"] == "usd_notional"
     assert listing["liquidations_24h"] == 2500000.0
     assert listing["long_short_ratio"] == 2.1
     assert listing["futures_volume_24h"] == 70000000.0
@@ -3216,6 +3228,7 @@ def test_event_discovery_coinalyze_live_provider_auto_resolves_future_markets_of
                 {"symbol": "TESTPERPUSDT_PERP.A", "value": 3000000, "update": 1781513400},
             ],
             "funding-rate": [],
+            "predicted-funding-rate": [],
             "open-interest-history": [],
             "liquidation-history": [],
             "long-short-ratio-history": [],
@@ -39109,6 +39122,13 @@ def test_derivatives_crowding_fixture_lanes_and_artifacts():
     assert len(evaluated_rows) == 5
     assert derivatives_candidates_path_exists is True
     assert len(fade_rows) == 1
+    state_by_symbol = {str(row.get("symbol") or ""): row for row in states}
+    assert state_by_symbol["TESTLIST"]["supported_metric_status"]["predicted_funding"] == "implemented"
+    assert state_by_symbol["TESTLIST"]["supported_metric_status"]["basis"] == "fixture_only"
+    assert state_by_symbol["TESTLIST"]["funding_rate_unit"] == "decimal_rate"
+    assert state_by_symbol["TESTLIST"]["basis_unit"] == "decimal_rate"
+    assert state_by_symbol["TESTLIST"]["open_interest_freshness"] == "fresh"
+    assert state_by_symbol["TESTLIST"]["derivatives_snapshot_freshness_status"] == "fresh"
     assert by_symbol["TESTLIST"]["opportunity_type"] == "FADE_SHORT_REVIEW"
     assert by_symbol["TESTLIST"]["completed_move"] is True
     assert by_symbol["TESTLIST"]["fade_requirements_met"] is True
@@ -39123,7 +39143,83 @@ def test_derivatives_crowding_fixture_lanes_and_artifacts():
     assert all(row["normal_rsi_signal_written"] is False for row in result.candidate_rows)
     assert all(row["triggered_fade_created"] is False for row in result.candidate_rows)
     assert all(row["paper_trade_created"] is False for row in result.candidate_rows)
+    assert "predicted_funding=0.2%" in report
+    assert "basis=2.4%" in report
+    assert "basis=fixture_only" in report
     assert "Research-only. Not a trade signal" in report
+
+
+def test_derivatives_crowding_missing_predicted_funding_and_basis_are_explicit():
+    import json
+    from crypto_rsi_scanner import event_derivatives_crowding, event_research_cards
+
+    payload = {
+        "derivatives": [
+            {
+                "provider": "coinalyze",
+                "coin_id": "testmissing",
+                "symbol": "TESTMISSUSDT_PERP",
+                "base_symbol": "TESTMISS",
+                "market": "TESTMISSUSDT_PERP",
+                "timestamp": "2026-06-15T15:30:00Z",
+                "open_interest": 9000000,
+                "open_interest_delta_24h": 0.22,
+                "funding_rate": 0.0008,
+                "funding_zscore": 1.2,
+                "liquidation_long_usd": 500000,
+                "liquidation_short_usd": 250000,
+                "long_short_ratio": 1.7,
+                "perp_volume": 22000000,
+                "spot_volume": 9000000,
+            }
+        ],
+        "candidates": [
+            {
+                "symbol": "TESTMISS",
+                "coin_id": "testmissing",
+                "event_name": "TESTMISS moderate crowding check",
+                "source_class": "derivatives_provider",
+                "source_pack": "derivatives_crowding_pack",
+                "impact_path_type": "derivatives_crowding_research",
+                "playbook_type": "derivatives_crowding_research",
+                "evidence_quality_score": 82,
+                "accepted_evidence_count": 1,
+                "market_snapshot": {
+                    "return_24h": 0.08,
+                    "return_4h": 0.03,
+                    "market_context_freshness_status": "fresh",
+                },
+            }
+        ],
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "derivatives.json"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        result = event_derivatives_crowding.run_derivatives_crowding_scan(
+            namespace_dir=tmp,
+            derivatives_path=path,
+            profile="fixture",
+            artifact_namespace="missing_metric_status",
+            run_mode="fixture",
+            run_id="run-missing-metrics",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        report = result.report_path.read_text(encoding="utf-8")
+
+    state = result.derivatives_state_rows[0]
+    candidate = {**result.candidate_rows[0], "alert_id": "TESTMISS", "tier": "STORE_ONLY"}
+    card = event_research_cards.render_research_card("TESTMISS", alert_rows=[candidate])
+
+    assert state["supported_metric_status"]["predicted_funding"] == "missing_from_response"
+    assert state["supported_metric_status"]["basis"] == "not_implemented"
+    assert state["basis_freshness"] == "missing"
+    assert "predicted_funding=missing_from_response" in report
+    assert "basis=not_implemented" in report
+    assert card.found is True
+    assert "predicted=missing_from_response" in card.markdown
+    assert "- Basis: not_implemented" in card.markdown
+    assert "predicted=n/a" not in card.markdown
+    assert "- Basis: n/a" not in card.markdown
 
 
 def test_derivatives_crowding_artifact_doctor_conflicts():
@@ -39133,6 +39229,8 @@ def test_derivatives_crowding_artifact_doctor_conflicts():
         {
             "row_type": "derivatives_state_snapshot",
             "symbol": "MISS",
+            "funding_rate": 0.001,
+            "supported_metric_status": {"basis": "implemented"},
             "raw_payload_redacted": {"api_key": "should_not_show"},
         },
         {
@@ -39143,6 +39241,7 @@ def test_derivatives_crowding_artifact_doctor_conflicts():
             "fade_requirements_met": True,
             "crowding_exhaustion_evidence": ["funding_zscore_elevated"],
             "research_only_disclaimer": "Research-only. Not a trade signal.",
+            "derivatives_state_snapshot": {"freshness_status": "stale"},
         },
         {
             "row_type": "fade_short_review_candidate",
@@ -39183,6 +39282,9 @@ def test_derivatives_crowding_artifact_doctor_conflicts():
     assert conflicts["fade_review_notification_missing_disclaimer"] == 1
     assert conflicts["derivatives_artifact_secret_leak"] == 2
     assert conflicts["derivatives_state_missing_freshness_status"] == 1
+    assert conflicts["derivatives_metric_claim_implemented_missing"] == 1
+    assert conflicts["derivatives_unit_metadata_missing"] == 1
+    assert conflicts["stale_derivatives_snapshot_promoted_fade_review"] == 1
     assert conflicts["confirmed_long_crowded_without_warning"] == 1
 
 
@@ -39234,6 +39336,10 @@ def test_research_card_renders_derivatives_crowding_section():
     assert card.found is True
     assert "## Derivatives / Crowding" in card.markdown
     assert "- Research-only. Not a trade signal." in card.markdown
+    assert "predicted=+0.15%" in card.markdown
+    assert "- Basis: +2.40%" in card.markdown
+    assert "basis=fixture_only" in card.markdown
+    assert "predicted=n/a" not in card.markdown
     assert "- Crowding class: extreme" in card.markdown
     assert "What invalidates fade review" in card.markdown
 
@@ -39683,6 +39789,8 @@ def test_integrated_doctor_catches_core_and_card_mismatches():
                 "- Why now: completed move with derivatives crowding/exhaustion evidence",
                 "",
                 "## Derivatives / Crowding",
+                "- Funding: current=+12.00% predicted=n/a z=n/a",
+                "- Basis: n/a unit=unknown",
                 "- Crowding class: unknown",
                 "- Fade readiness: unknown",
                 "",
@@ -39701,6 +39809,7 @@ def test_integrated_doctor_catches_core_and_card_mismatches():
         )
     assert fade_conflicts["integrated_fade_card_missing_disclaimer"] == 1
     assert fade_conflicts["integrated_fade_card_crowding_unknown"] == 1
+    assert fade_conflicts["derivatives_card_metric_claim_without_data"] == 2
     assert fade_conflicts["integrated_outcome_card_thesis_interpretation_missing"] == 1
 
 
@@ -40117,6 +40226,8 @@ def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_reda
                     return FakeResponse([{"symbol": symbol, "value": 1000, "update": 1781513400}])
                 if endpoint == "funding-rate":
                     return FakeResponse([{"symbol": symbol, "value": funding, "update": 1781513400}])
+                if endpoint == "predicted-funding-rate":
+                    return FakeResponse([{"symbol": symbol, "value": funding * 1.1, "update": 1781513400}])
                 if endpoint == "open-interest-history":
                     return FakeResponse([{"symbol": symbol, "history": [{"c": 100}, {"c": oi_end}]}])
                 if endpoint == "liquidation-history":
@@ -40144,10 +40255,11 @@ def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_reda
                 clock=lambda: 1781513400,
             )
             assert report.status == "live_rehearsal_success"
-            assert report.requests_used == 6
+            assert report.requests_used == 7
             assert calls == [
                 "open-interest",
                 "funding-rate",
+                "predicted-funding-rate",
                 "open-interest-history",
                 "liquidation-history",
                 "long-short-ratio-history",
@@ -40161,6 +40273,11 @@ def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_reda
             assert "coinalyze-key" not in ledger_text
             assert all(json.loads(line)["token_redacted"] is True for line in ledger_text.splitlines() if line.strip())
             assert (base / "event_derivatives_state.jsonl").read_text(encoding="utf-8").count("\n") == 1
+            state_rows = [
+                json.loads(line)
+                for line in (base / "event_derivatives_state.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
             crowding_rows = [
                 json.loads(line)
                 for line in (base / "event_derivatives_crowding_candidates.jsonl").read_text(encoding="utf-8").splitlines()
@@ -40171,8 +40288,16 @@ def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_reda
                 for line in (base / "event_fade_short_review_candidates.jsonl").read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
+            assert state_rows[0]["supported_metric_status"]["predicted_funding"] == "implemented"
+            assert state_rows[0]["supported_metric_status"]["basis"] == "not_implemented"
+            assert state_rows[0]["open_interest_unit"] == "usd_notional"
+            assert state_rows[0]["funding_rate_unit"] == "decimal_rate"
+            assert state_rows[0]["basis_unit"] == "decimal_rate"
+            assert state_rows[0]["derivatives_snapshot_freshness_status"] == "fresh"
             assert len(crowding_rows) == 1
             assert len(fade_rows) == 1
+            assert crowding_rows[0]["supported_metric_status"]["predicted_funding"] == "implemented"
+            assert crowding_rows[0]["unit_metadata"]["funding_rate_unit"] == "decimal_rate"
             assert fade_rows[0]["symbol"] == "TESTFADE"
             assert fade_rows[0]["opportunity_type"] == "FADE_SHORT_REVIEW"
             assert fade_rows[0]["research_only"] is True
@@ -40186,6 +40311,8 @@ def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_reda
             report_payload = json.loads((base / event_coinalyze_preflight.REHEARSAL_JSON).read_text(encoding="utf-8"))
             assert report_payload["crowding_candidates_written"] == 1
             assert report_payload["fade_review_candidates_written"] == 1
+            assert report_payload["supported_metric_status"]["predicted_funding"] == "implemented"
+            assert report_payload["supported_metric_status"]["basis"] == "not_implemented"
             assert report_payload["strict_alerts_created"] == 0
             assert report_payload["telegram_sends"] == 0
             assert report_payload["trades_created"] == 0
@@ -40346,6 +40473,9 @@ def test_event_alpha_source_coverage_coinalyze_links_only_existing_artifacts():
         text = event_alpha_source_coverage.format_source_coverage_report(report)
         assert "- Coinalyze preflight report: event_coinalyze_preflight.md" in text
         assert "- Coinalyze preflight JSON: event_coinalyze_preflight.json" in text
+        assert "Coinalyze supported metric status:" in text
+        assert "basis=fixture_only" in text
+        assert report.to_dict()["coinalyze_supported_metric_status"]["predicted_funding"] == "implemented"
 
         bad = base / "event_alpha_source_coverage.md"
         bad.write_text("- Coinalyze preflight report: event_coinalyze_preflight.md\n- Coinalyze preflight JSON: event_coinalyze_preflight.json\n", encoding="utf-8")

@@ -26,6 +26,36 @@ FADE_SHORT_REVIEW_CANDIDATES_FILENAME = "event_fade_short_review_candidates.json
 
 FADE_REVIEW_LANE = "FADE_SHORT_REVIEW"
 RESEARCH_DISCLAIMER = "Research-only. Not a trade signal."
+METRIC_STATUS_IMPLEMENTED = "implemented"
+METRIC_STATUS_NOT_IMPLEMENTED = "not_implemented"
+METRIC_STATUS_PROVIDER_UNAVAILABLE = "provider_unavailable"
+METRIC_STATUS_FIXTURE_ONLY = "fixture_only"
+METRIC_STATUS_MISSING_FROM_RESPONSE = "missing_from_response"
+SUPPORTED_METRIC_STATUSES = (
+    METRIC_STATUS_IMPLEMENTED,
+    METRIC_STATUS_NOT_IMPLEMENTED,
+    METRIC_STATUS_PROVIDER_UNAVAILABLE,
+    METRIC_STATUS_FIXTURE_ONLY,
+    METRIC_STATUS_MISSING_FROM_RESPONSE,
+)
+DERIVATIVES_SUPPORTED_METRICS = (
+    "open_interest",
+    "funding_rate",
+    "predicted_funding",
+    "liquidations",
+    "long_short_ratio",
+    "basis",
+    "perp_volume",
+)
+DERIVATIVES_LIVE_METRIC_IMPLEMENTATION_STATUS = {
+    "open_interest": METRIC_STATUS_IMPLEMENTED,
+    "funding_rate": METRIC_STATUS_IMPLEMENTED,
+    "predicted_funding": METRIC_STATUS_IMPLEMENTED,
+    "liquidations": METRIC_STATUS_IMPLEMENTED,
+    "long_short_ratio": METRIC_STATUS_IMPLEMENTED,
+    "basis": METRIC_STATUS_FIXTURE_ONLY,
+    "perp_volume": METRIC_STATUS_IMPLEMENTED,
+}
 
 
 @dataclass(frozen=True)
@@ -216,7 +246,9 @@ def normalize_derivatives_state(
     """Return one normalized derivatives-state snapshot."""
     observed = _as_utc(_parse_time(observed_at) or datetime.now(timezone.utc))
     timestamp = _parse_time(_first(row, "observed_at", "timestamp", "time", "created_at", "updated_at"))
-    observed_source = _as_utc(timestamp or observed)
+    source_timestamp = _as_utc(timestamp) if timestamp else None
+    observed_source = source_timestamp or observed
+    explicit_freshness = _explicit_freshness_status(row)
     symbol = _base_symbol(row)
     coin_id = _text(_first(row, "coin_id", "id", "asset_id"))
     long_liq = _float(_first(row, "liquidation_long_usd", "long_liquidations_usd", "long_liquidations", "liquidations_long"))
@@ -230,12 +262,83 @@ def normalize_derivatives_state(
     if perp_spot_ratio is None and perp_volume is not None and spot_volume and spot_volume > 0:
         perp_spot_ratio = perp_volume / spot_volume
     funding = _float(_first(row, "funding_rate", "funding_rate_8h", "funding"))
+    predicted_funding = _float(_first(row, "predicted_funding_rate", "predicted_funding"))
     funding_z = _float(_first(row, "funding_zscore", "funding_rate_zscore"))
+    open_interest = _float(_first(row, "open_interest", "oi"))
+    open_interest_delta_1h = _pct(_first(row, "open_interest_delta_1h", "oi_delta_1h", "open_interest_1h_change_pct"))
+    open_interest_delta_4h = _pct(_first(row, "open_interest_delta_4h", "oi_delta_4h", "open_interest_4h_change_pct"))
+    open_interest_delta_24h = _pct(_first(row, "open_interest_delta_24h", "open_interest_24h_change_pct", "oi_24h_change_pct", "open_interest_change_24h"))
+    futures_return_24h = _pct(_first(row, "futures_price_return_24h_pct", "futures_price_24h_change_pct", "price_return_24h", "return_24h", "price_change_24h"))
+    futures_return_4h = _pct(_first(row, "futures_price_return_4h_pct", "futures_price_4h_change_pct", "price_return_4h", "return_4h", "price_change_4h"))
+    long_short_ratio = _float(_first(row, "long_short_ratio"))
+    basis = _float(_first(row, "basis"))
+    open_interest_freshness = _metric_freshness(
+        row,
+        observed_at=observed,
+        value_present=open_interest is not None or open_interest_delta_24h is not None or open_interest_delta_4h is not None,
+        fallback_timestamp=source_timestamp,
+        fallback_status=explicit_freshness,
+        keys=("open_interest_timestamp", "open_interest_history_timestamp", "open_interest_observed_at"),
+    )
+    funding_freshness = _metric_freshness(
+        row,
+        observed_at=observed,
+        value_present=funding is not None or predicted_funding is not None or funding_z is not None,
+        fallback_timestamp=source_timestamp,
+        fallback_status=explicit_freshness,
+        keys=("funding_timestamp", "predicted_funding_timestamp", "funding_observed_at", "predicted_funding_observed_at"),
+    )
+    liquidation_freshness = _metric_freshness(
+        row,
+        observed_at=observed,
+        value_present=long_liq is not None or short_liq is not None or liquidation_imbalance is not None,
+        fallback_timestamp=source_timestamp,
+        fallback_status=explicit_freshness,
+        keys=("liquidation_timestamp", "liquidation_observed_at"),
+    )
+    long_short_freshness = _metric_freshness(
+        row,
+        observed_at=observed,
+        value_present=long_short_ratio is not None,
+        fallback_timestamp=source_timestamp,
+        fallback_status=explicit_freshness,
+        keys=("long_short_timestamp", "long_short_observed_at"),
+    )
+    basis_freshness = _metric_freshness(
+        row,
+        observed_at=observed,
+        value_present=basis is not None,
+        fallback_timestamp=source_timestamp,
+        fallback_status=explicit_freshness,
+        keys=("basis_timestamp", "basis_observed_at"),
+    )
+    derivatives_snapshot_freshness = _combined_freshness_status(
+        open_interest_freshness,
+        funding_freshness,
+        liquidation_freshness,
+        long_short_freshness,
+        basis_freshness,
+    )
+    metric_values = {
+        "open_interest": open_interest is not None or open_interest_delta_24h is not None or open_interest_delta_4h is not None,
+        "funding_rate": funding is not None,
+        "predicted_funding": predicted_funding is not None,
+        "liquidations": long_liq is not None or short_liq is not None or liquidation_imbalance is not None,
+        "long_short_ratio": long_short_ratio is not None,
+        "basis": basis is not None,
+        "perp_volume": perp_volume is not None or perp_spot_ratio is not None,
+    }
+    supported_metric_status = _supported_metric_status(metric_values, provider_unavailable=bool(row.get("provider_unavailable")))
+    open_interest_unit = _unit(row, "open_interest_unit", default="usd_notional")
+    funding_rate_unit = _unit(row, "funding_rate_unit", default="decimal_rate")
+    basis_unit = _unit(row, "basis_unit", default="decimal_rate")
+    liquidation_unit = _unit(row, "liquidation_unit", default="usd_notional")
+    volume_unit = _unit(row, "volume_unit", default="provider_native")
     warnings = _derivatives_warnings(
         timestamp=observed_source,
         observed_at=observed,
         funding_rate=funding,
-        open_interest=_float(_first(row, "open_interest", "oi")),
+        open_interest=open_interest,
     )
     return {
         "schema_version": 1,
@@ -251,24 +354,46 @@ def normalize_derivatives_state(
         "provider": _text(_first(row, "provider")) or "coinalyze",
         "market": _text(_first(row, "market", "market_symbol", "symbol")) or None,
         "exchange": _text(_first(row, "exchange")) or None,
-        "open_interest": _float(_first(row, "open_interest", "oi")),
-        "open_interest_delta_1h": _pct(_first(row, "open_interest_delta_1h", "oi_delta_1h", "open_interest_1h_change_pct")),
-        "open_interest_delta_4h": _pct(_first(row, "open_interest_delta_4h", "oi_delta_4h", "open_interest_4h_change_pct")),
-        "open_interest_delta_24h": _pct(_first(row, "open_interest_delta_24h", "open_interest_24h_change_pct", "oi_24h_change_pct", "open_interest_change_24h")),
+        "open_interest": open_interest,
+        "open_interest_delta_1h": open_interest_delta_1h,
+        "open_interest_delta_4h": open_interest_delta_4h,
+        "open_interest_delta_24h": open_interest_delta_24h,
         "funding_rate": funding,
-        "predicted_funding_rate": _float(_first(row, "predicted_funding_rate", "predicted_funding")),
+        "predicted_funding_rate": predicted_funding,
         "funding_zscore": funding_z,
-        "futures_price_return_24h_pct": _pct(_first(row, "futures_price_return_24h_pct", "futures_price_24h_change_pct", "price_return_24h", "return_24h", "price_change_24h")),
-        "futures_price_return_4h_pct": _pct(_first(row, "futures_price_return_4h_pct", "futures_price_4h_change_pct", "price_return_4h", "return_4h", "price_change_4h")),
+        "futures_price_return_24h_pct": futures_return_24h,
+        "futures_price_return_4h_pct": futures_return_4h,
         "liquidation_long_usd": long_liq,
         "liquidation_short_usd": short_liq,
         "liquidation_imbalance": liquidation_imbalance,
-        "long_short_ratio": _float(_first(row, "long_short_ratio")),
-        "basis": _float(_first(row, "basis")),
+        "long_short_ratio": long_short_ratio,
+        "basis": basis,
         "perp_volume": perp_volume,
         "spot_volume": spot_volume,
         "perp_spot_volume_ratio": perp_spot_ratio,
-        "freshness_status": _freshness_status(observed_source, observed),
+        "supported_metric_status": supported_metric_status,
+        "implemented_metrics": tuple(metric for metric, status in supported_metric_status.items() if status == METRIC_STATUS_IMPLEMENTED and metric_values.get(metric)),
+        "fixture_only_metrics": tuple(metric for metric, status in supported_metric_status.items() if status == METRIC_STATUS_FIXTURE_ONLY and metric_values.get(metric)),
+        "missing_metrics": tuple(metric for metric, status in supported_metric_status.items() if status in {METRIC_STATUS_MISSING_FROM_RESPONSE, METRIC_STATUS_NOT_IMPLEMENTED, METRIC_STATUS_PROVIDER_UNAVAILABLE}),
+        "open_interest_freshness": open_interest_freshness,
+        "funding_freshness": funding_freshness,
+        "liquidation_freshness": liquidation_freshness,
+        "long_short_freshness": long_short_freshness,
+        "basis_freshness": basis_freshness,
+        "derivatives_snapshot_freshness_status": derivatives_snapshot_freshness,
+        "freshness_status": derivatives_snapshot_freshness,
+        "open_interest_unit": open_interest_unit,
+        "funding_rate_unit": funding_rate_unit,
+        "basis_unit": basis_unit,
+        "liquidation_unit": liquidation_unit,
+        "volume_unit": volume_unit,
+        "unit_metadata": {
+            "open_interest_unit": open_interest_unit,
+            "funding_rate_unit": funding_rate_unit,
+            "basis_unit": basis_unit,
+            "liquidation_unit": liquidation_unit,
+            "volume_unit": volume_unit,
+        },
         "warnings": warnings,
         "raw_payload_redacted": _redacted_payload(row),
         "research_only": True,
@@ -317,11 +442,15 @@ def evaluate_derivatives_fade_candidate(
     if not liquidity_sane and completed_move:
         opportunity = event_market_reaction.EventOpportunityType.RISK_ONLY.value
         warnings.append("suspicious_illiquid_move_not_fade_review")
+    freshness_ok = _state_fresh_for_fade_review(state)
+    if opportunity == FADE_REVIEW_LANE and not freshness_ok:
+        warnings.append("fade_review_requires_fresh_derivatives_state")
     fade_ready = (
         opportunity == FADE_REVIEW_LANE
         and completed_move
         and bool(crowding_evidence)
         and liquidity_sane
+        and freshness_ok
         and not _negative_without_crowding(item, state)
     )
     if opportunity == FADE_REVIEW_LANE and not fade_ready:
@@ -348,6 +477,19 @@ def evaluate_derivatives_fade_candidate(
         "market_state_class": reaction.market_state,
         "market_state_snapshot": reaction.market_state_snapshot.to_dict(),
         "derivatives_state_snapshot": dict(state),
+        "supported_metric_status": dict(state.get("supported_metric_status") or {}),
+        "open_interest_unit": state.get("open_interest_unit"),
+        "funding_rate_unit": state.get("funding_rate_unit"),
+        "basis_unit": state.get("basis_unit"),
+        "liquidation_unit": state.get("liquidation_unit"),
+        "volume_unit": state.get("volume_unit"),
+        "unit_metadata": dict(state.get("unit_metadata") or {}),
+        "derivatives_snapshot_freshness_status": state.get("derivatives_snapshot_freshness_status") or state.get("freshness_status"),
+        "open_interest_freshness": state.get("open_interest_freshness"),
+        "funding_freshness": state.get("funding_freshness"),
+        "liquidation_freshness": state.get("liquidation_freshness"),
+        "long_short_freshness": state.get("long_short_freshness"),
+        "basis_freshness": state.get("basis_freshness"),
         "opportunity_type": opportunity,
         "opportunity_type_original": reaction.opportunity_type,
         "opportunity_type_fade_requirements_met": bool(fade_ready),
@@ -424,6 +566,9 @@ def format_derivatives_crowding_report(
         f"Fade / short-review candidates: {len(fade)}",
         "Opportunity lanes: " + (_format_counts(lanes) or "none"),
         "Crowding classes: " + (_format_counts(crowding) or "none"),
+        "Implemented metric values: " + (_join(_metrics_by_status(states, METRIC_STATUS_IMPLEMENTED)) or "none"),
+        "Fixture-only metric values: " + (_join(_metrics_by_status(states, METRIC_STATUS_FIXTURE_ONLY)) or "none"),
+        "Missing/planned metric values: " + (_join(_metrics_by_status(states, METRIC_STATUS_MISSING_FROM_RESPONSE, METRIC_STATUS_NOT_IMPLEMENTED, METRIC_STATUS_PROVIDER_UNAVAILABLE)) or "none"),
         "",
         "## Fade / Short-Review Research",
         "Move may be crowded/exhausted; review risk and invalidation. Research-only. Not a trade signal.",
@@ -458,8 +603,14 @@ def format_derivatives_crowding_report(
     for row in states:
         lines.append(
             f"- {row.get('symbol')}/{row.get('coin_id')} provider={row.get('provider')} "
-            f"freshness={row.get('freshness_status')} oi_delta_24h={_fmt_pct(row.get('open_interest_delta_24h'))} "
-            f"funding={_fmt_pct(row.get('funding_rate'))} funding_z={row.get('funding_zscore') or 'n/a'}"
+            f"freshness={row.get('derivatives_snapshot_freshness_status') or row.get('freshness_status')} "
+            f"oi_delta_24h={_fmt_pct(row.get('open_interest_delta_24h'))} "
+            f"funding={_fmt_pct(row.get('funding_rate'))} "
+            f"predicted_funding={_fmt_metric_pct(row, 'predicted_funding', 'predicted_funding_rate')} "
+            f"funding_z={row.get('funding_zscore') or 'n/a'} "
+            f"basis={_fmt_metric_pct(row, 'basis', 'basis')} "
+            f"metric_status={_format_metric_status(row.get('supported_metric_status'))} "
+            f"units={_format_unit_metadata(row)}"
         )
     if warnings:
         lines.extend(["", "## Warnings"])
@@ -511,7 +662,7 @@ def _market_snapshot_from_derivatives_state(state: Mapping[str, Any], *, observe
         "return_24h": return_24h,
         "return_4h": return_4h,
         "volume_zscore_24h": volume_z,
-        "market_context_freshness_status": state.get("freshness_status") or "unknown",
+        "market_context_freshness_status": state.get("derivatives_snapshot_freshness_status") or state.get("freshness_status") or "unknown",
         "market_context_source": "coinalyze_derivatives_rehearsal",
     }
     age = _state_age_hours(state, observed_at=observed_at)
@@ -608,11 +759,14 @@ def _reaction_derivatives_snapshot(state: Mapping[str, Any]) -> dict[str, Any]:
         "open_interest_delta": _first(state, "open_interest_delta_24h", "open_interest_delta_4h", "open_interest_delta_1h"),
         "open_interest_24h_change_pct": state.get("open_interest_delta_24h"),
         "funding_rate_8h": state.get("funding_rate"),
+        "predicted_funding_rate": state.get("predicted_funding_rate"),
         "funding_zscore": state.get("funding_zscore"),
         "liquidation_imbalance": state.get("liquidation_imbalance"),
         "long_short_ratio": state.get("long_short_ratio"),
         "basis": state.get("basis"),
         "perp_spot_volume_ratio": state.get("perp_spot_volume_ratio"),
+        "supported_metric_status": dict(state.get("supported_metric_status") or {}),
+        "unit_metadata": dict(state.get("unit_metadata") or {}),
     }
 
 
@@ -651,6 +805,7 @@ def _crowding_evidence(state: Mapping[str, Any]) -> tuple[str, ...]:
     funding_z = _float(state.get("funding_zscore"))
     liq = _float(state.get("liquidation_imbalance"))
     perp_spot = _float(state.get("perp_spot_volume_ratio"))
+    basis = _pct(state.get("basis"))
     if oi4 is not None and oi4 >= 30:
         evidence.append("open_interest_delta_4h_high")
     if oi24 is not None and oi24 >= 35:
@@ -663,6 +818,8 @@ def _crowding_evidence(state: Mapping[str, Any]) -> tuple[str, ...]:
         evidence.append("liquidation_imbalance_extreme")
     if perp_spot is not None and perp_spot >= 3:
         evidence.append("perp_spot_volume_divergence")
+    if basis is not None and funding is not None and abs(basis) >= 0.25 and abs(funding) >= 0.01 and _sign(basis) != _sign(funding):
+        evidence.append("basis_funding_disagreement")
     return tuple(evidence)
 
 
@@ -702,6 +859,15 @@ def _negative_without_crowding(item: Mapping[str, Any], state: Mapping[str, Any]
     return any(token in text for token in ("exploit", "security", "risk", "delisting")) and not _crowding_evidence(state)
 
 
+def _state_fresh_for_fade_review(state: Mapping[str, Any]) -> bool:
+    status = str(
+        state.get("derivatives_snapshot_freshness_status")
+        or state.get("freshness_status")
+        or ""
+    ).casefold()
+    return status in {"fresh", "fixture_allowed_stale"}
+
+
 def _derivatives_warnings(
     *,
     timestamp: datetime,
@@ -710,7 +876,7 @@ def _derivatives_warnings(
     open_interest: float | None,
 ) -> tuple[str, ...]:
     warnings: list[str] = []
-    if _freshness_status(timestamp, observed_at) == "stale":
+    if _freshness_status(timestamp, observed_at) in {"stale", "expired"}:
         warnings.append("derivatives_state_stale")
     if funding_rate is None:
         warnings.append("funding_rate_missing")
@@ -728,6 +894,69 @@ def _freshness_status(timestamp: datetime | None, observed_at: datetime) -> str:
     if age_hours <= 24:
         return "stale"
     return "expired"
+
+
+def _metric_freshness(
+    row: Mapping[str, Any],
+    *,
+    observed_at: datetime,
+    value_present: bool,
+    fallback_timestamp: datetime | None,
+    fallback_status: str | None = None,
+    keys: Iterable[str],
+) -> str:
+    if not value_present:
+        return "missing"
+    timestamp: datetime | None = None
+    for key in keys:
+        timestamp = _parse_time(row.get(key))
+        if timestamp is not None:
+            break
+    if timestamp is None:
+        timestamp = fallback_timestamp
+    if timestamp is None and fallback_status:
+        return fallback_status
+    return _freshness_status(_as_utc(timestamp), observed_at) if timestamp else "unknown"
+
+
+def _explicit_freshness_status(row: Mapping[str, Any]) -> str | None:
+    value = str(_first(row, "derivatives_snapshot_freshness_status", "freshness_status") or "").strip().casefold()
+    if value in {"fresh", "stale", "expired", "unknown", "missing", "fixture_allowed_stale"}:
+        return value
+    return None
+
+
+def _combined_freshness_status(*statuses: str) -> str:
+    useful = [str(status or "").strip().casefold() for status in statuses if str(status or "").strip()]
+    useful = [status for status in useful if status != "missing"]
+    if not useful:
+        return "missing"
+    for status in ("expired", "stale", "unknown"):
+        if status in useful:
+            return status
+    return "fresh" if "fresh" in useful else useful[0]
+
+
+def _supported_metric_status(metric_values: Mapping[str, bool], *, provider_unavailable: bool = False) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for metric in DERIVATIVES_SUPPORTED_METRICS:
+        if provider_unavailable:
+            out[metric] = METRIC_STATUS_PROVIDER_UNAVAILABLE
+            continue
+        base_status = DERIVATIVES_LIVE_METRIC_IMPLEMENTATION_STATUS.get(metric, METRIC_STATUS_NOT_IMPLEMENTED)
+        present = bool(metric_values.get(metric))
+        if base_status == METRIC_STATUS_FIXTURE_ONLY:
+            out[metric] = METRIC_STATUS_FIXTURE_ONLY if present else METRIC_STATUS_NOT_IMPLEMENTED
+        elif base_status == METRIC_STATUS_IMPLEMENTED:
+            out[metric] = METRIC_STATUS_IMPLEMENTED if present else METRIC_STATUS_MISSING_FROM_RESPONSE
+        else:
+            out[metric] = base_status
+    return out
+
+
+def _unit(row: Mapping[str, Any], key: str, *, default: str) -> str:
+    value = str(row.get(key) or "").strip()
+    return value or default
 
 
 def _liquidation_imbalance(long_usd: float | None, short_usd: float | None) -> float | None:
@@ -852,9 +1081,59 @@ def _pct(value: object) -> float | None:
     return number
 
 
+def _sign(value: float) -> int:
+    if value > 0:
+        return 1
+    if value < 0:
+        return -1
+    return 0
+
+
 def _fmt_pct(value: object) -> str:
     number = _pct(value)
     return "n/a" if number is None else f"{number:.1f}%"
+
+
+def _fmt_metric_pct(row: Mapping[str, Any], metric: str, value_key: str) -> str:
+    value = row.get(value_key)
+    if _float(value) is not None:
+        return _fmt_pct(value)
+    return _metric_status(row, metric) or "missing_from_response"
+
+
+def _metric_status(row: Mapping[str, Any], metric: str) -> str:
+    status = row.get("supported_metric_status")
+    if isinstance(status, Mapping):
+        return str(status.get(metric) or "").strip()
+    return ""
+
+
+def _format_metric_status(value: object) -> str:
+    if not isinstance(value, Mapping):
+        return "none"
+    parts = [f"{metric}={value.get(metric)}" for metric in DERIVATIVES_SUPPORTED_METRICS if value.get(metric)]
+    return ", ".join(parts) if parts else "none"
+
+
+def _format_unit_metadata(row: Mapping[str, Any]) -> str:
+    units = row.get("unit_metadata") if isinstance(row.get("unit_metadata"), Mapping) else row
+    keys = ("open_interest_unit", "funding_rate_unit", "basis_unit", "liquidation_unit", "volume_unit")
+    parts = [f"{key}={units.get(key)}" for key in keys if units.get(key)]  # type: ignore[union-attr]
+    return ", ".join(parts) if parts else "none"
+
+
+def _metrics_by_status(rows: Iterable[Mapping[str, Any]], *statuses: str) -> tuple[str, ...]:
+    wanted = {str(status) for status in statuses}
+    out: list[str] = []
+    for row in rows:
+        metric_status = row.get("supported_metric_status")
+        if not isinstance(metric_status, Mapping):
+            continue
+        for metric in DERIVATIVES_SUPPORTED_METRICS:
+            status = str(metric_status.get(metric) or "")
+            if status in wanted:
+                out.append(f"{metric}:{status}")
+    return tuple(dict.fromkeys(out))
 
 
 def _move_summary(row: Mapping[str, Any]) -> str:

@@ -112,7 +112,7 @@ class CoinalyzeDerivativesProvider:
                 raise
             log.warning(warning)
             return {}
-        self.last_warnings = ()
+        self.last_warnings = tuple(dict.fromkeys(self.last_warnings))
         out: dict[str, dict[str, Any]] = {}
         for row in rows:
             snapshot = _snapshot(row)
@@ -140,6 +140,8 @@ class CoinalyzeDerivativesProvider:
                     continue
                 row = by_symbol.setdefault(symbol, _live_base_row(symbol))
                 row["open_interest"] = item.get("value")
+                row["open_interest_timestamp"] = _max_time(row.get("open_interest_timestamp"), item.get("update"))
+                row["open_interest_unit"] = "usd_notional" if self.convert_to_usd else "provider_native"
                 row["timestamp"] = _max_time(row.get("timestamp"), item.get("update"))
             for item in self._get("funding-rate", {"symbols": ",".join(symbols)}):
                 symbol = str(item.get("symbol") or "")
@@ -147,6 +149,17 @@ class CoinalyzeDerivativesProvider:
                     continue
                 row = by_symbol.setdefault(symbol, _live_base_row(symbol))
                 row["funding_rate_8h"] = item.get("value")
+                row["funding_timestamp"] = _max_time(row.get("funding_timestamp"), item.get("update"))
+                row["funding_rate_unit"] = "decimal_rate"
+                row["timestamp"] = _max_time(row.get("timestamp"), item.get("update"))
+            for item in self._get_optional("predicted-funding-rate", {"symbols": ",".join(symbols)}):
+                symbol = str(item.get("symbol") or "")
+                if not symbol:
+                    continue
+                row = by_symbol.setdefault(symbol, _live_base_row(symbol))
+                row["predicted_funding_rate"] = item.get("value")
+                row["predicted_funding_timestamp"] = _max_time(row.get("predicted_funding_timestamp"), item.get("update"))
+                row["funding_rate_unit"] = "decimal_rate"
                 row["timestamp"] = _max_time(row.get("timestamp"), item.get("update"))
             history_params = {
                 "symbols": ",".join(symbols),
@@ -158,21 +171,28 @@ class CoinalyzeDerivativesProvider:
                 symbol = str(item.get("symbol") or "")
                 row = by_symbol.setdefault(symbol, _live_base_row(symbol))
                 row["open_interest_24h_change_pct"] = _history_change_pct(item.get("history"))
+                row["open_interest_history_timestamp"] = _latest_history_time(item.get("history"))
+                row["open_interest_unit"] = "usd_notional" if self.convert_to_usd else "provider_native"
             for item in self._get("liquidation-history", {**history_params, "convert_to_usd": _bool_param(self.convert_to_usd)}):
                 symbol = str(item.get("symbol") or "")
                 row = by_symbol.setdefault(symbol, _live_base_row(symbol))
                 row["liquidations_24h"] = _liquidation_sum(item.get("history"))
                 row["long_liquidations"] = _history_sum(item.get("history"), "l")
                 row["short_liquidations"] = _history_sum(item.get("history"), "s")
+                row["liquidation_timestamp"] = _latest_history_time(item.get("history"))
+                row["liquidation_unit"] = "usd_notional" if self.convert_to_usd else "provider_native"
             for item in self._get("long-short-ratio-history", history_params):
                 symbol = str(item.get("symbol") or "")
                 row = by_symbol.setdefault(symbol, _live_base_row(symbol))
                 row["long_short_ratio"] = _latest_history_value(item.get("history"), "r")
+                row["long_short_timestamp"] = _latest_history_time(item.get("history"))
             for item in self._get("ohlcv-history", history_params):
                 symbol = str(item.get("symbol") or "")
                 row = by_symbol.setdefault(symbol, _live_base_row(symbol))
                 row["futures_price_24h_change_pct"] = _history_change_pct(item.get("history"))
                 row["futures_volume_24h"] = _history_sum(item.get("history"), "v")
+                row["ohlcv_timestamp"] = _latest_history_time(item.get("history"))
+                row["volume_unit"] = "provider_native"
             rows.extend(by_symbol.values())
         return rows
 
@@ -184,6 +204,15 @@ class CoinalyzeDerivativesProvider:
         if not isinstance(raw, list):
             raise ValueError(f"Coinalyze {path} response must be a list")
         return [dict(item) for item in raw if isinstance(item, Mapping)]
+
+    def _get_optional(self, path: str, params: Mapping[str, str]) -> list[Mapping[str, Any]]:
+        try:
+            return self._get(path, params)
+        except Exception as exc:  # noqa: BLE001 - optional live metric must fail soft
+            warning = f"Coinalyze optional endpoint {path} skipped: {_safe_error(exc, self.api_key)}"
+            self.last_warnings = tuple(dict.fromkeys((*self.last_warnings, warning)))
+            log.warning(warning)
+            return []
 
 
 def _load_rows(path: Path) -> list[Mapping[str, Any]]:
@@ -271,24 +300,38 @@ def _snapshot(row: Mapping[str, Any]) -> dict[str, Any] | None:
         "timestamp": timestamp.isoformat() if timestamp else None,
         "perp_available": bool(row.get("perp_available", True)),
         "open_interest": _float_or_none(_first_present(row, "open_interest", "oi")),
+        "open_interest_timestamp": _iso_time(_first_present(row, "open_interest_timestamp", "open_interest_observed_at")),
+        "open_interest_unit": str(row.get("open_interest_unit") or "").strip() or None,
         "open_interest_24h_change_pct": _float_or_none(
             _first_present(row, "open_interest_24h_change_pct", "oi_24h_change_pct", "open_interest_change_24h")
         ),
+        "open_interest_history_timestamp": _iso_time(_first_present(row, "open_interest_history_timestamp", "open_interest_history_observed_at")),
         "open_interest_to_market_cap": _float_or_none(
             _first_present(row, "open_interest_to_market_cap", "oi_to_market_cap")
         ),
         "funding_rate_8h": _float_or_none(_first_present(row, "funding_rate_8h", "funding_rate")),
+        "predicted_funding_rate": _float_or_none(_first_present(row, "predicted_funding_rate", "predicted_funding")),
+        "funding_timestamp": _iso_time(_first_present(row, "funding_timestamp", "funding_observed_at")),
+        "predicted_funding_timestamp": _iso_time(_first_present(row, "predicted_funding_timestamp", "predicted_funding_observed_at")),
+        "funding_rate_unit": str(row.get("funding_rate_unit") or "").strip() or None,
         "funding_rate_percentile": _float_or_none(row.get("funding_rate_percentile")),
         "futures_price_24h_change_pct": _float_or_none(
             _first_present(row, "futures_price_24h_change_pct", "price_return_24h", "return_24h", "price_change_24h")
         ),
+        "ohlcv_timestamp": _iso_time(_first_present(row, "ohlcv_timestamp", "volume_timestamp", "volume_observed_at")),
         "futures_volume_24h": _float_or_none(_first_present(row, "futures_volume_24h", "volume_24h")),
+        "volume_unit": str(row.get("volume_unit") or "").strip() or None,
         "perp_spot_volume_ratio": _float_or_none(row.get("perp_spot_volume_ratio")),
         "liquidations_24h": _float_or_none(row.get("liquidations_24h")),
         "long_liquidations": _float_or_none(_first_present(row, "long_liquidations", "long_liquidations_24h", "liquidation_long_usd")),
         "short_liquidations": _float_or_none(_first_present(row, "short_liquidations", "short_liquidations_24h", "liquidation_short_usd")),
+        "liquidation_timestamp": _iso_time(_first_present(row, "liquidation_timestamp", "liquidation_observed_at")),
+        "liquidation_unit": str(row.get("liquidation_unit") or "").strip() or None,
         "long_short_ratio": _float_or_none(row.get("long_short_ratio")),
+        "long_short_timestamp": _iso_time(_first_present(row, "long_short_timestamp", "long_short_observed_at")),
         "basis": _float_or_none(row.get("basis")),
+        "basis_timestamp": _iso_time(_first_present(row, "basis_timestamp", "basis_observed_at")),
+        "basis_unit": str(row.get("basis_unit") or "").strip() or None,
     }
     metric_keys = tuple(key for key in snapshot if key not in {"symbol", "timestamp", "perp_available"})
     if not any(snapshot.get(key) is not None for key in metric_keys) and row.get("perp_available") is not False:
@@ -452,6 +495,25 @@ def _liquidation_sum(history: object) -> float | None:
 def _latest_history_value(history: object, field: str) -> float | None:
     values = _history_values(history, field)
     return values[-1] if values else None
+
+
+def _latest_history_time(history: object) -> str | None:
+    if not isinstance(history, list):
+        return None
+    latest: datetime | None = None
+    for item in history:
+        if not isinstance(item, Mapping):
+            continue
+        timestamp = _parse_dt(item.get("t"))
+        if timestamp is None:
+            continue
+        latest = timestamp if latest is None else max(latest, timestamp)
+    return latest.isoformat() if latest else None
+
+
+def _iso_time(value: object) -> str | None:
+    parsed = _parse_dt(value)
+    return parsed.isoformat() if parsed else None
 
 
 def _max_time(left: object, right: object) -> object:

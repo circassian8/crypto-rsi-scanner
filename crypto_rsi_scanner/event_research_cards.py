@@ -2026,9 +2026,20 @@ def _derivatives_crowding_lines(
         f"4h={_display_pct(state.get('open_interest_delta_4h'))} "
         f"24h={_display_pct(state.get('open_interest_delta_24h'))}",
         f"- Funding: current={_display_pct(state.get('funding_rate'))} "
-        f"predicted={_display_pct(state.get('predicted_funding_rate'))} "
-        f"z={_display_text(state.get('funding_zscore')) or 'n/a'}",
+        f"predicted={_derivatives_metric_pct(state, 'predicted_funding', 'predicted_funding_rate')} "
+        f"z={_display_text(state.get('funding_zscore')) or 'n/a'} "
+        f"unit={_display_text(state.get('funding_rate_unit')) or 'unknown'}",
+        f"- Basis: {_derivatives_metric_pct(state, 'basis', 'basis')} "
+        f"unit={_display_text(state.get('basis_unit')) or 'unknown'}",
         f"- Liquidation imbalance: {_display_text(state.get('liquidation_imbalance')) or 'n/a'}",
+        f"- Metric status: {_derivatives_metric_status_summary(state)}",
+        f"- Unit metadata: {_derivatives_unit_summary(state)}",
+        f"- Freshness: snapshot={_display_text(state.get('derivatives_snapshot_freshness_status') or state.get('freshness_status')) or 'unknown'} "
+        f"oi={_display_text(state.get('open_interest_freshness')) or 'unknown'} "
+        f"funding={_display_text(state.get('funding_freshness')) or 'unknown'} "
+        f"liquidations={_display_text(state.get('liquidation_freshness')) or 'unknown'} "
+        f"long_short={_display_text(state.get('long_short_freshness')) or 'unknown'} "
+        f"basis={_display_text(state.get('basis_freshness')) or 'unknown'}",
         f"- Crowding class: {crowding or 'unknown'}",
         f"- Fade readiness: {_display_text(components.get('fade_readiness')) or 'unknown'}",
     ]
@@ -2042,6 +2053,31 @@ def _derivatives_crowding_lines(
     if warnings:
         lines.append("- Warnings: " + "; ".join(warnings[:6]))
     return lines
+
+
+def _derivatives_metric_pct(state: Mapping[str, Any], metric: str, key: str) -> str:
+    if _float(state.get(key)) is not None:
+        return _display_pct(state.get(key))
+    status = state.get("supported_metric_status")
+    if isinstance(status, Mapping) and status.get(metric):
+        return str(status.get(metric))
+    return "missing_from_response"
+
+
+def _derivatives_metric_status_summary(state: Mapping[str, Any]) -> str:
+    status = state.get("supported_metric_status")
+    if not isinstance(status, Mapping):
+        return "none"
+    metrics = ("open_interest", "funding_rate", "predicted_funding", "liquidations", "long_short_ratio", "basis", "perp_volume")
+    parts = [f"{metric}={status.get(metric)}" for metric in metrics if status.get(metric)]
+    return ", ".join(parts) if parts else "none"
+
+
+def _derivatives_unit_summary(state: Mapping[str, Any]) -> str:
+    units = state.get("unit_metadata") if isinstance(state.get("unit_metadata"), Mapping) else state
+    keys = ("open_interest_unit", "funding_rate_unit", "basis_unit", "liquidation_unit", "volume_unit")
+    parts = [f"{key}={units.get(key)}" for key in keys if units.get(key)]  # type: ignore[union-attr]
+    return ", ".join(parts) if parts else "none"
 
 
 def _display_pct(value: Any) -> str:

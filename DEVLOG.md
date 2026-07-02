@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Make Coinalyze derivatives metric claims explicit · Codex
+**Why:** Coinalyze readiness and rehearsal reports listed derivatives metrics
+that were not all populated in live-capable snapshots, making crowding artifacts
+look more complete than the actual provider data.
+**Changes:**
+- Added explicit supported-metric status reporting across Coinalyze preflight,
+  no-send rehearsal, derivatives state, source coverage, reports, and cards.
+- Added a bounded live predicted-funding fetch from the documented Coinalyze
+  endpoint; basis remains `fixture_only`/planned because the public docs do not
+  expose a basis endpoint.
+- Persisted per-symbol freshness and unit metadata for OI, funding,
+  liquidations, long/short, basis, and volume into state, candidates, and card
+  surfaces.
+- Strengthened crowding evidence with funding z-score and optional
+  basis/funding disagreement checks, while blocking stale derivatives state from
+  fade-review promotion.
+- Expanded artifact doctor checks for implemented metric claims with no state
+  data, missing unit metadata, stale fade-review rows, and card copy that shows
+  predicted funding or basis without data.
+**Verify:** `python3 tests/test_indicators.py` (662/662); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`; `make
+event-alpha-derivatives-smoke PYTHON=python3`; `make
+event-alpha-fade-review-smoke PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** Coinalyze still makes no live call by default. The no-key
+rehearsal remains `missing_config` with zero requests and zero sends/trades/
+paper/RSI/`TRIGGERED_FADE` side effects; live calls still require key plus an
+explicit allow flag and request ledger.
+
 ## 2026-07-02 — Emit Coinalyze rehearsal crowding artifacts · Codex
 **Why:** A bounded Coinalyze no-send rehearsal could prove request/parse health
 but still left `event_derivatives_crowding_candidates.jsonl` and

@@ -47,6 +47,7 @@ SUPPORTED_METRICS = (
     "basis",
     "perp_volume",
 )
+SUPPORTED_METRIC_STATUS = dict(event_derivatives_crowding.DERIVATIVES_LIVE_METRIC_IMPLEMENTATION_STATUS)
 LANES_ENABLED = (
     "FADE_SHORT_REVIEW",
     "CONFIRMED_LONG_RESEARCH crowding warnings",
@@ -61,6 +62,7 @@ FIXTURE_SYMBOLS = ("BTC", "ETH", "SOL", "TESTPERP", "TESTFADE")
 _LIVE_ENDPOINTS_PER_BATCH = (
     "open-interest",
     "funding-rate",
+    "predicted-funding-rate",
     "open-interest-history",
     "liquidation-history",
     "long-short-ratio-history",
@@ -98,6 +100,7 @@ class CoinalyzeRehearsalReport:
     fade_readiness_counts: dict[str, int]
     symbols_with_extreme_crowding: tuple[str, ...]
     symbols_with_confirmed_long_crowding_warning: tuple[str, ...]
+    supported_metric_status: Mapping[str, str]
     provider_health_status: str
     error_class: str | None = None
     error_message_safe: str | None = None
@@ -140,6 +143,26 @@ class CoinalyzeRehearsalReport:
             "fade_readiness_counts": dict(self.fade_readiness_counts),
             "symbols_with_extreme_crowding": list(self.symbols_with_extreme_crowding),
             "symbols_with_confirmed_long_crowding_warning": list(self.symbols_with_confirmed_long_crowding_warning),
+            "supported_metric_status": dict(self.supported_metric_status),
+            "implemented_metrics": [
+                metric
+                for metric, status in self.supported_metric_status.items()
+                if status == event_derivatives_crowding.METRIC_STATUS_IMPLEMENTED
+            ],
+            "fixture_only_metrics": [
+                metric
+                for metric, status in self.supported_metric_status.items()
+                if status == event_derivatives_crowding.METRIC_STATUS_FIXTURE_ONLY
+            ],
+            "missing_or_planned_metrics": [
+                metric
+                for metric, status in self.supported_metric_status.items()
+                if status in {
+                    event_derivatives_crowding.METRIC_STATUS_MISSING_FROM_RESPONSE,
+                    event_derivatives_crowding.METRIC_STATUS_NOT_IMPLEMENTED,
+                    event_derivatives_crowding.METRIC_STATUS_PROVIDER_UNAVAILABLE,
+                }
+            ],
             "provider_health_status": self.provider_health_status,
             "error_class": self.error_class,
             "error_message_safe": self.error_message_safe,
@@ -171,6 +194,7 @@ class CoinalyzePreflightReport:
     fixture_parser_status: str
     fixture_symbol_mapping_status: str
     supported_metrics: tuple[str, ...]
+    supported_metric_status: Mapping[str, str]
     lanes_enabled_if_healthy: tuple[str, ...]
     source_packs_enabled: tuple[str, ...]
     safety_notes: tuple[str, ...]
@@ -199,6 +223,26 @@ class CoinalyzePreflightReport:
             "fixture_parser_status": self.fixture_parser_status,
             "fixture_symbol_mapping_status": self.fixture_symbol_mapping_status,
             "supported_metrics": list(self.supported_metrics),
+            "supported_metric_status": dict(self.supported_metric_status),
+            "implemented_metrics": [
+                metric
+                for metric, status in self.supported_metric_status.items()
+                if status == event_derivatives_crowding.METRIC_STATUS_IMPLEMENTED
+            ],
+            "fixture_only_metrics": [
+                metric
+                for metric, status in self.supported_metric_status.items()
+                if status == event_derivatives_crowding.METRIC_STATUS_FIXTURE_ONLY
+            ],
+            "missing_or_planned_metrics": [
+                metric
+                for metric, status in self.supported_metric_status.items()
+                if status in {
+                    event_derivatives_crowding.METRIC_STATUS_MISSING_FROM_RESPONSE,
+                    event_derivatives_crowding.METRIC_STATUS_NOT_IMPLEMENTED,
+                    event_derivatives_crowding.METRIC_STATUS_PROVIDER_UNAVAILABLE,
+                }
+            ],
             "lanes_enabled_if_healthy": list(self.lanes_enabled_if_healthy),
             "source_packs_enabled": list(self.source_packs_enabled),
             "safety_notes": list(self.safety_notes),
@@ -250,6 +294,7 @@ def build_preflight_report(
         fixture_parser_status=fixture_parser_status,
         fixture_symbol_mapping_status=symbol_status,
         supported_metrics=SUPPORTED_METRICS,
+        supported_metric_status=dict(SUPPORTED_METRIC_STATUS),
         lanes_enabled_if_healthy=LANES_ENABLED,
         source_packs_enabled=SOURCE_PACKS,
         safety_notes=(
@@ -286,7 +331,7 @@ def write_rehearsal_report(report: CoinalyzePreflightReport, namespace_dir: str 
         next_step = "rerun only with explicit --event-alpha-coinalyze-allow-live-preflight after reviewing quota and doctor output"
     else:
         status = "ready_for_future_bounded_no_send_rehearsal"
-        next_step = "future implementation may run one or two metadata requests with request ledger enforcement"
+        next_step = "run the bounded no-send rehearsal only with explicit allow flag and request ledger enforcement"
     lines = [
         "# Coinalyze No-Send Rehearsal Stub",
         "",
@@ -487,6 +532,7 @@ def run_no_send_rehearsal(
         fade_readiness_counts=fade_readiness_counts,
         symbols_with_extreme_crowding=_symbols_with_crowding_class(candidate_rows, "extreme"),
         symbols_with_confirmed_long_crowding_warning=_symbols_with_confirmed_long_crowding_warning(candidate_rows),
+        supported_metric_status=_metric_status_from_state_rows(_read_jsonl(derivatives_state_path)),
         provider_health_status=provider_health_status,
         error_class=error_class,
         error_message_safe=error_message_safe,
@@ -520,6 +566,10 @@ def format_preflight_report(report: CoinalyzePreflightReport) -> str:
         f"fixture_symbol_mapping_status: {report.fixture_symbol_mapping_status}",
         f"fixture_symbols_observed: {', '.join(report.fixture_symbols_observed) or 'none'}",
         f"supported_metrics: {', '.join(report.supported_metrics)}",
+        f"supported_metric_status: {_format_metric_status(report.supported_metric_status)}",
+        f"implemented_metrics: {_metrics_by_report_status(report.supported_metric_status, event_derivatives_crowding.METRIC_STATUS_IMPLEMENTED)}",
+        f"fixture_only_metrics: {_metrics_by_report_status(report.supported_metric_status, event_derivatives_crowding.METRIC_STATUS_FIXTURE_ONLY)}",
+        f"missing_or_planned_metrics: {_metrics_by_report_status(report.supported_metric_status, event_derivatives_crowding.METRIC_STATUS_MISSING_FROM_RESPONSE, event_derivatives_crowding.METRIC_STATUS_NOT_IMPLEMENTED, event_derivatives_crowding.METRIC_STATUS_PROVIDER_UNAVAILABLE)}",
         f"lanes_enabled_if_healthy: {', '.join(report.lanes_enabled_if_healthy)}",
         f"source_packs_enabled: {', '.join(report.source_packs_enabled)}",
         "",
@@ -551,6 +601,10 @@ def format_rehearsal_report(report: CoinalyzeRehearsalReport) -> str:
         f"max_requests_per_run: {report.max_requests_per_run}",
         f"symbols_requested: {', '.join(report.symbols_requested) or 'none'}",
         f"symbols_resolved: {', '.join(report.symbols_resolved) or 'none'}",
+        f"supported_metric_status: {_format_metric_status(report.supported_metric_status)}",
+        f"implemented_metrics: {_metrics_by_report_status(report.supported_metric_status, event_derivatives_crowding.METRIC_STATUS_IMPLEMENTED)}",
+        f"fixture_only_metrics: {_metrics_by_report_status(report.supported_metric_status, event_derivatives_crowding.METRIC_STATUS_FIXTURE_ONLY)}",
+        f"missing_or_planned_metrics: {_metrics_by_report_status(report.supported_metric_status, event_derivatives_crowding.METRIC_STATUS_MISSING_FROM_RESPONSE, event_derivatives_crowding.METRIC_STATUS_NOT_IMPLEMENTED, event_derivatives_crowding.METRIC_STATUS_PROVIDER_UNAVAILABLE)}",
         f"snapshots_written: {report.snapshots_written}",
         f"crowding_candidates_written: {report.crowding_candidates_written}",
         f"fade_review_candidates_written: {report.fade_review_candidates_written}",
@@ -621,7 +675,7 @@ def _max_requests_per_run(*, explicit_symbols: bool) -> int:
             return max(0, int(raw))
         except ValueError:
             return 0
-    return 6 if explicit_symbols else 7
+    return 7 if explicit_symbols else 8
 
 
 def _symbol_warnings(symbols: Iterable[str]) -> tuple[str, ...]:
@@ -711,6 +765,45 @@ def _counts(values: Iterable[str]) -> dict[str, int]:
 
 def _format_counts(counts: Mapping[str, int]) -> str:
     return ", ".join(f"{key}={value}" for key, value in sorted(counts.items())) or "none"
+
+
+def _format_metric_status(status: Mapping[str, str]) -> str:
+    return ", ".join(
+        f"{metric}={status.get(metric)}"
+        for metric in SUPPORTED_METRICS
+        if status.get(metric)
+    ) or "none"
+
+
+def _metrics_by_report_status(status: Mapping[str, str], *wanted: str) -> str:
+    wanted_set = {str(item) for item in wanted}
+    metrics = [metric for metric in SUPPORTED_METRICS if str(status.get(metric) or "") in wanted_set]
+    return ", ".join(metrics) if metrics else "none"
+
+
+def _metric_status_from_state_rows(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
+    materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
+    if not materialized:
+        return dict(SUPPORTED_METRIC_STATUS)
+    out: dict[str, str] = {}
+    priority = {
+        event_derivatives_crowding.METRIC_STATUS_IMPLEMENTED: 5,
+        event_derivatives_crowding.METRIC_STATUS_FIXTURE_ONLY: 4,
+        event_derivatives_crowding.METRIC_STATUS_MISSING_FROM_RESPONSE: 3,
+        event_derivatives_crowding.METRIC_STATUS_NOT_IMPLEMENTED: 2,
+        event_derivatives_crowding.METRIC_STATUS_PROVIDER_UNAVAILABLE: 1,
+    }
+    for metric in SUPPORTED_METRICS:
+        observed_statuses: list[str] = []
+        for row in materialized:
+            status = row.get("supported_metric_status")
+            if isinstance(status, Mapping) and str(status.get(metric) or "").strip():
+                observed_statuses.append(str(status.get(metric)))
+        if observed_statuses:
+            out[metric] = max(observed_statuses, key=lambda value: priority.get(value, 0))
+        else:
+            out[metric] = SUPPORTED_METRIC_STATUS.get(metric, event_derivatives_crowding.METRIC_STATUS_NOT_IMPLEMENTED)
+    return out
 
 
 def _symbols_with_crowding_class(rows: Iterable[Mapping[str, Any]], crowding_class: str) -> tuple[str, ...]:
@@ -1115,6 +1208,7 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
         "coinalyze_rehearsal_success_without_crowding_candidates": 0,
         "coinalyze_provider_health_healthy_without_successful_ledger": 0,
         "coinalyze_rehearsal_forbidden_side_effect_claim": 0,
+        "coinalyze_supported_metric_implemented_missing_state": 0,
     }
     if namespace_dir is None:
         return out
@@ -1153,6 +1247,7 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
     except (OSError, json.JSONDecodeError):
         rehearsal_data = {}
     ledger_rows = _read_jsonl(base / REQUEST_LEDGER)
+    state_rows = _read_jsonl(base / event_derivatives_crowding.DERIVATIVES_STATE_FILENAME)
     if rehearsal_data:
         status = str(rehearsal_data.get("status") or "")
         live_allowed = bool(rehearsal_data.get("live_call_allowed"))
@@ -1170,6 +1265,13 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
             out["coinalyze_rehearsal_success_without_derivatives_state"] = 1
         if status == "live_rehearsal_success" and int(rehearsal_data.get("crowding_candidates_written") or 0) <= 0:
             out["coinalyze_rehearsal_success_without_crowding_candidates"] = 1
+        supported_status = rehearsal_data.get("supported_metric_status")
+        if isinstance(supported_status, Mapping) and status in {"live_rehearsal_success", "live_rehearsal_partial"}:
+            for metric, metric_status in supported_status.items():
+                if str(metric_status) != event_derivatives_crowding.METRIC_STATUS_IMPLEMENTED:
+                    continue
+                if not any(_state_metric_has_value(row, str(metric)) for row in state_rows):
+                    out["coinalyze_supported_metric_implemented_missing_state"] += 1
         for key in (
             "strict_alerts_created",
             "telegram_sends",
@@ -1183,13 +1285,25 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
     if re.search(r"(?i)\b(send telegram|paper trade|live trade|execute order|triggered_fade created)\b", text):
         out["coinalyze_rehearsal_forbidden_side_effect_claim"] = 1
     health_rows = _provider_health_rows(base / "event_provider_health.json")
-    state_rows = _read_jsonl(base / event_derivatives_crowding.DERIVATIVES_STATE_FILENAME)
     if _coinalyze_health_observed_healthy(health_rows) and (
         not any(row.get("provider") == "coinalyze" and row.get("success") for row in ledger_rows)
         or not state_rows
     ):
         out["coinalyze_provider_health_healthy_without_successful_ledger"] = 1
     return out
+
+
+def _state_metric_has_value(row: Mapping[str, Any], metric: str) -> bool:
+    values = {
+        "open_interest": ("open_interest", "open_interest_delta_1h", "open_interest_delta_4h", "open_interest_delta_24h"),
+        "funding_rate": ("funding_rate",),
+        "predicted_funding": ("predicted_funding_rate",),
+        "liquidations": ("liquidation_long_usd", "liquidation_short_usd", "liquidation_imbalance"),
+        "long_short_ratio": ("long_short_ratio",),
+        "basis": ("basis",),
+        "perp_volume": ("perp_volume", "perp_spot_volume_ratio"),
+    }
+    return any(row.get(key) not in (None, "", [], {}, ()) for key in values.get(metric, ()))
 
 
 def _provider_health_rows(path: Path) -> tuple[Mapping[str, Any], ...]:

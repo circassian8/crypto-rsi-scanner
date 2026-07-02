@@ -121,6 +121,9 @@ class EventAlphaArtifactDoctorResult:
     fade_review_notification_missing_disclaimer: int = 0
     derivatives_artifact_secret_leak: int = 0
     derivatives_state_missing_freshness_status: int = 0
+    derivatives_metric_claim_implemented_missing: int = 0
+    derivatives_unit_metadata_missing: int = 0
+    stale_derivatives_snapshot_promoted_fade_review: int = 0
     confirmed_long_crowded_without_warning: int = 0
     integrated_radar_candidate_rows: int = 0
     integrated_candidate_missing_opportunity_type: int = 0
@@ -152,6 +155,7 @@ class EventAlphaArtifactDoctorResult:
     integrated_candidate_card_official_event_missing: int = 0
     integrated_candidate_card_source_url_missing: int = 0
     integrated_candidate_core_crowding_metadata_loss: int = 0
+    derivatives_card_metric_claim_without_data: int = 0
     integrated_fade_card_crowding_unknown: int = 0
     integrated_fade_card_missing_disclaimer: int = 0
     integrated_confirmed_long_crowding_warning_hidden: int = 0
@@ -215,6 +219,7 @@ class EventAlphaArtifactDoctorResult:
     coinalyze_rehearsal_success_without_crowding_candidates: int = 0
     coinalyze_provider_health_healthy_without_successful_ledger: int = 0
     coinalyze_rehearsal_forbidden_side_effect_claim: int = 0
+    coinalyze_supported_metric_implemented_missing_state: int = 0
     source_pack_provider_status_missing: int = 0
     missing_provider_recommendations_missing: int = 0
     degraded_provider_absence_marked_meaningful: int = 0
@@ -1208,6 +1213,8 @@ def diagnose_artifacts(
         "fade_review_created_normal_rsi_signal",
         "fade_review_notification_missing_disclaimer",
         "derivatives_artifact_secret_leak",
+        "derivatives_metric_claim_implemented_missing",
+        "stale_derivatives_snapshot_promoted_fade_review",
     ):
         count = derivatives_conflicts.get(key, 0)
         if count:
@@ -1218,6 +1225,7 @@ def diagnose_artifacts(
                 warnings.append(message)
     for key in (
         "derivatives_state_missing_freshness_status",
+        "derivatives_unit_metadata_missing",
         "confirmed_long_crowded_without_warning",
     ):
         count = derivatives_conflicts.get(key, 0)
@@ -1253,6 +1261,7 @@ def diagnose_artifacts(
         "integrated_candidate_card_official_event_missing",
         "integrated_candidate_card_source_url_missing",
         "integrated_candidate_core_crowding_metadata_loss",
+        "derivatives_card_metric_claim_without_data",
         "integrated_fade_card_crowding_unknown",
         "integrated_fade_card_missing_disclaimer",
         "integrated_confirmed_long_crowding_warning_hidden",
@@ -1364,6 +1373,7 @@ def diagnose_artifacts(
         "coinalyze_rehearsal_success_without_crowding_candidates",
         "coinalyze_provider_health_healthy_without_successful_ledger",
         "coinalyze_rehearsal_forbidden_side_effect_claim",
+        "coinalyze_supported_metric_implemented_missing_state",
     ):
         count = coinalyze_preflight_conflicts.get(key, 0)
         if not count:
@@ -1996,6 +2006,9 @@ def diagnose_artifacts(
         fade_review_notification_missing_disclaimer=derivatives_conflicts["fade_review_notification_missing_disclaimer"],
         derivatives_artifact_secret_leak=derivatives_conflicts["derivatives_artifact_secret_leak"],
         derivatives_state_missing_freshness_status=derivatives_conflicts["derivatives_state_missing_freshness_status"],
+        derivatives_metric_claim_implemented_missing=derivatives_conflicts["derivatives_metric_claim_implemented_missing"],
+        derivatives_unit_metadata_missing=derivatives_conflicts["derivatives_unit_metadata_missing"],
+        stale_derivatives_snapshot_promoted_fade_review=derivatives_conflicts["stale_derivatives_snapshot_promoted_fade_review"],
         confirmed_long_crowded_without_warning=derivatives_conflicts["confirmed_long_crowded_without_warning"],
         integrated_radar_candidate_rows=len(integrated_candidates),
         integrated_candidate_missing_opportunity_type=integrated_conflicts["integrated_candidate_missing_opportunity_type"],
@@ -2027,6 +2040,7 @@ def diagnose_artifacts(
         integrated_candidate_card_official_event_missing=integrated_conflicts["integrated_candidate_card_official_event_missing"],
         integrated_candidate_card_source_url_missing=integrated_conflicts["integrated_candidate_card_source_url_missing"],
         integrated_candidate_core_crowding_metadata_loss=integrated_conflicts["integrated_candidate_core_crowding_metadata_loss"],
+        derivatives_card_metric_claim_without_data=integrated_conflicts["derivatives_card_metric_claim_without_data"],
         integrated_fade_card_crowding_unknown=integrated_conflicts["integrated_fade_card_crowding_unknown"],
         integrated_fade_card_missing_disclaimer=integrated_conflicts["integrated_fade_card_missing_disclaimer"],
         integrated_confirmed_long_crowding_warning_hidden=integrated_conflicts["integrated_confirmed_long_crowding_warning_hidden"],
@@ -2129,6 +2143,9 @@ def diagnose_artifacts(
         ],
         coinalyze_rehearsal_forbidden_side_effect_claim=coinalyze_preflight_conflicts[
             "coinalyze_rehearsal_forbidden_side_effect_claim"
+        ],
+        coinalyze_supported_metric_implemented_missing_state=coinalyze_preflight_conflicts[
+            "coinalyze_supported_metric_implemented_missing_state"
         ],
         source_pack_provider_status_missing=source_coverage_conflicts["source_pack_provider_status_missing"],
         missing_provider_recommendations_missing=source_coverage_conflicts["missing_provider_recommendations_missing"],
@@ -3222,8 +3239,13 @@ def _derivatives_crowding_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) 
         "fade_review_notification_missing_disclaimer": 0,
         "derivatives_artifact_secret_leak": 0,
         "derivatives_state_missing_freshness_status": 0,
+        "derivatives_metric_claim_implemented_missing": 0,
+        "derivatives_unit_metadata_missing": 0,
+        "stale_derivatives_snapshot_promoted_fade_review": 0,
         "confirmed_long_crowded_without_warning": 0,
     }
+    implemented_claims: set[str] = set()
+    metrics_with_values: set[str] = set()
     for row in rows:
         if not isinstance(row, Mapping):
             continue
@@ -3234,6 +3256,15 @@ def _derivatives_crowding_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) 
         if row_type == "derivatives_state_snapshot":
             if not str(row.get("freshness_status") or "").strip():
                 out["derivatives_state_missing_freshness_status"] += 1
+            metric_status = row.get("supported_metric_status")
+            if isinstance(metric_status, Mapping):
+                for metric, status in metric_status.items():
+                    if str(status) == event_derivatives_crowding.METRIC_STATUS_IMPLEMENTED:
+                        implemented_claims.add(str(metric))
+            for metric in event_derivatives_crowding.DERIVATIVES_SUPPORTED_METRICS:
+                if _derivatives_metric_has_value(row, metric):
+                    metrics_with_values.add(metric)
+            out["derivatives_unit_metadata_missing"] += _derivatives_unit_metadata_missing(row)
             continue
         if row_type != "fade_short_review_candidate":
             continue
@@ -3242,6 +3273,7 @@ def _derivatives_crowding_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) 
         evidence = [str(item) for item in row.get("crowding_exhaustion_evidence") or () if str(item)]
         warnings = [str(item) for item in row.get("warnings") or () if str(item)]
         disclaimer = str(row.get("research_only_disclaimer") or "")
+        state = row.get("derivatives_state_snapshot") if isinstance(row.get("derivatives_state_snapshot"), Mapping) else row
         if opportunity == "FADE_SHORT_REVIEW":
             if not bool(row.get("completed_move")):
                 out["fade_review_without_completed_move"] += 1
@@ -3249,6 +3281,9 @@ def _derivatives_crowding_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) 
                 out["fade_review_without_crowding_exhaustion"] += 1
             if "Research-only" not in disclaimer or "Not a trade signal" not in disclaimer:
                 out["fade_review_notification_missing_disclaimer"] += 1
+            freshness = str(state.get("derivatives_snapshot_freshness_status") or state.get("freshness_status") or "").casefold()
+            if freshness in {"stale", "expired"}:
+                out["stale_derivatives_snapshot_promoted_fade_review"] += 1
         if bool(row.get("triggered_fade_created")) or str(row.get("signal_type") or "").upper() == "TRIGGERED_FADE":
             out["fade_review_created_triggered_fade"] += 1
         if bool(row.get("normal_rsi_signal_written")):
@@ -3256,7 +3291,39 @@ def _derivatives_crowding_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) 
         if opportunity == "CONFIRMED_LONG_RESEARCH" and crowding in {"high", "extreme"}:
             if not any("crowding" in warning.casefold() for warning in warnings):
                 out["confirmed_long_crowded_without_warning"] += 1
+    for metric in sorted(implemented_claims - metrics_with_values):
+        if metric:
+            out["derivatives_metric_claim_implemented_missing"] += 1
     return out
+
+
+def _derivatives_metric_has_value(row: Mapping[str, Any], metric: str) -> bool:
+    values = {
+        "open_interest": ("open_interest", "open_interest_delta_1h", "open_interest_delta_4h", "open_interest_delta_24h"),
+        "funding_rate": ("funding_rate",),
+        "predicted_funding": ("predicted_funding_rate",),
+        "liquidations": ("liquidation_long_usd", "liquidation_short_usd", "liquidation_imbalance"),
+        "long_short_ratio": ("long_short_ratio",),
+        "basis": ("basis",),
+        "perp_volume": ("perp_volume", "perp_spot_volume_ratio"),
+    }
+    return any(row.get(key) not in (None, "", [], {}, ()) for key in values.get(metric, ()))
+
+
+def _derivatives_unit_metadata_missing(row: Mapping[str, Any]) -> int:
+    checks = (
+        ("open_interest", "open_interest_unit"),
+        ("funding_rate", "funding_rate_unit"),
+        ("predicted_funding", "funding_rate_unit"),
+        ("basis", "basis_unit"),
+        ("liquidations", "liquidation_unit"),
+        ("perp_volume", "volume_unit"),
+    )
+    missing = 0
+    for metric, unit_key in checks:
+        if _derivatives_metric_has_value(row, metric) and not str(row.get(unit_key) or "").strip():
+            missing += 1
+    return missing
 
 
 def _derivatives_row_has_secret_leak(value: object) -> bool:
@@ -3316,6 +3383,7 @@ def _integrated_radar_artifact_conflicts(
         "integrated_candidate_card_official_event_missing": 0,
         "integrated_candidate_card_source_url_missing": 0,
         "integrated_candidate_core_crowding_metadata_loss": 0,
+        "derivatives_card_metric_claim_without_data": 0,
         "integrated_fade_card_crowding_unknown": 0,
         "integrated_fade_card_missing_disclaimer": 0,
         "integrated_confirmed_long_crowding_warning_hidden": 0,
@@ -3798,6 +3866,20 @@ def _integrated_candidate_core_card_conflicts(
     card_text = card_text_by_core.get(core_id, "")
     if not card_text:
         return
+    derivatives_state = candidate.get("derivatives_state_snapshot")
+    if not isinstance(derivatives_state, Mapping):
+        derivatives_state = core.get("derivatives_state_snapshot") if isinstance(core.get("derivatives_state_snapshot"), Mapping) else {}
+    if derivatives_state:
+        if not _derivatives_metric_has_value(derivatives_state, "predicted_funding") and re.search(
+            r"(?i)\bpredicted(?: funding)?=(?:n/a|[+-]?\d+(?:\.\d+)?%)",
+            card_text,
+        ):
+            out["derivatives_card_metric_claim_without_data"] += 1
+        if not _derivatives_metric_has_value(derivatives_state, "basis") and re.search(
+            r"(?im)^-\s*Basis:\s*(?:n/a|[+-]?\d+(?:\.\d+)?%)",
+            card_text,
+        ):
+            out["derivatives_card_metric_claim_without_data"] += 1
     card_lane = _markdown_bullet_value(card_text, "Opportunity type", section="Opportunity Lane")
     core_lane_lit = str(core.get("opportunity_type") or "").strip()
     if candidate_lane and card_lane and card_lane != candidate_lane:
@@ -6169,6 +6251,11 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"fade_review_notification_missing_disclaimer={result.fade_review_notification_missing_disclaimer} "
             f"derivatives_artifact_secret_leak={result.derivatives_artifact_secret_leak} "
             f"derivatives_state_missing_freshness_status={result.derivatives_state_missing_freshness_status} "
+            "derivatives_metric_claim_implemented_missing="
+            f"{result.derivatives_metric_claim_implemented_missing} "
+            f"derivatives_unit_metadata_missing={result.derivatives_unit_metadata_missing} "
+            "stale_derivatives_snapshot_promoted_fade_review="
+            f"{result.stale_derivatives_snapshot_promoted_fade_review} "
             f"confirmed_long_crowded_without_warning={result.confirmed_long_crowded_without_warning} "
             f"integrated_radar_candidate_rows={result.integrated_radar_candidate_rows} "
             f"integrated_candidate_missing_opportunity_type={result.integrated_candidate_missing_opportunity_type} "
@@ -6200,6 +6287,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"integrated_candidate_card_official_event_missing={result.integrated_candidate_card_official_event_missing} "
             f"integrated_candidate_card_source_url_missing={result.integrated_candidate_card_source_url_missing} "
             f"integrated_candidate_core_crowding_metadata_loss={result.integrated_candidate_core_crowding_metadata_loss} "
+            f"derivatives_card_metric_claim_without_data={result.derivatives_card_metric_claim_without_data} "
             f"integrated_fade_card_crowding_unknown={result.integrated_fade_card_crowding_unknown} "
             f"integrated_fade_card_missing_disclaimer={result.integrated_fade_card_missing_disclaimer} "
             f"integrated_confirmed_long_crowding_warning_hidden={result.integrated_confirmed_long_crowding_warning_hidden} "
@@ -6271,6 +6359,8 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"{result.coinalyze_provider_health_healthy_without_successful_ledger} "
             "coinalyze_rehearsal_forbidden_side_effect_claim="
             f"{result.coinalyze_rehearsal_forbidden_side_effect_claim} "
+            "coinalyze_supported_metric_implemented_missing_state="
+            f"{result.coinalyze_supported_metric_implemented_missing_state} "
             f"source_pack_provider_status_missing={result.source_pack_provider_status_missing} "
             f"missing_provider_recommendations_missing={result.missing_provider_recommendations_missing} "
             f"degraded_provider_absence_marked_meaningful={result.degraded_provider_absence_marked_meaningful} "

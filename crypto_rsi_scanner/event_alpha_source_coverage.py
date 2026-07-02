@@ -226,6 +226,7 @@ class EventAlphaSourceCoverageReport:
     coinalyze_provider_health_status: str = "not_observed"
     coinalyze_requests_used: int = 0
     coinalyze_snapshots_written: int = 0
+    coinalyze_supported_metric_status: Mapping[str, str] | None = None
     category_priorities: tuple[Mapping[str, Any], ...] = SOURCE_COVERAGE_CATEGORY_PRIORITIES
 
     def to_dict(self) -> dict[str, Any]:
@@ -261,6 +262,7 @@ class EventAlphaSourceCoverageReport:
             "coinalyze_provider_health_status": self.coinalyze_provider_health_status,
             "coinalyze_requests_used": self.coinalyze_requests_used,
             "coinalyze_snapshots_written": self.coinalyze_snapshots_written,
+            "coinalyze_supported_metric_status": dict(self.coinalyze_supported_metric_status or {}),
             "category_priorities": [
                 {
                     "category_priority_rank": idx + 1,
@@ -444,6 +446,7 @@ def build_source_coverage_report(
         coinalyze_provider_health_status=coinalyze_stats["provider_health_status"],
         coinalyze_requests_used=int(coinalyze_stats["requests_used"]),
         coinalyze_snapshots_written=int(coinalyze_stats["snapshots_written"]),
+        coinalyze_supported_metric_status=coinalyze_stats["supported_metric_status"],
     )
 
 
@@ -522,6 +525,7 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         lines.append(f"- Coinalyze preflight: {report.coinalyze_preflight_status}")
         lines.append(f"- Coinalyze preflight report: {report.coinalyze_preflight_report_path}")
         lines.append(f"- Coinalyze preflight JSON: {report.coinalyze_preflight_json_path}")
+        lines.append(f"- Coinalyze supported metric status: {_coinalyze_metric_status_line(report.coinalyze_supported_metric_status)}")
     else:
         lines.append("- Coinalyze preflight: not generated")
         lines.append(
@@ -534,6 +538,7 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         if report.coinalyze_request_ledger_path:
             lines.append(f"- Coinalyze request ledger: {report.coinalyze_request_ledger_path}")
         lines.append(f"- Coinalyze provider health: {report.coinalyze_provider_health_status}")
+        lines.append(f"- Coinalyze supported metric status: {_coinalyze_metric_status_line(report.coinalyze_supported_metric_status)}")
         lines.append(
             f"- Coinalyze rehearsal counters: requests_used={report.coinalyze_requests_used} "
             f"snapshots_written={report.coinalyze_snapshots_written}"
@@ -579,7 +584,35 @@ def _coinalyze_artifact_stats(
         "provider_health_status": str(rehearsal_payload.get("provider_health_status") or health_by_provider.get("coinalyze") or "not_observed"),
         "requests_used": int(rehearsal_payload.get("requests_used") or 0),
         "snapshots_written": int(rehearsal_payload.get("snapshots_written") or 0),
+        "supported_metric_status": _coinalyze_supported_metric_status(preflight_payload, rehearsal_payload),
     }
+
+
+def _coinalyze_supported_metric_status(
+    preflight_payload: Mapping[str, Any],
+    rehearsal_payload: Mapping[str, Any],
+) -> dict[str, str]:
+    for payload in (rehearsal_payload, preflight_payload):
+        status = payload.get("supported_metric_status")
+        if isinstance(status, Mapping):
+            return {str(key): str(value) for key, value in status.items() if str(key)}
+    return {}
+
+
+def _coinalyze_metric_status_line(status: Mapping[str, str] | None) -> str:
+    if not status:
+        return "none"
+    metrics = (
+        "open_interest",
+        "funding_rate",
+        "predicted_funding",
+        "liquidations",
+        "long_short_ratio",
+        "basis",
+        "perp_volume",
+    )
+    parts = [f"{metric}={status.get(metric)}" for metric in metrics if status.get(metric)]
+    return ", ".join(parts) if parts else "none"
 
 
 def _namespace_dir(artifact_namespace: str) -> Path:
