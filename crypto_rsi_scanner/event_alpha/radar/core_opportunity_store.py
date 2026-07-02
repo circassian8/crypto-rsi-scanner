@@ -937,6 +937,7 @@ def _row_from_core_opportunity(
         or _mapping_text(unlock_event, ("provider", "source_class"))
     )
     row = {
+        "schema_id": "core_opportunity_v1",
         "schema_version": EVENT_CORE_OPPORTUNITY_STORE_SCHEMA_VERSION,
         "row_type": "event_core_opportunity",
         "run_id": run_id,

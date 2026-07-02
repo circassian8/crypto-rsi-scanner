@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from ..artifacts import paths as event_artifact_paths
+from ..artifacts import schema_v1
 
 
 NAMESPACE_STATUS_FILENAME = "event_alpha_namespace_status.json"
@@ -33,7 +34,8 @@ class EventAlphaNamespaceStatus:
         else:
             superseded = self.superseded_by
         return {
-            "schema_version": 1,
+            "schema_id": "namespace_status_v1",
+            "schema_version": schema_v1.EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION,
             "row_type": "event_alpha_namespace_status",
             "namespace": self.namespace,
             "status": self.status,

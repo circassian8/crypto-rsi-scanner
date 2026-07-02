@@ -23,6 +23,7 @@ from ... import config
 from ...event_providers._announcement_common import _announcement_items
 from ...event_providers.bybit_announcements import BybitAnnouncementProvider
 from ..artifacts import paths as event_artifact_paths
+from ..artifacts import schema_v1
 from . import official_exchange as event_official_exchange
 from . import official_exchange_activation as event_official_exchange_activation
 from . import provider_health as event_provider_health
@@ -240,7 +241,8 @@ def write_preflight_artifacts(report: BybitAnnouncementsPreflightReport, namespa
     base.mkdir(parents=True, exist_ok=True)
     json_path = base / PREFLIGHT_JSON
     md_path = base / PREFLIGHT_MD
-    json_path.write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    payload = schema_v1.stamp_artifact_payload(report.to_dict(), path=json_path)
+    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(format_preflight_report(report) + "\n", encoding="utf-8")
     return json_path, md_path
 
@@ -381,7 +383,8 @@ def run_no_send_rehearsal(
         error_message_safe=error_message_safe,
         warnings=tuple(dict.fromkeys(warnings)),
     )
-    rehearsal_json.write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    payload = schema_v1.stamp_artifact_payload(report.to_dict(), schema_id="provider_preflight_v1", path=rehearsal_json)
+    rehearsal_json.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     rehearsal_md.write_text(format_rehearsal_report(report) + "\n", encoding="utf-8")
     activation_report = event_official_exchange_activation.build_activation_report(
         namespace_dir=base,

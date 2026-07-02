@@ -24,6 +24,7 @@ from ...event_providers._announcement_common import (
     _announcement_symbols,
 )
 from ...event_providers.manual_json import parse_datetime
+from ..artifacts import schema_v1
 from ..radar import market_reaction as event_market_reaction
 
 
@@ -702,7 +703,8 @@ def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:
         for row in rows:
-            fh.write(json.dumps(_json_ready(dict(row)), sort_keys=True, separators=(",", ":"), default=str) + "\n")
+            stamped = schema_v1.stamp_artifact_row(row, path=path)
+            fh.write(json.dumps(_json_ready(stamped), sort_keys=True, separators=(",", ":"), default=str) + "\n")
 
 
 def _json_ready(value: Any) -> Any:

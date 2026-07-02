@@ -32,6 +32,7 @@ from ... import (
 from ..artifacts import context as event_alpha_artifacts
 from ..artifacts import paths as event_artifact_paths
 from ..artifacts import run_ledger as event_alpha_run_ledger
+from ..artifacts import schema_v1
 from ..namespace import status as event_alpha_namespace_status
 from ..providers import coinalyze_preflight as event_coinalyze_preflight
 from ..providers import dex_onchain_readiness as event_dex_onchain_readiness
@@ -3324,7 +3325,8 @@ def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
-            handle.write(json.dumps(_json_ready(dict(row)), sort_keys=True, separators=(",", ":")) + "\n")
+            stamped = schema_v1.stamp_artifact_row(row, path=path)
+            handle.write(json.dumps(_json_ready(stamped), sort_keys=True, separators=(",", ":")) + "\n")
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -3346,7 +3348,8 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_ready(dict(payload)), sort_keys=True), encoding="utf-8")
+    stamped = schema_v1.stamp_artifact_payload(payload, path=path)
+    path.write_text(json.dumps(_json_ready(stamped), sort_keys=True), encoding="utf-8")
 
 
 def _json_ready(value: Any) -> Any:

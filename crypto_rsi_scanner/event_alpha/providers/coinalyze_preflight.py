@@ -23,6 +23,7 @@ from urllib.request import Request
 from ... import config, event_derivatives_crowding
 from ...derivatives_providers.coinalyze import CoinalyzeDerivativesProvider, resolve_future_market_symbols
 from ..artifacts import paths as event_artifact_paths
+from ..artifacts import schema_v1
 from . import provider_health as event_provider_health
 
 
@@ -316,7 +317,8 @@ def write_preflight_artifacts(report: CoinalyzePreflightReport, namespace_dir: s
     base.mkdir(parents=True, exist_ok=True)
     json_path = base / PREFLIGHT_JSON
     md_path = base / PREFLIGHT_MD
-    json_path.write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    payload = schema_v1.stamp_artifact_payload(report.to_dict(), path=json_path)
+    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(format_preflight_report(report) + "\n", encoding="utf-8")
     return json_path, md_path
 
@@ -540,7 +542,8 @@ def run_no_send_rehearsal(
         error_message_safe=error_message_safe,
         warnings=tuple(dict.fromkeys(warnings)),
     )
-    rehearsal_json.write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    payload = schema_v1.stamp_artifact_payload(report.to_dict(), schema_id="provider_preflight_v1", path=rehearsal_json)
+    rehearsal_json.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     rehearsal_md.write_text(format_rehearsal_report(report) + "\n", encoding="utf-8")
     return preflight, report, (preflight_json, preflight_md, rehearsal_json, rehearsal_md)
 
@@ -834,7 +837,7 @@ def _symbols_with_confirmed_long_crowding_warning(rows: Iterable[Mapping[str, An
 
 def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
+    materialized = [schema_v1.stamp_artifact_row(row, path=path) for row in rows if isinstance(row, Mapping)]
     path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in materialized), encoding="utf-8")
 
 
@@ -1116,7 +1119,8 @@ def _ledger_row(
 def _append_ledger_row(path: Path, row: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(dict(row), sort_keys=True) + "\n")
+        stamped = schema_v1.stamp_artifact_row(row, path=path)
+        fh.write(json.dumps(stamped, sort_keys=True) + "\n")
 
 
 def _endpoint(url: str) -> str:

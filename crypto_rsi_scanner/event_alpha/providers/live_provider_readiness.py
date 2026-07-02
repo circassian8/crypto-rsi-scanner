@@ -16,6 +16,7 @@ from typing import Any, Iterable, Mapping
 
 from ... import config
 from ..artifacts import paths as event_artifact_paths
+from ..artifacts import schema_v1
 from ..radar import source_coverage as event_alpha_source_coverage
 from . import dex_onchain_readiness as event_dex_onchain_readiness
 
@@ -204,7 +205,8 @@ def write_readiness_artifacts(report: LiveProviderReadinessReport, out_dir: str 
     target.mkdir(parents=True, exist_ok=True)
     json_path = target / READINESS_JSON
     md_path = target / READINESS_MD
-    json_path.write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    payload = schema_v1.stamp_artifact_payload(report.to_dict(), path=json_path)
+    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(format_readiness_report(report) + "\n", encoding="utf-8")
     return json_path, md_path
 

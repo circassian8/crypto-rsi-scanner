@@ -10,6 +10,7 @@ from statistics import median
 from typing import Any, Iterable, Mapping
 
 from ..artifacts import paths as event_artifact_paths
+from ..artifacts import schema_v1
 from ..radar import integrated_radar as event_integrated_radar
 
 
@@ -44,8 +45,9 @@ def fill_integrated_radar_outcomes(
     base = Path(namespace_dir)
     candidates = _read_jsonl(base / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME)
     now = _iso(_parse_time(observed_at) or datetime.now(timezone.utc))
-    rows = tuple(_outcome_row(candidate, now=now) for candidate in candidates)
-    _write_jsonl(base / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME, rows)
+    outcomes_path = base / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
+    rows = tuple(schema_v1.stamp_artifact_row(_outcome_row(candidate, now=now), path=outcomes_path) for candidate in candidates)
+    _write_jsonl(outcomes_path, rows)
     report = format_integrated_radar_outcome_report(rows)
     (base / event_integrated_radar.INTEGRATED_OUTCOME_REPORT_FILENAME).write_text(report, encoding="utf-8")
     calibration = format_integrated_radar_calibration_report(rows)
@@ -1209,12 +1211,14 @@ def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
-            handle.write(json.dumps(_json_ready(dict(row)), sort_keys=True, separators=(",", ":")) + "\n")
+            stamped = schema_v1.stamp_artifact_row(row, path=path)
+            handle.write(json.dumps(_json_ready(stamped), sort_keys=True, separators=(",", ":")) + "\n")
 
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_ready(dict(payload)), sort_keys=True), encoding="utf-8")
+    stamped = schema_v1.stamp_artifact_payload(payload, path=path)
+    path.write_text(json.dumps(_json_ready(stamped), sort_keys=True), encoding="utf-8")
 
 
 def _json_ready(value: Any) -> Any:

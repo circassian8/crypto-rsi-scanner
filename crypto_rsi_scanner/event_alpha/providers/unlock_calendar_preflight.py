@@ -18,6 +18,7 @@ from typing import Any, Iterable, Mapping
 
 from ... import config, event_scheduled_catalysts
 from ..artifacts import paths as event_artifact_paths
+from ..artifacts import schema_v1
 
 
 PREFLIGHT_JSON = "event_unlock_calendar_preflight.json"
@@ -192,7 +193,8 @@ def write_preflight_artifacts(report: UnlockCalendarPreflightReport, namespace_d
     base.mkdir(parents=True, exist_ok=True)
     json_path = base / PREFLIGHT_JSON
     md_path = base / PREFLIGHT_MD
-    json_path.write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    payload = schema_v1.stamp_artifact_payload(report.to_dict(), path=json_path)
+    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(format_preflight_report(report) + "\n", encoding="utf-8")
     return json_path, md_path
 

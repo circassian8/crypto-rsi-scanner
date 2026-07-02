@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from ... import event_asset_registry
+from ..artifacts import schema_v1
 from . import market_state as event_market_state
 
 
@@ -976,7 +977,8 @@ def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:
         for row in rows:
-            fh.write(json.dumps(dict(row), sort_keys=True, default=str, separators=(",", ":")) + "\n")
+            stamped = schema_v1.stamp_artifact_row(row, path=path)
+            fh.write(json.dumps(stamped, sort_keys=True, default=str, separators=(",", ":")) + "\n")
 
 
 def _market_anomaly_id(*, symbol: str, coin_id: str, anomaly_type: str, observed_at: str) -> str:

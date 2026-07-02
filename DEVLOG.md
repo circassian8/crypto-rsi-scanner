@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Finish Event Alpha artifact schema v1 stamping · Codex
+**Why:** Artifact doctor checks now depend on many Event Alpha artifact fields,
+so schema v1 needed to become a practical contract instead of a partial
+registry before additional refactors and doctor checks build on it.
+**Changes:**
+- Expanded `crypto_rsi_scanner/event_alpha/artifacts/schema_v1.py` with all
+  current v1 schema IDs, required/optional/deprecated fields, type/enum/path/
+  timestamp/safety/lineage/secret metadata, filename inference, row/file
+  validation, schema-error collection, secret-like field checks, and safe
+  row/payload stamping helpers.
+- Stamped key writers for integrated radar candidates/source coverage/delivery
+  rows, CoreOpportunity rows, notification deliveries, run ledgers, namespace
+  status, Coinalyze request/state/crowding/fade artifacts, market anomaly rows,
+  official exchange events, scheduled catalyst/unlock rows, provider
+  readiness/preflight reports, and integrated outcome/calibration artifacts.
+- Kept legacy writer-specific `schema_version` strings where existing readers
+  filter on them, adding `schema_id` instead of forcing incompatible version
+  churn.
+- Expanded `tests/event_alpha/test_artifact_schema.py` for valid/invalid
+  integrated candidates, invalid opportunity types, absolute path policy,
+  debug absolute paths, secret leakage, filename-inferred legacy rows, and
+  stamping compatibility.
+- Updated `research/EVENT_ALPHA_ARTIFACT_SCHEMA_V1.md` and `ROADMAP.md` with
+  the schema v1 contract and freeze policy for future doctor checks.
+**Verify:** `python3 tests/test_indicators.py` (717/717);
+`python3 -m pytest tests/event_alpha/test_artifact_schema.py` (9/9);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-integrated-radar-smoke PYTHON=python3` (strict doctor OK,
+schema validation 71 rows / 0 errors);
+`make event-alpha-integrated-radar-doctor PYTHON=python3` (OK);
+`make verify PYTHON=python3`.
+**Notes/risks:** No live calls, Telegram sends, trades, paper trades, normal RSI
+signal writes, execution, or Event Alpha-created `TRIGGERED_FADE` behavior were
+added. Official listing candidate sidecar rows remain validated by existing
+artifact-doctor source-field checks rather than being forced into the integrated
+candidate schema, because diagnostic official-listing rows may intentionally
+lack a symbol.
+
 ## 2026-07-02 — Split RSI and CLI tests into pytest packages · Codex
 **Why:** The refactor baseline calls for `tests/test_indicators.py` to become a
 small umbrella runner. After the Event Alpha split, the remaining RSI,

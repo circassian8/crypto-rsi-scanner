@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import event_market_reaction
+from .event_alpha.artifacts import schema_v1
 from .event_providers.manual_json import parse_datetime
 
 
@@ -1003,7 +1004,8 @@ def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
-            handle.write(json.dumps(_jsonable(dict(row)), sort_keys=True) + "\n")
+            stamped = schema_v1.stamp_artifact_row(row, path=path)
+            handle.write(json.dumps(_jsonable(stamped), sort_keys=True) + "\n")
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
 from crypto_rsi_scanner.event_alpha.doctor import schema_doctor
 
@@ -449,7 +451,7 @@ def test_event_alpha_consolidation_import_shims_and_schema_registry():
     assert schema_doctor.check_registry_schema_dependency_errors() == ()
 
 
-def test_event_alpha_schema_v1_validation_policy():
+def test_event_alpha_schema_v1_validation_policy(tmp_path):
     from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
 
     schema = schema_v1.get_schema("integrated_radar_candidate_v1")
@@ -471,6 +473,11 @@ def test_event_alpha_schema_v1_validation_policy():
     invalid_enum = dict(valid, opportunity_type="BUY_NOW")
     assert any(error.startswith("invalid_enum:opportunity_type") for error in schema_v1.validate_row_against_schema(invalid_enum, schema))
 
+    leaked_secret = dict(valid, api_key="plain-text-provider-key")
+    assert "secret_field_unredacted:api_key" in schema_v1.validate_row_against_schema(leaked_secret, schema)
+    redacted_secret = dict(valid, api_key="<redacted>")
+    assert "secret_field_unredacted:api_key" not in schema_v1.validate_row_against_schema(redacted_secret, schema)
+
     path_schema = schema_v1.get_schema("core_opportunity_v1")
     bad_path = {
         "row_type": "event_core_opportunity",
@@ -482,6 +489,43 @@ def test_event_alpha_schema_v1_validation_policy():
     assert "absolute_non_debug_path:research_card_path" in schema_v1.validate_row_against_schema(bad_path, path_schema)
     debug_abs = dict(bad_path, research_card_path="event_fade_cache/unit/card.md", research_card_path_abs_debug="/tmp/local-card.md")
     assert "absolute_non_debug_path:research_card_path" not in schema_v1.validate_row_against_schema(debug_abs, path_schema)
+
+    legacy_path = tmp_path / "event_integrated_radar_candidates.jsonl"
+    legacy_path.write_text(json.dumps(valid, sort_keys=True) + "\n", encoding="utf-8")
+    result = schema_v1.validate_artifact_file(legacy_path)
+    assert result["schema_id"] == "integrated_radar_candidate_v1"
+    assert result["inferred_schema_id"] == "integrated_radar_candidate_v1"
+    assert result["rows_validated"] == 1
+    assert result["errors"] == []
+
+    crowding_path = tmp_path / "event_derivatives_crowding_candidates.jsonl"
+    shared_legacy_row_type = {
+        "row_type": "fade_short_review_candidate",
+        "symbol": "TESTFADE",
+        "crowding_class": "extreme",
+    }
+    crowding_path.write_text(json.dumps(shared_legacy_row_type, sort_keys=True) + "\n", encoding="utf-8")
+    crowding_result = schema_v1.validate_artifact_file(crowding_path)
+    assert crowding_result["schema_id"] == "derivatives_crowding_candidate_v1"
+    assert crowding_result["rows_validated"] == 1
+    assert crowding_result["errors"] == []
+
+    stamped = schema_v1.stamp_artifact_row(valid, path=legacy_path)
+    assert stamped["schema_id"] == "integrated_radar_candidate_v1"
+    assert stamped["schema_version"] == schema_v1.EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION
+
+    core_stamped = schema_v1.stamp_artifact_row(
+        {
+            "row_type": "event_core_opportunity",
+            "core_opportunity_id": "core:test",
+            "symbol": "TEST",
+            "opportunity_type": "UNCONFIRMED_RESEARCH",
+            "schema_version": "event_core_opportunity_store_v1",
+        },
+        path=tmp_path / "event_core_opportunities.jsonl",
+    )
+    assert core_stamped["schema_id"] == "core_opportunity_v1"
+    assert core_stamped["schema_version"] == "event_core_opportunity_store_v1"
 
 
 def test_event_alpha_cli_package_and_make_targets_are_available():

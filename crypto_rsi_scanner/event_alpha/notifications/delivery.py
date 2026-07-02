@@ -172,6 +172,7 @@ class NotificationDeliveryRecord:
             or (self.would_send is True and self.send_guard_enabled is False)
         )
         row = {
+            "schema_id": "notification_delivery_v1",
             "schema_version": DELIVERY_SCHEMA_VERSION,
             "row_type": "event_alpha_notification_delivery",
             "delivery_id": self.delivery_id,

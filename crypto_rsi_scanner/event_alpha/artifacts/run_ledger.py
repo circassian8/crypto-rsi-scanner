@@ -397,6 +397,7 @@ def _run_record(
         or str(profile or "").startswith("notify_")
     )
     row = {
+        "schema_id": "run_ledger_v1",
         "schema_version": RUN_LEDGER_SCHEMA_VERSION,
         "row_type": "event_alpha_run",
         "run_id": run_id,
