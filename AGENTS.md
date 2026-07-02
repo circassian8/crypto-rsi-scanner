@@ -324,6 +324,33 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `backtest.py` | offline research; **reuses the pure functions** so it matches live logic |
 | `tests/test_indicators.py` | every test (pure, no network) |
 
+### Event Alpha v1 package boundaries
+
+New Event Alpha implementation code should land in package homes, not in
+top-level `event_*.py` shims:
+
+| package | responsibility |
+|---|---|
+| `event_alpha/providers/` | provider activation, readiness, preflight/rehearsal, provider health, source registry, source packs |
+| `event_alpha/radar/` | integrated radar, market state/reaction/anomaly, evidence acquisition, CoreOpportunity rows, source coverage, verdicts, impact hypotheses, incidents |
+| `event_alpha/artifacts/` | artifact context, paths, schema v1, run ledger, retention, locks |
+| `event_alpha/notifications/` | previews, no-send delivery, send-readiness, go/no-go, inbox, SLO, pack, pause, final check, sender, formatting |
+| `event_alpha/outcomes/` | outcomes, calibration, feedback, burn-in, quality, priors, policy simulation |
+| `event_alpha/doctor/` | schema-first doctor phases, check registry, plugin checks, reports |
+| `event_alpha/namespace/` | namespace status and lifecycle reporting |
+| `cli/` | parser, dispatch, and command-group modules |
+
+Old import paths remain as v1 compatibility shims. New code should import the
+new package path, and old top-level shims should not gain new implementation
+logic. CLI parser construction belongs in `cli/parser.py`, dispatch in
+`cli/dispatch.py`, and command groups in `cli/commands_*.py`. New tests belong
+in `tests/event_alpha/`, `tests/rsi/`, or `tests/cli/`; `tests/test_indicators.py`
+is the compatibility umbrella runner. New artifact fields require schema v1
+updates, and new doctor checks require check-registry schema dependencies. Every
+new Event Alpha namespace needs lifecycle status, retention policy, and explicit
+`safe_for_send_readiness`. Preserve research-only/no-trading/no-paper/no-send
+guards in all Event Alpha package work.
+
 ---
 
 ## Conventions

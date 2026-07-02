@@ -487,6 +487,66 @@ def test_github_actions_are_safe_fixture_verification_only():
     assert "--upgrade pip" not in text
 
 
+def test_event_alpha_architecture_docs_capture_v1_guardrails():
+    root = REPO_ROOT
+    doc_paths = [
+        root / "research" / "EVENT_ALPHA_ARCHITECTURE_V1.md",
+        root / "research" / "EVENT_ALPHA_ARTIFACT_SCHEMA_V1.md",
+        root / "research" / "EVENT_ALPHA_NAMESPACE_LIFECYCLE.md",
+        root / "research" / "EVENT_ALPHA_CONSOLIDATION_PLAN.md",
+        root / "research" / "EVENT_ALPHA_RUNBOOK.md",
+        root / "AGENTS.md",
+        root / "DECISIONS.md",
+        root / "ROADMAP.md",
+        root / "DEVLOG.md",
+    ]
+    for path in doc_paths:
+        assert path.exists(), path
+    corpus = "\n".join(path.read_text(encoding="utf-8") for path in doc_paths).casefold()
+    normalized = " ".join(corpus.split())
+    required = (
+        "event_alpha/providers",
+        "event_alpha/radar",
+        "event_alpha/artifacts",
+        "event_alpha/notifications",
+        "event_alpha/outcomes",
+        "event_alpha/doctor",
+        "event_alpha/namespace",
+        "cli/",
+        "old import",
+        "compatibility shims",
+        "new code should import",
+        "should not gain new implementation logic",
+        "cli/parser.py",
+        "cli/dispatch.py",
+        "cli/commands_*.py",
+        "tests/event_alpha",
+        "tests/rsi",
+        "tests/cli",
+        "tests/test_indicators.py",
+        "compatibility umbrella",
+        "new artifact field",
+        "schema v1",
+        "new doctor check",
+        "schema dependencies",
+        "schema-first",
+        "namespace lifecycle",
+        "safe_for_send_readiness",
+        "retention policy",
+        "research-only/no-trading/no-paper/no-send guards",
+        "no live trading",
+        "no live provider calls",
+        "no live telegram sends",
+        "triggered_fade",
+        "how to add a provider",
+        "how to add a radar artifact",
+        "how to add a notification lane",
+        "how to add an outcome",
+    )
+    for item in required:
+        assert item in normalized, item
+
+
 def test_refactor_baseline_generation_writes_reports_without_behavior_invocation():
     from crypto_rsi_scanner import refactor_baseline
 

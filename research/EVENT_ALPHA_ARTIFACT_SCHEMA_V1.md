@@ -11,6 +11,19 @@ declared schema records required fields, optional fields, deprecated fields,
 field types, enum fields, path fields, debug absolute path fields, timestamp
 fields, safety fields, lineage fields, and secret-redaction fields.
 
+Schema v1 is also the behavior-freeze boundary for artifact sprawl:
+
+- New artifact field => update schema v1 in the same change.
+- New enum value => update schema v1 and tests before writer rollout.
+- New path field => classify it as an operator-relative path field or a
+  `_abs_debug` debug path field.
+- New side-effect/safety field => classify it in `safety_fields`.
+- New lineage field => classify it in `lineage_fields`.
+- New secret-bearing/redaction field => classify it in
+  `secret_redaction_fields`.
+- New doctor check => register schema dependencies in
+  `event_alpha/doctor/check_registry.py`.
+
 The registry currently covers:
 
 - `core_opportunity_v1`
@@ -62,6 +75,12 @@ Validation is intentionally lightweight and local. It checks required fields,
 declared types, enums, non-debug absolute path leakage, guarded side-effect
 flags/counts, `auto_apply=true`, and unredacted secret-looking fields.
 
+The artifact doctor is schema-first. Its order is namespace lifecycle, schema
+validation, schema safety, legacy checks, consistency checks, and report
+rendering. This means future doctor checks must not silently depend on
+undeclared artifact fields; they should fail the registry/schema dependency test
+until schema v1 is updated.
+
 ## Path Rule
 
 Operator artifact path fields are relative. Absolute paths are allowed only for
@@ -70,10 +89,10 @@ debug fields ending in `_abs_debug`.
 ## Safety Rule
 
 Rows that can affect notifications, outcomes, or provider rehearsal surfaces
-must carry explicit no-send/research-only fields where applicable. Schema
-validation flags sent rows, RSI signal writes, trading/paper counts, nonzero
-strict-alert/Telegram counts in guarded artifacts, and
-`triggered_fade_created` claims when they appear.
+must carry explicit research-only/no-trading/no-paper/no-send guards where
+applicable. Schema validation flags sent rows, RSI signal writes,
+trading/paper counts, nonzero strict-alert/Telegram counts in guarded
+artifacts, and `triggered_fade_created` claims when they appear.
 
 ## Secret Rule
 
@@ -89,3 +108,9 @@ If a check relies on a new field, enum value, path field, safety flag, lineage
 field, or timestamp, the schema declaration is the acceptance gate. Artifact
 schema changes remain additive unless a migration is explicitly documented and
 implemented.
+
+Outcome/calibration fields follow the same rule. If a dashboard, prior,
+performance, maturation, conversion, continuation, exhaustion, risk-validation,
+noise-rate, or time-to-confirmation field is introduced, update schema v1,
+register doctor dependencies for any checks, and keep prior suggestions
+recommendation-only with `auto_apply=false`.

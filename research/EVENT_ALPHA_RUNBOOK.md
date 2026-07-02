@@ -13,6 +13,60 @@ subpackage in small, tested slices. CLI facade code lives under
 `crypto_rsi_scanner/cli/`, with the root `main.py` delegating through that
 facade.
 
+Package ownership for new code:
+
+- `event_alpha/providers`: provider activation, readiness, source registry,
+  source packs, provider health, and provider-specific preflight/rehearsal
+  orchestration.
+- `event_alpha/radar`: integrated radar, market state/reaction/anomaly,
+  evidence acquisition, CoreOpportunity rows, source coverage, opportunity
+  verdicts, impact hypotheses, and incidents.
+- `event_alpha/artifacts`: artifact context, paths, schema v1, run ledgers,
+  retention, and locks.
+- `event_alpha/notifications`: preview, no-send delivery, send-readiness,
+  go/no-go, inbox, SLO, pack, pause, final check, sender, and formatting.
+- `event_alpha/outcomes`: outcomes, calibration, feedback, burn-in, quality,
+  priors, and policy simulation.
+- `event_alpha/doctor`: schema-first doctor phases, check registry, plugin
+  checks, and reports.
+- `event_alpha/namespace`: namespace status and lifecycle reporting.
+- `cli/`: parser, dispatch, and command-group modules.
+
+Old import shims are compatibility surfaces only. New code should import the
+new package path. Old top-level modules should not receive new implementation
+logic during the v1 migration.
+
+CLI rules:
+
+- Parser construction belongs in `crypto_rsi_scanner/cli/parser.py`.
+- Dispatch belongs in `crypto_rsi_scanner/cli/dispatch.py`.
+- Command groups belong in `crypto_rsi_scanner/cli/commands_*.py`.
+
+Test rules:
+
+- New tests belong in `tests/event_alpha/`, `tests/rsi/`, or `tests/cli/`.
+- `tests/test_indicators.py` is the compatibility umbrella runner.
+
+Schema and doctor rules:
+
+- New artifact field => update schema v1.
+- New doctor check => register schema dependencies first.
+- The artifact doctor is schema-first: namespace lifecycle, schema validation,
+  schema safety, legacy checks, consistency checks, report.
+
+Namespace lifecycle rules:
+
+- Every new namespace needs status, retention policy, and explicit
+  `safe_for_send_readiness`.
+- Stale/archived/quarantine namespaces cannot be send-ready.
+- Provider and fixture namespaces remain no-send/no-live by default.
+
+Research-only/no-trading/no-paper/no-send guards remain active for all Event
+Alpha operator paths. Nothing in this runbook authorizes live trading, paper
+trading, execution, normal RSI signal writes, live Telegram sends in tests,
+live provider calls by default, secret printing, or Event Alpha-created
+`TRIGGERED_FADE`.
+
 Useful consolidation checks:
 
 - `make test-pytest PYTHON=python3`
@@ -25,6 +79,40 @@ When adding an artifact row, update schema v1 first, then the writer, doctor
 validation, tests, and docs. When adding a doctor check, register its schema
 field dependencies before adding enforcement. When adding a namespace, declare
 its lifecycle status, key artifacts, retention policy, and send/burn-in safety.
+
+## Adding New Surfaces
+
+Add a provider:
+
+1. Put activation/preflight/readiness orchestration in `event_alpha/providers`.
+2. Keep reusable provider adapters in lower-level provider packages.
+3. Start fixture/no-call; add live rehearsal only with explicit allow flag,
+   request ledger, redaction, request budget, no-send mode, and provider health.
+4. Add source coverage, integrated radar, doctor, and fixture tests.
+
+Add a radar artifact:
+
+1. Declare schema v1 fields first.
+2. Write under the namespace with artifact helpers and relative operator paths.
+3. Attach canonical identity, source lineage, freshness, safety counters, and
+   schema metadata.
+4. Add card/brief/source-coverage/doctor surfaces only after schema and tests.
+
+Add a notification lane:
+
+1. Add planning/rendering in `event_alpha/notifications`.
+2. Preserve no-send previews, structured skip telemetry, and delivery
+   `status`/`status_detail`.
+3. Keep real sends behind explicit guard/final-check commands.
+4. Keep message copy research-only and not a trade signal.
+
+Add an outcome/calibration field:
+
+1. Update schema v1.
+2. Add writer/report fields.
+3. Register doctor dependencies where checks use the field.
+4. Keep priors recommendation-only with `auto_apply=false` and low-sample
+   warnings.
 
 ## Integrated Radar Artifact Review
 

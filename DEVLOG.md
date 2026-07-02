@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Document Event Alpha v1 architecture guardrails · Codex
+**Why:** Future Event Alpha refactor and provider/radar/notification passes need
+a clear package map and behavior-freeze rules so implementation does not drift
+back into top-level shims, scanner dispatch, or undocumented artifact fields.
+**Changes:**
+- Expanded `research/EVENT_ALPHA_ARCHITECTURE_V1.md`,
+  `research/EVENT_ALPHA_ARTIFACT_SCHEMA_V1.md`,
+  `research/EVENT_ALPHA_NAMESPACE_LIFECYCLE.md`,
+  `research/EVENT_ALPHA_CONSOLIDATION_PLAN.md`, and
+  `research/EVENT_ALPHA_RUNBOOK.md` with package ownership, old-import shim
+  policy, CLI/test rules, schema-first doctor policy, namespace lifecycle
+  requirements, safety invariants, and how-to sections for providers, radar
+  artifacts, notification lanes, and outcome/calibration fields.
+- Updated `AGENTS.md` and `DECISIONS.md` with durable Event Alpha v1 placement
+  and anti-sprawl rules.
+- Updated `ROADMAP.md` and added a static documentation guard test in
+  `tests/cli/test_make_targets.py`.
+**Verify:** `python3 -m pytest tests/cli/test_make_targets.py -q -k architecture_docs`
+(1/1); `python3 tests/test_indicators.py` (723/723);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make verify PYTHON=python3`; `git diff --check`.
+**Notes/risks:** Documentation-only behavior change. The guard test checks the
+combined architecture docs and collaboration files for research-only/no-trading/
+no-paper/no-send guards, schema-first doctor policy, namespace lifecycle, shim
+policy, package map, and extension rules.
+
 ## 2026-07-02 — Harden GitHub Actions safe verification · Codex
 **Why:** CI should verify push and PR changes without relying on local `.env`
 state, provider keys, Telegram credentials, live-provider allow flags, live

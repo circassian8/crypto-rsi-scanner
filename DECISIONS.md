@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Event Alpha v1 architecture rules prevent renewed sprawl
+**Status:** accepted
+**Decision:** Event Alpha v1 uses the package map documented in
+`research/EVENT_ALPHA_ARCHITECTURE_V1.md`: providers, radar, artifacts,
+notifications, outcomes, doctor, namespace, and CLI command modules each own
+their respective implementation surfaces. Old top-level import modules remain
+compatibility shims during v1 migration, but new implementation logic should go
+to the new package paths. CLI parser/dispatch changes belong under `cli/`,
+new tests belong in `tests/event_alpha`, `tests/rsi`, or `tests/cli`, new
+artifact fields require schema v1 updates, new doctor checks require
+check-registry schema dependencies, and every new namespace requires lifecycle
+status, retention, and explicit `safe_for_send_readiness`.
+**Why:** Event Alpha has enough providers, artifacts, doctor checks,
+notifications, outcomes, and CLI paths that undocumented placement choices
+would recreate the old monolith/sprawl. The package map plus schema-first and
+namespace-lifecycle rules keep future refactors behavior-preserving and
+research-only.
+**Revisit when:** v1 shims are intentionally retired through an explicit
+compatibility-breaking migration with old/new import audits, CLI snapshots,
+schema migration notes, doctor registry updates, and full verification.
+
 ## 2026-07-02 - Event Alpha consolidation is compatibility-first
 **Status:** accepted
 **Decision:** Event Alpha moves toward `crypto_rsi_scanner/event_alpha/` and

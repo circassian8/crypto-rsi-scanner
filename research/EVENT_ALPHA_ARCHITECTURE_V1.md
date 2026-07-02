@@ -30,13 +30,37 @@ layout gives new code a home while old import paths continue to work.
 `crypto_rsi_scanner/event_alpha/MODULE_MAP.md` lists old top-level module paths
 and their intended package locations.
 
+## V1 Boundary Rules
+
+These rules are the anti-sprawl contract for future Codex/Claude passes:
+
+- Old import shims remain during the v1 migration so historical imports,
+  tests, and Make targets keep working.
+- New code should import the new package paths listed in the package map.
+- Old top-level `crypto_rsi_scanner/event_*.py` shim modules should not gain
+  new implementation logic. They may re-export symbols, hold compatibility
+  comments, or contain temporary glue only when a tested migration requires it.
+- CLI parser construction belongs in `crypto_rsi_scanner/cli/parser.py`.
+- CLI dispatch belongs in `crypto_rsi_scanner/cli/dispatch.py`.
+- Command groups belong in `crypto_rsi_scanner/cli/commands_*.py`.
+- New tests belong in `tests/event_alpha/`, `tests/rsi/`, or `tests/cli/`.
+- `tests/test_indicators.py` is a compatibility umbrella runner, not the home
+  for new behavior tests.
+- New artifact fields require a schema v1 update before or with writer changes.
+- New doctor checks require a check-registry entry with schema dependencies.
+- Every new namespace needs lifecycle status, retention policy, and explicit
+  `safe_for_send_readiness`.
+
 ## Safety Invariants
 
+- Research-only/no-trading/no-paper/no-send guards apply to every Event Alpha
+  path unless a later explicit human decision says otherwise.
 - No live trading, paper trading, execution, order logic, or normal RSI signal
   writes.
 - Event Alpha does not create `TRIGGERED_FADE`; that remains owned by
   `event_fade.py` plus proxy-fade eligibility.
-- Provider calls and Telegram sends stay opt-in and guarded.
+- Provider calls and Telegram sends stay opt-in and guarded; tests and CI run
+  no live provider calls and no live Telegram sends by default.
 - Tests and smokes require no API keys and must not print secrets.
 - Long/fade language is research-only operator review language.
 
@@ -45,9 +69,10 @@ and their intended package locations.
 Provider/preflight artifacts feed source coverage and integrated radar sidecars.
 Integrated radar writes candidates, CoreOpportunity rows, cards, previews,
 daily briefs, outcomes, and calibration/performance artifacts under a namespace.
-The artifact doctor first validates schema v1 structure, then runs higher-order
-safety, delivery, source coverage, provider readiness, outcome, and namespace
-checks.
+The artifact doctor is schema-first: it inspects namespace lifecycle state,
+validates schema v1 structure, runs schema safety checks, then runs legacy and
+consistency checks. Doctor checks that depend on fields must declare schema
+dependencies in the check registry.
 
 Artifact implementation code now lives in package modules:
 
@@ -183,6 +208,56 @@ remaining top-level implementation files.
 New Event Alpha code should land in the subpackage first. Keep a top-level shim
 when an old import path is public or used by Make targets. Move physical code in
 small, tested slices only.
+
+## How To Add A Provider
+
+1. Put Event Alpha activation/preflight orchestration in
+   `event_alpha/providers/`; keep reusable HTTP/parser adapters in
+   `event_providers/`, `derivatives_providers/`, or `supply_providers/`.
+2. Add fixture/parser status first. Live calls must be blocked by default and
+   require an explicit allow flag, bounded request budget, redacted request
+   ledger, and no-send mode.
+3. Add source-registry/source-pack metadata and provider-health keys.
+4. Write provider preflight/rehearsal artifacts with `research_only=true`,
+   no-send side-effect counters, and schema ids when known.
+5. Add source coverage, artifact doctor, and fixture tests proving no live
+   calls, no sends, no trades, no paper trades, no RSI rows, no
+   `TRIGGERED_FADE`, and no secrets.
+
+## How To Add A Radar Artifact
+
+1. Define the row contract in `event_alpha/artifacts/schema_v1.py`.
+2. Write artifacts under the active namespace through artifact path/context
+   helpers, using relative operator paths.
+3. Attach canonical identity, source lineage, safety counters, freshness, and
+   schema metadata when applicable.
+4. Add integrated-radar/source-coverage/card/doctor checks if the artifact feeds
+   operator surfaces.
+5. Add tests in `tests/event_alpha/`; do not add the new behavior to the
+   umbrella runner directly.
+
+## How To Add A Notification Lane
+
+1. Put planning/rendering logic in `event_alpha/notifications/pipeline.py` or a
+   focused notification package module.
+2. Preserve no-send rehearsal behavior and delivery rows with
+   `status`/`status_detail`.
+3. Keep Telegram delivery guarded by `RSI_EVENT_ALERTS_ENABLED=1`, explicit send
+   commands, and final readiness checks.
+4. Preserve research-only copy and "Not a trade signal" framing where operator
+   messages can be mistaken for action instructions.
+5. Add preview, delivery, final-check, inbox/SLO, and artifact-doctor tests.
+
+## How To Add An Outcome Or Calibration Field
+
+1. Add the field to schema v1 and the relevant outcome/calibration row writer.
+2. Keep terminology research-only: `validated`, `invalidated`, `noise`,
+   `inconclusive`, `validation_rate`, and recommendation-only prior language.
+3. New prior/threshold suggestions must include `auto_apply=false` and
+   low-sample warnings where applicable.
+4. Update cards/daily brief/report rendering only after the schema and doctor
+   dependencies are declared.
+5. Add outcome/calibration tests in `tests/event_alpha/`.
 
 ## CLI Split Direction
 
