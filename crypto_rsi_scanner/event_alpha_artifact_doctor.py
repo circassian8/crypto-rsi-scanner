@@ -3232,16 +3232,18 @@ def _market_anomaly_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) -> dic
         route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").upper()
         tier = str(row.get("tier") or row.get("alert_tier") or "").upper()
         opportunity_type = str(row.get("opportunity_type") or "").upper()
+        anomaly_bucket = str(row.get("anomaly_bucket") or row.get("market_anomaly_bucket") or "").strip()
         created_alert = bool(row.get("created_alert")) or bool(row.get("alert_id")) or route in alertable_routes or tier in alertable_tiers
         if created_alert:
             out["market_anomaly_created_alert_rows"] += 1
-        if anomaly_type == "suspicious_illiquid_move" and (
+        if (anomaly_type == "suspicious_illiquid_move" or anomaly_bucket == "low_liquidity_suspicious") and (
             opportunity_type == "CONFIRMED_LONG_RESEARCH"
             or route in alertable_routes
             or tier in {"WATCHLIST", "HIGH_PRIORITY", "TRIGGERED_FADE"}
         ):
             out["market_anomaly_suspicious_illiquid_promoted_confirmed"] += 1
-        if bool(row.get("needs_catalyst_search")) and not row.get("suggested_source_packs_to_search"):
+        has_source_plan = bool(row.get("suggested_source_packs_to_search")) or bool(row.get("search_queries"))
+        if bool(row.get("needs_catalyst_search")) and not has_source_plan:
             out["market_anomaly_needs_search_without_plan"] += 1
     return out
 

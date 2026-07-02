@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Promote market anomalies into catalyst-search queue artifacts · Codex
+**Why:** Market anomaly scanning needed to move beyond fixture sidecar seeds
+into a broad market-first research queue with canonical identity, richer
+ranking, and explicit catalyst-search handoff while preserving the
+research-only gates.
+**Changes:**
+- Extended `event_market_anomaly_scanner.py` to enrich market rows from the
+  canonical asset registry and optional cached CoinGecko universe rows, bucket
+  anomalies, score priority with relative returns, volume z-score, liquidity,
+  turnover, derivatives availability, source unknownness, and event age, and
+  write `event_market_anomaly_catalyst_search_queue.jsonl`.
+- Added queue/source-plan metadata, deterministic search queries, safety fields,
+  and report copy for “Top Market Anomalies Needing Catalyst Search.”
+- Wired the market-anomaly CLI and Make targets to accept registry/universe
+  inputs and require the queue artifact in market-anomaly and integrated-radar
+  smokes.
+- Updated daily briefs, artifact doctor checks, and integrated radar policy so
+  anomaly-only rows remain `UNCONFIRMED_RESEARCH`, official/structured evidence
+  can confirm valid market anomalies, and low-liquidity suspicious moves stay
+  diagnostics instead of confirmed opportunities.
+- Added tests for high-liquidity breakout queue output, cached-universe/registry
+  enrichment, low-liquidity suspicious diagnostics, and research-only queue
+  safety fields.
+**Verify:** `python3 tests/test_indicators.py` (671/671); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make event-alpha-market-anomaly-smoke
+PYTHON=python3`; `make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** No live calls, sends, trades, paper trades, normal RSI rows,
+execution, or Event Alpha-created `TRIGGERED_FADE` are added. Market anomalies
+remain research queue inputs until source evidence confirms the catalyst.
+
 ## 2026-07-02 — Add canonical Event Alpha asset/instrument resolver · Codex
 **Why:** Event Alpha now consumes tickers, CoinGecko IDs, official exchange
 pairs, Coinalyze futures symbols, and theme rows; these needed one conservative

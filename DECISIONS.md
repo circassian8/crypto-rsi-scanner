@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Market anomalies are catalyst-search queue inputs until sourced
+**Status:** accepted
+**Decision:** Broad market anomaly scanning may rank cached/fixture market rows,
+attach canonical asset identity, bucket anomalies, and write catalyst-search
+queue artifacts, but a market anomaly alone remains `UNCONFIRMED_RESEARCH`.
+Official or structured source evidence plus a valid market anomaly can confirm
+research rows; anomaly plus fresh Coinalyze crowding can support
+`FADE_SHORT_REVIEW` only when the move is completed/exhausted. Low-liquidity
+suspicious moves remain diagnostic/risk review and cannot be promoted to
+confirmed long research. These artifacts must not create Telegram sends, trades,
+paper trades, normal RSI rows, execution, or Event Alpha-created
+`TRIGGERED_FADE`.
+**Why:** Market-first scanning is useful for finding unknown catalysts, but
+price/volume alone is not catalyst evidence and thin-liquidity spikes are too
+fragile for operator opportunity lanes.
+**Revisit when:** A reviewed broad-market live/cache sample shows reliable
+source-confirmation coverage and a separate human-approved promotion path is
+defined.
+
 ## 2026-07-02 - Event Alpha uses canonical asset identity as research metadata
 **Status:** accepted
 **Decision:** Event Alpha provider artifacts should resolve crypto/provider

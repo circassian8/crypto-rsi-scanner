@@ -46,7 +46,9 @@ EVENT_DISCOVERY_POLYMARKET_UNIVERSE_FETCH_LIMIT ?= 250
 EVENT_ALERT_LLM_MODE ?= advisory
 EVENT_ALERT_LLM_PROVIDER ?= fixture
 EVENT_ALPHA_UNIVERSE_PATH ?= fixtures/coingecko_smoke/top_markets.json
+EVENT_ALPHA_ASSET_REGISTRY_PATH ?= fixtures/event_discovery/asset_registry.json
 EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH ?= fixtures/event_market_anomaly/market_rows.json
+EVENT_ALPHA_MARKET_ANOMALY_UNIVERSE_PATH ?= $(EVENT_ALPHA_UNIVERSE_PATH)
 EVENT_ALPHA_OFFICIAL_EXCHANGE_BINANCE_PATH ?= fixtures/event_discovery/official_exchange_binance_announcements.json
 EVENT_ALPHA_OFFICIAL_EXCHANGE_BYBIT_PATH ?= fixtures/event_discovery/official_exchange_bybit_announcements.json
 EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH ?= fixtures/event_discovery/scheduled_tokenomist_unlocks.json
@@ -549,7 +551,7 @@ event-alpha-market-anomaly-scan:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(ARTIFACT_NAMESPACE) \
 	RSI_EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH=$(EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH) \
-	$(PYTHON) main.py --event-alpha-market-anomaly-scan --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) --event-alpha-market-anomaly-rows $(EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH) $(EVENT_ALPHA_INCLUDE_TEST_ARG)
+	$(PYTHON) main.py --event-alpha-market-anomaly-scan --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) --event-alpha-market-anomaly-rows $(EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH) --event-alpha-market-anomaly-asset-registry $(EVENT_ALPHA_ASSET_REGISTRY_PATH) --event-alpha-market-anomaly-universe $(EVENT_ALPHA_MARKET_ANOMALY_UNIVERSE_PATH) $(EVENT_ALPHA_INCLUDE_TEST_ARG)
 
 event-alpha-integrated-radar-cycle:
 	env $(EVENT_RESEARCH_NOW_ENV) \
@@ -566,6 +568,7 @@ event-alpha-integrated-radar-smoke:
 	$(PYTHON) main.py --event-alpha-integrated-radar-cycle --event-alpha-integrated-radar-fixture --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	test -s event_fade_cache/$(PROFILE)/event_market_state_snapshots.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_market_anomalies.jsonl
+	test -s event_fade_cache/$(PROFILE)/event_market_anomaly_catalyst_search_queue.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_exchange_announcements.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_official_exchange_events.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_official_listing_candidates.jsonl
@@ -632,9 +635,10 @@ event-alpha-market-anomaly-smoke:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
 	RSI_EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH=$(EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH) \
-	$(PYTHON) main.py --event-alpha-market-anomaly-scan --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-market-anomaly-rows $(EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH) --event-alpha-include-test-artifacts
+	$(PYTHON) main.py --event-alpha-market-anomaly-scan --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-market-anomaly-rows $(EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH) --event-alpha-market-anomaly-asset-registry $(EVENT_ALPHA_ASSET_REGISTRY_PATH) --event-alpha-market-anomaly-universe $(EVENT_ALPHA_MARKET_ANOMALY_UNIVERSE_PATH) --event-alpha-include-test-artifacts
 	test -s event_fade_cache/$(PROFILE)/event_market_state_snapshots.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_market_anomalies.jsonl
+	test -s event_fade_cache/$(PROFILE)/event_market_anomaly_catalyst_search_queue.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_market_anomaly_report.md
 	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict

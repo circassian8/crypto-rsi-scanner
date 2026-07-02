@@ -2175,6 +2175,8 @@ def _policy_opportunity_type(
         return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
     if any(_truthy(row.get("quote_asset_excluded")) or _truthy(row.get("is_quote_asset")) for row in rows):
         return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
+    if _has_low_liquidity_suspicious_anomaly(rows):
+        return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
     if official_row and bool(official_row.get("major_pair_simple_announcement")):
         return event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value
     if _fade_requirements_met(event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value, rows):
@@ -2197,6 +2199,14 @@ def _policy_opportunity_type(
     if origin_set == {"market_anomaly"}:
         return event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value
     return reaction.opportunity_type
+
+
+def _has_low_liquidity_suspicious_anomaly(rows: Iterable[Mapping[str, Any]]) -> bool:
+    return any(
+        str(row.get("anomaly_type") or row.get("market_state_class") or "") == "suspicious_illiquid_move"
+        or str(row.get("anomaly_bucket") or row.get("market_anomaly_bucket") or "") == "low_liquidity_suspicious"
+        for row in rows
+    )
 
 
 def _level_route_state(opportunity: str) -> tuple[str, str, str]:

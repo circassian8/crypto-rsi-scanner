@@ -121,6 +121,7 @@ from . import event_alpha_telegram_recipient_check
 from . import event_alpha_v1_readiness
 from . import event_alpha_environment_doctor
 from . import event_artifact_paths
+from . import event_asset_registry
 from . import event_source_reliability
 from . import event_catalyst_search
 from . import event_clock
@@ -8233,6 +8234,8 @@ def event_alpha_market_anomaly_scan_report(
     *,
     artifact_namespace: str | None = None,
     market_rows_path: str | None = None,
+    asset_registry_path: str | None = None,
+    coingecko_universe_path: str | None = None,
     include_test_artifacts: bool = False,
 ) -> None:
     """Run the research-only broad market anomaly scanner and write artifacts."""
@@ -8251,6 +8254,17 @@ def event_alpha_market_anomaly_scan_report(
     run_id = event_alpha_run_ledger.run_id_for(started_at, context.profile)
     path = Path(market_rows_path).expanduser() if market_rows_path else Path(config.EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH)
     rows = event_market_anomaly_scanner.load_market_rows(path)
+    registry_path = Path(asset_registry_path).expanduser() if asset_registry_path else config.EVENT_ASSET_REGISTRY_PATH
+    universe_path = (
+        Path(coingecko_universe_path).expanduser()
+        if coingecko_universe_path
+        else config.EVENT_DISCOVERY_UNIVERSE_PATH
+    )
+    universe_rows = event_market_anomaly_scanner.load_coingecko_universe_rows(universe_path) if universe_path else []
+    registry = event_asset_registry.build_asset_registry(
+        fixture_path=registry_path,
+        coingecko_universe_path=universe_path,
+    )
     cfg = event_market_anomaly_scanner.MarketAnomalyScannerConfig(
         max_assets=int(getattr(config, "EVENT_ALPHA_MARKET_ANOMALY_MAX_ASSETS", config.EVENT_ANOMALY_MAX_ASSETS)),
         suspicious_liquidity_usd=float(getattr(config, "EVENT_ALPHA_MARKET_ANOMALY_SUSPICIOUS_LIQUIDITY_USD", 50_000.0)),
@@ -8260,6 +8274,8 @@ def event_alpha_market_anomaly_scan_report(
         namespace_dir=context.namespace_dir,
         cfg=cfg,
         observed_at=_event_research_now(),
+        asset_registry=registry,
+        coingecko_universe_rows=universe_rows,
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
         run_mode=context.run_mode,
@@ -8274,17 +8290,21 @@ def event_alpha_market_anomaly_scan_report(
         raw_rows=len(rows),
         snapshot_count=result.snapshot_count,
         anomaly_count=result.anomaly_count,
+        catalyst_search_queue_count=result.catalyst_search_queue_count,
     )
     print(_event_alpha_context_block(context))
     print(
         "market_anomaly_scan: "
         f"rows={len(rows)} snapshots={result.snapshot_count} anomalies={result.anomaly_count} "
+        f"catalyst_search_queue={result.catalyst_search_queue_count} "
         f"snapshots_path={event_artifact_paths.artifact_display_path(result.snapshots_path)} "
         f"anomalies_path={event_artifact_paths.artifact_display_path(result.anomalies_path)} "
+        f"queue_path={event_artifact_paths.artifact_display_path(result.catalyst_search_queue_path)} "
         f"report_path={event_artifact_paths.artifact_display_path(result.report_path)}"
     )
     print(event_market_anomaly_scanner.format_market_anomaly_report(
         result.anomalies,
+        catalyst_search_queue=result.catalyst_search_queue,
         snapshot_count=result.snapshot_count,
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
@@ -8300,6 +8320,7 @@ def _append_market_anomaly_run_ledger_row(
     raw_rows: int,
     snapshot_count: int,
     anomaly_count: int,
+    catalyst_search_queue_count: int = 0,
 ) -> None:
     row = {
         "schema_version": event_alpha_run_ledger.RUN_LEDGER_SCHEMA_VERSION,
@@ -8317,7 +8338,8 @@ def _append_market_anomaly_run_ledger_row(
         "market_rows": int(raw_rows),
         "market_state_snapshots": int(snapshot_count),
         "market_anomalies": int(anomaly_count),
-        "catalyst_queries": 0,
+        "catalyst_search_queue_items": int(catalyst_search_queue_count),
+        "catalyst_queries": int(catalyst_search_queue_count),
         "catalyst_results_accepted": 0,
         "catalyst_results_rejected": 0,
         "extraction_rows": 0,
@@ -11586,6 +11608,16 @@ def cli() -> None:
         help="Optional JSON/JSONL market rows path for --event-alpha-market-anomaly-scan.",
     )
     parser.add_argument(
+        "--event-alpha-market-anomaly-asset-registry",
+        default=None,
+        help="Optional canonical asset registry JSON path for --event-alpha-market-anomaly-scan.",
+    )
+    parser.add_argument(
+        "--event-alpha-market-anomaly-universe",
+        default=None,
+        help="Optional cached CoinGecko universe rows path for --event-alpha-market-anomaly-scan.",
+    )
+    parser.add_argument(
         "--event-alpha-official-exchange-report",
         action="store_true",
         help="Write research-only official exchange announcement artifacts from configured fixtures.",
@@ -12700,6 +12732,8 @@ def cli() -> None:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             market_rows_path=args.event_alpha_market_anomaly_rows,
+            asset_registry_path=args.event_alpha_market_anomaly_asset_registry,
+            coingecko_universe_path=args.event_alpha_market_anomaly_universe,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
         )
         return

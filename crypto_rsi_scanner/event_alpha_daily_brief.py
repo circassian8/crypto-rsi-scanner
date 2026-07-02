@@ -378,7 +378,7 @@ def build_daily_brief(
         "## Live Confirmation Gated Candidates",
         *_live_confirmation_gated_core_lines(core_opportunities, limit=8),
         "",
-        "## Market Anomalies Without Confirmed Catalyst",
+        "## Top Market Anomalies Needing Catalyst Search",
         *_market_anomaly_daily_lines(market_anomalies, limit=10),
         "",
         "## Fresh Official Exchange Catalysts",
@@ -2049,6 +2049,7 @@ def _market_anomaly_daily_lines(
         lines.append(
             f"- {row.get('symbol') or row.get('coin_id') or 'UNKNOWN'}/{row.get('coin_id') or 'unknown'}: "
             f"type={row.get('market_state_class') or row.get('anomaly_type') or 'unknown'} "
+            f"bucket={row.get('anomaly_bucket') or row.get('market_anomaly_bucket') or 'unknown'} "
             f"return_4h={_format_signed_pct(snapshot.get('return_4h'))} "
             f"return_24h={_format_signed_pct(snapshot.get('return_24h'))} "
             f"volume_z={_format_float(snapshot.get('volume_zscore_24h'))} "

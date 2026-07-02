@@ -38570,6 +38570,13 @@ def test_market_anomaly_scanner_classifies_fixture_rows():
     assert by_coin["token-f"] == "post_event_fade_setup"
     assert "token-e" not in by_coin
     assert all(row["market_state_class"] == row["anomaly_type"] for row in anomalies)
+    by_bucket = {row["coin_id"]: row["anomaly_bucket"] for row in anomalies}
+    assert by_bucket["token-b"] == "high_liquidity_breakout"
+    assert by_bucket["token-c"] == "low_liquidity_suspicious"
+    assert by_bucket["token-a"] == "stealth_accumulation"
+    assert by_bucket["token-f"] == "late_momentum_needs_crowding_check"
+    assert all(row.get("priority_components") for row in anomalies)
+    assert all(row.get("search_queries") for row in anomalies)
 
 
 def test_market_anomaly_artifacts_are_research_only_and_seed_search():
@@ -38588,10 +38595,22 @@ def test_market_anomaly_artifacts_are_research_only_and_seed_search():
 
         assert result.snapshot_count == 8
         assert result.anomaly_count == 5
+        assert result.catalyst_search_queue_count == 5
         assert result.snapshots_path.exists()
         assert result.anomalies_path.exists()
+        assert result.catalyst_search_queue_path.exists()
         assert result.report_path.exists()
         assert len(loaded) == 5
+        queue = event_market_anomaly_scanner.load_market_anomaly_catalyst_search_queue(tmp)
+        assert len(queue) == 5
+        assert all(row["no_alert_until_evidence"] is True for row in queue)
+        assert all(row["research_only"] is True for row in queue)
+        assert all(row["telegram_sends"] == 0 for row in queue)
+        assert all(row["trades_created"] == 0 for row in queue)
+        assert all(row["paper_trades_created"] == 0 for row in queue)
+        assert all(row["normal_rsi_signal_rows_written"] == 0 for row in queue)
+        assert all(row["triggered_fade_created"] == 0 for row in queue)
+        assert all(row.get("search_queries") for row in queue)
         assert all(row["created_alert"] is False for row in loaded)
         assert all(row["research_only"] is True for row in loaded)
         assert all(row["needs_catalyst_search"] is True for row in loaded)
@@ -38605,6 +38624,72 @@ def test_market_anomaly_artifacts_are_research_only_and_seed_search():
             "cryptopanic_tagged",
             "coinalyze_derivatives",
         ]
+        report_text = result.report_path.read_text(encoding="utf-8")
+        assert "Top Market Anomalies Needing Catalyst Search" in report_text
+        assert "Catalyst Search Queue" in report_text
+
+
+def test_market_anomaly_scanner_uses_registry_and_cached_universe_rows():
+    from crypto_rsi_scanner import event_asset_registry, event_market_anomaly_scanner
+
+    universe_rows = [
+        {
+            "id": "bitcoin",
+            "symbol": "btc",
+            "return_4h": 0.001,
+            "return_24h": 0.002,
+            "total_volume": 20_000_000_000,
+            "market_cap": 1_000_000_000_000,
+            "observed_at": "2026-06-15T16:00:00Z",
+        },
+        {
+            "id": "ethereum",
+            "symbol": "eth",
+            "return_4h": 0.001,
+            "return_24h": 0.003,
+            "total_volume": 10_000_000_000,
+            "market_cap": 400_000_000_000,
+            "observed_at": "2026-06-15T16:00:00Z",
+        },
+        {
+            "id": "queue-token",
+            "symbol": "queue",
+            "name": "Queue Token",
+            "return_4h": 0.12,
+            "return_24h": 0.22,
+            "volume_zscore_24h": 4.1,
+            "total_volume": 45_000_000,
+            "market_cap": 600_000_000,
+            "liquidity_usd": 9_000_000,
+            "observed_at": "2026-06-15T16:00:00Z",
+        },
+    ]
+    registry = (
+        event_asset_registry.CanonicalAsset(
+            canonical_asset_id="queue-token",
+            symbol="QUEUE",
+            coin_id="queue-token",
+            name="Queue Token",
+            liquidity_tier="large",
+            venues=("binance", "coinalyze"),
+            perp_symbols=("QUEUEUSDT_PERP.A",),
+            coinalyze_symbols=("QUEUEUSDT_PERP.A",),
+            eligible_lanes=("research", "derivatives"),
+        ),
+    )
+    snapshots, anomalies = event_market_anomaly_scanner.scan_market_rows(
+        [],
+        coingecko_universe_rows=universe_rows,
+        asset_registry=registry,
+        observed_at="2026-06-15T16:00:00Z",
+    )
+    by_coin = {row["coin_id"]: row for row in anomalies}
+
+    assert len(snapshots) == 3
+    assert by_coin["queue-token"]["canonical_asset_id"] == "queue-token"
+    assert by_coin["queue-token"]["anomaly_bucket"] == "high_liquidity_breakout"
+    assert by_coin["queue-token"]["derivatives_available"] is True
+    assert by_coin["queue-token"]["market_state_snapshot"]["liquidity_tier"] == "large"
 
 
 def test_artifact_doctor_flags_malformed_market_anomaly_artifacts():
@@ -40428,6 +40513,64 @@ def test_integrated_market_anomaly_alone_does_not_confirm():
 
     assert len(rows) == 1
     assert rows[0]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+    assert rows[0]["created_alert"] is False
+    assert rows[0]["triggered_fade_created"] is False
+
+
+def test_integrated_low_liquidity_suspicious_anomaly_is_diagnostic_even_with_official_source():
+    from crypto_rsi_scanner import event_integrated_radar
+
+    rows = event_integrated_radar.build_integrated_candidates(
+        sidecar_rows={
+            "market_anomaly": [
+                {
+                    "row_type": "event_market_anomaly",
+                    "symbol": "THIN",
+                    "coin_id": "thin-token",
+                    "canonical_asset_id": "thin-token",
+                    "anomaly_type": "suspicious_illiquid_move",
+                    "anomaly_bucket": "low_liquidity_suspicious",
+                    "market_state": "suspicious_illiquid_move",
+                    "market_state_class": "suspicious_illiquid_move",
+                    "market_state_snapshot": {
+                        "return_unit": "percent_points",
+                        "return_4h": 30.0,
+                        "return_24h": 75.0,
+                        "volume_zscore_24h": 4.0,
+                        "liquidity_usd": 18_000,
+                        "spread_bps": 250,
+                    },
+                    "source_pack": "market_anomaly_pack",
+                    "needs_catalyst_search": True,
+                    "suggested_source_packs_to_search": ["market_anomaly_pack", "dex_liquidity_pack"],
+                }
+            ],
+            "official_exchange": [
+                {
+                    "row_type": "official_listing_candidate",
+                    "symbol": "THIN",
+                    "coin_id": "thin-token",
+                    "canonical_asset_id": "thin-token",
+                    "title": "Bybit Lists THIN/USDT",
+                    "source_url": "https://announcements.bybit.com/thin",
+                    "published_at": "2026-06-15T15:00:00Z",
+                    "source_class": "official_exchange",
+                    "source_pack": "official_exchange_listing_pack",
+                    "impact_path_type": "listing_liquidity_event",
+                    "accepted_evidence_count": 1,
+                    "source_strength": "official_structured",
+                }
+            ],
+        },
+        profile="fixture",
+        artifact_namespace="integrated_test",
+        run_mode="fixture",
+        run_id="run",
+        observed_at="2026-06-15T16:00:00Z",
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["opportunity_type"] == "DIAGNOSTIC"
     assert rows[0]["created_alert"] is False
     assert rows[0]["triggered_fade_created"] is False
 
