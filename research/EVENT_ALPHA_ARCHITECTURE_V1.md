@@ -5,8 +5,9 @@ layout gives new code a home while old import paths continue to work.
 
 ## Package Map
 
-- `crypto_rsi_scanner/event_alpha/providers/`: provider activation,
-  readiness, preflight, and source-pack wrappers.
+- `crypto_rsi_scanner/event_alpha/providers/`: Event Alpha provider
+  activation, readiness, preflight, provider-health, official-exchange,
+  CryptoPanic, source-registry, and source-pack orchestration.
 - `crypto_rsi_scanner/event_alpha/radar/`: integrated radar, market state and
   reaction logic, market anomaly scanning, source coverage, core opportunity
   aggregation/store views, evidence acquisition, opportunity verdicts, impact
@@ -83,11 +84,38 @@ Radar/core implementation code now lives in package modules:
   and artifact persistence.
 - `event_alpha.radar.incidents` for profile-scoped incident artifacts.
 
-The old top-level modules remain quiet compatibility shims. Current size gate
-after this pass: `125` top-level `event_*.py` files, `18` compatibility shims,
-and `107` remaining top-level implementation files. The moved radar targets
-are all shims at the top level. `event_source_packs.py` remains provider-side
-per `crypto_rsi_scanner/event_alpha/MODULE_MAP.md`.
+The old top-level modules remain quiet compatibility shims. After the radar
+move, the size gate was `125` top-level `event_*.py` files, `18`
+compatibility shims, and `107` remaining top-level implementation files.
+
+## Provider Implementation Move
+
+Event Alpha provider/readiness orchestration code now lives in package modules:
+
+- `event_alpha.providers.live_provider_readiness` for no-call provider
+  activation readiness.
+- `event_alpha.providers.coinalyze_preflight` for Coinalyze preflight and
+  bounded no-send rehearsal artifacts.
+- `event_alpha.providers.official_exchange` and
+  `event_alpha.providers.official_exchange_activation` for official exchange
+  artifact normalization and activation rows.
+- `event_alpha.providers.cryptopanic` for CryptoPanic operational preflight
+  helpers.
+- `event_alpha.providers.provider_health` for Event Alpha provider health and
+  circuit-breaker state.
+- `event_alpha.providers.source_registry` and
+  `event_alpha.providers.source_packs` for source semantics and playbook source
+  packs.
+- `event_alpha.providers.bybit_announcements_preflight`,
+  `event_alpha.providers.unlock_calendar_preflight`, and
+  `event_alpha.providers.dex_onchain_readiness` for fixture-first provider
+  activation/readiness scaffolds.
+
+The lower-level reusable provider adapter packages remain in place:
+`crypto_rsi_scanner/event_providers/`, `crypto_rsi_scanner/derivatives_providers/`,
+and `crypto_rsi_scanner/supply_providers/` are not folded into Event Alpha.
+Current size gate after this provider move: `125` top-level `event_*.py` files,
+`29` compatibility shims, and `96` remaining top-level implementation files.
 
 ## Future Code Placement
 

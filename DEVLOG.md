@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Move Event Alpha provider modules into package homes · Codex
+**Why:** The provider/readiness refactor slice needed Event Alpha activation,
+preflight, source-pack, and provider-health orchestration to live under
+`crypto_rsi_scanner.event_alpha.providers` while old imports, Make targets, and
+no-call defaults stayed compatible.
+**Changes:**
+- Moved live-provider readiness, Coinalyze preflight/rehearsal orchestration,
+  official exchange activation, official exchange normalization, CryptoPanic
+  preflight support, provider health, source registry, source packs, Bybit
+  announcements preflight, unlock/calendar preflight, and DEX/on-chain readiness
+  implementations into `crypto_rsi_scanner/event_alpha/providers/`.
+- Replaced the old top-level modules with quiet compatibility shims and updated
+  high-confidence internal imports in radar/source-coverage paths to use the
+  new package modules.
+- Left reusable provider adapters in `crypto_rsi_scanner/event_providers/`,
+  `crypto_rsi_scanner/derivatives_providers/`, and
+  `crypto_rsi_scanner/supply_providers/` rather than folding adapters into the
+  Event Alpha orchestration package.
+- Added focused provider-readiness pytest coverage for old/new import
+  equivalence, Coinalyze preflight smoke behavior, live-provider readiness,
+  official exchange fixture normalization, and source registry/source-pack
+  classification.
+- Refreshed `crypto_rsi_scanner/event_alpha/MODULE_MAP.md` and
+  `research/EVENT_ALPHA_ARCHITECTURE_V1.md`; current size gate is 125 top-level
+  `event_*.py` files, 29 shims, and 96 remaining top-level implementation files.
+**Verify:** `python3 tests/test_indicators.py` (686/686); `python3 -m pytest
+tests/event_alpha/test_provider_readiness.py` (5/5); `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make event-alpha-live-provider-readiness-smoke
+PYTHON=python3`; `make event-alpha-coinalyze-preflight-smoke PYTHON=python3`;
+`make event-alpha-official-exchange-smoke PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** The official-exchange fixture smoke still reports expected
+strict-doctor warnings for readiness/source-coverage artifacts not generated in
+that fixture namespace, with no blockers. No live provider calls, sends, trades,
+paper rows, normal RSI rows, or Event Alpha-created `TRIGGERED_FADE` behavior
+were added.
+
 ## 2026-07-02 — Move Event Alpha radar modules into package homes · Codex
 **Why:** The next refactor slice was to move radar/core Event Alpha
 implementation code under `crypto_rsi_scanner.event_alpha.radar` while keeping

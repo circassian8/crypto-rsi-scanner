@@ -21,11 +21,11 @@ from ... import (
     event_evidence_quality,
     event_llm_evidence_planner,
     event_source_enrichment,
-    event_source_packs,
-    event_source_registry,
 )
 from ...event_models import RawDiscoveredEvent
 from ...event_resolver import clean_text
+from ..providers import source_packs as event_source_packs
+from ..providers import source_registry as event_source_registry
 from . import core_opportunities as event_core_opportunities
 from . import impact_hypotheses as event_impact_hypotheses
 

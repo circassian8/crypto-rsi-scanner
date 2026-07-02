@@ -2523,7 +2523,7 @@ def _best_source_pack(rows: Iterable[Mapping[str, Any]], impact_path: str | None
     if fallback:
         return fallback[0]
     try:
-        from ... import event_source_packs
+        from ..providers import source_packs as event_source_packs
         impact = str(impact_path or "")
         pack_impact = "venue_value_capture" if impact.casefold() in {"proxy_attention", "proxy_exposure"} else impact
         return event_source_packs.source_pack_for_playbook(

@@ -22,13 +22,9 @@ from ... import (
     config,
     event_alpha_router,
     event_asset_registry,
-    event_coinalyze_preflight,
-    event_dex_onchain_readiness,
-    event_live_provider_readiness,
     event_derivatives_crowding,
     event_instrument_resolver,
     event_market_confirmation,
-    event_official_exchange,
     event_research_cards,
     event_scheduled_catalysts,
     event_watchlist,
@@ -37,6 +33,10 @@ from ..artifacts import context as event_alpha_artifacts
 from ..artifacts import paths as event_artifact_paths
 from ..artifacts import run_ledger as event_alpha_run_ledger
 from ..namespace import status as event_alpha_namespace_status
+from ..providers import coinalyze_preflight as event_coinalyze_preflight
+from ..providers import dex_onchain_readiness as event_dex_onchain_readiness
+from ..providers import live_provider_readiness as event_live_provider_readiness
+from ..providers import official_exchange as event_official_exchange
 from . import core_opportunity_store as event_core_opportunity_store
 from . import market_anomaly_scanner as event_market_anomaly_scanner
 from . import market_reaction as event_market_reaction
@@ -1386,7 +1386,7 @@ def _run_or_load_sidecars(
 
 
 def _derivatives_manifest_mode(namespace_dir: Path, derivatives_rows: tuple[dict[str, Any], ...]) -> tuple[str, bool, tuple[str, ...]]:
-    from ... import event_coinalyze_preflight
+    from ..providers import coinalyze_preflight as event_coinalyze_preflight
 
     rehearsal_path = namespace_dir / event_coinalyze_preflight.REHEARSAL_JSON
     state_path = namespace_dir / event_derivatives_crowding.DERIVATIVES_STATE_FILENAME
