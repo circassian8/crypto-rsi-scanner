@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Harden GitHub Actions safe verification · Codex
+**Why:** CI should verify push and PR changes without relying on local `.env`
+state, provider keys, Telegram credentials, live-provider allow flags, live
+sends, or trading/paper/RSI side effects.
+**Changes:**
+- Hardened `.github/workflows/verify.yml` to run standalone tests, full pytest,
+  compileall, and `make verify` on push/PR with read-only repository
+  permissions, a bounded timeout, deterministic fixture clock, and
+  `RSI_EVENT_ALERTS_ENABLED=0`.
+- Kept `.github/workflows/event-alpha-smoke.yml` manual-only and no-call,
+  running integrated radar smoke/doctor, live-provider readiness smoke, and
+  Coinalyze preflight smoke under the same disabled-alert CI environment.
+- Strengthened the static workflow guard in `tests/cli/test_make_targets.py` to
+  check trigger shape, command order, minimal install commands, no secret
+  references, no live-provider allow flags, and no live-send targets.
+- Added `README.md` CI safety notes and updated `ROADMAP.md` with the no-live
+  CI milestone.
+**Verify:** `python3 -m pytest tests/cli/test_make_targets.py -q -k github_actions`
+(1/1); `python3 -m pytest tests/cli tests/event_alpha` (587/587);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (722/722); `python3 -m pytest` (728/728);
+`make verify PYTHON=python3`; `git diff --check`.
+**Notes/risks:** CI still installs runtime requirements plus pytest because
+pytest is not in `requirements.txt`. No workflow references secrets, provider
+API keys, Telegram tokens, live allow flags, or send targets.
+
 ## 2026-07-02 — Make Event Alpha namespace lifecycle first-class · Codex
 **Why:** Event Alpha now has many fixture, provider, rehearsal, and stale
 artifact namespaces. Operators and doctor checks need an explicit lifecycle

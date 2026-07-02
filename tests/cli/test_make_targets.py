@@ -420,21 +420,71 @@ def test_github_actions_are_safe_fixture_verification_only():
     smoke = root / ".github" / "workflows" / "event-alpha-smoke.yml"
     assert verify.exists()
     assert smoke.exists()
-    text = (verify.read_text(encoding="utf-8") + "\n" + smoke.read_text(encoding="utf-8")).casefold()
+    verify_text = verify.read_text(encoding="utf-8")
+    smoke_text = smoke.read_text(encoding="utf-8")
+    text = (verify_text + "\n" + smoke_text).casefold()
+
+    assert "on:\n  push:\n  pull_request:" in verify_text
+    assert "workflow_dispatch" not in verify_text
+    assert "on:\n  workflow_dispatch:" in smoke_text
+    assert "\n  push:" not in smoke_text
+    assert "\n  pull_request:" not in smoke_text
+    assert "permissions:\n  contents: read" in verify_text
+    assert "permissions:\n  contents: read" in smoke_text
+    assert 'RSI_EVENT_ALERTS_ENABLED: "0"' in verify_text
+    assert 'RSI_EVENT_ALERTS_ENABLED: "0"' in smoke_text
+    assert 'RSI_EVENT_RESEARCH_NOW: "2026-06-15T16:00:00Z"' in verify_text
+    assert 'RSI_EVENT_RESEARCH_NOW: "2026-06-15T16:00:00Z"' in smoke_text
+
+    verify_runs = [line.split("run:", 1)[1].strip() for line in verify_text.splitlines() if line.strip().startswith("run:")]
+    assert verify_runs == [
+        "python3 -m pip install --disable-pip-version-check -r requirements.txt pytest",
+        "python3 tests/test_indicators.py",
+        "python3 -m pytest",
+        "python3 -m compileall -q crypto_rsi_scanner tests",
+        "make verify PYTHON=python3",
+    ]
+    smoke_runs = [line.split("run:", 1)[1].strip() for line in smoke_text.splitlines() if line.strip().startswith("run:")]
+    assert smoke_runs == [
+        "python3 -m pip install --disable-pip-version-check -r requirements.txt pytest",
+        "make event-alpha-integrated-radar-smoke PYTHON=python3",
+        "make event-alpha-integrated-radar-doctor PYTHON=python3",
+        "make event-alpha-live-provider-readiness-smoke PYTHON=python3",
+        "make event-alpha-coinalyze-preflight-smoke PYTHON=python3",
+    ]
+
     forbidden = (
         "allow_live",
         "allow-live",
+        "_allow_live",
+        "allow_live_preflight",
+        "allow-live-preflight",
+        "rsi_event_alpha_coinalyze_allow_live_preflight",
+        "rsi_event_alpha_bybit_announcements_allow_live_preflight",
         "rsi_event_alerts_enabled=1",
+        'rsi_event_alerts_enabled: "1"',
+        "secrets.",
+        "telegram",
+        "api_key",
+        "api-secret",
+        "api_secret",
+        "bot_token",
         "event-alert-send",
+        "event-alert-no-key-send",
         "event-alpha-cycle-send",
+        "event-alpha-cycle-profile-send",
+        "event-alpha-daily-send",
+        "event-alpha-notify-cycle",
         "event-alpha-telegram-send-one-cycle",
         "telegram_bot_token",
         "coinalyze_api_key",
+        "--event-alert-send",
     )
     for item in forbidden:
         assert item not in text
     assert "make verify python=python3" in text
     assert "event-alpha-integrated-radar-smoke" in text
+    assert "--upgrade pip" not in text
 
 
 def test_refactor_baseline_generation_writes_reports_without_behavior_invocation():
