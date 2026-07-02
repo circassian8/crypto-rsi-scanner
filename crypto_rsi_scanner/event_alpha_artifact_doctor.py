@@ -67,6 +67,7 @@ class EventAlphaArtifactDoctorResult:
     daily_brief_core_count_mismatch_store: int = 0
     daily_brief_research_review_lane_missing: int = 0
     daily_brief_source_coverage_path_missing: int = 0
+    daily_brief_coinalyze_source_coverage_mismatch: int = 0
     core_route_conflicts_with_opportunity_level: int = 0
     live_validated_without_confirmation: int = 0
     live_sector_digest_without_asset: int = 0
@@ -194,6 +195,7 @@ class EventAlphaArtifactDoctorResult:
     source_coverage_category_priority_missing: int = 0
     source_coverage_readiness_link_missing: int = 0
     source_coverage_context_provider_ranked_above_lane_critical: int = 0
+    source_coverage_coinalyze_missing_linked_artifact: int = 0
     live_provider_readiness_missing: int = 0
     live_provider_readiness_secret_leak: int = 0
     live_provider_readiness_live_calls_allowed_in_smoke: int = 0
@@ -204,6 +206,14 @@ class EventAlphaArtifactDoctorResult:
     coinalyze_preflight_ready_without_request_ledger: int = 0
     coinalyze_preflight_missing_fixture_parser_status: int = 0
     coinalyze_preflight_forbidden_side_effect_claim: int = 0
+    coinalyze_rehearsal_secret_leak: int = 0
+    coinalyze_rehearsal_live_without_ledger: int = 0
+    coinalyze_rehearsal_live_call_allowed_in_smoke: int = 0
+    coinalyze_rehearsal_live_without_explicit_allow: int = 0
+    coinalyze_rehearsal_request_budget_exceeded: int = 0
+    coinalyze_rehearsal_success_without_derivatives_state: int = 0
+    coinalyze_provider_health_healthy_without_successful_ledger: int = 0
+    coinalyze_rehearsal_forbidden_side_effect_claim: int = 0
     source_pack_provider_status_missing: int = 0
     missing_provider_recommendations_missing: int = 0
     degraded_provider_absence_marked_meaningful: int = 0
@@ -266,6 +276,7 @@ class EventAlphaArtifactDoctorResult:
     research_review_digest_missing_feedback_target: int = 0
     research_review_digest_skipped_without_reason: int = 0
     research_review_digest_missing_family_summary: int = 0
+    research_review_digest_duplicate_visible_family_summary: int = 0
     research_review_digest_absolute_path: int = 0
     notification_body_card_mismatch_canonical: int = 0
     notification_body_feedback_mismatch_canonical: int = 0
@@ -1070,6 +1081,7 @@ def diagnose_artifacts(
         "daily_brief_core_count_mismatch_store",
         "daily_brief_research_review_lane_missing",
         "daily_brief_source_coverage_path_missing",
+        "daily_brief_coinalyze_source_coverage_mismatch",
     ):
         count = daily_brief_conflicts.get(key, 0)
         if not count:
@@ -1314,6 +1326,12 @@ def diagnose_artifacts(
             f"{source_coverage_report_conflicts['source_coverage_context_provider_ranked_above_lane_critical']}"
         )
         (blockers if strict else warnings).append(message)
+    if source_coverage_report_conflicts["source_coverage_coinalyze_missing_linked_artifact"]:
+        message = (
+            "source_coverage_coinalyze_missing_linked_artifact="
+            f"{source_coverage_report_conflicts['source_coverage_coinalyze_missing_linked_artifact']}"
+        )
+        (blockers if strict else warnings).append(message)
     if live_provider_readiness_conflicts["live_provider_readiness_missing"]:
         warnings.append(
             "live_provider_readiness_missing="
@@ -1336,6 +1354,14 @@ def diagnose_artifacts(
         "coinalyze_preflight_ready_without_request_ledger",
         "coinalyze_preflight_missing_fixture_parser_status",
         "coinalyze_preflight_forbidden_side_effect_claim",
+        "coinalyze_rehearsal_secret_leak",
+        "coinalyze_rehearsal_live_without_ledger",
+        "coinalyze_rehearsal_live_call_allowed_in_smoke",
+        "coinalyze_rehearsal_live_without_explicit_allow",
+        "coinalyze_rehearsal_request_budget_exceeded",
+        "coinalyze_rehearsal_success_without_derivatives_state",
+        "coinalyze_provider_health_healthy_without_successful_ledger",
+        "coinalyze_rehearsal_forbidden_side_effect_claim",
     ):
         count = coinalyze_preflight_conflicts.get(key, 0)
         if not count:
@@ -1605,6 +1631,7 @@ def diagnose_artifacts(
         "research_review_digest_missing_feedback_target",
         "research_review_digest_skipped_without_reason",
         "research_review_digest_missing_family_summary",
+        "research_review_digest_duplicate_visible_family_summary",
         "research_review_digest_absolute_path",
     ):
         if delivery_conflicts[key]:
@@ -1615,6 +1642,7 @@ def diagnose_artifacts(
                 "research_review_digest_missing_feedback_target",
                 "research_review_digest_skipped_without_reason",
                 "research_review_digest_missing_family_summary",
+                "research_review_digest_duplicate_visible_family_summary",
                 "research_review_digest_absolute_path",
             }:
                 (blockers if strict else warnings).append(message)
@@ -1910,6 +1938,9 @@ def diagnose_artifacts(
         daily_brief_core_count_mismatch_store=daily_brief_conflicts["daily_brief_core_count_mismatch_store"],
         daily_brief_research_review_lane_missing=daily_brief_conflicts["daily_brief_research_review_lane_missing"],
         daily_brief_source_coverage_path_missing=daily_brief_conflicts["daily_brief_source_coverage_path_missing"],
+        daily_brief_coinalyze_source_coverage_mismatch=daily_brief_conflicts[
+            "daily_brief_coinalyze_source_coverage_mismatch"
+        ],
         core_route_conflicts_with_opportunity_level=core_route_conflicts,
         live_validated_without_confirmation=live_confirmation_conflicts["live_validated_without_confirmation"],
         live_sector_digest_without_asset=live_confirmation_conflicts["live_sector_digest_without_asset"],
@@ -2045,6 +2076,9 @@ def diagnose_artifacts(
         source_coverage_context_provider_ranked_above_lane_critical=source_coverage_report_conflicts[
             "source_coverage_context_provider_ranked_above_lane_critical"
         ],
+        source_coverage_coinalyze_missing_linked_artifact=source_coverage_report_conflicts[
+            "source_coverage_coinalyze_missing_linked_artifact"
+        ],
         live_provider_readiness_missing=live_provider_readiness_conflicts["live_provider_readiness_missing"],
         live_provider_readiness_secret_leak=live_provider_readiness_conflicts["live_provider_readiness_secret_leak"],
         live_provider_readiness_live_calls_allowed_in_smoke=live_provider_readiness_conflicts[
@@ -2068,6 +2102,28 @@ def diagnose_artifacts(
         ],
         coinalyze_preflight_forbidden_side_effect_claim=coinalyze_preflight_conflicts[
             "coinalyze_preflight_forbidden_side_effect_claim"
+        ],
+        coinalyze_rehearsal_secret_leak=coinalyze_preflight_conflicts["coinalyze_rehearsal_secret_leak"],
+        coinalyze_rehearsal_live_without_ledger=coinalyze_preflight_conflicts[
+            "coinalyze_rehearsal_live_without_ledger"
+        ],
+        coinalyze_rehearsal_live_call_allowed_in_smoke=coinalyze_preflight_conflicts[
+            "coinalyze_rehearsal_live_call_allowed_in_smoke"
+        ],
+        coinalyze_rehearsal_live_without_explicit_allow=coinalyze_preflight_conflicts[
+            "coinalyze_rehearsal_live_without_explicit_allow"
+        ],
+        coinalyze_rehearsal_request_budget_exceeded=coinalyze_preflight_conflicts[
+            "coinalyze_rehearsal_request_budget_exceeded"
+        ],
+        coinalyze_rehearsal_success_without_derivatives_state=coinalyze_preflight_conflicts[
+            "coinalyze_rehearsal_success_without_derivatives_state"
+        ],
+        coinalyze_provider_health_healthy_without_successful_ledger=coinalyze_preflight_conflicts[
+            "coinalyze_provider_health_healthy_without_successful_ledger"
+        ],
+        coinalyze_rehearsal_forbidden_side_effect_claim=coinalyze_preflight_conflicts[
+            "coinalyze_rehearsal_forbidden_side_effect_claim"
         ],
         source_pack_provider_status_missing=source_coverage_conflicts["source_pack_provider_status_missing"],
         missing_provider_recommendations_missing=source_coverage_conflicts["missing_provider_recommendations_missing"],
@@ -2135,6 +2191,9 @@ def diagnose_artifacts(
         research_review_digest_missing_feedback_target=delivery_conflicts["research_review_digest_missing_feedback_target"],
         research_review_digest_skipped_without_reason=delivery_conflicts["research_review_digest_skipped_without_reason"],
         research_review_digest_missing_family_summary=delivery_conflicts["research_review_digest_missing_family_summary"],
+        research_review_digest_duplicate_visible_family_summary=delivery_conflicts[
+            "research_review_digest_duplicate_visible_family_summary"
+        ],
         research_review_digest_absolute_path=delivery_conflicts["research_review_digest_absolute_path"],
         notification_body_card_mismatch_canonical=delivery_conflicts["notification_body_card_mismatch_canonical"],
         notification_body_feedback_mismatch_canonical=delivery_conflicts["notification_body_feedback_mismatch_canonical"],
@@ -4092,6 +4151,7 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
         "source_coverage_category_priority_missing": 0,
         "source_coverage_readiness_link_missing": 0,
         "source_coverage_context_provider_ranked_above_lane_critical": 0,
+        "source_coverage_coinalyze_missing_linked_artifact": 0,
     }
     if path is None:
         return out
@@ -4128,6 +4188,15 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
             out["source_coverage_provider_marked_healthy_without_observation"] += len(healthy & unknown)
     if "Most useful next data source categories:" not in text:
         out["source_coverage_category_priority_missing"] = 1
+    for artifact_name in (
+        event_coinalyze_preflight.PREFLIGHT_JSON,
+        event_coinalyze_preflight.PREFLIGHT_MD,
+        event_coinalyze_preflight.REHEARSAL_JSON,
+        event_coinalyze_preflight.REHEARSAL_MD,
+        event_coinalyze_preflight.REQUEST_LEDGER,
+    ):
+        if artifact_name in text and not (report_path.parent / artifact_name).exists():
+            out["source_coverage_coinalyze_missing_linked_artifact"] += 1
     readiness_present = "Live-provider activation readiness:" in text
     readiness_md_path = report_path.parent / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_MD
     readiness_json_path = report_path.parent / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_JSON
@@ -4256,6 +4325,9 @@ def _source_coverage_report_required(namespace_dir: Path) -> bool:
         "event_live_provider_activation_readiness.md",
         "event_coinalyze_preflight.json",
         "event_coinalyze_preflight.md",
+        "event_coinalyze_rehearsal_report.json",
+        "event_coinalyze_rehearsal_report.md",
+        "event_coinalyze_request_ledger.jsonl",
         "cryptopanic_request_ledger.jsonl",
     )
     return any((namespace_dir / name).exists() for name in required_markers)
@@ -4273,6 +4345,8 @@ def _live_provider_readiness_required(namespace_dir: Path) -> bool:
         "event_integrated_radar_candidates.jsonl",
         "event_coinalyze_preflight.json",
         "event_coinalyze_preflight.md",
+        "event_coinalyze_rehearsal_report.json",
+        "event_coinalyze_rehearsal_report.md",
     )
     return any((namespace_dir / name).exists() for name in required_markers)
 
@@ -4670,6 +4744,7 @@ def _daily_brief_consistency_conflicts(
         "daily_brief_core_count_mismatch_store": 0,
         "daily_brief_research_review_lane_missing": 0,
         "daily_brief_source_coverage_path_missing": 0,
+        "daily_brief_coinalyze_source_coverage_mismatch": 0,
     }
     if path is None:
         return out
@@ -4724,6 +4799,18 @@ def _daily_brief_consistency_conflicts(
         source_text = str(source_coverage_report_path)
         if source_text not in text and Path(source_coverage_report_path).name not in text:
             out["daily_brief_source_coverage_path_missing"] = 1
+        try:
+            source_body = Path(source_coverage_report_path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            source_body = ""
+        coverage_links_coinalyze = (
+            event_coinalyze_preflight.PREFLIGHT_JSON in source_body
+            or event_coinalyze_preflight.PREFLIGHT_MD in source_body
+            or event_coinalyze_preflight.REHEARSAL_MD in source_body
+        )
+        brief_says_missing = "Coinalyze preflight: not generated" in text or "Coinalyze preflight: not written yet" in text
+        if coverage_links_coinalyze and brief_says_missing:
+            out["daily_brief_coinalyze_source_coverage_mismatch"] = 1
     return out
 
 
@@ -4800,6 +4887,7 @@ def _notification_delivery_conflicts(
         "research_review_digest_missing_feedback_target": 0,
         "research_review_digest_skipped_without_reason": 0,
         "research_review_digest_missing_family_summary": 0,
+        "research_review_digest_duplicate_visible_family_summary": 0,
         "research_review_digest_absolute_path": 0,
         "notification_body_card_mismatch_canonical": 0,
         "notification_body_feedback_mismatch_canonical": 0,
@@ -4896,18 +4984,27 @@ def _notification_delivery_conflicts(
                     if isinstance(summary, Mapping)
                     else []
                 )
+                display_family_summary = (
+                    row.get("skipped_display_family_summary")
+                    if isinstance(row.get("skipped_display_family_summary"), list)
+                    else summary.get("skipped_display_family_summary")
+                    if isinstance(summary, Mapping) and isinstance(summary.get("skipped_display_family_summary"), list)
+                    else None
+                )
                 family_summary = (
-                    row.get("skipped_family_summary")
+                    display_family_summary
+                    if isinstance(display_family_summary, list)
+                    else row.get("skipped_family_summary")
                     if isinstance(row.get("skipped_family_summary"), list)
                     else summary.get("skipped_family_summary")
-                    if isinstance(summary, Mapping)
+                    if isinstance(summary, Mapping) and isinstance(summary.get("skipped_family_summary"), list)
                     else []
                 )
                 has_reason_counts = isinstance(reason_counts, Mapping) and any(str(key).strip() for key in reason_counts)
                 if not has_reason_counts:
                     out["research_review_digest_skipped_without_reason"] += 1
                 has_family_summary = isinstance(family_summary, list) and any(
-                    isinstance(item, Mapping) and str(item.get("candidate_family_id") or item.get("label") or "").strip()
+                    isinstance(item, Mapping) and str(item.get("display_family_id") or item.get("candidate_family_id") or item.get("label") or "").strip()
                     for item in family_summary
                 )
                 if skipped_count > 10 and not has_family_summary:
@@ -4916,10 +5013,30 @@ def _notification_delivery_conflicts(
                     out["research_review_digest_missing_family_summary"] += 1
                 if has_family_summary:
                     family_keys = {
-                        str(item.get("candidate_family_id") or item.get("label") or "").strip()
+                        str(item.get("display_family_id") or item.get("candidate_family_id") or item.get("label") or "").strip()
                         for item in family_summary
                         if isinstance(item, Mapping)
                     }
+                    family_keys.update(
+                        str(item.get("label") or f"{item.get('symbol')}/{item.get('coin_id')}" or "").strip()
+                        for item in family_summary
+                        if isinstance(item, Mapping)
+                    )
+                    if isinstance(display_family_summary, list):
+                        visible_labels: list[str] = []
+                        for family_item in display_family_summary:
+                            if not isinstance(family_item, Mapping) or bool(family_item.get("display_hidden")):
+                                continue
+                            label = str(
+                                family_item.get("display_label")
+                                or family_item.get("label")
+                                or f"{family_item.get('symbol')}/{family_item.get('coin_id')}"
+                                or ""
+                            ).strip().casefold()
+                            if label:
+                                visible_labels.append(label)
+                        if len(visible_labels) != len(set(visible_labels)):
+                            out["research_review_digest_duplicate_visible_family_summary"] += 1
                     material_missing = [
                         item for item in skipped_items
                         if isinstance(item, Mapping)
@@ -4928,13 +5045,15 @@ def _notification_delivery_conflicts(
                             or _as_float(item.get("score") or item.get("rank_score")) >= 60
                         )
                         and str(
-                            item.get("candidate_family_id")
+                            item.get("display_family_id")
                             or f"{item.get('symbol')}/{item.get('coin_id')}"
+                            or item.get("candidate_family_id")
                             or ""
                         ).strip()
                         and str(
-                            item.get("candidate_family_id")
+                            item.get("display_family_id")
                             or f"{item.get('symbol')}/{item.get('coin_id')}"
+                            or item.get("candidate_family_id")
                             or ""
                         ).strip() not in family_keys
                     ]
@@ -5976,6 +6095,8 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"daily_brief_core_count_mismatch_store={result.daily_brief_core_count_mismatch_store} "
             f"daily_brief_research_review_lane_missing={result.daily_brief_research_review_lane_missing} "
             f"daily_brief_source_coverage_path_missing={result.daily_brief_source_coverage_path_missing} "
+            "daily_brief_coinalyze_source_coverage_mismatch="
+            f"{result.daily_brief_coinalyze_source_coverage_mismatch} "
             f"core_route_conflicts_with_opportunity_level={result.core_route_conflicts_with_opportunity_level} "
             f"alert_snapshot_route_mismatch_core_store={result.alert_snapshot_route_mismatch_core_store} "
             f"alert_snapshot_level_mismatch_core_store={result.alert_snapshot_level_mismatch_core_store} "
@@ -6118,6 +6239,8 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"source_coverage_category_priority_missing={result.source_coverage_category_priority_missing} "
             f"source_coverage_readiness_link_missing={result.source_coverage_readiness_link_missing} "
             f"source_coverage_context_provider_ranked_above_lane_critical={result.source_coverage_context_provider_ranked_above_lane_critical} "
+            "source_coverage_coinalyze_missing_linked_artifact="
+            f"{result.source_coverage_coinalyze_missing_linked_artifact} "
             f"live_provider_readiness_missing={result.live_provider_readiness_missing} "
             f"live_provider_readiness_secret_leak={result.live_provider_readiness_secret_leak} "
             f"live_provider_readiness_live_calls_allowed_in_smoke={result.live_provider_readiness_live_calls_allowed_in_smoke} "
@@ -6128,6 +6251,19 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"coinalyze_preflight_ready_without_request_ledger={result.coinalyze_preflight_ready_without_request_ledger} "
             f"coinalyze_preflight_missing_fixture_parser_status={result.coinalyze_preflight_missing_fixture_parser_status} "
             f"coinalyze_preflight_forbidden_side_effect_claim={result.coinalyze_preflight_forbidden_side_effect_claim} "
+            f"coinalyze_rehearsal_secret_leak={result.coinalyze_rehearsal_secret_leak} "
+            f"coinalyze_rehearsal_live_without_ledger={result.coinalyze_rehearsal_live_without_ledger} "
+            "coinalyze_rehearsal_live_call_allowed_in_smoke="
+            f"{result.coinalyze_rehearsal_live_call_allowed_in_smoke} "
+            "coinalyze_rehearsal_live_without_explicit_allow="
+            f"{result.coinalyze_rehearsal_live_without_explicit_allow} "
+            f"coinalyze_rehearsal_request_budget_exceeded={result.coinalyze_rehearsal_request_budget_exceeded} "
+            "coinalyze_rehearsal_success_without_derivatives_state="
+            f"{result.coinalyze_rehearsal_success_without_derivatives_state} "
+            "coinalyze_provider_health_healthy_without_successful_ledger="
+            f"{result.coinalyze_provider_health_healthy_without_successful_ledger} "
+            "coinalyze_rehearsal_forbidden_side_effect_claim="
+            f"{result.coinalyze_rehearsal_forbidden_side_effect_claim} "
             f"source_pack_provider_status_missing={result.source_pack_provider_status_missing} "
             f"missing_provider_recommendations_missing={result.missing_provider_recommendations_missing} "
             f"degraded_provider_absence_marked_meaningful={result.degraded_provider_absence_marked_meaningful} "
@@ -6212,6 +6348,8 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"research_review_feedback_missing={result.research_review_digest_missing_feedback_target} "
             f"research_review_skipped_without_reason={result.research_review_digest_skipped_without_reason} "
             f"research_review_missing_family_summary={result.research_review_digest_missing_family_summary} "
+            "research_review_duplicate_visible_family_summary="
+            f"{result.research_review_digest_duplicate_visible_family_summary} "
             f"research_review_absolute_path={result.research_review_digest_absolute_path} "
             f"body_card_mismatch={result.notification_body_card_mismatch_canonical} "
             f"body_feedback_mismatch={result.notification_body_feedback_mismatch_canonical} "

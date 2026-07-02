@@ -53,29 +53,41 @@ MIN_ZIP_TIMESTAMP = 315532800.0  # 1980-01-01, earliest timestamp ZipInfo can re
 DEFAULT_EXPORT_MTIME_SAFETY_MARGIN_SECONDS = 300.0
 
 
-def _tracked_paths() -> set[Path]:
-    output = subprocess.check_output(
-        ["git", "ls-tree", "-r", "--name-only", "HEAD"],
-        cwd=ROOT,
-        text=True,
-    )
-    return {ROOT / line for line in output.splitlines() if line.strip()}
+def _tracked_paths(root: Path = ROOT) -> set[Path]:
+    try:
+        output = subprocess.check_output(
+            ["git", "ls-tree", "-r", "--name-only", "HEAD"],
+            cwd=root,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return _walk_source_paths(root)
+    return {root / line for line in output.splitlines() if line.strip()}
 
 
-def _artifact_paths() -> set[Path]:
+def _walk_source_paths(root: Path = ROOT) -> set[Path]:
+    paths: set[Path] = set()
+    for path in root.rglob("*"):
+        if path.is_file() and not _skip(path, root=root):
+            paths.add(path)
+    return paths
+
+
+def _artifact_paths(root: Path = ROOT) -> set[Path]:
     paths: set[Path] = set()
     for name in ARTIFACT_ROOTS:
-        root = ROOT / name
-        if not root.exists():
+        artifact_root = root / name
+        if not artifact_root.exists():
             continue
-        for path in root.rglob("*"):
+        for path in artifact_root.rglob("*"):
             if path.is_file():
                 paths.add(path)
     return paths
 
 
-def _skip(path: Path) -> bool:
-    rel = path.relative_to(ROOT)
+def _skip(path: Path, root: Path = ROOT) -> bool:
+    rel = path.relative_to(root)
     parts = rel.parts
     if any(part in EXCLUDE_DIRS for part in parts):
         return True
@@ -106,6 +118,24 @@ def _validate(names: list[str]) -> list[str]:
             or lower.endswith((".db", ".db-wal", ".db-shm", ".sqlite", ".sqlite3", ".log", ".zip", ".pyc"))
         ):
             bad.append(name)
+    return bad
+
+
+def _validate_archive_entries(zip_path: Path, *, safe_export_timestamp: float) -> list[str]:
+    bad = []
+    with zipfile.ZipFile(zip_path) as zf:
+        names = zf.namelist()
+        bad.extend(_validate(names))
+        for info in zf.infolist():
+            entry_ts = datetime(*info.date_time).timestamp()
+            # Zip timestamps have two-second granularity.
+            if entry_ts > safe_export_timestamp + 2:
+                bad.append(f"future_mtime:{info.filename}:{entry_ts:.0f}>{safe_export_timestamp:.0f}")
+        makefile = next((info for info in zf.infolist() if info.filename == "Makefile"), None)
+        if makefile is not None:
+            makefile_ts = datetime(*makefile.date_time).timestamp()
+            if makefile_ts > safe_export_timestamp + 2:
+                bad.append(f"future_makefile_mtime:{makefile_ts:.0f}>{safe_export_timestamp:.0f}")
     return bad
 
 
@@ -148,24 +178,24 @@ def _write_file_to_zip(zf: zipfile.ZipFile, path: Path, arcname: str, *, now_ts:
         dst.write(src.read())
 
 
-def main() -> int:
-    paths = _tracked_paths() | _artifact_paths()
+def main(root: Path = ROOT, out: Path = OUT) -> int:
+    paths = _tracked_paths(root) | _artifact_paths(root)
     entries = [
         path
-        for path in sorted(paths, key=lambda item: item.relative_to(ROOT).as_posix())
-        if path.exists() and path.is_file() and not _skip(path)
+        for path in sorted(paths, key=lambda item: item.relative_to(root).as_posix())
+        if path.exists() and path.is_file() and not _skip(path, root=root)
     ]
 
-    if OUT.exists():
-        OUT.unlink()
     now_ts = _safe_export_timestamp()
-    with zipfile.ZipFile(OUT, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+    if out.exists():
+        out.unlink()
+    with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         for path in entries:
-            _write_file_to_zip(zf, path, path.relative_to(ROOT).as_posix(), now_ts=now_ts)
+            _write_file_to_zip(zf, path, path.relative_to(root).as_posix(), now_ts=now_ts)
 
-    with zipfile.ZipFile(OUT) as zf:
+    with zipfile.ZipFile(out) as zf:
         names = zf.namelist()
-    bad = _validate(names)
+    bad = _validate_archive_entries(out, safe_export_timestamp=now_ts)
     artifact_entries = [name for name in names if name.startswith("event_fade_cache/")]
     research_cards = [
         name
@@ -173,8 +203,8 @@ def main() -> int:
         if "/research_cards/" in name and name.endswith(".md") and not name.endswith("/index.md")
     ]
 
-    print(OUT)
-    print(f"size_bytes={OUT.stat().st_size}")
+    print(out)
+    print(f"size_bytes={out.stat().st_size}")
     print(f"entries={len(names)}")
     print(f"artifact_entries={len(artifact_entries)}")
     print(f"research_card_files={len(research_cards)}")

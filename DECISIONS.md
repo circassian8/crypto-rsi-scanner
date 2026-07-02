@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Coinalyze live rehearsal is bounded no-send only
+**Status:** accepted
+**Decision:** Coinalyze may run a live-capable no-send rehearsal only inside a
+clean activation namespace and only when a key is configured, an explicit
+operator allow flag is set, no-send mode is preserved, the request ledger is
+writable, and a tiny request budget is enforced. Missing key reports
+`missing_config`; key without allow reports `live_call_blocked_by_default`.
+Successful rehearsals must write redacted request-ledger rows plus local
+derivatives state/candidate artifacts and provider-health telemetry. Stale
+namespaces must block preflight or rehearsal writes unless the operator sets an
+explicit stale-namespace override.
+**Why:** A bounded live data check is useful for parser, quota, and provider
+health validation, but it must not turn into notification routing or trading by
+accident.
+**Revisit when:** A reviewed no-send Coinalyze sample has stable quota behavior,
+source coverage, and useful operator rows, and the human approves promotion to a
+regular research profile.
+
 ## 2026-07-02 - Coinalyze activation starts with a no-call preflight
 **Status:** accepted
 **Decision:** Coinalyze derivatives/OI/funding activation must start with a

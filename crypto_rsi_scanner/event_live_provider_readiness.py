@@ -61,6 +61,13 @@ class LiveProviderReadinessProvider:
     artifact_outputs: tuple[str, ...]
     no_send_only: bool
     safety_notes: tuple[str, ...]
+    latest_preflight_status: str | None = None
+    latest_rehearsal_status: str | None = None
+    latest_request_ledger_path: str | None = None
+    latest_provider_health_status: str | None = None
+    latest_rehearsal_generated_at: str | None = None
+    latest_snapshots_written: int = 0
+    latest_budget_used: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -105,6 +112,13 @@ class LiveProviderReadinessProvider:
             "artifact_outputs": list(self.artifact_outputs),
             "no_send_only": self.no_send_only,
             "safety_notes": list(self.safety_notes),
+            "latest_preflight_status": self.latest_preflight_status,
+            "latest_rehearsal_status": self.latest_rehearsal_status,
+            "latest_request_ledger_path": self.latest_request_ledger_path,
+            "latest_provider_health_status": self.latest_provider_health_status,
+            "latest_rehearsal_generated_at": self.latest_rehearsal_generated_at,
+            "latest_snapshots_written": self.latest_snapshots_written,
+            "latest_budget_used": self.latest_budget_used,
         }
 
 
@@ -165,7 +179,7 @@ def build_readiness_report(
     now: datetime | None = None,
 ) -> LiveProviderReadinessReport:
     observed = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    providers = tuple(_provider_rows(smoke_mode=smoke_mode))
+    providers = tuple(_provider_rows(smoke_mode=smoke_mode, artifact_namespace=artifact_namespace))
     return LiveProviderReadinessReport(
         profile=str(profile or "default"),
         artifact_namespace=str(artifact_namespace or "default"),
@@ -244,6 +258,13 @@ def format_readiness_report(report: LiveProviderReadinessReport) -> str:
             f"  source_packs_enabled: {_join(provider.source_packs_enabled)}",
             f"  opportunity_lanes_enabled: {_join(provider.opportunity_lanes_enabled)}",
             f"  artifact_outputs: {_join(provider.artifact_outputs)}",
+            f"  latest_preflight_status: {provider.latest_preflight_status or 'not_generated'}",
+            f"  latest_rehearsal_status: {provider.latest_rehearsal_status or 'not_generated'}",
+            f"  latest_request_ledger_path: {provider.latest_request_ledger_path or 'none'}",
+            f"  latest_provider_health_status: {provider.latest_provider_health_status or 'not_observed'}",
+            f"  latest_rehearsal_generated_at: {provider.latest_rehearsal_generated_at or 'none'}",
+            f"  latest_snapshots_written: {provider.latest_snapshots_written}",
+            f"  latest_budget_used: {provider.latest_budget_used}",
             f"  safety_notes: {_join(provider.safety_notes)}",
         ])
         if not provider.configured and (provider.sidecar_fixture_available or provider.smoke_target_available):
@@ -266,7 +287,8 @@ def format_readiness_report(report: LiveProviderReadinessReport) -> str:
     return "\n".join(lines)
 
 
-def _provider_rows(*, smoke_mode: bool) -> Iterable[LiveProviderReadinessProvider]:
+def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[LiveProviderReadinessProvider]:
+    coinalyze_history = _coinalyze_history(artifact_namespace)
     rows = (
         _row(
             "coinalyze",
@@ -299,6 +321,14 @@ def _provider_rows(*, smoke_mode: bool) -> Iterable[LiveProviderReadinessProvide
             cache_ttl_seconds=900,
             provider_health_key="coinalyze",
             lanes_blocked_without_market=("CONFIRMED_LONG_RESEARCH",),
+            latest_preflight_status=coinalyze_history["latest_preflight_status"],
+            latest_rehearsal_status=coinalyze_history["latest_rehearsal_status"],
+            latest_request_ledger_path=coinalyze_history["latest_request_ledger_path"],
+            latest_provider_health_status=coinalyze_history["latest_provider_health_status"],
+            latest_rehearsal_generated_at=coinalyze_history["latest_rehearsal_generated_at"],
+            latest_snapshots_written=coinalyze_history["latest_snapshots_written"],
+            latest_budget_used=coinalyze_history["latest_budget_used"],
+            activation_phase_override=coinalyze_history["activation_phase"],
         ),
         _row(
             "bybit_announcements",
@@ -500,6 +530,14 @@ def _row(
     cache_ttl_seconds: int | None = None,
     provider_health_key: str | None = None,
     lanes_blocked_without_market: tuple[str, ...] = (),
+    latest_preflight_status: str | None = None,
+    latest_rehearsal_status: str | None = None,
+    latest_request_ledger_path: str | None = None,
+    latest_provider_health_status: str | None = None,
+    latest_rehearsal_generated_at: str | None = None,
+    latest_snapshots_written: int = 0,
+    latest_budget_used: int = 0,
+    activation_phase_override: str | None = None,
 ) -> LiveProviderReadinessProvider:
     provider_fixture_available = bool(fixture_path and Path(fixture_path).exists())
     fixture_available = bool(provider_fixture_available or sidecar_fixture_available or smoke_targets)
@@ -525,6 +563,8 @@ def _row(
         activation_phase = "not_implemented"
     else:
         activation_phase = "blocked"
+    if activation_phase_override:
+        activation_phase = activation_phase_override
     return LiveProviderReadinessProvider(
         provider_name=provider_name,
         category=category,
@@ -570,7 +610,57 @@ def _row(
             "no Telegram sends unless existing send guard is explicitly enabled",
             "no trades, paper trades, RSI rows, execution, or Event Alpha TRIGGERED_FADE",
         ),
+        latest_preflight_status=latest_preflight_status,
+        latest_rehearsal_status=latest_rehearsal_status,
+        latest_request_ledger_path=latest_request_ledger_path,
+        latest_provider_health_status=latest_provider_health_status,
+        latest_rehearsal_generated_at=latest_rehearsal_generated_at,
+        latest_snapshots_written=latest_snapshots_written,
+        latest_budget_used=latest_budget_used,
     )
+
+
+def _coinalyze_history(artifact_namespace: str) -> dict[str, Any]:
+    from . import event_coinalyze_preflight
+
+    base = Path(getattr(config, "EVENT_ALPHA_ARTIFACT_BASE_DIR", "event_fade_cache")).expanduser()
+    namespace_dir = base / str(artifact_namespace or "default")
+    preflight = _read_json(namespace_dir / event_coinalyze_preflight.PREFLIGHT_JSON)
+    rehearsal = _read_json(namespace_dir / event_coinalyze_preflight.REHEARSAL_JSON)
+    ledger = namespace_dir / event_coinalyze_preflight.REQUEST_LEDGER
+    status = str(rehearsal.get("status") or "not_generated")
+    if status in {"missing_config"}:
+        activation_phase = "missing_config"
+    elif status == "live_call_blocked_by_default":
+        activation_phase = "config_ready_no_live"
+    elif status == "live_rehearsal_success":
+        activation_phase = "live_rehearsal_success"
+    elif status == "live_rehearsal_partial":
+        activation_phase = "live_rehearsal_partial"
+    elif status and status != "not_generated" and status.startswith("blocked"):
+        activation_phase = "blocked"
+    else:
+        activation_phase = str(preflight.get("preflight_status") or "not_generated")
+    return {
+        "latest_preflight_status": str(preflight.get("preflight_status") or "not_generated"),
+        "latest_rehearsal_status": activation_phase if status == "not_generated" else status,
+        "latest_request_ledger_path": event_artifact_paths.artifact_display_path(ledger) if ledger.exists() else None,
+        "latest_provider_health_status": str(rehearsal.get("provider_health_status") or "not_observed"),
+        "latest_rehearsal_generated_at": str(rehearsal.get("generated_at") or "") or None,
+        "latest_snapshots_written": int(rehearsal.get("snapshots_written") or 0),
+        "latest_budget_used": int(rehearsal.get("requests_used") or 0),
+        "activation_phase": activation_phase,
+    }
+
+
+def _read_json(path: Path) -> Mapping[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, Mapping) else {}
 
 
 def _join(values: Iterable[Any]) -> str:

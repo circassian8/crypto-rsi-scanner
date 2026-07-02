@@ -1030,6 +1030,8 @@ def _run_or_load_sidecars(
             for name, value in rows.items()
         )
         return rows, manifest
+    derivatives_rows = tuple(event_derivatives_crowding.load_derivatives_candidates(namespace_dir))
+    derivatives_mode, derivatives_configured, derivatives_warnings = _derivatives_manifest_mode(namespace_dir, derivatives_rows)
     rows = {
         "market_anomaly": tuple(event_market_anomaly_scanner.load_market_anomaly_rows(namespace_dir)),
         "official_exchange": _official_exchange_integration_rows(
@@ -1038,23 +1040,46 @@ def _run_or_load_sidecars(
         ),
         "scheduled_catalyst": tuple(event_scheduled_catalysts.load_scheduled_catalysts(namespace_dir)),
         "unlock": tuple(event_scheduled_catalysts.load_unlock_candidates(namespace_dir)),
-        "derivatives": tuple(event_derivatives_crowding.load_derivatives_candidates(namespace_dir)),
+        "derivatives": derivatives_rows,
     }
     manifest = tuple(
         _manifest_item(
             sidecar_name=name,
-            mode="loaded_existing" if value else "skipped_missing_config",
+            mode=derivatives_mode if name == "derivatives" else "loaded_existing" if value else "skipped_missing_config",
             namespace_dir=namespace_dir,
             rows=value,
-            configured=bool(value),
+            configured=derivatives_configured if name == "derivatives" else bool(value),
             sidecar_research_observed_at=observed_at,
             wall_started_at=datetime.now(timezone.utc),
             wall_finished_at=datetime.now(timezone.utc),
-            warnings=() if value else (f"{name} sidecar artifact missing or empty",),
+            warnings=derivatives_warnings if name == "derivatives" else () if value else (f"{name} sidecar artifact missing or empty",),
         )
         for name, value in rows.items()
     )
     return rows, manifest
+
+
+def _derivatives_manifest_mode(namespace_dir: Path, derivatives_rows: tuple[dict[str, Any], ...]) -> tuple[str, bool, tuple[str, ...]]:
+    from . import event_coinalyze_preflight
+
+    rehearsal_path = namespace_dir / event_coinalyze_preflight.REHEARSAL_JSON
+    state_path = namespace_dir / event_derivatives_crowding.DERIVATIVES_STATE_FILENAME
+    if derivatives_rows:
+        return "loaded_existing", True, ()
+    if not rehearsal_path.exists():
+        return "skipped_missing_config", False, ("derivatives sidecar artifact missing or empty",)
+    try:
+        payload = json.loads(rehearsal_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        payload = {}
+    status = str(payload.get("status") or "unknown") if isinstance(payload, Mapping) else "unknown"
+    if status == "missing_config":
+        return "skipped_missing_config", False, ("coinalyze rehearsal missing_config",)
+    if status == "live_call_blocked_by_default":
+        return "live_blocked_by_default", True, ("coinalyze live call blocked by default",)
+    if state_path.exists():
+        return "loaded_existing", True, (f"coinalyze rehearsal status={status}",)
+    return "skipped_missing_config", False, (f"coinalyze rehearsal status={status} without derivatives state",)
 
 
 def _run_fixture_sidecars(

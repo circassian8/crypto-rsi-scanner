@@ -5026,6 +5026,7 @@ def event_alpha_source_coverage_report(
         cryptopanic_request_ledger_path=context.provider_health_path.with_name("cryptopanic_request_ledger.jsonl"),
         cryptopanic_weekly_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_WEEKLY_REQUEST_LIMIT,
         cryptopanic_daily_soft_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT,
+        artifact_namespace_dir=context.namespace_dir,
     )
     event_alpha_run_ledger.reconcile_cryptopanic_counts(
         context.run_ledger_path,
@@ -5098,6 +5099,8 @@ def event_alpha_coinalyze_preflight_report(
     except ValueError as exc:
         print(str(exc))
         return
+    if _coinalyze_namespace_write_blocked(context, suggested_namespace=event_coinalyze_preflight.DEFAULT_PREFLIGHT_NAMESPACE):
+        return
     report = event_coinalyze_preflight.build_preflight_report(
         namespace_dir=context.namespace_dir,
         smoke_mode=smoke_mode,
@@ -5125,25 +5128,45 @@ def event_alpha_coinalyze_no_send_rehearsal(
     except ValueError as exc:
         print(str(exc))
         return
-    report = event_coinalyze_preflight.build_preflight_report(
+    if _coinalyze_namespace_write_blocked(context, suggested_namespace=event_coinalyze_preflight.DEFAULT_REHEARSAL_NAMESPACE):
+        return
+    preflight, report, paths = event_coinalyze_preflight.run_no_send_rehearsal(
         namespace_dir=context.namespace_dir,
-        smoke_mode=False,
+        provider_health_path=context.provider_health_path,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
         allow_live_preflight=allow_live_preflight,
+        no_send_rehearsal=True,
         now=_event_research_now(),
     )
-    json_path, md_path = event_coinalyze_preflight.write_preflight_artifacts(report, context.namespace_dir)
-    rehearsal_path = event_coinalyze_preflight.write_rehearsal_report(report, context.namespace_dir)
-    status = (
-        "missing_config"
-        if not report.configured
-        else ("ready_for_future_bounded_no_send_rehearsal" if report.live_call_allowed else "live_call_blocked_by_default")
-    )
+    json_path, md_path, rehearsal_json_path, rehearsal_path = paths
     print(_event_alpha_context_block(context))
     print(f"coinalyze_preflight_json: {event_artifact_paths.artifact_display_path(json_path)}")
     print(f"coinalyze_preflight_report: {event_artifact_paths.artifact_display_path(md_path)}")
+    print(f"coinalyze_rehearsal_json: {event_artifact_paths.artifact_display_path(rehearsal_json_path)}")
     print(f"coinalyze_rehearsal_report: {event_artifact_paths.artifact_display_path(rehearsal_path)}")
-    print(f"coinalyze_no_send_rehearsal_status: {status}")
-    print("No Coinalyze network calls, Telegram sends, trades, paper trades, normal RSI rows, or Event Alpha TRIGGERED_FADE were performed.")
+    print(f"coinalyze_no_send_rehearsal_status: {report.status}")
+    print(event_coinalyze_preflight.format_rehearsal_report(report))
+
+
+def _coinalyze_namespace_write_blocked(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    *,
+    suggested_namespace: str,
+) -> bool:
+    status = event_alpha_namespace_status.load_namespace_status(context.namespace_dir)
+    allow = str(os.getenv("ALLOW_STALE_NAMESPACE_WRITE", "")).strip().casefold() in {"1", "true", "yes", "on"} or str(
+        os.getenv("RSI_EVENT_ALPHA_ALLOW_STALE_NAMESPACE_WRITE", "")
+    ).strip().casefold() in {"1", "true", "yes", "on"}
+    if not event_alpha_namespace_status.is_stale_deprecated(status) or allow:
+        return False
+    suggested = status.superseded_by or suggested_namespace
+    print(_event_alpha_context_block(context))
+    print("status=blocked_stale_namespace")
+    print(f"active_suggested_namespace={suggested}")
+    print(event_alpha_namespace_status.format_namespace_status(status))
+    print("No Coinalyze preflight/rehearsal artifacts were written to the stale namespace.")
+    return True
 
 
 def event_alpha_mark_namespace_stale(

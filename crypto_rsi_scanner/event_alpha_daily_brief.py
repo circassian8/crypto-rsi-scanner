@@ -1341,18 +1341,33 @@ def _source_activation_plan_lines(
     if base is not None:
         coinalyze_json = base / event_coinalyze_preflight.PREFLIGHT_JSON
         coinalyze_md = base / event_coinalyze_preflight.PREFLIGHT_MD
-        if coinalyze_json.exists():
+        coverage_preflight_status = str((coverage or {}).get("coinalyze_preflight_status") or "")
+        coverage_rehearsal_status = str((coverage or {}).get("coinalyze_rehearsal_status") or "")
+        coverage_rehearsal_path = str((coverage or {}).get("coinalyze_rehearsal_report_path") or "")
+        coverage_ledger_path = str((coverage or {}).get("coinalyze_request_ledger_path") or "")
+        if coinalyze_json.exists() and coinalyze_md.exists():
             try:
                 payload = json.loads(coinalyze_json.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 payload = {}
-            status = str(payload.get("preflight_status") or "unreadable")
+            status = coverage_preflight_status or str(payload.get("preflight_status") or "unreadable")
             lines.append(
                 "- Coinalyze preflight: "
                 f"{status} ({event_artifact_paths.artifact_display_path(coinalyze_md)})"
             )
         else:
-            lines.append("- Coinalyze preflight: not written yet (make event-alpha-coinalyze-preflight PROFILE=notify_llm_deep)")
+            namespace = str((coverage or {}).get("artifact_namespace") or Path(base).name)
+            profile = str((coverage or {}).get("profile") or "notify_llm_deep")
+            lines.append(
+                "- Coinalyze preflight: not generated "
+                f"(command: make event-alpha-coinalyze-preflight ARTIFACT_NAMESPACE={namespace} PROFILE={profile} PYTHON=python3)"
+            )
+        if coverage_rehearsal_status and coverage_rehearsal_status != "not_generated":
+            detail = f" ({coverage_rehearsal_path})" if coverage_rehearsal_path else ""
+            ledger = f" ledger={coverage_ledger_path}" if coverage_ledger_path else ""
+            lines.append(f"- Coinalyze rehearsal: {coverage_rehearsal_status}{detail}{ledger}")
+        else:
+            lines.append("- Coinalyze rehearsal: not generated")
     if readiness_md is None or not readiness_md.exists():
         lines.append("- Readiness command: make event-alpha-live-provider-readiness PROFILE=notify_llm_deep")
     return lines

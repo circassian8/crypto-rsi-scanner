@@ -63,6 +63,7 @@ EVENT_ALPHA_ARTIFACT_BASE_DIR ?= $(EVENT_DISCOVERY_CACHE_DIR)
 ARTIFACT_NAMESPACE ?= $(PROFILE)
 EVENT_ALPHA_ARTIFACT_NAMESPACE ?= $(ARTIFACT_NAMESPACE)
 EVENT_ALPHA_PROFILE_DIR ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVENT_ALPHA_ARTIFACT_NAMESPACE)
+COINALYZE_LIVE_PREFLIGHT_ARG = $(if $(filter 1 true yes,$(ALLOW_LIVE_PREFLIGHT)),--event-alpha-coinalyze-allow-live-preflight,)
 EVENT_ALPHA_FIXTURE_DIR ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/fixture
 EVENT_WATCHLIST_STATE_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_watchlist_state.jsonl
 EVENT_ALPHA_ALERT_STORE_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_alerts.jsonl
@@ -223,9 +224,9 @@ help:
 	@echo "  make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke  Print source-pack provider/evidence coverage"
 	@echo "  make event-alpha-live-provider-readiness PROFILE=notify_llm_deep  Write no-call live-provider activation readiness artifacts"
 	@echo "  make event-alpha-live-provider-readiness-smoke  Fixture/config-only readiness artifact smoke; no live provider calls"
-	@echo "  make event-alpha-coinalyze-preflight PROFILE=notify_llm_deep  Write no-call Coinalyze OI/funding preflight artifacts"
+	@echo "  make event-alpha-coinalyze-preflight  Write no-call Coinalyze OI/funding preflight artifacts into coinalyze_preflight"
 	@echo "  make event-alpha-coinalyze-preflight-smoke  Fixture-only Coinalyze preflight smoke; no key/network"
-	@echo "  make event-alpha-coinalyze-no-send-rehearsal PROFILE=notify_llm_deep  Guarded Coinalyze no-send rehearsal stub"
+	@echo "  make event-alpha-coinalyze-no-send-rehearsal  Guarded Coinalyze no-send rehearsal into coinalyze_no_send_rehearsal"
 	@echo "  make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal  Regenerate local preview/skip telemetry without providers"
 	@echo "  make event-alpha-mark-namespace-stale ARTIFACT_NAMESPACE=notify_llm_deep REASON='pre-canonical artifacts'  Mark a namespace stale/deprecated"
 	@echo "  make event-alpha-mark-known-stale-namespaces  Mark known pre-canonical namespaces stale/deprecated"
@@ -1190,11 +1191,12 @@ event-alpha-live-provider-readiness-smoke:
 	grep -q "no provider network calls" "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_live_provider_activation_readiness.md"
 
 event-alpha-coinalyze-preflight: PROFILE = notify_llm_deep
+event-alpha-coinalyze-preflight: ARTIFACT_NAMESPACE = coinalyze_preflight
 event-alpha-coinalyze-preflight:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(ARTIFACT_NAMESPACE) \
 	RSI_EVENT_ALERTS_ENABLED=0 \
-	$(PYTHON) main.py --event-alpha-coinalyze-preflight --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE)
+	$(PYTHON) main.py --event-alpha-coinalyze-preflight --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) $(COINALYZE_LIVE_PREFLIGHT_ARG)
 
 event-alpha-coinalyze-preflight-smoke: PROFILE = coinalyze_preflight_smoke
 event-alpha-coinalyze-preflight-smoke:
@@ -1211,11 +1213,12 @@ event-alpha-coinalyze-preflight-smoke:
 	grep -q '"live_call_allowed": false' "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_coinalyze_preflight.json"
 
 event-alpha-coinalyze-no-send-rehearsal: PROFILE = notify_llm_deep
+event-alpha-coinalyze-no-send-rehearsal: ARTIFACT_NAMESPACE = coinalyze_no_send_rehearsal
 event-alpha-coinalyze-no-send-rehearsal:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(ARTIFACT_NAMESPACE) \
 	RSI_EVENT_ALERTS_ENABLED=0 \
-	$(PYTHON) main.py --event-alpha-coinalyze-no-send-rehearsal --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE)
+	$(PYTHON) main.py --event-alpha-coinalyze-no-send-rehearsal --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) $(COINALYZE_LIVE_PREFLIGHT_ARG)
 
 event-alpha-mark-namespace-stale: PROFILE = notify_llm_deep
 event-alpha-mark-namespace-stale:

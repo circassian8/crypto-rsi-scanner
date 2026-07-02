@@ -314,6 +314,8 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
         text=True,
     )
     assert "--event-alpha-coinalyze-preflight --event-alpha-profile notify_llm_deep" in coinalyze_preflight_dry
+    assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=coinalyze_preflight" in coinalyze_preflight_dry
+    assert "--event-alpha-artifact-namespace coinalyze_preflight" in coinalyze_preflight_dry
     assert "RSI_EVENT_ALERTS_ENABLED=0" in coinalyze_preflight_dry
     assert "--event-alpha-coinalyze-allow-live-preflight" not in coinalyze_preflight_dry
     coinalyze_smoke_dry = subprocess.check_output(
@@ -324,6 +326,14 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "--event-alpha-coinalyze-preflight-smoke --event-alpha-profile fixture" in coinalyze_smoke_dry
     assert "RSI_EVENT_DISCOVERY_COINALYZE_API_KEY=" in coinalyze_smoke_dry
     assert "--event-alpha-coinalyze-allow-live-preflight" not in coinalyze_smoke_dry
+    coinalyze_rehearsal_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-coinalyze-no-send-rehearsal", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=coinalyze_no_send_rehearsal" in coinalyze_rehearsal_dry
+    assert "--event-alpha-artifact-namespace coinalyze_no_send_rehearsal" in coinalyze_rehearsal_dry
+    assert "--event-alpha-coinalyze-allow-live-preflight" not in coinalyze_rehearsal_dry
     notify_preview_from_artifacts_dry = subprocess.check_output(
         [
             "make",
@@ -1364,6 +1374,14 @@ def test_event_alpha_coinalyze_preflight_smoke_artifacts_are_safe_and_doctor_che
             "coinalyze_preflight_ready_without_request_ledger": 0,
             "coinalyze_preflight_missing_fixture_parser_status": 0,
             "coinalyze_preflight_forbidden_side_effect_claim": 0,
+            "coinalyze_rehearsal_secret_leak": 0,
+            "coinalyze_rehearsal_live_without_ledger": 0,
+            "coinalyze_rehearsal_live_call_allowed_in_smoke": 0,
+            "coinalyze_rehearsal_live_without_explicit_allow": 0,
+            "coinalyze_rehearsal_request_budget_exceeded": 0,
+            "coinalyze_rehearsal_success_without_derivatives_state": 0,
+            "coinalyze_provider_health_healthy_without_successful_ledger": 0,
+            "coinalyze_rehearsal_forbidden_side_effect_claim": 0,
         }
         clean = event_alpha_artifact_doctor.diagnose_artifacts(
             profile="fixture",
@@ -1978,21 +1996,33 @@ def _full_event_discovery_config_values():
         "EVENT_DISCOVERY_EVENTS_PATH": events_path,
         "EVENT_DISCOVERY_ALIASES_PATH": aliases_path,
         "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH": binance_path,
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE": False,
         "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH": bybit_path,
+        "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE": False,
         "EVENT_DISCOVERY_COINMARKETCAL_PATH": coinmarketcal_path,
         "EVENT_DISCOVERY_TOKENOMIST_PATH": tokenomist_path,
         "EVENT_DISCOVERY_CRYPTOPANIC_PATH": cryptopanic_path,
+        "EVENT_DISCOVERY_CRYPTOPANIC_LIVE": False,
+        "EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN": "",
         "EVENT_DISCOVERY_GDELT_PATH": gdelt_path,
+        "EVENT_DISCOVERY_GDELT_LIVE": False,
         "EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH": blog_path,
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE": False,
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS": (),
         "EVENT_DISCOVERY_EXTERNAL_IPO_PATH": ipo_path,
         "EVENT_DISCOVERY_SPORTS_FIXTURES_PATH": sports_path,
         "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH": prediction_path,
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE": False,
         "EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH": _derivatives_fixture_path(),
+        "EVENT_DISCOVERY_COINALYZE_LIVE": False,
         "EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH": tokenomist_supply_path,
         "EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH": etherscan_supply_path,
         "EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH": arkham_supply_path,
         "EVENT_DISCOVERY_DUNE_SUPPLY_PATH": dune_supply_path,
         "EVENT_DISCOVERY_UNIVERSE_PATH": _coingecko_universe_fixture_path(),
+        "EVENT_DISCOVERY_UNIVERSE_LIVE": False,
+        "EVENT_SOURCE_ENRICHMENT_ENABLED": False,
+        "EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN": 0,
         "EVENT_DISCOVERY_LOOKBACK_HOURS": 120,
         "EVENT_DISCOVERY_HORIZON_DAYS": 2,
         "EVENT_RESEARCH_NOW": "2026-06-15T16:00:00Z",
@@ -5631,6 +5661,12 @@ def test_event_alpha_report_context_and_preflight_are_profile_scoped():
         "EVENT_ALERTS_ENABLED",
         "EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY",
         "EVENT_RESEARCH_NOW",
+        "EVENT_LLM_ENABLED",
+        "EVENT_LLM_PROVIDER",
+        "EVENT_LLM_EXTRACTOR_ENABLED",
+        "EVENT_LLM_EXTRACTOR_PROVIDER",
+        "EVENT_LLM_CATALYST_FRAMES_ENABLED",
+        "EVENT_LLM_CATALYST_FRAMES_PROVIDER",
         "TELEGRAM_BOT_TOKEN",
         "TELEGRAM_CHAT_IDS",
     )
@@ -5681,6 +5717,12 @@ def test_event_alpha_report_context_and_preflight_are_profile_scoped():
             config.EVENT_ALERTS_ENABLED = False
             config.EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY = False
             config.EVENT_RESEARCH_NOW = None
+            config.EVENT_LLM_ENABLED = False
+            config.EVENT_LLM_PROVIDER = "fixture"
+            config.EVENT_LLM_EXTRACTOR_ENABLED = False
+            config.EVENT_LLM_EXTRACTOR_PROVIDER = "fixture"
+            config.EVENT_LLM_CATALYST_FRAMES_ENABLED = False
+            config.EVENT_LLM_CATALYST_FRAMES_PROVIDER = "fixture"
             config.TELEGRAM_BOT_TOKEN = None
             config.TELEGRAM_CHAT_IDS = []
 
@@ -10208,8 +10250,23 @@ def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
         "EVENT_DISCOVERY_EVENTS_PATH": config.EVENT_DISCOVERY_EVENTS_PATH,
         "EVENT_DISCOVERY_ALIASES_PATH": config.EVENT_DISCOVERY_ALIASES_PATH,
         "EVENT_DISCOVERY_UNIVERSE_PATH": config.EVENT_DISCOVERY_UNIVERSE_PATH,
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE": config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE,
+        "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE": config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE,
+        "EVENT_DISCOVERY_CRYPTOPANIC_PATH": config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
+        "EVENT_DISCOVERY_CRYPTOPANIC_LIVE": config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE,
+        "EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN": config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN,
+        "EVENT_DISCOVERY_GDELT_PATH": config.EVENT_DISCOVERY_GDELT_PATH,
+        "EVENT_DISCOVERY_GDELT_LIVE": config.EVENT_DISCOVERY_GDELT_LIVE,
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH": config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE": config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE,
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS": config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS,
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH": config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE": config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE,
+        "EVENT_DISCOVERY_COINALYZE_LIVE": config.EVENT_DISCOVERY_COINALYZE_LIVE,
         "EVENT_DISCOVERY_UNIVERSE_LIVE": config.EVENT_DISCOVERY_UNIVERSE_LIVE,
         "EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT": config.EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT,
+        "EVENT_SOURCE_ENRICHMENT_ENABLED": config.EVENT_SOURCE_ENRICHMENT_ENABLED,
+        "EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN": config.EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN,
         "EVENT_MARKET_ENRICHMENT_ENABLED": config.EVENT_MARKET_ENRICHMENT_ENABLED,
         "EVENT_ANOMALY_SCANNER_ENABLED": config.EVENT_ANOMALY_SCANNER_ENABLED,
         "EVENT_ANOMALY_MIN_RETURN_24H": config.EVENT_ANOMALY_MIN_RETURN_24H,
@@ -11717,8 +11774,23 @@ def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies
         config.EVENT_DISCOVERY_EVENTS_PATH = None
         config.EVENT_DISCOVERY_ALIASES_PATH = None
         config.EVENT_DISCOVERY_UNIVERSE_PATH = Path("fixtures/coingecko_smoke/top_markets.json")
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE = False
+        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE = False
+        config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
+        config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE = False
+        config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN = ""
+        config.EVENT_DISCOVERY_GDELT_PATH = None
+        config.EVENT_DISCOVERY_GDELT_LIVE = False
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE = False
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS = ()
+        config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = None
+        config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE = False
+        config.EVENT_DISCOVERY_COINALYZE_LIVE = False
         config.EVENT_DISCOVERY_UNIVERSE_LIVE = False
         config.EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT = 0
+        config.EVENT_SOURCE_ENRICHMENT_ENABLED = False
+        config.EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN = 0
         config.EVENT_MARKET_ENRICHMENT_ENABLED = True
         config.EVENT_ANOMALY_SCANNER_ENABLED = True
         config.EVENT_ANOMALY_MIN_RETURN_24H = 0.03
@@ -11805,7 +11877,22 @@ def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
         "EVENT_DISCOVERY_EVENTS_PATH",
         "EVENT_DISCOVERY_ALIASES_PATH",
         "EVENT_DISCOVERY_UNIVERSE_PATH",
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE",
+        "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE",
+        "EVENT_DISCOVERY_CRYPTOPANIC_PATH",
+        "EVENT_DISCOVERY_CRYPTOPANIC_LIVE",
+        "EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN",
+        "EVENT_DISCOVERY_GDELT_PATH",
+        "EVENT_DISCOVERY_GDELT_LIVE",
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH",
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE",
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS",
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH",
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE",
+        "EVENT_DISCOVERY_COINALYZE_LIVE",
         "EVENT_DISCOVERY_UNIVERSE_LIVE",
+        "EVENT_SOURCE_ENRICHMENT_ENABLED",
+        "EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN",
         "EVENT_MARKET_ENRICHMENT_ENABLED",
         "EVENT_ANOMALY_SCANNER_ENABLED",
         "EVENT_WATCHLIST_ENABLED",
@@ -11821,6 +11908,8 @@ def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
         "EVENT_LLM_EXTRACTOR_PROVIDER",
         "EVENT_LLM_MODE",
         "EVENT_LLM_PROVIDER",
+        "EVENT_LLM_CATALYST_FRAMES_ENABLED",
+        "EVENT_LLM_CATALYST_FRAMES_PROVIDER",
     )
     original = {name: getattr(config, name) for name in attrs}
     original_extraction_provider = scanner._event_llm_extraction_provider
@@ -11859,7 +11948,22 @@ def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
         config.EVENT_DISCOVERY_EVENTS_PATH = event_path
         config.EVENT_DISCOVERY_ALIASES_PATH = alias_path
         config.EVENT_DISCOVERY_UNIVERSE_PATH = None
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE = False
+        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE = False
+        config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
+        config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE = False
+        config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN = ""
+        config.EVENT_DISCOVERY_GDELT_PATH = None
+        config.EVENT_DISCOVERY_GDELT_LIVE = False
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE = False
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS = ()
+        config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = None
+        config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE = False
+        config.EVENT_DISCOVERY_COINALYZE_LIVE = False
         config.EVENT_DISCOVERY_UNIVERSE_LIVE = False
+        config.EVENT_SOURCE_ENRICHMENT_ENABLED = False
+        config.EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN = 0
         config.EVENT_MARKET_ENRICHMENT_ENABLED = False
         config.EVENT_ANOMALY_SCANNER_ENABLED = False
         config.EVENT_WATCHLIST_ENABLED = True
@@ -11875,6 +11979,8 @@ def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
         config.EVENT_LLM_EXTRACTOR_PROVIDER = "fixture"
         config.EVENT_LLM_MODE = "shadow"
         config.EVENT_LLM_PROVIDER = "fixture"
+        config.EVENT_LLM_CATALYST_FRAMES_ENABLED = False
+        config.EVENT_LLM_CATALYST_FRAMES_PROVIDER = "fixture"
         scanner._event_llm_extraction_provider = lambda extractor_cfg: Provider()
         scanner._event_llm_provider = lambda llm_cfg: None
         try:
@@ -13425,11 +13531,19 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
     original_send = scanner.send_telegram
     original_structured_send = scanner.send_telegram_structured
     original_ids = config.TELEGRAM_CHAT_IDS
+    original_notification_flags = {
+        "EVENT_ALPHA_NOTIFY_SCOPE": config.EVENT_ALPHA_NOTIFY_SCOPE,
+        "EVENT_ALPHA_EXPLORATORY_DIGEST_ENABLED": config.EVENT_ALPHA_EXPLORATORY_DIGEST_ENABLED,
+        "EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED": config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED,
+    }
     FakeStorage.meta = {}
     scanner.Storage = FakeStorage
     scanner.send_telegram = fake_send
     scanner.send_telegram_structured = fake_send
     config.TELEGRAM_CHAT_IDS = ["fallback"]
+    config.EVENT_ALPHA_NOTIFY_SCOPE = "global"
+    config.EVENT_ALPHA_EXPLORATORY_DIGEST_ENABLED = False
+    config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED = False
     try:
         cfg = event_alerts.EventAlertConfig(enabled=True)
         result = scanner._send_event_alpha_routed_digest([], cfg)
@@ -13491,6 +13605,8 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
         scanner.send_telegram = original_send
         scanner.send_telegram_structured = original_structured_send
         config.TELEGRAM_CHAT_IDS = original_ids
+        for name, value in original_notification_flags.items():
+            setattr(config, name, value)
 
 
 def test_event_alpha_notification_profiles_and_preflight_guards():
@@ -26446,10 +26562,11 @@ def test_event_alpha_research_review_skipped_sample_dedupes_by_family():
             symbol="CHZ",
             coin_id="chiliz",
             core_opportunity_id=f"agg:chz-{idx}",
-            candidate_family_id="world-cup:chiliz",
+            candidate_family_id=f"world-cup:chiliz:{idx % 3}",
             score=70 - idx,
             rank_score=70 - idx,
             skip_reason="max_items",
+            card_path=f"research_cards/chz_{idx}.md",
         )
         for idx in range(8)
     ]
@@ -26464,14 +26581,32 @@ def test_event_alpha_research_review_skipped_sample_dedupes_by_family():
             skip_reason="max_items",
         )
     )
-    sample = notif._diverse_skipped_sample(skipped, limit=2)  # noqa: SLF001
-    assert [item.candidate_family_id for item in sample] == ["world-cup:chiliz", "spacex:velvet"]
-    summary = notif._research_review_skipped_family_summary(skipped)  # noqa: SLF001
-    by_family = {row["candidate_family_id"]: row for row in summary}
-    assert by_family["world-cup:chiliz"]["skipped_count"] == 8
-    assert by_family["spacex:velvet"]["skipped_count"] == 1
+    skipped.append(
+        notif.EventAlphaResearchReviewSkippedItem(
+            symbol="SECTOR",
+            coin_id="diagnostic",
+            core_opportunity_id="diag:sector",
+            candidate_family_id="sector:diagnostic",
+            score=80,
+            rank_score=80,
+            skip_reason="sector_excluded",
+            opportunity_type="DIAGNOSTIC",
+        )
+    )
+    sample = notif._diverse_skipped_sample(skipped, limit=10)  # noqa: SLF001
+    assert "VELVET" in [item.symbol for item in sample]
+    assert len({item.candidate_family_id for item in sample}) >= 5
+    candidate_summary = notif._research_review_skipped_family_summary(skipped)  # noqa: SLF001
+    assert len([row for row in candidate_summary if str(row["candidate_family_id"]).startswith("world-cup:chiliz")]) == 3
+    summary = notif._research_review_skipped_display_family_summary(skipped)  # noqa: SLF001
+    by_label = {row["label"]: row for row in summary}
+    assert by_label["CHZ/chiliz"]["skipped_count"] == 8
+    assert by_label["CHZ/chiliz"]["sample_core_opportunity_ids"][:2] == ["agg:chz-0", "agg:chz-1"]
+    assert by_label["CHZ/chiliz"]["representative_card_path"] == "research_cards/chz_0.md"
+    assert by_label["VELVET/velvet"]["skipped_count"] == 1
+    assert by_label["SECTOR/diagnostic"]["display_hidden"] is True
     display = notif._research_review_skipped_family_display(summary, limit=2)  # noqa: SLF001
-    assert {row["candidate_family_id"] for row in display} == {"world-cup:chiliz", "spacex:velvet"}
+    assert {row["label"] for row in display} == {"CHZ/chiliz", "VELVET/velvet"}
 
 
 def test_event_alpha_research_review_digest_inbox_and_doctor_checks():
@@ -39786,6 +39921,309 @@ def test_event_alpha_heartbeat_uses_strict_alert_and_research_candidate_copy():
     assert "Strict alerts: 0" in message
     assert "Research candidates: 7" in message
     assert "Core opportunities: 6" in message
+
+
+def test_event_alpha_coinalyze_rehearsal_guards_no_key_default_and_budget():
+    import json
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import config, event_coinalyze_preflight
+
+    original_key = config.EVENT_DISCOVERY_COINALYZE_API_KEY
+    original_symbols = config.EVENT_DISCOVERY_COINALYZE_SYMBOLS
+    original_budget = os.environ.get(event_coinalyze_preflight.ENV_PREFLIGHT_MAX_REQUESTS)
+    original_env_key = os.environ.get(event_coinalyze_preflight.ENV_API_KEY)
+    calls = []
+
+    def opener(_request, _timeout):
+        calls.append("called")
+        raise AssertionError("Coinalyze opener must not be called")
+
+    try:
+        config.EVENT_DISCOVERY_COINALYZE_API_KEY = ""
+        config.EVENT_DISCOVERY_COINALYZE_SYMBOLS = ("BTCUSDT_PERP.A", "ETHUSDT_PERP.A", "SOLUSDT_PERP.A")
+        os.environ.pop(event_coinalyze_preflight.ENV_API_KEY, None)
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _preflight, report, _paths = event_coinalyze_preflight.run_no_send_rehearsal(
+                namespace_dir=base,
+                provider_health_path=base / "event_provider_health.json",
+                profile="notify_llm_deep",
+                artifact_namespace="coinalyze_no_send_rehearsal",
+                allow_live_preflight=False,
+                opener=opener,
+                now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+            )
+            assert report.status == "missing_config"
+            assert not (base / event_coinalyze_preflight.REQUEST_LEDGER).exists()
+
+        config.EVENT_DISCOVERY_COINALYZE_API_KEY = "coinalyze-key"
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _preflight, report, _paths = event_coinalyze_preflight.run_no_send_rehearsal(
+                namespace_dir=base,
+                provider_health_path=base / "event_provider_health.json",
+                profile="notify_llm_deep",
+                artifact_namespace="coinalyze_no_send_rehearsal",
+                allow_live_preflight=False,
+                opener=opener,
+                now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+            )
+            assert report.status == "live_call_blocked_by_default"
+            assert not (base / event_coinalyze_preflight.REQUEST_LEDGER).exists()
+
+        os.environ[event_coinalyze_preflight.ENV_PREFLIGHT_MAX_REQUESTS] = "1"
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _preflight, report, _paths = event_coinalyze_preflight.run_no_send_rehearsal(
+                namespace_dir=base,
+                provider_health_path=base / "event_provider_health.json",
+                profile="notify_llm_deep",
+                artifact_namespace="coinalyze_no_send_rehearsal",
+                allow_live_preflight=True,
+                opener=opener,
+                now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+            )
+            assert report.status == "blocked_request_budget"
+            assert not (base / event_coinalyze_preflight.REQUEST_LEDGER).exists()
+        assert calls == []
+    finally:
+        config.EVENT_DISCOVERY_COINALYZE_API_KEY = original_key
+        config.EVENT_DISCOVERY_COINALYZE_SYMBOLS = original_symbols
+        if original_budget is None:
+            os.environ.pop(event_coinalyze_preflight.ENV_PREFLIGHT_MAX_REQUESTS, None)
+        else:
+            os.environ[event_coinalyze_preflight.ENV_PREFLIGHT_MAX_REQUESTS] = original_budget
+        if original_env_key is None:
+            os.environ.pop(event_coinalyze_preflight.ENV_API_KEY, None)
+        else:
+            os.environ[event_coinalyze_preflight.ENV_API_KEY] = original_env_key
+
+
+def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_redacted():
+    import json
+    from datetime import datetime, timezone
+    from urllib.error import HTTPError
+    from urllib.parse import urlparse
+    from crypto_rsi_scanner import config, event_coinalyze_preflight
+
+    original_key = config.EVENT_DISCOVERY_COINALYZE_API_KEY
+    original_symbols = config.EVENT_DISCOVERY_COINALYZE_SYMBOLS
+    original_base_url = config.EVENT_DISCOVERY_COINALYZE_BASE_URL
+    try:
+        config.EVENT_DISCOVERY_COINALYZE_API_KEY = "coinalyze-key"
+        config.EVENT_DISCOVERY_COINALYZE_SYMBOLS = ("BTCUSDT_PERP.A", "ETHUSDT_PERP.A", "SOLUSDT_PERP.A")
+        config.EVENT_DISCOVERY_COINALYZE_BASE_URL = "https://example.test/v1/"
+
+        class FakeResponse:
+            status = 200
+
+            def __init__(self, payload):
+                self.payload = payload
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return json.dumps(self.payload).encode("utf-8")
+
+        def opener(request, _timeout):
+            endpoint = urlparse(request.full_url).path.rsplit("/", 1)[-1]
+            symbols = ["BTCUSDT_PERP.A", "ETHUSDT_PERP.A", "SOLUSDT_PERP.A"]
+            if endpoint == "open-interest":
+                return FakeResponse([{"symbol": symbol, "value": 1000 + idx, "update": 1781513400} for idx, symbol in enumerate(symbols)])
+            if endpoint == "funding-rate":
+                return FakeResponse([{"symbol": symbol, "value": 0.001, "update": 1781513400} for symbol in symbols])
+            if endpoint == "open-interest-history":
+                return FakeResponse([{"symbol": symbol, "history": [{"c": 100}, {"c": 120}]} for symbol in symbols])
+            if endpoint == "liquidation-history":
+                return FakeResponse([{"symbol": symbol, "history": [{"l": 10, "s": 4}]} for symbol in symbols])
+            if endpoint == "long-short-ratio-history":
+                return FakeResponse([{"symbol": symbol, "history": [{"r": 1.2}]} for symbol in symbols])
+            if endpoint == "ohlcv-history":
+                return FakeResponse([{"symbol": symbol, "history": [{"v": 50}, {"v": 60}]} for symbol in symbols])
+            raise AssertionError(endpoint)
+
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _preflight, report, _paths = event_coinalyze_preflight.run_no_send_rehearsal(
+                namespace_dir=base,
+                provider_health_path=base / "event_provider_health.json",
+                profile="notify_llm_deep",
+                artifact_namespace="coinalyze_no_send_rehearsal",
+                allow_live_preflight=True,
+                opener=opener,
+                now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+                clock=lambda: 1781513400,
+            )
+            assert report.status == "live_rehearsal_success"
+            assert report.requests_used == 6
+            assert report.snapshots_written == 3
+            ledger_text = (base / event_coinalyze_preflight.REQUEST_LEDGER).read_text(encoding="utf-8")
+            assert "coinalyze-key" not in ledger_text
+            assert all(json.loads(line)["token_redacted"] is True for line in ledger_text.splitlines() if line.strip())
+            assert (base / "event_derivatives_state.jsonl").read_text(encoding="utf-8").count("\n") == 3
+            health = json.loads((base / "event_provider_health.json").read_text(encoding="utf-8"))
+            assert "observed_healthy" in json.dumps(health)
+            assert event_coinalyze_preflight.artifact_conflicts(base)["coinalyze_rehearsal_secret_leak"] == 0
+
+        for code, expected_status in ((429, "rate_limited"), (403, "auth_or_access_error")):
+            with TemporaryDirectory() as tmp:
+                base = Path(tmp)
+
+                def failing_opener(request, _timeout, *, code=code):
+                    raise HTTPError(request.full_url, code, "safe failure", hdrs={}, fp=None)
+
+                _preflight, report, _paths = event_coinalyze_preflight.run_no_send_rehearsal(
+                    namespace_dir=base,
+                    provider_health_path=base / "event_provider_health.json",
+                    profile="notify_llm_deep",
+                    artifact_namespace="coinalyze_no_send_rehearsal",
+                    allow_live_preflight=True,
+                    opener=failing_opener,
+                    now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+                    clock=lambda: 1781513400,
+                )
+                assert report.status == expected_status
+                assert "coinalyze-key" not in (base / event_coinalyze_preflight.REQUEST_LEDGER).read_text(encoding="utf-8")
+    finally:
+        config.EVENT_DISCOVERY_COINALYZE_API_KEY = original_key
+        config.EVENT_DISCOVERY_COINALYZE_SYMBOLS = original_symbols
+        config.EVENT_DISCOVERY_COINALYZE_BASE_URL = original_base_url
+
+
+def test_event_alpha_coinalyze_stale_namespace_blocks_without_override():
+    import contextlib
+    import io
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import config, event_alpha_namespace_status, event_coinalyze_preflight, scanner
+
+    original_base = config.EVENT_ALPHA_ARTIFACT_BASE_DIR
+    original_namespace = config.EVENT_ALPHA_ARTIFACT_NAMESPACE
+    original_override = os.environ.get("ALLOW_STALE_NAMESPACE_WRITE")
+    try:
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            config.EVENT_ALPHA_ARTIFACT_BASE_DIR = base
+            config.EVENT_ALPHA_ARTIFACT_NAMESPACE = "notify_llm_deep"
+            namespace_dir = base / "notify_llm_deep"
+            event_alpha_namespace_status.mark_namespace_stale(
+                namespace_dir,
+                namespace="notify_llm_deep",
+                reason="unit test stale namespace",
+                superseded_by=event_coinalyze_preflight.DEFAULT_PREFLIGHT_NAMESPACE,
+                now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+            )
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                scanner.event_alpha_coinalyze_preflight_report(
+                    profile_name="notify_llm_deep",
+                    artifact_namespace="notify_llm_deep",
+                )
+            output = buf.getvalue()
+            assert "status=blocked_stale_namespace" in output
+            assert "active_suggested_namespace=coinalyze_preflight" in output
+            assert not (namespace_dir / event_coinalyze_preflight.PREFLIGHT_JSON).exists()
+    finally:
+        config.EVENT_ALPHA_ARTIFACT_BASE_DIR = original_base
+        config.EVENT_ALPHA_ARTIFACT_NAMESPACE = original_namespace
+        if original_override is None:
+            os.environ.pop("ALLOW_STALE_NAMESPACE_WRITE", None)
+        else:
+            os.environ["ALLOW_STALE_NAMESPACE_WRITE"] = original_override
+
+
+def test_event_alpha_source_coverage_coinalyze_links_only_existing_artifacts():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import config, event_alpha_artifact_doctor, event_alpha_source_coverage, event_coinalyze_preflight
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        provider_report = event_provider_status.build_event_discovery_provider_status(config)
+        report = event_alpha_source_coverage.build_source_coverage_report(
+            provider_status_report=provider_report,
+            artifact_namespace="unit",
+            profile="notify_llm_deep",
+            artifact_namespace_dir=base,
+            now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+        )
+        text = event_alpha_source_coverage.format_source_coverage_report(report)
+        assert "- Coinalyze preflight: not generated" in text
+        assert "event_coinalyze_preflight.md" not in text
+        assert "make event-alpha-coinalyze-preflight ARTIFACT_NAMESPACE=unit PROFILE=notify_llm_deep PYTHON=python3" in text
+
+        preflight = event_coinalyze_preflight.build_preflight_report(
+            namespace_dir=base,
+            smoke_mode=True,
+            now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+        )
+        event_coinalyze_preflight.write_preflight_artifacts(preflight, base)
+        report = event_alpha_source_coverage.build_source_coverage_report(
+            provider_status_report=provider_report,
+            artifact_namespace="unit",
+            profile="notify_llm_deep",
+            artifact_namespace_dir=base,
+            now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+        )
+        text = event_alpha_source_coverage.format_source_coverage_report(report)
+        assert "- Coinalyze preflight report: event_coinalyze_preflight.md" in text
+        assert "- Coinalyze preflight JSON: event_coinalyze_preflight.json" in text
+
+        bad = base / "event_alpha_source_coverage.md"
+        bad.write_text("- Coinalyze preflight report: event_coinalyze_preflight.md\n- Coinalyze preflight JSON: event_coinalyze_preflight.json\n", encoding="utf-8")
+        (base / event_coinalyze_preflight.PREFLIGHT_JSON).unlink()
+        result = event_alpha_artifact_doctor.diagnose_artifacts(
+            profile="notify_llm_deep",
+            artifact_namespace="unit",
+            source_coverage_report_path=bad,
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert result.source_coverage_coinalyze_missing_linked_artifact >= 1
+        assert result.status == "BLOCKED"
+
+
+def test_export_source_with_artifacts_fallback_and_archive_validation():
+    import importlib.util
+    import time
+    import zipfile
+    from datetime import datetime
+
+    root = Path(__file__).resolve().parent.parent
+    spec = importlib.util.spec_from_file_location(
+        "export_source_with_artifacts",
+        root / "scripts" / "export_source_with_artifacts.py",
+    )
+    assert spec and spec.loader
+    export_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(export_module)
+    with TemporaryDirectory() as tmp:
+        tree = Path(tmp) / "tree"
+        tree.mkdir()
+        (tree / "Makefile").write_text("all:\n\t@true\n", encoding="utf-8")
+        (tree / "crypto_rsi_scanner").mkdir()
+        (tree / "crypto_rsi_scanner" / "unit.py").write_text("VALUE = 1\n", encoding="utf-8")
+        (tree / ".env").write_text("SECRET=1\n", encoding="utf-8")
+        (tree / "local.db").write_text("db\n", encoding="utf-8")
+        out = Path(tmp) / "out.zip"
+        assert export_module.main(root=tree, out=out) == 0
+        with zipfile.ZipFile(out) as zf:
+            names = set(zf.namelist())
+        assert "Makefile" in names
+        assert "crypto_rsi_scanner/unit.py" in names
+        assert ".env" not in names
+        assert "local.db" not in names
+
+        future_zip = Path(tmp) / "future.zip"
+        now_ts = time.time()
+        future = datetime.fromtimestamp(now_ts + 86400).timetuple()[:6]
+        with zipfile.ZipFile(future_zip, "w") as zf:
+            info = zipfile.ZipInfo("Makefile", future)
+            zf.writestr(info, "all:\n\t@true\n")
+        bad = export_module._validate_archive_entries(future_zip, safe_export_timestamp=now_ts)
+        assert any(item.startswith("future_mtime:Makefile") for item in bad)
 
 
 def _run_all():

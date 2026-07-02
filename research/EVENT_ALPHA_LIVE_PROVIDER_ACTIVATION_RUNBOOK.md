@@ -47,6 +47,11 @@ provider-specific no-call preflight:
 make event-alpha-coinalyze-preflight PROFILE=notify_llm_deep PYTHON=python3
 ```
 
+The Make target defaults to the clean `coinalyze_preflight` namespace. If an
+operator explicitly points it at a stale namespace such as `notify_llm_deep`,
+the command must block with `blocked_stale_namespace` unless
+`ALLOW_STALE_NAMESPACE_WRITE=1` is deliberately supplied for a diagnostic run.
+
 For fixture proof without a key or network:
 
 ```bash
@@ -64,30 +69,54 @@ preflight reports `missing_config` when the key is absent. If a key is present,
 live calls are still blocked unless an operator explicitly passes the live
 preflight flag through the CLI after reviewing quota and doctor output.
 
-The guarded rehearsal stub is:
+The guarded no-send rehearsal is:
 
 ```bash
 make event-alpha-coinalyze-no-send-rehearsal PROFILE=notify_llm_deep PYTHON=python3
 ```
 
-Current behavior:
+The Make target defaults to the clean `coinalyze_no_send_rehearsal` namespace.
+
+Current guard behavior:
 
 - no key: exits gracefully with `missing_config`
 - key configured but no explicit live flag: `live_call_blocked_by_default`
+- explicit stale namespace: `blocked_stale_namespace` unless
+  `ALLOW_STALE_NAMESPACE_WRITE=1`
+- live-capable rehearsal: requires a key, explicit allow flag, no-send mode,
+  writable request ledger, and the configured request budget
 - no Telegram sends, trades, paper trades, normal RSI rows, or
   Event Alpha-created `TRIGGERED_FADE`
 
-Expected artifacts after a future bounded live rehearsal:
+A bounded live rehearsal is intentionally small:
+
+```bash
+ALLOW_LIVE_PREFLIGHT=1 \
+  make event-alpha-coinalyze-no-send-rehearsal \
+  PROFILE=notify_llm_deep \
+  ARTIFACT_NAMESPACE=coinalyze_no_send_rehearsal \
+  PYTHON=python3
+```
+
+By default it requests only BTC/ETH/SOL-sized coverage and honors the
+Coinalyze preflight request budget. To rehearse a different tiny symbol set,
+set `RSI_EVENT_ALPHA_COINALYZE_PREFLIGHT_SYMBOLS` before the command and keep
+the budget small.
+
+Expected artifacts after a bounded live rehearsal:
 
 - `event_coinalyze_request_ledger.jsonl`
 - `event_derivatives_state.jsonl`
 - `event_derivatives_crowding_candidates.jsonl`
 - `event_fade_short_review_candidates.jsonl`
+- `event_coinalyze_rehearsal_report.json`
 - `event_coinalyze_rehearsal_report.md`
 
 Abort if the request ledger is missing, provider health is in backoff, a secret
 value appears in artifacts, live calls happen without the explicit flag, or
-artifact doctor reports blockers.
+artifact doctor reports blockers. Source coverage and the daily brief should
+link Coinalyze preflight/rehearsal artifacts only when those files exist; a
+missing linked artifact is a doctor issue.
 
 ## Provider Activation Order
 
@@ -100,9 +129,12 @@ priority is:
 4. DEX/on-chain/protocol metrics from GeckoTerminal or DefiLlama-style sources.
 5. Context/news sources such as CryptoPanic, RSS, and GDELT.
 
-Binance public or fixture announcement normalization is separate from the
-signed Binance listener. Public/fixture announcement parsing can be
-`fixture_ready` without Binance credentials. The signed listener remains
+Official exchange is the next provider family to activate, but it remains
+fixture/no-call until it has its own provider-specific preflight, redacted
+request ledger, small-budget no-send rehearsal, provider-health update, and
+artifact-doctor checks. Binance public or fixture announcement normalization is
+separate from the signed Binance listener. Public/fixture announcement parsing
+can be `fixture_ready` without Binance credentials. The signed listener remains
 blocked until its API key/secret and bounded no-send rehearsal are configured.
 
 ## No-Send Rehearsal

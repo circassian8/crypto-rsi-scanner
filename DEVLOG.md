@@ -17,6 +17,69 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Add bounded Coinalyze no-send rehearsal and artifact checks · Codex
+**Why:** Coinalyze activation needed to move past a no-call preflight without
+opening an unsafe live path, while source coverage, daily briefs, research-review
+delivery rows, and review zips needed tighter artifact truth and portability.
+**Changes:**
+- Added clean default Coinalyze namespaces plus stale-namespace write blocking
+  for preflight and no-send rehearsal; explicit stale writes require
+  `ALLOW_STALE_NAMESPACE_WRITE=1`.
+- Implemented a bounded live-capable Coinalyze no-send rehearsal with key/allow
+  guards, no-send enforcement, tiny symbol/request budget, redacted request
+  ledger, provider-health updates, and local derivatives/candidate artifacts
+  only.
+- Made source coverage, daily brief, live-provider readiness, and integrated
+  radar manifests report Coinalyze preflight/rehearsal state only when matching
+  artifacts exist, with doctor checks for missing linked artifacts and unsafe
+  rehearsal claims.
+- Split research-review skipped telemetry into display-family and raw
+  candidate-family summaries; the preview renders display rows first and doctor
+  checks duplicate visible labels without confusing raw candidate detail.
+- Hardened `make export-src-with-artifacts` fallback/validation so archive
+  entries are safe without `.git`, excluded paths stay excluded, and future
+  mtimes are clamped.
+- Updated the live-provider activation runbook, roadmap, and decisions for the
+  bounded rehearsal flow and official-exchange-next no-call placeholder.
+**Verify:** `python3 tests/test_indicators.py` (660/660); `python3 -m compileall
+-q crypto_rsi_scanner tests scripts`; `git diff --check`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make
+event-alpha-integrated-radar-outcome-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-outcome-report PYTHON=python3`; `make
+event-alpha-integrated-radar-calibration-report PYTHON=python3`; `make
+event-alpha-live-provider-readiness-smoke PYTHON=python3`; `make
+event-alpha-live-provider-readiness PROFILE=fixture
+ARTIFACT_NAMESPACE=integrated_radar_smoke PYTHON=python3`; `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-preflight PYTHON=python3`; `make
+event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`; `make
+event-alpha-market-anomaly-smoke PYTHON=python3`; `make
+event-alpha-official-exchange-smoke PYTHON=python3`; `make
+event-alpha-scheduled-catalyst-smoke PYTHON=python3`; `make
+event-alpha-unlock-risk-smoke PYTHON=python3`; `make
+event-alpha-derivatives-smoke PYTHON=python3`; `make
+event-alpha-fade-review-smoke PYTHON=python3`; `make
+event-alpha-source-coverage-report PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1
+PYTHON=python3` (WARN only, no blockers); `make
+event-alpha-notification-format-smoke PYTHON=python3`; `make
+event-alpha-telegram-no-send-final-check-fast PYTHON=python3`; `make
+event-alpha-mark-known-stale-namespaces PYTHON=python3`; `make
+event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep STRICT=1 PYTHON=python3`; `make
+export-src-with-artifacts PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** The actual Coinalyze live-capable rehearsal was not run because
+no key/allow flag was provided; the no-send rehearsal correctly reported
+`missing_config`. No Telegram sends, trades, paper trades, normal RSI rows,
+execution, or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-02 — Add Coinalyze preflight and research-review telemetry backfill · Codex
 **Why:** The active CryptoPanic rehearsal still needed structured
 research-review skip telemetry on normal delivery rows, fixture-only notification

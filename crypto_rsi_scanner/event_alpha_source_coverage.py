@@ -8,12 +8,14 @@ those gates.
 
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_provider_health, event_provider_status, event_source_packs
+from . import event_artifact_paths, event_coinalyze_preflight, event_provider_health, event_provider_status, event_source_packs
 from .event_providers import cryptopanic as cryptopanic_provider
 
 
@@ -215,6 +217,15 @@ class EventAlphaSourceCoverageReport:
     cryptopanic_not_used_reason: str | None = None
     cryptopanic_coverage_status: str = "not_configured"
     cryptopanic_recommendation: str | None = None
+    coinalyze_preflight_status: str = "not_generated"
+    coinalyze_preflight_json_path: str | None = None
+    coinalyze_preflight_report_path: str | None = None
+    coinalyze_rehearsal_status: str = "not_generated"
+    coinalyze_rehearsal_report_path: str | None = None
+    coinalyze_request_ledger_path: str | None = None
+    coinalyze_provider_health_status: str = "not_observed"
+    coinalyze_requests_used: int = 0
+    coinalyze_snapshots_written: int = 0
     category_priorities: tuple[Mapping[str, Any], ...] = SOURCE_COVERAGE_CATEGORY_PRIORITIES
 
     def to_dict(self) -> dict[str, Any]:
@@ -241,6 +252,15 @@ class EventAlphaSourceCoverageReport:
             "cryptopanic_not_used_reason": self.cryptopanic_not_used_reason,
             "cryptopanic_coverage_status": self.cryptopanic_coverage_status,
             "cryptopanic_recommendation": self.cryptopanic_recommendation,
+            "coinalyze_preflight_status": self.coinalyze_preflight_status,
+            "coinalyze_preflight_json_path": self.coinalyze_preflight_json_path,
+            "coinalyze_preflight_report_path": self.coinalyze_preflight_report_path,
+            "coinalyze_rehearsal_status": self.coinalyze_rehearsal_status,
+            "coinalyze_rehearsal_report_path": self.coinalyze_rehearsal_report_path,
+            "coinalyze_request_ledger_path": self.coinalyze_request_ledger_path,
+            "coinalyze_provider_health_status": self.coinalyze_provider_health_status,
+            "coinalyze_requests_used": self.coinalyze_requests_used,
+            "coinalyze_snapshots_written": self.coinalyze_snapshots_written,
             "category_priorities": [
                 {
                     "category_priority_rank": idx + 1,
@@ -271,6 +291,7 @@ def build_source_coverage_report(
     cryptopanic_request_ledger_path: str | Path | None = None,
     cryptopanic_weekly_limit: int = 600,
     cryptopanic_daily_soft_limit: int = 80,
+    artifact_namespace_dir: str | Path | None = None,
     now: datetime | None = None,
 ) -> EventAlphaSourceCoverageReport:
     """Build source-pack coverage from readiness, health, and artifact rows."""
@@ -289,6 +310,11 @@ def build_source_coverage_report(
         daily_soft_limit=cryptopanic_daily_soft_limit,
         now=observed,
         raw_backoff_present=_raw_provider_backoff_present(provider_health_rows or {}, "cryptopanic"),
+    )
+    coinalyze_stats = _coinalyze_artifact_stats(
+        artifact_namespace_dir=artifact_namespace_dir,
+        artifact_namespace=artifact_namespace,
+        health_by_provider=raw_health_by_provider,
     )
     cryptopanic_effectively_healthy = cryptopanic_stats["coverage_status"] in {
         "observed_healthy",
@@ -409,6 +435,15 @@ def build_source_coverage_report(
         cryptopanic_not_used_reason=cryptopanic_stats["not_used_reason"],
         cryptopanic_coverage_status=cryptopanic_stats["coverage_status"],
         cryptopanic_recommendation=cryptopanic_stats["recommendation"],
+        coinalyze_preflight_status=coinalyze_stats["preflight_status"],
+        coinalyze_preflight_json_path=coinalyze_stats["preflight_json_path"],
+        coinalyze_preflight_report_path=coinalyze_stats["preflight_report_path"],
+        coinalyze_rehearsal_status=coinalyze_stats["rehearsal_status"],
+        coinalyze_rehearsal_report_path=coinalyze_stats["rehearsal_report_path"],
+        coinalyze_request_ledger_path=coinalyze_stats["request_ledger_path"],
+        coinalyze_provider_health_status=coinalyze_stats["provider_health_status"],
+        coinalyze_requests_used=int(coinalyze_stats["requests_used"]),
+        coinalyze_snapshots_written=int(coinalyze_stats["snapshots_written"]),
     )
 
 
@@ -480,16 +515,33 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
             f"   enables: {_join(category.get('enabled_lanes') or ())}",
             f"   reason: {category.get('reason') or 'none'}",
         ])
+    lines.extend(["", "Live-provider activation readiness:"])
+    lines.append(f"- readiness report: {LIVE_PROVIDER_READINESS_MD}")
+    lines.append(f"- readiness JSON: {LIVE_PROVIDER_READINESS_JSON}")
+    if report.coinalyze_preflight_report_path and report.coinalyze_preflight_json_path:
+        lines.append(f"- Coinalyze preflight: {report.coinalyze_preflight_status}")
+        lines.append(f"- Coinalyze preflight report: {report.coinalyze_preflight_report_path}")
+        lines.append(f"- Coinalyze preflight JSON: {report.coinalyze_preflight_json_path}")
+    else:
+        lines.append("- Coinalyze preflight: not generated")
+        lines.append(
+            "- command: make event-alpha-coinalyze-preflight ARTIFACT_NAMESPACE="
+            f"{report.artifact_namespace} PROFILE={report.profile} PYTHON=python3"
+        )
+    if report.coinalyze_rehearsal_report_path:
+        lines.append(f"- Coinalyze rehearsal: {report.coinalyze_rehearsal_status}")
+        lines.append(f"- Coinalyze rehearsal report: {report.coinalyze_rehearsal_report_path}")
+        if report.coinalyze_request_ledger_path:
+            lines.append(f"- Coinalyze request ledger: {report.coinalyze_request_ledger_path}")
+        lines.append(f"- Coinalyze provider health: {report.coinalyze_provider_health_status}")
+        lines.append(
+            f"- Coinalyze rehearsal counters: requests_used={report.coinalyze_requests_used} "
+            f"snapshots_written={report.coinalyze_snapshots_written}"
+        )
+    else:
+        lines.append("- Coinalyze rehearsal: not generated")
     lines.extend(
         [
-            "",
-            "Live-provider activation readiness:",
-            f"- readiness report: {LIVE_PROVIDER_READINESS_MD}",
-            f"- readiness JSON: {LIVE_PROVIDER_READINESS_JSON}",
-            "- Coinalyze preflight report: event_coinalyze_preflight.md",
-            "- Coinalyze preflight JSON: event_coinalyze_preflight.json",
-            "- Coinalyze command: make event-alpha-coinalyze-preflight PROFILE="
-            f"{report.profile} ARTIFACT_NAMESPACE={report.artifact_namespace}",
             "- command: make event-alpha-live-provider-readiness PROFILE="
             f"{report.profile} ARTIFACT_NAMESPACE={report.artifact_namespace}",
             "- next activation plan: use the ranked source categories above; rehearse no-send before enabling live calls.",
@@ -501,6 +553,48 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
     lines.append("")
     lines.append("No alerts, sends, trades, paper rows, normal RSI rows, or triggers were changed.")
     return "\n".join(lines)
+
+
+def _coinalyze_artifact_stats(
+    *,
+    artifact_namespace_dir: str | Path | None,
+    artifact_namespace: str,
+    health_by_provider: Mapping[str, str],
+) -> dict[str, Any]:
+    base = Path(artifact_namespace_dir).expanduser() if artifact_namespace_dir is not None else _namespace_dir(artifact_namespace)
+    preflight_json = base / event_coinalyze_preflight.PREFLIGHT_JSON
+    preflight_md = base / event_coinalyze_preflight.PREFLIGHT_MD
+    rehearsal_json = base / event_coinalyze_preflight.REHEARSAL_JSON
+    rehearsal_md = base / event_coinalyze_preflight.REHEARSAL_MD
+    ledger = base / event_coinalyze_preflight.REQUEST_LEDGER
+    preflight_payload = _read_json(preflight_json)
+    rehearsal_payload = _read_json(rehearsal_json)
+    return {
+        "preflight_status": str(preflight_payload.get("preflight_status") or "generated" if preflight_json.exists() else "not_generated"),
+        "preflight_json_path": event_artifact_paths.artifact_display_path(preflight_json) if preflight_json.exists() else None,
+        "preflight_report_path": event_artifact_paths.artifact_display_path(preflight_md) if preflight_md.exists() else None,
+        "rehearsal_status": str(rehearsal_payload.get("status") or "generated" if rehearsal_json.exists() or rehearsal_md.exists() else "not_generated"),
+        "rehearsal_report_path": event_artifact_paths.artifact_display_path(rehearsal_md) if rehearsal_md.exists() else None,
+        "request_ledger_path": event_artifact_paths.artifact_display_path(ledger) if ledger.exists() else None,
+        "provider_health_status": str(rehearsal_payload.get("provider_health_status") or health_by_provider.get("coinalyze") or "not_observed"),
+        "requests_used": int(rehearsal_payload.get("requests_used") or 0),
+        "snapshots_written": int(rehearsal_payload.get("snapshots_written") or 0),
+    }
+
+
+def _namespace_dir(artifact_namespace: str) -> Path:
+    base = Path(os.getenv("RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR", "event_fade_cache")).expanduser()
+    return base / str(artifact_namespace or "default")
+
+
+def _read_json(path: Path) -> Mapping[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, Mapping) else {}
 
 
 def _configured_providers(

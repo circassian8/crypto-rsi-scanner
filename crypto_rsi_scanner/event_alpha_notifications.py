@@ -1197,7 +1197,7 @@ def format_research_review_telegram_digest(
         displayed += 1
     lines.append("")
     if skipped:
-        family_summary = _research_review_skipped_family_summary(skipped)
+        family_summary = _research_review_skipped_display_family_summary(skipped)
         lines.append("<b>Skipped candidate families</b>")
         family_display = _research_review_skipped_family_display(family_summary, limit=8)
         for family in family_display:
@@ -1229,7 +1229,8 @@ def _research_review_channel_summary(plan: EventAlphaNotificationPlan) -> dict[s
     for item in plan.research_review_skipped_items:
         reason = str(item.skip_reason or "unknown")
         reason_counts[reason] = reason_counts.get(reason, 0) + 1
-    family_summary = _research_review_skipped_family_summary(plan.research_review_skipped_items)
+    candidate_family_summary = _research_review_skipped_family_summary(plan.research_review_skipped_items)
+    display_family_summary = _research_review_skipped_display_family_summary(plan.research_review_skipped_items)
     sample = _diverse_skipped_sample(plan.research_review_skipped_items, limit=20)
     rendered = len(plan.research_review_items)
     rendered_decisions = [item.decision for item in plan.research_review_items]
@@ -1252,8 +1253,11 @@ def _research_review_channel_summary(plan: EventAlphaNotificationPlan) -> dict[s
         "skipped_reason_counts": dict(sorted(reason_counts.items())),
         "skipped_candidates": [item.to_dict() for item in sample],
         "skipped_candidates_sample": [item.to_dict() for item in sample],
-        "skipped_family_summary": family_summary,
-        "skipped_family_count": len(family_summary),
+        "skipped_family_summary": display_family_summary,
+        "skipped_display_family_summary": display_family_summary,
+        "skipped_candidate_family_summary": candidate_family_summary,
+        "skipped_family_count": len(display_family_summary),
+        "skipped_candidate_family_count": len(candidate_family_summary),
         "selection_policy": "rank by research-review score, source quality, market confirmation, and recency; render top max_items",
         "max_items": rendered,
         "ranking_policy": "rank_score_desc_then_score_recency_symbol",
@@ -1295,6 +1299,77 @@ def _research_review_skipped_family_summary(
     )
 
 
+def _research_review_skipped_display_family_summary(
+    skipped_items: Iterable[EventAlphaResearchReviewSkippedItem],
+) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for item in skipped_items:
+        symbol = _norm_display_part(item.symbol)
+        coin_id = _norm_display_part(item.coin_id)
+        key = f"{symbol}|{coin_id}"
+        label = f"{item.symbol}/{item.coin_id}"
+        row = grouped.setdefault(
+            key,
+            {
+                "display_family_id": key,
+                "symbol": item.symbol,
+                "coin_id": item.coin_id,
+                "label": label,
+                "broad_opportunity_family": _broad_opportunity_family(item),
+                "skipped_count": 0,
+                "skip_reason_counts": {},
+                "max_score": item.score,
+                "sample_core_opportunity_ids": [],
+                "candidate_family_ids": [],
+                "representative_card_path": item.card_path,
+                "display_hidden": _display_family_hidden(item),
+            },
+        )
+        row["skipped_count"] = int(row["skipped_count"]) + 1
+        reasons = row["skip_reason_counts"]
+        reasons[item.skip_reason] = int(reasons.get(item.skip_reason, 0)) + 1
+        row["max_score"] = max(float(row.get("max_score") or 0.0), float(item.score or 0.0))
+        if item.core_opportunity_id and item.core_opportunity_id not in row["sample_core_opportunity_ids"]:
+            row["sample_core_opportunity_ids"].append(item.core_opportunity_id)
+        if item.candidate_family_id and item.candidate_family_id not in row["candidate_family_ids"]:
+            row["candidate_family_ids"].append(item.candidate_family_id)
+        if not row.get("representative_card_path") and item.card_path:
+            row["representative_card_path"] = item.card_path
+        row["display_hidden"] = bool(row.get("display_hidden")) or _display_family_hidden(item)
+    return sorted(
+        grouped.values(),
+        key=lambda row: (
+            not bool(row.get("display_hidden")),
+            int(row.get("skipped_count") or 0),
+            float(row.get("max_score") or 0.0),
+            str(row.get("label") or ""),
+        ),
+        reverse=True,
+    )
+
+
+def _norm_display_part(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", str(value or "unknown").strip().casefold()).strip("-") or "unknown"
+
+
+def _broad_opportunity_family(item: EventAlphaResearchReviewSkippedItem) -> str:
+    for value in (item.opportunity_type, item.final_opportunity_level):
+        text = str(value or "").strip()
+        if text:
+            return text
+    family = str(item.candidate_family_id or "").strip()
+    if ":" in family:
+        return family.split(":", 1)[0]
+    return family or "unknown"
+
+
+def _display_family_hidden(item: EventAlphaResearchReviewSkippedItem) -> bool:
+    symbol = str(item.symbol or "").casefold()
+    coin_id = str(item.coin_id or "").casefold()
+    family = " ".join(str(value or "").casefold() for value in (item.opportunity_type, item.final_opportunity_level, item.candidate_family_id, item.skip_reason))
+    return symbol == "sector" or coin_id == "diagnostic" or "diagnostic" in family or "sector" in family
+
+
 def _research_review_skipped_family_display(
     family_summary: Iterable[Mapping[str, Any]],
     *,
@@ -1327,7 +1402,9 @@ def _research_review_skipped_family_display(
     seen: set[str] = set()
 
     def add(row: Mapping[str, Any]) -> None:
-        key = str(row.get("candidate_family_id") or row.get("label") or "").strip()
+        if bool(row.get("display_hidden")):
+            return
+        key = str(row.get("display_family_id") or row.get("candidate_family_id") or row.get("label") or "").strip()
         if not key or key in seen or len(selected) >= limit:
             return
         selected.append(dict(row))
