@@ -1,6 +1,8 @@
 """Placeholder package for future artifact doctor test extraction."""
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
+from types import SimpleNamespace
+
 from tests.event_alpha import _legacy_helpers as _event_alpha_legacy_helpers
 
 globals().update({
@@ -8,6 +10,142 @@ globals().update({
     for name, value in vars(_event_alpha_legacy_helpers).items()
     if not name.startswith("__")
 })
+
+
+def test_event_alpha_doctor_check_plugins_emit_regression_messages():
+    from crypto_rsi_scanner.event_alpha.doctor.checks import (
+        integrated_radar,
+        namespace,
+        notifications,
+        outcomes,
+        paths,
+        provider_readiness,
+        safety,
+        source_coverage,
+        stale_artifacts,
+    )
+
+    blockers: list[str] = []
+    warnings: list[str] = []
+    base = SimpleNamespace(strict=True)
+
+    integrated_radar.apply_core_card_checks(
+        SimpleNamespace(
+            strict=True,
+            card_count=1,
+            index_present=False,
+            acquisition_final_conflicts={},
+            daily_brief_conflicts={"daily_brief_missing_selected_run": 1},
+            live_confirmation_conflicts={"live_validated_without_confirmation": 1},
+            raw_core_conflicts={},
+            opportunity_lane_conflicts={"market_state_return_unit_missing": 1},
+            market_anomaly_conflicts={"market_anomaly_needs_search_without_plan": 1},
+        ),
+        blockers,
+        warnings,
+    )
+    provider_readiness.apply_structured_artifact_checks(
+        SimpleNamespace(
+            strict=True,
+            official_exchange_conflicts={"official_exchange_secret_leak": 1},
+            official_exchange_activation_conflicts={},
+            instrument_resolution_conflicts={"instrument_resolution_sector_visible_as_tradable": 1},
+            scheduled_conflicts={},
+            derivatives_conflicts={"derivatives_unit_metadata_missing": 1},
+        ),
+        blockers,
+        warnings,
+    )
+    integrated_radar.apply_integrated_artifact_checks(
+        SimpleNamespace(strict=True, integrated_conflicts={"integrated_created_triggered_fade": 1}),
+        blockers,
+        warnings,
+    )
+    paths.apply_integrated_path_checks(
+        SimpleNamespace(strict=True, integrated_conflicts={"operator_structured_path_absolute": 1}),
+        blockers,
+        warnings,
+    )
+    source_coverage.apply_checks(
+        SimpleNamespace(
+            strict=True,
+            source_coverage_report_conflicts={"source_coverage_provider_marked_healthy_without_observation": 1},
+            source_coverage_conflicts={"source_pack_provider_status_missing": 1},
+            cryptopanic_conflicts={"cryptopanic_token_printed_or_unredacted": 1},
+        ),
+        blockers,
+        warnings,
+    )
+    provider_readiness.apply_preflight_checks(
+        SimpleNamespace(
+            strict=True,
+            live_provider_readiness_conflicts={"live_provider_readiness_live_calls_allowed_in_smoke": 1},
+            coinalyze_preflight_conflicts={"coinalyze_rehearsal_live_without_ledger": 1},
+            bybit_announcements_conflicts={"bybit_announcements_rehearsal_unsupported_params": 1},
+            unlock_calendar_conflicts={"unlock_calendar_preflight_live_without_ledger": 1},
+            dex_onchain_conflicts={"dex_onchain_live_without_ledger": 1},
+        ),
+        blockers,
+        warnings,
+    )
+    notifications.apply_checks(
+        SimpleNamespace(
+            strict=True,
+            research_review_enabled_but_lane_missing=1,
+            delivery_summary=SimpleNamespace(failed=1),
+            delivery_conflicts={"delivery_core_id_missing": 1, "legacy_pre_core_delivery_identity": 1},
+            preview_conflicts={"notification_preview_no_send_status_unclear": 1},
+        ),
+        blockers,
+        warnings,
+    )
+    outcomes.apply_checks(
+        SimpleNamespace(
+            strict=True,
+            strict_legacy=True,
+            core_store_available=True,
+            fresh_missing=1,
+            route_conflicts=1,
+            fresh_route_conflicts=1,
+            fresh_missing_final_route=1,
+            quality={
+                "quality_fields_missing_count": 1,
+                "hypothesis_rows_missing_opportunity_verdict": 1,
+                "watchlist_rows_missing_quality_fields": 0,
+                "alert_rows_missing_quality_fields": 0,
+                "fresh_hypothesis_rows_missing_top_level_quality": 1,
+                "fresh_watchlist_rows_missing_top_level_quality": 0,
+                "fresh_alert_rows_missing_top_level_quality": 0,
+                "legacy_quality_missing_rows": 0,
+            },
+            snapshot_core_conflicts={"route_mismatch": 1},
+            watchlist_conflicts={"fresh_uncapped": 1},
+            incident_linkage={"active_incident_without_qualified_link": 1},
+        ),
+        blockers,
+        warnings,
+    )
+    namespace.apply_checks(base, blockers, warnings)
+    stale_artifacts.apply_checks(base, blockers, warnings)
+    safety.apply_checks(base, blockers, warnings)
+
+    assert "research cards exist but index.md was not found" in blockers
+    assert "daily_brief_missing_selected_run=1" in blockers
+    assert "official_exchange_secret_leak=1" in blockers
+    assert "instrument_resolution_sector_visible_as_tradable=1" in blockers
+    assert "integrated_created_triggered_fade=1" in blockers
+    assert "operator_structured_path_absolute=1" in blockers
+    assert "source_coverage_provider_marked_healthy_without_observation=1" in blockers
+    assert "live_provider_readiness_live_calls_allowed_in_smoke=1" in blockers
+    assert "coinalyze_rehearsal_live_without_ledger=1" in blockers
+    assert "research_review_digest_enabled_but_lane_missing=1" in blockers
+    assert "delivery_core_id_missing=1" in blockers
+    assert "notification_preview_no_send_status_unclear=1" in blockers
+    assert "fresh_quality_route_conflict_rows=1" in blockers
+    assert "active_incident_without_qualified_link=1" in blockers
+    assert "derivatives_unit_metadata_missing=1" in warnings
+    assert "source_pack_provider_status_missing=1" in warnings
+    assert any("pre-canonical notification delivery rows" in message for message in warnings)
 
 def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor_checked():
     import json

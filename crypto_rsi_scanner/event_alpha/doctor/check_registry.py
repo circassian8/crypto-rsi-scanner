@@ -47,7 +47,7 @@ SEVERITIES: tuple[str, ...] = ("blocker", "warning", "info")
 # Current unmigrated legacy append-site ceiling in event_alpha_artifact_doctor.py.
 # The check-registry target fails if this grows, forcing new checks to declare a
 # registry entry and use a registry id in output.
-LEGACY_UNREGISTERED_BASELINE = 182
+LEGACY_UNREGISTERED_BASELINE = 15
 
 
 @dataclass(frozen=True)

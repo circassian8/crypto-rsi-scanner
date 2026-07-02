@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Move artifact doctor checks into plugins · Codex
+**Why:** The artifact doctor still had major consistency checks embedded in the
+top-level compatibility file. Moving high-value checks into focused plugins
+keeps the doctor as an orchestrator and makes future schema-dependent checks
+easier to place without changing artifact behavior.
+**Changes:**
+- Added `crypto_rsi_scanner/event_alpha/doctor/checks/` with focused plugins
+  for integrated radar/core/card checks, provider readiness/preflight checks,
+  source coverage, notification delivery/preview checks, path hygiene, outcomes
+  and quality/incident checks, plus placeholders for namespace, stale-artifact,
+  and safety checks that still run in earlier doctor phases.
+- Replaced the largest message-emission blocks in
+  `crypto_rsi_scanner/event_alpha_artifact_doctor.py` with plugin calls while
+  preserving the existing counter calculations, result fields, and report
+  counter names.
+- Reduced `event_alpha_artifact_doctor.py` from 7,255 to 6,335 lines and cut
+  the doctor check-registry `legacy_unregistered` ceiling from 182 to 15.
+- Added direct plugin regression coverage in
+  `tests/event_alpha/test_artifact_doctor.py`.
+**Verify:** `python3 tests/test_indicators.py` (721/721);
+`python3 -m pytest tests/event_alpha/test_artifact_doctor.py` (44/44);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3` (OK);
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`
+(WARN/no blockers, existing quality/incident warnings only);
+`make event-alpha-doctor-check-registry PYTHON=python3`; `make verify
+PYTHON=python3`; `git diff --check`.
+**Notes/risks:** This pass moves the top high-value append rules, not every
+legacy helper. Counter computation stays in the compatibility doctor to reduce
+behavior risk; follow-up passes can move the remaining 15 unregistered legacy
+append sites.
+
 ## 2026-07-02 — Add schema-dependent doctor check registry · Codex
 **Why:** Future artifact-doctor checks need a declared schema contract before
 they are added, so the doctor does not keep accumulating hidden field
