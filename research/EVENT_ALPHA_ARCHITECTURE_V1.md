@@ -52,20 +52,24 @@ small, tested slices only.
 
 ## CLI Split Direction
 
-`scanner.py` remains the runtime dispatch entrypoint while the parser split is
-proven. `crypto_rsi_scanner.cli.parser.build_parser()` mirrors the current
-`scanner.cli()` argparse construction without calling `parse_args()` or any
-command branch. New helpers classify command groups and dispatch keys from
-argv/parsed args so future slices can move one group at a time behind parser
-snapshot tests and the old `scanner.py` module entrypoint.
+`scanner.py` is now a compatibility wrapper for the package CLI entrypoint.
+`crypto_rsi_scanner.cli.parser.build_parser()` owns argparse construction
+without calling `parse_args()` or any command branch, and
+`crypto_rsi_scanner.cli.dispatch.dispatch_args()` routes parsed args into
+command-group modules. The current command modules still bind to historical
+scanner helpers for command bodies; future slices can move one body at a time
+behind the same parser, dispatch, and Make target coverage.
 
 Compatibility rules for CLI refactors:
 
 - `python3 -m crypto_rsi_scanner.scanner --help` must keep working.
 - `python3 -m crypto_rsi_scanner.cli.main --help` must expose the same operator
-  flags while dispatch still delegates to `scanner.cli()`.
+  flags.
 - Existing flags, defaults, Make targets, and old imports must remain
   compatible until a migration is explicit.
 - Parser snapshot tests must cover representative RSI, paper, maintenance,
   Event Alpha radar, doctor, notification, provider readiness, Coinalyze, and
-  official-exchange paths before runtime dispatch moves.
+  official-exchange paths before parser changes land.
+- Dispatch tests must cover representative Event Alpha, provider readiness,
+  notification preview, export, and default RSI scan routes before moving
+  command bodies out of scanner helpers.

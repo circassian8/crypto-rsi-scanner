@@ -31,6 +31,8 @@ def test_build_parser_preserves_core_defaults():
     assert args.event_fade_queue_limit == 20
     assert args.event_alpha_coinalyze_allow_live_preflight is False
     assert args.event_alpha_bybit_announcements_allow_live_preflight is False
+    assert args.export_src is False
+    assert args.export_src_with_artifacts is False
     assert dispatch_key_from_args(args) == "run_scan"
 
 
@@ -149,6 +151,7 @@ def test_classify_command_groups_cover_representative_paths():
         (["--score"], "score", "paper"),
         (["--backup-db"], "backup_db", "maintenance"),
         (["--export-src"], "export_src", "export"),
+        (["--export-src-with-artifacts"], "export_src_with_artifacts", "export"),
         (["--event-alpha-integrated-radar-cycle"], "event_alpha_integrated_radar_cycle", "event_alpha_integrated_radar"),
         (["--event-alpha-artifact-doctor"], "event_alpha_artifact_doctor", "event_alpha_artifact_doctor"),
         (["--event-alpha-notify-preview"], "event_alpha_notify_preview", "event_alpha_notification"),

@@ -42365,6 +42365,37 @@ def test_event_alpha_cli_package_and_make_targets_are_available():
     assert "event-alpha-archive-stale-namespaces:" in makefile
 
 
+def test_cli_dispatch_extracts_representative_routes_without_side_effects():
+    from crypto_rsi_scanner import scanner as scanner_module
+    from crypto_rsi_scanner.cli.dispatch import dispatch_args
+    from crypto_rsi_scanner.cli.parser import build_parser
+
+    parser = build_parser()
+    calls = []
+    old_coinalyze = scanner_module.event_alpha_coinalyze_preflight_report
+    old_run = scanner_module.run
+    try:
+        scanner_module.event_alpha_coinalyze_preflight_report = lambda **kwargs: calls.append(("coinalyze", kwargs))
+        scanner_module.run = lambda **kwargs: calls.append(("run", kwargs))
+        dispatch_args(parser.parse_args(["--event-alpha-coinalyze-preflight", "--event-alpha-profile", "fixture"]))
+        dispatch_args(parser.parse_args(["--dry-run", "--top-n", "3"]))
+    finally:
+        scanner_module.event_alpha_coinalyze_preflight_report = old_coinalyze
+        scanner_module.run = old_run
+
+    assert calls[0] == (
+        "coinalyze",
+        {
+            "verbose": False,
+            "profile_name": "fixture",
+            "artifact_namespace": None,
+            "smoke_mode": False,
+            "allow_live_preflight": False,
+        },
+    )
+    assert calls[1] == ("run", {"top_n": 3, "dry_run": True, "verbose": False})
+
+
 def test_github_actions_are_safe_fixture_verification_only():
     root = Path(__file__).resolve().parent.parent
     verify = root / ".github" / "workflows" / "verify.yml"

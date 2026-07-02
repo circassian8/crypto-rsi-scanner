@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Move scanner dispatch into CLI modules · Codex
+**Why:** The parser split proved flag compatibility, so the next refactor step
+was moving runtime command routing out of `scanner.py` while preserving the old
+module entrypoint and historical helper imports.
+**Changes:**
+- Replaced `scanner.cli()` with a compatibility wrapper around
+  `crypto_rsi_scanner.cli.main.main()` while leaving scanner helper functions
+  available for old imports and tests.
+- Moved argparse construction into `crypto_rsi_scanner/cli/parser.py` and
+  runtime routing into `crypto_rsi_scanner/cli/dispatch.py` plus command-group
+  modules for RSI, paper, maintenance, export, Event Alpha, provider readiness,
+  Coinalyze, and Bybit/official exchange paths.
+- Added `crypto_rsi_scanner/cli/_scanner_bindings.py` so extracted command
+  modules can bind to historical scanner command bodies during incremental
+  migration.
+- Added dispatch tests in `tests/cli/test_dispatch.py` and standalone runner
+  coverage for representative integrated radar, artifact doctor, Coinalyze
+  preflight, notification preview, default RSI dry-run, and export routes.
+- Added `research/CLI_COMMAND_INVENTORY.md`, updated
+  `research/EVENT_ALPHA_ARCHITECTURE_V1.md`, and updated `ROADMAP.md` with the
+  new CLI dispatch layout and size gate. `scanner.py` is now 11,262 lines, down
+  from the 13,373-line refactor baseline.
+**Verify:** `python3 tests/test_indicators.py` (686/686); `python3 -m pytest
+tests/cli` (14/14); `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 -m crypto_rsi_scanner.scanner --help`; `python3 -m
+crypto_rsi_scanner.cli.main --help`; `make event-alpha-integrated-radar-smoke
+PYTHON=python3`; `make event-alpha-coinalyze-preflight PYTHON=python3`; `make
+event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1
+PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** Command bodies still live in scanner helpers and are only
+routed from the CLI package in this slice. No live provider calls, Telegram
+sends, trades, paper trades, normal RSI rows, or Event Alpha-created
+`TRIGGERED_FADE` were added.
+
 ## 2026-07-02 — Mirror scanner parser into CLI facade · Codex
 **Why:** The refactor baseline established that `scanner.py` is still the real
 CLI monolith; the next safe step was exposing parser construction and command
