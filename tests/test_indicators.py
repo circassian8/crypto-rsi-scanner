@@ -1380,6 +1380,7 @@ def test_event_alpha_coinalyze_preflight_smoke_artifacts_are_safe_and_doctor_che
             "coinalyze_rehearsal_live_without_explicit_allow": 0,
             "coinalyze_rehearsal_request_budget_exceeded": 0,
             "coinalyze_rehearsal_success_without_derivatives_state": 0,
+            "coinalyze_rehearsal_success_without_crowding_candidates": 0,
             "coinalyze_provider_health_healthy_without_successful_ledger": 0,
             "coinalyze_rehearsal_forbidden_side_effect_claim": 0,
         }
@@ -1416,6 +1417,73 @@ def test_event_alpha_coinalyze_preflight_smoke_artifacts_are_safe_and_doctor_che
         assert unsafe.coinalyze_preflight_live_call_allowed_in_smoke == 1
         assert unsafe.coinalyze_preflight_missing_fixture_parser_status == 1
         assert unsafe.status == "BLOCKED"
+
+
+def test_event_alpha_coinalyze_rehearsal_doctor_blocks_missing_live_artifacts():
+    import json
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_coinalyze_preflight
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        rehearsal = {
+            "schema_version": "event_coinalyze_rehearsal_v1",
+            "row_type": "event_coinalyze_rehearsal_report",
+            "provider": "coinalyze",
+            "status": "live_rehearsal_success",
+            "configured": True,
+            "allow_live_preflight": True,
+            "live_call_allowed": True,
+            "no_send": True,
+            "research_only": True,
+            "generated_at": "2026-06-15T16:00:00+00:00",
+            "request_ledger_path": "event_coinalyze_request_ledger.jsonl",
+            "snapshots_written": 1,
+            "crowding_candidates_written": 0,
+            "fade_review_candidates_written": 0,
+            "max_requests_per_run": 6,
+            "requests_used": 1,
+            "strict_alerts_created": 0,
+            "telegram_sends": 0,
+            "trades_created": 0,
+            "paper_trades_created": 0,
+            "normal_rsi_signal_rows_written": 0,
+            "triggered_fade_created": 0,
+        }
+        (base / event_coinalyze_preflight.REHEARSAL_JSON).write_text(json.dumps(rehearsal), encoding="utf-8")
+        (base / event_coinalyze_preflight.REHEARSAL_MD).write_text("Research-only. Not a trade signal.\n", encoding="utf-8")
+        (base / "event_provider_health.json").write_text(
+            json.dumps({
+                "schema_version": "event_provider_health_v1",
+                "providers": {
+                    "coinalyze:derivatives_no_send_rehearsal": {
+                        "provider": "coinalyze",
+                        "provider_key": "coinalyze:derivatives_no_send_rehearsal",
+                        "provider_service": "coinalyze",
+                        "provider_coverage_status": "observed_healthy",
+                        "last_success_at": "2026-06-15T16:00:00+00:00",
+                        "consecutive_failures": 0,
+                    }
+                },
+            }),
+            encoding="utf-8",
+        )
+
+        conflicts = event_coinalyze_preflight.artifact_conflicts(base)
+        assert conflicts["coinalyze_rehearsal_live_without_ledger"] == 1
+        assert conflicts["coinalyze_rehearsal_success_without_crowding_candidates"] == 1
+        assert conflicts["coinalyze_provider_health_healthy_without_successful_ledger"] == 1
+
+        doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            source_coverage_report_path=base / "event_alpha_source_coverage.md",
+            profile="fixture",
+            artifact_namespace="coinalyze_no_send_rehearsal",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert doctor.coinalyze_rehearsal_live_without_ledger == 1
+        assert doctor.coinalyze_rehearsal_success_without_crowding_candidates == 1
+        assert doctor.coinalyze_provider_health_healthy_without_successful_ledger == 1
+        assert doctor.status == "BLOCKED"
 
 
 def test_public_rss_make_target_does_not_inject_fixture_aliases():
@@ -40011,7 +40079,6 @@ def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_reda
     original_base_url = config.EVENT_DISCOVERY_COINALYZE_BASE_URL
     try:
         config.EVENT_DISCOVERY_COINALYZE_API_KEY = "coinalyze-key"
-        config.EVENT_DISCOVERY_COINALYZE_SYMBOLS = ("BTCUSDT_PERP.A", "ETHUSDT_PERP.A", "SOLUSDT_PERP.A")
         config.EVENT_DISCOVERY_COINALYZE_BASE_URL = "https://example.test/v1/"
 
         class FakeResponse:
@@ -40029,49 +40096,156 @@ def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_reda
             def read(self):
                 return json.dumps(self.payload).encode("utf-8")
 
-        def opener(request, _timeout):
-            endpoint = urlparse(request.full_url).path.rsplit("/", 1)[-1]
-            symbols = ["BTCUSDT_PERP.A", "ETHUSDT_PERP.A", "SOLUSDT_PERP.A"]
-            if endpoint == "open-interest":
-                return FakeResponse([{"symbol": symbol, "value": 1000 + idx, "update": 1781513400} for idx, symbol in enumerate(symbols)])
-            if endpoint == "funding-rate":
-                return FakeResponse([{"symbol": symbol, "value": 0.001, "update": 1781513400} for symbol in symbols])
-            if endpoint == "open-interest-history":
-                return FakeResponse([{"symbol": symbol, "history": [{"c": 100}, {"c": 120}]} for symbol in symbols])
-            if endpoint == "liquidation-history":
-                return FakeResponse([{"symbol": symbol, "history": [{"l": 10, "s": 4}]} for symbol in symbols])
-            if endpoint == "long-short-ratio-history":
-                return FakeResponse([{"symbol": symbol, "history": [{"r": 1.2}]} for symbol in symbols])
-            if endpoint == "ohlcv-history":
-                return FakeResponse([{"symbol": symbol, "history": [{"v": 50}, {"v": 60}]} for symbol in symbols])
-            raise AssertionError(endpoint)
+        def coinalyze_opener(
+            symbol,
+            *,
+            price_end=140,
+            oi_end=160,
+            funding=0.0015,
+            long_liq=12,
+            short_liq=3,
+            calls=None,
+            empty=False,
+        ):
+            def opener(request, _timeout):
+                endpoint = urlparse(request.full_url).path.rsplit("/", 1)[-1]
+                if calls is not None:
+                    calls.append(endpoint)
+                if empty:
+                    return FakeResponse([])
+                if endpoint == "open-interest":
+                    return FakeResponse([{"symbol": symbol, "value": 1000, "update": 1781513400}])
+                if endpoint == "funding-rate":
+                    return FakeResponse([{"symbol": symbol, "value": funding, "update": 1781513400}])
+                if endpoint == "open-interest-history":
+                    return FakeResponse([{"symbol": symbol, "history": [{"c": 100}, {"c": oi_end}]}])
+                if endpoint == "liquidation-history":
+                    return FakeResponse([{"symbol": symbol, "history": [{"l": long_liq, "s": short_liq}]}])
+                if endpoint == "long-short-ratio-history":
+                    return FakeResponse([{"symbol": symbol, "history": [{"r": 1.8}]}])
+                if endpoint == "ohlcv-history":
+                    return FakeResponse([{"symbol": symbol, "history": [{"c": 100, "v": 50}, {"c": price_end, "v": 60}]}])
+                raise AssertionError(endpoint)
+
+            return opener
 
         with TemporaryDirectory() as tmp:
             base = Path(tmp)
+            calls = []
+            config.EVENT_DISCOVERY_COINALYZE_SYMBOLS = ("TESTFADEUSDT_PERP.A",)
             _preflight, report, _paths = event_coinalyze_preflight.run_no_send_rehearsal(
                 namespace_dir=base,
                 provider_health_path=base / "event_provider_health.json",
                 profile="notify_llm_deep",
                 artifact_namespace="coinalyze_no_send_rehearsal",
                 allow_live_preflight=True,
-                opener=opener,
+                opener=coinalyze_opener("TESTFADEUSDT_PERP.A", calls=calls),
                 now=datetime(2026, 6, 15, tzinfo=timezone.utc),
                 clock=lambda: 1781513400,
             )
             assert report.status == "live_rehearsal_success"
             assert report.requests_used == 6
-            assert report.snapshots_written == 3
+            assert calls == [
+                "open-interest",
+                "funding-rate",
+                "open-interest-history",
+                "liquidation-history",
+                "long-short-ratio-history",
+                "ohlcv-history",
+            ]
+            assert report.snapshots_written == 1
+            assert report.crowding_candidates_written == 1
+            assert report.fade_review_candidates_written == 1
+            assert report.fade_readiness_counts == {"ready_for_review": 1}
             ledger_text = (base / event_coinalyze_preflight.REQUEST_LEDGER).read_text(encoding="utf-8")
             assert "coinalyze-key" not in ledger_text
             assert all(json.loads(line)["token_redacted"] is True for line in ledger_text.splitlines() if line.strip())
-            assert (base / "event_derivatives_state.jsonl").read_text(encoding="utf-8").count("\n") == 3
+            assert (base / "event_derivatives_state.jsonl").read_text(encoding="utf-8").count("\n") == 1
+            crowding_rows = [
+                json.loads(line)
+                for line in (base / "event_derivatives_crowding_candidates.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            fade_rows = [
+                json.loads(line)
+                for line in (base / "event_fade_short_review_candidates.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            assert len(crowding_rows) == 1
+            assert len(fade_rows) == 1
+            assert fade_rows[0]["symbol"] == "TESTFADE"
+            assert fade_rows[0]["opportunity_type"] == "FADE_SHORT_REVIEW"
+            assert fade_rows[0]["research_only"] is True
+            assert fade_rows[0]["no_send_rehearsal"] is True
+            assert fade_rows[0]["strict_alerts_created"] == 0
+            assert fade_rows[0]["telegram_sends"] == 0
+            assert fade_rows[0]["trades_created"] == 0
+            assert fade_rows[0]["paper_trades_created"] == 0
+            assert fade_rows[0]["normal_rsi_signal_rows_written"] == 0
+            assert fade_rows[0]["triggered_fade_created"] is False
+            report_payload = json.loads((base / event_coinalyze_preflight.REHEARSAL_JSON).read_text(encoding="utf-8"))
+            assert report_payload["crowding_candidates_written"] == 1
+            assert report_payload["fade_review_candidates_written"] == 1
+            assert report_payload["strict_alerts_created"] == 0
+            assert report_payload["telegram_sends"] == 0
+            assert report_payload["trades_created"] == 0
+            assert report_payload["paper_trades_created"] == 0
+            assert report_payload["normal_rsi_signal_rows_written"] == 0
+            assert report_payload["triggered_fade_created"] == 0
             health = json.loads((base / "event_provider_health.json").read_text(encoding="utf-8"))
             assert "observed_healthy" in json.dumps(health)
             assert event_coinalyze_preflight.artifact_conflicts(base)["coinalyze_rehearsal_secret_leak"] == 0
 
-        for code, expected_status in ((429, "rate_limited"), (403, "auth_or_access_error")):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            config.EVENT_DISCOVERY_COINALYZE_SYMBOLS = ("TESTBREAKUSDT_PERP.A",)
+            _preflight, report, _paths = event_coinalyze_preflight.run_no_send_rehearsal(
+                namespace_dir=base,
+                provider_health_path=base / "event_provider_health.json",
+                profile="notify_llm_deep",
+                artifact_namespace="coinalyze_no_send_rehearsal",
+                allow_live_preflight=True,
+                opener=coinalyze_opener("TESTBREAKUSDT_PERP.A", price_end=114, oi_end=108, funding=0.001, long_liq=4, short_liq=4),
+                now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+                clock=lambda: 1781513400,
+            )
+            assert report.status == "live_rehearsal_success"
+            assert report.crowding_candidates_written == 1
+            assert report.fade_review_candidates_written == 0
+            rows = [
+                json.loads(line)
+                for line in (base / "event_derivatives_crowding_candidates.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            assert rows[0]["symbol"] == "TESTBREAK"
+            assert rows[0]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH"
+            assert rows[0]["crowding_class"] == "moderate"
+            assert "confirmed_long_derivatives_crowding_warning" in rows[0]["warnings"]
+            assert report.symbols_with_confirmed_long_crowding_warning == ("TESTBREAK",)
+            assert not (base / "event_fade_short_review_candidates.jsonl").read_text(encoding="utf-8").strip()
+
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            config.EVENT_DISCOVERY_COINALYZE_SYMBOLS = ("EMPTYUSDT_PERP.A",)
+            _preflight, report, _paths = event_coinalyze_preflight.run_no_send_rehearsal(
+                namespace_dir=base,
+                provider_health_path=base / "event_provider_health.json",
+                profile="notify_llm_deep",
+                artifact_namespace="coinalyze_no_send_rehearsal",
+                allow_live_preflight=True,
+                opener=coinalyze_opener("EMPTYUSDT_PERP.A", empty=True),
+                now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+                clock=lambda: 1781513400,
+            )
+            assert report.status == "provider_unavailable"
+            assert report.snapshots_written == 0
+            assert report.provider_health_status == "provider_unavailable"
+            assert "observed_healthy" not in (base / "event_provider_health.json").read_text(encoding="utf-8")
+
+        for code, expected_status in ((429, "rate_limited"), (401, "auth_or_access_error"), (403, "auth_or_access_error")):
             with TemporaryDirectory() as tmp:
                 base = Path(tmp)
+                config.EVENT_DISCOVERY_COINALYZE_SYMBOLS = ("TESTFADEUSDT_PERP.A",)
 
                 def failing_opener(request, _timeout, *, code=code):
                     raise HTTPError(request.full_url, code, "safe failure", hdrs={}, fp=None)
@@ -40087,7 +40261,9 @@ def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_reda
                     clock=lambda: 1781513400,
                 )
                 assert report.status == expected_status
-                assert "coinalyze-key" not in (base / event_coinalyze_preflight.REQUEST_LEDGER).read_text(encoding="utf-8")
+                ledger = (base / event_coinalyze_preflight.REQUEST_LEDGER).read_text(encoding="utf-8")
+                assert "coinalyze-key" not in ledger
+                assert str(code) in ledger
     finally:
         config.EVENT_DISCOVERY_COINALYZE_API_KEY = original_key
         config.EVENT_DISCOVERY_COINALYZE_SYMBOLS = original_symbols

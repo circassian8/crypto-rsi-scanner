@@ -94,6 +94,10 @@ class CoinalyzeRehearsalReport:
     snapshots_written: int
     crowding_candidates_written: int
     fade_review_candidates_written: int
+    crowding_class_counts: dict[str, int]
+    fade_readiness_counts: dict[str, int]
+    symbols_with_extreme_crowding: tuple[str, ...]
+    symbols_with_confirmed_long_crowding_warning: tuple[str, ...]
     provider_health_status: str
     error_class: str | None = None
     error_message_safe: str | None = None
@@ -132,6 +136,10 @@ class CoinalyzeRehearsalReport:
             "snapshots_written": self.snapshots_written,
             "crowding_candidates_written": self.crowding_candidates_written,
             "fade_review_candidates_written": self.fade_review_candidates_written,
+            "crowding_class_counts": dict(self.crowding_class_counts),
+            "fade_readiness_counts": dict(self.fade_readiness_counts),
+            "symbols_with_extreme_crowding": list(self.symbols_with_extreme_crowding),
+            "symbols_with_confirmed_long_crowding_warning": list(self.symbols_with_confirmed_long_crowding_warning),
             "provider_health_status": self.provider_health_status,
             "error_class": self.error_class,
             "error_message_safe": self.error_message_safe,
@@ -343,6 +351,7 @@ def run_no_send_rehearsal(
     snapshots_written = 0
     crowding_written = 0
     fade_written = 0
+    candidate_rows: tuple[dict[str, Any], ...] = ()
     provider_health_status = "not_observed"
 
     if not configured:
@@ -397,29 +406,59 @@ def run_no_send_rehearsal(
             fallback_error_class=error_class,
             fallback_error_message=error_message_safe,
         )
+        run_id = f"coinalyze-rehearsal-{int(observed.timestamp())}"
         state_rows = _derivatives_state_rows(
             snapshots.values(),
             observed_at=observed,
             profile=profile,
             artifact_namespace=artifact_namespace,
+            run_id=run_id,
         )
+        candidate_evaluation_complete = False
         if state_rows:
-            _write_jsonl(derivatives_state_path, state_rows)
-            _write_jsonl(derivatives_candidates_path, [])
-            _write_jsonl(fade_review_path, [])
+            try:
+                derivatives_result = event_derivatives_crowding.run_derivatives_crowding_scan_from_state_rows(
+                    namespace_dir=base,
+                    state_rows=state_rows,
+                    profile=profile,
+                    artifact_namespace=artifact_namespace,
+                    run_mode="no_send_rehearsal",
+                    run_id=run_id,
+                    observed_at=observed,
+                    no_send_rehearsal=True,
+                    warnings=warnings,
+                )
+                candidate_rows = derivatives_result.candidate_rows
+                candidate_evaluation_complete = derivatives_result.evaluated_candidate_count >= len(state_rows)
+                crowding_written = derivatives_result.evaluated_candidate_count
+                fade_written = derivatives_result.fade_review_candidate_count
+            except Exception as exc:  # noqa: BLE001 - rehearsal artifacts must fail safe
+                _write_jsonl(derivatives_state_path, state_rows)
+                _write_jsonl(derivatives_candidates_path, [])
+                _write_jsonl(fade_review_path, [])
+                warnings.append(f"derivatives_candidate_evaluation_failed:{type(exc).__name__}")
+                error_class = error_class or type(exc).__name__
+                error_message_safe = error_message_safe or _safe_error_message(exc, _api_key())
+        if status == "live_rehearsal_success" and state_rows and not candidate_evaluation_complete:
+            status = "live_rehearsal_partial"
+            error_class = error_class or "candidate_evaluation_partial"
+            error_message_safe = error_message_safe or "derivatives candidate evaluation did not complete"
         snapshots_written = len(state_rows)
-        crowding_written = 0
-        fade_written = 0
         provider_health_status = _record_provider_health(
             status=status,
             provider_health_path=provider_health_path,
             now=observed,
-            run_id=f"coinalyze-rehearsal-{int(observed.timestamp())}",
+            run_id=run_id,
+            successful_ledger_rows=sum(1 for row in ledger_rows if bool(row.get("success"))),
+            derivatives_state_rows=snapshots_written,
+            candidate_evaluation_complete=candidate_evaluation_complete,
             error_class=error_class,
             error_message=error_message_safe,
         )
 
     requests_used = len(_read_jsonl(ledger_path))
+    crowding_class_counts = _counts(str(row.get("crowding_class") or "unknown") for row in candidate_rows)
+    fade_readiness_counts = _counts(str(row.get("fade_readiness") or "unknown") for row in candidate_rows)
     report = CoinalyzeRehearsalReport(
         provider="coinalyze",
         status=status,
@@ -444,6 +483,10 @@ def run_no_send_rehearsal(
         snapshots_written=snapshots_written,
         crowding_candidates_written=crowding_written,
         fade_review_candidates_written=fade_written,
+        crowding_class_counts=crowding_class_counts,
+        fade_readiness_counts=fade_readiness_counts,
+        symbols_with_extreme_crowding=_symbols_with_crowding_class(candidate_rows, "extreme"),
+        symbols_with_confirmed_long_crowding_warning=_symbols_with_confirmed_long_crowding_warning(candidate_rows),
         provider_health_status=provider_health_status,
         error_class=error_class,
         error_message_safe=error_message_safe,
@@ -511,6 +554,12 @@ def format_rehearsal_report(report: CoinalyzeRehearsalReport) -> str:
         f"snapshots_written: {report.snapshots_written}",
         f"crowding_candidates_written: {report.crowding_candidates_written}",
         f"fade_review_candidates_written: {report.fade_review_candidates_written}",
+        f"crowding_class_counts: {_format_counts(report.crowding_class_counts)}",
+        f"fade_readiness_counts: {_format_counts(report.fade_readiness_counts)}",
+        "symbols_with_extreme_crowding: "
+        + (", ".join(report.symbols_with_extreme_crowding) or "none"),
+        "symbols_with_confirmed_long_crowding_warning: "
+        + (", ".join(report.symbols_with_confirmed_long_crowding_warning) or "none"),
         f"provider_health_status: {report.provider_health_status}",
         f"request_ledger_path: {report.request_ledger_path}",
         f"derivatives_state_path: {report.derivatives_state_path}",
@@ -609,6 +658,7 @@ def _derivatives_state_rows(
     observed_at: datetime,
     profile: str | None,
     artifact_namespace: str | None,
+    run_id: str,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -628,9 +678,16 @@ def _derivatives_state_rows(
                 profile=profile,
                 artifact_namespace=artifact_namespace,
                 run_mode="no_send_rehearsal",
-                run_id=f"coinalyze-rehearsal-{int(observed_at.timestamp())}",
+                run_id=run_id,
             )
         )
+        rows[-1]["no_send_rehearsal"] = True
+        rows[-1]["strict_alerts_created"] = 0
+        rows[-1]["telegram_sends"] = 0
+        rows[-1]["trades_created"] = 0
+        rows[-1]["paper_trades_created"] = 0
+        rows[-1]["normal_rsi_signal_rows_written"] = 0
+        rows[-1]["triggered_fade_created"] = 0
     return rows
 
 
@@ -642,6 +699,42 @@ def _symbols_from_state_file(path: Path) -> tuple[str, ...]:
             if str(row.get("symbol") or "").strip()
         )
     )
+
+
+def _counts(values: Iterable[str]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for value in values:
+        text = str(value or "").strip() or "unknown"
+        out[text] = out.get(text, 0) + 1
+    return dict(sorted(out.items()))
+
+
+def _format_counts(counts: Mapping[str, int]) -> str:
+    return ", ".join(f"{key}={value}" for key, value in sorted(counts.items())) or "none"
+
+
+def _symbols_with_crowding_class(rows: Iterable[Mapping[str, Any]], crowding_class: str) -> tuple[str, ...]:
+    target = crowding_class.casefold()
+    symbols = (
+        str(row.get("symbol") or "").upper()
+        for row in rows
+        if str(row.get("crowding_class") or "").casefold() == target
+    )
+    return tuple(dict.fromkeys(symbol for symbol in symbols if symbol))
+
+
+def _symbols_with_confirmed_long_crowding_warning(rows: Iterable[Mapping[str, Any]]) -> tuple[str, ...]:
+    symbols: list[str] = []
+    for row in rows:
+        if str(row.get("opportunity_type") or "").upper() != "CONFIRMED_LONG_RESEARCH":
+            continue
+        warnings = [str(item) for item in row.get("warnings") or () if str(item)]
+        if not any("crowding" in warning.casefold() for warning in warnings):
+            continue
+        symbol = str(row.get("symbol") or "").upper()
+        if symbol:
+            symbols.append(symbol)
+    return tuple(dict.fromkeys(symbols))
 
 
 def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
@@ -700,11 +793,16 @@ def _record_provider_health(
     provider_health_path: str | Path,
     now: datetime,
     run_id: str,
+    successful_ledger_rows: int,
+    derivatives_state_rows: int,
+    candidate_evaluation_complete: bool,
     error_class: str | None,
     error_message: str | None,
 ) -> str:
     cfg = event_provider_health.EventProviderHealthConfig(path=Path(provider_health_path), max_consecutive_failures=1)
-    if status == "live_rehearsal_success":
+    has_successful_ledger = successful_ledger_rows > 0
+    has_derivatives_state = derivatives_state_rows > 0
+    if status == "live_rehearsal_success" and has_successful_ledger and has_derivatives_state and candidate_evaluation_complete:
         row = event_provider_health.record_provider_success(
             PROVIDER_HEALTH_KEY,
             cfg=cfg,
@@ -718,7 +816,7 @@ def _record_provider_health(
         rows[str(row.get("provider_key") or PROVIDER_HEALTH_KEY)] = row
         event_provider_health.write_provider_health(cfg.path, rows)
         return "observed_healthy"
-    if status == "live_rehearsal_partial":
+    if status in {"live_rehearsal_success", "live_rehearsal_partial"} and has_successful_ledger:
         row = event_provider_health.record_provider_success(
             PROVIDER_HEALTH_KEY,
             cfg=cfg,
@@ -1014,6 +1112,7 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
         "coinalyze_rehearsal_live_without_explicit_allow": 0,
         "coinalyze_rehearsal_request_budget_exceeded": 0,
         "coinalyze_rehearsal_success_without_derivatives_state": 0,
+        "coinalyze_rehearsal_success_without_crowding_candidates": 0,
         "coinalyze_provider_health_healthy_without_successful_ledger": 0,
         "coinalyze_rehearsal_forbidden_side_effect_claim": 0,
     }
@@ -1069,6 +1168,8 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
             out["coinalyze_rehearsal_request_budget_exceeded"] = 1
         if status in {"live_rehearsal_success", "live_rehearsal_partial"} and int(rehearsal_data.get("snapshots_written") or 0) <= 0:
             out["coinalyze_rehearsal_success_without_derivatives_state"] = 1
+        if status == "live_rehearsal_success" and int(rehearsal_data.get("crowding_candidates_written") or 0) <= 0:
+            out["coinalyze_rehearsal_success_without_crowding_candidates"] = 1
         for key in (
             "strict_alerts_created",
             "telegram_sends",
@@ -1082,8 +1183,10 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
     if re.search(r"(?i)\b(send telegram|paper trade|live trade|execute order|triggered_fade created)\b", text):
         out["coinalyze_rehearsal_forbidden_side_effect_claim"] = 1
     health_rows = _provider_health_rows(base / "event_provider_health.json")
-    if _coinalyze_health_healthy(health_rows) and not any(
-        row.get("provider") == "coinalyze" and row.get("success") for row in ledger_rows
+    state_rows = _read_jsonl(base / event_derivatives_crowding.DERIVATIVES_STATE_FILENAME)
+    if _coinalyze_health_observed_healthy(health_rows) and (
+        not any(row.get("provider") == "coinalyze" and row.get("success") for row in ledger_rows)
+        or not state_rows
     ):
         out["coinalyze_provider_health_healthy_without_successful_ledger"] = 1
     return out
@@ -1102,14 +1205,12 @@ def _provider_health_rows(path: Path) -> tuple[Mapping[str, Any], ...]:
     return ()
 
 
-def _coinalyze_health_healthy(rows: Iterable[Mapping[str, Any]]) -> bool:
+def _coinalyze_health_observed_healthy(rows: Iterable[Mapping[str, Any]]) -> bool:
     for row in rows:
         if "coinalyze" not in " ".join(str(row.get(key) or "") for key in ("provider", "provider_key", "provider_service")).casefold():
             continue
         status = str(row.get("provider_coverage_status") or "").casefold()
-        if status in {"observed_healthy", "observed_partial_success"}:
-            return True
-        if row.get("last_success_at") and not int(row.get("consecutive_failures") or 0):
+        if status == "observed_healthy":
             return True
     return False
 

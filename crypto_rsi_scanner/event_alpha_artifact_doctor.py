@@ -212,6 +212,7 @@ class EventAlphaArtifactDoctorResult:
     coinalyze_rehearsal_live_without_explicit_allow: int = 0
     coinalyze_rehearsal_request_budget_exceeded: int = 0
     coinalyze_rehearsal_success_without_derivatives_state: int = 0
+    coinalyze_rehearsal_success_without_crowding_candidates: int = 0
     coinalyze_provider_health_healthy_without_successful_ledger: int = 0
     coinalyze_rehearsal_forbidden_side_effect_claim: int = 0
     source_pack_provider_status_missing: int = 0
@@ -1360,6 +1361,7 @@ def diagnose_artifacts(
         "coinalyze_rehearsal_live_without_explicit_allow",
         "coinalyze_rehearsal_request_budget_exceeded",
         "coinalyze_rehearsal_success_without_derivatives_state",
+        "coinalyze_rehearsal_success_without_crowding_candidates",
         "coinalyze_provider_health_healthy_without_successful_ledger",
         "coinalyze_rehearsal_forbidden_side_effect_claim",
     ):
@@ -2118,6 +2120,9 @@ def diagnose_artifacts(
         ],
         coinalyze_rehearsal_success_without_derivatives_state=coinalyze_preflight_conflicts[
             "coinalyze_rehearsal_success_without_derivatives_state"
+        ],
+        coinalyze_rehearsal_success_without_crowding_candidates=coinalyze_preflight_conflicts[
+            "coinalyze_rehearsal_success_without_crowding_candidates"
         ],
         coinalyze_provider_health_healthy_without_successful_ledger=coinalyze_preflight_conflicts[
             "coinalyze_provider_health_healthy_without_successful_ledger"
@@ -6260,6 +6265,8 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"coinalyze_rehearsal_request_budget_exceeded={result.coinalyze_rehearsal_request_budget_exceeded} "
             "coinalyze_rehearsal_success_without_derivatives_state="
             f"{result.coinalyze_rehearsal_success_without_derivatives_state} "
+            "coinalyze_rehearsal_success_without_crowding_candidates="
+            f"{result.coinalyze_rehearsal_success_without_crowding_candidates} "
             "coinalyze_provider_health_healthy_without_successful_ledger="
             f"{result.coinalyze_provider_health_healthy_without_successful_ledger} "
             "coinalyze_rehearsal_forbidden_side_effect_claim="

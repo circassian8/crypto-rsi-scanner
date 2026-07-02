@@ -132,6 +132,78 @@ def run_derivatives_crowding_scan(
     )
 
 
+def run_derivatives_crowding_scan_from_state_rows(
+    *,
+    namespace_dir: str | Path,
+    state_rows: Iterable[Mapping[str, Any]],
+    profile: str | None = None,
+    artifact_namespace: str | None = None,
+    run_mode: str | None = None,
+    run_id: str | None = None,
+    observed_at: datetime | str | None = None,
+    no_send_rehearsal: bool = False,
+    warnings: Iterable[str] = (),
+) -> DerivativesCrowdingScanResult:
+    """Evaluate already-normalized derivatives state into research candidates."""
+    directory = Path(namespace_dir).expanduser()
+    directory.mkdir(parents=True, exist_ok=True)
+    observed = _as_utc(_parse_time(observed_at) or datetime.now(timezone.utc))
+    states = [dict(row) for row in state_rows if isinstance(row, Mapping)]
+    candidate_rows: list[dict[str, Any]] = []
+    for state in states:
+        candidate = evaluate_derivatives_fade_candidate(
+            _candidate_from_derivatives_state(state, observed_at=observed),
+            derivatives_state=state,
+            observed_at=observed,
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+            run_mode=run_mode,
+            run_id=run_id,
+        )
+        candidate["research_only"] = True
+        candidate["no_send_rehearsal"] = bool(no_send_rehearsal)
+        candidate["strict_alerts_created"] = 0
+        candidate["telegram_sends"] = 0
+        candidate["trades_created"] = 0
+        candidate["paper_trades_created"] = 0
+        candidate["normal_rsi_signal_rows_written"] = 0
+        candidate["triggered_fade_created"] = False
+        candidate_rows.append(candidate)
+
+    fade_rows = [row for row in candidate_rows if row.get("opportunity_type") == FADE_REVIEW_LANE]
+    state_path = directory / DERIVATIVES_STATE_FILENAME
+    candidates_path = directory / DERIVATIVES_CROWDING_CANDIDATES_FILENAME
+    fade_path = directory / FADE_SHORT_REVIEW_CANDIDATES_FILENAME
+    report_path = directory / DERIVATIVES_CROWDING_REPORT_FILENAME
+    _write_jsonl(state_path, states)
+    _write_jsonl(candidates_path, candidate_rows)
+    _write_jsonl(fade_path, fade_rows)
+    report_path.write_text(
+        format_derivatives_crowding_report(
+            state_rows=states,
+            candidate_rows=candidate_rows,
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+            warnings=warnings,
+        ),
+        encoding="utf-8",
+    )
+    return DerivativesCrowdingScanResult(
+        namespace_dir=directory,
+        derivatives_state_path=state_path,
+        derivatives_candidates_path=candidates_path,
+        fade_review_candidates_path=fade_path,
+        report_path=report_path,
+        derivatives_state_count=len(states),
+        evaluated_candidate_count=len(candidate_rows),
+        fade_review_candidate_count=len(fade_rows),
+        derivatives_state_rows=tuple(states),
+        candidate_rows=tuple(candidate_rows),
+        fade_review_candidates=tuple(fade_rows),
+        warnings=tuple(warnings),
+    )
+
+
 def normalize_derivatives_state(
     row: Mapping[str, Any],
     *,
@@ -186,6 +258,8 @@ def normalize_derivatives_state(
         "funding_rate": funding,
         "predicted_funding_rate": _float(_first(row, "predicted_funding_rate", "predicted_funding")),
         "funding_zscore": funding_z,
+        "futures_price_return_24h_pct": _pct(_first(row, "futures_price_return_24h_pct", "futures_price_24h_change_pct", "price_return_24h", "return_24h", "price_change_24h")),
+        "futures_price_return_4h_pct": _pct(_first(row, "futures_price_return_4h_pct", "futures_price_4h_change_pct", "price_return_4h", "return_4h", "price_change_4h")),
         "liquidation_long_usd": long_liq,
         "liquidation_short_usd": short_liq,
         "liquidation_imbalance": liquidation_imbalance,
@@ -391,6 +465,96 @@ def format_derivatives_crowding_report(
         lines.extend(["", "## Warnings"])
         lines.extend(f"- {warning}" for warning in warnings)
     return "\n".join(lines) + "\n"
+
+
+def _candidate_from_derivatives_state(state: Mapping[str, Any], *, observed_at: datetime) -> dict[str, Any]:
+    symbol = (_text(state.get("symbol")) or "UNKNOWN").upper()
+    coin_id = _text(state.get("coin_id")) or symbol.lower()
+    market_snapshot = _market_snapshot_from_derivatives_state(state, observed_at=observed_at)
+    confirmation_score = _state_market_confirmation_score(market_snapshot, state)
+    if confirmation_score >= 75:
+        confirmation_level = "strong"
+    elif confirmation_score >= 50:
+        confirmation_level = "moderate"
+    else:
+        confirmation_level = "weak"
+    return {
+        "symbol": symbol,
+        "coin_id": coin_id,
+        "event_name": f"{symbol} Coinalyze derivatives crowding rehearsal",
+        "source_class": "derivatives_provider",
+        "source_pack": "derivatives_crowding_pack",
+        "impact_path_type": "derivatives_crowding_research",
+        "playbook_type": "derivatives_crowding_research",
+        "evidence_quality_score": 82,
+        "accepted_evidence_count": 1,
+        "accepted_evidence_reason_codes": ("coinalyze_derivatives_state",),
+        "market_confirmation_level": confirmation_level,
+        "market_confirmation_score": confirmation_score,
+        "market_snapshot": market_snapshot,
+    }
+
+
+def _market_snapshot_from_derivatives_state(state: Mapping[str, Any], *, observed_at: datetime) -> dict[str, Any]:
+    return_24h = _return_fraction(_first(state, "futures_price_return_24h_pct", "futures_price_return_24h", "price_return_24h", "return_24h"))
+    return_4h = _return_fraction(_first(state, "futures_price_return_4h_pct", "futures_price_return_4h", "price_return_4h", "return_4h"))
+    volume_ratio = _float(state.get("perp_spot_volume_ratio"))
+    volume_z = None
+    if volume_ratio is not None:
+        if volume_ratio >= 4:
+            volume_z = 4.0
+        elif volume_ratio >= 3:
+            volume_z = 3.0
+        elif volume_ratio >= 2:
+            volume_z = 2.0
+    market: dict[str, Any] = {
+        "return_24h": return_24h,
+        "return_4h": return_4h,
+        "volume_zscore_24h": volume_z,
+        "market_context_freshness_status": state.get("freshness_status") or "unknown",
+        "market_context_source": "coinalyze_derivatives_rehearsal",
+    }
+    age = _state_age_hours(state, observed_at=observed_at)
+    if age is not None:
+        market["event_age_hours"] = age
+    return {key: value for key, value in market.items() if value is not None}
+
+
+def _state_market_confirmation_score(market: Mapping[str, Any], state: Mapping[str, Any]) -> int:
+    r24 = _return_pct(market.get("return_24h"))
+    r4 = _return_pct(market.get("return_4h"))
+    if (r24 is not None and r24 >= 30) or (r4 is not None and r4 >= 20):
+        return 82
+    if (r24 is not None and r24 >= 12) or (r4 is not None and r4 >= 5):
+        return 62
+    if _crowding_evidence(state):
+        return 45
+    return 30
+
+
+def _state_age_hours(state: Mapping[str, Any], *, observed_at: datetime) -> float | None:
+    source_time = _parse_time(state.get("observed_at"))
+    if source_time is None:
+        return None
+    return max(0.0, (observed_at - _as_utc(source_time)).total_seconds() / 3600.0)
+
+
+def _return_fraction(value: object) -> float | None:
+    number = _float(value)
+    if number is None:
+        return None
+    if abs(number) <= 3.0:
+        return number
+    return number / 100.0
+
+
+def _return_pct(value: object) -> float | None:
+    number = _float(value)
+    if number is None:
+        return None
+    if abs(number) <= 3.0:
+        return number * 100.0
+    return number
 
 
 def _load_payload(path: str | Path) -> Any:

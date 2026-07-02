@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Emit Coinalyze rehearsal crowding artifacts · Codex
+**Why:** A bounded Coinalyze no-send rehearsal could prove request/parse health
+but still left `event_derivatives_crowding_candidates.jsonl` and
+`event_fade_short_review_candidates.jsonl` empty, so successful live/mocked
+state did not produce reviewable derivatives research rows.
+**Changes:**
+- Reused the deterministic derivatives crowding/fade evaluator for
+  Coinalyze live/mocked rehearsal state rows, writing crowding and
+  fade/short-review candidate artifacts plus class/readiness summaries.
+- Carried live OHLCV price change and long/short liquidation splits through the
+  Coinalyze provider normalization while dropping metric-empty live rows from
+  healthy state counts.
+- Tightened Coinalyze provider-health and artifact-doctor checks so
+  `observed_healthy` requires successful ledger rows plus derivatives state,
+  live success without crowding candidates blocks, and live-call paths require
+  a request ledger.
+- Expanded tests for mocked TESTFADE-like fade rows, moderate crowded long
+  warnings, 429/401/403 handling, zero-snapshot success ledgers, blocked default
+  live calls, and no side effects.
+**Verify:** `python3 tests/test_indicators.py` (661/661); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-preflight PYTHON=python3`; `make
+event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`; `make
+event-alpha-derivatives-smoke PYTHON=python3`; `make
+event-alpha-fade-review-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** The normal local rehearsal still made no provider call because
+no Coinalyze key/explicit allow flag was present; it reported `missing_config`
+with zero requests and zero sends/trades/paper/RSI/`TRIGGERED_FADE` side
+effects.
+
 ## 2026-07-02 — Add bounded Coinalyze no-send rehearsal and artifact checks · Codex
 **Why:** Coinalyze activation needed to move past a no-call preflight without
 opening an unsafe live path, while source coverage, daily briefs, research-review

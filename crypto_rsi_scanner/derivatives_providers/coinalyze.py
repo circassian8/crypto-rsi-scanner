@@ -162,6 +162,8 @@ class CoinalyzeDerivativesProvider:
                 symbol = str(item.get("symbol") or "")
                 row = by_symbol.setdefault(symbol, _live_base_row(symbol))
                 row["liquidations_24h"] = _liquidation_sum(item.get("history"))
+                row["long_liquidations"] = _history_sum(item.get("history"), "l")
+                row["short_liquidations"] = _history_sum(item.get("history"), "s")
             for item in self._get("long-short-ratio-history", history_params):
                 symbol = str(item.get("symbol") or "")
                 row = by_symbol.setdefault(symbol, _live_base_row(symbol))
@@ -169,6 +171,7 @@ class CoinalyzeDerivativesProvider:
             for item in self._get("ohlcv-history", history_params):
                 symbol = str(item.get("symbol") or "")
                 row = by_symbol.setdefault(symbol, _live_base_row(symbol))
+                row["futures_price_24h_change_pct"] = _history_change_pct(item.get("history"))
                 row["futures_volume_24h"] = _history_sum(item.get("history"), "v")
             rows.extend(by_symbol.values())
         return rows
@@ -263,7 +266,7 @@ def _snapshot(row: Mapping[str, Any]) -> dict[str, Any] | None:
     if not symbol:
         return None
     timestamp = _parse_dt(row.get("timestamp") or row.get("time") or row.get("created_at"))
-    return {
+    snapshot = {
         "symbol": symbol,
         "timestamp": timestamp.isoformat() if timestamp else None,
         "perp_available": bool(row.get("perp_available", True)),
@@ -276,12 +279,21 @@ def _snapshot(row: Mapping[str, Any]) -> dict[str, Any] | None:
         ),
         "funding_rate_8h": _float_or_none(_first_present(row, "funding_rate_8h", "funding_rate")),
         "funding_rate_percentile": _float_or_none(row.get("funding_rate_percentile")),
+        "futures_price_24h_change_pct": _float_or_none(
+            _first_present(row, "futures_price_24h_change_pct", "price_return_24h", "return_24h", "price_change_24h")
+        ),
         "futures_volume_24h": _float_or_none(_first_present(row, "futures_volume_24h", "volume_24h")),
         "perp_spot_volume_ratio": _float_or_none(row.get("perp_spot_volume_ratio")),
         "liquidations_24h": _float_or_none(row.get("liquidations_24h")),
+        "long_liquidations": _float_or_none(_first_present(row, "long_liquidations", "long_liquidations_24h", "liquidation_long_usd")),
+        "short_liquidations": _float_or_none(_first_present(row, "short_liquidations", "short_liquidations_24h", "liquidation_short_usd")),
         "long_short_ratio": _float_or_none(row.get("long_short_ratio")),
         "basis": _float_or_none(row.get("basis")),
     }
+    metric_keys = tuple(key for key in snapshot if key not in {"symbol", "timestamp", "perp_available"})
+    if not any(snapshot.get(key) is not None for key in metric_keys) and row.get("perp_available") is not False:
+        return None
+    return snapshot
 
 
 def _keys(row: Mapping[str, Any], snapshot: Mapping[str, Any]) -> tuple[str, ...]:
