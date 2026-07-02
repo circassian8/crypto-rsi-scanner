@@ -864,7 +864,8 @@ def _announcement_id(provider: str, item: Mapping[str, Any], title: str, publish
     explicit = item.get("announcement_id") or item.get("id") or item.get("code") or item.get("articleId")
     if explicit:
         return str(explicit)
-    return f"{provider}:{_digest(f'{title}|{published_at or ''}')}"
+    digest_source = f"{title}|{published_at or ''}"
+    return f"{provider}:{_digest(digest_source)}"
 
 
 def _event_time(item: Mapping[str, Any], *keys: str) -> str | None:

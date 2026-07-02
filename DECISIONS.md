@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Event Alpha refactor v1 accepted
+**Status:** accepted
+**Decision:** Event Alpha refactor v1 is accepted for resuming provider
+activation work. The compatibility-first package split, schema-first doctor,
+namespace lifecycle, shim registry, pytest-compatible test split, and safe CI
+workflow configuration are now the baseline architecture contract.
+**Why:** The post-refactor release-candidate gauntlet passed all critical local
+checks: standalone runner, full pytest, compileall, `make test-pytest`, Event
+Alpha integrated radar/outcome/readiness/provider/scheduled/unlock/derivatives/
+fade-review/source-coverage/daily-brief/notify-preview/strict-doctor/namespace
+lifecycle smokes, and `make verify`. Doctor schema validation covered 328 row
+checks with zero schema errors, the doctor registry remained stable at 53
+registered checks and 15 legacy-unregistered checks, active shim logic
+violations are zero, and safety invariants remained no-live/no-send/no-trading/
+no-paper/no-RSI/no-Event-Alpha-created-TRIGGERED_FADE. A prior GitHub Actions
+run failed on Python 3.11 f-string parsing; this RC includes the compatibility
+fix and `/usr/bin/python3` compileall now passes.
+**Revisit when:** a critical smoke/doctor/verify command regresses, GitHub
+Actions exposes a new incompatibility on the RC commit, an old import shim is
+removed, or provider activation work needs to change the schema/doctor/namespace
+contract.
+
 ## 2026-07-02 - Active Event Alpha shims are compatibility-only
 **Status:** accepted
 **Decision:** Old top-level Event Alpha modules that have migrated package homes

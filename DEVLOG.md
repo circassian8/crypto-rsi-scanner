@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Accept Event Alpha refactor v1 release candidate · Codex
+**Why:** Provider activation work should resume only after the post-refactor
+architecture has a full regression pass, explicit safety evidence, and a
+release-candidate report.
+**Changes:**
+- Fixed a Python 3.11-compatible f-string parse issue in
+  `crypto_rsi_scanner/event_alpha/providers/official_exchange.py` found by the
+  latest GitHub Actions run.
+- Added `research/REFACTOR_RELEASE_CANDIDATE_REPORT.md` and
+  `research/REFACTOR_RELEASE_CANDIDATE_REPORT.json` with command results,
+  monolith reductions, shim/module counts, schema validation coverage, doctor
+  registry coverage, namespace lifecycle inventory, CI status, safety
+  invariants, and remaining non-critical follow-ups.
+- Added the durable `Event Alpha refactor v1 accepted` decision to
+  `DECISIONS.md`.
+- Updated `ROADMAP.md`.
+**Verify:** Full requested gauntlet passed: `python3 tests/test_indicators.py`
+(730/730); `python3 -m pytest` (736/736); `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make test-pytest PYTHON=python3`; integrated
+radar smoke/doctor/outcome smoke/outcome report/calibration report; live-provider
+readiness smoke; Coinalyze preflight smoke, normal preflight, and no-send
+rehearsal; market anomaly, official exchange, scheduled catalyst, unlock risk,
+derivatives, and fade-review smokes; source coverage report, daily brief,
+notify preview from artifacts, strict artifact doctor for
+`notify_llm_deep_cryptopanic_rehearsal`, namespace lifecycle report, known-stale
+namespace marking, and `make verify PYTHON=python3`. Also ran
+`/usr/bin/python3 -m compileall -q crypto_rsi_scanner tests` to verify the CI
+Python 3.11 syntax class.
+**Notes/risks:** No critical RC blockers remain locally. `scanner.py` and
+`event_alpha_artifact_doctor.py` still exceed final size targets and remain
+documented follow-ups. The previous pushed GitHub Actions `Verify` run failed
+before this compatibility fix, so the next post-push remote CI run should be
+watched.
+
 ## 2026-07-02 — Generate refactor final gate report · Codex
 **Why:** After the v1 migration phases, the remaining monolith and shim state
 needed a measurable final gate report before more code movement.
