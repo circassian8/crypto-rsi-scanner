@@ -283,6 +283,8 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "git archive --format=zip -o crypto-rsi-scanner-source.zip HEAD" in makefile
     assert "export-src-with-artifacts:" in makefile
     assert "python3 scripts/export_source_with_artifacts.py" in makefile
+    assert "export-src-with-artifacts-smoke:" in makefile
+    assert "$(PYTHON) scripts/export_source_with_artifacts.py" in makefile
     assert "event-fade-check-review-template:" in makefile
     assert "--event-fade-check-review-template $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_TEMPLATE)" in makefile
     assert "event-fade-check-review-bundle:" in makefile
@@ -334,6 +336,9 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
             zipped_ts = datetime(*zf.getinfo("Makefile").date_time).timestamp()
         assert zipped_ts <= now_ts + 2
         assert zipped_ts < future_ts - 3600
+        changed = export_module._normalize_input_timestamps([future_file], safe_export_timestamp=now_ts)
+        assert changed == 1
+        assert future_file.stat().st_mtime <= now_ts + 2
         original_epoch = os.environ.get("SOURCE_DATE_EPOCH")
         os.environ["SOURCE_DATE_EPOCH"] = "315619200"
         try:
@@ -435,12 +440,14 @@ def test_github_actions_are_safe_fixture_verification_only():
     assert 'RSI_EVENT_ALERTS_ENABLED: "0"' in smoke_text
     assert 'RSI_EVENT_RESEARCH_NOW: "2026-06-15T16:00:00Z"' in verify_text
     assert 'RSI_EVENT_RESEARCH_NOW: "2026-06-15T16:00:00Z"' in smoke_text
+    assert 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in verify_text
+    assert 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in smoke_text
 
     verify_runs = [line.split("run:", 1)[1].strip() for line in verify_text.splitlines() if line.strip().startswith("run:")]
     assert verify_runs == [
         "python3 -m pip install --disable-pip-version-check -r requirements.txt pytest",
         "python3 tests/test_indicators.py",
-        "python3 -m pytest",
+        "python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py",
         "python3 -m compileall -q crypto_rsi_scanner tests",
         "make verify PYTHON=python3",
     ]
@@ -582,7 +589,7 @@ def test_refactor_baseline_json_contains_file_counts_and_inventory():
     assert counts["crypto_rsi_scanner/scanner.py"] > 4000
     assert counts["tests/test_indicators.py"] == umbrella_lines
     assert counts["tests/test_indicators.py"] < 2000
-    assert counts["crypto_rsi_scanner/event_alpha_artifact_doctor.py"] > 1500
+    assert counts["crypto_rsi_scanner/event_alpha_artifact_doctor.py"] < 100
     assert payload["top_level_event_module_count"] == len(payload["top_level_event_modules"])
     assert payload["top_level_event_module_count"] > 0
     assert "crypto_rsi_scanner/event_alpha/artifacts/schema_v1.py" in payload["event_alpha_package_files"]
@@ -632,14 +639,16 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["pytest_runtime_seconds"] == 12.34
     assert payload["standalone_runner_runtime_seconds"] == 56.78
     assert payload["line_counts"]["tests/test_indicators.py"] < 2000
-    assert payload["line_counts"]["crypto_rsi_scanner/scanner.py"] > 4000
-    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha_artifact_doctor.py"] > 1500
+    assert payload["line_counts"]["crypto_rsi_scanner/scanner.py"] < 8000
+    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha_artifact_doctor.py"] < 100
+    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"] > 1500
     assert payload["active_shims"] >= 50
-    assert payload["partial_shims"] >= 1
+    assert payload["partial_shims"] == 0
     assert payload["unmigrated_modules"] >= 1
     assert payload["active_shim_modules_with_implementation_logic"] == 0
-    assert any(row["path"] == "crypto_rsi_scanner/scanner.py" for row in payload["blockers"])
-    assert any(row["path"] == "crypto_rsi_scanner/event_alpha_artifact_doctor.py" for row in payload["blockers"])
+    assert not any(row["path"] == "crypto_rsi_scanner/scanner.py" for row in payload["blockers"])
+    assert not any(row["path"] == "crypto_rsi_scanner/event_alpha_artifact_doctor.py" for row in payload["blockers"])
+    assert any(row["path"] == "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py" for row in payload["blockers"])
     phases = {row["phase"]: row["policy"] for row in payload["deprecation_plan"]}
     assert "v1" in phases and "active compatibility shims" in phases["v1"]
     assert "v2" in phases and "warn in development mode only" in phases["v2"]
@@ -662,6 +671,49 @@ def test_refactor_final_report_make_target_is_available():
     assert "subprocess" not in module_text
     assert "urlopen" not in module_text
     assert "requests." not in module_text
+
+
+def test_test_runtime_report_writes_json_and_markdown_without_live_side_effects():
+    import json
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from crypto_rsi_scanner import test_runtime_report
+
+    results = (
+        test_runtime_report.RuntimeCommandResult(
+            name="standalone_runner",
+            command=("python3", "tests/test_indicators.py"),
+            returncode=0,
+            runtime_seconds=1.25,
+        ),
+        test_runtime_report.RuntimeCommandResult(
+            name="pytest_safe",
+            command=("python3", "-m", "pytest"),
+            returncode=0,
+            runtime_seconds=2.5,
+        ),
+    )
+    with TemporaryDirectory() as tmp:
+        paths = test_runtime_report.write_runtime_report(
+            root=REPO_ROOT,
+            out_dir=Path(tmp),
+            results=results,
+        )
+        payload = json.loads(paths["json"].read_text(encoding="utf-8"))
+        markdown = paths["markdown"].read_text(encoding="utf-8")
+
+    assert payload["schema_version"] == "test_runtime_report_v1"
+    assert payload["research_only"] is True
+    assert payload["live_provider_calls_allowed"] is False
+    assert payload["telegram_sends"] == 0
+    assert payload["trades_created"] == 0
+    assert payload["paper_trades_created"] == 0
+    assert payload["normal_rsi_signal_rows_written"] == 0
+    assert payload["triggered_fade_created"] == 0
+    assert payload["standalone_runner_runtime_seconds"] == 1.25
+    assert payload["pytest_runtime_seconds"] == 2.5
+    assert "Test Runtime Report" in markdown
 
 
 def test_split_rsi_cli_runner_and_make_targets_are_wired():

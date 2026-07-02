@@ -27,12 +27,12 @@ from ... import (
     event_incident_graph,
     event_impact_path_validator,
     event_llm_catalyst_frames,
-    event_market_confirmation,
 )
 from ...event_llm_extractor import EventLLMExtractionReportRow
 from ...event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 from ...event_resolver import clean_text
 from . import incidents as event_incident_store
+from . import market_confirmation as event_market_confirmation
 from . import opportunity_verdict as event_opportunity_verdict
 
 

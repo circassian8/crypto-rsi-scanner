@@ -591,7 +591,7 @@ def registry_errors() -> tuple[str, ...]:
 
 
 def _artifact_doctor_source_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "event_alpha_artifact_doctor.py"
+    return Path(__file__).resolve().parent / "artifact_doctor.py"
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -15,8 +15,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import event_asset_registry
 from ..artifacts import schema_v1
+from . import asset_registry as event_asset_registry
 from . import market_state as event_market_state
 
 

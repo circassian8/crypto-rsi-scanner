@@ -1989,7 +1989,7 @@ def _markdown_card_paths(path: str | Path | None) -> tuple[Path, ...]:
 def _card_path_by_core_id(paths: Iterable[str | Path]) -> dict[str, str]:
     out: dict[str, str] = {}
     try:
-        from ... import event_research_cards
+        from ..artifacts import research_cards as event_research_cards
     except Exception:  # noqa: BLE001 - optional presentation helper.
         return out
     for value in paths:
@@ -2237,7 +2237,7 @@ def _research_card_path(
     if existing:
         return existing
     try:
-        from ... import event_research_cards
+        from ..artifacts import research_cards as event_research_cards
     except Exception:  # noqa: BLE001 - optional presentation helper.
         return None
     for path in paths:

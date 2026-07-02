@@ -25,6 +25,8 @@ STATUS_ACTIVE_FIXTURE_SMOKE = "active_fixture_smoke"
 STATUS_ACTIVE_PROVIDER_PREFLIGHT = "active_provider_preflight"
 STATUS_ACTIVE_PROVIDER_REHEARSAL = "active_provider_rehearsal"
 STATUS_ACTIVE_INTEGRATED_SMOKE = "active_integrated_smoke"
+STATUS_ACTIVE_REFACTOR_REPORT = "active_refactor_report"
+STATUS_MANUAL_REVIEW = "manual_review"
 STATUS_STALE_DEPRECATED = "stale_deprecated"
 STATUS_ARCHIVED = "archived"
 STATUS_QUARANTINE = "quarantine"
@@ -302,15 +304,28 @@ def _classify_namespace(
         STATUS_ACTIVE_PROVIDER_PREFLIGHT,
         STATUS_ACTIVE_PROVIDER_REHEARSAL,
         STATUS_ACTIVE_INTEGRATED_SMOKE,
+        STATUS_ACTIVE_REFACTOR_REPORT,
+        STATUS_MANUAL_REVIEW,
         STATUS_STALE_DEPRECATED,
         STATUS_ARCHIVED,
         STATUS_QUARANTINE,
-        STATUS_UNKNOWN,
     }:
         return marker.status, marker.reason, marker.superseded_by
     if namespace in KNOWN_STALE_NAMESPACES:
         known = KNOWN_STALE_NAMESPACES[namespace]
         return STATUS_STALE_DEPRECATED, known["reason"], known["superseded_by"]
+    if namespace in {"shim_report", "refactor_final_report", "refactor_baseline"}:
+        return STATUS_ACTIVE_REFACTOR_REPORT, "refactor/report namespace", None
+    if namespace in {
+        "catalyst_frame_e2e",
+        "catalyst_frame_validation",
+        "quality_validation",
+        "research_send",
+        "source_enrichment",
+    }:
+        return STATUS_MANUAL_REVIEW, "manual review or validation namespace", None
+    if namespace.startswith("tmp_") or namespace.endswith("_cli_test"):
+        return STATUS_QUARANTINE, "temporary test namespace; not part of active lifecycle", None
     if namespace == "integrated_radar_smoke":
         return STATUS_ACTIVE_INTEGRATED_SMOKE, "integrated fixture smoke namespace", None
     if namespace.endswith("_smoke") or "_smoke" in namespace:
@@ -327,6 +342,10 @@ def _classify_namespace(
 def _profile_for_namespace(namespace: str, status: str) -> str:
     if status in {STATUS_ACTIVE_FIXTURE_SMOKE, STATUS_ACTIVE_INTEGRATED_SMOKE}:
         return "fixture"
+    if status == STATUS_ACTIVE_REFACTOR_REPORT:
+        return "refactor"
+    if status == STATUS_MANUAL_REVIEW:
+        return "manual_review"
     if namespace.startswith("notify_llm_deep"):
         return "notify_llm_deep"
     if namespace.startswith("notify_llm"):
@@ -363,6 +382,10 @@ def _retention_policy(status: str) -> str:
         return "audit_then_archive"
     if status in {STATUS_ACTIVE_FIXTURE_SMOKE, STATUS_ACTIVE_INTEGRATED_SMOKE}:
         return "keep_latest_fixture_artifacts"
+    if status == STATUS_ACTIVE_REFACTOR_REPORT:
+        return "keep_latest_refactor_reports"
+    if status == STATUS_MANUAL_REVIEW:
+        return "manual_review"
     if status in {STATUS_ACTIVE_PROVIDER_PREFLIGHT, STATUS_ACTIVE_PROVIDER_REHEARSAL}:
         return "keep_recent_provider_artifacts"
     if status == STATUS_ACTIVE_LIVE_REHEARSAL:
@@ -391,6 +414,10 @@ def _key_artifacts_for_status(namespace: str, status: str) -> tuple[str, ...]:
         return ()
     if status == STATUS_STALE_DEPRECATED:
         return (event_alpha_namespace_status.NAMESPACE_STATUS_FILENAME,)
+    if status == STATUS_ACTIVE_REFACTOR_REPORT:
+        return ()
+    if status == STATUS_MANUAL_REVIEW:
+        return ()
     if status == STATUS_ACTIVE_LIVE_REHEARSAL:
         return (
             "event_alpha_runs.jsonl",

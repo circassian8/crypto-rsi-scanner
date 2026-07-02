@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import config, event_asset_registry, event_instrument_resolver
+from ... import config
 from ...event_providers._announcement_common import (
     _announcement_contracts,
     _announcement_items,
@@ -25,6 +25,8 @@ from ...event_providers._announcement_common import (
 )
 from ...event_providers.manual_json import parse_datetime
 from ..artifacts import schema_v1
+from ..radar import asset_registry as event_asset_registry
+from ..radar import instrument_resolver as event_instrument_resolver
 from ..radar import market_reaction as event_market_reaction
 
 

@@ -25,10 +25,11 @@ Statuses:
 
 Current phase:
 
-- Most mapped modules are `active_shim`.
-- `crypto_rsi_scanner.event_alpha_artifact_doctor` is `partial_shim` because it
-  remains the compatibility doctor CLI/entrypoint while plugin migration
-  continues.
+- Mapped modules are `active_shim` unless a future row is explicitly marked as a
+  temporary migration bridge in `crypto_rsi_scanner.event_alpha.shims`.
+- `crypto_rsi_scanner.event_alpha_artifact_doctor` is now an active
+  compatibility shim; the implementation lives in
+  `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor`.
 
 Run `make event-alpha-shim-report PYTHON=python3` to write
 `event_alpha_shim_report.json` and `event_alpha_shim_report.md` under the
@@ -54,6 +55,9 @@ Run `make event-alpha-shim-report PYTHON=python3` to write
 | `crypto_rsi_scanner.event_alpha_run_ledger` | `crypto_rsi_scanner.event_alpha.artifacts.run_ledger` | artifacts |
 | `crypto_rsi_scanner.event_alpha_retention` | `crypto_rsi_scanner.event_alpha.artifacts.retention` | artifacts |
 | `crypto_rsi_scanner.event_alpha_run_lock` | `crypto_rsi_scanner.event_alpha.artifacts.locks` | artifacts |
+| `crypto_rsi_scanner.event_research_cards` | `crypto_rsi_scanner.event_alpha.artifacts.research_cards` | artifacts |
+| `crypto_rsi_scanner.event_alpha_daily_brief` | `crypto_rsi_scanner.event_alpha.artifacts.daily_brief` | artifacts |
+| `crypto_rsi_scanner.event_opportunity_audit` | `crypto_rsi_scanner.event_alpha.artifacts.opportunity_audit` | artifacts |
 | `crypto_rsi_scanner.event_alpha_artifact_doctor` | `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` | doctor |
 | `crypto_rsi_scanner.event_alpha_namespace_status` | `crypto_rsi_scanner.event_alpha.namespace.status` | namespace |
 | `crypto_rsi_scanner.event_alpha_notifications` | `crypto_rsi_scanner.event_alpha.notifications.pipeline` | notifications |
@@ -94,3 +98,10 @@ Run `make event-alpha-shim-report PYTHON=python3` to write
 | `crypto_rsi_scanner.event_bybit_announcements_preflight` | `crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight` | providers |
 | `crypto_rsi_scanner.event_unlock_calendar_preflight` | `crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight` | providers |
 | `crypto_rsi_scanner.event_dex_onchain_readiness` | `crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness` | providers |
+| `crypto_rsi_scanner.event_derivatives_crowding` | `crypto_rsi_scanner.event_alpha.radar.derivatives_crowding` | radar |
+| `crypto_rsi_scanner.event_scheduled_catalysts` | `crypto_rsi_scanner.event_alpha.radar.scheduled_catalysts` | radar |
+| `crypto_rsi_scanner.event_asset_registry` | `crypto_rsi_scanner.event_alpha.radar.asset_registry` | radar |
+| `crypto_rsi_scanner.event_instrument_resolver` | `crypto_rsi_scanner.event_alpha.radar.instrument_resolver` | radar |
+| `crypto_rsi_scanner.event_market_confirmation` | `crypto_rsi_scanner.event_alpha.radar.market_confirmation` | radar |
+| `crypto_rsi_scanner.event_catalyst_search` | `crypto_rsi_scanner.event_alpha.radar.catalyst_search` | radar |
+| `crypto_rsi_scanner.event_source_enrichment` | `crypto_rsi_scanner.event_alpha.radar.source_enrichment` | radar |

@@ -16,9 +16,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import config, event_scheduled_catalysts
+from ... import config
 from ..artifacts import paths as event_artifact_paths
 from ..artifacts import schema_v1
+from ..radar import scheduled_catalysts as event_scheduled_catalysts
 
 
 PREFLIGHT_JSON = "event_unlock_calendar_preflight.json"

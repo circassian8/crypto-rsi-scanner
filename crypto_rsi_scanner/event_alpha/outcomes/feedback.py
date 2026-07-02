@@ -180,9 +180,9 @@ from typing import Any, Iterable, Mapping
 from ... import (
     event_alpha_alert_store,
     event_alpha_router,
-    event_research_cards,
     event_watchlist,
 )
+from ..artifacts import research_cards as event_research_cards
 from ..notifications import inbox as event_alpha_notification_inbox
 from ..radar import core_opportunities as event_core_opportunities
 

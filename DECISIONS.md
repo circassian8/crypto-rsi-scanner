@@ -16,6 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Event Alpha refactor blocker burn-down accepted with doctor-plugin follow-up
+**Status:** accepted
+**Decision:** The current refactor continuation is accepted for the
+compatibility baseline: `scanner.py` is below the interim 8k gate, the
+top-level artifact doctor is an active compatibility shim, the migrated module
+batch is active-shim guarded, safe pytest is the default CI/test mode, namespace
+unknowns are classified, and export timestamp hardening is in place. Provider
+activation work may continue behind the existing research-only behavior freeze.
+The final refactor report remains `blocked` only for the documented
+doctor-plugin target because `legacy_unregistered=15` still exceeds the
+requested <=5 threshold.
+**Why:** Verification passed across standalone tests, safe pytest, compileall,
+Event Alpha shim/report/namespace/integrated/provider/Coinalyze/source-coverage/
+daily-brief/notification/doctor/scheduled/unlock/derivatives/fade-review/
+official-exchange/export smokes, and `make verify`. Current measured state:
+`scanner.py` 7,744 lines, top-level `event_alpha_artifact_doctor.py` 19 lines,
+package doctor implementation 6,363 lines, `tests/test_indicators.py` 1,771
+lines, active shims 67, partial shims 0, unmigrated modules 58, unknown
+namespaces 0, and active-shim logic violations 0.
+**Revisit when:** the remaining 15 unregistered legacy doctor append sites are
+migrated or a doctor strict/WARN counter regresses; future scanner extraction
+changes CLI defaults, Make targets, provider guardrails, or research-only
+side-effect gates; or a shim is retired.
+
 ## 2026-07-02 - Event Alpha refactor v1 accepted
 **Status:** accepted
 **Decision:** Event Alpha refactor v1 is accepted for resuming provider
@@ -47,9 +71,11 @@ must be tracked by `crypto_rsi_scanner.event_alpha.shims` and marked as
 `active_shim`, `partial_shim`, or `not_migrated`. `active_shim` modules may only
 contain docstrings, imports, `globals().update(...)`, `__all__`, comments, and
 minimal compatibility glue; new implementation logic belongs in the new package
-path. `partial_shim` is allowed only for explicit migration bridges such as the
-current artifact doctor entrypoint. `make event-alpha-shim-report` writes the
-audit artifacts, and artifact doctor warns if active shims accumulate logic.
+path. `partial_shim` is reserved for explicit migration bridges; the artifact
+doctor bridge has now been promoted to `active_shim` after moving the real
+implementation into `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor`.
+`make event-alpha-shim-report` writes the audit artifacts, and artifact doctor
+warns if active shims accumulate logic.
 **Why:** Compatibility wrappers keep old import paths stable during the v1
 migration, but leaving them unguarded would let new behavior drift back into the
 old top-level sprawl.

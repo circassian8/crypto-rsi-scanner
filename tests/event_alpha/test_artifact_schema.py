@@ -572,6 +572,9 @@ def test_event_alpha_cli_package_and_make_targets_are_available():
     assert command_group(["--event-alpha-bybit-announcements-preflight"]) == "event_alpha_official_exchange"
     assert dispatch_command_name(["--event-alpha-namespace-lifecycle-report"]) == "event_alpha_namespace_lifecycle_report"
     assert "test-pytest:" in makefile
+    assert "test-pytest-safe:" in makefile
+    assert "test-pytest-timed:" in makefile
+    assert "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in makefile
     assert "test-pytest-parallel:" in makefile
     assert "event-alpha-namespace-lifecycle-report:" in makefile
     assert "event-alpha-list-active-namespaces:" in makefile

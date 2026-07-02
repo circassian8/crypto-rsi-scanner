@@ -21,15 +21,10 @@ from typing import Any, Iterable, Mapping
 from ... import (
     config,
     event_alpha_router,
-    event_asset_registry,
-    event_derivatives_crowding,
-    event_instrument_resolver,
-    event_market_confirmation,
-    event_research_cards,
-    event_scheduled_catalysts,
     event_watchlist,
 )
 from ..artifacts import context as event_alpha_artifacts
+from ..artifacts import research_cards as event_research_cards
 from ..artifacts import paths as event_artifact_paths
 from ..artifacts import run_ledger as event_alpha_run_ledger
 from ..artifacts import schema_v1
@@ -38,9 +33,14 @@ from ..providers import coinalyze_preflight as event_coinalyze_preflight
 from ..providers import dex_onchain_readiness as event_dex_onchain_readiness
 from ..providers import live_provider_readiness as event_live_provider_readiness
 from ..providers import official_exchange as event_official_exchange
+from . import asset_registry as event_asset_registry
 from . import core_opportunity_store as event_core_opportunity_store
+from . import derivatives_crowding as event_derivatives_crowding
+from . import instrument_resolver as event_instrument_resolver
 from . import market_anomaly_scanner as event_market_anomaly_scanner
+from . import market_confirmation as event_market_confirmation
 from . import market_reaction as event_market_reaction
+from . import scheduled_catalysts as event_scheduled_catalysts
 from . import source_coverage as event_alpha_source_coverage
 
 

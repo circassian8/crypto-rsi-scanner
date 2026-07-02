@@ -178,6 +178,22 @@ def _write_file_to_zip(zf: zipfile.ZipFile, path: Path, arcname: str, *, now_ts:
         dst.write(src.read())
 
 
+def _normalize_input_timestamps(paths: list[Path], *, safe_export_timestamp: float) -> int:
+    """Clamp source mtimes before archiving so later fallback exports stay safe."""
+
+    changed = 0
+    for path in paths:
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        if stat.st_mtime <= safe_export_timestamp + 2:
+            continue
+        os.utime(path, (min(stat.st_atime, safe_export_timestamp), safe_export_timestamp))
+        changed += 1
+    return changed
+
+
 def main(root: Path = ROOT, out: Path = OUT) -> int:
     paths = _tracked_paths(root) | _artifact_paths(root)
     entries = [
@@ -187,6 +203,7 @@ def main(root: Path = ROOT, out: Path = OUT) -> int:
     ]
 
     now_ts = _safe_export_timestamp()
+    normalized_mtimes = _normalize_input_timestamps(entries, safe_export_timestamp=now_ts)
     if out.exists():
         out.unlink()
     with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
@@ -208,6 +225,7 @@ def main(root: Path = ROOT, out: Path = OUT) -> int:
     print(f"entries={len(names)}")
     print(f"artifact_entries={len(artifact_entries)}")
     print(f"research_card_files={len(research_cards)}")
+    print(f"normalized_mtimes={normalized_mtimes}")
     print(f"bad_entries={len(bad)}")
     if bad:
         print("\n".join(bad[:50]))

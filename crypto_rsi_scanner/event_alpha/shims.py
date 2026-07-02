@@ -29,12 +29,7 @@ STATUS_PARTIAL_SHIM = "partial_shim"
 STATUS_NOT_MIGRATED = "not_migrated"
 SHIM_STATUSES = (STATUS_ACTIVE_SHIM, STATUS_PARTIAL_SHIM, STATUS_NOT_MIGRATED)
 
-_PARTIAL_SHIMS = {
-    "crypto_rsi_scanner.event_alpha_artifact_doctor": (
-        "Compatibility CLI/entrypoint still contains legacy doctor orchestration "
-        "while plugin migration continues."
-    ),
-}
+_PARTIAL_SHIMS: dict[str, str] = {}
 
 
 @dataclass(frozen=True)

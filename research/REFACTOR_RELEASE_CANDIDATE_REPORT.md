@@ -1,183 +1,116 @@
 # Refactor Release Candidate Report
 
-- generated_at: `2026-07-02T16:45:53Z`
-- status: `accepted_with_noncritical_followups`
-- command_set: `post_refactor_regression_gauntlet`
-- total_commands: `26`
+- generated_at: `2026-07-02T18:04:07Z`
+- status: `accepted_with_documented_doctor_plugin_followup`
+- canonical_final_report: `research/REFACTOR_FINAL_REPORT.json`
+- test_runtime_report: `research/test_runtime_report.json`
+- total_commands: `25`
 - failed_commands: `0`
-- measured_command_seconds: `93.19`
 
-This is a research-only release-candidate report. The verification pass did not
-enable live provider calls, live Telegram sends, trading, paper trading,
-execution, normal RSI signal writes from Event Alpha, or Event Alpha-created
-`TRIGGERED_FADE`.
+This is a research-only release-candidate report. The verification pass did not enable live provider calls, live Telegram sends, trading, paper trading, execution, normal RSI signal writes from Event Alpha, or Event Alpha-created `TRIGGERED_FADE`.
 
 ## Verification Results
 
-| # | command | status | seconds |
-|---:|---|---:|---:|
-| 1 | `python3 tests/test_indicators.py` | pass | 14.23 |
-| 2 | `python3 -m pytest` | pass | 14.04 |
-| 3 | `python3 -m compileall -q crypto_rsi_scanner tests` | pass | 0.05 |
-| 4 | `make test-pytest PYTHON=python3` | pass | 16.21 |
-| 5 | `make event-alpha-integrated-radar-smoke PYTHON=python3` | pass | 2.06 |
-| 6 | `make event-alpha-integrated-radar-doctor PYTHON=python3` | pass | 0.92 |
-| 7 | `make event-alpha-integrated-radar-outcome-smoke PYTHON=python3` | pass | 6.67 |
-| 8 | `make event-alpha-integrated-radar-outcome-report PYTHON=python3` | pass | 0.67 |
-| 9 | `make event-alpha-integrated-radar-calibration-report PYTHON=python3` | pass | 0.63 |
-| 10 | `make event-alpha-live-provider-readiness-smoke PYTHON=python3` | pass | 0.64 |
-| 11 | `make event-alpha-coinalyze-preflight-smoke PYTHON=python3` | pass | 0.68 |
-| 12 | `make event-alpha-coinalyze-preflight PYTHON=python3` | pass | 0.62 |
-| 13 | `make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3` | pass | 0.62 |
-| 14 | `make event-alpha-market-anomaly-smoke PYTHON=python3` | pass | 2.48 |
-| 15 | `make event-alpha-official-exchange-smoke PYTHON=python3` | pass | 2.59 |
-| 16 | `make event-alpha-scheduled-catalyst-smoke PYTHON=python3` | pass | 2.53 |
-| 17 | `make event-alpha-unlock-risk-smoke PYTHON=python3` | pass | 1.83 |
-| 18 | `make event-alpha-derivatives-smoke PYTHON=python3` | pass | 1.83 |
-| 19 | `make event-alpha-fade-review-smoke PYTHON=python3` | pass | 1.82 |
-| 20 | `make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | pass | 0.62 |
-| 21 | `make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | pass | 3.67 |
-| 22 | `make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | pass | 0.71 |
-| 23 | `make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3` | pass | 1.27 |
-| 24 | `make event-alpha-namespace-lifecycle-report PYTHON=python3` | pass | 0.71 |
-| 25 | `make event-alpha-mark-known-stale-namespaces PYTHON=python3` | pass | 0.60 |
-| 26 | `make verify PYTHON=python3` | pass | 14.49 |
+| # | command | status | note |
+|---:|---|---:|---|
+| 1 | `python3 tests/test_indicators.py` | pass | 733/733 standalone tests |
+| 2 | `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py` | pass | 739/739 pytest tests |
+| 3 | `python3 -m compileall -q crypto_rsi_scanner tests` | pass | source/test bytecode compile |
+| 4 | `make test-pytest-safe PYTHON=python3` | pass | safe pytest target, external plugin autoload disabled |
+| 5 | `make test-pytest-timed PYTHON=python3` | pass | wrote research/test_runtime_report.md/json |
+| 6 | `make event-alpha-shim-report PYTHON=python3` | pass | active shim logic violations=0 |
+| 7 | `make refactor-final-report PYTHON=python3` | pass | report generated; gate blocked only by documented doctor-plugin target |
+| 8 | `make event-alpha-namespace-lifecycle-report PYTHON=python3` | pass | unknown_namespace_count=0 |
+| 9 | `make event-alpha-integrated-radar-smoke PYTHON=python3` | pass | fixture smoke, no live calls |
+| 10 | `make event-alpha-integrated-radar-doctor PYTHON=python3` | pass | doctor OK |
+| 11 | `make event-alpha-live-provider-readiness-smoke PYTHON=python3` | pass | live calls remain disabled |
+| 12 | `make event-alpha-coinalyze-preflight-smoke PYTHON=python3` | pass | fixture/no-call preflight |
+| 13 | `make event-alpha-coinalyze-preflight PYTHON=python3` | pass | missing_config, no provider network calls |
+| 14 | `make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3` | pass | no-send rehearsal, no side effects |
+| 15 | `make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | pass | source coverage rendered |
+| 16 | `make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | pass | daily brief rendered |
+| 17 | `make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | pass | preview rendered, no send |
+| 18 | `make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3` | pass | WARN/no blockers |
+| 19 | `make export-src-with-artifacts-smoke PYTHON=python3` | pass | zip timestamp validation passed |
+| 20 | `make verify PYTHON=python3` | pass | standard repo verification passed |
+| 21 | `make event-alpha-scheduled-catalyst-smoke PYTHON=python3` | pass | scheduled catalyst smoke |
+| 22 | `make event-alpha-unlock-risk-smoke PYTHON=python3` | pass | unlock risk smoke |
+| 23 | `make event-alpha-derivatives-smoke PYTHON=python3` | pass | derivatives smoke |
+| 24 | `make event-alpha-fade-review-smoke PYTHON=python3` | pass | fade-review smoke |
+| 25 | `make event-alpha-official-exchange-smoke PYTHON=python3` | pass | official exchange smoke |
 
-Additional compatibility check:
+## Runtime
 
-- `/usr/bin/python3 -m compileall -q crypto_rsi_scanner tests`: pass. This
-  catches the Python 3.11 syntax class used by GitHub Actions.
+- standalone_runner_runtime_seconds: `10.761`
+- pytest_runtime_seconds: `11.25`
+- pytest_plugin_autoload_disabled: `true`
 
 ## Size And Organization
 
 | file | baseline lines | current lines | reduced by | reduction | target | status |
 |---|---:|---:|---:|---:|---:|---|
-| `crypto_rsi_scanner/scanner.py` | 13373 | 11267 | 2106 | 15.75% | <4000 | blocked |
+| `crypto_rsi_scanner/scanner.py` | 13373 | 7744 | 5629 | 42.09% | <8000 | pass |
 | `tests/test_indicators.py` | 42498 | 1771 | 40727 | 95.83% | <2000 | pass |
-| `crypto_rsi_scanner/event_alpha_artifact_doctor.py` | 7145 | 6359 | 786 | 11.00% | <1500 | blocked |
+| `crypto_rsi_scanner/event_alpha_artifact_doctor.py` | 7145 | 19 | 7126 | 99.73% | <100 | pass |
 
-Organization counts:
-
+- package_doctor_implementation_lines: `6363`
 - top_level_event_module_count: `125`
-- migrated_modules_tracked_by_shims: `57`
-- active_shims: `56`
-- partial_shims: `1`
-- unmigrated_modules: `68`
+- active_shims: `67`
+- partial_shims: `0`
+- unmigrated_modules: `58`
 - active_shim_modules_with_implementation_logic: `0`
+- migrated_modules_this_run_count: `11`
+- scanner_bind_scanner_globals_call_sites: `7`
+- scanner_command_body_functions_remaining: `105`
 
-## Schema And Doctor Coverage
+Migrated this run:
+- `crypto_rsi_scanner.event_alpha_artifact_doctor`
+- `crypto_rsi_scanner.event_research_cards`
+- `crypto_rsi_scanner.event_alpha_daily_brief`
+- `crypto_rsi_scanner.event_derivatives_crowding`
+- `crypto_rsi_scanner.event_scheduled_catalysts`
+- `crypto_rsi_scanner.event_asset_registry`
+- `crypto_rsi_scanner.event_instrument_resolver`
+- `crypto_rsi_scanner.event_market_confirmation`
+- `crypto_rsi_scanner.event_catalyst_search`
+- `crypto_rsi_scanner.event_source_enrichment`
+- `crypto_rsi_scanner.event_opportunity_audit`
 
-Doctor-invoking gauntlet commands validated `330` schema row-checks across
-fixture, provider, integrated radar, derivatives, fade-review, and rehearsal
-namespaces. All schema counters were zero for validation failures:
-
-- schema_validation_errors: `0`
-- missing_required_fields: `0`
-- invalid_enum_fields: `0`
-- invalid_path_fields: `0`
-- invalid_safety_fields: `0`
-- deprecated_field_usage: `0`
-
-Doctor registry coverage stayed stable:
+## Doctor And Namespace Coverage
 
 - registered_checks: `53`
 - legacy_unregistered: `15`
-- legacy_unregistered_baseline: `15`
-
-Doctor statuses in the gauntlet:
-
-- integrated radar smoke/doctor/outcome: `OK`, no blockers, no warnings.
-- derivatives and fade-review smokes: `OK`, no blockers, no warnings.
-- market anomaly, official exchange, scheduled catalyst, and unlock-risk smokes:
-  `WARN`, no blockers; warnings were isolated fixture/source-coverage or
-  readiness-context gaps.
-- `notify_llm_deep_cryptopanic_rehearsal` strict artifact doctor: `WARN`, no
-  blockers; warnings were known quality-capped/incident-linkage review items.
-
-## Namespace Lifecycle
-
-Namespace registry:
-
+- legacy_unregistered_target: `5`
+- legacy_unregistered_status: `documented_blocker`
 - namespace_count: `46`
-- safe_for_send_readiness_count: `0`
-- status_counts: `active_fixture_smoke=18`, `active_integrated_smoke=1`,
-  `active_live_rehearsal=9`, `active_provider_preflight=5`,
-  `active_provider_rehearsal=5`, `stale_deprecated=1`, `unknown=7`
-
-`make event-alpha-mark-known-stale-namespaces` marked `notify_llm_deep` as
-`stale_deprecated`, not safe for send-readiness, burn-in measurement, or
-calibration.
+- unknown_namespace_count: `0`
+- namespace_status_counts: `{"active_fixture_smoke": 18, "active_integrated_smoke": 1, "active_live_rehearsal": 9, "active_provider_preflight": 5, "active_provider_rehearsal": 5, "active_refactor_report": 1, "manual_review": 5, "quarantine": 1, "stale_deprecated": 1}`
 
 ## CI Status
 
-Workflow configuration is present and safe:
-
-- `.github/workflows/verify.yml` runs standalone tests, full pytest, compileall,
-  and `make verify` with `RSI_EVENT_ALERTS_ENABLED=0`.
-- `.github/workflows/event-alpha-smoke.yml` is `workflow_dispatch` only and runs
-  fixture/no-call Event Alpha smoke targets.
-- Full pytest includes the workflow guard test that blocks secret-looking env
-  values, live allow flags, and live-send targets.
-
-Remote GitHub Actions observation before this RC commit:
-
-- Latest pushed `Verify` run for `3855cf6b` failed on Python 3.11 syntax in
-  `crypto_rsi_scanner/event_alpha/providers/official_exchange.py`.
-- This RC fixes that parser incompatibility by splitting the nested f-string
-  digest input before formatting.
-- The next pushed `Verify` run for `bf862ea6` reached 729/730 standalone tests
-  and failed only because the workflow-level fixed research clock blocked a
-  fake-send unit test.
-- This RC also isolates that test by enabling
-  `EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY` only inside the fake-send test and
-  restoring the prior config afterward.
-- Local `/usr/bin/python3` compileall now passes, covering the failed CI syntax
-  class. The full gauntlet also passes with
-  `RSI_EVENT_RESEARCH_NOW=2026-06-15T16:00:00Z`, covering the fixed-clock CI
-  environment. The next pushed commit should be watched for the remote `Verify`
-  result.
+- workflow_configuration_safe: `true`
+- pytest_disable_plugin_autoload: `true`
+- verify workflow uses standalone tests, safe pytest, compileall, and `make verify`.
+- Event Alpha smoke workflow remains `workflow_dispatch` only.
 
 ## Safety Invariants
 
-- no_live_provider_calls_by_default: confirmed
-- no_live_telegram_sends: confirmed
-- no_trading_paper_or_execution_changes: confirmed
-- no_event_alpha_normal_rsi_signal_writes: confirmed
-- no_event_alpha_created_triggered_fade: confirmed
-- no_secrets_in_artifacts: confirmed by doctor/preflight checks
-
-Evidence:
-
-- Coinalyze preflight reported `No provider network calls were performed by this
-  preflight`.
-- Live provider readiness smoke asserted `"live_calls_allowed": false`.
-- Coinalyze no-send rehearsal reported `telegram_sends=0`, `trades_created=0`,
-  `paper_trades_created=0`, `normal_rsi_signal_rows_written=0`, and
-  `triggered_fade_created=0`.
-- Daily brief/source coverage/doctor outputs reported no alert, send, trade,
-  paper, live DB, execution, normal RSI, or trigger changes.
+- research_only: `true`
+- no_live_provider_calls_by_default: `true`
+- no_live_telegram_sends: `true`
+- no_trading_paper_or_execution_changes: `true`
+- no_event_alpha_normal_rsi_signal_writes: `true`
+- no_event_alpha_created_triggered_fade: `true`
+- no_secrets_in_artifacts: `true`
 
 ## Known Remaining Blockers
 
-No critical RC blockers remain after the local gauntlet and Python 3.11 syntax
-fix.
+### `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py`
 
-Non-critical refactor follow-ups remain:
-
-- `scanner.py` is still above the final target. Next migration module:
-  `crypto_rsi_scanner/cli/commands_event_alpha.py` plus service modules for
-  remaining scanner-bound command bodies. Risk: CLI defaults, Make target
-  behavior, provider guardrails, and research-only side-effect gates.
-- `event_alpha_artifact_doctor.py` is still above the final target. Next
-  migration modules:
-  `crypto_rsi_scanner/event_alpha/doctor/checks/safety.py`, `namespace.py`,
-  `stale_artifacts.py`, and focused legacy counter plugins. Risk: strict/WARN
-  semantics, report counter names, and stale namespace handling.
-- Remote CI should be observed after the RC commit because the previous pushed
-  run failed before the Python 3.11 compatibility fix.
+- blocker_reason: legacy_unregistered doctor append sites remain above the requested <=5 target.
+- next_migration_module: `crypto_rsi_scanner/event_alpha/doctor/checks/safety.py and integrated_radar.py`
+- risk: Moving the last imperative checks without enough fixtures can change blocker/WARN semantics.
 
 ## RC Verdict
 
-Event Alpha refactor v1 is accepted for resuming provider activation work, with
-the remaining size-reduction work tracked as non-critical follow-up and remote
-CI to be watched after push.
+Critical behavior and safety checks pass. Refactor continuation is accepted with one documented non-behavior blocker: legacy_unregistered doctor append sites remain above the <=5 target.

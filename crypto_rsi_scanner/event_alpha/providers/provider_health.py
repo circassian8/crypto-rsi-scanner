@@ -707,7 +707,7 @@ def _reset_selector_label(
 
 
 def _empty_search_result(provider: str, queries: tuple[Any, ...], warning: str) -> Any:
-    from ... import event_catalyst_search
+    from ..radar import catalyst_search as event_catalyst_search
 
     return event_catalyst_search.CatalystSearchRunResult(
         provider=provider,

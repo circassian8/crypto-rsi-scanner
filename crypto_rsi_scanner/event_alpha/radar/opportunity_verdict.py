@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Mapping
 
-from ... import event_evidence_quality, event_impact_path_validator, event_market_confirmation
+from ... import event_evidence_quality, event_impact_path_validator
+from . import market_confirmation as event_market_confirmation
 
 
 class OpportunityLevel(str, Enum):

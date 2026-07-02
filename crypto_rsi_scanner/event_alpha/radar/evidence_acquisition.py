@@ -17,17 +17,17 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Protocol
 
 from ... import (
-    event_catalyst_search,
     event_evidence_quality,
     event_llm_evidence_planner,
-    event_source_enrichment,
 )
 from ...event_models import RawDiscoveredEvent
 from ...event_resolver import clean_text
 from ..providers import source_packs as event_source_packs
 from ..providers import source_registry as event_source_registry
+from . import catalyst_search as event_catalyst_search
 from . import core_opportunities as event_core_opportunities
 from . import impact_hypotheses as event_impact_hypotheses
+from . import source_enrichment as event_source_enrichment
 
 
 SCHEMA_VERSION = "event_evidence_acquisition_v1"

@@ -14,6 +14,35 @@ def test_known_stale_namespace_classifies_without_marker(tmp_path: Path):
     assert rows["notify_llm_deep"]["status"] == "stale_deprecated"
     assert rows["notify_llm_deep"]["safe_for_send_readiness"] is False
 
+
+def test_known_refactor_and_manual_review_namespaces_are_not_unknown(tmp_path: Path):
+    for namespace in (
+        "catalyst_frame_e2e",
+        "catalyst_frame_validation",
+        "quality_validation",
+        "research_send",
+        "shim_report",
+        "source_enrichment",
+        "tmp_nonexistent_cli_test",
+    ):
+        (tmp_path / namespace).mkdir()
+
+    registry = lifecycle.build_namespace_registry(tmp_path)
+    rows = {row["namespace"]: row for row in registry["namespaces"]}
+
+    assert rows["shim_report"]["status"] == "active_refactor_report"
+    assert rows["tmp_nonexistent_cli_test"]["status"] == "quarantine"
+    for namespace in (
+        "catalyst_frame_e2e",
+        "catalyst_frame_validation",
+        "quality_validation",
+        "research_send",
+        "source_enrichment",
+    ):
+        assert rows[namespace]["status"] == "manual_review"
+        assert rows[namespace]["safe_for_send_readiness"] is False
+    assert not [row for row in rows.values() if row["status"] == "unknown"]
+
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
 from tests.event_alpha import _legacy_helpers as _event_alpha_legacy_helpers
 

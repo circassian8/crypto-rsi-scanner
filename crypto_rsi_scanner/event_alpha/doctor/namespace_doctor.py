@@ -76,6 +76,8 @@ def _namespace_policy_messages(
         event_alpha_namespace_status.STATUS_ACTIVE_PROVIDER_PREFLIGHT,
         event_alpha_namespace_status.STATUS_ACTIVE_PROVIDER_REHEARSAL,
         event_alpha_namespace_status.STATUS_ACTIVE_INTEGRATED_SMOKE,
+        event_alpha_namespace_status.STATUS_ACTIVE_REFACTOR_REPORT,
+        event_alpha_namespace_status.STATUS_MANUAL_REVIEW,
     }
     if status in active_statuses:
         doctor_status = str(marker.current_doctor_status or "not_run").upper()

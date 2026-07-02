@@ -13,9 +13,9 @@ from ... import (
     event_alpha_quality_fields,
     event_alpha_router,
     event_core_opportunities,
-    event_research_cards,
     event_watchlist,
 )
+from ..artifacts import research_cards as event_research_cards
 from ..radar import core_opportunity_store as event_core_opportunity_store
 from . import delivery
 from . import pipeline as event_alpha_notifications

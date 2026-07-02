@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import importlib
 
 from crypto_rsi_scanner.event_alpha import shims
 
@@ -17,7 +18,7 @@ def test_known_active_shims_are_minimal_compatibility_modules():
     assert not report["active_shim_violations"]
     assert any(
         row["old_module"] == "crypto_rsi_scanner.event_alpha_artifact_doctor"
-        and row["shim_status"] == shims.STATUS_PARTIAL_SHIM
+        and row["shim_status"] == shims.STATUS_ACTIVE_SHIM
         for row in report["entries"]
     )
 
@@ -85,3 +86,22 @@ def test_artifact_doctor_warns_when_active_shim_contains_logic():
         event_alpha_artifact_doctor.event_alpha_shims.active_shim_violation_summary = original
 
     assert any("paths.active_shim_contains_logic" in warning for warning in result.warnings)
+
+
+def test_recently_migrated_old_and_new_import_paths_share_key_callables():
+    pairs = (
+        ("crypto_rsi_scanner.event_research_cards", "crypto_rsi_scanner.event_alpha.artifacts.research_cards", "render_research_card"),
+        ("crypto_rsi_scanner.event_alpha_daily_brief", "crypto_rsi_scanner.event_alpha.artifacts.daily_brief", "build_daily_brief"),
+        ("crypto_rsi_scanner.event_derivatives_crowding", "crypto_rsi_scanner.event_alpha.radar.derivatives_crowding", "run_derivatives_crowding_scan"),
+        ("crypto_rsi_scanner.event_scheduled_catalysts", "crypto_rsi_scanner.event_alpha.radar.scheduled_catalysts", "run_scheduled_catalyst_scan"),
+        ("crypto_rsi_scanner.event_asset_registry", "crypto_rsi_scanner.event_alpha.radar.asset_registry", "build_asset_registry"),
+        ("crypto_rsi_scanner.event_instrument_resolver", "crypto_rsi_scanner.event_alpha.radar.instrument_resolver", "resolve_rows"),
+        ("crypto_rsi_scanner.event_market_confirmation", "crypto_rsi_scanner.event_alpha.radar.market_confirmation", "evaluate_market_confirmation"),
+        ("crypto_rsi_scanner.event_catalyst_search", "crypto_rsi_scanner.event_alpha.radar.catalyst_search", "run_catalyst_search"),
+        ("crypto_rsi_scanner.event_source_enrichment", "crypto_rsi_scanner.event_alpha.radar.source_enrichment", "enrich_source_text"),
+        ("crypto_rsi_scanner.event_opportunity_audit", "crypto_rsi_scanner.event_alpha.artifacts.opportunity_audit", "format_opportunity_audit"),
+    )
+    for old_name, new_name, attr in pairs:
+        old_module = importlib.import_module(old_name)
+        new_module = importlib.import_module(new_name)
+        assert getattr(old_module, attr) is getattr(new_module, attr)

@@ -17,6 +17,50 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Continue Event Alpha refactor blocker burn-down · Codex
+**Why:** The first refactor v1 release candidate still left `scanner.py` and
+the top-level artifact doctor as real implementation blockers. This pass makes
+the CLI extraction and doctor ownership inversion measurable while preserving
+the research-only Event Alpha behavior freeze.
+**Changes:**
+- Moved a large Event Alpha command-body batch from `scanner.py` into
+  `crypto_rsi_scanner/cli/services/event_alpha.py` and added CLI service
+  support/reporting helpers. `scanner.py` is now 7,744 lines, below the
+  interim 8k gate.
+- Inverted artifact doctor ownership so
+  `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py` owns the
+  implementation and `crypto_rsi_scanner/event_alpha_artifact_doctor.py` is a
+  19-line active compatibility shim.
+- Migrated 10 large Event Alpha modules into package homes under
+  `event_alpha/artifacts/` and `event_alpha/radar/`, keeping old top-level
+  modules as active shims with old/new import coverage.
+- Hardened pytest and CI defaults with `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`,
+  added safe/timed pytest targets and `research/test_runtime_report.*`, and
+  made `research/REFACTOR_FINAL_REPORT.*` the canonical final report path.
+- Classified remaining namespace lifecycle unknowns, added refactor/manual
+  review statuses, and hardened export timestamp normalization plus the export
+  smoke target.
+- Updated `ROADMAP.md`, `DECISIONS.md`, and
+  `research/REFACTOR_RELEASE_CANDIDATE_REPORT.*` with the current metrics.
+**Verify:** `python3 tests/test_indicators.py` (733/733);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py` (739/739); `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make test-pytest-safe PYTHON=python3`;
+`make test-pytest-timed PYTHON=python3`; `make event-alpha-shim-report
+PYTHON=python3`; `make refactor-final-report PYTHON=python3`;
+`make event-alpha-namespace-lifecycle-report PYTHON=python3`; integrated radar
+smoke/doctor, live-provider readiness smoke, Coinalyze preflight smoke,
+Coinalyze normal preflight, Coinalyze no-send rehearsal, source coverage, daily
+brief, notify preview from artifacts, strict CryptoPanic rehearsal doctor,
+scheduled catalyst, unlock risk, derivatives, fade-review, official exchange,
+export source-with-artifacts smoke, and `make verify PYTHON=python3`.
+**Notes/risks:** The current final report has all three size gates passing and
+`partial_shims=0`, `active_shims=67`, `unmigrated_modules=58`, unknown
+namespaces at 0, and active-shim implementation violations at 0. The only
+remaining refactor blocker is documented: `legacy_unregistered=15` still exceeds
+the requested <=5 doctor-plugin target, with the next migration pointed at
+`event_alpha/doctor/checks/safety.py` and integrated-radar checks.
+
 ## 2026-07-02 — Accept Event Alpha refactor v1 release candidate · Codex
 **Why:** Provider activation work should resume only after the post-refactor
 architecture has a full regression pass, explicit safety evidence, and a

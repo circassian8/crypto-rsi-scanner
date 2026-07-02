@@ -20,10 +20,11 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request
 
-from ... import config, event_derivatives_crowding
+from ... import config
 from ...derivatives_providers.coinalyze import CoinalyzeDerivativesProvider, resolve_future_market_symbols
 from ..artifacts import paths as event_artifact_paths
 from ..artifacts import schema_v1
+from ..radar import derivatives_crowding as event_derivatives_crowding
 from . import provider_health as event_provider_health
 
 
