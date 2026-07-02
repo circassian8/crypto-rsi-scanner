@@ -2537,7 +2537,7 @@ def test_event_evidence_acquisition_provider_unavailable_and_operator_surfaces()
 def test_event_alpha_evidence_acquisition_smoke_target_exists():
     makefile = Path("Makefile").read_text(encoding="utf-8")
     assert "event-alpha-evidence-acquisition-smoke" in makefile
-    profiles = Path("crypto_rsi_scanner/event_alpha_profiles.py").read_text(encoding="utf-8")
+    profiles = Path("crypto_rsi_scanner/event_alpha/config/profiles.py").read_text(encoding="utf-8")
     assert "evidence_acquisition_smoke" in profiles
     assert "EVENT_ALPHA_EVIDENCE_ACQUISITION_FIXTURE_ONLY" in profiles
 

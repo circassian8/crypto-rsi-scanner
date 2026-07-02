@@ -24,8 +24,18 @@ layout gives new code a home while old import paths continue to work.
   compatibility doctor layers.
 - `crypto_rsi_scanner/event_alpha/namespace/`: namespace status and lifecycle
   reporting.
+- `crypto_rsi_scanner/event_alpha/config/`: Event Alpha profiles, preflight,
+  scheduler, v1 readiness, and health-guard configuration helpers.
+- `crypto_rsi_scanner/event_alpha/radar/llm/`: Event Alpha LLM budget and
+  catalyst-frame evaluation helpers that remain research-only inputs to
+  deterministic radar gates.
 - `crypto_rsi_scanner/cli/`: CLI facade, parser snapshots, and command-group
-  extraction targets.
+  extraction targets. `cli/services/event_alpha.py` is now a compatibility
+  aggregator over focused Event Alpha service modules such as
+  `event_alpha_notifications.py`, `event_alpha_integrated.py`,
+  `event_alpha_outcomes.py`, `event_alpha_reports.py`,
+  `event_alpha_provider_preflights.py`, `event_alpha_namespace.py`,
+  `event_alpha_research.py`, and `event_alpha_fade_review.py`.
 
 `crypto_rsi_scanner/event_alpha/MODULE_MAP.md` lists old top-level module paths
 and their intended package locations.
@@ -66,6 +76,12 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
   crowding/exhaustion review, but those rows are not `TRIGGERED_FADE` and must
   not become triggers without deterministic `event_fade.py` + `proxy_fade`
   output.
+- `event_fade.py` is intentionally outside the Event Alpha package during v1.
+  Future refactors must not move it under Event Alpha unless a new explicit
+  decision preserves the deterministic `TRIGGERED_FADE` ownership boundary.
+- `event_clock.py` and `event_models.py` are shared event infrastructure, not
+  Event Alpha-specific implementation. They need a neutral shared package
+  decision before any move.
 - Provider calls and Telegram sends stay opt-in and guarded; tests and CI run
   no live provider calls and no live Telegram sends by default.
 - Tests and smokes require no API keys and must not print secrets.
@@ -272,9 +288,11 @@ small, tested slices only.
 `crypto_rsi_scanner.cli.parser.build_parser()` owns argparse construction
 without calling `parse_args()` or any command branch, and
 `crypto_rsi_scanner.cli.dispatch.dispatch_args()` routes parsed args into
-command-group modules. The current command modules still bind to historical
-scanner helpers for command bodies; future slices can move one body at a time
-behind the same parser, dispatch, and Make target coverage.
+command-group modules. Event Alpha command bodies are being split into focused
+`crypto_rsi_scanner.cli.services.event_alpha_*` service modules while the old
+`event_alpha.py` service module re-exports them. The remaining bind sites to
+historical scanner globals are a measured blocker for the next CLI pass, not a
+reason to add new logic to the aggregator.
 
 Compatibility rules for CLI refactors:
 

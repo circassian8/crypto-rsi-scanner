@@ -3,6 +3,15 @@
 from __future__ import annotations
 
 from ._scanner_bindings import bind_scanner_globals
+from .services import (
+    event_alpha_integrated as _service_integrated,
+    event_alpha_namespace as _service_namespace,
+    event_alpha_notifications as _service_notifications,
+    event_alpha_outcomes as _service_outcomes,
+    event_alpha_provider_preflights as _service_provider_preflights,
+    event_alpha_reports as _service_reports,
+    event_alpha_research as _service_research,
+)
 
 EVENT_ALPHA_COMMAND_GROUP = "event_alpha"
 
@@ -27,7 +36,7 @@ def handle(args) -> bool:
         event_alpha_radar_report(verbose=args.verbose, with_llm=args.with_llm, event_now=args.event_now)
         return True
     if args.event_alpha_cycle:
-        event_alpha_cycle(
+        _service_research.event_alpha_cycle(
             verbose=args.verbose,
             with_llm=args.with_llm,
             send=args.event_alert_send,
@@ -46,10 +55,10 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_notify_preview:
-        event_alpha_notify_preview(verbose=args.verbose, profile_name=args.event_alpha_profile)
+        _service_notifications.event_alpha_notify_preview(verbose=args.verbose, profile_name=args.event_alpha_profile)
         return True
     if args.event_alpha_notify_go_no_go:
-        event_alpha_notify_go_no_go(
+        _service_notifications.event_alpha_notify_go_no_go(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
@@ -58,7 +67,10 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_environment_doctor:
-        event_alpha_environment_doctor_report(verbose=args.verbose, profile_name=args.event_alpha_profile)
+        _service_reports.event_alpha_environment_doctor_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+        )
         return True
     if args.event_alpha_pause_notifications:
         event_alpha_pause_notifications(
@@ -96,7 +108,7 @@ def handle(args) -> bool:
         if not args.out:
             print("--event-alpha-export-notification-pack requires --out OUT.zip")
             return True
-        event_alpha_export_notification_pack(
+        _service_notifications.event_alpha_export_notification_pack(
             args.out,
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
@@ -107,7 +119,7 @@ def handle(args) -> bool:
         event_alpha_notification_checklist_report(verbose=args.verbose, profile_name=args.event_alpha_profile)
         return True
     if args.event_alpha_notify_preview_from_artifacts:
-        event_alpha_notify_preview_from_artifacts(
+        _service_notifications.event_alpha_notify_preview_from_artifacts(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
@@ -178,7 +190,7 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_mark_namespace_stale:
-        event_alpha_mark_namespace_stale(
+        _service_namespace.event_alpha_mark_namespace_stale(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
@@ -187,10 +199,10 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_mark_known_stale_namespaces:
-        event_alpha_mark_known_stale_namespaces(verbose=args.verbose)
+        _service_namespace.event_alpha_mark_known_stale_namespaces(verbose=args.verbose)
         return True
     if args.event_alpha_prune_or_archive_stale_namespace:
-        event_alpha_prune_or_archive_stale_namespace(
+        _service_namespace.event_alpha_prune_or_archive_stale_namespace(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
@@ -198,16 +210,16 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_namespace_lifecycle_report:
-        event_alpha_namespace_lifecycle_report(verbose=args.verbose)
+        _service_namespace.event_alpha_namespace_lifecycle_report(verbose=args.verbose)
         return True
     if args.event_alpha_list_active_namespaces:
-        event_alpha_list_active_namespaces(verbose=args.verbose)
+        _service_namespace.event_alpha_list_active_namespaces(verbose=args.verbose)
         return True
     if args.event_alpha_archive_stale_namespaces:
-        event_alpha_archive_stale_namespaces(verbose=args.verbose)
+        _service_namespace.event_alpha_archive_stale_namespaces(verbose=args.verbose)
         return True
     if args.event_alpha_provider_health_reset:
-        event_alpha_provider_health_reset(
+        _service_provider_preflights.event_alpha_provider_health_reset(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
@@ -219,10 +231,10 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_notify_fixture_smoke:
-        event_alpha_notify_fixture_smoke(verbose=args.verbose, event_now=args.event_now)
+        _service_notifications.event_alpha_notify_fixture_smoke(verbose=args.verbose, event_now=args.event_now)
         return True
     if args.event_alpha_runs_report:
-        event_alpha_runs_report(
+        _service_reports.event_alpha_runs_report(
             path=args.event_alpha_run_ledger_path,
             limit=args.event_alpha_run_limit,
             verbose=args.verbose,
@@ -273,10 +285,10 @@ def handle(args) -> bool:
         event_impact_hypothesis_smoke(verbose=args.verbose, event_now=args.event_now)
         return True
     if args.event_alpha_status:
-        event_alpha_status(profile_name=args.event_alpha_profile, verbose=args.verbose)
+        _service_reports.event_alpha_status(profile_name=args.event_alpha_profile, verbose=args.verbose)
         return True
     if args.event_alpha_preflight:
-        event_alpha_preflight_report(
+        _service_reports.event_alpha_preflight_report(
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
             send_requested=args.event_alert_send,
@@ -405,14 +417,14 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_burn_in_readiness:
-        event_alpha_burn_in_readiness_report(
+        _service_outcomes.event_alpha_burn_in_readiness_report(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
         )
         return True
     if args.event_alpha_v1_readiness:
-        event_alpha_v1_readiness_report(
+        _service_reports.event_alpha_v1_readiness_report(
             days=args.event_alpha_burn_in_days,
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
@@ -422,7 +434,7 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_health_guard:
-        event_alpha_health_guard_report(
+        _service_reports.event_alpha_health_guard_report(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
@@ -431,7 +443,7 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_artifact_doctor:
-        event_alpha_artifact_doctor_report(
+        _service_reports.event_alpha_artifact_doctor_report(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
@@ -454,7 +466,7 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_export_burn_in_pack:
-        event_alpha_export_burn_in_pack(
+        _service_outcomes.event_alpha_export_burn_in_pack(
             args.event_alpha_export_burn_in_pack,
             days=args.event_alpha_burn_in_days,
             verbose=args.verbose,
@@ -495,7 +507,7 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_daily_brief:
-        event_alpha_daily_brief_report(
+        _service_reports.event_alpha_daily_brief_report(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
@@ -511,7 +523,7 @@ def handle(args) -> bool:
             integrated_input_mode = event_integrated_radar.INPUT_MODE_LOAD_EXISTING
         if args.event_alpha_integrated_radar_auto:
             integrated_input_mode = event_integrated_radar.INPUT_MODE_AUTO
-        event_alpha_integrated_radar_cycle_report(
+        _service_integrated.event_alpha_integrated_radar_cycle_report(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
@@ -554,7 +566,7 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_market_anomaly_scan:
-        event_alpha_market_anomaly_scan_report(
+        _service_integrated.event_alpha_market_anomaly_scan_report(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
@@ -565,7 +577,7 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_official_exchange_report:
-        event_alpha_official_exchange_report(
+        _service_integrated.event_alpha_official_exchange_report(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
@@ -575,7 +587,7 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_scheduled_catalyst_report:
-        event_alpha_scheduled_catalyst_report(
+        _service_integrated.event_alpha_scheduled_catalyst_report(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
@@ -586,7 +598,7 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_derivatives_report:
-        event_alpha_derivatives_report(
+        _service_integrated.event_alpha_derivatives_report(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
@@ -595,7 +607,7 @@ def handle(args) -> bool:
         )
         return True
     if args.event_alpha_replay:
-        event_alpha_replay_report(
+        _service_integrated.event_alpha_replay_report(
             priors=args.event_alpha_replay_priors,
             llm_advisory=args.event_alpha_replay_llm_advisory,
             raw_events_path=args.event_alpha_replay_raw_events,

@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Split Event Alpha CLI services and migrate 25 modules · Codex
+**Why:** The next refactor continuation needed to reduce the Event Alpha CLI
+service monolith, migrate the named small/medium Event Alpha modules, and keep
+the remaining scanner/doctor work measured without changing behavior.
+**Changes:**
+- Split `crypto_rsi_scanner/cli/services/event_alpha.py` into focused service
+  modules for notifications, integrated radar, reports, provider preflights,
+  namespace lifecycle, outcomes, research, and fade-review helpers. The old
+  service file remains a 46-line aggregator/re-export module.
+- Routed representative provider-preflight, namespace, report, integrated, and
+  notification dispatch branches through service modules, with tests proving
+  selected routes no longer call scanner globals directly. Scanner-owned bodies
+  remain compatibility implementations where moving them was still risky.
+- Migrated 25 additional top-level Event Alpha modules into package homes under
+  `event_alpha/radar/`, `radar/llm/`, `providers/`, `artifacts/`, `outcomes/`,
+  `config/`, `doctor/`, and `notifications/`, leaving old import paths as
+  active shims.
+- Refreshed `MODULE_MAP.md`, remaining-module classification, final refactor
+  reports, release-candidate reports, architecture docs, roadmap, and durable
+  decisions. Current measured state: 120 active shims, 5 unmigrated modules,
+  0 active-shim implementation violations, `scanner.py` 7,744 lines,
+  `cli/services/event_alpha.py` 46 lines, and `legacy_unregistered=15`.
+**Verify:** Full safe gauntlet passed: `python3 tests/test_indicators.py`
+(734/734); safe pytest with plugin autoload disabled (740/740); compileall;
+`make test-pytest-safe`; shim report; refactor final report; namespace
+lifecycle report; integrated radar smoke/doctor; live-provider readiness smoke;
+Coinalyze smoke/preflight/no-send rehearsal; market anomaly, official exchange,
+scheduled catalyst, unlock risk, derivatives, and fade-review smokes; source
+coverage, daily brief, no-send preview, strict CryptoPanic rehearsal doctor;
+and `make verify PYTHON=python3`.
+**Notes/risks:** Refactor gates remain intentionally blocked for the next
+focused pass: `scanner.py <6,500`, 50% reduction from 26 Event Alpha service
+`bind_scanner_globals(...)` call sites, and doctor `legacy_unregistered <=5`.
+`event_fade.py` remains outside Event Alpha; `TRIGGERED_FADE` is still owned
+only by deterministic `event_fade.py` plus `proxy_fade`. No live provider calls,
+sends, trades, paper trades, normal RSI writes, or Event Alpha-created
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-07-02 — Migrate remaining Event Alpha module batch · Codex
 **Why:** The next refactor continuation needed to reduce top-level
 `event_*.py` implementation sprawl while keeping Event Alpha behavior frozen

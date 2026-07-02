@@ -199,18 +199,21 @@ def test_cli_dispatch_extracts_representative_routes_without_side_effects():
     from crypto_rsi_scanner import scanner as scanner_module
     from crypto_rsi_scanner.cli.dispatch import dispatch_args
     from crypto_rsi_scanner.cli.parser import build_parser
+    from crypto_rsi_scanner.cli.services import event_alpha_provider_preflights
 
     parser = build_parser()
     calls = []
-    old_coinalyze = scanner_module.event_alpha_coinalyze_preflight_report
+    old_coinalyze = event_alpha_provider_preflights.event_alpha_coinalyze_preflight_report
     old_run = scanner_module.run
     try:
-        scanner_module.event_alpha_coinalyze_preflight_report = lambda **kwargs: calls.append(("coinalyze", kwargs))
+        event_alpha_provider_preflights.event_alpha_coinalyze_preflight_report = (
+            lambda **kwargs: calls.append(("coinalyze", kwargs))
+        )
         scanner_module.run = lambda **kwargs: calls.append(("run", kwargs))
         dispatch_args(parser.parse_args(["--event-alpha-coinalyze-preflight", "--event-alpha-profile", "fixture"]))
         dispatch_args(parser.parse_args(["--dry-run", "--top-n", "3"]))
     finally:
-        scanner_module.event_alpha_coinalyze_preflight_report = old_coinalyze
+        event_alpha_provider_preflights.event_alpha_coinalyze_preflight_report = old_coinalyze
         scanner_module.run = old_run
 
     assert calls[0] == (

@@ -55,34 +55,31 @@ TRACKED_LINE_COUNT_PATHS = tuple(
     )
 )
 MIGRATED_MODULES_THIS_RUN = (
-    "crypto_rsi_scanner.event_validation",
-    "crypto_rsi_scanner.event_discovery",
-    "crypto_rsi_scanner.event_near_miss",
-    "crypto_rsi_scanner.event_classification",
-    "crypto_rsi_scanner.event_catalyst_frames",
-    "crypto_rsi_scanner.event_claim_semantics",
-    "crypto_rsi_scanner.event_playbooks",
-    "crypto_rsi_scanner.event_impact_path_validator",
-    "crypto_rsi_scanner.event_evidence_quality",
-    "crypto_rsi_scanner.event_market_enrichment",
-    "crypto_rsi_scanner.event_llm_extractor",
-    "crypto_rsi_scanner.event_llm_analyzer",
-    "crypto_rsi_scanner.event_llm_evidence_planner",
-    "crypto_rsi_scanner.event_llm_catalyst_frames",
-    "crypto_rsi_scanner.event_llm_extract_eval",
-    "crypto_rsi_scanner.event_llm_eval",
-    "crypto_rsi_scanner.event_llm_models",
-    "crypto_rsi_scanner.event_llm_extraction_models",
-    "crypto_rsi_scanner.event_alpha_alert_store",
-    "crypto_rsi_scanner.event_alerts",
-    "crypto_rsi_scanner.event_alpha_router",
-    "crypto_rsi_scanner.event_alpha_pipeline",
-    "crypto_rsi_scanner.event_watchlist",
-    "crypto_rsi_scanner.event_watchlist_monitor",
-    "crypto_rsi_scanner.event_watchlist_enrichment",
-    "crypto_rsi_scanner.event_watchlist_market",
-    "crypto_rsi_scanner.event_alpha_replay",
-    "crypto_rsi_scanner.event_feedback",
+    "crypto_rsi_scanner.event_incident_graph",
+    "crypto_rsi_scanner.event_identity",
+    "crypto_rsi_scanner.event_graph",
+    "crypto_rsi_scanner.event_resolver",
+    "crypto_rsi_scanner.event_price_history",
+    "crypto_rsi_scanner.event_catalyst_frame_validator",
+    "crypto_rsi_scanner.event_anomaly_state",
+    "crypto_rsi_scanner.event_anomaly_scanner",
+    "crypto_rsi_scanner.event_market_units",
+    "crypto_rsi_scanner.event_llm_budget",
+    "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
+    "crypto_rsi_scanner.event_source_reliability",
+    "crypto_rsi_scanner.event_cache",
+    "crypto_rsi_scanner.event_alpha_explain",
+    "crypto_rsi_scanner.event_alpha_quality_fields",
+    "crypto_rsi_scanner.event_alpha_outcomes",
+    "crypto_rsi_scanner.event_alpha_eval",
+    "crypto_rsi_scanner.event_alpha_burn_in_checklist",
+    "crypto_rsi_scanner.event_alpha_profiles",
+    "crypto_rsi_scanner.event_alpha_v1_readiness",
+    "crypto_rsi_scanner.event_alpha_preflight",
+    "crypto_rsi_scanner.event_alpha_health_guard",
+    "crypto_rsi_scanner.event_alpha_scheduler",
+    "crypto_rsi_scanner.event_alpha_environment_doctor",
+    "crypto_rsi_scanner.event_provider_status",
 )
 
 
@@ -210,6 +207,86 @@ def _doctor_plugin_check_counts(root: Path) -> dict[str, int]:
         generic_apply = len(re.findall(r"(?m)^def apply_checks\(", text))
         counts[path.stem] = max(registry_messages, exported_apply_functions + generic_apply)
     return counts
+
+
+def _doctor_legacy_unregistered_details() -> list[dict[str, str]]:
+    return [
+        {
+            "check": "missing_operational_run_rows",
+            "reason": "Run-row absence drives strict doctor status and needs fixture coverage before registry migration.",
+            "next_plugin": "namespace.py or stale_artifacts.py",
+        },
+        {
+            "check": "snapshot_availability_lineage_warnings",
+            "reason": "Snapshot availability distinguishes fixture, external, stale, and strict operational rows.",
+            "next_plugin": "integrated_radar.py",
+        },
+        {
+            "check": "orphan_alert_snapshot_run_ids",
+            "reason": "Alert snapshot lineage counters are compatibility-sensitive in strict and non-strict modes.",
+            "next_plugin": "integrated_radar.py",
+        },
+        {
+            "check": "legacy_alert_snapshot_lineage",
+            "reason": "Legacy rows are intentionally tolerated in some scopes and blocked in others.",
+            "next_plugin": "stale_artifacts.py",
+        },
+        {
+            "check": "feedback_without_matching_alert_snapshot",
+            "reason": "Feedback lineage severity depends on strict mode and latest-run filtering.",
+            "next_plugin": "outcomes.py",
+        },
+        {
+            "check": "outcomes_without_matching_alert_snapshot",
+            "reason": "Outcome lineage severity depends on strict mode and legacy artifact scope.",
+            "next_plugin": "outcomes.py",
+        },
+        {
+            "check": "mixed_artifact_namespaces",
+            "reason": "Namespace-mixing behavior must preserve strict blocker versus warning semantics.",
+            "next_plugin": "namespace.py",
+        },
+        {
+            "check": "multiple_artifact_namespaces_present",
+            "reason": "Multiple namespaces are tolerated in audit modes but not strict current-run checks.",
+            "next_plugin": "namespace.py",
+        },
+        {
+            "check": "multiple_profiles_present",
+            "reason": "Profile-mixing is currently warning-only and should stay compatible.",
+            "next_plugin": "namespace.py",
+        },
+        {
+            "check": "provider_health_missing_for_live_profile",
+            "reason": "Provider health rows are required only for selected live/burn-in profile families.",
+            "next_plugin": "provider_readiness.py",
+        },
+        {
+            "check": "llm_budget_rows_missing_for_llm_profile",
+            "reason": "Budget telemetry is warning-only for LLM profiles and must not block no-key paths.",
+            "next_plugin": "provider_readiness.py",
+        },
+        {
+            "check": "invalid_canonical_incident_rows",
+            "reason": "Incident linkage counters are shared with integrated-radar/card consistency checks.",
+            "next_plugin": "integrated_radar.py",
+        },
+        {
+            "check": "alertable_run_external_snapshot_path",
+            "reason": "External snapshot paths are blockers for operational rows but allowed for some fixture rows.",
+            "next_plugin": "paths.py",
+        },
+        {
+            "check": "fixture_snapshot_external_allowed",
+            "reason": "Fixture external snapshot rows remain warning-only under current doctor semantics.",
+            "next_plugin": "paths.py",
+        },
+        {
+            "check": "snapshot_availability_unknown_or_missing",
+            "reason": "Unknown or missing snapshot availability depends on run_mode and strictness.",
+            "next_plugin": "integrated_radar.py",
+        },
+    ]
 
 
 def _namespace_inventory(root: Path) -> dict[str, Any]:
@@ -355,6 +432,7 @@ def build_refactor_final_report(
         "legacy_unregistered_target": 5,
         "legacy_unregistered_status": "pass" if legacy_unregistered <= 5 else "documented_blocker",
         "legacy_unregistered_note": "" if legacy_unregistered <= 5 else "Remaining imperative doctor append sites are documented for the next plugin migration batch.",
+        "remaining_legacy_unregistered_details": _doctor_legacy_unregistered_details() if legacy_unregistered > 5 else [],
         "migrated_this_run": len(MIGRATED_MODULES_THIS_RUN),
     }
     extra_blockers: list[dict[str, str]] = []
@@ -532,6 +610,19 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             f"- legacy_unregistered_status: `{data['doctor_plugin_migration']['legacy_unregistered_status']}`",
             f"- plugin_check_counts: `{json.dumps(data.get('plugin_check_counts', {}), sort_keys=True)}`",
             f"- migrated_this_run: `{data['doctor_plugin_migration']['migrated_this_run']}`",
+            "",
+            "### Remaining Legacy-Unregistered Doctor Sites",
+            "",
+            "| check | next plugin | reason |",
+            "|---|---|---|",
+        ]
+    )
+    for row in data["doctor_plugin_migration"].get("remaining_legacy_unregistered_details", []):
+        lines.append(f"| `{row['check']}` | `{row['next_plugin']}` | {row['reason']} |")
+    if not data["doctor_plugin_migration"].get("remaining_legacy_unregistered_details"):
+        lines.append("| none | none | none |")
+    lines.extend(
+        [
             "",
             "## Namespace And CI",
             "",

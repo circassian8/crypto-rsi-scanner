@@ -1,13 +1,24 @@
 {
+  "active_shim_modules_with_implementation_logic": 0,
+  "active_shims": 120,
   "canonical_final_report": "research/REFACTOR_FINAL_REPORT.json",
-  "ci_status": {
-    "event_alpha_smoke_workflow_dispatch_only": true,
-    "pytest_disable_plugin_autoload": true,
-    "verify_workflow_runs_safe_tests": true,
-    "workflow_configuration_safe": true
+  "ci_status": {},
+  "classification_report": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
+  "cli_event_alpha_service_lines": 46,
+  "cli_service_bind_scanner_globals_call_sites": 26,
+  "cli_service_line_counts": {
+    "crypto_rsi_scanner/cli/services/__init__.py": 8,
+    "crypto_rsi_scanner/cli/services/event_alpha.py": 46,
+    "crypto_rsi_scanner/cli/services/event_alpha_fade_review.py": 488,
+    "crypto_rsi_scanner/cli/services/event_alpha_integrated.py": 474,
+    "crypto_rsi_scanner/cli/services/event_alpha_namespace.py": 50,
+    "crypto_rsi_scanner/cli/services/event_alpha_notifications.py": 1668,
+    "crypto_rsi_scanner/cli/services/event_alpha_outcomes.py": 318,
+    "crypto_rsi_scanner/cli/services/event_alpha_provider_preflights.py": 71,
+    "crypto_rsi_scanner/cli/services/event_alpha_reports.py": 291,
+    "crypto_rsi_scanner/cli/services/event_alpha_research.py": 851,
+    "crypto_rsi_scanner/cli/services/inventory.py": 48
   },
-  "command_set": "refactor_continuation_safe_regression",
-  "critical_failures": 0,
   "doctor_registry_coverage": {
     "legacy_unregistered": 15,
     "legacy_unregistered_status": "documented_blocker",
@@ -23,10 +34,89 @@
       "source_coverage": 1,
       "stale_artifacts": 1
     },
-    "registered_checks": 53
+    "registered_checks": null,
+    "remaining_legacy_unregistered_details": [
+      {
+        "check": "missing_operational_run_rows",
+        "next_plugin": "namespace.py or stale_artifacts.py",
+        "reason": "Run-row absence drives strict doctor status and needs fixture coverage before registry migration."
+      },
+      {
+        "check": "snapshot_availability_lineage_warnings",
+        "next_plugin": "integrated_radar.py",
+        "reason": "Snapshot availability distinguishes fixture, external, stale, and strict operational rows."
+      },
+      {
+        "check": "orphan_alert_snapshot_run_ids",
+        "next_plugin": "integrated_radar.py",
+        "reason": "Alert snapshot lineage counters are compatibility-sensitive in strict and non-strict modes."
+      },
+      {
+        "check": "legacy_alert_snapshot_lineage",
+        "next_plugin": "stale_artifacts.py",
+        "reason": "Legacy rows are intentionally tolerated in some scopes and blocked in others."
+      },
+      {
+        "check": "feedback_without_matching_alert_snapshot",
+        "next_plugin": "outcomes.py",
+        "reason": "Feedback lineage severity depends on strict mode and latest-run filtering."
+      },
+      {
+        "check": "outcomes_without_matching_alert_snapshot",
+        "next_plugin": "outcomes.py",
+        "reason": "Outcome lineage severity depends on strict mode and legacy artifact scope."
+      },
+      {
+        "check": "mixed_artifact_namespaces",
+        "next_plugin": "namespace.py",
+        "reason": "Namespace-mixing behavior must preserve strict blocker versus warning semantics."
+      },
+      {
+        "check": "multiple_artifact_namespaces_present",
+        "next_plugin": "namespace.py",
+        "reason": "Multiple namespaces are tolerated in audit modes but not strict current-run checks."
+      },
+      {
+        "check": "multiple_profiles_present",
+        "next_plugin": "namespace.py",
+        "reason": "Profile-mixing is currently warning-only and should stay compatible."
+      },
+      {
+        "check": "provider_health_missing_for_live_profile",
+        "next_plugin": "provider_readiness.py",
+        "reason": "Provider health rows are required only for selected live/burn-in profile families."
+      },
+      {
+        "check": "llm_budget_rows_missing_for_llm_profile",
+        "next_plugin": "provider_readiness.py",
+        "reason": "Budget telemetry is warning-only for LLM profiles and must not block no-key paths."
+      },
+      {
+        "check": "invalid_canonical_incident_rows",
+        "next_plugin": "integrated_radar.py",
+        "reason": "Incident linkage counters are shared with integrated-radar/card consistency checks."
+      },
+      {
+        "check": "alertable_run_external_snapshot_path",
+        "next_plugin": "paths.py",
+        "reason": "External snapshot paths are blockers for operational rows but allowed for some fixture rows."
+      },
+      {
+        "check": "fixture_snapshot_external_allowed",
+        "next_plugin": "paths.py",
+        "reason": "Fixture external snapshot rows remain warning-only under current doctor semantics."
+      },
+      {
+        "check": "snapshot_availability_unknown_or_missing",
+        "next_plugin": "integrated_radar.py",
+        "reason": "Unknown or missing snapshot availability depends on run_mode and strictness."
+      }
+    ]
   },
-  "failed_commands": 0,
-  "generated_at": "2026-07-02T18:39:48Z",
+  "generated_at": "2026-07-02T19:08:45Z",
+  "intentionally_outside_event_alpha_modules": [
+    "crypto_rsi_scanner.event_fade"
+  ],
   "known_remaining_blockers": [
     {
       "blocker_reason": "scanner.py still contains many historical Event Alpha command bodies and runtime config adapters that were only partially routed through cli/dispatch.py.",
@@ -41,139 +131,54 @@
       "risk": "Moving the last imperative checks without enough fixtures can change blocker/WARN semantics."
     },
     {
-      "blocker_reason": "event_alpha CLI service remains above the requested <1500 split target.",
-      "next_migration_module": "crypto_rsi_scanner/cli/services/event_alpha_notifications.py, event_alpha_integrated.py, provider_preflights.py, reports.py, namespace.py, and outcomes.py",
-      "path": "crypto_rsi_scanner/cli/services/event_alpha.py",
-      "risk": "Splitting service bodies before replacing scanner-bound globals can change CLI dispatch behavior or provider/send guardrails."
-    },
-    {
       "blocker_reason": "cli service bind_scanner_globals call sites were not reduced by the requested 50%.",
       "next_migration_module": "Replace scanner-global dependencies in the split Event Alpha service modules with explicit imports and focused dispatch monkeypatch tests.",
       "path": "crypto_rsi_scanner/cli/services/event_alpha.py",
       "risk": "Removing the runtime binding too early can break historical helper/config resolution for Makefile-backed commands."
     }
   ],
-  "module_organization": {
-    "active_shim_modules_with_implementation_logic": 0,
-    "active_shims": 95,
-    "cli_event_alpha_service_lines": 3938,
-    "cli_service_bind_scanner_globals_call_sites": 26,
-    "intentionally_outside_event_alpha_modules": [
-      "crypto_rsi_scanner.event_fade"
-    ],
-    "migrated_modules_this_run": [
-      "crypto_rsi_scanner.event_validation",
-      "crypto_rsi_scanner.event_discovery",
-      "crypto_rsi_scanner.event_near_miss",
-      "crypto_rsi_scanner.event_classification",
-      "crypto_rsi_scanner.event_catalyst_frames",
-      "crypto_rsi_scanner.event_claim_semantics",
-      "crypto_rsi_scanner.event_playbooks",
-      "crypto_rsi_scanner.event_impact_path_validator",
-      "crypto_rsi_scanner.event_evidence_quality",
-      "crypto_rsi_scanner.event_market_enrichment",
-      "crypto_rsi_scanner.event_llm_extractor",
-      "crypto_rsi_scanner.event_llm_analyzer",
-      "crypto_rsi_scanner.event_llm_evidence_planner",
-      "crypto_rsi_scanner.event_llm_catalyst_frames",
-      "crypto_rsi_scanner.event_llm_extract_eval",
-      "crypto_rsi_scanner.event_llm_eval",
-      "crypto_rsi_scanner.event_llm_models",
-      "crypto_rsi_scanner.event_llm_extraction_models",
-      "crypto_rsi_scanner.event_alpha_alert_store",
-      "crypto_rsi_scanner.event_alerts",
-      "crypto_rsi_scanner.event_alpha_router",
-      "crypto_rsi_scanner.event_alpha_pipeline",
-      "crypto_rsi_scanner.event_watchlist",
-      "crypto_rsi_scanner.event_watchlist_monitor",
-      "crypto_rsi_scanner.event_watchlist_enrichment",
-      "crypto_rsi_scanner.event_watchlist_market",
-      "crypto_rsi_scanner.event_alpha_replay",
-      "crypto_rsi_scanner.event_feedback"
-    ],
-    "migrated_modules_this_run_count": 28,
-    "partial_shims": 0,
-    "remaining_implementation_modules_by_package_target": {
-      "artifacts": 3,
-      "config": 5,
-      "doctor": 1,
-      "notifications": 1,
-      "outcomes": 4,
-      "providers": 1,
-      "radar": 9,
-      "radar_llm": 2,
-      "shared_event_infra": 2,
-      "shared_radar_infra": 1
-    },
-    "remaining_module_classification_path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
-    "scanner_bind_scanner_globals_call_sites": 7,
-    "scanner_command_body_functions_remaining": 105,
-    "top_level_event_module_count": 125,
-    "unmigrated_modules": 30
+  "line_counts": {
+    "crypto_rsi_scanner/cli/services/event_alpha.py": 46,
+    "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 6363,
+    "crypto_rsi_scanner/event_alpha_artifact_doctor.py": 19,
+    "crypto_rsi_scanner/scanner.py": 7744,
+    "tests/test_indicators.py": 1771
   },
-  "monolith_size_reductions": {
-    "crypto_rsi_scanner/cli/services/event_alpha.py": {
-      "baseline_lines": 3938,
-      "current_lines": 3938,
-      "reduced_by_lines": 0,
-      "reduction_pct": 0.0,
-      "target_lines_lt": 1500,
-      "target_status": "blocked"
-    },
-    "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": {
-      "baseline_lines": 7145,
-      "current_lines": 6363,
-      "reduced_by_lines": 782,
-      "reduction_pct": 10.94,
-      "target_lines_lt": 1500,
-      "target_status": "blocked"
-    },
-    "crypto_rsi_scanner/event_alpha_artifact_doctor.py": {
-      "baseline_lines": 7145,
-      "current_lines": 19,
-      "reduced_by_lines": 7126,
-      "reduction_pct": 99.73,
-      "target_lines_lt": 100,
-      "target_status": "pass"
-    },
-    "crypto_rsi_scanner/scanner.py": {
-      "baseline_lines": 13373,
-      "current_lines": 7744,
-      "reduced_by_lines": 5629,
-      "reduction_pct": 42.09,
-      "target_lines_lt": 6500,
-      "target_status": "blocked"
-    },
-    "tests/test_indicators.py": {
-      "baseline_lines": 42498,
-      "current_lines": 1771,
-      "reduced_by_lines": 40727,
-      "reduction_pct": 95.83,
-      "target_lines_lt": 2000,
-      "target_status": "pass"
-    }
-  },
-  "namespace_lifecycle_inventory": {
-    "namespace_count": 46,
-    "status_counts": {
-      "active_fixture_smoke": 18,
-      "active_integrated_smoke": 1,
-      "active_live_rehearsal": 9,
-      "active_provider_preflight": 5,
-      "active_provider_rehearsal": 5,
-      "active_refactor_report": 1,
-      "manual_review": 5,
-      "quarantine": 1,
-      "stale_deprecated": 1
-    },
-    "unknown_namespace_count": 0,
-    "unknown_namespaces": []
-  },
-  "rc_verdict": "Critical behavior and safety checks pass. This refactor continuation is pending final acceptance because scanner.py, cli/services/event_alpha.py, bind_scanner_globals reduction, and doctor legacy_unregistered targets remain documented blockers.",
-  "runtime": {
-    "pytest_plugin_autoload_disabled": true,
-    "pytest_runtime_seconds": 11.538,
-    "standalone_runner_runtime_seconds": 11.191
+  "migrated_modules_this_run": [
+    "crypto_rsi_scanner.event_incident_graph",
+    "crypto_rsi_scanner.event_identity",
+    "crypto_rsi_scanner.event_graph",
+    "crypto_rsi_scanner.event_resolver",
+    "crypto_rsi_scanner.event_price_history",
+    "crypto_rsi_scanner.event_catalyst_frame_validator",
+    "crypto_rsi_scanner.event_anomaly_state",
+    "crypto_rsi_scanner.event_anomaly_scanner",
+    "crypto_rsi_scanner.event_market_units",
+    "crypto_rsi_scanner.event_llm_budget",
+    "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
+    "crypto_rsi_scanner.event_source_reliability",
+    "crypto_rsi_scanner.event_cache",
+    "crypto_rsi_scanner.event_alpha_explain",
+    "crypto_rsi_scanner.event_alpha_quality_fields",
+    "crypto_rsi_scanner.event_alpha_outcomes",
+    "crypto_rsi_scanner.event_alpha_eval",
+    "crypto_rsi_scanner.event_alpha_burn_in_checklist",
+    "crypto_rsi_scanner.event_alpha_profiles",
+    "crypto_rsi_scanner.event_alpha_v1_readiness",
+    "crypto_rsi_scanner.event_alpha_preflight",
+    "crypto_rsi_scanner.event_alpha_health_guard",
+    "crypto_rsi_scanner.event_alpha_scheduler",
+    "crypto_rsi_scanner.event_alpha_environment_doctor",
+    "crypto_rsi_scanner.event_provider_status"
+  ],
+  "migrated_modules_this_run_count": 25,
+  "namespace_lifecycle_inventory": {},
+  "partial_shims": 0,
+  "rc_verdict": "Critical behavior and safety checks pass. This continuation remains pending final refactor acceptance because scanner size, Event Alpha service bind-site reduction, and doctor legacy-unregistered targets are documented blockers.",
+  "remaining_implementation_modules_by_package_target": {
+    "artifacts": 1,
+    "radar": 1,
+    "shared_event_infra": 2
   },
   "safety_invariants": {
     "event_fade_remains_outside_event_alpha": true,
@@ -183,162 +188,214 @@
     "no_live_telegram_sends": true,
     "no_secrets_in_artifacts": true,
     "no_trading_paper_or_execution_changes": true,
-    "research_only": true
+    "research_only": true,
+    "triggered_fade_source": "event_fade.py + proxy_fade only"
   },
-  "schema_version": "refactor_release_candidate_report_v3",
+  "scanner_bind_scanner_globals_call_sites": 7,
+  "scanner_command_body_functions_remaining": 105,
+  "schema_validation_coverage": {},
+  "schema_version": "refactor_release_candidate_report_v1",
+  "shared_event_infra_modules": null,
   "status": "pending_with_documented_refactor_blockers",
-  "test_runtime_report": "research/test_runtime_report.json",
-  "total_commands": 25,
-  "verification_results": [
-    {
-      "command": "python3 tests/test_indicators.py",
-      "index": 1,
-      "note": "734/734 standalone tests",
-      "status": "pass"
-    },
-    {
-      "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py",
-      "index": 2,
-      "note": "740/740 pytest tests",
-      "status": "pass"
-    },
-    {
-      "command": "python3 -m compileall -q crypto_rsi_scanner tests",
-      "index": 3,
-      "note": "source/test bytecode compile",
-      "status": "pass"
-    },
-    {
-      "command": "make test-pytest-safe PYTHON=python3",
-      "index": 4,
-      "note": "safe pytest target, external plugin autoload disabled",
-      "status": "pass"
-    },
-    {
-      "command": "make test-pytest-timed PYTHON=python3",
-      "index": 5,
-      "note": "wrote research/test_runtime_report.md/json",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-shim-report PYTHON=python3",
-      "index": 6,
-      "note": "active shim logic violations=0",
-      "status": "pass"
-    },
-    {
-      "command": "make refactor-final-report PYTHON=python3",
-      "index": 7,
-      "note": "report generated with documented size/doctor blockers",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-namespace-lifecycle-report PYTHON=python3",
-      "index": 8,
-      "note": "unknown_namespace_count=0",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-integrated-radar-smoke PYTHON=python3",
-      "index": 9,
-      "note": "fixture smoke, no live calls",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-integrated-radar-doctor PYTHON=python3",
-      "index": 10,
-      "note": "doctor OK",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-live-provider-readiness-smoke PYTHON=python3",
-      "index": 11,
-      "note": "live calls remain disabled",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-coinalyze-preflight-smoke PYTHON=python3",
-      "index": 12,
-      "note": "fixture/no-call preflight",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-coinalyze-preflight PYTHON=python3",
-      "index": 13,
-      "note": "missing_config, no provider network calls",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3",
-      "index": 14,
-      "note": "no-send rehearsal, no side effects",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-market-anomaly-smoke PYTHON=python3",
-      "index": 15,
-      "note": "market anomaly smoke",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-official-exchange-smoke PYTHON=python3",
-      "index": 16,
-      "note": "official exchange smoke",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-scheduled-catalyst-smoke PYTHON=python3",
-      "index": 17,
-      "note": "scheduled catalyst smoke",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-unlock-risk-smoke PYTHON=python3",
-      "index": 18,
-      "note": "unlock risk smoke",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-derivatives-smoke PYTHON=python3",
-      "index": 19,
-      "note": "derivatives smoke",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-fade-review-smoke PYTHON=python3",
-      "index": 20,
-      "note": "fade-review smoke",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
-      "index": 21,
-      "note": "source coverage rendered",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
-      "index": 22,
-      "note": "daily brief rendered",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
-      "index": 23,
-      "note": "preview rendered, no send",
-      "status": "pass"
-    },
-    {
-      "command": "make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3",
-      "index": 24,
-      "note": "WARN/no blockers",
-      "status": "pass"
-    },
-    {
-      "command": "make verify PYTHON=python3",
-      "index": 25,
-      "note": "standard repo verification passed",
-      "status": "pass"
-    }
-  ]
+  "top_level_event_module_count": 125,
+  "unmigrated_modules": 5,
+  "verification": {
+    "commands": [
+      {
+        "command": "python3 tests/test_indicators.py",
+        "elapsed_seconds": 11.515,
+        "index": 1,
+        "note": "734/734 standalone tests",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q",
+        "elapsed_seconds": 11.847,
+        "index": 2,
+        "note": "740/740 pytest tests",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "python3 -m compileall -q crypto_rsi_scanner tests",
+        "elapsed_seconds": 0.035,
+        "index": 3,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make test-pytest-safe PYTHON=python3",
+        "elapsed_seconds": 12.073,
+        "index": 4,
+        "note": "740/740 pytest tests",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-shim-report PYTHON=python3",
+        "elapsed_seconds": 0.057,
+        "index": 5,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-final-report PYTHON=python3",
+        "elapsed_seconds": 0.138,
+        "index": 6,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-namespace-lifecycle-report PYTHON=python3",
+        "elapsed_seconds": 0.697,
+        "index": 7,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-integrated-radar-smoke PYTHON=python3",
+        "elapsed_seconds": 1.534,
+        "index": 8,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-integrated-radar-doctor PYTHON=python3",
+        "elapsed_seconds": 0.733,
+        "index": 9,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-live-provider-readiness-smoke PYTHON=python3",
+        "elapsed_seconds": 0.625,
+        "index": 10,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-preflight-smoke PYTHON=python3",
+        "elapsed_seconds": 0.628,
+        "index": 11,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-preflight PYTHON=python3",
+        "elapsed_seconds": 0.608,
+        "index": 12,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3",
+        "elapsed_seconds": 0.61,
+        "index": 13,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-market-anomaly-smoke PYTHON=python3",
+        "elapsed_seconds": 2.462,
+        "index": 14,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-official-exchange-smoke PYTHON=python3",
+        "elapsed_seconds": 2.485,
+        "index": 15,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-scheduled-catalyst-smoke PYTHON=python3",
+        "elapsed_seconds": 2.444,
+        "index": 16,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-unlock-risk-smoke PYTHON=python3",
+        "elapsed_seconds": 1.852,
+        "index": 17,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-derivatives-smoke PYTHON=python3",
+        "elapsed_seconds": 1.839,
+        "index": 18,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-fade-review-smoke PYTHON=python3",
+        "elapsed_seconds": 1.844,
+        "index": 19,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+        "elapsed_seconds": 0.63,
+        "index": 20,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+        "elapsed_seconds": 3.648,
+        "index": 21,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+        "elapsed_seconds": 0.744,
+        "index": 22,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3",
+        "elapsed_seconds": 1.241,
+        "index": 23,
+        "note": "",
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make verify PYTHON=python3",
+        "elapsed_seconds": 12.775,
+        "index": 24,
+        "note": "734/734 standalone tests",
+        "returncode": 0,
+        "status": "pass"
+      }
+    ],
+    "failed_commands": 0,
+    "total_commands": 24,
+    "total_elapsed_seconds": 73.066
+  }
 }

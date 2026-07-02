@@ -9,6 +9,12 @@ import pytest
 from crypto_rsi_scanner import scanner
 from crypto_rsi_scanner.cli.dispatch import dispatch_args
 from crypto_rsi_scanner.cli.parser import build_parser
+from crypto_rsi_scanner.cli.services import (
+    event_alpha_integrated,
+    event_alpha_notifications,
+    event_alpha_provider_preflights,
+    event_alpha_reports,
+)
 
 
 def _args(argv: list[str]):
@@ -21,7 +27,12 @@ def test_dispatch_integrated_radar_fixture_cycle(monkeypatch):
     def fake_integrated(**kwargs):
         calls.append(kwargs)
 
-    monkeypatch.setattr(scanner, "event_alpha_integrated_radar_cycle_report", fake_integrated)
+    monkeypatch.setattr(event_alpha_integrated, "event_alpha_integrated_radar_cycle_report", fake_integrated)
+    monkeypatch.setattr(
+        scanner,
+        "event_alpha_integrated_radar_cycle_report",
+        lambda **kwargs: pytest.fail("dispatch should call event_alpha_integrated service directly"),
+    )
     dispatch_args(_args([
         "--event-alpha-integrated-radar-cycle",
         "--event-alpha-integrated-radar-fixture",
@@ -42,7 +53,12 @@ def test_dispatch_integrated_radar_fixture_cycle(monkeypatch):
 
 def test_dispatch_artifact_doctor(monkeypatch):
     calls: list[dict[str, object]] = []
-    monkeypatch.setattr(scanner, "event_alpha_artifact_doctor_report", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(event_alpha_reports, "event_alpha_artifact_doctor_report", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(
+        scanner,
+        "event_alpha_artifact_doctor_report",
+        lambda **kwargs: pytest.fail("dispatch should call event_alpha_reports service directly"),
+    )
     dispatch_args(_args([
         "--event-alpha-artifact-doctor",
         "--event-alpha-artifact-doctor-strict",
@@ -59,7 +75,16 @@ def test_dispatch_artifact_doctor(monkeypatch):
 
 def test_dispatch_coinalyze_preflight(monkeypatch):
     calls: list[dict[str, object]] = []
-    monkeypatch.setattr(scanner, "event_alpha_coinalyze_preflight_report", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(
+        event_alpha_provider_preflights,
+        "event_alpha_coinalyze_preflight_report",
+        lambda **kwargs: calls.append(kwargs),
+    )
+    monkeypatch.setattr(
+        scanner,
+        "event_alpha_coinalyze_preflight_report",
+        lambda **kwargs: pytest.fail("dispatch should call event_alpha_provider_preflights service directly"),
+    )
     dispatch_args(_args(["--event-alpha-coinalyze-preflight", "--event-alpha-profile", "fixture"]))
     assert calls == [{
         "verbose": False,
@@ -72,7 +97,12 @@ def test_dispatch_coinalyze_preflight(monkeypatch):
 
 def test_dispatch_notify_preview(monkeypatch):
     calls: list[dict[str, object]] = []
-    monkeypatch.setattr(scanner, "event_alpha_notify_preview", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(event_alpha_notifications, "event_alpha_notify_preview", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(
+        scanner,
+        "event_alpha_notify_preview",
+        lambda **kwargs: pytest.fail("dispatch should call event_alpha_notifications service directly"),
+    )
     dispatch_args(_args(["--event-alpha-notify-preview", "--event-alpha-profile", "notify_no_key"]))
     assert calls == [{"verbose": False, "profile_name": "notify_no_key"}]
 

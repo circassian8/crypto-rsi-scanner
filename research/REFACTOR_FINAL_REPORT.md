@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-02T18:39:16+00:00`
+- generated_at: `2026-07-02T19:07:28+00:00`
 - gate_status: `blocked`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -24,48 +24,45 @@ Research-only refactor gate report. This report does not call providers, send Te
 ## Organization Counts
 
 - top_level_event_module_count: `125`
-- active_shims: `95`
+- active_shims: `120`
 - partial_shims: `0`
-- unmigrated_modules: `30`
+- unmigrated_modules: `5`
 - active_shim_modules_with_implementation_logic: `0`
-- migrated_modules_this_run_count: `28`
+- migrated_modules_this_run_count: `25`
 - scanner_bind_scanner_globals_call_sites: `7`
 - cli_service_bind_scanner_globals_call_sites: `26`
-- cli_event_alpha_service_lines: `3938`
+- cli_event_alpha_service_lines: `46`
 - scanner_command_body_functions_remaining: `105`
-- remaining_implementation_modules_by_package_target: `{"artifacts": 3, "config": 5, "doctor": 1, "notifications": 1, "outcomes": 4, "providers": 1, "radar": 9, "radar_llm": 2, "shared_event_infra": 2, "shared_radar_infra": 1}`
+- remaining_implementation_modules_by_package_target: `{"artifacts": 1, "radar": 1, "shared_event_infra": 2}`
 - intentionally_outside_event_alpha_modules: `["crypto_rsi_scanner.event_fade"]`
 
 ## Newly Migrated Modules
 
-- `crypto_rsi_scanner.event_validation`
-- `crypto_rsi_scanner.event_discovery`
-- `crypto_rsi_scanner.event_near_miss`
-- `crypto_rsi_scanner.event_classification`
-- `crypto_rsi_scanner.event_catalyst_frames`
-- `crypto_rsi_scanner.event_claim_semantics`
-- `crypto_rsi_scanner.event_playbooks`
-- `crypto_rsi_scanner.event_impact_path_validator`
-- `crypto_rsi_scanner.event_evidence_quality`
-- `crypto_rsi_scanner.event_market_enrichment`
-- `crypto_rsi_scanner.event_llm_extractor`
-- `crypto_rsi_scanner.event_llm_analyzer`
-- `crypto_rsi_scanner.event_llm_evidence_planner`
-- `crypto_rsi_scanner.event_llm_catalyst_frames`
-- `crypto_rsi_scanner.event_llm_extract_eval`
-- `crypto_rsi_scanner.event_llm_eval`
-- `crypto_rsi_scanner.event_llm_models`
-- `crypto_rsi_scanner.event_llm_extraction_models`
-- `crypto_rsi_scanner.event_alpha_alert_store`
-- `crypto_rsi_scanner.event_alerts`
-- `crypto_rsi_scanner.event_alpha_router`
-- `crypto_rsi_scanner.event_alpha_pipeline`
-- `crypto_rsi_scanner.event_watchlist`
-- `crypto_rsi_scanner.event_watchlist_monitor`
-- `crypto_rsi_scanner.event_watchlist_enrichment`
-- `crypto_rsi_scanner.event_watchlist_market`
-- `crypto_rsi_scanner.event_alpha_replay`
-- `crypto_rsi_scanner.event_feedback`
+- `crypto_rsi_scanner.event_incident_graph`
+- `crypto_rsi_scanner.event_identity`
+- `crypto_rsi_scanner.event_graph`
+- `crypto_rsi_scanner.event_resolver`
+- `crypto_rsi_scanner.event_price_history`
+- `crypto_rsi_scanner.event_catalyst_frame_validator`
+- `crypto_rsi_scanner.event_anomaly_state`
+- `crypto_rsi_scanner.event_anomaly_scanner`
+- `crypto_rsi_scanner.event_market_units`
+- `crypto_rsi_scanner.event_llm_budget`
+- `crypto_rsi_scanner.event_llm_catalyst_frames_eval`
+- `crypto_rsi_scanner.event_source_reliability`
+- `crypto_rsi_scanner.event_cache`
+- `crypto_rsi_scanner.event_alpha_explain`
+- `crypto_rsi_scanner.event_alpha_quality_fields`
+- `crypto_rsi_scanner.event_alpha_outcomes`
+- `crypto_rsi_scanner.event_alpha_eval`
+- `crypto_rsi_scanner.event_alpha_burn_in_checklist`
+- `crypto_rsi_scanner.event_alpha_profiles`
+- `crypto_rsi_scanner.event_alpha_v1_readiness`
+- `crypto_rsi_scanner.event_alpha_preflight`
+- `crypto_rsi_scanner.event_alpha_health_guard`
+- `crypto_rsi_scanner.event_alpha_scheduler`
+- `crypto_rsi_scanner.event_alpha_environment_doctor`
+- `crypto_rsi_scanner.event_provider_status`
 
 ## Doctor Plugin Migration
 
@@ -73,7 +70,27 @@ Research-only refactor gate report. This report does not call providers, send Te
 - legacy_unregistered_target: `5`
 - legacy_unregistered_status: `documented_blocker`
 - plugin_check_counts: `{"integrated_radar": 3, "namespace": 1, "notifications": 1, "outcomes": 1, "paths": 1, "provider_readiness": 2, "safety": 1, "source_coverage": 1, "stale_artifacts": 1}`
-- migrated_this_run: `28`
+- migrated_this_run: `25`
+
+### Remaining Legacy-Unregistered Doctor Sites
+
+| check | next plugin | reason |
+|---|---|---|
+| `missing_operational_run_rows` | `namespace.py or stale_artifacts.py` | Run-row absence drives strict doctor status and needs fixture coverage before registry migration. |
+| `snapshot_availability_lineage_warnings` | `integrated_radar.py` | Snapshot availability distinguishes fixture, external, stale, and strict operational rows. |
+| `orphan_alert_snapshot_run_ids` | `integrated_radar.py` | Alert snapshot lineage counters are compatibility-sensitive in strict and non-strict modes. |
+| `legacy_alert_snapshot_lineage` | `stale_artifacts.py` | Legacy rows are intentionally tolerated in some scopes and blocked in others. |
+| `feedback_without_matching_alert_snapshot` | `outcomes.py` | Feedback lineage severity depends on strict mode and latest-run filtering. |
+| `outcomes_without_matching_alert_snapshot` | `outcomes.py` | Outcome lineage severity depends on strict mode and legacy artifact scope. |
+| `mixed_artifact_namespaces` | `namespace.py` | Namespace-mixing behavior must preserve strict blocker versus warning semantics. |
+| `multiple_artifact_namespaces_present` | `namespace.py` | Multiple namespaces are tolerated in audit modes but not strict current-run checks. |
+| `multiple_profiles_present` | `namespace.py` | Profile-mixing is currently warning-only and should stay compatible. |
+| `provider_health_missing_for_live_profile` | `provider_readiness.py` | Provider health rows are required only for selected live/burn-in profile families. |
+| `llm_budget_rows_missing_for_llm_profile` | `provider_readiness.py` | Budget telemetry is warning-only for LLM profiles and must not block no-key paths. |
+| `invalid_canonical_incident_rows` | `integrated_radar.py` | Incident linkage counters are shared with integrated-radar/card consistency checks. |
+| `alertable_run_external_snapshot_path` | `paths.py` | External snapshot paths are blockers for operational rows but allowed for some fixture rows. |
+| `fixture_snapshot_external_allowed` | `paths.py` | Fixture external snapshot rows remain warning-only under current doctor semantics. |
+| `snapshot_availability_unknown_or_missing` | `integrated_radar.py` | Unknown or missing snapshot availability depends on run_mode and strictness. |
 
 ## Namespace And CI
 
@@ -95,12 +112,6 @@ Research-only refactor gate report. This report does not call providers, send Te
 - blocker_reason: legacy_unregistered doctor append sites remain above the requested <=5 target.
 - next_migration_module: `crypto_rsi_scanner/event_alpha/doctor/checks/safety.py and integrated_radar.py`
 - risk: Moving the last imperative checks without enough fixtures can change blocker/WARN semantics.
-
-### `crypto_rsi_scanner/cli/services/event_alpha.py`
-
-- blocker_reason: event_alpha CLI service remains above the requested <1500 split target.
-- next_migration_module: `crypto_rsi_scanner/cli/services/event_alpha_notifications.py, event_alpha_integrated.py, provider_preflights.py, reports.py, namespace.py, and outcomes.py`
-- risk: Splitting service bodies before replacing scanner-bound globals can change CLI dispatch behavior or provider/send guardrails.
 
 ### `crypto_rsi_scanner/cli/services/event_alpha.py`
 

@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Event Alpha service split and 25-module migration accepted with bind-site blockers
+**Status:** accepted
+**Decision:** The current behavior-preserving refactor continuation is accepted:
+`crypto_rsi_scanner/cli/services/event_alpha.py` is now a compatibility
+aggregator over focused Event Alpha service modules, 25 additional top-level
+Event Alpha modules have package homes with active shims, and
+`event_fade.py` remains explicitly outside Event Alpha. `event_clock.py` and
+`event_models.py` remain shared event infrastructure until a neutral package
+decision is made.
+**Why:** The split reduces the Event Alpha CLI service file to 46 lines and
+raises the active-shim count to 120 with zero active-shim implementation
+violations, while preserving old import paths and research-only/no-send/no-live
+guards. The final refactor gate remains pending only for measured blockers:
+`scanner.py` is still 7,744 lines against the <6,500 target, Event Alpha
+service modules still have 26 `bind_scanner_globals(...)` call sites, and the
+doctor registry still reports `legacy_unregistered=15` against the <=5 target.
+**Revisit when:** the next CLI pass can replace scanner-global binding with
+explicit imports under command dispatch tests, the scanner drops below 6,500
+lines, or the remaining doctor sites can be migrated without changing
+strict/WARN semantics.
+
 ## 2026-07-02 - Event Alpha module migration accepted with final gates pending
 **Status:** accepted
 **Decision:** The 28-module Event Alpha migration batch is accepted as a
