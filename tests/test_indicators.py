@@ -6,6 +6,7 @@ Or standalone:     python tests/test_indicators.py
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -42370,6 +42371,69 @@ def test_github_actions_are_safe_fixture_verification_only():
         assert item not in text
     assert "make verify python=python3" in text
     assert "event-alpha-integrated-radar-smoke" in text
+
+
+def test_refactor_baseline_generation_writes_reports_without_behavior_invocation():
+    from crypto_rsi_scanner import refactor_baseline
+
+    root = Path(__file__).resolve().parent.parent
+    with TemporaryDirectory() as tmp:
+        out_dir = Path(tmp) / "research"
+        paths = refactor_baseline.write_refactor_baseline(root=root, out_dir=out_dir)
+        assert paths["json"].exists()
+        assert paths["markdown"].exists()
+        payload = json.loads(paths["json"].read_text(encoding="utf-8"))
+        markdown = paths["markdown"].read_text(encoding="utf-8")
+
+    assert payload["schema_version"] == "refactor_baseline_v1"
+    assert payload["static_inventory_only"] is True
+    assert payload["behavior_changing_code_invoked"] is False
+    assert payload["live_provider_calls_allowed"] is False
+    assert payload["telegram_sends"] == 0
+    assert payload["trades_created"] == 0
+    assert payload["paper_trades_created"] == 0
+    assert payload["normal_rsi_signal_rows_written"] == 0
+    assert payload["triggered_fade_created"] == 0
+    assert "Behavior Freeze Contract" in markdown
+    assert "Refactor Success Gates" in markdown
+
+
+def test_refactor_baseline_json_contains_file_counts_and_inventory():
+    from crypto_rsi_scanner import refactor_baseline
+
+    root = Path(__file__).resolve().parent.parent
+    payload = refactor_baseline.build_refactor_baseline(root=root)
+    counts = payload["line_counts"]
+    assert counts["crypto_rsi_scanner/scanner.py"] > 4000
+    assert counts["tests/test_indicators.py"] > 2000
+    assert counts["crypto_rsi_scanner/event_alpha_artifact_doctor.py"] > 1500
+    assert payload["top_level_event_module_count"] == len(payload["top_level_event_modules"])
+    assert payload["top_level_event_module_count"] > 0
+    assert "crypto_rsi_scanner/event_alpha/artifacts/schema_v1.py" in payload["event_alpha_package_files"]
+    assert "crypto_rsi_scanner/cli/parser.py" in payload["cli_package_files"]
+    assert "tests/test_indicators.py" in payload["tests_package_files"]
+    assert ".github/workflows/verify.yml" in payload["github_actions_workflows"]
+    assert "event-alpha-integrated-radar-smoke" in payload["makefile_event_targets"]
+    assert payload["namespace_inventory"]["base_dir"] == "event_fade_cache"
+
+
+def test_refactor_baseline_make_target_is_static_and_no_live_runtime_path():
+    root = Path(__file__).resolve().parent.parent
+    makefile = (root / "Makefile").read_text(encoding="utf-8")
+    module_text = (root / "crypto_rsi_scanner" / "refactor_baseline.py").read_text(encoding="utf-8").casefold()
+    assert "refactor-baseline:" in makefile
+    assert "$(python) -m crypto_rsi_scanner.refactor_baseline" in makefile.casefold()
+    forbidden = (
+        "urlopen",
+        "requests.",
+        "aiohttp",
+        "from crypto_rsi_scanner.scanner import",
+        "import crypto_rsi_scanner.scanner",
+        "main.py --",
+        "event_alert_send",
+    )
+    for item in forbidden:
+        assert item not in module_text
 
 
 def test_export_source_with_artifacts_fallback_and_archive_validation():

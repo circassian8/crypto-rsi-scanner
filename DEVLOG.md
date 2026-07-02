@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Record refactor baseline and behavior-freeze contract · Codex
+**Why:** Before moving more Event Alpha or CLI code, the repo needed a static
+baseline that records the current architecture, test/CLI/artifact surface, and
+measurable acceptance gates so future refactors can prove compatibility.
+**Changes:**
+- Added `crypto_rsi_scanner/refactor_baseline.py`, a static inventory generator
+  that reads repository files and namespace artifacts only; it does not invoke
+  scanner/provider/runtime behavior.
+- Added `research/REFACTOR_BASELINE.md` and
+  `research/REFACTOR_BASELINE.json` with major file line counts, Event Alpha
+  module/package inventories, CLI/test/workflow inventories, Event-related
+  Makefile targets, namespace inventory, behavior-freeze contract, schema v1
+  artifact contract, and final-phase refactor success gates.
+- Added `make refactor-baseline PYTHON=python3` and standalone tests for report
+  generation, baseline JSON counts, and no behavior-changing/runtime path
+  invocation.
+- Updated `ROADMAP.md` with the completed refactor-baseline milestone.
+**Verify:** `make refactor-baseline PYTHON=python3`; `python3
+tests/test_indicators.py` (685/685); `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make verify PYTHON=python3`.
+**Notes/risks:** Baseline artifacts record the current large-file counts:
+`scanner.py` 13,373 lines, `tests/test_indicators.py` 42,498 lines, and
+`event_alpha_artifact_doctor.py` 7,145 lines. No live provider calls,
+Telegram sends, trades, paper trades, normal RSI writes, or Event Alpha-created
+`TRIGGERED_FADE` were added.
+
 ## 2026-07-02 — Add Event Alpha consolidation scaffolding · Codex
 **Why:** Event Alpha needed maintainable package boundaries, schema-first
 artifact validation, pytest-compatible test organization, CI verification, and
