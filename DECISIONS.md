@@ -30,9 +30,11 @@ lifecycle smokes, and `make verify`. Doctor schema validation covered 328 row
 checks with zero schema errors, the doctor registry remained stable at 53
 registered checks and 15 legacy-unregistered checks, active shim logic
 violations are zero, and safety invariants remained no-live/no-send/no-trading/
-no-paper/no-RSI/no-Event-Alpha-created-TRIGGERED_FADE. A prior GitHub Actions
-run failed on Python 3.11 f-string parsing; this RC includes the compatibility
-fix and `/usr/bin/python3` compileall now passes.
+no-paper/no-RSI/no-Event-Alpha-created-TRIGGERED_FADE. Prior GitHub Actions
+runs exposed Python 3.11 f-string parsing and fixed-clock test-isolation
+failures; this RC includes both compatibility fixes, `/usr/bin/python3`
+compileall now passes, and the full gauntlet passes with the workflow fixed
+research clock set.
 **Revisit when:** a critical smoke/doctor/verify command regresses, GitHub
 Actions exposes a new incompatibility on the RC commit, an old import shim is
 removed, or provider activation work needs to change the schema/doctor/namespace

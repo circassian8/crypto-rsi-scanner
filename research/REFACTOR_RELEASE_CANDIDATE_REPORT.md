@@ -5,7 +5,7 @@
 - command_set: `post_refactor_regression_gauntlet`
 - total_commands: `26`
 - failed_commands: `0`
-- measured_command_seconds: `85.66`
+- measured_command_seconds: `93.19`
 
 This is a research-only release-candidate report. The verification pass did not
 enable live provider calls, live Telegram sends, trading, paper trading,
@@ -16,32 +16,32 @@ execution, normal RSI signal writes from Event Alpha, or Event Alpha-created
 
 | # | command | status | seconds |
 |---:|---|---:|---:|
-| 1 | `python3 tests/test_indicators.py` | pass | 13.65 |
-| 2 | `python3 -m pytest` | pass | 13.80 |
+| 1 | `python3 tests/test_indicators.py` | pass | 14.23 |
+| 2 | `python3 -m pytest` | pass | 14.04 |
 | 3 | `python3 -m compileall -q crypto_rsi_scanner tests` | pass | 0.05 |
-| 4 | `make test-pytest PYTHON=python3` | pass | 14.06 |
-| 5 | `make event-alpha-integrated-radar-smoke PYTHON=python3` | pass | 1.55 |
-| 6 | `make event-alpha-integrated-radar-doctor PYTHON=python3` | pass | 0.74 |
-| 7 | `make event-alpha-integrated-radar-outcome-smoke PYTHON=python3` | pass | 2.97 |
-| 8 | `make event-alpha-integrated-radar-outcome-report PYTHON=python3` | pass | 0.64 |
-| 9 | `make event-alpha-integrated-radar-calibration-report PYTHON=python3` | pass | 0.61 |
-| 10 | `make event-alpha-live-provider-readiness-smoke PYTHON=python3` | pass | 0.62 |
-| 11 | `make event-alpha-coinalyze-preflight-smoke PYTHON=python3` | pass | 0.62 |
-| 12 | `make event-alpha-coinalyze-preflight PYTHON=python3` | pass | 0.64 |
-| 13 | `make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3` | pass | 0.61 |
-| 14 | `make event-alpha-market-anomaly-smoke PYTHON=python3` | pass | 2.45 |
-| 15 | `make event-alpha-official-exchange-smoke PYTHON=python3` | pass | 2.45 |
-| 16 | `make event-alpha-scheduled-catalyst-smoke PYTHON=python3` | pass | 2.45 |
-| 17 | `make event-alpha-unlock-risk-smoke PYTHON=python3` | pass | 1.85 |
-| 18 | `make event-alpha-derivatives-smoke PYTHON=python3` | pass | 1.84 |
-| 19 | `make event-alpha-fade-review-smoke PYTHON=python3` | pass | 1.84 |
-| 20 | `make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | pass | 0.63 |
-| 21 | `make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | pass | 3.75 |
-| 22 | `make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | pass | 0.70 |
-| 23 | `make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3` | pass | 1.19 |
-| 24 | `make event-alpha-namespace-lifecycle-report PYTHON=python3` | pass | 0.69 |
-| 25 | `make event-alpha-mark-known-stale-namespaces PYTHON=python3` | pass | 0.61 |
-| 26 | `make verify PYTHON=python3` | pass | 14.65 |
+| 4 | `make test-pytest PYTHON=python3` | pass | 16.21 |
+| 5 | `make event-alpha-integrated-radar-smoke PYTHON=python3` | pass | 2.06 |
+| 6 | `make event-alpha-integrated-radar-doctor PYTHON=python3` | pass | 0.92 |
+| 7 | `make event-alpha-integrated-radar-outcome-smoke PYTHON=python3` | pass | 6.67 |
+| 8 | `make event-alpha-integrated-radar-outcome-report PYTHON=python3` | pass | 0.67 |
+| 9 | `make event-alpha-integrated-radar-calibration-report PYTHON=python3` | pass | 0.63 |
+| 10 | `make event-alpha-live-provider-readiness-smoke PYTHON=python3` | pass | 0.64 |
+| 11 | `make event-alpha-coinalyze-preflight-smoke PYTHON=python3` | pass | 0.68 |
+| 12 | `make event-alpha-coinalyze-preflight PYTHON=python3` | pass | 0.62 |
+| 13 | `make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3` | pass | 0.62 |
+| 14 | `make event-alpha-market-anomaly-smoke PYTHON=python3` | pass | 2.48 |
+| 15 | `make event-alpha-official-exchange-smoke PYTHON=python3` | pass | 2.59 |
+| 16 | `make event-alpha-scheduled-catalyst-smoke PYTHON=python3` | pass | 2.53 |
+| 17 | `make event-alpha-unlock-risk-smoke PYTHON=python3` | pass | 1.83 |
+| 18 | `make event-alpha-derivatives-smoke PYTHON=python3` | pass | 1.83 |
+| 19 | `make event-alpha-fade-review-smoke PYTHON=python3` | pass | 1.82 |
+| 20 | `make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | pass | 0.62 |
+| 21 | `make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | pass | 3.67 |
+| 22 | `make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | pass | 0.71 |
+| 23 | `make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3` | pass | 1.27 |
+| 24 | `make event-alpha-namespace-lifecycle-report PYTHON=python3` | pass | 0.71 |
+| 25 | `make event-alpha-mark-known-stale-namespaces PYTHON=python3` | pass | 0.60 |
+| 26 | `make verify PYTHON=python3` | pass | 14.49 |
 
 Additional compatibility check:
 
@@ -67,7 +67,7 @@ Organization counts:
 
 ## Schema And Doctor Coverage
 
-Doctor-invoking gauntlet commands validated `328` schema row-checks across
+Doctor-invoking gauntlet commands validated `330` schema row-checks across
 fixture, provider, integrated radar, derivatives, fade-review, and rehearsal
 namespaces. All schema counters were zero for validation failures:
 
@@ -125,8 +125,17 @@ Remote GitHub Actions observation before this RC commit:
   `crypto_rsi_scanner/event_alpha/providers/official_exchange.py`.
 - This RC fixes that parser incompatibility by splitting the nested f-string
   digest input before formatting.
+- The next pushed `Verify` run for `bf862ea6` reached 729/730 standalone tests
+  and failed only because the workflow-level fixed research clock blocked a
+  fake-send unit test.
+- This RC also isolates that test by enabling
+  `EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY` only inside the fake-send test and
+  restoring the prior config afterward.
 - Local `/usr/bin/python3` compileall now passes, covering the failed CI syntax
-  class. The next pushed commit should be watched for the remote `Verify` result.
+  class. The full gauntlet also passes with
+  `RSI_EVENT_RESEARCH_NOW=2026-06-15T16:00:00Z`, covering the fixed-clock CI
+  environment. The next pushed commit should be watched for the remote `Verify`
+  result.
 
 ## Safety Invariants
 

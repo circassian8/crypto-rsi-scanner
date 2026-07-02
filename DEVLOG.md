@@ -25,6 +25,9 @@ release-candidate report.
 - Fixed a Python 3.11-compatible f-string parse issue in
   `crypto_rsi_scanner/event_alpha/providers/official_exchange.py` found by the
   latest GitHub Actions run.
+- Isolated the router-approved fake-send unit test from the workflow-level fixed
+  research clock by enabling the fixed-clock notify override only inside that
+  test and restoring it afterward.
 - Added `research/REFACTOR_RELEASE_CANDIDATE_REPORT.md` and
   `research/REFACTOR_RELEASE_CANDIDATE_REPORT.json` with command results,
   monolith reductions, shim/module counts, schema validation coverage, doctor
@@ -42,14 +45,16 @@ rehearsal; market anomaly, official exchange, scheduled catalyst, unlock risk,
 derivatives, and fade-review smokes; source coverage report, daily brief,
 notify preview from artifacts, strict artifact doctor for
 `notify_llm_deep_cryptopanic_rehearsal`, namespace lifecycle report, known-stale
-namespace marking, and `make verify PYTHON=python3`. Also ran
+namespace marking, and `make verify PYTHON=python3`. The final gauntlet was run
+with `RSI_EVENT_RESEARCH_NOW=2026-06-15T16:00:00Z` to match CI's fixed-clock
+environment. Also ran
 `/usr/bin/python3 -m compileall -q crypto_rsi_scanner tests` to verify the CI
 Python 3.11 syntax class.
 **Notes/risks:** No critical RC blockers remain locally. `scanner.py` and
 `event_alpha_artifact_doctor.py` still exceed final size targets and remain
-documented follow-ups. The previous pushed GitHub Actions `Verify` run failed
-before this compatibility fix, so the next post-push remote CI run should be
-watched.
+documented follow-ups. Prior pushed GitHub Actions `Verify` runs failed before
+the Python 3.11 and fixed-clock test-isolation fixes, so the next post-push
+remote CI run should be watched.
 
 ## 2026-07-02 — Generate refactor final gate report · Codex
 **Why:** After the v1 migration phases, the remaining monolith and shim state

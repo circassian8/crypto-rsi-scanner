@@ -5729,6 +5729,7 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
     original_structured_send = scanner.send_telegram_structured
     original_ids = config.TELEGRAM_CHAT_IDS
     original_notification_flags = {
+        "EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY": config.EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY,
         "EVENT_ALPHA_NOTIFY_SCOPE": config.EVENT_ALPHA_NOTIFY_SCOPE,
         "EVENT_ALPHA_EXPLORATORY_DIGEST_ENABLED": config.EVENT_ALPHA_EXPLORATORY_DIGEST_ENABLED,
         "EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED": config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED,
@@ -5738,6 +5739,7 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
     scanner.send_telegram = fake_send
     scanner.send_telegram_structured = fake_send
     config.TELEGRAM_CHAT_IDS = ["fallback"]
+    config.EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY = True
     config.EVENT_ALPHA_NOTIFY_SCOPE = "global"
     config.EVENT_ALPHA_EXPLORATORY_DIGEST_ENABLED = False
     config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED = False
