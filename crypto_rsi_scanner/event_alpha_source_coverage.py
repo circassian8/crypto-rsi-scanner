@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_official_exchange_activation, event_provider_health, event_provider_status, event_source_packs, event_unlock_calendar_preflight
+from . import event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_dex_onchain_readiness, event_official_exchange_activation, event_provider_health, event_provider_status, event_source_packs, event_unlock_calendar_preflight
 from .event_providers import cryptopanic as cryptopanic_provider
 
 
@@ -29,6 +29,7 @@ SOURCE_COVERAGE_PACK_ORDER = (
     "listing_liquidity_pack",
     "fan_sports_pack",
     "market_anomaly_pack",
+    "dex_liquidity_pack",
     "unlock_supply_pack",
     "perp_listing_squeeze_pack",
 )
@@ -52,6 +53,9 @@ _READY_PROVIDER_ALIASES = {
     "prediction_market_events": "polymarket",
     "coinalyze_derivatives": "coinalyze",
     "coingecko_universe": "coingecko",
+    "geckoterminal": "geckoterminal",
+    "coingecko_dex": "coingecko_dex",
+    "defillama_tvl_fees_revenue": "defillama_tvl_fees_revenue",
 }
 
 _HEALTH_PROVIDER_ALIASES = {
@@ -73,6 +77,9 @@ _HEALTH_PROVIDER_ALIASES = {
     "coinmarketcal": "coinmarketcal",
     "sports_fixtures": "sports_fixtures",
     "defillama": "defillama",
+    "defillama_tvl_fees_revenue": "defillama_tvl_fees_revenue",
+    "geckoterminal": "geckoterminal",
+    "coingecko_dex": "coingecko_dex",
 }
 
 _HIGH_SPECIFICITY_PROVIDERS = {
@@ -87,6 +94,9 @@ _HIGH_SPECIFICITY_PROVIDERS = {
     "coinalyze",
     "coingecko",
     "defillama",
+    "defillama_tvl_fees_revenue",
+    "geckoterminal",
+    "coingecko_dex",
 }
 
 _BROAD_CONTEXT_PROVIDERS = {"gdelt", "polymarket"}
@@ -141,13 +151,13 @@ SOURCE_COVERAGE_CATEGORY_PRIORITIES: tuple[dict[str, Any], ...] = (
     },
     {
         "category": "DEX/on-chain liquidity",
-        "providers": ("geckoterminal", "defillama"),
+        "providers": ("geckoterminal", "coingecko_dex"),
         "enabled_lanes": ("market anomaly confirmation", "DEX-native moves"),
         "reason": "confirms whether market anomalies have real DEX liquidity and turnover support",
     },
     {
         "category": "Protocol fundamentals",
-        "providers": ("defillama", "project official metrics"),
+        "providers": ("defillama_tvl_fees_revenue", "defillama", "project official metrics"),
         "enabled_lanes": ("strategic investment", "protocol fundamentals", "risk review"),
         "reason": "adds non-price context for protocol-specific catalysts",
     },
@@ -260,6 +270,13 @@ class EventAlphaSourceCoverageReport:
     unlock_calendar_preflight_json_path: str | None = None
     unlock_calendar_preflight_report_path: str | None = None
     unlock_calendar_preflight_provider_rows: tuple[Mapping[str, Any], ...] = ()
+    dex_onchain_readiness_status: str = "not_generated"
+    dex_onchain_readiness_json_path: str | None = None
+    dex_onchain_readiness_report_path: str | None = None
+    dex_onchain_readiness_provider_rows: tuple[Mapping[str, Any], ...] = ()
+    dex_pool_state_rows: int = 0
+    dex_pool_anomaly_rows: int = 0
+    protocol_fundamental_rows: int = 0
     official_exchange_activation_status: str = "not_generated"
     official_exchange_activation_json_path: str | None = None
     official_exchange_activation_report_path: str | None = None
@@ -316,6 +333,15 @@ class EventAlphaSourceCoverageReport:
             "unlock_calendar_preflight_provider_rows": [
                 dict(row) for row in self.unlock_calendar_preflight_provider_rows
             ],
+            "dex_onchain_readiness_status": self.dex_onchain_readiness_status,
+            "dex_onchain_readiness_json_path": self.dex_onchain_readiness_json_path,
+            "dex_onchain_readiness_report_path": self.dex_onchain_readiness_report_path,
+            "dex_onchain_readiness_provider_rows": [
+                dict(row) for row in self.dex_onchain_readiness_provider_rows
+            ],
+            "dex_pool_state_rows": self.dex_pool_state_rows,
+            "dex_pool_anomaly_rows": self.dex_pool_anomaly_rows,
+            "protocol_fundamental_rows": self.protocol_fundamental_rows,
             "official_exchange_activation_status": self.official_exchange_activation_status,
             "official_exchange_activation_json_path": self.official_exchange_activation_json_path,
             "official_exchange_activation_report_path": self.official_exchange_activation_report_path,
@@ -386,6 +412,10 @@ def build_source_coverage_report(
         artifact_namespace_dir=artifact_namespace_dir,
         artifact_namespace=artifact_namespace,
     )
+    dex_onchain_stats = _dex_onchain_artifact_stats(
+        artifact_namespace_dir=artifact_namespace_dir,
+        artifact_namespace=artifact_namespace,
+    )
     activation_stats = event_official_exchange_activation.activation_artifact_stats(
         artifact_namespace_dir if artifact_namespace_dir is not None else _namespace_dir(artifact_namespace)
     )
@@ -423,6 +453,12 @@ def build_source_coverage_report(
         if not provider:
             continue
         if bool(unlock_row.get("configured")) or str(unlock_row.get("fixture_parser_status") or "") == "pass":
+            configured.add(provider)
+    for dex_row in dex_onchain_stats["provider_rows"]:
+        provider = str(dex_row.get("provider") or "")
+        if not provider:
+            continue
+        if bool(dex_row.get("configured")) or str(dex_row.get("fixture_parser_status") or "") == "pass":
             configured.add(provider)
 
     packs: list[EventAlphaSourceCoveragePack] = []
@@ -557,6 +593,13 @@ def build_source_coverage_report(
         unlock_calendar_preflight_json_path=unlock_calendar_stats["preflight_json_path"],
         unlock_calendar_preflight_report_path=unlock_calendar_stats["preflight_report_path"],
         unlock_calendar_preflight_provider_rows=tuple(unlock_calendar_stats["provider_rows"]),
+        dex_onchain_readiness_status=str(dex_onchain_stats["readiness_status"]),
+        dex_onchain_readiness_json_path=dex_onchain_stats["readiness_json_path"],
+        dex_onchain_readiness_report_path=dex_onchain_stats["readiness_report_path"],
+        dex_onchain_readiness_provider_rows=tuple(dex_onchain_stats["provider_rows"]),
+        dex_pool_state_rows=int(dex_onchain_stats["dex_pool_state_rows"]),
+        dex_pool_anomaly_rows=int(dex_onchain_stats["dex_pool_anomaly_rows"]),
+        protocol_fundamental_rows=int(dex_onchain_stats["protocol_fundamental_rows"]),
         official_exchange_activation_status=str(activation_stats["status"]),
         official_exchange_activation_json_path=activation_stats["json_path"],
         official_exchange_activation_report_path=activation_stats["report_path"],
@@ -703,6 +746,32 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
             "- command: make event-alpha-tokenomist-preflight ARTIFACT_NAMESPACE="
             f"{report.artifact_namespace} PROFILE={report.profile} PYTHON=python3"
         )
+    if report.dex_onchain_readiness_report_path and report.dex_onchain_readiness_json_path:
+        lines.append(f"- DEX/on-chain readiness: {report.dex_onchain_readiness_status}")
+        lines.append(f"- DEX/on-chain readiness report: {report.dex_onchain_readiness_report_path}")
+        lines.append(f"- DEX/on-chain readiness JSON: {report.dex_onchain_readiness_json_path}")
+        lines.append(
+            f"- DEX/on-chain counters: pool_state={report.dex_pool_state_rows} "
+            f"pool_anomalies={report.dex_pool_anomaly_rows} "
+            f"protocol_fundamentals={report.protocol_fundamental_rows}"
+        )
+        if report.dex_onchain_readiness_provider_rows:
+            lines.append("- DEX/on-chain provider rows:")
+            for row in report.dex_onchain_readiness_provider_rows:
+                lines.append(
+                    "  - "
+                    f"{row.get('provider') or 'unknown'} "
+                    f"configured={str(bool(row.get('configured'))).lower()} "
+                    f"fixture_parser_status={row.get('fixture_parser_status') or 'unknown'} "
+                    f"live_call_allowed={str(bool(row.get('live_call_allowed'))).lower()} "
+                    f"source_packs={_join(row.get('source_packs_enabled') or ())}"
+                )
+    else:
+        lines.append("- DEX/on-chain readiness: not generated")
+        lines.append(
+            "- command: make event-alpha-dex-onchain-readiness-smoke ARTIFACT_NAMESPACE="
+            f"{report.artifact_namespace} PROFILE={report.profile} PYTHON=python3"
+        )
     lines.append(f"- Official exchange activation: {report.official_exchange_activation_status}")
     if report.official_exchange_activation_report_path:
         lines.append(f"- Official exchange activation report: {report.official_exchange_activation_report_path}")
@@ -846,6 +915,41 @@ def _unlock_calendar_artifact_stats(
         "preflight_report_path": event_artifact_paths.artifact_display_path(preflight_md) if preflight_md.exists() else None,
         "provider_rows": tuple(dict(row) for row in provider_rows if isinstance(row, Mapping)),
     }
+
+
+def _dex_onchain_artifact_stats(
+    *,
+    artifact_namespace_dir: str | Path | None,
+    artifact_namespace: str,
+) -> dict[str, Any]:
+    base = Path(artifact_namespace_dir).expanduser() if artifact_namespace_dir is not None else _namespace_dir(artifact_namespace)
+    readiness_json = base / event_dex_onchain_readiness.READINESS_JSON
+    readiness_md = base / event_dex_onchain_readiness.READINESS_MD
+    state_path = base / event_dex_onchain_readiness.DEX_POOL_STATE_FILENAME
+    anomaly_path = base / event_dex_onchain_readiness.DEX_POOL_ANOMALIES_FILENAME
+    protocol_path = base / event_dex_onchain_readiness.PROTOCOL_FUNDAMENTALS_FILENAME
+    payload = _read_json(readiness_json)
+    provider_rows = payload.get("providers") or payload.get("provider_rows") or ()
+    if not isinstance(provider_rows, Iterable) or isinstance(provider_rows, (str, bytes, Mapping)):
+        provider_rows = ()
+    return {
+        "readiness_status": str(payload.get("readiness_status") or "generated" if readiness_json.exists() else "not_generated"),
+        "readiness_json_path": event_artifact_paths.artifact_display_path(readiness_json) if readiness_json.exists() else None,
+        "readiness_report_path": event_artifact_paths.artifact_display_path(readiness_md) if readiness_md.exists() else None,
+        "provider_rows": tuple(dict(row) for row in provider_rows if isinstance(row, Mapping)),
+        "dex_pool_state_rows": int(payload.get("dex_pool_state_rows") or _count_jsonl_rows(state_path)),
+        "dex_pool_anomaly_rows": int(payload.get("dex_pool_anomaly_rows") or _count_jsonl_rows(anomaly_path)),
+        "protocol_fundamental_rows": int(payload.get("protocol_fundamental_rows") or _count_jsonl_rows(protocol_path)),
+    }
+
+
+def _count_jsonl_rows(path: Path) -> int:
+    if not path.exists():
+        return 0
+    try:
+        return sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
+    except OSError:
+        return 0
 
 
 def _namespace_dir(artifact_namespace: str) -> Path:

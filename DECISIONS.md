@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - DEX/on-chain and protocol fundamentals activation is fixture-first
+**Status:** accepted
+**Decision:** GeckoTerminal, CoinGecko DEX, and DefiLlama TVL/fees/revenue
+activation starts with fixture/parser readiness artifacts only. The scaffold may
+write DEX pool state, DEX anomaly, and protocol fundamentals rows for integrated
+radar research, but `live_call_allowed` remains false by default and no live
+fetcher is claimed until a bounded provider-specific request path, request
+ledger, and explicit operator approval exist. Low-liquidity DEX pumps are
+diagnostic, protocol metrics require source/time provenance, and protocol
+fundamentals may support early/confirmed research only with market/liquidity
+sanity.
+**Why:** DEX-native moves and protocol fundamentals can explain catalysts that
+centralized exchange/news feeds miss, but pool-liquidity manipulation and stale
+fundamental metrics are high false-positive risks.
+**Revisit when:** A specific DEX/protocol provider has a reviewed bounded
+no-send live rehearsal with redacted request ledger rows, freshness checks, and
+human approval for a live preflight flag.
+
 ## 2026-07-02 - Structured unlock/calendar activation is fixture-first
 **Status:** accepted
 **Decision:** Tokenomist, Messari unlocks, and CoinMarketCal activation starts

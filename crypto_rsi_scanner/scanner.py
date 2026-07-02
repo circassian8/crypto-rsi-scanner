@@ -129,6 +129,7 @@ from . import event_bybit_announcements_preflight
 from . import event_coinalyze_preflight
 from . import event_core_opportunity_store
 from . import event_derivatives_crowding
+from . import event_dex_onchain_readiness
 from . import event_evidence_acquisition
 from . import event_feedback
 from . import event_llm_analyzer
@@ -5124,6 +5125,157 @@ def event_alpha_unlock_calendar_preflight_report(
     print(f"unlock_calendar_preflight_json: {event_artifact_paths.artifact_display_path(json_path)}")
     print(f"unlock_calendar_preflight_report: {event_artifact_paths.artifact_display_path(md_path)}")
     print(event_unlock_calendar_preflight.format_preflight_report(report))
+
+
+def event_alpha_dex_onchain_readiness_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    smoke_mode: bool = False,
+    include_test_artifacts: bool = False,
+) -> None:
+    """Write DEX/on-chain/protocol fundamentals readiness artifacts without live calls."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name or "fixture",
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    started_at = datetime.now(timezone.utc)
+    run_id = event_alpha_run_ledger.run_id_for(started_at, context.profile)
+    result = event_dex_onchain_readiness.run_dex_onchain_readiness(
+        namespace_dir=context.namespace_dir,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        geckoterminal_path=config.EVENT_ALPHA_DEX_GECKOTERMINAL_PATH,
+        coingecko_dex_path=config.EVENT_ALPHA_DEX_COINGECKO_PATH,
+        defillama_path=config.EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH,
+        smoke_mode=smoke_mode,
+        allow_live_preflight=False,
+        now=_event_research_now(),
+    )
+    finished_at = datetime.now(timezone.utc)
+    _record_dex_onchain_provider_health(context, result=result, run_id=run_id, now=finished_at)
+    _append_dex_onchain_run_ledger_row(
+        context,
+        run_id=run_id,
+        started_at=started_at,
+        finished_at=finished_at,
+        dex_pool_state_count=result.report.dex_pool_state_rows,
+        dex_pool_anomaly_count=result.report.dex_pool_anomaly_rows,
+        protocol_fundamental_count=result.report.protocol_fundamental_rows,
+        warnings=result.report.warnings,
+    )
+    print(_event_alpha_context_block(context))
+    print(f"dex_onchain_readiness_json: {event_artifact_paths.artifact_display_path(result.readiness_json_path)}")
+    print(f"dex_onchain_readiness_report: {event_artifact_paths.artifact_display_path(result.readiness_md_path)}")
+    print(f"dex_pool_state_path: {event_artifact_paths.artifact_display_path(result.dex_pool_state_path)}")
+    print(f"dex_pool_anomalies_path: {event_artifact_paths.artifact_display_path(result.dex_pool_anomalies_path)}")
+    print(f"protocol_fundamentals_path: {event_artifact_paths.artifact_display_path(result.protocol_fundamentals_path)}")
+    print(event_dex_onchain_readiness.format_readiness_report(result.report))
+
+
+def _record_dex_onchain_provider_health(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    *,
+    result: event_dex_onchain_readiness.DexOnchainReadinessResult,
+    run_id: str,
+    now: datetime,
+) -> None:
+    cfg = _event_provider_health_config_from_runtime()
+    for row in result.report.provider_rows:
+        rows_written = row.normalized_rows_written + row.anomaly_rows_written + row.protocol_rows_written
+        provider_role = "protocol_fundamentals" if row.family == "protocol_fundamentals" else "dex_onchain_liquidity"
+        if row.fixture_parser_status == "pass" and rows_written > 0:
+            event_provider_health.record_provider_success(
+                row.provider_health_key,
+                cfg=cfg,
+                run_id=run_id,
+                now=now,
+                provider_kind="enrichment",
+                provider_service=row.provider,
+                provider_role=provider_role,
+            )
+            continue
+        event_provider_health.record_provider_failure(
+            row.provider_health_key,
+            f"dex_onchain_fixture_{row.fixture_parser_status or 'not_ready'}",
+            cfg=cfg,
+            run_id=run_id,
+            now=now,
+            provider_kind="enrichment",
+            provider_service=row.provider,
+            provider_role=provider_role,
+        )
+
+
+def _append_dex_onchain_run_ledger_row(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    *,
+    run_id: str,
+    started_at: datetime,
+    finished_at: datetime,
+    dex_pool_state_count: int,
+    dex_pool_anomaly_count: int,
+    protocol_fundamental_count: int,
+    warnings: Iterable[str] = (),
+) -> None:
+    row = {
+        "schema_version": event_alpha_run_ledger.RUN_LEDGER_SCHEMA_VERSION,
+        "row_type": "event_alpha_run",
+        "run_id": run_id,
+        "profile": context.profile,
+        "run_mode": context.run_mode,
+        "artifact_namespace": context.artifact_namespace,
+        "started_at": started_at.astimezone(timezone.utc).isoformat(),
+        "finished_at": finished_at.astimezone(timezone.utc).isoformat(),
+        "runtime_seconds": max(0.0, (finished_at - started_at).total_seconds()),
+        "with_llm": False,
+        "send_requested": False,
+        "raw_events": 0,
+        "market_anomalies": 0,
+        "dex_pool_state_rows": int(dex_pool_state_count),
+        "dex_pool_anomalies": int(dex_pool_anomaly_count),
+        "protocol_fundamentals": int(protocol_fundamental_count),
+        "catalyst_queries": 0,
+        "catalyst_results_accepted": 0,
+        "catalyst_results_rejected": 0,
+        "extraction_rows": 0,
+        "extraction_hints_applied": 0,
+        "candidates": int(dex_pool_anomaly_count) + int(protocol_fundamental_count),
+        "clusters": 0,
+        "alerts": 0,
+        "watchlist_entries": 0,
+        "watchlist_escalations": 0,
+        "routed": 0,
+        "alertable": 0,
+        "sent": False,
+        "provider_fetch_count": 0,
+        "provider_cache_hits": 0,
+        "provider_cache_misses": 0,
+        "llm_cache_hits": 0,
+        "llm_cache_misses": 0,
+        "llm_calls_attempted": 0,
+        "llm_skipped_due_budget": 0,
+        "strict_alerts_created": 0,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "paper_trades_created": 0,
+        "normal_rsi_signal_rows_written": 0,
+        "triggered_fade_created": 0,
+        "warnings": tuple(str(warning) for warning in warnings if str(warning)),
+        "success": True,
+        "failure": None,
+    }
+    context.run_ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    with context.run_ledger_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, sort_keys=True, default=str, separators=(",", ":")))
+        fh.write("\n")
 
 
 def event_alpha_coinalyze_preflight_report(
@@ -11135,6 +11287,16 @@ def cli() -> None:
         help="Write CoinMarketCal provider preflight artifacts without live calls.",
     )
     parser.add_argument(
+        "--event-alpha-dex-onchain-readiness",
+        action="store_true",
+        help="Write DEX/on-chain/protocol fundamentals readiness artifacts from fixtures without live calls.",
+    )
+    parser.add_argument(
+        "--event-alpha-dex-onchain-readiness-smoke",
+        action="store_true",
+        help="Write fixture-only DEX/on-chain/protocol fundamentals readiness smoke artifacts; no network or keys required.",
+    )
+    parser.add_argument(
         "--event-alpha-derivatives-report",
         action="store_true",
         help="Normalize derivatives crowding fixtures into research-only fade/short-review artifacts.",
@@ -12408,6 +12570,15 @@ def cli() -> None:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
             smoke_mode=bool(args.event_alpha_live_provider_readiness_smoke),
+        )
+        return
+    if args.event_alpha_dex_onchain_readiness or args.event_alpha_dex_onchain_readiness_smoke:
+        event_alpha_dex_onchain_readiness_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            smoke_mode=bool(args.event_alpha_dex_onchain_readiness_smoke),
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
         )
         return
     if (

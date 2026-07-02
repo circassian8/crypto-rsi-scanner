@@ -334,6 +334,16 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=coinalyze_no_send_rehearsal" in coinalyze_rehearsal_dry
     assert "--event-alpha-artifact-namespace coinalyze_no_send_rehearsal" in coinalyze_rehearsal_dry
     assert "--event-alpha-coinalyze-allow-live-preflight" not in coinalyze_rehearsal_dry
+    dex_onchain_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-dex-onchain-readiness-smoke", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-dex-onchain-readiness-smoke --event-alpha-profile fixture" in dex_onchain_dry
+    assert "RSI_EVENT_ALPHA_DEX_GECKOTERMINAL_PATH=fixtures/event_dex_onchain/geckoterminal_pools.json" in dex_onchain_dry
+    assert "RSI_EVENT_ALPHA_DEX_COINGECKO_PATH=fixtures/event_dex_onchain/coingecko_dex_pools.json" in dex_onchain_dry
+    assert "RSI_EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH=fixtures/event_dex_onchain/defillama_protocol_fundamentals.json" in dex_onchain_dry
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in dex_onchain_dry
     bybit_preflight_dry = subprocess.check_output(
         ["make", "-n", "event-alpha-bybit-announcements-preflight", "PROFILE=notify_llm_deep", "PYTHON=python3"],
         cwd=root,
@@ -1329,6 +1339,23 @@ def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor
         assert "event-alpha-tokenomist-preflight" in by_provider["tokenomist"]["smoke_targets"]
         assert "event-alpha-messari-unlocks-preflight" in by_provider["messari_unlocks"]["smoke_targets"]
         assert "event-alpha-coinmarketcal-preflight" in by_provider["coinmarketcal"]["smoke_targets"]
+        assert by_provider["geckoterminal"]["env_vars_required"] == [
+            "RSI_EVENT_ALPHA_DEX_GECKOTERMINAL_PATH",
+        ]
+        assert by_provider["geckoterminal"]["preflight_status"] == "quota_guarded"
+        assert by_provider["geckoterminal"]["live_call_allowed"] is False
+        assert "event-alpha-dex-onchain-readiness-smoke" in by_provider["geckoterminal"]["smoke_targets"]
+        assert by_provider["coingecko_dex"]["env_vars_required"] == [
+            "RSI_EVENT_ALPHA_DEX_COINGECKO_PATH",
+            "COINGECKO_API_KEY",
+        ]
+        assert by_provider["coingecko_dex"]["preflight_status"] == "quota_guarded"
+        assert by_provider["coingecko_dex"]["live_call_allowed"] is False
+        assert by_provider["defillama_tvl_fees_revenue"]["env_vars_required"] == [
+            "RSI_EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH",
+        ]
+        assert by_provider["defillama_tvl_fees_revenue"]["preflight_status"] == "quota_guarded"
+        assert by_provider["defillama_tvl_fees_revenue"]["live_call_allowed"] is False
         assert not event_alpha_artifact_doctor._text_has_secret_like_value(md_path.read_text(encoding="utf-8"))
         clean = event_alpha_artifact_doctor.diagnose_artifacts(
             source_coverage_report_path=source_path,
@@ -1386,6 +1413,108 @@ def test_event_alpha_artifact_doctor_scopes_readiness_to_claimed_provider_namesp
         )
         assert claimed.source_coverage_report_missing == 1
         assert claimed.live_provider_readiness_missing == 1
+
+
+def test_event_alpha_dex_onchain_readiness_artifacts_are_fixture_only_and_covered():
+    import json
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner import (
+        event_alpha_artifact_doctor,
+        event_alpha_source_coverage,
+        event_dex_onchain_readiness,
+    )
+
+    root = Path(__file__).resolve().parent.parent
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        result = event_dex_onchain_readiness.run_dex_onchain_readiness(
+            namespace_dir=base,
+            profile="fixture",
+            artifact_namespace="dex_onchain_readiness_smoke",
+            geckoterminal_path=root / "fixtures/event_dex_onchain/geckoterminal_pools.json",
+            coingecko_dex_path=root / "fixtures/event_dex_onchain/coingecko_dex_pools.json",
+            defillama_path=root / "fixtures/event_dex_onchain/defillama_protocol_fundamentals.json",
+            smoke_mode=True,
+            now=datetime(2026, 6, 15, 16, tzinfo=timezone.utc),
+        )
+        payload = json.loads(result.readiness_json_path.read_text(encoding="utf-8"))
+        assert payload["readiness_status"] == "fixture_ready"
+        assert payload["live_call_allowed"] is False
+        assert payload["no_send_rehearsal"] is True
+        assert payload["telegram_sends"] == 0
+        assert payload["trades_created"] == 0
+        assert payload["paper_trades_created"] == 0
+        assert payload["normal_rsi_signal_rows_written"] == 0
+        assert payload["triggered_fade_created"] == 0
+        by_provider = {row["provider"]: row for row in payload["providers"]}
+        assert set(by_provider) == {"geckoterminal", "coingecko_dex", "defillama_tvl_fees_revenue"}
+        assert all(row["fixture_parser_status"] == "pass" for row in by_provider.values())
+        assert payload["dex_pool_state_rows"] == 3
+        assert payload["dex_pool_anomaly_rows"] == 3
+        assert payload["protocol_fundamental_rows"] == 2
+        assert payload["classification_counts"]["dex_liquidity_expansion"] == 2
+        assert payload["classification_counts"]["suspicious_low_liquidity_pump"] == 1
+        assert payload["classification_counts"]["protocol_revenue_tvl_growth"] == 1
+        assert payload["classification_counts"]["protocol_fundamentals_deterioration"] == 1
+
+        state_rows = event_dex_onchain_readiness.load_dex_pool_state(base)
+        anomaly_rows = event_dex_onchain_readiness.load_dex_pool_anomalies(base)
+        protocol_rows = event_dex_onchain_readiness.load_protocol_fundamentals(base)
+        assert {row["canonical_asset_id"] for row in state_rows} >= {"token-b", "token-c"}
+        assert any(row["classification"] == "suspicious_low_liquidity_pump" for row in anomaly_rows)
+        assert any(row["classification"] == "protocol_revenue_tvl_growth" for row in protocol_rows)
+        assert all(row["source_url"] and row["observed_at"] for row in protocol_rows)
+
+        source_report = event_alpha_source_coverage.build_source_coverage_report(
+            provider_status_report=event_provider_status.build_event_discovery_provider_status(_event_provider_status_cfg()),
+            profile="fixture",
+            artifact_namespace="dex_onchain_readiness_smoke",
+            artifact_namespace_dir=base,
+            now=datetime(2026, 6, 15, 16, tzinfo=timezone.utc),
+        )
+        assert source_report.dex_onchain_readiness_status == "fixture_ready"
+        assert source_report.dex_pool_state_rows == 3
+        assert source_report.dex_pool_anomaly_rows == 3
+        assert source_report.protocol_fundamental_rows == 2
+        source_text = event_alpha_source_coverage.format_source_coverage_report(source_report)
+        assert "DEX/on-chain readiness: fixture_ready" in source_text
+        assert "geckoterminal configured=true fixture_parser_status=pass" in source_text
+        assert "defillama_tvl_fees_revenue configured=true fixture_parser_status=pass" in source_text
+        (base / "event_alpha_source_coverage.md").write_text(source_text, encoding="utf-8")
+
+        clean = event_alpha_artifact_doctor.diagnose_artifacts(
+            source_coverage_report_path=base / "event_alpha_source_coverage.md",
+            profile="fixture",
+            artifact_namespace="dex_onchain_readiness_smoke",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert clean.dex_onchain_live_without_ledger == 0
+        assert clean.dex_low_liquidity_promoted_confirmed == 0
+        assert clean.protocol_metric_missing_source_time == 0
+
+        payload["live_call_allowed"] = True
+        payload["providers"][0]["live_call_allowed"] = True
+        payload["providers"][0]["fixture_parser_status"] = ""
+        result.readiness_json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        protocol_rows[0].pop("source_url", None)
+        result.protocol_fundamentals_path.write_text(
+            "\n".join(json.dumps(row, sort_keys=True) for row in protocol_rows) + "\n",
+            encoding="utf-8",
+        )
+        unsafe = event_alpha_artifact_doctor.diagnose_artifacts(
+            source_coverage_report_path=base / "event_alpha_source_coverage.md",
+            profile="fixture",
+            artifact_namespace="dex_onchain_readiness_smoke",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert unsafe.dex_onchain_live_without_ledger >= 1
+        assert unsafe.dex_onchain_live_call_allowed_in_smoke >= 1
+        assert unsafe.dex_onchain_missing_fixture_parser_status == 1
+        assert unsafe.protocol_metric_missing_source_time == 1
+        assert unsafe.status == "BLOCKED"
 
 
 def test_event_alpha_coinalyze_preflight_smoke_artifacts_are_safe_and_doctor_checked():
@@ -40236,6 +40365,15 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert by_symbol["TESTUNLOCK"]["opportunity_type"] == "RISK_ONLY"
         assert by_symbol["TESTRUMOR"]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
         assert by_symbol["SECTOR"]["opportunity_type"] == "DIAGNOSTIC"
+        assert by_symbol["TKNB"]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+        assert by_symbol["TKNB"]["dex_liquidity_level"] in {"moderate", "strong"}
+        assert by_symbol["TKNC"]["opportunity_type"] == "DIAGNOSTIC"
+        assert "dex_low_liquidity_pump_diagnostic_only" in by_symbol["TKNC"]["warnings"]
+        assert by_symbol["AAVE"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH"
+        assert by_symbol["AAVE"]["protocol_fundamentals_class"] == "protocol_revenue_tvl_growth"
+        assert by_symbol["AAVE"]["protocol_metrics_level"] in {"moderate", "strong"}
+        assert by_symbol["TKND"]["opportunity_type"] == "RISK_ONLY"
+        assert by_symbol["TKND"]["protocol_fundamentals_class"] == "protocol_fundamentals_deterioration"
         assert by_symbol["BTC"]["opportunity_type"] != "EARLY_LONG_RESEARCH"
         assert by_symbol["BTC"]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
         assert by_symbol["BTC"]["why_now"] == "simple major-pair announcement capped as unconfirmed research"
@@ -40287,6 +40425,9 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert core_by_symbol["TESTFADE"]["crowding_class"] == "extreme"
         assert core_by_symbol["TESTFADE"]["fade_readiness"] == "ready_for_review"
         assert "liquidation_imbalance_extreme" in core_by_symbol["TESTFADE"]["crowding_exhaustion_evidence"]
+        assert core_by_symbol["AAVE"]["protocol_metrics_level"] in {"moderate", "strong"}
+        assert "protocol_tvl_growth" in core_by_symbol["AAVE"]["protocol_metrics_reasons"]
+        assert "TKNC" not in core_by_symbol
         assert core_by_symbol["TESTUNLOCK"]["scheduled_catalyst_event"]["event_type"] == "token_unlock"
         assert core_by_symbol["TESTUNLOCK"]["unlock_event"]["event_type"] == "token_unlock"
         loaded_cores = event_core_opportunity_store.core_opportunities_from_rows(cores)
@@ -40298,7 +40439,7 @@ def test_integrated_radar_fixture_lanes_and_merge():
             if "index.md" in str(path):
                 continue
             text = path.read_text(encoding="utf-8")
-            for symbol in ("BTC", "TESTFADE", "TESTPERP"):
+            for symbol in ("BTC", "TESTFADE", "TESTPERP", "AAVE", "TKND"):
                 if f"# {symbol} Event Research Card" in text:
                     card_text_by_symbol[symbol] = text
         card_text = "\n".join(card_text_by_symbol.values())
@@ -40322,6 +40463,8 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert "confirmed_long_derivatives_crowding_warning" in card_text_by_symbol["TESTPERP"]
         assert "- Integrated market state: confirmed_breakout" in card_text_by_symbol["TESTPERP"]
         assert "Market confirmation: none" not in card_text_by_symbol["TESTPERP"]
+        assert "Protocol metrics confirmation:" in card_text_by_symbol["AAVE"]
+        assert "DEX liquidity confirmation:" in card_text_by_symbol["AAVE"]
         card_groups = event_research_cards.card_index_group_map(result.research_card_paths)
         group_names = set(card_groups.values())
         assert "Early Long Research Cards" in group_names
@@ -40332,12 +40475,22 @@ def test_integrated_radar_fixture_lanes_and_merge():
         daily = result.daily_brief_path.read_text(encoding="utf-8")
         before_diagnostics = daily.split("## Diagnostics Appendix", 1)[0]
         assert "SECTOR/ai_theme" not in before_diagnostics
+        assert "TKNC/token-c" not in before_diagnostics
+        assert "## DEX / On-Chain Liquidity" in daily
+        assert "## Protocol Fundamentals" in daily
         assert "## Diagnostics Appendix" in daily
         assert "SECTOR/ai_theme DIAGNOSTIC" in daily
+        assert "TKNC/token-c DIAGNOSTIC" in daily
 
         manifest = json.loads(result.input_manifest_path.read_text(encoding="utf-8"))
         assert manifest["input_mode"] == "auto"
         assert manifest["row_counts"]["official_exchange"] >= 4
+        assert manifest["row_counts"]["dex_pool_state"] == 3
+        assert manifest["row_counts"]["dex_pool_anomaly"] == 3
+        assert manifest["row_counts"]["protocol_fundamentals"] == 2
+        assert manifest["dex_pool_state_rows_loaded"] == 3
+        assert manifest["dex_pool_anomaly_rows_loaded"] == 3
+        assert manifest["protocol_fundamental_rows_loaded"] == 2
         for sidecar in manifest["sidecars"]:
             assert sidecar["sidecar_research_observed_at"] == "2026-06-15T16:00:00+00:00"
             assert sidecar["sidecar_wall_started_at"] != sidecar["sidecar_research_observed_at"]
@@ -40348,6 +40501,10 @@ def test_integrated_radar_fixture_lanes_and_merge():
         source_coverage = json.loads(result.source_coverage_json_path.read_text(encoding="utf-8"))
         assert source_coverage["candidate_count"] == len(rows)
         assert "official_exchange_announcements" in source_coverage["lane_critical_priority"]
+        assert source_coverage["dex_pool_state_rows"] == 3
+        assert source_coverage["dex_pool_anomaly_rows"] == 3
+        assert source_coverage["protocol_fundamental_rows"] == 2
+        assert source_coverage["dex_onchain_readiness_status"] == "fixture_ready"
         assert source_coverage["live_provider_readiness_report_path"].endswith("event_live_provider_activation_readiness.md")
         assert source_coverage["live_provider_readiness_json_path"].endswith("event_live_provider_activation_readiness.json")
         assert (context.namespace_dir / "event_live_provider_activation_readiness.md").exists()
@@ -40363,6 +40520,9 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert run_row["market_state_snapshots"] >= 2
         assert run_row["official_exchange_events"] >= 4
         assert run_row["derivatives_state_rows"] >= 2
+        assert result.dex_pool_state_rows == 3
+        assert result.dex_pool_anomaly_rows == 3
+        assert result.protocol_fundamental_rows == 2
 
         preview = result.notification_preview_path.read_text(encoding="utf-8")
         assert "Early Long Research" in preview
@@ -40381,8 +40541,10 @@ def test_integrated_radar_fixture_lanes_and_merge():
         lanes = {row["lane"]: row for row in deliveries}
         assert {"early_long_research", "confirmed_long_research", "fade_short_review", "risk_only", "unconfirmed_research", "source_provider_health"} <= set(lanes)
         assert lanes["early_long_research"]["status"] == "would_send_but_guard_disabled"
-        assert lanes["source_provider_health"]["skipped_item_count"] == 1
-        assert lanes["source_provider_health"]["skipped_items"][0]["reason"] == "diagnostic_only_hidden_from_research_lanes"
+        assert lanes["source_provider_health"]["skipped_item_count"] >= 2
+        assert {
+            item["reason"] for item in lanes["source_provider_health"]["skipped_items"]
+        } == {"diagnostic_only_hidden_from_research_lanes"}
         assert all(row["sent"] is False for row in deliveries)
         assert all(row["normal_rsi_signal_written"] is False for row in deliveries)
         assert all(row["triggered_fade_created"] is False for row in deliveries)
@@ -40621,6 +40783,92 @@ def test_integrated_radar_loads_external_coinalyze_namespace():
         missing_manifest = json.loads(missing_result.input_manifest_path.read_text(encoding="utf-8"))
         assert missing_manifest["coinalyze_artifact_namespace"] == "missing_coinalyze"
         assert missing_manifest["coinalyze_skip_reason"] == "coinalyze_artifacts_missing_or_empty"
+
+
+def test_integrated_dex_sidecars_gate_market_anomaly_confirmation():
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner import event_dex_onchain_readiness, event_integrated_radar
+
+    root = Path(__file__).resolve().parent.parent
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        dex_result = event_dex_onchain_readiness.run_dex_onchain_readiness(
+            namespace_dir=base,
+            profile="fixture",
+            artifact_namespace="dex_merge_test",
+            geckoterminal_path=root / "fixtures/event_dex_onchain/geckoterminal_pools.json",
+            coingecko_dex_path=root / "fixtures/event_dex_onchain/coingecko_dex_pools.json",
+            defillama_path=root / "fixtures/event_dex_onchain/defillama_protocol_fundamentals.json",
+            smoke_mode=True,
+            now=datetime(2026, 6, 15, 16, tzinfo=timezone.utc),
+        )
+        market_rows = [
+            {
+                "row_type": "event_market_anomaly",
+                "source_class": "market_data",
+                "source_pack": "market_anomaly_pack",
+                "impact_path_type": "market_anomaly_unknown",
+                "symbol": "TKNB",
+                "coin_id": "token-b",
+                "canonical_asset_id": "token-b",
+                "market_state_class": "high_liquidity_breakout",
+                "market_anomaly_bucket": "high_liquidity_breakout",
+                "market_snapshot": {
+                    "return_unit": "percent_points",
+                    "return_24h": 21,
+                    "volume_zscore_24h": 3.5,
+                    "volume_24h": 2_000_000,
+                    "market_cap": 24_000_000,
+                    "liquidity_usd": 2_200_000,
+                    "spread_bps": 34,
+                    "observed_at": "2026-06-15T16:00:00Z",
+                    "market_context_freshness_status": "fresh",
+                },
+            },
+            {
+                "row_type": "event_market_anomaly",
+                "source_class": "market_data",
+                "source_pack": "market_anomaly_pack",
+                "impact_path_type": "market_anomaly_unknown",
+                "symbol": "TKNC",
+                "coin_id": "token-c",
+                "canonical_asset_id": "token-c",
+                "market_state_class": "low_liquidity_suspicious",
+                "market_anomaly_bucket": "low_liquidity_suspicious",
+                "market_snapshot": {
+                    "return_unit": "percent_points",
+                    "return_24h": 62,
+                    "volume_zscore_24h": 2.8,
+                    "volume_24h": 300_000,
+                    "market_cap": 900_000,
+                    "liquidity_usd": 18_000,
+                    "spread_bps": 340,
+                    "observed_at": "2026-06-15T16:00:00Z",
+                    "market_context_freshness_status": "fresh",
+                },
+            },
+        ]
+        rows = event_integrated_radar.build_integrated_candidates(
+            sidecar_rows={
+                "market_anomaly": market_rows,
+                "dex_pool_state": dex_result.dex_pool_state_rows,
+                "dex_pool_anomaly": dex_result.dex_pool_anomaly_rows,
+                "protocol_fundamentals": dex_result.protocol_fundamental_rows,
+            },
+            profile="fixture",
+            artifact_namespace="dex_merge_test",
+            run_mode="fixture",
+            run_id="dex-merge-run",
+            observed_at=datetime(2026, 6, 15, 16, tzinfo=timezone.utc),
+        )
+        by_symbol = {row["symbol"]: row for row in rows}
+        assert by_symbol["TKNB"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH"
+        assert set(by_symbol["TKNB"]["source_origins"]) >= {"market_anomaly", "dex_pool_state", "dex_pool_anomaly"}
+        assert by_symbol["TKNB"]["dex_liquidity_level"] in {"moderate", "strong"}
+        assert by_symbol["TKNB"]["market_requirements_met"] is True
+        assert by_symbol["TKNC"]["opportunity_type"] == "DIAGNOSTIC"
+        assert "dex_low_liquidity_pump_diagnostic_only" in by_symbol["TKNC"]["warnings"]
 
 
 def test_integrated_market_anomaly_alone_does_not_confirm():

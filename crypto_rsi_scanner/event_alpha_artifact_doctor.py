@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_instrument_resolver, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_official_exchange_activation, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_unlock_calendar_preflight, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_dex_onchain_readiness, event_integrated_radar, event_instrument_resolver, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_official_exchange_activation, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_unlock_calendar_preflight, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -115,6 +115,9 @@ class EventAlphaArtifactDoctorResult:
     unlock_candidate_rows: int = 0
     derivatives_state_rows: int = 0
     fade_review_candidate_rows: int = 0
+    dex_pool_state_rows: int = 0
+    dex_pool_anomaly_rows: int = 0
+    protocol_fundamental_rows: int = 0
     unlock_without_structured_evidence: int = 0
     unlock_missing_event_time: int = 0
     unlock_promoted_without_size_metrics: int = 0
@@ -173,6 +176,7 @@ class EventAlphaArtifactDoctorResult:
     integrated_fade_card_crowding_unknown: int = 0
     integrated_fade_card_missing_disclaimer: int = 0
     integrated_confirmed_long_crowding_warning_hidden: int = 0
+    integrated_dex_low_liquidity_promoted_confirmed: int = 0
     integrated_market_confirmation_display_contradiction: int = 0
     integrated_derivatives_display_contradiction: int = 0
     integrated_manifest_mixed_timestamp_pair: int = 0
@@ -216,6 +220,7 @@ class EventAlphaArtifactDoctorResult:
     source_coverage_coinalyze_missing_linked_artifact: int = 0
     source_coverage_bybit_announcements_missing_linked_artifact: int = 0
     source_coverage_unlock_calendar_missing_linked_artifact: int = 0
+    source_coverage_dex_onchain_missing_linked_artifact: int = 0
     live_provider_readiness_missing: int = 0
     live_provider_readiness_secret_leak: int = 0
     live_provider_readiness_live_calls_allowed_in_smoke: int = 0
@@ -249,6 +254,13 @@ class EventAlphaArtifactDoctorResult:
     unlock_calendar_preflight_live_call_allowed_in_smoke: int = 0
     unlock_calendar_preflight_missing_fixture_parser_status: int = 0
     unlock_calendar_preflight_forbidden_side_effect_claim: int = 0
+    dex_onchain_readiness_secret_leak: int = 0
+    dex_onchain_live_without_ledger: int = 0
+    dex_onchain_live_call_allowed_in_smoke: int = 0
+    dex_onchain_missing_fixture_parser_status: int = 0
+    dex_onchain_forbidden_side_effect_claim: int = 0
+    dex_low_liquidity_promoted_confirmed: int = 0
+    protocol_metric_missing_source_time: int = 0
     source_pack_provider_status_missing: int = 0
     missing_provider_recommendations_missing: int = 0
     degraded_provider_absence_marked_meaningful: int = 0
@@ -496,6 +508,14 @@ def diagnose_artifacts(
             raw_fade_review_candidates = list(event_derivatives_crowding.load_fade_review_candidates(default_fade_review_path))
     else:
         raw_fade_review_candidates = [dict(row) for row in fade_review_candidate_rows if isinstance(row, Mapping)]
+    default_dex_onchain_path = None
+    if inspected_alert_store_path is not None:
+        default_dex_onchain_path = Path(inspected_alert_store_path).parent
+    elif source_coverage_report_path is not None:
+        default_dex_onchain_path = Path(source_coverage_report_path).parent
+    raw_dex_pool_state = list(event_dex_onchain_readiness.load_dex_pool_state(default_dex_onchain_path))
+    raw_dex_pool_anomalies = list(event_dex_onchain_readiness.load_dex_pool_anomalies(default_dex_onchain_path))
+    raw_protocol_fundamentals = list(event_dex_onchain_readiness.load_protocol_fundamentals(default_dex_onchain_path))
     default_integrated_path = None
     if inspected_alert_store_path is not None:
         default_integrated_path = Path(inspected_alert_store_path).parent / "event_integrated_radar_candidates.jsonl"
@@ -627,6 +647,27 @@ def diagnose_artifacts(
     )
     fade_review_candidates = event_alpha_artifacts.filter_artifact_rows(
         raw_fade_review_candidates,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    dex_pool_state = event_alpha_artifacts.filter_artifact_rows(
+        raw_dex_pool_state,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    dex_pool_anomalies = event_alpha_artifacts.filter_artifact_rows(
+        raw_dex_pool_anomalies,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    protocol_fundamentals = event_alpha_artifacts.filter_artifact_rows(
+        raw_protocol_fundamentals,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -947,6 +988,9 @@ def diagnose_artifacts(
             *unlock_candidates,
             *derivatives_state,
             *fade_review_candidates,
+            *dex_pool_state,
+            *dex_pool_anomalies,
+            *protocol_fundamentals,
             *integrated_candidates,
             *delivery_rows,
         )
@@ -963,6 +1007,7 @@ def diagnose_artifacts(
     coinalyze_preflight_conflicts = event_coinalyze_preflight.artifact_conflicts(namespace_dir)
     bybit_announcements_conflicts = event_bybit_announcements_preflight.artifact_conflicts(namespace_dir)
     unlock_calendar_conflicts = event_unlock_calendar_preflight.artifact_conflicts(namespace_dir)
+    dex_onchain_conflicts = event_dex_onchain_readiness.artifact_conflicts(namespace_dir)
     official_exchange_activation_conflicts = event_official_exchange_activation.artifact_conflicts(namespace_dir)
     instrument_resolution_conflicts = event_instrument_resolver.artifact_conflicts(namespace_dir)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
@@ -1337,6 +1382,7 @@ def diagnose_artifacts(
         "integrated_fade_card_crowding_unknown",
         "integrated_fade_card_missing_disclaimer",
         "integrated_confirmed_long_crowding_warning_hidden",
+        "integrated_dex_low_liquidity_promoted_confirmed",
         "integrated_market_confirmation_display_contradiction",
         "integrated_derivatives_display_contradiction",
         "integrated_manifest_mixed_timestamp_pair",
@@ -1426,6 +1472,12 @@ def diagnose_artifacts(
             f"{source_coverage_report_conflicts['source_coverage_unlock_calendar_missing_linked_artifact']}"
         )
         (blockers if strict else warnings).append(message)
+    if source_coverage_report_conflicts["source_coverage_dex_onchain_missing_linked_artifact"]:
+        message = (
+            "source_coverage_dex_onchain_missing_linked_artifact="
+            f"{source_coverage_report_conflicts['source_coverage_dex_onchain_missing_linked_artifact']}"
+        )
+        (blockers if strict else warnings).append(message)
     if live_provider_readiness_conflicts["live_provider_readiness_missing"]:
         warnings.append(
             "live_provider_readiness_missing="
@@ -1487,6 +1539,20 @@ def diagnose_artifacts(
         "unlock_calendar_preflight_forbidden_side_effect_claim",
     ):
         count = unlock_calendar_conflicts.get(key, 0)
+        if not count:
+            continue
+        message = f"{key}={count}"
+        (blockers if strict else warnings).append(message)
+    for key in (
+        "dex_onchain_readiness_secret_leak",
+        "dex_onchain_live_without_ledger",
+        "dex_onchain_live_call_allowed_in_smoke",
+        "dex_onchain_missing_fixture_parser_status",
+        "dex_onchain_forbidden_side_effect_claim",
+        "dex_low_liquidity_promoted_confirmed",
+        "protocol_metric_missing_source_time",
+    ):
+        count = dex_onchain_conflicts.get(key, 0)
         if not count:
             continue
         message = f"{key}={count}"
@@ -2129,6 +2195,9 @@ def diagnose_artifacts(
         unlock_candidate_rows=len(unlock_candidates),
         derivatives_state_rows=len(derivatives_state),
         fade_review_candidate_rows=len(fade_review_candidates),
+        dex_pool_state_rows=len(dex_pool_state),
+        dex_pool_anomaly_rows=len(dex_pool_anomalies),
+        protocol_fundamental_rows=len(protocol_fundamentals),
         unlock_without_structured_evidence=scheduled_conflicts["unlock_without_structured_evidence"],
         unlock_missing_event_time=scheduled_conflicts["unlock_missing_event_time"],
         unlock_promoted_without_size_metrics=scheduled_conflicts["unlock_promoted_without_size_metrics"],
@@ -2187,6 +2256,9 @@ def diagnose_artifacts(
         integrated_fade_card_crowding_unknown=integrated_conflicts["integrated_fade_card_crowding_unknown"],
         integrated_fade_card_missing_disclaimer=integrated_conflicts["integrated_fade_card_missing_disclaimer"],
         integrated_confirmed_long_crowding_warning_hidden=integrated_conflicts["integrated_confirmed_long_crowding_warning_hidden"],
+        integrated_dex_low_liquidity_promoted_confirmed=integrated_conflicts[
+            "integrated_dex_low_liquidity_promoted_confirmed"
+        ],
         integrated_market_confirmation_display_contradiction=integrated_conflicts["integrated_market_confirmation_display_contradiction"],
         integrated_derivatives_display_contradiction=integrated_conflicts["integrated_derivatives_display_contradiction"],
         integrated_manifest_mixed_timestamp_pair=integrated_conflicts["integrated_manifest_mixed_timestamp_pair"],
@@ -2243,6 +2315,9 @@ def diagnose_artifacts(
         ],
         source_coverage_unlock_calendar_missing_linked_artifact=source_coverage_report_conflicts[
             "source_coverage_unlock_calendar_missing_linked_artifact"
+        ],
+        source_coverage_dex_onchain_missing_linked_artifact=source_coverage_report_conflicts[
+            "source_coverage_dex_onchain_missing_linked_artifact"
         ],
         live_provider_readiness_missing=live_provider_readiness_conflicts["live_provider_readiness_missing"],
         live_provider_readiness_secret_leak=live_provider_readiness_conflicts["live_provider_readiness_secret_leak"],
@@ -2335,6 +2410,13 @@ def diagnose_artifacts(
         unlock_calendar_preflight_forbidden_side_effect_claim=unlock_calendar_conflicts[
             "unlock_calendar_preflight_forbidden_side_effect_claim"
         ],
+        dex_onchain_readiness_secret_leak=dex_onchain_conflicts["dex_onchain_readiness_secret_leak"],
+        dex_onchain_live_without_ledger=dex_onchain_conflicts["dex_onchain_live_without_ledger"],
+        dex_onchain_live_call_allowed_in_smoke=dex_onchain_conflicts["dex_onchain_live_call_allowed_in_smoke"],
+        dex_onchain_missing_fixture_parser_status=dex_onchain_conflicts["dex_onchain_missing_fixture_parser_status"],
+        dex_onchain_forbidden_side_effect_claim=dex_onchain_conflicts["dex_onchain_forbidden_side_effect_claim"],
+        dex_low_liquidity_promoted_confirmed=dex_onchain_conflicts["dex_low_liquidity_promoted_confirmed"],
+        protocol_metric_missing_source_time=dex_onchain_conflicts["protocol_metric_missing_source_time"],
         source_pack_provider_status_missing=source_coverage_conflicts["source_pack_provider_status_missing"],
         missing_provider_recommendations_missing=source_coverage_conflicts["missing_provider_recommendations_missing"],
         degraded_provider_absence_marked_meaningful=source_coverage_conflicts["degraded_provider_absence_marked_meaningful"],
@@ -3585,6 +3667,7 @@ def _integrated_radar_artifact_conflicts(
         "integrated_fade_card_crowding_unknown": 0,
         "integrated_fade_card_missing_disclaimer": 0,
         "integrated_confirmed_long_crowding_warning_hidden": 0,
+        "integrated_dex_low_liquidity_promoted_confirmed": 0,
         "integrated_market_confirmation_display_contradiction": 0,
         "integrated_derivatives_display_contradiction": 0,
         "integrated_manifest_mixed_timestamp_pair": 0,
@@ -3676,6 +3759,16 @@ def _integrated_radar_artifact_conflicts(
             out["integrated_cryptopanic_confirmed"] += 1
         if lane == "EARLY_LONG_RESEARCH" and _truthy(row.get("major_pair_simple_announcement")):
             out["integrated_major_pair_early_long"] += 1
+        dex_class = str(row.get("dex_onchain_classification") or row.get("dex_anomaly_class") or "").strip()
+        row_warnings = {str(item) for item in _tuple_value(row.get("warnings"))}
+        if (
+            lane == "CONFIRMED_LONG_RESEARCH"
+            and (
+                dex_class == event_dex_onchain_readiness.SUSPICIOUS_LOW_LIQUIDITY_PUMP
+                or "dex_low_liquidity_confirmation_cap" in row_warnings
+            )
+        ):
+            out["integrated_dex_low_liquidity_promoted_confirmed"] += 1
         if _truthy(row.get("normal_rsi_signal_written")):
             out["integrated_created_normal_rsi_signal"] += 1
         if _truthy(row.get("triggered_fade_created")) or str(row.get("signal_type") or "").upper() == "TRIGGERED_FADE":
@@ -4343,6 +4436,8 @@ def _opportunity_lane_risk_only_missing_evidence(row: Mapping[str, Any]) -> bool
         "sell_pressure",
         "bridge_compromise",
         "chain_halt",
+        "protocol_fundamentals_deterioration",
+        "fundamentals_deterioration",
     )
     if any(token in text for token in risk_tokens):
         return False
@@ -4527,6 +4622,7 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
         "source_coverage_coinalyze_missing_linked_artifact": 0,
         "source_coverage_bybit_announcements_missing_linked_artifact": 0,
         "source_coverage_unlock_calendar_missing_linked_artifact": 0,
+        "source_coverage_dex_onchain_missing_linked_artifact": 0,
     }
     if path is None:
         return out
@@ -4588,6 +4684,15 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
     ):
         if artifact_name in text and not (report_path.parent / artifact_name).exists():
             out["source_coverage_unlock_calendar_missing_linked_artifact"] += 1
+    for artifact_name in (
+        event_dex_onchain_readiness.READINESS_JSON,
+        event_dex_onchain_readiness.READINESS_MD,
+        event_dex_onchain_readiness.DEX_POOL_STATE_FILENAME,
+        event_dex_onchain_readiness.DEX_POOL_ANOMALIES_FILENAME,
+        event_dex_onchain_readiness.PROTOCOL_FUNDAMENTALS_FILENAME,
+    ):
+        if artifact_name in text and not (report_path.parent / artifact_name).exists():
+            out["source_coverage_dex_onchain_missing_linked_artifact"] += 1
     readiness_present = "Live-provider activation readiness:" in text
     readiness_md_path = report_path.parent / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_MD
     readiness_json_path = report_path.parent / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_JSON
@@ -4727,6 +4832,11 @@ def _source_coverage_report_required(namespace_dir: Path) -> bool:
         "event_unlock_calendar_preflight.json",
         "event_unlock_calendar_preflight.md",
         "event_unlock_calendar_request_ledger.jsonl",
+        event_dex_onchain_readiness.READINESS_JSON,
+        event_dex_onchain_readiness.READINESS_MD,
+        event_dex_onchain_readiness.DEX_POOL_STATE_FILENAME,
+        event_dex_onchain_readiness.DEX_POOL_ANOMALIES_FILENAME,
+        event_dex_onchain_readiness.PROTOCOL_FUNDAMENTALS_FILENAME,
         "event_official_exchange_activation.json",
         "event_official_exchange_activation.md",
         "cryptopanic_request_ledger.jsonl",
@@ -4754,6 +4864,8 @@ def _live_provider_readiness_required(namespace_dir: Path) -> bool:
         "event_bybit_announcements_rehearsal_report.md",
         "event_unlock_calendar_preflight.json",
         "event_unlock_calendar_preflight.md",
+        event_dex_onchain_readiness.READINESS_JSON,
+        event_dex_onchain_readiness.READINESS_MD,
         "event_official_exchange_activation.json",
         "event_official_exchange_activation.md",
     )

@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Add DEX/on-chain readiness scaffolding · Codex
+**Why:** Event Alpha needed fixture-first DEX liquidity and protocol
+fundamentals readiness artifacts so market-anomaly research can distinguish
+real liquidity-supported moves from low-liquidity pumps before any live
+DEX/on-chain provider activation.
+**Changes:**
+- Added `event_dex_onchain_readiness.py` with fixture/no-call provider rows for
+  GeckoTerminal, CoinGecko DEX, and DefiLlama TVL/fees/revenue, plus
+  `event_dex_onchain_readiness.json/md`, `event_dex_pool_state.jsonl`,
+  `event_dex_pool_anomalies.jsonl`, and
+  `event_protocol_fundamentals.jsonl`.
+- Added GeckoTerminal-style, CoinGecko DEX-style, and DefiLlama-style fixtures
+  for DEX liquidity expansion, DEX volume/liquidity anomalies, suspicious
+  low-liquidity pumps, protocol growth, and protocol deterioration.
+- Wired the artifacts into source coverage, live-provider readiness,
+  integrated radar sidecars, daily brief/card metadata, and artifact doctor
+  checks for low-liquidity DEX promotions, missing protocol source/time, live
+  calls without ledgers, and side-effect claims.
+- Added fixture run-ledger/provider-health recording for DEX readiness while
+  keeping all send/trade/paper/RSI/`TRIGGERED_FADE` counters at zero.
+- Updated Make targets, config defaults, roadmap/decision notes, and tests for
+  fixture parsers, source coverage, integrated market anomaly gating, protocol
+  fundamentals cards, and doctor conflicts.
+**Verify:** `python3 tests/test_indicators.py` (676/676); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-dex-onchain-readiness-smoke PYTHON=python3`; `make
+event-alpha-market-anomaly-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-live-provider-readiness-smoke PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** This is readiness scaffolding only. No live provider calls are
+implemented or allowed by default, and no sends, trades, paper trades, normal
+RSI rows, execution, secrets, or Event Alpha-created `TRIGGERED_FADE` are
+introduced.
+
 ## 2026-07-02 — Add fixture-first unlock calendar provider preflights · Codex
 **Why:** Structured scheduled catalyst and unlock providers needed
 provider-specific readiness artifacts and no-send activation stubs before any

@@ -1,0 +1,35 @@
+{
+  "pools": [
+    {
+      "pool_id": "eth_0xtknbpool_cg",
+      "network": "eth",
+      "dex": "uniswap_v3",
+      "symbol": "TKNB",
+      "coin_id": "token-b",
+      "canonical_asset_id": "token-b",
+      "pool_liquidity_usd": 1950000,
+      "dex_volume_24h": 1450000,
+      "dex_volume_zscore_24h": 3.1,
+      "pool_liquidity_change_pct": 0.31,
+      "dex_volume_24h_change_pct": 0.68,
+      "pool_age_hours": 240,
+      "price_change_24h": 16,
+      "source_url": "https://www.coingecko.com/en/coins/token-b#markets",
+      "observed_at": "2026-06-15T16:00:00Z",
+      "freshness_status": "fresh",
+      "market_context_freshness_status": "fresh",
+      "market_snapshot": {
+        "return_unit": "percent_points",
+        "return_24h": 16,
+        "volume_zscore_24h": 3.1,
+        "volume_24h": 1450000,
+        "market_cap": 24000000,
+        "liquidity_usd": 1950000,
+        "spread_bps": 38,
+        "market_context_freshness_status": "fresh",
+        "market_context_source": "coingecko_dex_fixture",
+        "observed_at": "2026-06-15T16:00:00Z"
+      }
+    }
+  ]
+}

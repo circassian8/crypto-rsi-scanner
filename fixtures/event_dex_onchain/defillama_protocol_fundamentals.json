@@ -1,0 +1,68 @@
+{
+  "protocols": [
+    {
+      "id": "aave",
+      "slug": "aave",
+      "name": "Aave",
+      "symbol": "AAVE",
+      "coin_id": "aave",
+      "canonical_asset_id": "aave",
+      "tvl_usd": 12500000000,
+      "tvl_change_24h_pct": 0.1,
+      "fees_24h": 2800000,
+      "fees_change_24h_pct": 0.22,
+      "revenue_24h": 900000,
+      "revenue_change_24h_pct": 0.18,
+      "protocol_dex_volume_24h": 18000000,
+      "protocol_volume_change_24h_pct": 0.24,
+      "source_url": "https://defillama.com/protocol/aave",
+      "observed_at": "2026-06-15T16:00:00Z",
+      "freshness_status": "fresh",
+      "market_context_freshness_status": "fresh",
+      "market_snapshot": {
+        "return_unit": "fraction",
+        "return_24h": 0.09,
+        "volume_zscore_24h": 2.4,
+        "volume_24h": 150000000,
+        "market_cap": 1700000000,
+        "liquidity_usd": 12000000,
+        "spread_bps": 18,
+        "market_context_freshness_status": "fresh",
+        "market_context_source": "defillama_fixture",
+        "observed_at": "2026-06-15T16:00:00Z"
+      }
+    },
+    {
+      "id": "tokend",
+      "slug": "tokend",
+      "name": "TokenD",
+      "symbol": "TKND",
+      "coin_id": "token-d",
+      "canonical_asset_id": "token-d",
+      "tvl_usd": 8200000,
+      "tvl_change_24h_pct": -0.14,
+      "fees_24h": 12000,
+      "fees_change_24h_pct": -0.35,
+      "revenue_24h": 4200,
+      "revenue_change_24h_pct": -0.4,
+      "protocol_dex_volume_24h": 65000,
+      "protocol_volume_change_24h_pct": -0.28,
+      "source_url": "https://defillama.com/protocol/tokend",
+      "observed_at": "2026-06-15T16:00:00Z",
+      "freshness_status": "fresh",
+      "market_context_freshness_status": "fresh",
+      "market_snapshot": {
+        "return_unit": "fraction",
+        "return_24h": -0.11,
+        "volume_zscore_24h": 1.9,
+        "volume_24h": 420000,
+        "market_cap": 20000000,
+        "liquidity_usd": 540000,
+        "spread_bps": 80,
+        "market_context_freshness_status": "fresh",
+        "market_context_source": "defillama_fixture",
+        "observed_at": "2026-06-15T16:00:00Z"
+      }
+    }
+  ]
+}

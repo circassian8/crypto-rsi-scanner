@@ -143,6 +143,23 @@ SOURCE_PACKS: dict[str, SourcePack] = {
         impact_path_families=("listing_liquidity_event", "direct_listing"),
         market_refresh_required=True,
     ),
+    "dex_liquidity_pack": SourcePack(
+        name="dex_liquidity_pack",
+        playbooks=("dex_liquidity_expansion", "dex_volume_breakout", "market_anomaly", "dex_native_move"),
+        preferred_source_classes=(
+            event_source_registry.SourceClass.MARKET_DATA.value,
+            event_source_registry.SourceClass.OFFICIAL_PROJECT.value,
+        ),
+        preferred_providers=("geckoterminal", "coingecko_dex"),
+        minimum_evidence=("DEX pool liquidity", "DEX volume or turnover", "asset/pool identity"),
+        validation_requirements=("liquidity_sanity", "market_confirmation", "source_time"),
+        sufficient_for_validated_digest=("liquidity_sanity", "market_confirmation"),
+        required_for_watchlist=("liquidity_sanity", "market_confirmation", "asset_identity"),
+        required_for_high_priority=("liquidity_sanity", "strong_market_confirmation", "asset_identity"),
+        impact_path_validating_sources=(event_source_registry.SourceClass.MARKET_DATA.value,),
+        impact_path_families=("dex_liquidity_reaction", "dex_native_move", "market_dislocation_unknown"),
+        market_refresh_required=True,
+    ),
     "perp_listing_squeeze_pack": SourcePack(
         name="perp_listing_squeeze_pack",
         playbooks=("perp_listing_squeeze", "listing_volatility", "direct_event"),
@@ -243,7 +260,7 @@ SOURCE_PACKS: dict[str, SourcePack] = {
             event_source_registry.SourceClass.CRYPTO_NEWS.value,
             event_source_registry.SourceClass.BROAD_NEWS.value,
         ),
-        preferred_providers=("project_blog_rss", "cryptopanic", "gdelt", "defillama"),
+        preferred_providers=("project_blog_rss", "cryptopanic", "gdelt", "defillama_tvl_fees_revenue", "defillama"),
         minimum_evidence=("AI company catalyst", "crypto asset named", "proxy or venue mechanism"),
         validation_requirements=("impact_path_validation", "asset_identity", "market_confirmation"),
         sufficient_for_validated_digest=("asset_identity", "impact_path_validation"),
@@ -390,6 +407,7 @@ SOURCE_PACKS: dict[str, SourcePack] = {
             "binance_announcements_public_or_fixture",
             "bybit_announcements_public",
             "binance_announcements_signed_listener",
+            "defillama_tvl_fees_revenue",
             "defillama",
         ),
         minimum_evidence=("fresh market anomaly", "independent catalyst source", "asset identity"),
@@ -433,6 +451,8 @@ def source_pack_for_playbook(
         return SOURCE_PACKS["listing_liquidity_pack"]
     if "unlock" in text or "vesting" in text or "supply" in text:
         return SOURCE_PACKS["unlock_supply_pack"]
+    if "dex_liquidity_pack" in text or "dex_liquidity" in text or "dex_volume" in text or "dex_native" in text:
+        return SOURCE_PACKS["dex_liquidity_pack"]
     if any(term in text for term in ("mainnet", "hard fork", "hard_fork", "protocol_upgrade", "direct_protocol", "project_event", "governance")):
         return SOURCE_PACKS["project_event_pack"]
     if "spacex" in text or "preipo" in text or "pre-ipo" in text or "rwa" in text or "tokenized_stock" in text or "venue_value_capture" in text:

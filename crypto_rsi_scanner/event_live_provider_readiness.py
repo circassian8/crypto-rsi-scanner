@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import config, event_artifact_paths, event_alpha_source_coverage
+from . import config, event_artifact_paths, event_alpha_source_coverage, event_dex_onchain_readiness
 
 READINESS_JSON = "event_live_provider_activation_readiness.json"
 READINESS_MD = "event_live_provider_activation_readiness.md"
@@ -301,6 +301,7 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
     coinalyze_history = _coinalyze_history(artifact_namespace)
     bybit_history = _bybit_announcements_history(artifact_namespace)
     unlock_history = _unlock_calendar_history(artifact_namespace)
+    dex_onchain_history = _dex_onchain_history(artifact_namespace)
     rows = (
         _row(
             "coinalyze",
@@ -567,36 +568,139 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
             activation_phase_override=unlock_history["activation_phase"],
         ),
         _row(
-            "geckoterminal_defillama",
+            "geckoterminal",
             category="dex_onchain",
             priority_rank=8,
-            env_vars=(),
-            configured=False,
+            env_vars=("RSI_EVENT_ALPHA_DEX_GECKOTERMINAL_PATH",),
+            configured=Path(config.EVENT_ALPHA_DEX_GECKOTERMINAL_PATH).exists(),
             live_enabled=False,
-            fixture_path=None,
-            source_packs=("market_anomaly_pack", "protocol_fundamentals_pack"),
-            lanes=("EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH", "RISK_ONLY"),
-            quota="public/no-key sources still need per-run request caps, cache, and stale-data handling",
-            outputs=("event_market_anomalies.jsonl",),
-            ledger=None,
-            status_if_missing="not_implemented",
+            fixture_path=getattr(config, "EVENT_ALPHA_DEX_GECKOTERMINAL_PATH", None),
+            source_packs=("dex_liquidity_pack", "market_anomaly_pack"),
+            lanes=("UNCONFIRMED_RESEARCH", "CONFIRMED_LONG_RESEARCH", "DIAGNOSTIC"),
+            quota="fixture/parser ready by default; any future live call requires explicit allow flag, request ledger, and per-run pool cap",
+            outputs=(
+                event_dex_onchain_readiness.READINESS_JSON,
+                event_dex_onchain_readiness.READINESS_MD,
+                event_dex_onchain_readiness.DEX_POOL_STATE_FILENAME,
+                event_dex_onchain_readiness.DEX_POOL_ANOMALIES_FILENAME,
+            ),
+            ledger=dex_onchain_history["latest_request_ledger_path"],
+            status_if_missing="fixture_ready",
             smoke_mode=smoke_mode,
             sidecar_fixture_available=True,
-            smoke_targets=("event-alpha-market-anomaly-smoke",),
-            fixture_artifacts=("event_market_state_snapshots.jsonl", "event_market_anomalies.jsonl"),
-            next_safe_command="make event-alpha-market-anomaly-smoke PYTHON=python3",
-            no_send_rehearsal_command="make event-alpha-market-anomaly-smoke PYTHON=python3",
-            max_requests_per_run=0,
-            weekly_or_daily_budget="not implemented for live DEX/on-chain providers yet",
-            timeout_seconds=None,
-            cache_ttl_seconds=None,
-            provider_health_key="geckoterminal_defillama",
+            smoke_targets=("event-alpha-dex-onchain-readiness-smoke", "event-alpha-market-anomaly-smoke"),
+            fixture_artifacts=(
+                event_dex_onchain_readiness.READINESS_JSON,
+                event_dex_onchain_readiness.DEX_POOL_STATE_FILENAME,
+                event_dex_onchain_readiness.DEX_POOL_ANOMALIES_FILENAME,
+            ),
+            next_safe_command="make event-alpha-dex-onchain-readiness-smoke PYTHON=python3",
+            no_send_rehearsal_command="make event-alpha-dex-onchain-readiness-smoke PYTHON=python3",
+            max_requests_per_run=20,
+            weekly_or_daily_budget="not implemented for live DEX/on-chain providers yet; readiness remains no-call",
+            timeout_seconds=20,
+            cache_ttl_seconds=900,
+            provider_health_key="geckoterminal",
             lanes_blocked_without_market=("CONFIRMED_LONG_RESEARCH",),
+            latest_preflight_status=dex_onchain_history["latest_preflight_status"],
+            latest_rehearsal_status=dex_onchain_history["latest_rehearsal_status"],
+            latest_request_ledger_path=dex_onchain_history["latest_request_ledger_path"],
+            latest_provider_health_status=dex_onchain_history["latest_provider_health_status"],
+            latest_rehearsal_generated_at=dex_onchain_history["latest_rehearsal_generated_at"],
+            latest_snapshots_written=dex_onchain_history["latest_dex_pool_state_rows"],
+            latest_budget_used=0,
+            activation_phase_override=dex_onchain_history["activation_phase"],
+        ),
+        _row(
+            "coingecko_dex",
+            category="dex_onchain",
+            priority_rank=9,
+            env_vars=("RSI_EVENT_ALPHA_DEX_COINGECKO_PATH", "COINGECKO_API_KEY"),
+            configured=Path(config.EVENT_ALPHA_DEX_COINGECKO_PATH).exists(),
+            live_enabled=False,
+            fixture_path=getattr(config, "EVENT_ALPHA_DEX_COINGECKO_PATH", None),
+            source_packs=("dex_liquidity_pack", "market_anomaly_pack"),
+            lanes=("UNCONFIRMED_RESEARCH", "CONFIRMED_LONG_RESEARCH", "DIAGNOSTIC"),
+            quota="fixture/parser ready by default; CoinGecko DEX live calls not implemented in this readiness path",
+            outputs=(
+                event_dex_onchain_readiness.READINESS_JSON,
+                event_dex_onchain_readiness.READINESS_MD,
+                event_dex_onchain_readiness.DEX_POOL_STATE_FILENAME,
+                event_dex_onchain_readiness.DEX_POOL_ANOMALIES_FILENAME,
+            ),
+            ledger=dex_onchain_history["latest_request_ledger_path"],
+            status_if_missing="fixture_ready",
+            smoke_mode=smoke_mode,
+            sidecar_fixture_available=True,
+            smoke_targets=("event-alpha-dex-onchain-readiness-smoke", "event-alpha-market-anomaly-smoke"),
+            fixture_artifacts=(
+                event_dex_onchain_readiness.READINESS_JSON,
+                event_dex_onchain_readiness.DEX_POOL_STATE_FILENAME,
+                event_dex_onchain_readiness.DEX_POOL_ANOMALIES_FILENAME,
+            ),
+            next_safe_command="make event-alpha-dex-onchain-readiness-smoke PYTHON=python3",
+            no_send_rehearsal_command="make event-alpha-dex-onchain-readiness-smoke PYTHON=python3",
+            max_requests_per_run=20,
+            weekly_or_daily_budget="not implemented for live DEX/on-chain providers yet; readiness remains no-call",
+            timeout_seconds=20,
+            cache_ttl_seconds=900,
+            provider_health_key="coingecko_dex",
+            lanes_blocked_without_market=("CONFIRMED_LONG_RESEARCH",),
+            latest_preflight_status=dex_onchain_history["latest_preflight_status"],
+            latest_rehearsal_status=dex_onchain_history["latest_rehearsal_status"],
+            latest_request_ledger_path=dex_onchain_history["latest_request_ledger_path"],
+            latest_provider_health_status=dex_onchain_history["latest_provider_health_status"],
+            latest_rehearsal_generated_at=dex_onchain_history["latest_rehearsal_generated_at"],
+            latest_snapshots_written=dex_onchain_history["latest_dex_pool_state_rows"],
+            latest_budget_used=0,
+            activation_phase_override=dex_onchain_history["activation_phase"],
+        ),
+        _row(
+            "defillama_tvl_fees_revenue",
+            category="protocol_fundamentals",
+            priority_rank=10,
+            env_vars=("RSI_EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH",),
+            configured=Path(config.EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH).exists(),
+            live_enabled=False,
+            fixture_path=getattr(config, "EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH", None),
+            source_packs=("protocol_fundamentals_pack", "strategic_investment_pack", "security_shock_pack"),
+            lanes=("EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH", "RISK_ONLY"),
+            quota="fixture/parser ready by default; DefiLlama live calls not implemented in this readiness path",
+            outputs=(
+                event_dex_onchain_readiness.READINESS_JSON,
+                event_dex_onchain_readiness.READINESS_MD,
+                event_dex_onchain_readiness.PROTOCOL_FUNDAMENTALS_FILENAME,
+            ),
+            ledger=dex_onchain_history["latest_request_ledger_path"],
+            status_if_missing="fixture_ready",
+            smoke_mode=smoke_mode,
+            sidecar_fixture_available=True,
+            smoke_targets=("event-alpha-dex-onchain-readiness-smoke", "event-alpha-integrated-radar-smoke"),
+            fixture_artifacts=(
+                event_dex_onchain_readiness.READINESS_JSON,
+                event_dex_onchain_readiness.PROTOCOL_FUNDAMENTALS_FILENAME,
+            ),
+            next_safe_command="make event-alpha-dex-onchain-readiness-smoke PYTHON=python3",
+            no_send_rehearsal_command="make event-alpha-dex-onchain-readiness-smoke PYTHON=python3",
+            max_requests_per_run=20,
+            weekly_or_daily_budget="not implemented for live protocol-fundamental providers yet; readiness remains no-call",
+            timeout_seconds=20,
+            cache_ttl_seconds=900,
+            provider_health_key="defillama_tvl_fees_revenue",
+            lanes_blocked_without_market=("CONFIRMED_LONG_RESEARCH",),
+            latest_preflight_status=dex_onchain_history["latest_preflight_status"],
+            latest_rehearsal_status=dex_onchain_history["latest_rehearsal_status"],
+            latest_request_ledger_path=dex_onchain_history["latest_request_ledger_path"],
+            latest_provider_health_status=dex_onchain_history["latest_provider_health_status"],
+            latest_rehearsal_generated_at=dex_onchain_history["latest_rehearsal_generated_at"],
+            latest_snapshots_written=dex_onchain_history["latest_protocol_fundamental_rows"],
+            latest_budget_used=0,
+            activation_phase_override=dex_onchain_history["activation_phase"],
         ),
         _row(
             "cryptopanic_rss_gdelt_context",
             category="news_context",
-            priority_rank=9,
+            priority_rank=11,
             env_vars=("RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN",),
             configured=bool(config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN),
             live_enabled=bool(config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE),
@@ -837,6 +941,25 @@ def _unlock_calendar_history(artifact_namespace: str) -> dict[str, Any]:
         "latest_rehearsal_generated_at": str(preflight.get("generated_at") or "") or None,
         "latest_snapshots_written": fixture_rows,
         "latest_budget_used": 0,
+        "activation_phase": activation_phase,
+    }
+
+
+def _dex_onchain_history(artifact_namespace: str) -> dict[str, Any]:
+    base = Path(getattr(config, "EVENT_ALPHA_ARTIFACT_BASE_DIR", "event_fade_cache")).expanduser()
+    namespace_dir = base / str(artifact_namespace or "default")
+    readiness = _read_json(namespace_dir / event_dex_onchain_readiness.READINESS_JSON)
+    ledger = namespace_dir / event_dex_onchain_readiness.REQUEST_LEDGER
+    status = str(readiness.get("readiness_status") or "not_generated")
+    activation_phase = "fixture_ready" if status in {"fixture_ready", "fixture_partial"} else status
+    return {
+        "latest_preflight_status": status,
+        "latest_rehearsal_status": status,
+        "latest_request_ledger_path": event_artifact_paths.artifact_display_path(ledger) if ledger.exists() else None,
+        "latest_provider_health_status": "not_observed",
+        "latest_rehearsal_generated_at": str(readiness.get("generated_at") or "") or None,
+        "latest_dex_pool_state_rows": int(readiness.get("dex_pool_state_rows") or 0),
+        "latest_protocol_fundamental_rows": int(readiness.get("protocol_fundamental_rows") or 0),
         "activation_phase": activation_phase,
     }
 

@@ -55,6 +55,9 @@ EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH ?= fixtures/event_discovery/sched
 EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH ?= fixtures/event_discovery/scheduled_messari_unlocks.json
 EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH ?= fixtures/event_discovery/scheduled_coinmarketcal_events.json
 EVENT_ALPHA_DERIVATIVES_CROWDING_PATH ?= fixtures/event_derivatives_crowding/derivatives_crowding_rows.json
+EVENT_ALPHA_DEX_GECKOTERMINAL_PATH ?= fixtures/event_dex_onchain/geckoterminal_pools.json
+EVENT_ALPHA_DEX_COINGECKO_PATH ?= fixtures/event_dex_onchain/coingecko_dex_pools.json
+EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH ?= fixtures/event_dex_onchain/defillama_protocol_fundamentals.json
 EVENT_ALPHA_ANOMALY_MIN_RETURN_24H ?= 0.03
 EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP ?= 0.05
 EVENT_ALPHA_INTEGRATED_RADAR_INPUT_ARG ?= --event-alpha-integrated-radar-auto
@@ -125,7 +128,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_NAMESPACE ?= $(if $(filter notify_llm_deep,$(PRO
 EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_NAMESPACE)/event_alpha_one_cycle_send_preflight_passed.marker
 
 .PHONY: help check-python bootstrap export-src export-src-with-artifacts verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-catalyst-frame-validation-cycle event-alpha-catalyst-frame-e2e-cycle event-alpha-notify-llm-quality-frame-smoke event-alpha-integrated-radar-smoke event-alpha-integrated-radar-doctor event-alpha-integrated-radar-cycle event-alpha-integrated-radar-fill-outcomes event-alpha-integrated-radar-outcome-smoke event-alpha-integrated-radar-outcome-report event-alpha-integrated-radar-calibration-report event-alpha-integrated-radar-calibration-export-priors event-alpha-market-anomaly-scan event-alpha-market-anomaly-smoke event-alpha-official-exchange-report event-alpha-official-exchange-smoke event-alpha-scheduled-catalyst-report event-alpha-scheduled-catalyst-smoke event-alpha-unlock-risk-smoke event-alpha-derivatives-report event-alpha-derivatives-smoke event-alpha-fade-review-smoke event-alpha-market-refresh-smoke event-alpha-evidence-acquisition-smoke event-alpha-quality-frame-live-smoke event-alpha-frame-quality-loop event-alpha-signal-quality-eval event-alpha-quality-review event-alpha-quality-coverage-report event-alpha-quality-validation-cycle event-alpha-notify-llm-quality-validation-cycle event-alpha-notify-llm-quality-fresh-cycle event-alpha-quality-live-smoke event-alpha-live-burn-in-no-send event-alpha-burn-in-readiness event-alpha-policy-simulate event-alpha-export-signal-quality-cases event-alpha-quality-loop event-alpha-quality-loop-llm event-opportunity-audit event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-cycle-profile event-alpha-cycle-profile-send event-alpha-notify-cycle event-alpha-notify-no-key event-alpha-notify-llm event-alpha-notify-preview event-alpha-notify-go-no-go event-alpha-send-go-no-go event-alpha-telegram-no-send-final-check-fast event-alpha-telegram-no-send-final-check event-alpha-telegram-one-cycle-send-preflight event-alpha-telegram-send-one-cycle event-alpha-telegram-post-send-audit event-alpha-notification-pause event-alpha-telegram-send-readiness-final event-alpha-telegram-final-send-checklist event-alpha-environment-doctor event-alpha-pause-notifications event-alpha-resume-notifications event-alpha-scheduler-status event-alpha-generate-launchd event-alpha-notification-slo-report event-alpha-export-notification-pack event-alpha-notification-checklist event-alpha-send-readiness event-alpha-notification-runs-report event-alpha-notification-inbox event-alpha-notification-deliveries-report event-alpha-notification-retry-failed event-alpha-notify-no-key-scheduled event-alpha-notify-llm-scheduled event-alpha-notify-llm-deep-scheduled event-alpha-notify-llm-quality-scheduled event-alpha-provider-health-report event-alpha-cryptopanic-preflight event-alpha-source-coverage-report event-alpha-provider-health-reset event-alpha-day1-start event-alpha-day1-start-llm event-alpha-notify-fixture-smoke event-alpha-research-review-digest-smoke event-alpha-notify-llm-deep-research-review-no-send-smoke event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal event-alpha-notification-format-smoke event-alpha-notify-llm-deep-no-send-smoke event-alpha-notify-llm-deep-fixture-rehearsal-artifacts event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate event-alpha-notify-llm-deep-real-no-send-rehearsal-with-fixture-candidate event-alpha-notify-llm-deep-real-no-send-rehearsal-fast event-alpha-notify-start-no-key event-alpha-notify-start-llm event-alpha-send-test event-alpha-telegram-recipient-check event-alpha-runs-report event-alpha-status event-alpha-preflight event-alpha-daily-report event-alpha-daily-llm-report event-alpha-daily-send event-alpha-health event-alpha-health-guard event-alpha-artifact-doctor event-alpha-v1-readiness event-alpha-tuning-worksheet event-alpha-export-burn-in-pack event-alpha-launchd-template event-alpha-open-items event-alpha-daily-brief event-alpha-prune-artifacts event-alpha-replay event-alpha-priors-shadow-report event-alpha-burn-in-no-key event-alpha-burn-in-llm event-alpha-weekly-review event-alpha-burn-in-scorecard event-alpha-burn-in-checklist event-alpha-feedback-readiness event-feedback-useful event-feedback-junk event-feedback-watch event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-watchlist-monitor event-alpha-router-report event-alpha-missed-report event-alpha-near-miss-report event-alpha-calibration-report event-source-reliability-report event-alpha-calibration-export-priors event-alpha-export-eval-cases event-alpha-explain-last-run event-research-cards event-research-cards-write event-feedback-report event-incidents-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
-.PHONY: event-alpha-live-provider-readiness event-alpha-live-provider-readiness-smoke event-alpha-coinalyze-preflight event-alpha-coinalyze-preflight-smoke event-alpha-coinalyze-no-send-rehearsal event-alpha-bybit-announcements-preflight event-alpha-bybit-announcements-preflight-smoke event-alpha-bybit-announcements-no-send-rehearsal event-alpha-tokenomist-preflight event-alpha-messari-unlocks-preflight event-alpha-coinmarketcal-preflight event-alpha-notify-preview-from-artifacts event-alpha-mark-namespace-stale event-alpha-mark-known-stale-namespaces event-alpha-prune-or-archive-stale-namespace normalize-export-timestamps
+.PHONY: event-alpha-live-provider-readiness event-alpha-live-provider-readiness-smoke event-alpha-dex-onchain-readiness event-alpha-dex-onchain-readiness-smoke event-alpha-coinalyze-preflight event-alpha-coinalyze-preflight-smoke event-alpha-coinalyze-no-send-rehearsal event-alpha-bybit-announcements-preflight event-alpha-bybit-announcements-preflight-smoke event-alpha-bybit-announcements-no-send-rehearsal event-alpha-tokenomist-preflight event-alpha-messari-unlocks-preflight event-alpha-coinmarketcal-preflight event-alpha-notify-preview-from-artifacts event-alpha-mark-namespace-stale event-alpha-mark-known-stale-namespaces event-alpha-prune-or-archive-stale-namespace normalize-export-timestamps
 
 help:
 	@echo "Targets:"
@@ -186,6 +189,7 @@ help:
 	@echo "  make event-alpha-tokenomist-preflight  Write fixture/no-call Tokenomist unlock preflight"
 	@echo "  make event-alpha-messari-unlocks-preflight  Write fixture/no-call Messari unlock preflight"
 	@echo "  make event-alpha-coinmarketcal-preflight  Write fixture/no-call CoinMarketCal preflight"
+	@echo "  make event-alpha-dex-onchain-readiness-smoke  Write fixture/no-call DEX/on-chain readiness artifacts"
 	@echo "  make event-alpha-scheduled-catalyst-report PROFILE=no_key_live  Normalize configured calendar/unlock fixtures"
 	@echo "  make event-alpha-derivatives-smoke  Write fixture derivatives crowding artifacts, no sends"
 	@echo "  make event-alpha-fade-review-smoke  Prove fixture FADE_SHORT_REVIEW lanes are review-only"
@@ -573,6 +577,10 @@ event-alpha-integrated-radar-smoke:
 	test -s event_fade_cache/$(PROFILE)/event_market_state_snapshots.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_market_anomalies.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_market_anomaly_catalyst_search_queue.jsonl
+	test -s event_fade_cache/$(PROFILE)/event_dex_onchain_readiness.json
+	test -s event_fade_cache/$(PROFILE)/event_dex_pool_state.jsonl
+	test -s event_fade_cache/$(PROFILE)/event_dex_pool_anomalies.jsonl
+	test -s event_fade_cache/$(PROFILE)/event_protocol_fundamentals.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_exchange_announcements.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_official_exchange_events.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_official_listing_candidates.jsonl
@@ -595,6 +603,8 @@ event-alpha-integrated-radar-smoke:
 	grep -q "RISK_ONLY" event_fade_cache/$(PROFILE)/event_integrated_radar_candidates.jsonl
 	grep -q "UNCONFIRMED_RESEARCH" event_fade_cache/$(PROFILE)/event_integrated_radar_candidates.jsonl
 	grep -q "DIAGNOSTIC" event_fade_cache/$(PROFILE)/event_integrated_radar_candidates.jsonl
+	grep -q "DEX / On-Chain Liquidity" event_fade_cache/$(PROFILE)/event_alpha_daily_brief.md
+	grep -q "Protocol Fundamentals" event_fade_cache/$(PROFILE)/event_alpha_daily_brief.md
 	grep -q "Research-only" event_fade_cache/$(PROFILE)/event_alpha_notification_preview.md
 	grep -q "would_send_but_guard_disabled" event_fade_cache/$(PROFILE)/event_integrated_radar_notification_deliveries.jsonl
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict
@@ -640,9 +650,21 @@ event-alpha-market-anomaly-smoke:
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
 	RSI_EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH=$(EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH) \
 	$(PYTHON) main.py --event-alpha-market-anomaly-scan --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-market-anomaly-rows $(EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH) --event-alpha-market-anomaly-asset-registry $(EVENT_ALPHA_ASSET_REGISTRY_PATH) --event-alpha-market-anomaly-universe $(EVENT_ALPHA_MARKET_ANOMALY_UNIVERSE_PATH) --event-alpha-include-test-artifacts
+	env $(EVENT_FIXTURE_NOW_ENV) \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	RSI_EVENT_ALPHA_DEX_GECKOTERMINAL_PATH=$(EVENT_ALPHA_DEX_GECKOTERMINAL_PATH) \
+	RSI_EVENT_ALPHA_DEX_COINGECKO_PATH=$(EVENT_ALPHA_DEX_COINGECKO_PATH) \
+	RSI_EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH=$(EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH) \
+	$(PYTHON) main.py --event-alpha-dex-onchain-readiness-smoke --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	test -s event_fade_cache/$(PROFILE)/event_market_state_snapshots.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_market_anomalies.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_market_anomaly_catalyst_search_queue.jsonl
+	test -s event_fade_cache/$(PROFILE)/event_dex_onchain_readiness.json
+	test -s event_fade_cache/$(PROFILE)/event_dex_pool_state.jsonl
+	test -s event_fade_cache/$(PROFILE)/event_dex_pool_anomalies.jsonl
+	test -s event_fade_cache/$(PROFILE)/event_protocol_fundamentals.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_market_anomaly_report.md
 	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict
@@ -1212,6 +1234,44 @@ event-alpha-live-provider-readiness-smoke:
 	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_live_provider_activation_readiness.md"
 	grep -q '"live_calls_allowed": false' "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_live_provider_activation_readiness.json"
 	grep -q "no provider network calls" "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_live_provider_activation_readiness.md"
+
+event-alpha-dex-onchain-readiness: PROFILE = dex_onchain_readiness
+event-alpha-dex-onchain-readiness:
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(ARTIFACT_NAMESPACE) \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	RSI_EVENT_ALPHA_DEX_GECKOTERMINAL_PATH=$(EVENT_ALPHA_DEX_GECKOTERMINAL_PATH) \
+	RSI_EVENT_ALPHA_DEX_COINGECKO_PATH=$(EVENT_ALPHA_DEX_COINGECKO_PATH) \
+	RSI_EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH=$(EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH) \
+	$(PYTHON) main.py --event-alpha-dex-onchain-readiness --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE)
+	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(ARTIFACT_NAMESPACE)/event_dex_onchain_readiness.json"
+	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(ARTIFACT_NAMESPACE)/event_dex_onchain_readiness.md"
+	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(ARTIFACT_NAMESPACE)/event_dex_pool_state.jsonl"
+	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(ARTIFACT_NAMESPACE)/event_dex_pool_anomalies.jsonl"
+	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(ARTIFACT_NAMESPACE)/event_protocol_fundamentals.jsonl"
+
+event-alpha-dex-onchain-readiness-smoke: PROFILE = dex_onchain_readiness_smoke
+event-alpha-dex-onchain-readiness-smoke:
+	rm -rf $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)
+	env $(EVENT_FIXTURE_NOW_ENV) \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	RSI_EVENT_ALPHA_DEX_GECKOTERMINAL_PATH=$(EVENT_ALPHA_DEX_GECKOTERMINAL_PATH) \
+	RSI_EVENT_ALPHA_DEX_COINGECKO_PATH=$(EVENT_ALPHA_DEX_COINGECKO_PATH) \
+	RSI_EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH=$(EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH) \
+	$(PYTHON) main.py --event-alpha-dex-onchain-readiness-smoke --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
+	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_dex_onchain_readiness.json"
+	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_dex_onchain_readiness.md"
+	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_dex_pool_state.jsonl"
+	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_dex_pool_anomalies.jsonl"
+	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_protocol_fundamentals.jsonl"
+	grep -q '"live_call_allowed": false' "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_dex_onchain_readiness.json"
+	grep -q "dex_liquidity_expansion" "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_dex_pool_anomalies.jsonl"
+	grep -q "suspicious_low_liquidity_pump" "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_dex_pool_anomalies.jsonl"
+	grep -q "protocol_revenue_tvl_growth" "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_protocol_fundamentals.jsonl"
+	$(PYTHON) main.py --event-alpha-source-coverage-report --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
+	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 
 event-alpha-tokenomist-preflight: PROFILE = tokenomist_preflight
 event-alpha-tokenomist-preflight:

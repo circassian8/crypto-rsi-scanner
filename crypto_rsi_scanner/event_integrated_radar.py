@@ -28,11 +28,13 @@ from . import (
     event_alpha_source_coverage,
     event_asset_registry,
     event_coinalyze_preflight,
+    event_dex_onchain_readiness,
     event_live_provider_readiness,
     event_core_opportunity_store,
     event_derivatives_crowding,
     event_instrument_resolver,
     event_market_anomaly_scanner,
+    event_market_confirmation,
     event_market_reaction,
     event_official_exchange,
     event_research_cards,
@@ -108,6 +110,9 @@ class EventIntegratedRadarResult:
     derivatives_state_rows: int = 0
     derivatives_crowding_candidates: int = 0
     fade_review_candidates: int = 0
+    dex_pool_state_rows: int = 0
+    dex_pool_anomaly_rows: int = 0
+    protocol_fundamental_rows: int = 0
     asset_registry_assets: int = 0
     instrument_resolution_rows: int = 0
     integrated_candidates: int = 0
@@ -379,6 +384,9 @@ def run_integrated_radar_cycle(
         derivatives_state_rows=sidecar_counts["derivatives_state_rows"],
         derivatives_crowding_candidates=sidecar_counts["derivatives_crowding_candidates"],
         fade_review_candidates=sidecar_counts["fade_review_candidates"],
+        dex_pool_state_rows=sidecar_counts["dex_pool_state_rows"],
+        dex_pool_anomaly_rows=sidecar_counts["dex_pool_anomaly_rows"],
+        protocol_fundamental_rows=sidecar_counts["protocol_fundamental_rows"],
         asset_registry_assets=len(asset_registry),
         instrument_resolution_rows=len(resolution_rows),
         integrated_candidates=len(candidates),
@@ -452,7 +460,7 @@ def _build_integrated_asset_registry(
             official_rows.extend(materialized)
         if origin in COINALYZE_EXTERNAL_SIDECARS or origin == "coinalyze":
             coinalyze_rows.extend(materialized)
-        if origin in {"market_anomaly", "scheduled_catalyst", "unlock"}:
+        if origin in {"market_anomaly", "scheduled_catalyst", "unlock", "dex_pool_state", "dex_pool_anomaly", "protocol_fundamentals"}:
             official_rows.extend(materialized)
     return event_asset_registry.build_asset_registry(
         fixture_path=config.EVENT_ASSET_REGISTRY_PATH,
@@ -780,6 +788,10 @@ def format_integrated_daily_brief(
     _append_filtered(lines, rows, lambda row: row.get("unlock_event"))
     lines.extend(["", "## Derivatives Crowding / Fade-Review Research"])
     _append_filtered(lines, rows, lambda row: row.get("derivatives_state_snapshot"))
+    lines.extend(["", "## DEX / On-Chain Liquidity"])
+    _append_filtered(lines, rows, lambda row: row.get("dex_liquidity_snapshot"))
+    lines.extend(["", "## Protocol Fundamentals"])
+    _append_filtered(lines, rows, lambda row: row.get("protocol_metrics_snapshot"))
     lines.extend(["", "## Source Coverage"])
     lines.extend(_source_coverage_lines(rows))
     lines.extend(["", "## Outcome Tracker Status"])
@@ -1176,6 +1188,11 @@ def format_integrated_source_coverage_json(
         source for row in rows for source in (row.get("source_packs") or [row.get("source_pack") or "unknown"])
     )
     lane_counts = Counter(str(row.get("opportunity_type") or "unknown") for row in rows)
+    manifest_rows = [dict(item) for item in input_manifest if isinstance(item, Mapping)]
+    manifest_counts = {
+        str(item.get("sidecar_name") or "unknown"): int((item.get("row_counts") or {}).get("rows") or 0)
+        for item in manifest_rows
+    }
     coinalyze = _coinalyze_manifest_summary(input_manifest)
     return {
         "schema_version": 1,
@@ -1191,6 +1208,16 @@ def format_integrated_source_coverage_json(
         "coinalyze_provider_health_status": coinalyze.get("coinalyze_provider_health_status", "not_observed"),
         "coinalyze_freshness_status": coinalyze.get("coinalyze_freshness_status", "missing"),
         "coinalyze_skip_reason": coinalyze.get("coinalyze_skip_reason"),
+        "dex_pool_state_rows": manifest_counts.get("dex_pool_state", 0),
+        "dex_pool_anomaly_rows": manifest_counts.get("dex_pool_anomaly", 0),
+        "protocol_fundamental_rows": manifest_counts.get("protocol_fundamentals", 0),
+        "dex_onchain_readiness_status": "fixture_ready"
+        if (
+            manifest_counts.get("dex_pool_state", 0)
+            or manifest_counts.get("dex_pool_anomaly", 0)
+            or manifest_counts.get("protocol_fundamentals", 0)
+        )
+        else "not_loaded",
         "live_provider_readiness_report_path": event_artifact_paths.artifact_display_path(readiness_md_path)
         if readiness_md_path
         else None,
@@ -1216,7 +1243,7 @@ def format_integrated_source_coverage_json(
             "cryptopanic_tagged_news",
             "rss_gdelt_context",
         ],
-        "input_manifest": [dict(item) for item in input_manifest if isinstance(item, Mapping)],
+        "input_manifest": manifest_rows,
     }
 
 
@@ -1276,6 +1303,9 @@ def _run_or_load_sidecars(
             "scheduled_catalyst": (),
             "unlock": (),
             "derivatives": (),
+            "dex_pool_state": (),
+            "dex_pool_anomaly": (),
+            "protocol_fundamentals": (),
         }
         manifest = tuple(
             _manifest_item(
@@ -1309,6 +1339,9 @@ def _run_or_load_sidecars(
         "scheduled_catalyst": tuple(event_scheduled_catalysts.load_scheduled_catalysts(namespace_dir)),
         "unlock": tuple(event_scheduled_catalysts.load_unlock_candidates(namespace_dir)),
         "derivatives": derivatives_rows,
+        "dex_pool_state": tuple(event_dex_onchain_readiness.load_dex_pool_state(namespace_dir)),
+        "dex_pool_anomaly": tuple(event_dex_onchain_readiness.load_dex_pool_anomalies(namespace_dir)),
+        "protocol_fundamentals": tuple(event_dex_onchain_readiness.load_protocol_fundamentals(namespace_dir)),
     }
     manifest = tuple(
         _manifest_item(
@@ -1724,12 +1757,25 @@ def _run_fixture_sidecars(
             run_id=run_id,
             observed_at=observed_at,
         )
+        dex_onchain = event_dex_onchain_readiness.run_dex_onchain_readiness(
+            namespace_dir=namespace_dir,
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+            geckoterminal_path=config.EVENT_ALPHA_DEX_GECKOTERMINAL_PATH,
+            coingecko_dex_path=config.EVENT_ALPHA_DEX_COINGECKO_PATH,
+            defillama_path=config.EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH,
+            smoke_mode=True,
+            now=observed_at,
+        )
     return {
         "market_anomaly": market.anomalies,
         "official_exchange": _official_exchange_integration_rows(official.events, official.candidates),
         "scheduled_catalyst": scheduled.scheduled_events,
         "unlock": scheduled.unlock_candidates,
         "derivatives": derivatives.candidate_rows,
+        "dex_pool_state": dex_onchain.dex_pool_state_rows,
+        "dex_pool_anomaly": dex_onchain.dex_pool_anomaly_rows,
+        "protocol_fundamentals": dex_onchain.protocol_fundamental_rows,
     }
 
 
@@ -1845,6 +1891,10 @@ def _merge_family(
     )
     scheduled_row = _best_row(rows, lambda row: str(row.get("row_type")) == "scheduled_catalyst_event")
     unlock_row = _best_row(rows, lambda row: str(row.get("row_type")) in {"unlock_event", "unlock_candidate"})
+    dex_row = _best_dex_row(rows)
+    protocol_row = _best_protocol_row(rows)
+    dex_liquidity_snapshot = _snapshot_from_row(dex_row, "dex_liquidity_snapshot")
+    protocol_metrics_snapshot = _snapshot_from_row(protocol_row, "protocol_metrics_snapshot")
     source_strength = _best_source_strength(rows)
     source_class = _best_text(rows, "source_class") or "unknown"
     source_pack = _best_source_pack(rows, source_packs)
@@ -1863,23 +1913,51 @@ def _merge_family(
         "evidence_acquisition_status": evidence_status,
         "market_snapshot": market_snapshot,
         "derivatives_snapshot": dict(derivatives_row.get("derivatives_state_snapshot") or {}) if derivatives_row else {},
+        "dex_liquidity_snapshot": dex_liquidity_snapshot,
         "event_age_hours": _first_value(rows, "event_age_hours"),
         "catalyst_fresh": True,
         "negative_catalyst": _negative_candidate(rows, impact_path, source_pack),
     })
-    opportunity = _policy_opportunity_type(raw_reaction, rows, origins, official_row=official_row)
+    market_confirmation = event_market_confirmation.evaluate_market_confirmation({
+        "market_snapshot": market_snapshot,
+        "derivatives_snapshot": dict(derivatives_row.get("derivatives_state_snapshot") or {}) if derivatives_row else {},
+        "dex_liquidity_snapshot": dex_liquidity_snapshot,
+        "protocol_metrics_snapshot": protocol_metrics_snapshot,
+        "playbook_type": impact_path,
+        "now": observed_at,
+        "allow_stale_fixture_market_context": True,
+    })
+    opportunity = _policy_opportunity_type(
+        raw_reaction,
+        rows,
+        origins,
+        official_row=official_row,
+        dex_row=dex_row,
+        protocol_row=protocol_row,
+        market_confirmation=market_confirmation,
+    )
     score = _score_for(opportunity, raw_reaction, rows, source_strength)
     level, route, state = _level_route_state(opportunity)
     reason_codes = tuple(dict.fromkeys((*_merged_list(rows, "reason_codes"), *raw_reaction.reason_codes)))
     warnings = tuple(dict.fromkeys((
         *_merged_list(rows, "warnings"),
         *resolver_warnings,
-        *_policy_warnings(opportunity, rows, raw_reaction),
+        *_policy_warnings(
+            opportunity,
+            rows,
+            raw_reaction,
+            dex_row=dex_row,
+            protocol_row=protocol_row,
+            market_confirmation=market_confirmation,
+        ),
     )))
     candidate_id = f"iar:{_digest(key)}"
     derivatives_metadata = _derivatives_metadata(derivatives_row)
     derivatives_state_snapshot = dict(derivatives_row.get("derivatives_state_snapshot") or {}) if derivatives_row else None
-    integrated_market = _integrated_market_confirmation(opportunity, raw_reaction)
+    integrated_market = _integrated_market_confirmation(opportunity, raw_reaction, market_confirmation=market_confirmation)
+    latest_source = _best_text(rows, "latest_source", "source_provider", "provider", "source")
+    latest_source_url = _best_text(rows, "latest_source_url", "source_url", "url")
+    latest_source_title = _best_text(rows, "latest_source_title", "source_title", "title", "event_name")
     candidate = {
         "schema_version": 1,
         "row_type": "event_integrated_radar_candidate",
@@ -1936,7 +2014,7 @@ def _merge_family(
         "final_state_after_quality_gate": state,
         "score": score,
         "source_requirements_met": _source_requirements_met(opportunity, rows, source_strength),
-        "market_requirements_met": _market_requirements_met(opportunity, raw_reaction),
+        "market_requirements_met": _market_requirements_met(opportunity, raw_reaction, market_confirmation=market_confirmation),
         "fade_requirements_met": _fade_requirements_met(opportunity, rows),
         "risk_requirements_met": _risk_requirements_met(opportunity, rows),
         "integrated_market_confirmation_level": integrated_market["level"],
@@ -1955,6 +2033,18 @@ def _merge_family(
         "what_confirms_fade_review": derivatives_metadata.get("what_confirms_fade_review") or [],
         "what_invalidates_fade_review": derivatives_metadata.get("what_invalidates_fade_review") or [],
         "derivatives_warning_codes": derivatives_metadata.get("derivatives_warning_codes") or [],
+        "dex_liquidity_snapshot": dex_liquidity_snapshot,
+        "dex_liquidity_score": market_confirmation.dex_liquidity_score,
+        "dex_liquidity_level": market_confirmation.dex_liquidity_level,
+        "dex_liquidity_reasons": list(market_confirmation.dex_liquidity_reasons),
+        "dex_freshness_status": market_confirmation.dex_freshness_status,
+        "dex_onchain_classification": dex_row.get("classification") if dex_row else None,
+        "protocol_metrics_snapshot": protocol_metrics_snapshot,
+        "protocol_metrics_score": market_confirmation.protocol_metrics_score,
+        "protocol_metrics_level": market_confirmation.protocol_metrics_level,
+        "protocol_metrics_reasons": list(market_confirmation.protocol_metrics_reasons),
+        "protocol_metrics_freshness_status": market_confirmation.protocol_metrics_freshness_status,
+        "protocol_fundamentals_class": protocol_row.get("classification") if protocol_row else None,
         "coinalyze_derivatives_attached": bool(derivatives_metadata.get("coinalyze_derivatives_attached")),
         "coinalyze_artifact_namespace": derivatives_metadata.get("coinalyze_artifact_namespace"),
         "coinalyze_source_artifact_path": derivatives_metadata.get("coinalyze_source_artifact_path"),
@@ -1988,7 +2078,13 @@ def _merge_family(
         "incident_id": f"incident:{_digest(key)}",
         "event_name": _best_text(rows, "event_name", "title") or _canonical_incident_name(rows, symbol, opportunity),
         "latest_event_name": _best_text(rows, "event_name", "title") or _canonical_incident_name(rows, symbol, opportunity),
-        "source_url": _best_text(rows, "source_url", "url"),
+        "latest_source": latest_source,
+        "source_provider": latest_source,
+        "primary_source_provider": latest_source,
+        "latest_source_url": latest_source_url,
+        "source_url": latest_source_url,
+        "latest_source_title": latest_source_title,
+        "source_title": latest_source_title,
         "supporting_evidence_quotes": _supporting_quotes(rows),
         "supporting_categories": list(dict.fromkeys(_merged_list(rows, "impact_path_type") or [impact_path])),
         "supporting_impact_paths": list(dict.fromkeys(_merged_list(rows, "impact_path_type") or [impact_path])),
@@ -2144,6 +2240,10 @@ def _impact_family(row: Mapping[str, Any]) -> str:
     text = " ".join(str(row.get(key) or "") for key in ("source_pack", "impact_path_type", "event_type", "row_type")).casefold()
     if "unlock" in text:
         return "unlock_supply"
+    if "protocol_fundamentals" in text:
+        return "protocol_fundamentals"
+    if "dex_liquidity" in text or str(row.get("row_type") or "") in {"event_dex_pool_state", "event_dex_pool_anomaly"}:
+        return "listing_liquidity"
     if str(row.get("row_type") or "") == "event_market_anomaly":
         return "listing_liquidity"
     if (
@@ -2170,12 +2270,17 @@ def _policy_opportunity_type(
     origins: Iterable[str],
     *,
     official_row: Mapping[str, Any] | None,
+    dex_row: Mapping[str, Any] | None = None,
+    protocol_row: Mapping[str, Any] | None = None,
+    market_confirmation: event_market_confirmation.EventMarketConfirmationResult | None = None,
 ) -> str:
     if any(_truthy(row.get("is_theme_or_sector")) or str(row.get("symbol") or "").upper() == "SECTOR" for row in rows):
         return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
     if any(_truthy(row.get("quote_asset_excluded")) or _truthy(row.get("is_quote_asset")) for row in rows):
         return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
     if _has_low_liquidity_suspicious_anomaly(rows):
+        return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
+    if _dex_row_is_suspicious_low_liquidity(dex_row):
         return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
     if official_row and bool(official_row.get("major_pair_simple_announcement")):
         return event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value
@@ -2186,6 +2291,25 @@ def _policy_opportunity_type(
     origin_set = set(origins)
     has_official = official_row is not None and str(official_row.get("source_class")) == "official_exchange"
     market_confirmed = reaction.market_state in {"confirmed_breakout", "stealth_accumulation"}
+    confirmation_score = float(market_confirmation.market_confirmation_score if market_confirmation else 0.0)
+    dex_sane = _dex_liquidity_sane(dex_row)
+    protocol_growth = _protocol_growth(protocol_row)
+    protocol_deterioration = _protocol_deterioration(protocol_row)
+    liquidity_sane = dex_sane or _family_liquidity_sane(rows)
+    if protocol_deterioration and liquidity_sane:
+        return event_market_reaction.EventOpportunityType.RISK_ONLY.value
+    if origin_set & {"market_anomaly"} and (origin_set & {"dex_pool_state", "dex_pool_anomaly"}):
+        if not dex_sane:
+            return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
+        if market_confirmed or confirmation_score >= 50:
+            return event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value
+        return event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value
+    if protocol_growth:
+        if not liquidity_sane:
+            return event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value
+        if market_confirmed or confirmation_score >= 50:
+            return event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value
+        return event_market_reaction.EventOpportunityType.EARLY_LONG_RESEARCH.value
     if has_official and market_confirmed:
         return event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value
     if (
@@ -2205,8 +2329,47 @@ def _has_low_liquidity_suspicious_anomaly(rows: Iterable[Mapping[str, Any]]) -> 
     return any(
         str(row.get("anomaly_type") or row.get("market_state_class") or "") == "suspicious_illiquid_move"
         or str(row.get("anomaly_bucket") or row.get("market_anomaly_bucket") or "") == "low_liquidity_suspicious"
+        or str(row.get("classification") or "") == event_dex_onchain_readiness.SUSPICIOUS_LOW_LIQUIDITY_PUMP
         for row in rows
     )
+
+
+def _dex_row_is_suspicious_low_liquidity(row: Mapping[str, Any] | None) -> bool:
+    if not isinstance(row, Mapping):
+        return False
+    return str(row.get("classification") or row.get("dex_anomaly_class") or "") == event_dex_onchain_readiness.SUSPICIOUS_LOW_LIQUIDITY_PUMP
+
+
+def _dex_liquidity_sane(row: Mapping[str, Any] | None) -> bool:
+    if not isinstance(row, Mapping):
+        return False
+    snapshot = _snapshot_from_row(row, "dex_liquidity_snapshot")
+    liquidity = _float_value(snapshot.get("pool_liquidity_usd") or snapshot.get("liquidity_usd") or row.get("pool_liquidity_usd") or row.get("liquidity_usd"))
+    if liquidity is None:
+        return False
+    if liquidity < 250_000:
+        return False
+    return not _dex_row_is_suspicious_low_liquidity(row)
+
+
+def _family_liquidity_sane(rows: Iterable[Mapping[str, Any]]) -> bool:
+    for row in rows:
+        market = row.get("market_snapshot") if isinstance(row.get("market_snapshot"), Mapping) else row.get("market_state_snapshot")
+        if not isinstance(market, Mapping):
+            continue
+        liquidity = _float_value(market.get("liquidity_usd") or market.get("order_book_depth_2pct") or market.get("depth_2pct_usd"))
+        spread = _float_value(market.get("spread_bps") or market.get("bid_ask_spread_bps"))
+        if liquidity is not None and liquidity >= 250_000 and (spread is None or spread <= 150):
+            return True
+    return False
+
+
+def _protocol_growth(row: Mapping[str, Any] | None) -> bool:
+    return isinstance(row, Mapping) and str(row.get("classification") or row.get("protocol_fundamentals_class") or "") == event_dex_onchain_readiness.PROTOCOL_REVENUE_TVL_GROWTH
+
+
+def _protocol_deterioration(row: Mapping[str, Any] | None) -> bool:
+    return isinstance(row, Mapping) and str(row.get("classification") or row.get("protocol_fundamentals_class") or "") == event_dex_onchain_readiness.PROTOCOL_FUNDAMENTALS_DETERIORATION
 
 
 def _level_route_state(opportunity: str) -> tuple[str, str, str]:
@@ -2268,13 +2431,31 @@ def _source_requirements_met(opportunity: str, rows: list[dict[str, Any]], sourc
         event_market_reaction.EventOpportunityType.RISK_ONLY.value,
         event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value,
     }:
-        return source_strength == "official_structured" or any(row.get("accepted_evidence_count") for row in rows)
+        if source_strength == "official_structured" or any(row.get("accepted_evidence_count") for row in rows):
+            return True
+        if opportunity == event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value:
+            return any(str(row.get("_source_origin") or "") == "market_anomaly" for row in rows) and _dex_liquidity_sane(_best_dex_row(rows))
+        if opportunity in {
+            event_market_reaction.EventOpportunityType.EARLY_LONG_RESEARCH.value,
+            event_market_reaction.EventOpportunityType.RISK_ONLY.value,
+        }:
+            return _protocol_growth(_best_protocol_row(rows)) or _protocol_deterioration(_best_protocol_row(rows))
     return False
 
 
-def _market_requirements_met(opportunity: str, reaction: event_market_reaction.MarketReactionResult) -> bool:
+def _market_requirements_met(
+    opportunity: str,
+    reaction: event_market_reaction.MarketReactionResult,
+    *,
+    market_confirmation: event_market_confirmation.EventMarketConfirmationResult | None = None,
+) -> bool:
     if opportunity == event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value:
-        return reaction.market_state in {"confirmed_breakout", "stealth_accumulation"} or reaction.market_requirements_met
+        confirmation_score = float(market_confirmation.market_confirmation_score if market_confirmation else 0.0)
+        return (
+            reaction.market_state in {"confirmed_breakout", "stealth_accumulation"}
+            or reaction.market_requirements_met
+            or confirmation_score >= 50
+        )
     if opportunity == event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value:
         return reaction.market_state in {"post_event_fade_setup", "blowoff_crowded", "late_momentum"}
     return False
@@ -2295,7 +2476,9 @@ def _fade_requirements_met(opportunity: str, rows: list[dict[str, Any]]) -> bool
 
 
 def _risk_requirements_met(opportunity: str, rows: list[dict[str, Any]]) -> bool:
-    return any(str(row.get("opportunity_type")) == event_market_reaction.EventOpportunityType.RISK_ONLY.value for row in rows)
+    if any(str(row.get("opportunity_type")) == event_market_reaction.EventOpportunityType.RISK_ONLY.value for row in rows):
+        return True
+    return any(_protocol_deterioration(row) for row in rows)
 
 
 def _row_derivatives_state(row: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -2403,6 +2586,88 @@ def _best_derivatives_row(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     return _best_row(rows, lambda row: bool(row.get("derivatives_state_snapshot")))
 
 
+def _best_dex_row(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    candidates = [
+        row for row in rows
+        if str(row.get("row_type") or "") in {"event_dex_pool_state", "event_dex_pool_anomaly"}
+        or isinstance(row.get("dex_liquidity_snapshot"), Mapping)
+        or str(row.get("source_pack") or "") == "dex_liquidity_pack"
+    ]
+    if not candidates:
+        return None
+    return sorted(
+        candidates,
+        key=lambda row: (
+            -1 if _dex_row_is_suspicious_low_liquidity(row) else 0,
+            _float_value(row.get("pool_liquidity_usd") or row.get("liquidity_usd")) or 0.0,
+            _float_value(row.get("dex_volume_24h") or row.get("volume_24h")) or 0.0,
+        ),
+        reverse=True,
+    )[0]
+
+
+def _best_protocol_row(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    candidates = [
+        row for row in rows
+        if str(row.get("row_type") or "") == "event_protocol_fundamentals"
+        or isinstance(row.get("protocol_metrics_snapshot"), Mapping)
+        or str(row.get("source_pack") or "") == "protocol_fundamentals_pack"
+    ]
+    if not candidates:
+        return None
+    return sorted(
+        candidates,
+        key=lambda row: (
+            1 if _protocol_growth(row) or _protocol_deterioration(row) else 0,
+            _float_value(row.get("tvl_usd") or row.get("tvl")) or 0.0,
+        ),
+        reverse=True,
+    )[0]
+
+
+def _snapshot_from_row(row: Mapping[str, Any] | None, key: str) -> dict[str, Any]:
+    if not isinstance(row, Mapping):
+        return {}
+    value = row.get(key)
+    if isinstance(value, Mapping):
+        return dict(value)
+    if key == "dex_liquidity_snapshot":
+        fields = (
+            "pool_liquidity_usd",
+            "liquidity_usd",
+            "dex_volume_24h",
+            "volume_24h",
+            "dex_volume_zscore_24h",
+            "dex_volume_change",
+            "dex_volume_24h_change_pct",
+            "dex_liquidity_change",
+            "pool_liquidity_change_pct",
+            "pool_age_hours",
+            "source_url",
+            "observed_at",
+            "freshness_status",
+            "provider",
+        )
+    else:
+        fields = (
+            "tvl",
+            "tvl_usd",
+            "fees_24h",
+            "revenue_24h",
+            "protocol_revenue_24h",
+            "tvl_change_24h_pct",
+            "fees_change_24h_pct",
+            "revenue_change_24h_pct",
+            "protocol_dex_volume_24h",
+            "protocol_volume_change_24h_pct",
+            "source_url",
+            "observed_at",
+            "freshness_status",
+            "provider",
+        )
+    return {field: row.get(field) for field in fields if row.get(field) not in (None, "", [], {})}
+
+
 def _derivatives_metadata(row: Mapping[str, Any] | None) -> dict[str, Any]:
     if not isinstance(row, Mapping):
         return {}
@@ -2435,9 +2700,20 @@ def _derivatives_metadata(row: Mapping[str, Any] | None) -> dict[str, Any]:
 def _integrated_market_confirmation(
     opportunity: str,
     reaction: event_market_reaction.MarketReactionResult,
+    *,
+    market_confirmation: event_market_confirmation.EventMarketConfirmationResult | None = None,
 ) -> dict[str, Any]:
     market_state = str(reaction.market_state or "")
     if opportunity == event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value:
+        confirmation_score = float(market_confirmation.market_confirmation_score if market_confirmation else 0.0)
+        if confirmation_score >= 50:
+            return {
+                "level": "confirmed_breakout" if market_state in {"", "no_reaction"} else market_state,
+                "score": confirmation_score,
+                "reaction": market_state or "market_confirmation",
+                "source": "integrated_market_confirmation",
+                "freshness": reaction.market_state_snapshot.freshness_status or "fresh",
+            }
         return {
             "level": market_state or "confirmed",
             "score": 80.0 if reaction.market_requirements_met else 0.0,
@@ -2497,6 +2773,8 @@ def _best_source_pack(rows: list[dict[str, Any]], source_packs: Iterable[str]) -
         "perp_listing_squeeze_pack",
         "official_exchange_listing_pack",
         "listing_liquidity_pack",
+        "dex_liquidity_pack",
+        "protocol_fundamentals_pack",
         "unlock_supply_pack",
         "official_exchange_risk_pack",
         "market_anomaly_pack",
@@ -2514,6 +2792,10 @@ def _best_impact_path(rows: list[dict[str, Any]], source_pack: str) -> str:
             return value
     if "unlock" in source_pack:
         return "unlock_supply_event"
+    if "protocol_fundamentals" in source_pack:
+        return "protocol_fundamentals"
+    if "dex_liquidity" in source_pack:
+        return "dex_liquidity_reaction"
     if "listing" in source_pack or "exchange" in source_pack or "perp" in source_pack:
         return "listing_liquidity_event"
     return "market_anomaly_unknown"
@@ -2536,11 +2818,18 @@ def _policy_warnings(
     opportunity: str,
     rows: list[dict[str, Any]],
     reaction: event_market_reaction.MarketReactionResult,
+    *,
+    dex_row: Mapping[str, Any] | None = None,
+    protocol_row: Mapping[str, Any] | None = None,
+    market_confirmation: event_market_confirmation.EventMarketConfirmationResult | None = None,
 ) -> tuple[str, ...]:
     warnings: list[str] = []
     if any(row.get("major_pair_simple_announcement") for row in rows):
         warnings.append("major_pair_simple_announcement_capped")
-    if opportunity == event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value and not reaction.market_requirements_met:
+    if (
+        opportunity == event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value
+        and not _market_requirements_met(opportunity, reaction, market_confirmation=market_confirmation)
+    ):
         warnings.append("confirmed_long_requires_market_confirmation")
     if opportunity == event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value:
         if any(
@@ -2551,6 +2840,10 @@ def _policy_warnings(
             warnings.append("confirmed_long_derivatives_crowding_warning")
     if opportunity == event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value and _family_extreme_crowding_after_completed_move(rows, reaction):
         warnings.append("early_long_capped_by_extreme_crowding_after_completed_move")
+    if _dex_row_is_suspicious_low_liquidity(dex_row):
+        warnings.append("dex_low_liquidity_confirmation_cap")
+    if protocol_row and not (_dex_liquidity_sane(dex_row) or _family_liquidity_sane(rows)):
+        warnings.append("protocol_fundamentals_require_liquidity_sanity")
     return tuple(warnings)
 
 
@@ -2864,6 +3157,7 @@ def _input_manifest_document(
 ) -> dict[str, Any]:
     rows = [dict(item) for item in manifest if isinstance(item, Mapping)]
     coinalyze = _coinalyze_manifest_summary(rows)
+    row_counts = {str(item.get("sidecar_name") or "unknown"): int((item.get("row_counts") or {}).get("rows") or 0) for item in rows}
     return {
         "schema_version": 1,
         "row_type": "event_integrated_radar_input_manifest",
@@ -2873,7 +3167,10 @@ def _input_manifest_document(
         "run_mode": run_mode,
         "input_mode": input_mode,
         "sidecars": rows,
-        "row_counts": {str(item.get("sidecar_name") or "unknown"): int((item.get("row_counts") or {}).get("rows") or 0) for item in rows},
+        "row_counts": row_counts,
+        "dex_pool_state_rows_loaded": row_counts.get("dex_pool_state", 0),
+        "dex_pool_anomaly_rows_loaded": row_counts.get("dex_pool_anomaly", 0),
+        "protocol_fundamental_rows_loaded": row_counts.get("protocol_fundamentals", 0),
         "coinalyze_artifact_namespace": coinalyze.get("coinalyze_artifact_namespace"),
         "coinalyze_derivatives_state_rows_loaded": coinalyze.get("coinalyze_derivatives_state_rows_loaded", 0),
         "coinalyze_crowding_candidates_loaded": coinalyze.get("coinalyze_crowding_candidates_loaded", 0),
@@ -2899,6 +3196,9 @@ def _sidecar_artifact_paths(namespace_dir: Path, sidecar_name: str) -> tuple[Pat
         "scheduled_catalyst": ("event_scheduled_catalysts.jsonl",),
         "unlock": ("event_unlock_candidates.jsonl",),
         "derivatives": ("event_derivatives_state.jsonl", "event_derivatives_crowding_candidates.jsonl", "event_fade_short_review_candidates.jsonl"),
+        "dex_pool_state": (event_dex_onchain_readiness.DEX_POOL_STATE_FILENAME,),
+        "dex_pool_anomaly": (event_dex_onchain_readiness.DEX_POOL_ANOMALIES_FILENAME,),
+        "protocol_fundamentals": (event_dex_onchain_readiness.PROTOCOL_FUNDAMENTALS_FILENAME,),
     }
     return tuple(namespace_dir / name for name in mapping.get(sidecar_name, ()))
 
@@ -2910,6 +3210,9 @@ def _sidecar_count_summary(sidecars: Mapping[str, Iterable[Mapping[str, Any]]]) 
     coinalyze_state_rows = list(sidecars.get("coinalyze_derivatives_state", ()))
     coinalyze_crowding_rows = list(sidecars.get("coinalyze_derivatives_crowding", ()))
     coinalyze_fade_rows = list(sidecars.get("coinalyze_fade_review", ()))
+    dex_pool_state_rows = list(sidecars.get("dex_pool_state", ()))
+    dex_pool_anomaly_rows = list(sidecars.get("dex_pool_anomaly", ()))
+    protocol_fundamental_rows = list(sidecars.get("protocol_fundamentals", ()))
     all_derivative_candidates = [*derivatives_rows, *coinalyze_crowding_rows, *coinalyze_fade_rows]
     return {
         "market_anomalies": len(market_rows),
@@ -2935,6 +3238,9 @@ def _sidecar_count_summary(sidecars: Mapping[str, Iterable[Mapping[str, Any]]]) 
             1 for row in all_derivative_candidates
             if str(row.get("opportunity_type") or "") == event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value
         ),
+        "dex_pool_state_rows": len(dex_pool_state_rows),
+        "dex_pool_anomaly_rows": len(dex_pool_anomaly_rows),
+        "protocol_fundamental_rows": len(protocol_fundamental_rows),
     }
 
 

@@ -1,0 +1,81 @@
+{
+  "data": [
+    {
+      "id": "eth_0xtknbpool",
+      "type": "pool",
+      "attributes": {
+        "name": "TKNB / WETH",
+        "address": "0xtknbpool",
+        "network": "eth",
+        "dex": "uniswap_v3",
+        "base_symbol": "TKNB",
+        "coin_id": "token-b",
+        "canonical_asset_id": "token-b",
+        "reserve_in_usd": "2200000",
+        "volume_usd": {
+          "h24": "1800000"
+        },
+        "price_change_percentage": {
+          "h24": "18"
+        },
+        "pool_liquidity_change_pct": "0.42",
+        "volume_zscore_24h": 3.4,
+        "pool_age_hours": 240,
+        "source_url": "https://www.geckoterminal.com/eth/pools/0xtknbpool",
+        "observed_at": "2026-06-15T16:00:00Z",
+        "freshness_status": "fresh",
+        "market_context_freshness_status": "fresh",
+        "market_snapshot": {
+          "return_unit": "percent_points",
+          "return_24h": 18,
+          "volume_zscore_24h": 3.4,
+          "volume_24h": 1800000,
+          "market_cap": 24000000,
+          "liquidity_usd": 2200000,
+          "spread_bps": 34,
+          "market_context_freshness_status": "fresh",
+          "market_context_source": "geckoterminal_fixture",
+          "observed_at": "2026-06-15T16:00:00Z"
+        }
+      }
+    },
+    {
+      "id": "eth_0xtkncpool",
+      "type": "pool",
+      "attributes": {
+        "name": "TKNC / WETH",
+        "address": "0xtkncpool",
+        "network": "eth",
+        "dex": "uniswap_v2",
+        "base_symbol": "TKNC",
+        "coin_id": "token-c",
+        "canonical_asset_id": "token-c",
+        "reserve_in_usd": "18000",
+        "volume_usd": {
+          "h24": "300000"
+        },
+        "price_change_percentage": {
+          "h24": "62"
+        },
+        "volume_zscore_24h": 2.8,
+        "pool_age_hours": 18,
+        "source_url": "https://www.geckoterminal.com/eth/pools/0xtkncpool",
+        "observed_at": "2026-06-15T16:00:00Z",
+        "freshness_status": "fresh",
+        "market_context_freshness_status": "fresh",
+        "market_snapshot": {
+          "return_unit": "percent_points",
+          "return_24h": 62,
+          "volume_zscore_24h": 2.8,
+          "volume_24h": 300000,
+          "market_cap": 900000,
+          "liquidity_usd": 18000,
+          "spread_bps": 340,
+          "market_context_freshness_status": "fresh",
+          "market_context_source": "geckoterminal_fixture",
+          "observed_at": "2026-06-15T16:00:00Z"
+        }
+      }
+    }
+  ]
+}
