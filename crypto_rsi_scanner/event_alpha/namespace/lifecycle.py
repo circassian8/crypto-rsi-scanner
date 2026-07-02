@@ -13,8 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-from ... import event_alpha_namespace_status
-from ... import event_artifact_paths
+from ..artifacts import paths as event_artifact_paths
+from . import status as event_alpha_namespace_status
 
 
 REGISTRY_FILENAME = "event_alpha_namespace_registry.json"

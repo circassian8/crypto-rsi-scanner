@@ -9,8 +9,8 @@ layout gives new code a home while old import paths continue to work.
   readiness, preflight, and source-pack wrappers.
 - `crypto_rsi_scanner/event_alpha/radar/`: integrated radar, market anomaly,
   source coverage, and core opportunity wrappers.
-- `crypto_rsi_scanner/event_alpha/artifacts/`: artifact paths, context,
-  run-ledger wrappers, and schema v1.
+- `crypto_rsi_scanner/event_alpha/artifacts/`: artifact context, portable
+  path helpers, run-ledger rows, retention, locks, and schema v1.
 - `crypto_rsi_scanner/event_alpha/notifications/`: no-send delivery and sender
   wrappers.
 - `crypto_rsi_scanner/event_alpha/outcomes/`: integrated outcomes and
@@ -43,6 +43,20 @@ daily briefs, outcomes, and calibration/performance artifacts under a namespace.
 The artifact doctor first validates schema v1 structure, then runs higher-order
 safety, delivery, source coverage, provider readiness, outcome, and namespace
 checks.
+
+Artifact implementation code now lives in package modules:
+
+- `event_alpha.artifacts.context` for namespace/path context and row filtering.
+- `event_alpha.artifacts.paths` for portable operator path labels and absolute
+  path scrubbing.
+- `event_alpha.artifacts.run_ledger` for Event Alpha run ledger rows.
+- `event_alpha.artifacts.retention` for dry-run/confirmed artifact pruning.
+- `event_alpha.artifacts.locks` for profile/namespace run locks.
+- `event_alpha.namespace.status` for stale/deprecated namespace markers.
+
+The top-level imports remain compatibility shims with no runtime deprecation
+warnings. Artifact paths and output schemas must stay unchanged unless a
+separate migration explicitly updates schema v1 consumers.
 
 ## Future Code Placement
 

@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Move Event Alpha artifact modules into package homes · Codex
+**Why:** The Event Alpha refactor plan called for artifact/path/run-ledger code
+to live under `crypto_rsi_scanner.event_alpha.artifacts` while old top-level
+imports continue to work during incremental migration.
+**Changes:**
+- Moved artifact context/filtering, portable path helpers, run ledger,
+  retention, and run-lock implementations into
+  `crypto_rsi_scanner/event_alpha/artifacts/`.
+- Moved namespace status implementation into
+  `crypto_rsi_scanner/event_alpha/namespace/status.py`, keeping it in the
+  namespace package rather than the artifact package.
+- Replaced top-level artifact modules with quiet compatibility shims carrying
+  module-level deprecation comments and preserving historical direct attributes,
+  including private helpers used by existing tests.
+- Updated the namespace lifecycle package import to use the new package modules
+  and refreshed `crypto_rsi_scanner/event_alpha/MODULE_MAP.md` plus
+  `research/EVENT_ALPHA_ARCHITECTURE_V1.md`.
+- Added import compatibility coverage for old and new module paths in
+  `tests/event_alpha/test_artifact_schema.py`.
+**Verify:** `python3 -m pytest tests/event_alpha/test_artifact_schema.py
+tests/event_alpha/test_artifact_doctor.py` (2/2); `python3 -m compileall -q
+crypto_rsi_scanner tests`; `python3 tests/test_indicators.py` (686/686); `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** Broader top-level runtime modules still import the compatibility
+shims unless they were already inside the new package boundary. Artifact paths,
+schemas, sends, trades, paper trades, normal RSI rows, and Event
+Alpha-created `TRIGGERED_FADE` behavior were not changed.
+
 ## 2026-07-02 — Move scanner dispatch into CLI modules · Codex
 **Why:** The parser split proved flag compatibility, so the next refactor step
 was moving runtime command routing out of `scanner.py` while preserving the old
