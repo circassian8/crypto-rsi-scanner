@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Official exchange activation uses provider-specific modes under one schema
+**Status:** accepted
+**Decision:** Official exchange activation artifacts use one shared schema with
+separate provider rows for `bybit_announcements_public`,
+`binance_announcements_public_or_fixture`, and
+`binance_announcements_signed_listener`. Bybit public and Binance
+public/fixture rows may be fixture/parser-ready without API keys; the Binance
+signed listener remains blocked unless explicit live-listener env vars are
+configured and reviewed. Any live-call-allowed row requires a request ledger,
+and activation artifacts must not claim sends, trades, paper trades, normal RSI
+rows, or Event Alpha `TRIGGERED_FADE`.
+**Why:** Bybit and Binance official announcement paths share downstream source
+packs and artifact doctor checks, but their credential and request models
+differ. One activation schema avoids drift while keeping public/fixture parsing
+distinct from the signed listener.
+**Revisit when:** Binance has a reviewed bounded signed-listener no-send
+rehearsal with redacted ledger/artifacts and human approval to promote it beyond
+blocked readiness.
+
 ## 2026-07-02 - Coinalyze live rehearsal is bounded no-send only
 **Status:** accepted
 **Decision:** Coinalyze may run a live-capable no-send rehearsal only inside a

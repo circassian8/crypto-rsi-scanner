@@ -660,6 +660,8 @@ event-alpha-official-exchange-smoke:
 	test -s event_fade_cache/$(PROFILE)/event_exchange_announcements.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_official_exchange_events.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_official_listing_candidates.jsonl
+	test -s event_fade_cache/$(PROFILE)/event_official_exchange_activation.json
+	test -s event_fade_cache/$(PROFILE)/event_official_exchange_activation.md
 	$(PYTHON) main.py --event-alpha-source-coverage-report --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE)
 	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict

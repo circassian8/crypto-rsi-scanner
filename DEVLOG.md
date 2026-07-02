@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Add official exchange activation framework · Codex
+**Why:** Bybit and Binance official exchange artifacts needed one shared
+activation schema so source coverage, readiness, and artifact doctor checks can
+consume them without provider-specific drift or credential confusion.
+**Changes:**
+- Added `event_official_exchange_activation.py` with provider rows for
+  `bybit_announcements_public`, `binance_announcements_public_or_fixture`, and
+  `binance_announcements_signed_listener`, shared no-send safety counters,
+  request-ledger checks, and Markdown/JSON activation reports.
+- Wrote activation artifacts from official exchange fixture/public scans and
+  Bybit no-send rehearsals; source coverage now shows each official exchange
+  provider separately and treats Bybit/Binance public fixture rows as parser
+  ready without implying Binance public requires an API key.
+- Updated source packs, live-provider readiness runbook, and artifact doctor
+  checks for activation schema, live-without-ledger, signed-listener secret
+  leakage, and forbidden side-effect claims.
+- Added tests for shared activation schema, fixture-ready Bybit/Binance public
+  rows, signed listener blocked without env vars, source coverage display, and
+  doctor blockers.
+**Verify:** `python3 tests/test_indicators.py` (667/667); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-official-exchange-smoke PYTHON=python3`; `make
+event-alpha-live-provider-readiness-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** Activation artifacts are local research metadata only. The
+Binance signed listener remains blocked without explicit env vars, no provider
+network calls are made by default, and no Telegram, trade, paper, normal RSI, or
+Event Alpha `TRIGGERED_FADE` side effects are added.
+
 ## 2026-07-02 — Add Bybit announcement preflight and no-send rehearsal · Codex
 **Why:** Bybit official announcements had fixture/provider parsing but no
 provider-specific readiness, request ledger, bounded no-send rehearsal, or

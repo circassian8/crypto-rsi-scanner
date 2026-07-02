@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_official_exchange_activation, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -103,6 +103,10 @@ class EventAlphaArtifactDoctorResult:
     official_exchange_quote_asset_misclassified: int = 0
     official_exchange_major_pair_noise_promoted_early_long: int = 0
     official_exchange_created_alert_rows: int = 0
+    official_exchange_activation_missing_shared_schema: int = 0
+    official_exchange_activation_live_without_ledger: int = 0
+    official_exchange_activation_signed_listener_secret_leak: int = 0
+    official_exchange_activation_forbidden_side_effect_claim: int = 0
     scheduled_catalyst_rows: int = 0
     unlock_candidate_rows: int = 0
     derivatives_state_rows: int = 0
@@ -948,6 +952,7 @@ def diagnose_artifacts(
     live_provider_readiness_conflicts = _live_provider_readiness_conflicts(namespace_dir)
     coinalyze_preflight_conflicts = event_coinalyze_preflight.artifact_conflicts(namespace_dir)
     bybit_announcements_conflicts = event_bybit_announcements_preflight.artifact_conflicts(namespace_dir)
+    official_exchange_activation_conflicts = event_official_exchange_activation.artifact_conflicts(namespace_dir)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
         acquisition_rows=acquisition_rows,
         core_rows=core_rows,
@@ -1198,6 +1203,19 @@ def diagnose_artifacts(
         "official_exchange_created_alert_rows",
     ):
         count = official_exchange_conflicts.get(key, 0)
+        if count:
+            message = f"{key}={count}"
+            if strict:
+                blockers.append(message)
+            else:
+                warnings.append(message)
+    for key in (
+        "official_exchange_activation_missing_shared_schema",
+        "official_exchange_activation_live_without_ledger",
+        "official_exchange_activation_signed_listener_secret_leak",
+        "official_exchange_activation_forbidden_side_effect_claim",
+    ):
+        count = official_exchange_activation_conflicts.get(key, 0)
         if count:
             message = f"{key}={count}"
             if strict:
@@ -2033,6 +2051,18 @@ def diagnose_artifacts(
             "official_exchange_major_pair_noise_promoted_early_long"
         ],
         official_exchange_created_alert_rows=official_exchange_conflicts["official_exchange_created_alert_rows"],
+        official_exchange_activation_missing_shared_schema=official_exchange_activation_conflicts[
+            "official_exchange_activation_missing_shared_schema"
+        ],
+        official_exchange_activation_live_without_ledger=official_exchange_activation_conflicts[
+            "official_exchange_activation_live_without_ledger"
+        ],
+        official_exchange_activation_signed_listener_secret_leak=official_exchange_activation_conflicts[
+            "official_exchange_activation_signed_listener_secret_leak"
+        ],
+        official_exchange_activation_forbidden_side_effect_claim=official_exchange_activation_conflicts[
+            "official_exchange_activation_forbidden_side_effect_claim"
+        ],
         scheduled_catalyst_rows=len(scheduled_catalysts),
         unlock_candidate_rows=len(unlock_candidates),
         derivatives_state_rows=len(derivatives_state),
@@ -4604,6 +4634,8 @@ def _source_coverage_report_required(namespace_dir: Path) -> bool:
         "event_bybit_announcements_rehearsal_report.json",
         "event_bybit_announcements_rehearsal_report.md",
         "event_bybit_announcements_request_ledger.jsonl",
+        "event_official_exchange_activation.json",
+        "event_official_exchange_activation.md",
         "cryptopanic_request_ledger.jsonl",
     )
     return any((namespace_dir / name).exists() for name in required_markers)
@@ -4627,6 +4659,8 @@ def _live_provider_readiness_required(namespace_dir: Path) -> bool:
         "event_bybit_announcements_preflight.md",
         "event_bybit_announcements_rehearsal_report.json",
         "event_bybit_announcements_rehearsal_report.md",
+        "event_official_exchange_activation.json",
+        "event_official_exchange_activation.md",
     )
     return any((namespace_dir / name).exists() for name in required_markers)
 
@@ -6426,6 +6460,14 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"official_exchange_quote_asset_misclassified={result.official_exchange_quote_asset_misclassified} "
             f"official_exchange_major_pair_noise_promoted_early_long={result.official_exchange_major_pair_noise_promoted_early_long} "
             f"official_exchange_created_alert_rows={result.official_exchange_created_alert_rows} "
+            "official_exchange_activation_missing_shared_schema="
+            f"{result.official_exchange_activation_missing_shared_schema} "
+            "official_exchange_activation_live_without_ledger="
+            f"{result.official_exchange_activation_live_without_ledger} "
+            "official_exchange_activation_signed_listener_secret_leak="
+            f"{result.official_exchange_activation_signed_listener_secret_leak} "
+            "official_exchange_activation_forbidden_side_effect_claim="
+            f"{result.official_exchange_activation_forbidden_side_effect_claim} "
             f"scheduled_catalyst_rows={result.scheduled_catalyst_rows} "
             f"unlock_candidate_rows={result.unlock_candidate_rows} "
             f"derivatives_state_rows={result.derivatives_state_rows} "

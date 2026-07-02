@@ -168,6 +168,11 @@ class LiveProviderReadinessReport:
                 }
                 for provider in sorted(self.providers, key=lambda item: item.priority_rank)
             ],
+            "official_exchange_activation_runbook": [
+                "Bybit first official exchange live rehearsal: public HTTP, no key, explicit allow flag, no-send, bounded page/limit, request ledger required.",
+                "Binance public/fixture second: validate parser/artifact flow without API key or live provider calls.",
+                "Binance signed listener later: signed WebSocket only after explicit API key/secret env vars and bounded listener review.",
+            ],
         }
 
 
@@ -270,6 +275,11 @@ def format_readiness_report(report: LiveProviderReadinessReport) -> str:
         if not provider.configured and (provider.sidecar_fixture_available or provider.smoke_target_available):
             lines.append("  note: Live provider not configured, but fixture sidecar coverage exists.")
     lines.extend(["", "Activation Runbook:"])
+    lines.extend([
+        "- Bybit first official exchange live rehearsal: public HTTP, no key, explicit allow flag, bounded pages/limit, no-send, request ledger required.",
+        "- Binance public/fixture second: fixture/public parser validation, no API key required, no live call by default.",
+        "- Binance signed listener later: signed WebSocket only after explicit env vars and bounded listener command review.",
+    ])
     for provider in sorted(report.providers, key=lambda item: item.priority_rank):
         lines.extend([
             f"- {provider.provider_name}: {provider.activation_phase}",
@@ -332,7 +342,7 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
             activation_phase_override=coinalyze_history["activation_phase"],
         ),
         _row(
-            "bybit_announcements",
+            "bybit_announcements_public",
             category="official_exchange",
             priority_rank=2,
             env_vars=(),
@@ -351,6 +361,8 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
                 "event_exchange_announcements.jsonl",
                 "event_official_exchange_events.jsonl",
                 "event_official_listing_candidates.jsonl",
+                "event_official_exchange_activation.json",
+                "event_official_exchange_activation.md",
             ),
             ledger=bybit_history["latest_request_ledger_path"],
             status_if_missing="config_ready_no_live",
@@ -386,7 +398,13 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
             source_packs=("official_exchange_listing_pack", "official_exchange_risk_pack"),
             lanes=("EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH", "RISK_ONLY"),
             quota="offline fixture/public normalization lane; no secrets required; live polling remains guarded if added",
-            outputs=("event_official_exchange_candidates.jsonl",),
+            outputs=(
+                "event_exchange_announcements.jsonl",
+                "event_official_exchange_events.jsonl",
+                "event_official_listing_candidates.jsonl",
+                "event_official_exchange_activation.json",
+                "event_official_exchange_activation.md",
+            ),
             ledger=None,
             status_if_missing="fixture_ready",
             smoke_mode=smoke_mode,
@@ -420,7 +438,13 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
             source_packs=("official_exchange_listing_pack", "official_exchange_risk_pack"),
             lanes=("EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH", "RISK_ONLY"),
             quota="signed websocket; bounded listen seconds/max messages; explicit listener command only",
-            outputs=("event_official_exchange_candidates.jsonl",),
+            outputs=(
+                "event_exchange_announcements.jsonl",
+                "event_official_exchange_events.jsonl",
+                "event_official_listing_candidates.jsonl",
+                "event_official_exchange_activation.json",
+                "event_official_exchange_activation.md",
+            ),
             ledger=None,
             status_if_missing="missing_config",
             smoke_mode=smoke_mode,

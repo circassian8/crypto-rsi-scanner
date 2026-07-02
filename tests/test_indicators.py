@@ -1305,11 +1305,11 @@ def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor
         assert by_provider["coinalyze"]["smoke_target_available"] is True
         assert "event-alpha-derivatives-smoke" in by_provider["coinalyze"]["smoke_targets"]
         assert "event-alpha-fade-review-smoke" in by_provider["coinalyze"]["smoke_targets"]
-        assert by_provider["bybit_announcements"]["env_vars_required"] == []
-        assert by_provider["bybit_announcements"]["request_ledger_required"] is True
-        assert "event-alpha-bybit-announcements-preflight-smoke" in by_provider["bybit_announcements"]["smoke_targets"]
-        assert by_provider["bybit_announcements"]["next_safe_command"].startswith("make event-alpha-bybit-announcements-preflight")
-        assert by_provider["bybit_announcements"]["no_send_rehearsal_command"].startswith("make event-alpha-bybit-announcements-no-send-rehearsal")
+        assert by_provider["bybit_announcements_public"]["env_vars_required"] == []
+        assert by_provider["bybit_announcements_public"]["request_ledger_required"] is True
+        assert "event-alpha-bybit-announcements-preflight-smoke" in by_provider["bybit_announcements_public"]["smoke_targets"]
+        assert by_provider["bybit_announcements_public"]["next_safe_command"].startswith("make event-alpha-bybit-announcements-preflight")
+        assert by_provider["bybit_announcements_public"]["no_send_rehearsal_command"].startswith("make event-alpha-bybit-announcements-no-send-rehearsal")
         assert by_provider["binance_announcements_public_or_fixture"]["env_vars_required"] == []
         assert by_provider["binance_announcements_public_or_fixture"]["preflight_status"] == "fixture_ready"
         assert by_provider["binance_announcements_signed_listener"]["env_vars_required"]
@@ -38773,6 +38773,7 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
         event_bybit_announcements_preflight,
         event_integrated_radar,
         event_official_exchange,
+        event_official_exchange_activation,
         event_provider_health,
         event_provider_status,
     )
@@ -38867,6 +38868,17 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             assert report.paper_trades_created == 0
             assert report.normal_rsi_signal_rows_written == 0
             assert report.triggered_fade_created == 0
+            activation_rows = event_official_exchange_activation.load_activation_rows(namespace_dir)
+            activation_by_provider = {str(row.get("provider") or ""): row for row in activation_rows}
+            bybit_activation = activation_by_provider["bybit_announcements_public"]
+            assert bybit_activation["mode"] == "public_http_no_key"
+            assert bybit_activation["live_call_allowed"] is True
+            assert bybit_activation["no_send_rehearsal"] is True
+            assert bybit_activation["announcements_seen"] == 2
+            assert bybit_activation["official_events_written"] == 2
+            assert bybit_activation["listing_candidates_written"] >= 1
+            assert bybit_activation["strict_alerts_created"] == 0
+            assert bybit_activation["telegram_sends"] == 0
             assert ledger_rows[0]["success"] is True
             assert ledger_rows[0]["live_call_allowed"] is True
             assert ledger_rows[0]["no_send_rehearsal"] is True
@@ -38875,13 +38887,16 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             assert by_symbol["TESTSPOT"]["source_url"]
             assert by_symbol["TESTSPOT"]["published_at"]
             assert by_symbol["TESTPERP"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH"
-            assert "bybit_announcements" in official_pack.healthy_providers
+            assert "bybit_announcements_public" in official_pack.healthy_providers
             assert coverage.bybit_announcements_provider_health_status == "observed_healthy"
             assert coverage.bybit_announcements_official_events_written == 2
             assert "TESTPERP" in integrated_symbols
             assert "TESTSPOT" in integrated_symbols
             assert event_bybit_announcements_preflight.artifact_conflicts(namespace_dir)[
                 "bybit_announcements_rehearsal_live_without_ledger"
+            ] == 0
+            assert event_official_exchange_activation.artifact_conflicts(namespace_dir)[
+                "official_exchange_activation_live_without_ledger"
             ] == 0
     finally:
         if original_max_pages is None:
@@ -39041,8 +39056,98 @@ def test_official_exchange_fixture_lanes_and_quote_filtering():
     assert all(row["research_only"] is True for row in candidates)
 
 
+def test_official_exchange_activation_schema_for_bybit_and_binance_fixture_artifacts():
+    import json
+
+    from crypto_rsi_scanner import (
+        config,
+        event_alpha_artifact_doctor,
+        event_alpha_source_coverage,
+        event_official_exchange,
+        event_official_exchange_activation,
+        event_provider_status,
+    )
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        event_official_exchange.run_official_exchange_scan(
+            namespace_dir=base,
+            provider_paths={
+                "binance_announcements": "fixtures/event_discovery/official_exchange_binance_announcements.json",
+                "bybit_announcements": "fixtures/event_discovery/official_exchange_bybit_announcements.json",
+            },
+            profile="fixture",
+            artifact_namespace="official_exchange_smoke",
+            run_mode="fixture",
+            run_id="run-official-activation",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        activation = event_official_exchange_activation.build_activation_report(
+            namespace_dir=base,
+            profile="fixture",
+            artifact_namespace="official_exchange_smoke",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        json_path, md_path = event_official_exchange_activation.write_activation_artifacts(activation, base)
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        rows = {str(row.get("provider") or ""): row for row in payload["providers"]}
+
+        assert set(event_official_exchange_activation.SHARED_SCHEMA_FIELDS) <= set(rows["bybit_announcements_public"])
+        assert set(event_official_exchange_activation.SHARED_SCHEMA_FIELDS) <= set(rows["binance_announcements_public_or_fixture"])
+        assert set(event_official_exchange_activation.SHARED_SCHEMA_FIELDS) <= set(rows["binance_announcements_signed_listener"])
+        assert rows["bybit_announcements_public"]["mode"] == "public_http_no_key"
+        assert rows["bybit_announcements_public"]["configured"] is True
+        assert rows["bybit_announcements_public"]["provider_health_status"] == "fixture_ready"
+        assert rows["bybit_announcements_public"]["official_events_written"] >= 1
+        assert rows["binance_announcements_public_or_fixture"]["mode"] == "public_or_fixture_parser"
+        assert rows["binance_announcements_public_or_fixture"]["configured"] is True
+        assert rows["binance_announcements_public_or_fixture"]["live_call_allowed"] is False
+        assert rows["binance_announcements_public_or_fixture"]["provider_health_status"] == "fixture_ready"
+        assert rows["binance_announcements_public_or_fixture"]["official_events_written"] >= 1
+        assert rows["binance_announcements_signed_listener"]["mode"] == "signed_websocket_listener"
+        assert rows["binance_announcements_signed_listener"]["configured"] is False
+        assert rows["binance_announcements_signed_listener"]["live_call_allowed"] is False
+        assert rows["binance_announcements_signed_listener"]["skip_reason"] == "blocked_without_signed_listener_env"
+        assert all(row["strict_alerts_created"] == 0 for row in rows.values())
+        assert all(row["telegram_sends"] == 0 for row in rows.values())
+        assert "Binance public/fixture second" in md_path.read_text(encoding="utf-8")
+
+        coverage = event_alpha_source_coverage.build_source_coverage_report(
+            provider_status_report=event_provider_status.build_event_discovery_provider_status(config),
+            provider_health_rows={},
+            profile="fixture",
+            artifact_namespace="official_exchange_smoke",
+            artifact_namespace_dir=base,
+        )
+        coverage_text = event_alpha_source_coverage.format_source_coverage_report(coverage)
+        official_pack = next(pack for pack in coverage.packs if pack.source_pack == "official_exchange_listing_pack")
+        assert "bybit_announcements_public" in official_pack.healthy_providers
+        assert "binance_announcements_public_or_fixture" in official_pack.healthy_providers
+        assert "binance_announcements_signed_listener" in official_pack.missing_providers
+        assert "bybit_announcements_public mode=public_http_no_key" in coverage_text
+        assert "binance_announcements_public_or_fixture mode=public_or_fixture_parser" in coverage_text
+        assert "binance_announcements_signed_listener mode=signed_websocket_listener" in coverage_text
+        assert "binance_announcements_public_or_fixture" in coverage_text
+        assert "Binance requires API key" not in coverage_text
+
+        doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            inspected_alert_store_path=base / "event_alpha_alerts.jsonl",
+            source_coverage_report_path=base / "event_alpha_source_coverage.md",
+            profile="fixture",
+            artifact_namespace="official_exchange_smoke",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert doctor.official_exchange_activation_missing_shared_schema == 0
+        assert doctor.official_exchange_activation_live_without_ledger == 0
+        assert doctor.official_exchange_activation_signed_listener_secret_leak == 0
+        assert doctor.official_exchange_activation_forbidden_side_effect_claim == 0
+
+
 def test_official_exchange_artifact_doctor_conflicts():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import json
+
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_official_exchange_activation
 
     rows = [
         {
@@ -39133,6 +39238,68 @@ def test_official_exchange_artifact_doctor_conflicts():
     assert conflicts["official_exchange_secret_leak"] == 1
     assert conflicts["official_exchange_major_pair_noise_promoted_early_long"] == 1
     assert conflicts["official_exchange_created_alert_rows"] == 1
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        (base / event_official_exchange_activation.ACTIVATION_JSON).write_text(
+            json.dumps(
+                {
+                    "schema_version": "event_official_exchange_activation_v1",
+                    "providers": [
+                        {
+                            "provider": "bybit_announcements_public",
+                            "mode": "public_http_no_key",
+                            "configured": True,
+                            "live_call_allowed": True,
+                            "no_send_rehearsal": True,
+                            "request_ledger_path": None,
+                            "provider_health_key": "bybit_announcements",
+                            "source_url_count": 1,
+                            "announcements_seen": 1,
+                            "official_events_written": 1,
+                            "listing_candidates_written": 1,
+                            "risk_candidates_written": 0,
+                            "strict_alerts_created": 0,
+                            "telegram_sends": 1,
+                        },
+                        {
+                            "provider": "binance_announcements_signed_listener",
+                            "mode": "signed_websocket_listener",
+                            "configured": True,
+                            "live_call_allowed": False,
+                            "no_send_rehearsal": True,
+                            "request_ledger_path": None,
+                            "provider_health_key": "binance_announcements_signed_listener",
+                            "source_url_count": 0,
+                            "announcements_seen": 0,
+                            "official_events_written": 0,
+                            "listing_candidates_written": 0,
+                            "risk_candidates_written": 0,
+                            "strict_alerts_created": 0,
+                            "telegram_sends": 0,
+                            "last_error_safe": "api_secret='THIS_IS_A_TEST_SECRET_VALUE_123456'",
+                        },
+                    ],
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        activation_conflicts = event_official_exchange_activation.artifact_conflicts(base)
+        assert activation_conflicts["official_exchange_activation_live_without_ledger"] == 1
+        assert activation_conflicts["official_exchange_activation_signed_listener_secret_leak"] == 1
+        assert activation_conflicts["official_exchange_activation_forbidden_side_effect_claim"] == 1
+        doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            inspected_alert_store_path=base / "event_alpha_alerts.jsonl",
+            profile="fixture",
+            artifact_namespace="official_exchange_smoke",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert doctor.official_exchange_activation_live_without_ledger == 1
+        assert doctor.official_exchange_activation_signed_listener_secret_leak == 1
+        assert doctor.official_exchange_activation_forbidden_side_effect_claim == 1
+        assert doctor.status == "BLOCKED"
 
 
 def test_cryptopanic_listing_article_is_not_official_exchange_proof():

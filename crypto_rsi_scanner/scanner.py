@@ -136,6 +136,7 @@ from . import event_llm_extractor
 from . import event_market_anomaly_scanner
 from . import event_near_miss
 from . import event_official_exchange
+from . import event_official_exchange_activation
 from . import event_opportunity_audit
 from . import event_provider_health
 from . import event_provider_status
@@ -8375,6 +8376,21 @@ def event_alpha_official_exchange_report(
         run_id=run_id,
         observed_at=_event_research_now(),
     )
+    activation_report = event_official_exchange_activation.build_activation_report(
+        namespace_dir=context.namespace_dir,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        observed_at=_event_research_now(),
+        no_send_rehearsal_by_provider={
+            event_official_exchange_activation.PROVIDER_BYBIT_PUBLIC: True,
+            event_official_exchange_activation.PROVIDER_BINANCE_PUBLIC_OR_FIXTURE: True,
+            event_official_exchange_activation.PROVIDER_BINANCE_SIGNED_LISTENER: True,
+        },
+    )
+    activation_json_path, activation_md_path = event_official_exchange_activation.write_activation_artifacts(
+        activation_report,
+        context.namespace_dir,
+    )
     finished_at = datetime.now(timezone.utc)
     _record_official_exchange_provider_health(context, result=result, run_id=run_id, now=finished_at)
     _append_official_exchange_run_ledger_row(
@@ -8394,7 +8410,9 @@ def event_alpha_official_exchange_report(
         f"announcements_path={event_artifact_paths.artifact_display_path(result.announcements_path)} "
         f"events_path={event_artifact_paths.artifact_display_path(result.events_path)} "
         f"candidates_path={event_artifact_paths.artifact_display_path(result.candidates_path)} "
-        f"report_path={event_artifact_paths.artifact_display_path(result.report_path)}"
+        f"report_path={event_artifact_paths.artifact_display_path(result.report_path)} "
+        f"activation_json_path={event_artifact_paths.artifact_display_path(activation_json_path)} "
+        f"activation_report_path={event_artifact_paths.artifact_display_path(activation_md_path)}"
     )
     print(event_official_exchange.format_official_exchange_report(
         result.events,

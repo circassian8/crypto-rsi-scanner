@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_provider_health, event_provider_status, event_source_packs
+from . import event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_official_exchange_activation, event_provider_health, event_provider_status, event_source_packs
 from .event_providers import cryptopanic as cryptopanic_provider
 
 
@@ -34,8 +34,11 @@ SOURCE_COVERAGE_PACK_ORDER = (
 )
 
 _READY_PROVIDER_ALIASES = {
-    "binance_announcements": "binance_announcements",
-    "bybit_announcements": "bybit_announcements",
+    "binance_announcements": "binance_announcements_public_or_fixture",
+    "binance_announcements_public_or_fixture": "binance_announcements_public_or_fixture",
+    "binance_announcements_signed_listener": "binance_announcements_signed_listener",
+    "bybit_announcements": "bybit_announcements_public",
+    "bybit_announcements_public": "bybit_announcements_public",
     "coinmarketcal_calendar": "coinmarketcal",
     "tokenomist_unlocks": "tokenomist",
     "tokenomist_supply": "tokenomist",
@@ -49,8 +52,10 @@ _READY_PROVIDER_ALIASES = {
 }
 
 _HEALTH_PROVIDER_ALIASES = {
-    "binance": "binance_announcements",
-    "bybit": "bybit_announcements",
+    "binance_announcements_signed_listener": "binance_announcements_signed_listener",
+    "signed_listener": "binance_announcements_signed_listener",
+    "binance": "binance_announcements_public_or_fixture",
+    "bybit": "bybit_announcements_public",
     "cryptopanic": "cryptopanic",
     "gdelt": "gdelt",
     "rss": "project_blog_rss",
@@ -65,8 +70,9 @@ _HEALTH_PROVIDER_ALIASES = {
 }
 
 _HIGH_SPECIFICITY_PROVIDERS = {
-    "binance_announcements",
-    "bybit_announcements",
+    "binance_announcements_public_or_fixture",
+    "binance_announcements_signed_listener",
+    "bybit_announcements_public",
     "coinmarketcal",
     "tokenomist",
     "cryptopanic",
@@ -110,7 +116,13 @@ SOURCE_COVERAGE_CATEGORY_PRIORITIES: tuple[dict[str, Any], ...] = (
     },
     {
         "category": "Official exchange announcements",
-        "providers": ("binance_announcements", "bybit_announcements", "okx_announcements", "coinbase"),
+        "providers": (
+            "bybit_announcements_public",
+            "binance_announcements_public_or_fixture",
+            "binance_announcements_signed_listener",
+            "okx_announcements",
+            "coinbase",
+        ),
         "enabled_lanes": ("EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH", "listing/perp/risk packs"),
         "reason": "validates listing, perp, delisting, launchpool, and exchange-specific catalyst identity",
     },
@@ -237,6 +249,10 @@ class EventAlphaSourceCoverageReport:
     bybit_announcements_requests_used: int = 0
     bybit_announcements_official_events_written: int = 0
     bybit_announcements_official_listing_candidates_written: int = 0
+    official_exchange_activation_status: str = "not_generated"
+    official_exchange_activation_json_path: str | None = None
+    official_exchange_activation_report_path: str | None = None
+    official_exchange_activation_provider_rows: tuple[Mapping[str, Any], ...] = ()
     category_priorities: tuple[Mapping[str, Any], ...] = SOURCE_COVERAGE_CATEGORY_PRIORITIES
 
     def to_dict(self) -> dict[str, Any]:
@@ -283,6 +299,12 @@ class EventAlphaSourceCoverageReport:
             "bybit_announcements_requests_used": self.bybit_announcements_requests_used,
             "bybit_announcements_official_events_written": self.bybit_announcements_official_events_written,
             "bybit_announcements_official_listing_candidates_written": self.bybit_announcements_official_listing_candidates_written,
+            "official_exchange_activation_status": self.official_exchange_activation_status,
+            "official_exchange_activation_json_path": self.official_exchange_activation_json_path,
+            "official_exchange_activation_report_path": self.official_exchange_activation_report_path,
+            "official_exchange_activation_provider_rows": [
+                dict(row) for row in self.official_exchange_activation_provider_rows
+            ],
             "category_priorities": [
                 {
                     "category_priority_rank": idx + 1,
@@ -343,6 +365,9 @@ def build_source_coverage_report(
         artifact_namespace=artifact_namespace,
         health_by_provider=raw_health_by_provider,
     )
+    activation_stats = event_official_exchange_activation.activation_artifact_stats(
+        artifact_namespace_dir if artifact_namespace_dir is not None else _namespace_dir(artifact_namespace)
+    )
     cryptopanic_effectively_healthy = cryptopanic_stats["coverage_status"] in {
         "observed_healthy",
         "observed_partial_success",
@@ -359,9 +384,19 @@ def build_source_coverage_report(
         )
         health_by_provider["cryptopanic"] = provider_status_overrides["cryptopanic"]
     if bybit_effectively_healthy:
-        provider_status_overrides["bybit_announcements"] = "healthy"
-        health_by_provider["bybit_announcements"] = "healthy"
-        configured.add("bybit_announcements")
+        provider_status_overrides["bybit_announcements_public"] = "healthy"
+        health_by_provider["bybit_announcements_public"] = "healthy"
+        configured.add("bybit_announcements_public")
+    for activation_row in activation_stats["rows"]:
+        provider = str(activation_row.get("provider") or "")
+        if not provider:
+            continue
+        if bool(activation_row.get("configured")):
+            configured.add(provider)
+        if event_official_exchange_activation.row_is_healthy(activation_row):
+            provider_status_overrides[provider] = "healthy"
+            health_by_provider[provider] = "healthy"
+            configured.add(provider)
 
     packs: list[EventAlphaSourceCoveragePack] = []
     for pack_name in SOURCE_COVERAGE_PACK_ORDER:
@@ -491,6 +526,10 @@ def build_source_coverage_report(
         bybit_announcements_requests_used=int(bybit_stats["requests_used"]),
         bybit_announcements_official_events_written=int(bybit_stats["official_events_written"]),
         bybit_announcements_official_listing_candidates_written=int(bybit_stats["official_listing_candidates_written"]),
+        official_exchange_activation_status=str(activation_stats["status"]),
+        official_exchange_activation_json_path=activation_stats["json_path"],
+        official_exchange_activation_report_path=activation_stats["report_path"],
+        official_exchange_activation_provider_rows=tuple(activation_stats["rows"]),
     )
 
 
@@ -612,6 +651,28 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         )
     else:
         lines.append("- Bybit announcements rehearsal: not generated")
+    lines.append(f"- Official exchange activation: {report.official_exchange_activation_status}")
+    if report.official_exchange_activation_report_path:
+        lines.append(f"- Official exchange activation report: {report.official_exchange_activation_report_path}")
+    if report.official_exchange_activation_json_path:
+        lines.append(f"- Official exchange activation JSON: {report.official_exchange_activation_json_path}")
+    if report.official_exchange_activation_provider_rows:
+        lines.append("- Official exchange activation provider rows:")
+        for row in report.official_exchange_activation_provider_rows:
+            lines.append(
+                "  - "
+                f"{row.get('provider') or 'unknown'} "
+                f"mode={row.get('mode') or 'unknown'} "
+                f"configured={str(bool(row.get('configured'))).lower()} "
+                f"live_call_allowed={str(bool(row.get('live_call_allowed'))).lower()} "
+                f"health={row.get('provider_health_status') or 'not_observed'} "
+                f"announcements_seen={int(row.get('announcements_seen') or 0)} "
+                f"official_events_written={int(row.get('official_events_written') or 0)} "
+                f"listing_candidates_written={int(row.get('listing_candidates_written') or 0)} "
+                f"risk_candidates_written={int(row.get('risk_candidates_written') or 0)}"
+            )
+    else:
+        lines.append("- Official exchange activation provider rows: none")
     lines.extend(
         [
             "- command: make event-alpha-live-provider-readiness PROFILE="
@@ -703,7 +764,12 @@ def _bybit_announcements_artifact_stats(
         "rehearsal_status": str(rehearsal_payload.get("status") or "generated" if rehearsal_json.exists() or rehearsal_md.exists() else "not_generated"),
         "rehearsal_report_path": event_artifact_paths.artifact_display_path(rehearsal_md) if rehearsal_md.exists() else None,
         "request_ledger_path": event_artifact_paths.artifact_display_path(ledger) if ledger.exists() else None,
-        "provider_health_status": str(rehearsal_payload.get("provider_health_status") or health_by_provider.get("bybit_announcements") or "not_observed"),
+        "provider_health_status": str(
+            rehearsal_payload.get("provider_health_status")
+            or health_by_provider.get("bybit_announcements_public")
+            or health_by_provider.get("bybit_announcements")
+            or "not_observed"
+        ),
         "requests_used": int(rehearsal_payload.get("requests_used") or 0),
         "official_events_written": int(rehearsal_payload.get("official_events_written") or 0),
         "official_listing_candidates_written": int(rehearsal_payload.get("official_listing_candidates_written") or 0),
@@ -1258,8 +1324,9 @@ def _provider_setup_action(provider: str, *, status: str) -> str:
         "cryptopanic": "CryptoPanic token/news coverage with RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN",
         "gdelt": "GDELT broad-news coverage and provider backoff health",
         "project_blog_rss": "project/blog RSS feeds; quarantine feed-level 403s instead of the whole RSS provider",
-        "binance_announcements": "official Binance announcement coverage for listing/perp events",
-        "bybit_announcements": "official Bybit announcement coverage for listing/perp events",
+        "binance_announcements_public_or_fixture": "official Binance fixture/public announcement parser coverage for listing/perp events; no API key required",
+        "binance_announcements_signed_listener": "official Binance signed WebSocket listener coverage; requires explicit API key/secret and bounded listener runbook",
+        "bybit_announcements_public": "official Bybit public announcement coverage for listing/perp events; no API key required",
         "coinmarketcal": "structured event calendar coverage",
         "tokenomist": "Tokenomist unlock/supply coverage",
         "sports_fixtures": "sports fixture coverage for fan-token packs",

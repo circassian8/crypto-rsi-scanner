@@ -19,7 +19,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request
 
-from . import config, event_artifact_paths, event_official_exchange, event_provider_health
+from . import config, event_artifact_paths, event_official_exchange, event_official_exchange_activation, event_provider_health
 from .event_providers._announcement_common import _announcement_items
 from .event_providers.bybit_announcements import BybitAnnouncementProvider
 
@@ -379,6 +379,26 @@ def run_no_send_rehearsal(
     )
     rehearsal_json.write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
     rehearsal_md.write_text(format_rehearsal_report(report) + "\n", encoding="utf-8")
+    activation_report = event_official_exchange_activation.build_activation_report(
+        namespace_dir=base,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        observed_at=observed,
+        live_call_allowed_by_provider={
+            event_official_exchange_activation.PROVIDER_BYBIT_PUBLIC: report.live_call_allowed,
+        },
+        no_send_rehearsal_by_provider={
+            event_official_exchange_activation.PROVIDER_BYBIT_PUBLIC: report.no_send,
+        },
+        request_ledger_path_by_provider={
+            event_official_exchange_activation.PROVIDER_BYBIT_PUBLIC: ledger_path if ledger_path.exists() else None,
+        },
+        provider_health_status_by_key={
+            PROVIDER_HEALTH_KEY: provider_health_status,
+        },
+        warnings=warnings,
+    )
+    event_official_exchange_activation.write_activation_artifacts(activation_report, base)
     return preflight, report, (preflight_json, preflight_md, rehearsal_json, rehearsal_md)
 
 
