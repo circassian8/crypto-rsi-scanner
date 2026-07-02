@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Radar performance learning is recommendation-only
+**Status:** accepted
+**Decision:** Cross-run Event Alpha radar performance artifacts may summarize
+provider, source-pack, lane, market-state, crowding, and source-strength
+research outcomes and may write prior/threshold suggestions, but every
+suggestion must be recommendation-only with `auto_apply=false`, low-sample
+warnings, and no automatic threshold mutation.
+**Why:** Cross-run no-send rehearsal outcomes are useful for learning which
+providers and lanes deserve attention, but small samples and fixture/live-cache
+mixing make automatic tuning unsafe.
+**Revisit when:** A human-reviewed, larger cross-run sample has enough mature
+rows per provider/lane and a separate explicit threshold-change workflow is
+approved.
+
 ## 2026-07-02 - DEX/on-chain and protocol fundamentals activation is fixture-first
 **Status:** accepted
 **Decision:** GeckoTerminal, CoinGecko DEX, and DefiLlama TVL/fees/revenue

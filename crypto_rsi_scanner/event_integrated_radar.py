@@ -50,6 +50,8 @@ INTEGRATED_OUTCOMES_FILENAME = "event_integrated_radar_outcomes.jsonl"
 INTEGRATED_OUTCOME_REPORT_FILENAME = "event_integrated_radar_outcome_report.md"
 INTEGRATED_CALIBRATION_REPORT_FILENAME = "event_integrated_radar_calibration_report.md"
 INTEGRATED_CALIBRATION_PRIORS_FILENAME = "event_integrated_radar_calibration_priors.json"
+RADAR_PERFORMANCE_DASHBOARD_FILENAME = "event_radar_performance_dashboard.md"
+RADAR_PROVIDER_PERFORMANCE_FILENAME = "event_radar_provider_performance.json"
 NOTIFICATION_PREVIEW_FILENAME = "event_alpha_notification_preview.md"
 DAILY_BRIEF_FILENAME = "event_alpha_daily_brief.md"
 SOURCE_COVERAGE_FILENAME = "event_alpha_source_coverage.md"
@@ -709,6 +711,7 @@ def format_integrated_daily_brief(
     input_manifest: Iterable[Mapping[str, Any]] = (),
     delivery_rows: Iterable[Mapping[str, Any]] = (),
     outcome_rows: Iterable[Mapping[str, Any]] = (),
+    performance_snapshot: Mapping[str, Any] | None = None,
     source_coverage_path: str | Path | None = None,
 ) -> str:
     rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
@@ -794,6 +797,22 @@ def format_integrated_daily_brief(
     _append_filtered(lines, rows, lambda row: row.get("protocol_metrics_snapshot"))
     lines.extend(["", "## Source Coverage"])
     lines.extend(_source_coverage_lines(rows))
+    lines.extend(["", "## Radar Learning Snapshot"])
+    if isinstance(performance_snapshot, Mapping):
+        maturation = performance_snapshot.get("maturation_counts") if isinstance(performance_snapshot.get("maturation_counts"), Mapping) else {}
+        views = performance_snapshot.get("performance_views") if isinstance(performance_snapshot.get("performance_views"), Mapping) else {}
+        early = views.get("early_long_conversion_rate") if isinstance(views, Mapping) else {}
+        fade = views.get("fade_review_exhaustion_rate") if isinstance(views, Mapping) else {}
+        lines.append(f"- Dashboard: {RADAR_PERFORMANCE_DASHBOARD_FILENAME}")
+        lines.append(f"- Evaluated rows: {_int(performance_snapshot.get('rows_evaluated'))}")
+        lines.append(f"- Maturation: {_format_counts(Counter({str(k): _int(v) for k, v in dict(maturation).items()}))}")
+        if isinstance(early, Mapping):
+            lines.append(f"- Early-long conversion rate: {_rate_text(early.get('rate'))}")
+        if isinstance(fade, Mapping):
+            lines.append(f"- Fade-review exhaustion rate: {_rate_text(fade.get('rate'))}")
+        lines.append("- Recommendations only; no automatic threshold changes were applied.")
+    else:
+        lines.append("- Dashboard not available yet.")
     lines.extend(["", "## Outcome Tracker Status"])
     if outcomes:
         matured = sum(1 for row in outcomes if str(row.get("outcome_status") or "") == "filled")
@@ -3366,6 +3385,13 @@ def _int(value: Any) -> int:
         return int(float(value or 0))
     except (TypeError, ValueError):
         return 0
+
+
+def _rate_text(value: Any) -> str:
+    try:
+        return f"{float(value):.2f}"
+    except (TypeError, ValueError):
+        return "n/a"
 
 
 def _digest(value: str) -> str:

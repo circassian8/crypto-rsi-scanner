@@ -41089,6 +41089,218 @@ def test_integrated_radar_outcomes_and_calibration_are_research_only():
         assert " junk" not in calibration.casefold()
 
 
+def test_integrated_radar_performance_dashboard_cross_namespace_recommendations():
+    import json
+
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_integrated_radar, event_integrated_radar_outcomes
+
+    def write_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\n", encoding="utf-8")
+
+    def candidate(
+        candidate_id: str,
+        symbol: str,
+        lane: str,
+        provider: str,
+        source_pack: str,
+        *,
+        source_origin: str = "official_exchange",
+        market_state_class: str = "confirmed_breakout",
+        crowding_class: str = "none",
+    ) -> dict[str, object]:
+        return {
+            "row_type": "event_integrated_radar_candidate",
+            "candidate_id": candidate_id,
+            "core_opportunity_id": f"core-{candidate_id}",
+            "symbol": symbol,
+            "coin_id": symbol.casefold(),
+            "opportunity_type": lane,
+            "provider": provider,
+            "source_origin": source_origin,
+            "source_pack": source_pack,
+            "market_state_class": market_state_class,
+            "crowding_class": crowding_class,
+            "source_strength": "official_structured" if source_origin == "official_exchange" else "context_only",
+            "observed_at": "2026-06-15T16:00:00+00:00",
+        }
+
+    def outcome(candidate_row: dict[str, object], label: str, *, status: str = "filled") -> dict[str, object]:
+        lane = str(candidate_row["opportunity_type"])
+        row = {
+            "row_type": "event_integrated_radar_outcome",
+            "candidate_id": candidate_row["candidate_id"],
+            "core_opportunity_id": candidate_row["core_opportunity_id"],
+            "symbol": candidate_row["symbol"],
+            "coin_id": candidate_row["coin_id"],
+            "opportunity_type": lane,
+            "outcome_status": status,
+            "outcome_label": label,
+            "return_by_horizon": {horizon: 0.04 for horizon in event_integrated_radar_outcomes.HORIZONS},
+            "horizons": {horizon: 0.04 for horizon in event_integrated_radar_outcomes.HORIZONS},
+            "time_to_peak_hours": 24.0,
+            "time_to_trough_hours": 24.0,
+        }
+        if status == "missing_data":
+            row["missing_data_reason"] = "no_cached_price_fixture"
+            row["return_by_horizon"] = {}
+            row["horizons"] = {}
+        return row
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        ns1 = base / "ns_one"
+        ns2 = base / "ns_two"
+        out = base / "dashboard"
+        bybit = candidate(
+            "bybit-early",
+            "TESTLIST",
+            "EARLY_LONG_RESEARCH",
+            "bybit",
+            "official_exchange_listing_pack",
+            market_state_class="no_reaction",
+        )
+        coinalyze = candidate(
+            "coinalyze-fade",
+            "TESTFADE",
+            "FADE_SHORT_REVIEW",
+            "coinalyze",
+            "derivatives_crowding_pack",
+            source_origin="derivatives",
+            market_state_class="post_event_fade_setup",
+            crowding_class="extreme",
+        )
+        pending = candidate(
+            "cryptopanic-pending",
+            "TESTPEND",
+            "UNCONFIRMED_RESEARCH",
+            "cryptopanic",
+            "cryptopanic_tagged_news_pack",
+            source_origin="source_news",
+        )
+        missing = candidate(
+            "cryptopanic-missing",
+            "TESTMISS",
+            "UNCONFIRMED_RESEARCH",
+            "cryptopanic",
+            "cryptopanic_tagged_news_pack",
+            source_origin="source_news",
+        )
+        cryptopanic = candidate(
+            "cryptopanic-noise",
+            "TESTRUMOR",
+            "UNCONFIRMED_RESEARCH",
+            "cryptopanic",
+            "cryptopanic_tagged_news_pack",
+            source_origin="source_news",
+        )
+        diagnostic = candidate(
+            "sector-diagnostic",
+            "SECTOR",
+            "DIAGNOSTIC",
+            "fixture",
+            "diagnostic_pack",
+            source_origin="diagnostic",
+        )
+        write_jsonl(ns1 / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME, [bybit, coinalyze, pending, missing])
+        write_jsonl(ns1 / "event_core_opportunities.jsonl", [bybit, coinalyze, pending, missing])
+        write_jsonl(
+            ns1 / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME,
+            [
+                outcome(bybit, "early_good"),
+                outcome(coinalyze, "fade_review_good"),
+                outcome(missing, "missing_data", status="missing_data"),
+            ],
+        )
+        write_jsonl(ns2 / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME, [cryptopanic, diagnostic])
+        write_jsonl(ns2 / "event_core_opportunities.jsonl", [cryptopanic, diagnostic])
+        write_jsonl(
+            ns2 / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME,
+            [outcome(cryptopanic, "remained_noise"), outcome(diagnostic, "diagnostic_only")],
+        )
+
+        payload = event_integrated_radar_outcomes.write_radar_performance_dashboard(
+            (ns1, ns2),
+            output_namespace_dir=out,
+            generated_at="2026-06-20T00:00:00+00:00",
+        )
+
+        assert (out / event_integrated_radar.RADAR_PERFORMANCE_DASHBOARD_FILENAME).exists()
+        assert (out / event_integrated_radar.RADAR_PROVIDER_PERFORMANCE_FILENAME).exists()
+        assert payload["thresholds_changed"] is False
+        assert payload["auto_apply"] is False
+        assert payload["rows_evaluated"] == 5
+        assert payload["diagnostic_rows_excluded"] == 1
+        assert payload["maturation_counts"]["matured"] == 3
+        assert payload["maturation_counts"]["pending"] == 1
+        assert payload["maturation_counts"]["missing_price_data"] == 1
+        assert payload["performance_views"]["early_long_conversion_rate"]["rate"] == 1.0
+        assert payload["performance_views"]["fade_review_exhaustion_rate"]["rate"] == 1.0
+        assert payload["performance_views"]["unconfirmed_later_confirmation_noise_rate"]["noise_rate"] == 1.0
+        assert {"bybit", "coinalyze", "cryptopanic"} <= set(payload["provider_performance"])
+        assert payload["provider_performance"]["coinalyze"]["validated_count"] == 1
+        assert payload["provider_performance"]["cryptopanic"]["invalidated_noise_count"] == 1
+        assert payload["provider_prior_suggestions"]["bybit"]["auto_apply"] is False
+        assert payload["provider_prior_suggestions"]["bybit"]["min_sample_warning"] is True
+        assert payload["source_pack_prior_suggestions"]["official_exchange_listing_pack"]["auto_apply"] is False
+        assert payload["lane_threshold_suggestions"]["FADE_SHORT_REVIEW"]["auto_apply"] is False
+        dashboard = (out / event_integrated_radar.RADAR_PERFORMANCE_DASHBOARD_FILENAME).read_text(encoding="utf-8")
+        assert "Radar Performance Dashboard" in dashboard
+        assert "Recommendations only" in dashboard
+        assert "trade" not in dashboard.casefold()
+        assert "paper" not in dashboard.casefold()
+        assert "pnl" not in dashboard.casefold()
+        assert "p&l" not in dashboard.casefold()
+        assert event_alpha_artifact_doctor._integrated_performance_dashboard_conflicts(out) == {  # noqa: SLF001
+            "integrated_performance_diagnostic_in_main_aggregate": 0,
+            "integrated_performance_auto_apply_enabled": 0,
+            "integrated_performance_low_sample_missing_warning": 0,
+            "integrated_performance_trade_pnl_wording": 0,
+        }
+
+        bad_payload = json.loads(json.dumps(payload))
+        bad_payload["provider_prior_suggestions"]["bybit"]["auto_apply"] = True
+        (out / event_integrated_radar.RADAR_PROVIDER_PERFORMANCE_FILENAME).write_text(
+            json.dumps(bad_payload, sort_keys=True),
+            encoding="utf-8",
+        )
+        assert event_alpha_artifact_doctor._integrated_performance_dashboard_conflicts(out)[  # noqa: SLF001
+            "integrated_performance_auto_apply_enabled"
+        ] > 0
+
+        bad_payload = json.loads(json.dumps(payload))
+        bad_payload["provider_prior_suggestions"]["bybit"].pop("min_sample_warning")
+        (out / event_integrated_radar.RADAR_PROVIDER_PERFORMANCE_FILENAME).write_text(
+            json.dumps(bad_payload, sort_keys=True),
+            encoding="utf-8",
+        )
+        assert event_alpha_artifact_doctor._integrated_performance_dashboard_conflicts(out)[  # noqa: SLF001
+            "integrated_performance_low_sample_missing_warning"
+        ] > 0
+
+        bad_payload = json.loads(json.dumps(payload))
+        bad_payload["lane_summaries"]["DIAGNOSTIC"] = {"rows": 1}
+        (out / event_integrated_radar.RADAR_PROVIDER_PERFORMANCE_FILENAME).write_text(
+            json.dumps(bad_payload, sort_keys=True),
+            encoding="utf-8",
+        )
+        assert event_alpha_artifact_doctor._integrated_performance_dashboard_conflicts(out)[  # noqa: SLF001
+            "integrated_performance_diagnostic_in_main_aggregate"
+        ] == 1
+
+        (out / event_integrated_radar.RADAR_PROVIDER_PERFORMANCE_FILENAME).write_text(
+            json.dumps(payload, sort_keys=True),
+            encoding="utf-8",
+        )
+        (out / event_integrated_radar.RADAR_PERFORMANCE_DASHBOARD_FILENAME).write_text(
+            dashboard + "\nPnL trade wording should block.\n",
+            encoding="utf-8",
+        )
+        assert event_alpha_artifact_doctor._integrated_performance_dashboard_conflicts(out)[  # noqa: SLF001
+            "integrated_performance_trade_pnl_wording"
+        ] == 1
+
+
 def test_makefile_exposes_integrated_radar_target():
     text = Path("Makefile").read_text(encoding="utf-8")
 

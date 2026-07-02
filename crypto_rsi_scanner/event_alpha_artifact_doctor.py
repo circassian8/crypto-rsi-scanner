@@ -209,6 +209,10 @@ class EventAlphaArtifactDoctorResult:
     integrated_outcome_thesis_move_missing: int = 0
     integrated_outcome_card_thesis_interpretation_missing: int = 0
     integrated_outcome_card_trade_wording: int = 0
+    integrated_performance_diagnostic_in_main_aggregate: int = 0
+    integrated_performance_auto_apply_enabled: int = 0
+    integrated_performance_low_sample_missing_warning: int = 0
+    integrated_performance_trade_pnl_wording: int = 0
     integrated_created_normal_rsi_signal: int = 0
     integrated_created_triggered_fade: int = 0
     source_coverage_report_missing: int = 0
@@ -1415,6 +1419,10 @@ def diagnose_artifacts(
         "integrated_outcome_thesis_move_missing",
         "integrated_outcome_card_thesis_interpretation_missing",
         "integrated_outcome_card_trade_wording",
+        "integrated_performance_diagnostic_in_main_aggregate",
+        "integrated_performance_auto_apply_enabled",
+        "integrated_performance_low_sample_missing_warning",
+        "integrated_performance_trade_pnl_wording",
         "integrated_created_normal_rsi_signal",
         "integrated_created_triggered_fade",
     ):
@@ -2293,6 +2301,14 @@ def diagnose_artifacts(
             "integrated_outcome_card_thesis_interpretation_missing"
         ],
         integrated_outcome_card_trade_wording=integrated_conflicts["integrated_outcome_card_trade_wording"],
+        integrated_performance_diagnostic_in_main_aggregate=integrated_conflicts[
+            "integrated_performance_diagnostic_in_main_aggregate"
+        ],
+        integrated_performance_auto_apply_enabled=integrated_conflicts["integrated_performance_auto_apply_enabled"],
+        integrated_performance_low_sample_missing_warning=integrated_conflicts[
+            "integrated_performance_low_sample_missing_warning"
+        ],
+        integrated_performance_trade_pnl_wording=integrated_conflicts["integrated_performance_trade_pnl_wording"],
         integrated_created_normal_rsi_signal=integrated_conflicts["integrated_created_normal_rsi_signal"],
         integrated_created_triggered_fade=integrated_conflicts["integrated_created_triggered_fade"],
         source_coverage_report_missing=source_coverage_report_conflicts["source_coverage_report_missing"],
@@ -3700,6 +3716,10 @@ def _integrated_radar_artifact_conflicts(
         "integrated_outcome_thesis_move_missing": 0,
         "integrated_outcome_card_thesis_interpretation_missing": 0,
         "integrated_outcome_card_trade_wording": 0,
+        "integrated_performance_diagnostic_in_main_aggregate": 0,
+        "integrated_performance_auto_apply_enabled": 0,
+        "integrated_performance_low_sample_missing_warning": 0,
+        "integrated_performance_trade_pnl_wording": 0,
         "integrated_created_normal_rsi_signal": 0,
         "integrated_created_triggered_fade": 0,
     }
@@ -3825,6 +3845,7 @@ def _integrated_radar_artifact_conflicts(
     if outcome_path is not None:
         priors_path = Path(outcome_path).parent / event_integrated_radar.INTEGRATED_CALIBRATION_PRIORS_FILENAME
         out.update(_merge_conflicts(out, _integrated_calibration_conflicts(priors_path)))
+        out.update(_merge_conflicts(out, _integrated_performance_dashboard_conflicts(Path(outcome_path).parent)))
     out["operator_structured_path_absolute"] += _structured_operator_path_conflicts(
         (*materialized_rows, *core_rows, *delivery_rows, *outcome_rows)
     )
@@ -4022,6 +4043,95 @@ def _integrated_calibration_conflicts(path: str | Path | None) -> dict[str, int]
         if sample_size < min_sample_size and not has_warning:
             out["integrated_calibration_prior_safety_missing"] += 1
     return out
+
+
+def _integrated_performance_dashboard_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
+    out = {
+        "integrated_performance_diagnostic_in_main_aggregate": 0,
+        "integrated_performance_auto_apply_enabled": 0,
+        "integrated_performance_low_sample_missing_warning": 0,
+        "integrated_performance_trade_pnl_wording": 0,
+    }
+    if namespace_dir is None:
+        return out
+    base = Path(namespace_dir)
+    json_path = base / event_integrated_radar.RADAR_PROVIDER_PERFORMANCE_FILENAME
+    dashboard_path = base / event_integrated_radar.RADAR_PERFORMANCE_DASHBOARD_FILENAME
+    data: Any = None
+    if json_path.exists():
+        try:
+            data = json.loads(json_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = None
+    if isinstance(data, Mapping):
+        if _performance_main_sections_contain_diagnostic(data):
+            out["integrated_performance_diagnostic_in_main_aggregate"] += 1
+        out["integrated_performance_auto_apply_enabled"] += _performance_auto_apply_enabled(data)
+        out["integrated_performance_low_sample_missing_warning"] += _performance_low_sample_missing_warning(data)
+    combined_text = ""
+    for path in (json_path, dashboard_path):
+        if not path.exists():
+            continue
+        try:
+            combined_text += "\n" + path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+    if re.search(r"\b(trade|trades|trading|paper|pnl|p&l|profit|loss)\b", combined_text, flags=re.IGNORECASE):
+        out["integrated_performance_trade_pnl_wording"] += 1
+    return out
+
+
+def _performance_main_sections_contain_diagnostic(data: Mapping[str, Any]) -> bool:
+    sections = (
+        data.get("main_aggregate"),
+        data.get("lane_summaries"),
+        data.get("dimension_summaries"),
+        data.get("performance_views"),
+        data.get("provider_performance"),
+    )
+    return any(_contains_diagnostic_value(section) for section in sections)
+
+
+def _contains_diagnostic_value(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            if str(key).strip().upper() == "DIAGNOSTIC":
+                return True
+            if _contains_diagnostic_value(nested):
+                return True
+    elif isinstance(value, (list, tuple, set)):
+        return any(_contains_diagnostic_value(item) for item in value)
+    elif str(value).strip().upper() == "DIAGNOSTIC":
+        return True
+    return False
+
+
+def _performance_auto_apply_enabled(value: Any) -> int:
+    count = 0
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            if str(key) in {"auto_apply", "eligible_for_auto_apply"} and _truthy(nested):
+                count += 1
+            count += _performance_auto_apply_enabled(nested)
+    elif isinstance(value, (list, tuple, set)):
+        for item in value:
+            count += _performance_auto_apply_enabled(item)
+    return count
+
+
+def _performance_low_sample_missing_warning(value: Any) -> int:
+    count = 0
+    if isinstance(value, Mapping):
+        sample = _safe_float(value.get("sample_size"))
+        min_sample = _safe_float(value.get("min_sample_size"))
+        if sample is not None and min_sample is not None and sample < min_sample and not _truthy(value.get("min_sample_warning")):
+            count += 1
+        for nested in value.values():
+            count += _performance_low_sample_missing_warning(nested)
+    elif isinstance(value, (list, tuple, set)):
+        for item in value:
+            count += _performance_low_sample_missing_warning(item)
+    return count
 
 
 def _structured_operator_path_conflicts(rows: Iterable[Mapping[str, Any]]) -> int:
@@ -6780,6 +6890,12 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             "integrated_outcome_card_thesis_interpretation_missing="
             f"{result.integrated_outcome_card_thesis_interpretation_missing} "
             f"integrated_outcome_card_trade_wording={result.integrated_outcome_card_trade_wording} "
+            "integrated_performance_diagnostic_in_main_aggregate="
+            f"{result.integrated_performance_diagnostic_in_main_aggregate} "
+            f"integrated_performance_auto_apply_enabled={result.integrated_performance_auto_apply_enabled} "
+            "integrated_performance_low_sample_missing_warning="
+            f"{result.integrated_performance_low_sample_missing_warning} "
+            f"integrated_performance_trade_pnl_wording={result.integrated_performance_trade_pnl_wording} "
             f"integrated_created_normal_rsi_signal={result.integrated_created_normal_rsi_signal} "
             f"integrated_created_triggered_fade={result.integrated_created_triggered_fade} "
             f"source_coverage_report_missing={result.source_coverage_report_missing} "

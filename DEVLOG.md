@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Add cross-run radar performance dashboard · Codex
+**Why:** Integrated radar outcomes were useful for fixture calibration, but
+real no-send rehearsal artifacts needed a cross-run research dashboard that can
+show which providers, source packs, lanes, and market states are producing
+useful research rows without automatically changing thresholds.
+**Changes:**
+- Added `event_radar_performance_dashboard.md` and
+  `event_radar_provider_performance.json` generation from selected artifact
+  namespaces, consuming integrated candidates, CoreOpportunity rows, integrated
+  outcomes, and notification delivery ledgers.
+- Added maturation states, provider/source-pack/lane/market/crowding/source
+  strength summaries, performance views, and recommendation-only prior
+  suggestions with `auto_apply=false`, threshold changes disabled, and
+  low-sample warnings.
+- Wired dashboard generation into integrated outcome fill and calibration
+  report commands, and added a “Radar Learning Snapshot” to the integrated
+  daily brief.
+- Extended artifact doctor checks for diagnostics leaking into main
+  performance aggregates, enabled auto-apply flags, missing low-sample
+  warnings, and forbidden performance-dashboard wording.
+- Updated the integrated outcome smoke target and tests for multi-namespace
+  performance, pending/matured/missing-price rows, Coinalyze/Bybit/CryptoPanic
+  provider summaries, and recommendation-only safety.
+**Verify:** `python3 tests/test_indicators.py` (677/677); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-integrated-radar-outcome-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-calibration-report PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** The dashboard is research-only and recommendations-only. It
+does not change thresholds, create sends, write normal RSI rows, or create
+Event Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-02 — Add DEX/on-chain readiness scaffolding · Codex
 **Why:** Event Alpha needed fixture-first DEX liquidity and protocol
 fundamentals readiness artifacts so market-anomaly research can distinguish

@@ -627,7 +627,11 @@ event-alpha-integrated-radar-outcome-smoke: event-alpha-integrated-radar-smoke e
 	test -s event_fade_cache/$(PROFILE)/event_integrated_radar_outcome_report.md
 	test -s event_fade_cache/$(PROFILE)/event_integrated_radar_calibration_report.md
 	test -s event_fade_cache/$(PROFILE)/event_integrated_radar_calibration_priors.json
+	test -s event_fade_cache/$(PROFILE)/event_radar_performance_dashboard.md
+	test -s event_fade_cache/$(PROFILE)/event_radar_provider_performance.json
 	grep -q "early_good\|useful" event_fade_cache/$(PROFILE)/event_integrated_radar_outcomes.jsonl
+	grep -q "Radar Learning Snapshot" event_fade_cache/$(PROFILE)/event_alpha_daily_brief.md
+	grep -q '"auto_apply": false' event_fade_cache/$(PROFILE)/event_radar_provider_performance.json
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict
 
 event-alpha-integrated-radar-outcome-report: PROFILE = integrated_radar_smoke

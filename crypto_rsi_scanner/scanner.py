@@ -8317,6 +8317,11 @@ def event_alpha_integrated_radar_fill_outcomes_report(
         context.namespace_dir,
         observed_at=_event_research_now(),
     )
+    performance = event_integrated_radar_outcomes.write_radar_performance_dashboard(
+        (context.namespace_dir,),
+        output_namespace_dir=context.namespace_dir,
+        generated_at=_event_research_now(),
+    )
     candidate_rows = event_integrated_radar.load_integrated_candidates(context.namespace_dir)
     core_rows = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
@@ -8349,6 +8354,7 @@ def event_alpha_integrated_radar_fill_outcomes_report(
             context=context,
             delivery_rows=delivery_rows,
             outcome_rows=rows,
+            performance_snapshot=performance,
             source_coverage_path=context.namespace_dir / event_integrated_radar.SOURCE_COVERAGE_FILENAME,
         ),
         encoding="utf-8",
@@ -8358,6 +8364,10 @@ def event_alpha_integrated_radar_fill_outcomes_report(
         "integrated_radar_outcomes_filled: "
         f"rows={len(rows)} "
         f"path={event_artifact_paths.artifact_display_path(context.namespace_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME)}"
+    )
+    print(
+        "radar_performance_dashboard: "
+        f"path={event_artifact_paths.artifact_display_path(context.namespace_dir / event_integrated_radar.RADAR_PERFORMANCE_DASHBOARD_FILENAME)}"
     )
     print("Research-only outcome artifacts written. No trades, paper trades, normal RSI rows, or sends were created.")
 
@@ -8415,6 +8425,11 @@ def event_alpha_integrated_radar_calibration_report(
     report = event_integrated_radar_outcomes.format_integrated_radar_calibration_report(rows)
     path = context.namespace_dir / event_integrated_radar.INTEGRATED_CALIBRATION_REPORT_FILENAME
     path.write_text(report, encoding="utf-8")
+    event_integrated_radar_outcomes.write_radar_performance_dashboard(
+        (context.namespace_dir,),
+        output_namespace_dir=context.namespace_dir,
+        generated_at=_event_research_now(),
+    )
     print(_event_alpha_context_block(context))
     print(report)
 
