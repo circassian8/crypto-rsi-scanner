@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from . import check_registry
+
 
 def schema_counter_line(result: Any) -> str:
     """Render schema counters with stable field names for tests and operators."""
@@ -25,3 +27,7 @@ def phase_line(result: Any) -> str:
         f"schema_only={str(bool(getattr(result, 'schema_only', False))).lower()} "
         f"legacy_checks_skipped={str(bool(getattr(result, 'legacy_checks_skipped', False))).lower()}"
     )
+
+
+def check_registry_lines() -> list[str]:
+    return check_registry.registry_report_lines()

@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Add schema-dependent doctor check registry · Codex
+**Why:** Future artifact-doctor checks need a declared schema contract before
+they are added, so the doctor does not keep accumulating hidden field
+dependencies in imperative branches.
+**Changes:**
+- Expanded `crypto_rsi_scanner/event_alpha/doctor/check_registry.py` into a
+  declarative registry with check ids, categories, severities, schema
+  dependencies, descriptions, schema version metadata, registry summaries, and
+  a legacy-unregistered append-site gate.
+- Added all requested categories: schema, safety, notification,
+  integrated_radar, source_coverage, provider_readiness, outcomes, namespace,
+  stale_artifacts, paths, and secrets.
+- Added a “Doctor Check Registry” report section with registered-check,
+  category, severity, and `legacy_unregistered` counts.
+- Started migrating doctor output to registry IDs for schema validation and
+  schema safety/secret findings while preserving legacy detail strings.
+- Added `make event-alpha-doctor-check-registry` and tests that validate every
+  schema dependency exists in `schema_v1.all_schema_fields()`.
+**Verify:** `python3 tests/test_indicators.py` (720/720);
+`python3 -m pytest tests/event_alpha/test_artifact_doctor.py tests/event_alpha/test_artifact_schema.py`
+(53/53); `python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-doctor-check-registry PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`;
+`make verify PYTHON=python3`; `git diff --check`.
+**Notes/risks:** Existing legacy checks still run by default. The registry gate
+pins `legacy_unregistered=182`; new append-style doctor checks must either use
+a registry id or deliberately update the baseline.
+
 ## 2026-07-02 — Make Event Alpha artifact doctor schema-first · Codex
 **Why:** Artifact doctor needs schema-backed validation to run before legacy
 imperative checks, so malformed artifacts, unsafe fields, stale namespaces, and

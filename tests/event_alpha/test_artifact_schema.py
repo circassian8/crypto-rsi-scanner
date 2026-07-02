@@ -5,13 +5,30 @@ from __future__ import annotations
 import json
 
 from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
-from crypto_rsi_scanner.event_alpha.doctor import schema_doctor
+from crypto_rsi_scanner.event_alpha.doctor import check_registry, schema_doctor
 
 
 def test_schema_registry_contains_required_ids():
     assert "integrated_radar_candidate_v1" in schema_v1.SCHEMAS
     assert "namespace_status_v1" in schema_v1.SCHEMAS
     assert schema_doctor.check_registry_schema_dependency_errors() == ()
+
+
+def test_doctor_check_registry_declares_schema_dependencies():
+    rows = check_registry.registry_rows()
+    categories = {str(row["category"]) for row in rows}
+    assert set(check_registry.CATEGORIES).issubset(categories)
+    assert check_registry.registry_errors() == ()
+    assert check_registry.legacy_unregistered_count() <= check_registry.LEGACY_UNREGISTERED_BASELINE
+
+    schema_fields = schema_v1.all_schema_fields()
+    for row in rows:
+        assert row["check_id"]
+        assert row["description"]
+        assert row["introduced_in_schema_version"] == schema_v1.EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION
+        assert row["severity"] in check_registry.SEVERITIES
+        for dependency in row["schema_dependencies"]:
+            assert dependency in schema_fields, row["check_id"]
 
 
 def test_artifact_module_import_shims_match_new_package_paths():
@@ -71,6 +88,8 @@ def test_event_alpha_split_runner_and_make_target_are_wired():
     makefile = (root / "Makefile").read_text(encoding="utf-8")
     assert "test-event-alpha:" in makefile
     assert "$(PYTHON) -m pytest tests/event_alpha" in makefile
+    assert "event-alpha-doctor-check-registry:" in makefile
+    assert "$(PYTHON) -m crypto_rsi_scanner.event_alpha.doctor.check_registry" in makefile
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
 from tests.event_alpha import _legacy_helpers as _event_alpha_legacy_helpers

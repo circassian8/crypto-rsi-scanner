@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlsplit
 from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_dex_onchain_readiness, event_integrated_radar, event_instrument_resolver, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_official_exchange_activation, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_unlock_calendar_preflight, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 from .event_alpha.doctor import (
+    check_registry,
     consistency_doctor,
     namespace_doctor,
     report as doctor_report,
@@ -741,7 +742,10 @@ def diagnose_artifacts(
         phase_blockers: list[str] = list(safety_result.blockers)
         phase_warnings: list[str] = list(safety_result.warnings)
         if schema_result.schema_validation_errors:
-            message = f"schema_validation_errors={schema_result.schema_validation_errors}"
+            message = check_registry.format_check_message(
+                "schema.validation_errors",
+                f"schema_validation_errors={schema_result.schema_validation_errors}",
+            )
             (phase_blockers if schema_only or strict else phase_warnings).append(message)
         consistency_phase = consistency_doctor.skipped_result()
         phase_blockers.extend(consistency_phase.blockers)
@@ -2144,7 +2148,12 @@ def diagnose_artifacts(
     if incident_linkage["garbage_primary_subject_incidents"]:
         warnings.append(f"garbage_primary_subject_incidents={incident_linkage['garbage_primary_subject_incidents']}")
     if schema_result.schema_validation_errors:
-        warnings.append(f"schema_validation_errors={schema_result.schema_validation_errors}")
+        warnings.append(
+            check_registry.format_check_message(
+                "schema.validation_errors",
+                f"schema_validation_errors={schema_result.schema_validation_errors}",
+            )
+        )
     if incident_linkage["invalid_canonical_incident_rows"]:
         message = f"invalid_canonical_incident_rows={incident_linkage['invalid_canonical_incident_rows']}"
         (blockers if strict else warnings).append(message)
@@ -6817,6 +6826,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"cards_missing_feedback_target={result.cards_missing_feedback_target}"
         ),
         doctor_report.schema_counter_line(result),
+        *doctor_report.check_registry_lines(),
         (
             "core opportunity coverage: "
             f"visible_core_opportunities={result.visible_core_opportunities} "

@@ -74,10 +74,4 @@ def validate_artifact_files(paths: Iterable[str | Path]) -> SchemaDoctorResult:
 def check_registry_schema_dependency_errors() -> tuple[str, ...]:
     from . import check_registry
 
-    fields = schema_v1.all_schema_fields()
-    errors: list[str] = []
-    for check in check_registry.CHECKS:
-        for field_name in check.schema_dependencies:
-            if field_name not in fields:
-                errors.append(f"{check.check_id}:{field_name}")
-    return tuple(errors)
+    return check_registry.schema_dependency_errors()

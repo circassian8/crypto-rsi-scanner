@@ -150,6 +150,9 @@ def test_event_alpha_artifact_doctor_schema_only_catches_bad_fixture():
         assert result.schema_rows_validated == 1
         assert result.schema_validation_errors == 1
         assert result.missing_required_fields == 1
+        assert "Doctor Check Registry:" in text
+        assert "legacy_unregistered=" in text
+        assert "schema.validation_errors: schema_validation_errors=1" in result.blockers
         assert "schema_rows_validated=1" in text
         assert "schema_validation_errors=1" in text
         assert "missing_required_fields=1" in text
