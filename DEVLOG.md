@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Mirror scanner parser into CLI facade · Codex
+**Why:** The refactor baseline established that `scanner.py` is still the real
+CLI monolith; the next safe step was exposing parser construction and command
+classification from `crypto_rsi_scanner/cli/` without moving runtime dispatch.
+**Changes:**
+- Added `crypto_rsi_scanner.cli.parser.build_parser()`, which mirrors the
+  current `scanner.cli()` argparse construction without calling `parse_args()`
+  or executing any command branch.
+- Expanded CLI command classification with `classify_command`,
+  `command_group`, and `dispatch_key_from_args` coverage for default RSI scan,
+  backtest module entry, paper, maintenance/export, integrated radar, artifact
+  doctor, notification preview, provider readiness, Coinalyze, and
+  Bybit/official exchange paths.
+- Added parser snapshot tests in `tests/cli/test_parser.py`, including default
+  preservation, representative Event Alpha/provider flags, and help smoke for
+  both `python3 -m crypto_rsi_scanner.scanner --help` and
+  `python3 -m crypto_rsi_scanner.cli.main --help`.
+- Made `crypto_rsi_scanner/cli/__init__.py` lazily expose `main()` so the
+  module help smoke runs without a runpy warning.
+- Updated `research/EVENT_ALPHA_ARCHITECTURE_V1.md` and `ROADMAP.md` with the
+  CLI split direction and compatibility rules.
+**Verify:** `python3 -m crypto_rsi_scanner.scanner --help`; `python3 -m
+crypto_rsi_scanner.cli.main --help`; `python3 -m pytest
+tests/cli/test_parser.py` (8/8); `python3 tests/test_indicators.py` (685/685);
+`python3 -m compileall -q crypto_rsi_scanner tests`; `make verify
+PYTHON=python3`.
+**Notes/risks:** Runtime dispatch still delegates to `scanner.cli()`. This pass
+does not remove parser code from `scanner.py`, does not move command bodies, and
+does not add live provider calls, sends, trades, paper trades, normal RSI
+writes, or Event Alpha-created `TRIGGERED_FADE`.
+
 ## 2026-07-02 — Record refactor baseline and behavior-freeze contract · Codex
 **Why:** Before moving more Event Alpha or CLI code, the repo needed a static
 baseline that records the current architecture, test/CLI/artifact surface, and

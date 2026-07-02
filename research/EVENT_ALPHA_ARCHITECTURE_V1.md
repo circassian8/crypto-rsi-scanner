@@ -19,7 +19,8 @@ layout gives new code a home while old import paths continue to work.
   compatibility doctor layers.
 - `crypto_rsi_scanner/event_alpha/namespace/`: namespace status and lifecycle
   reporting.
-- `crypto_rsi_scanner/cli/`: CLI facade and command-group extraction targets.
+- `crypto_rsi_scanner/cli/`: CLI facade, parser snapshots, and command-group
+  extraction targets.
 
 `crypto_rsi_scanner/event_alpha/MODULE_MAP.md` lists old top-level module paths
 and their intended package locations.
@@ -48,3 +49,23 @@ checks.
 New Event Alpha code should land in the subpackage first. Keep a top-level shim
 when an old import path is public or used by Make targets. Move physical code in
 small, tested slices only.
+
+## CLI Split Direction
+
+`scanner.py` remains the runtime dispatch entrypoint while the parser split is
+proven. `crypto_rsi_scanner.cli.parser.build_parser()` mirrors the current
+`scanner.cli()` argparse construction without calling `parse_args()` or any
+command branch. New helpers classify command groups and dispatch keys from
+argv/parsed args so future slices can move one group at a time behind parser
+snapshot tests and the old `scanner.py` module entrypoint.
+
+Compatibility rules for CLI refactors:
+
+- `python3 -m crypto_rsi_scanner.scanner --help` must keep working.
+- `python3 -m crypto_rsi_scanner.cli.main --help` must expose the same operator
+  flags while dispatch still delegates to `scanner.cli()`.
+- Existing flags, defaults, Make targets, and old imports must remain
+  compatible until a migration is explicit.
+- Parser snapshot tests must cover representative RSI, paper, maintenance,
+  Event Alpha radar, doctor, notification, provider readiness, Coinalyze, and
+  official-exchange paths before runtime dispatch moves.

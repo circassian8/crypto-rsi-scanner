@@ -42336,12 +42336,27 @@ def test_event_alpha_namespace_lifecycle_inventory_and_archive_plan():
 
 def test_event_alpha_cli_package_and_make_targets_are_available():
     from crypto_rsi_scanner.cli.dispatch import dispatch_command_name
+    from crypto_rsi_scanner.cli.parser import build_parser, command_group, dispatch_key_from_args
     from crypto_rsi_scanner.cli.main import main as cli_main
 
     root = Path(__file__).resolve().parent.parent
     makefile = (root / "Makefile").read_text(encoding="utf-8")
     assert callable(cli_main)
+    parser = build_parser()
+    default_args = parser.parse_args([])
+    assert default_args.top_n is None
+    assert default_args.dry_run is False
+    assert dispatch_key_from_args(default_args) == "run_scan"
+    preview_args = parser.parse_args(["--event-alpha-notify-preview", "--event-alpha-profile", "notify_no_key"])
+    assert preview_args.event_alpha_notify_preview is True
+    assert preview_args.event_alpha_profile == "notify_no_key"
+    assert dispatch_key_from_args(preview_args) == "event_alpha_notify_preview"
     assert dispatch_command_name(["--event-alpha-integrated-radar-smoke"]) == "event_alpha_integrated_radar_smoke"
+    assert dispatch_command_name(["--event-alpha-artifact-doctor"]) == "event_alpha_artifact_doctor"
+    assert command_group(["-m", "crypto_rsi_scanner.backtest"]) == "backtest"
+    assert command_group(["--event-alpha-live-provider-readiness"]) == "event_alpha_provider_readiness"
+    assert command_group(["--event-alpha-coinalyze-no-send-rehearsal"]) == "event_alpha_coinalyze"
+    assert command_group(["--event-alpha-bybit-announcements-preflight"]) == "event_alpha_official_exchange"
     assert dispatch_command_name(["--event-alpha-namespace-lifecycle-report"]) == "event_alpha_namespace_lifecycle_report"
     assert "test-pytest:" in makefile
     assert "test-pytest-parallel:" in makefile
