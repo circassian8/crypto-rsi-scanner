@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Make Event Alpha artifact doctor schema-first · Codex
+**Why:** Artifact doctor needs schema-backed validation to run before legacy
+imperative checks, so malformed artifacts, unsafe fields, stale namespaces, and
+future schema dependencies are visible before the older consistency sweep.
+**Changes:**
+- Added typed namespace, safety, consistency, and report phase helpers under
+  `crypto_rsi_scanner/event_alpha/doctor/`, while keeping the top-level
+  `event_alpha_artifact_doctor.py` compatibility entrypoint.
+- Reordered doctor execution so namespace lifecycle and schema validation run
+  first, then schema safety, legacy checks by default, consistency phase
+  facade, and report rendering.
+- Added schema counter output with stable names, plus
+  `--event-alpha-doctor-schema-only` and the development-only
+  `--event-alpha-doctor-skip-legacy-checks` option.
+- Added parser and artifact-doctor coverage for schema-only bad fixtures,
+  legacy-skip behavior, and the new CLI flags.
+**Verify:** `python3 tests/test_indicators.py` (719/719);
+`python3 -m pytest tests/event_alpha/test_artifact_doctor.py tests/event_alpha/test_artifact_schema.py`
+(52/52); `python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`
+(WARN/no blockers); `make verify PYTHON=python3`.
+**Notes/risks:** Legacy checks still run by default. Schema-only and
+skip-legacy modes do not send, trade, paper trade, write normal RSI rows, make
+live provider calls, or create Event Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-02 — Finish Event Alpha artifact schema v1 stamping · Codex
 **Why:** Artifact doctor checks now depend on many Event Alpha artifact fields,
 so schema v1 needed to become a practical contract instead of a partial

@@ -441,6 +441,8 @@ def handle(args) -> bool:
             strict_legacy=args.event_alpha_artifact_doctor_strict_legacy,
             delivery_strict_scope=args.event_alpha_artifact_doctor_delivery_scope,
             include_stale_artifacts=args.event_alpha_include_stale_artifacts,
+            schema_only=args.event_alpha_doctor_schema_only,
+            skip_legacy_checks=args.event_alpha_doctor_skip_legacy_checks,
         )
         return True
     if args.event_alpha_tuning_worksheet:

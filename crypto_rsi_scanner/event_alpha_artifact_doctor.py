@@ -11,7 +11,13 @@ from urllib.parse import parse_qs, urlsplit
 
 from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_dex_onchain_readiness, event_integrated_radar, event_instrument_resolver, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_official_exchange_activation, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_unlock_calendar_preflight, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
-from .event_alpha.doctor import schema_doctor
+from .event_alpha.doctor import (
+    consistency_doctor,
+    namespace_doctor,
+    report as doctor_report,
+    safety_doctor,
+    schema_doctor,
+)
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
     "This namespace contains pre-canonical notification delivery rows. Do not use it "
@@ -410,6 +416,8 @@ class EventAlphaArtifactDoctorResult:
     namespace_superseded_by: str | None = None
     strict_legacy: bool = False
     strict: bool = False
+    schema_only: bool = False
+    legacy_checks_skipped: bool = False
     schema_rows_validated: int = 0
     schema_validation_errors: int = 0
     missing_required_fields: int = 0
@@ -453,6 +461,8 @@ def diagnose_artifacts(
     strict_legacy: bool = False,
     delivery_strict_scope: str | None = None,
     include_stale_artifacts: bool = False,
+    schema_only: bool = False,
+    skip_legacy_checks: bool = False,
 ) -> EventAlphaArtifactDoctorResult:
     """Diagnose cross-artifact lineage, mode, and profile/namespace cleanliness."""
     raw_runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
@@ -692,8 +702,73 @@ def diagnose_artifacts(
         include_test_artifacts=include_test_artifacts,
         include_legacy_artifacts=include_legacy_artifacts,
     )
+    namespace_dir = _artifact_namespace_dir(
+        inspected_alert_store_path,
+        source_coverage_report_path,
+        daily_brief_path,
+        integrated_outcomes_path,
+    )
+    namespace_phase = namespace_doctor.inspect_namespace(
+        namespace_dir,
+        include_stale_artifacts=include_stale_artifacts,
+    )
+    schema_result = schema_doctor.validate_namespace_artifacts(namespace_phase.namespace_dir)
+    safety_result = safety_doctor.validate_schema_safety(
+        schema_result,
+        strict=strict,
+        schema_only=schema_only,
+    )
+    if namespace_phase.short_circuit:
+        return _phase_only_doctor_result(
+            status="STALE",
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+            runs=runs,
+            alerts=alerts,
+            feedback=feedback,
+            outcomes=outcomes,
+            card_paths=card_paths,
+            namespace_phase=namespace_phase,
+            schema_result=schema_result,
+            strict=strict,
+            strict_legacy=strict_legacy,
+            schema_only=schema_only,
+            legacy_checks_skipped=True,
+            blockers=(),
+            warnings=namespace_phase.warnings,
+        )
+    if schema_only or skip_legacy_checks:
+        phase_blockers: list[str] = list(safety_result.blockers)
+        phase_warnings: list[str] = list(safety_result.warnings)
+        if schema_result.schema_validation_errors:
+            message = f"schema_validation_errors={schema_result.schema_validation_errors}"
+            (phase_blockers if schema_only or strict else phase_warnings).append(message)
+        consistency_phase = consistency_doctor.skipped_result()
+        phase_blockers.extend(consistency_phase.blockers)
+        phase_warnings.extend(consistency_phase.warnings)
+        status = "BLOCKED" if phase_blockers else ("WARN" if phase_warnings else "OK")
+        return _phase_only_doctor_result(
+            status=status,
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+            runs=runs,
+            alerts=alerts,
+            feedback=feedback,
+            outcomes=outcomes,
+            card_paths=card_paths,
+            namespace_phase=namespace_phase,
+            schema_result=schema_result,
+            strict=strict,
+            strict_legacy=strict_legacy,
+            schema_only=schema_only,
+            legacy_checks_skipped=True,
+            blockers=phase_blockers,
+            warnings=phase_warnings,
+        )
     blockers: list[str] = []
     warnings: list[str] = []
+    blockers.extend(safety_result.blockers)
+    warnings.extend(safety_result.warnings)
     matching_snapshot_runs = 0
     missing_snapshot_runs = 0
     external_snapshot_runs = 0
@@ -959,31 +1034,7 @@ def diagnose_artifacts(
             )
         ),
     )
-    namespace_dir = _artifact_namespace_dir(
-        inspected_alert_store_path,
-        source_coverage_report_path,
-        daily_brief_path,
-        integrated_outcomes_path,
-    )
     namespace_status = event_alpha_namespace_status.load_namespace_status(namespace_dir)
-    if event_alpha_namespace_status.is_stale_deprecated(namespace_status) and not include_stale_artifacts:
-        return EventAlphaArtifactDoctorResult(
-            status="STALE",
-            profile=profile,
-            artifact_namespace=artifact_namespace,
-            run_rows=len(runs),
-            alert_rows=len(alerts),
-            feedback_rows=len(feedback),
-            outcome_rows=len(outcomes),
-            card_files=0,
-            namespace_status=namespace_status.status if namespace_status else None,
-            namespace_stale_deprecated=1,
-            namespace_superseded_by=namespace_status.superseded_by if namespace_status else None,
-            strict=strict,
-            strict_legacy=strict_legacy,
-            warnings=(event_alpha_namespace_status.format_namespace_status(namespace_status),),
-        )
-    schema_result = schema_doctor.validate_namespace_artifacts(namespace_dir)
     structured_path_conflicts = _structured_operator_path_conflicts(
         (
             *runs,
@@ -2097,6 +2148,9 @@ def diagnose_artifacts(
     if incident_linkage["invalid_canonical_incident_rows"]:
         message = f"invalid_canonical_incident_rows={incident_linkage['invalid_canonical_incident_rows']}"
         (blockers if strict else warnings).append(message)
+    consistency_phase = consistency_doctor.ConsistencyDoctorResult()
+    blockers.extend(consistency_phase.blockers)
+    warnings.extend(consistency_phase.warnings)
     status = "BLOCKED" if blockers else ("WARN" if warnings else "OK")
     return EventAlphaArtifactDoctorResult(
         status=status,
@@ -2602,6 +2656,60 @@ def diagnose_artifacts(
         namespace_superseded_by=namespace_status.superseded_by if namespace_status else None,
         strict_legacy=bool(strict_legacy),
         strict=bool(strict),
+        schema_only=False,
+        legacy_checks_skipped=False,
+        schema_rows_validated=schema_result.schema_rows_validated,
+        schema_validation_errors=schema_result.schema_validation_errors,
+        missing_required_fields=schema_result.missing_required_fields,
+        invalid_enum_fields=schema_result.invalid_enum_fields,
+        invalid_path_fields=schema_result.invalid_path_fields,
+        invalid_safety_fields=schema_result.invalid_safety_fields,
+        deprecated_field_usage=schema_result.deprecated_field_usage,
+        blockers=tuple(dict.fromkeys(blockers)),
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _phase_only_doctor_result(
+    *,
+    status: str,
+    profile: str | None,
+    artifact_namespace: str | None,
+    runs: Iterable[Mapping[str, Any]],
+    alerts: Iterable[Mapping[str, Any]],
+    feedback: Iterable[Mapping[str, Any]],
+    outcomes: Iterable[Mapping[str, Any]],
+    card_paths: Iterable[str | Path],
+    namespace_phase: namespace_doctor.NamespaceDoctorResult,
+    schema_result: schema_doctor.SchemaDoctorResult,
+    strict: bool,
+    strict_legacy: bool,
+    schema_only: bool,
+    legacy_checks_skipped: bool,
+    blockers: Iterable[str] = (),
+    warnings: Iterable[str] = (),
+) -> EventAlphaArtifactDoctorResult:
+    card_file_paths = [Path(path) for path in card_paths]
+    research_card_paths = [path for path in card_file_paths if path.name != "index.md"]
+    index_present = any(path.name == "index.md" for path in card_file_paths)
+    return EventAlphaArtifactDoctorResult(
+        status=status,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        run_rows=len(tuple(runs)),
+        alert_rows=len(tuple(alerts)),
+        feedback_rows=len(tuple(feedback)),
+        outcome_rows=len(tuple(outcomes)),
+        card_files=len(research_card_paths),
+        research_card_files=len(research_card_paths),
+        research_card_index_present=index_present,
+        namespace_status=namespace_phase.namespace_status,
+        namespace_stale_deprecated=namespace_phase.namespace_stale_deprecated,
+        namespace_superseded_by=namespace_phase.namespace_superseded_by,
+        strict=bool(strict),
+        strict_legacy=bool(strict_legacy),
+        schema_only=bool(schema_only),
+        legacy_checks_skipped=bool(legacy_checks_skipped),
         schema_rows_validated=schema_result.schema_rows_validated,
         schema_validation_errors=schema_result.schema_validation_errors,
         missing_required_fields=schema_result.missing_required_fields,
@@ -6695,6 +6803,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
         ),
         f"strict: {str(result.strict).lower()}",
         f"strict_legacy: {str(result.strict_legacy).lower()}",
+        doctor_report.phase_line(result),
         (
             "rows: "
             f"runs={result.run_rows} alerts={result.alert_rows} "
@@ -6707,16 +6816,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"cards_missing_lineage={result.cards_missing_lineage} "
             f"cards_missing_feedback_target={result.cards_missing_feedback_target}"
         ),
-        (
-            "schema validation: "
-            f"rows_validated={result.schema_rows_validated} "
-            f"errors={result.schema_validation_errors} "
-            f"missing_required_fields={result.missing_required_fields} "
-            f"invalid_enum_fields={result.invalid_enum_fields} "
-            f"invalid_path_fields={result.invalid_path_fields} "
-            f"invalid_safety_fields={result.invalid_safety_fields} "
-            f"deprecated_field_usage={result.deprecated_field_usage}"
-        ),
+        doctor_report.schema_counter_line(result),
         (
             "core opportunity coverage: "
             f"visible_core_opportunities={result.visible_core_opportunities} "

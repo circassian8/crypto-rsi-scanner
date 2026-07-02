@@ -7563,6 +7563,8 @@ def event_alpha_artifact_doctor_report(
     strict_legacy: bool = False,
     delivery_strict_scope: str | None = None,
     include_stale_artifacts: bool = False,
+    schema_only: bool = False,
+    skip_legacy_checks: bool = False,
 ) -> None:
     """Print artifact lineage/namespace diagnostics for Event Alpha."""
     _setup_event_discovery_logging(verbose)
@@ -7611,6 +7613,8 @@ def event_alpha_artifact_doctor_report(
         strict_legacy=strict_legacy,
         delivery_strict_scope=delivery_strict_scope,
         include_stale_artifacts=include_stale_artifacts,
+        schema_only=schema_only,
+        skip_legacy_checks=skip_legacy_checks,
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_artifact_doctor.format_artifact_doctor_report(result))

@@ -120,6 +120,63 @@ def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor
         assert unsafe.status == "BLOCKED"
 
 
+def test_event_alpha_artifact_doctor_schema_only_catches_bad_fixture():
+    import json
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        (base / "event_integrated_radar_candidates.jsonl").write_text(
+            json.dumps(
+                {
+                    "row_type": "event_integrated_radar_candidate",
+                    "symbol": "BAD",
+                    "opportunity_type": "CONFIRMED_LONG_RESEARCH",
+                },
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        result = event_alpha_artifact_doctor.diagnose_artifacts(
+            inspected_alert_store_path=base / "event_alpha_alerts.jsonl",
+            schema_only=True,
+        )
+        text = event_alpha_artifact_doctor.format_artifact_doctor_report(result)
+
+        assert result.status == "BLOCKED"
+        assert result.schema_only is True
+        assert result.legacy_checks_skipped is True
+        assert result.schema_rows_validated == 1
+        assert result.schema_validation_errors == 1
+        assert result.missing_required_fields == 1
+        assert "schema_rows_validated=1" in text
+        assert "schema_validation_errors=1" in text
+        assert "missing_required_fields=1" in text
+
+
+def test_event_alpha_artifact_doctor_skip_legacy_keeps_schema_phases_only():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        full = event_alpha_artifact_doctor.diagnose_artifacts(
+            inspected_alert_store_path=base / "event_alpha_alerts.jsonl",
+        )
+        skipped = event_alpha_artifact_doctor.diagnose_artifacts(
+            inspected_alert_store_path=base / "event_alpha_alerts.jsonl",
+            skip_legacy_checks=True,
+        )
+        text = event_alpha_artifact_doctor.format_artifact_doctor_report(skipped)
+
+        assert full.status == "BLOCKED"
+        assert "no matching operational/burn-in run rows found" in full.blockers
+        assert skipped.status == "OK"
+        assert skipped.legacy_checks_skipped is True
+        assert skipped.blockers == ()
+        assert "legacy_checks_skipped=true" in text
+
+
 def test_event_alpha_coinalyze_preflight_smoke_artifacts_are_safe_and_doctor_checked():
     import json
     from datetime import datetime, timezone

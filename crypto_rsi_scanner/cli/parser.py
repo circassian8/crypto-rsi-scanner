@@ -690,6 +690,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Diagnose Event Alpha artifact lineage, namespace, and snapshot consistency.",
     )
     parser.add_argument(
+        "--event-alpha-doctor-schema-only",
+        action="store_true",
+        help="Run only namespace, schema, and schema safety phases of the Event Alpha artifact doctor.",
+    )
+    parser.add_argument(
+        "--event-alpha-doctor-skip-legacy-checks",
+        action="store_true",
+        help="Development-only: skip legacy imperative artifact-doctor checks after schema phases.",
+    )
+    parser.add_argument(
         "--event-alpha-tuning-worksheet",
         action="store_true",
         help="Print weekly Event Alpha tuning suggestions without applying changes.",
