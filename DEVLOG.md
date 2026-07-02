@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Generate refactor final gate report · Codex
+**Why:** After the v1 migration phases, the remaining monolith and shim state
+needed a measurable final gate report before more code movement.
+**Changes:**
+- Added `crypto_rsi_scanner/refactor_final_report.py` and
+  `make refactor-final-report`.
+- Generated `refactor_final_report.json` and `refactor_final_report.md` with
+  line-count gates, shim counts, runtimes, blockers, next migration modules,
+  risk, and the v1/v2/v3 old-import deprecation plan.
+- Added focused report-generation and Makefile wiring tests in
+  `tests/cli/test_make_targets.py`.
+- Hardened the fixture-only LLM advisory scanner test so it isolates the local
+  LLM budget ledger and remains deterministic.
+- Updated `ROADMAP.md` with the completed final refactor gate milestone.
+**Verify:** `python3 -m pytest tests/event_alpha/test_integrated_radar.py::test_event_alert_scanner_report_with_llm_advisory_uses_runtime_config -q`
+(1/1); `python3 tests/test_indicators.py` (730/730, 13.73s);
+`python3 -m pytest` (736/736, 13.76s); `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make event-alpha-integrated-radar-smoke
+PYTHON=python3`; `make event-alpha-integrated-radar-doctor PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1
+PYTHON=python3` (WARN/no blockers); `make verify PYTHON=python3`.
+**Notes/risks:** No old import paths were removed and no duplicate code was
+deleted. The report status is `blocked` because `scanner.py` remains 11267 lines
+and `event_alpha_artifact_doctor.py` remains 6359 lines; both blocker reasons,
+next migration modules, and risks are recorded in the report. The umbrella test
+runner is below target at 1771 lines.
+
 ## 2026-07-02 — Enforce Event Alpha compatibility shims · Codex
 **Why:** The v1 package migration keeps old imports working, but those old
 top-level modules need a measurable guard so new implementation logic does not

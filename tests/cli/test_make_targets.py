@@ -598,6 +598,72 @@ def test_refactor_baseline_json_contains_file_counts_and_inventory():
     assert payload["namespace_inventory"]["base_dir"] == "event_fade_cache"
 
 
+def test_refactor_final_report_generation_writes_size_and_shim_gates():
+    import json
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from crypto_rsi_scanner import refactor_final_report
+
+    root = REPO_ROOT
+    with TemporaryDirectory() as tmp:
+        out_dir = Path(tmp)
+        paths = refactor_final_report.write_refactor_final_report(
+            root=root,
+            out_dir=out_dir,
+            pytest_runtime_seconds=12.34,
+            standalone_runner_runtime_seconds=56.78,
+        )
+        assert paths["json"].exists()
+        assert paths["markdown"].exists()
+        payload = json.loads(paths["json"].read_text(encoding="utf-8"))
+        markdown = paths["markdown"].read_text(encoding="utf-8")
+
+    assert payload["schema_version"] == "refactor_final_report_v1"
+    assert payload["research_only"] is True
+    assert payload["live_provider_calls_allowed"] is False
+    assert payload["telegram_sends"] == 0
+    assert payload["trades_created"] == 0
+    assert payload["paper_trades_created"] == 0
+    assert payload["normal_rsi_signal_rows_written"] == 0
+    assert payload["triggered_fade_created"] == 0
+    assert payload["old_module_paths_removed"] == 0
+    assert payload["dead_duplicate_code_removed"] is False
+    assert payload["pytest_runtime_seconds"] == 12.34
+    assert payload["standalone_runner_runtime_seconds"] == 56.78
+    assert payload["line_counts"]["tests/test_indicators.py"] < 2000
+    assert payload["line_counts"]["crypto_rsi_scanner/scanner.py"] > 4000
+    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha_artifact_doctor.py"] > 1500
+    assert payload["active_shims"] >= 50
+    assert payload["partial_shims"] >= 1
+    assert payload["unmigrated_modules"] >= 1
+    assert payload["active_shim_modules_with_implementation_logic"] == 0
+    assert any(row["path"] == "crypto_rsi_scanner/scanner.py" for row in payload["blockers"])
+    assert any(row["path"] == "crypto_rsi_scanner/event_alpha_artifact_doctor.py" for row in payload["blockers"])
+    phases = {row["phase"]: row["policy"] for row in payload["deprecation_plan"]}
+    assert "v1" in phases and "active compatibility shims" in phases["v1"]
+    assert "v2" in phases and "warn in development mode only" in phases["v2"]
+    assert "v3" in phases and "removed" in phases["v3"]
+    assert "Refactor Final Report" in markdown
+    assert "Blockers" in markdown
+    assert "Deprecation Plan" in markdown
+
+
+def test_refactor_final_report_make_target_is_available():
+    root = REPO_ROOT
+    makefile = (root / "Makefile").read_text(encoding="utf-8")
+    module_text = (root / "crypto_rsi_scanner" / "refactor_final_report.py").read_text(encoding="utf-8").casefold()
+
+    assert "refactor-final-report:" in makefile
+    assert "$(python) -m crypto_rsi_scanner.refactor_final_report" in makefile.casefold()
+    assert "PYTEST_RUNTIME_SECONDS" in makefile
+    assert "STANDALONE_RUNTIME_SECONDS" in makefile
+    assert "event_alpha import shims" in module_text
+    assert "subprocess" not in module_text
+    assert "urlopen" not in module_text
+    assert "requests." not in module_text
+
+
 def test_split_rsi_cli_runner_and_make_targets_are_wired():
     import subprocess
     import sys
