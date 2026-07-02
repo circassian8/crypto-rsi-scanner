@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Move Event Alpha notification modules into package homes · Codex
+**Why:** The notification refactor slice needed preview, delivery, send
+readiness, no-send final checks, and Telegram formatting code to live under
+`crypto_rsi_scanner.event_alpha.notifications` while preserving old imports,
+Make targets, delivery schemas, and no-send behavior.
+**Changes:**
+- Moved notification planning/preview/send orchestration, delivery ledger,
+  sender metadata, notification-run summaries, go/no-go, checklist, inbox,
+  export pack, pause, SLO, send-readiness, Telegram final-check, and recipient
+  check implementations into `crypto_rsi_scanner/event_alpha/notifications/`.
+- Added `event_alpha.notifications.formatting` as the stable formatting facade
+  for Telegram digest, heartbeat, preview, and chunk-sizing helpers.
+- Replaced the old top-level notification modules with quiet compatibility
+  shims and updated high-confidence scanner/daily-brief/scheduler consumers to
+  use the package modules directly.
+- Added focused pytest coverage for old/new import equivalence, normal preview
+  and heartbeat wording, research-review skip telemetry, delivery
+  `status`/`status_detail`, formatting smoke behavior, and final no-send checks.
+- Refreshed `crypto_rsi_scanner/event_alpha/MODULE_MAP.md` and
+  `research/EVENT_ALPHA_ARCHITECTURE_V1.md`; current size gate is 125 top-level
+  `event_*.py` files, 42 shims, and 83 remaining top-level implementation files.
+**Verify:** `python3 -m pytest tests/event_alpha/test_notifications.py` (5/5);
+`python3 -m compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-notification-format-smoke PYTHON=python3`; `make
+event-alpha-telegram-no-send-final-check-fast PYTHON=python3`; `make
+event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`python3 tests/test_indicators.py` (686/686); `make verify PYTHON=python3`.
+**Notes/risks:** The notification-format smoke keeps its existing non-strict
+artifact-doctor warning for schema-validation details in the fixture namespace,
+with no blockers. Normal heartbeat wording still uses `Strict alerts`,
+`Research candidates`, and `Raw source candidates`; delivery rows keep explicit
+`status` and `status_detail`; no live sends, trades, paper rows, normal RSI
+rows, or Event Alpha-created `TRIGGERED_FADE` behavior were added.
+
 ## 2026-07-02 — Move Event Alpha provider modules into package homes · Codex
 **Why:** The provider/readiness refactor slice needed Event Alpha activation,
 preflight, source-pack, and provider-health orchestration to live under

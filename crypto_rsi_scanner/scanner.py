@@ -89,16 +89,19 @@ from . import event_live_provider_readiness
 from . import event_alpha_missed
 from . import event_alpha_namespace_status
 from .event_alpha.namespace import lifecycle as event_alpha_namespace_lifecycle
-from . import event_alpha_notifications
-from . import event_alpha_notification_checklist
-from . import event_alpha_notification_delivery
-from . import event_alpha_notification_go_no_go
-from . import event_alpha_notification_inbox
-from . import event_alpha_notification_pack
-from . import event_alpha_notification_pause
-from . import event_alpha_notification_runs
-from . import event_alpha_notification_sender
-from . import event_alpha_notification_slo
+from .event_alpha.notifications import checklist as event_alpha_notification_checklist
+from .event_alpha.notifications import delivery as event_alpha_notification_delivery
+from .event_alpha.notifications import final_check as event_alpha_telegram_final_check
+from .event_alpha.notifications import go_no_go as event_alpha_notification_go_no_go
+from .event_alpha.notifications import inbox as event_alpha_notification_inbox
+from .event_alpha.notifications import pack as event_alpha_notification_pack
+from .event_alpha.notifications import pause as event_alpha_notification_pause
+from .event_alpha.notifications import pipeline as event_alpha_notifications
+from .event_alpha.notifications import readiness as event_alpha_send_readiness
+from .event_alpha.notifications import recipient_check as event_alpha_telegram_recipient_check
+from .event_alpha.notifications import runs as event_alpha_notification_runs
+from .event_alpha.notifications import sender as event_alpha_notification_sender
+from .event_alpha.notifications import slo as event_alpha_notification_slo
 from . import event_alpha_pipeline
 from . import event_alpha_preflight
 from . import event_alpha_priors
@@ -111,14 +114,11 @@ from . import event_alpha_router
 from . import event_alpha_policy_simulator
 from . import event_alpha_quality_review
 from . import event_alpha_quality_coverage
-from . import event_alpha_send_readiness
 from . import event_alpha_signal_quality
 from . import event_alpha_signal_quality_export
 from . import event_alpha_source_coverage
 from . import event_alpha_scheduler
-from . import event_alpha_telegram_final_check
 from . import event_alpha_tuning
-from . import event_alpha_telegram_recipient_check
 from . import event_alpha_v1_readiness
 from . import event_alpha_environment_doctor
 from . import event_artifact_paths

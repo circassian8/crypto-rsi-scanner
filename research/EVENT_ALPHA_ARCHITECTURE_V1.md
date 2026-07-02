@@ -14,8 +14,9 @@ layout gives new code a home while old import paths continue to work.
   hypotheses, and incident artifacts.
 - `crypto_rsi_scanner/event_alpha/artifacts/`: artifact context, portable
   path helpers, run-ledger rows, retention, locks, and schema v1.
-- `crypto_rsi_scanner/event_alpha/notifications/`: no-send delivery and sender
-  wrappers.
+- `crypto_rsi_scanner/event_alpha/notifications/`: notification preview,
+  no-send delivery, send-readiness, go/no-go, inbox, pack, SLO, pause,
+  Telegram final-check, recipient-check, sender, and formatting helpers.
 - `crypto_rsi_scanner/event_alpha/outcomes/`: integrated outcomes and
   calibration wrappers.
 - `crypto_rsi_scanner/event_alpha/doctor/`: schema doctor, check registry, and
@@ -116,6 +117,37 @@ The lower-level reusable provider adapter packages remain in place:
 and `crypto_rsi_scanner/supply_providers/` are not folded into Event Alpha.
 Current size gate after this provider move: `125` top-level `event_*.py` files,
 `29` compatibility shims, and `96` remaining top-level implementation files.
+
+## Notification Implementation Move
+
+Event Alpha notification, preview, delivery, send-readiness, and
+Telegram-formatting code now lives in package modules:
+
+- `event_alpha.notifications.pipeline` for notification planning, preview
+  rendering, heartbeat copy, research-review/exploratory/core digest rendering,
+  and guarded send orchestration.
+- `event_alpha.notifications.delivery` for the no-send/delivery ledger and
+  explicit `status`/`status_detail` rows.
+- `event_alpha.notifications.sender` for structured Telegram send-attempt
+  metadata and safe error redaction.
+- `event_alpha.notifications.runs` for notification-run summary artifacts.
+- `event_alpha.notifications.go_no_go`,
+  `event_alpha.notifications.readiness`, and
+  `event_alpha.notifications.final_check` for operator readiness and final
+  no-send checks.
+- `event_alpha.notifications.checklist`, `inbox`, `pack`, `pause`, and `slo`
+  for day-1 operator review, export, pause state, and SLO reports.
+- `event_alpha.notifications.formatting` as the public formatting facade for
+  Telegram digest/heartbeat/preview helpers and chunk sizing.
+- `event_alpha.notifications.recipient_check` for guarded Telegram recipient
+  diagnostics.
+
+The old top-level modules remain quiet compatibility shims. No-send semantics,
+structured skip telemetry, delivery `status`/`status_detail` fields, and normal
+heartbeat wording (`Strict alerts`, `Research candidates`, `Raw source
+candidates`) remain behavior-freeze gates. Current size gate after this
+notification move: `125` top-level `event_*.py` files, `42` compatibility shims,
+and `83` remaining top-level implementation files.
 
 ## Future Code Placement
 

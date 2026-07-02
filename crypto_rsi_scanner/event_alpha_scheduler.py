@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_notification_delivery as delivery
+from .event_alpha.notifications import delivery
 
 
 @dataclass(frozen=True)

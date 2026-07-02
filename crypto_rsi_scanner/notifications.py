@@ -7,7 +7,7 @@ from email.mime.text import MIMEText
 import requests
 
 from . import config, formatting
-from .event_alpha_notification_sender import NotificationSendAttemptResult, safe_error
+from .event_alpha.notifications.sender import NotificationSendAttemptResult, safe_error
 
 log = logging.getLogger(__name__)
 

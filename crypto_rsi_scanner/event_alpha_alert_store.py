@@ -12,7 +12,6 @@ from typing import Any, Iterable, Mapping
 
 from . import (
     event_alerts,
-    event_alpha_notification_delivery,
     event_alpha_outcomes,
     event_alpha_quality_fields,
     event_alpha_router,
@@ -22,6 +21,7 @@ from . import (
     event_graph,
     event_playbooks,
 )
+from .event_alpha.notifications import delivery as event_alpha_notification_delivery
 
 ALERT_STORE_SCHEMA_VERSION = "event_alpha_alert_snapshot_v1"
 

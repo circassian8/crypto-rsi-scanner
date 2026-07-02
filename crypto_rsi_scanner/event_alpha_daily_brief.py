@@ -13,8 +13,6 @@ from . import (
     event_alpha_calibration,
     event_alpha_alert_store,
     event_alpha_artifacts,
-    event_alpha_notifications,
-    event_alpha_notification_runs,
     event_alpha_explain,
     event_artifact_paths,
     event_coinalyze_preflight,
@@ -38,6 +36,8 @@ from . import (
     event_source_reliability,
     event_watchlist,
 )
+from .event_alpha.notifications import pipeline as event_alpha_notifications
+from .event_alpha.notifications import runs as event_alpha_notification_runs
 
 
 @dataclass(frozen=True)
