@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Add canonical Event Alpha asset/instrument resolver · Codex
+**Why:** Event Alpha now consumes tickers, CoinGecko IDs, official exchange
+pairs, Coinalyze futures symbols, and theme rows; these needed one conservative
+identity layer so provider artifacts merge on the same tradable asset identity
+without promoting quote assets or diagnostics.
+**Changes:**
+- Added `event_asset_registry.py`, `event_instrument_resolver.py`, and
+  `fixtures/event_discovery/asset_registry.json` with canonical asset schema,
+  fixture/CoinGecko/official exchange/Coinalyze inputs, quote/theme guardrails,
+  proxy labeling, and resolution artifacts.
+- Integrated radar now resolves sidecars before merging, writes
+  `event_asset_registry.json`, `event_instrument_resolution.jsonl`, and
+  `event_asset_resolution_report.md`, and carries canonical IDs/resolver
+  warnings into candidates, CoreOpportunity rows, cards, and doctor checks.
+- Official exchange scans now write the same registry/resolution artifacts, so
+  Bybit/Binance fixture or rehearsal rows share the common activation identity
+  surface.
+- Artifact doctor now reports blockers/warnings for missing canonical IDs when
+  registry fixtures can resolve them, quote assets promoted as targets, SECTOR
+  rows visible as tradable, and unlinked Coinalyze symbols.
+- Added tests for CHZ cross-provider resolution, BTC simple-pair caps,
+  VELVET proxy labeling, SECTOR diagnostics, TESTPERP official+Coinalyze merge,
+  card/core propagation, and doctor conflicts.
+**Verify:** `python3 tests/test_indicators.py` (669/669); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`; `make
+event-alpha-official-exchange-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** The resolver is artifact-only research metadata. It does not
+enable live calls, sends, trades, paper trades, normal RSI writes, execution, or
+Event Alpha-created `TRIGGERED_FADE`.
+
 ## 2026-07-02 — Add official exchange activation framework · Codex
 **Why:** Bybit and Binance official exchange artifacts needed one shared
 activation schema so source coverage, readiness, and artifact doctor checks can

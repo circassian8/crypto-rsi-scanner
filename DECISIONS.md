@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-02 - Event Alpha uses canonical asset identity as research metadata
+**Status:** accepted
+**Decision:** Event Alpha provider artifacts should resolve crypto/provider
+identifiers through a canonical asset/instrument registry before cross-provider
+merges. The resolver may attach `canonical_asset_id`, venue/instrument metadata,
+confidence, and warnings to research artifacts, but it must not create alerts,
+sends, trades, paper trades, normal RSI rows, execution, or Event Alpha-created
+`TRIGGERED_FADE`. Quote assets such as USDT/USDC/FDUSD are diagnostics unless
+explicitly targeted, SECTOR/theme rows are non-tradable diagnostics, BTC/ETH
+simple pair announcements are capped unless materially new, and proxy assets
+must be labeled proxy rather than direct beneficiaries.
+**Why:** CryptoPanic tickers, CoinGecko IDs, official exchange pairs, Coinalyze
+futures symbols, future DEX contracts, calendar symbols, and theme rows need a
+shared identity layer so integrated radar does not merge by fragile provider
+strings or promote non-opportunity assets by accident.
+**Revisit when:** contract-address/DEX pool resolution is added for live DEX
+artifacts or when a reviewed operator workflow explicitly targets quote/base
+assets as first-class research subjects.
+
 ## 2026-07-02 - Official exchange activation uses provider-specific modes under one schema
 **Status:** accepted
 **Decision:** Official exchange activation artifacts use one shared schema with

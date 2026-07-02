@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_official_exchange_activation, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_namespace_status, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_alpha_source_coverage, event_artifact_paths, event_bybit_announcements_preflight, event_coinalyze_preflight, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_instrument_resolver, event_live_provider_readiness, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_official_exchange_activation, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -107,6 +107,10 @@ class EventAlphaArtifactDoctorResult:
     official_exchange_activation_live_without_ledger: int = 0
     official_exchange_activation_signed_listener_secret_leak: int = 0
     official_exchange_activation_forbidden_side_effect_claim: int = 0
+    instrument_resolution_missing_canonical_id_when_fixture_has_it: int = 0
+    instrument_resolution_quote_asset_misclassified: int = 0
+    instrument_resolution_sector_visible_as_tradable: int = 0
+    instrument_resolution_coinalyze_symbol_unlinked: int = 0
     scheduled_catalyst_rows: int = 0
     unlock_candidate_rows: int = 0
     derivatives_state_rows: int = 0
@@ -953,6 +957,7 @@ def diagnose_artifacts(
     coinalyze_preflight_conflicts = event_coinalyze_preflight.artifact_conflicts(namespace_dir)
     bybit_announcements_conflicts = event_bybit_announcements_preflight.artifact_conflicts(namespace_dir)
     official_exchange_activation_conflicts = event_official_exchange_activation.artifact_conflicts(namespace_dir)
+    instrument_resolution_conflicts = event_instrument_resolver.artifact_conflicts(namespace_dir)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
         acquisition_rows=acquisition_rows,
         core_rows=core_rows,
@@ -1222,6 +1227,26 @@ def diagnose_artifacts(
                 blockers.append(message)
             else:
                 warnings.append(message)
+    for key in (
+        "instrument_resolution_missing_canonical_id_when_fixture_has_it",
+        "instrument_resolution_quote_asset_misclassified",
+        "instrument_resolution_sector_visible_as_tradable",
+    ):
+        count = instrument_resolution_conflicts.get(key, 0)
+        if count:
+            message = f"{key}={count}"
+            if strict or key in {
+                "instrument_resolution_quote_asset_misclassified",
+                "instrument_resolution_sector_visible_as_tradable",
+            }:
+                blockers.append(message)
+            else:
+                warnings.append(message)
+    if instrument_resolution_conflicts.get("instrument_resolution_coinalyze_symbol_unlinked", 0):
+        warnings.append(
+            "instrument_resolution_coinalyze_symbol_unlinked="
+            f"{instrument_resolution_conflicts['instrument_resolution_coinalyze_symbol_unlinked']}"
+        )
     for key in (
         "unlock_without_structured_evidence",
         "unlock_missing_event_time",
@@ -2062,6 +2087,18 @@ def diagnose_artifacts(
         ],
         official_exchange_activation_forbidden_side_effect_claim=official_exchange_activation_conflicts[
             "official_exchange_activation_forbidden_side_effect_claim"
+        ],
+        instrument_resolution_missing_canonical_id_when_fixture_has_it=instrument_resolution_conflicts[
+            "instrument_resolution_missing_canonical_id_when_fixture_has_it"
+        ],
+        instrument_resolution_quote_asset_misclassified=instrument_resolution_conflicts[
+            "instrument_resolution_quote_asset_misclassified"
+        ],
+        instrument_resolution_sector_visible_as_tradable=instrument_resolution_conflicts[
+            "instrument_resolution_sector_visible_as_tradable"
+        ],
+        instrument_resolution_coinalyze_symbol_unlinked=instrument_resolution_conflicts[
+            "instrument_resolution_coinalyze_symbol_unlinked"
         ],
         scheduled_catalyst_rows=len(scheduled_catalysts),
         unlock_candidate_rows=len(unlock_candidates),
@@ -6468,6 +6505,14 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"{result.official_exchange_activation_signed_listener_secret_leak} "
             "official_exchange_activation_forbidden_side_effect_claim="
             f"{result.official_exchange_activation_forbidden_side_effect_claim} "
+            "instrument_resolution_missing_canonical_id_when_fixture_has_it="
+            f"{result.instrument_resolution_missing_canonical_id_when_fixture_has_it} "
+            "instrument_resolution_quote_asset_misclassified="
+            f"{result.instrument_resolution_quote_asset_misclassified} "
+            "instrument_resolution_sector_visible_as_tradable="
+            f"{result.instrument_resolution_sector_visible_as_tradable} "
+            "instrument_resolution_coinalyze_symbol_unlinked="
+            f"{result.instrument_resolution_coinalyze_symbol_unlinked} "
             f"scheduled_catalyst_rows={result.scheduled_catalyst_rows} "
             f"unlock_candidate_rows={result.unlock_candidate_rows} "
             f"derivatives_state_rows={result.derivatives_state_rows} "

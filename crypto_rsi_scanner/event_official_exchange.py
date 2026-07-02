@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import config, event_market_reaction
+from . import config, event_asset_registry, event_instrument_resolver, event_market_reaction
 from .event_providers._announcement_common import (
     _announcement_contracts,
     _announcement_items,
@@ -143,6 +143,16 @@ def run_official_exchange_scan(
             event_rows.append(event)
             candidate_rows.extend(_candidate_rows_for_event(event, item))
 
+    event_rows, candidate_rows = _resolve_official_exchange_instruments(
+        directory,
+        event_rows=event_rows,
+        candidate_rows=candidate_rows,
+        generated_at=observed,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        run_mode=run_mode,
+        run_id=run_id,
+    )
     announcements_path = directory / EXCHANGE_ANNOUNCEMENTS_FILENAME
     events_path = directory / OFFICIAL_EXCHANGE_EVENTS_FILENAME
     candidates_path = directory / OFFICIAL_LISTING_CANDIDATES_FILENAME
@@ -223,6 +233,16 @@ def run_official_exchange_scan_from_items(
             event_rows.append(event)
             candidate_rows.extend(_candidate_rows_for_event(event, item))
 
+    event_rows, candidate_rows = _resolve_official_exchange_instruments(
+        directory,
+        event_rows=event_rows,
+        candidate_rows=candidate_rows,
+        generated_at=observed,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        run_mode=run_mode,
+        run_id=run_id,
+    )
     announcements_path = directory / EXCHANGE_ANNOUNCEMENTS_FILENAME
     events_path = directory / OFFICIAL_EXCHANGE_EVENTS_FILENAME
     candidates_path = directory / OFFICIAL_LISTING_CANDIDATES_FILENAME
@@ -253,6 +273,58 @@ def run_official_exchange_scan_from_items(
         candidates=tuple(candidate_rows),
         warnings=tuple(warning_rows),
     )
+
+
+def _resolve_official_exchange_instruments(
+    namespace_dir: Path,
+    *,
+    event_rows: Iterable[Mapping[str, Any]],
+    candidate_rows: Iterable[Mapping[str, Any]],
+    generated_at: str,
+    profile: str | None,
+    artifact_namespace: str | None,
+    run_mode: str | None,
+    run_id: str | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    events = [dict(row) for row in event_rows if isinstance(row, Mapping)]
+    candidates = [dict(row) for row in candidate_rows if isinstance(row, Mapping)]
+    registry = event_asset_registry.build_asset_registry(
+        fixture_path=config.EVENT_ASSET_REGISTRY_PATH,
+        coingecko_universe_path=config.EVENT_DISCOVERY_UNIVERSE_PATH,
+        official_exchange_rows=(*events, *candidates),
+    )
+    resolved_events, event_resolutions = event_instrument_resolver.resolve_rows(
+        events,
+        registry,
+        source_name="official_exchange_event",
+        generated_at=generated_at,
+    )
+    resolved_candidates, candidate_resolutions = event_instrument_resolver.resolve_rows(
+        candidates,
+        registry,
+        source_name="official_listing_candidate",
+        generated_at=generated_at,
+    )
+    event_asset_registry.write_asset_registry_artifact(
+        registry,
+        namespace_dir,
+        generated_at=generated_at,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        run_mode=run_mode,
+        run_id=run_id,
+    )
+    event_instrument_resolver.write_resolution_artifacts(
+        namespace_dir,
+        registry,
+        (*event_resolutions, *candidate_resolutions),
+        generated_at=generated_at,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        run_mode=run_mode,
+        run_id=run_id,
+    )
+    return list(resolved_events), list(resolved_candidates)
 
 
 def normalize_official_exchange_event(

@@ -19,16 +19,19 @@ from tempfile import TemporaryDirectory
 from typing import Any, Iterable, Mapping
 
 from . import (
+    config,
     event_artifact_paths,
     event_alpha_artifacts,
     event_alpha_namespace_status,
     event_alpha_run_ledger,
     event_alpha_router,
     event_alpha_source_coverage,
+    event_asset_registry,
     event_coinalyze_preflight,
     event_live_provider_readiness,
     event_core_opportunity_store,
     event_derivatives_crowding,
+    event_instrument_resolver,
     event_market_anomaly_scanner,
     event_market_reaction,
     event_official_exchange,
@@ -90,6 +93,9 @@ class EventIntegratedRadarResult:
     input_manifest_path: Path | None = None
     source_coverage_json_path: Path | None = None
     source_coverage_path: Path | None = None
+    asset_registry_path: Path | None = None
+    instrument_resolution_path: Path | None = None
+    asset_resolution_report_path: Path | None = None
     research_observed_at: datetime | None = None
     wall_started_at: datetime | None = None
     wall_finished_at: datetime | None = None
@@ -102,6 +108,8 @@ class EventIntegratedRadarResult:
     derivatives_state_rows: int = 0
     derivatives_crowding_candidates: int = 0
     fade_review_candidates: int = 0
+    asset_registry_assets: int = 0
+    instrument_resolution_rows: int = 0
     integrated_candidates: int = 0
     alerts: tuple[Mapping[str, Any], ...] = ()
     routed: int = 0
@@ -175,6 +183,12 @@ def run_integrated_radar_cycle(
         input_mode=mode,
         coinalyze_namespace=coinalyze_namespace,
     )
+    asset_registry = _build_integrated_asset_registry(sidecars)
+    sidecars, sidecar_resolution_rows = event_instrument_resolver.resolve_sidecar_mapping(
+        sidecars,
+        asset_registry,
+        generated_at=research_observed_at,
+    )
     manifest_path = namespace_dir / INPUT_MANIFEST_FILENAME
     _write_json(manifest_path, _input_manifest_document(
         input_manifest,
@@ -193,9 +207,36 @@ def run_integrated_radar_cycle(
         run_mode=context.run_mode,
         run_id=run_id,
         observed_at=research_observed_at,
+        asset_registry=asset_registry,
+    )
+    candidates, candidate_resolution_rows = event_instrument_resolver.resolve_rows(
+        candidates,
+        asset_registry,
+        source_name="integrated_candidate",
+        generated_at=research_observed_at,
     )
     candidates_path = namespace_dir / INTEGRATED_CANDIDATES_FILENAME
     _write_jsonl(candidates_path, candidates)
+    asset_registry_path = event_asset_registry.write_asset_registry_artifact(
+        asset_registry,
+        namespace_dir,
+        generated_at=research_observed_at,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        run_mode=context.run_mode,
+        run_id=run_id,
+    )
+    resolution_rows = (*sidecar_resolution_rows, *candidate_resolution_rows)
+    instrument_resolution_path, asset_resolution_report_path = event_instrument_resolver.write_resolution_artifacts(
+        namespace_dir,
+        asset_registry,
+        resolution_rows,
+        generated_at=research_observed_at,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        run_mode=context.run_mode,
+        run_id=run_id,
+    )
     report_path = namespace_dir / INTEGRATED_REPORT_FILENAME
     report_path.write_text(
         format_integrated_radar_report(candidates, context=context, input_manifest=input_manifest),
@@ -338,6 +379,8 @@ def run_integrated_radar_cycle(
         derivatives_state_rows=sidecar_counts["derivatives_state_rows"],
         derivatives_crowding_candidates=sidecar_counts["derivatives_crowding_candidates"],
         fade_review_candidates=sidecar_counts["fade_review_candidates"],
+        asset_registry_assets=len(asset_registry),
+        instrument_resolution_rows=len(resolution_rows),
         integrated_candidates=len(candidates),
         candidates=len(candidates),
         core_opportunity_rows_written=core_result.rows_written,
@@ -356,6 +399,9 @@ def run_integrated_radar_cycle(
         input_manifest_path=manifest_path,
         source_coverage_json_path=source_coverage_json_path,
         source_coverage_path=source_coverage_path,
+        asset_registry_path=asset_registry_path,
+        instrument_resolution_path=instrument_resolution_path,
+        asset_resolution_report_path=asset_resolution_report_path,
         send_lane_items_attempted=dict(lane_due),
         send_lane_items_delivered={lane: 0 for lane in lane_due},
         send_would_send_items=sum(lane_due.values()),
@@ -395,6 +441,27 @@ def run_integrated_radar_cycle(
     return result
 
 
+def _build_integrated_asset_registry(
+    sidecar_rows: Mapping[str, Iterable[Mapping[str, Any]]],
+) -> tuple[event_asset_registry.CanonicalAsset, ...]:
+    official_rows: list[Mapping[str, Any]] = []
+    coinalyze_rows: list[Mapping[str, Any]] = []
+    for origin, rows in sidecar_rows.items():
+        materialized = [row for row in rows if isinstance(row, Mapping)]
+        if origin in {"official_exchange"}:
+            official_rows.extend(materialized)
+        if origin in COINALYZE_EXTERNAL_SIDECARS or origin == "coinalyze":
+            coinalyze_rows.extend(materialized)
+        if origin in {"market_anomaly", "scheduled_catalyst", "unlock"}:
+            official_rows.extend(materialized)
+    return event_asset_registry.build_asset_registry(
+        fixture_path=config.EVENT_ASSET_REGISTRY_PATH,
+        coingecko_universe_path=config.EVENT_DISCOVERY_UNIVERSE_PATH,
+        official_exchange_rows=official_rows,
+        coinalyze_rows=coinalyze_rows,
+    )
+
+
 def build_integrated_candidates(
     *,
     sidecar_rows: Mapping[str, Iterable[Mapping[str, Any]]],
@@ -403,9 +470,17 @@ def build_integrated_candidates(
     run_mode: str | None,
     run_id: str | None,
     observed_at: datetime | str | None = None,
+    asset_registry: Iterable[event_asset_registry.CanonicalAsset] | None = None,
 ) -> tuple[dict[str, Any], ...]:
     """Merge sidecar rows into one candidate per canonical family."""
     observed = _as_utc(_parse_time(observed_at) or datetime.now(timezone.utc)).isoformat()
+    if asset_registry is None:
+        asset_registry = _build_integrated_asset_registry(sidecar_rows)
+        sidecar_rows, _resolution_rows = event_instrument_resolver.resolve_sidecar_mapping(
+            sidecar_rows,
+            asset_registry,
+            generated_at=observed,
+        )
     coinalyze_index = _coinalyze_match_index(sidecar_rows)
     coinalyze_seen_by_family: dict[str, set[str]] = {}
     grouped: dict[str, list[dict[str, Any]]] = {}
@@ -1746,6 +1821,19 @@ def _merge_family(
     primary = _select_primary(rows)
     symbol = _text(_first_value(rows, "symbol", "validated_symbol")) or "UNKNOWN"
     coin_id = _text(_first_value(rows, "coin_id", "validated_coin_id")) or symbol.casefold()
+    canonical_asset_id = _text(_first_value(rows, "canonical_asset_id")) or coin_id or symbol
+    resolver_confidences = [
+        _float_value(row.get("instrument_resolver_confidence"))
+        for row in rows
+        if _float_value(row.get("instrument_resolver_confidence")) is not None
+    ]
+    resolver_warnings = tuple(dict.fromkeys(_merged_list(rows, "instrument_resolver_warnings")))
+    is_theme_or_sector = any(_truthy(row.get("is_theme_or_sector")) for row in rows)
+    is_quote_asset = any(_truthy(row.get("is_quote_asset")) or _truthy(row.get("quote_asset_excluded")) for row in rows)
+    is_tradable_asset = not (is_theme_or_sector or is_quote_asset)
+    explicit_tradable_values = [row.get("is_tradable_asset") for row in rows if row.get("is_tradable_asset") is not None]
+    if explicit_tradable_values:
+        is_tradable_asset = all(_truthy(value) for value in explicit_tradable_values) and not (is_theme_or_sector or is_quote_asset)
     market_snapshot = _best_market_snapshot(rows)
     derivatives_row = _best_derivatives_row(rows)
     official_row = _best_row(
@@ -1783,7 +1871,11 @@ def _merge_family(
     score = _score_for(opportunity, raw_reaction, rows, source_strength)
     level, route, state = _level_route_state(opportunity)
     reason_codes = tuple(dict.fromkeys((*_merged_list(rows, "reason_codes"), *raw_reaction.reason_codes)))
-    warnings = tuple(dict.fromkeys((*_merged_list(rows, "warnings"), *_policy_warnings(opportunity, rows, raw_reaction))))
+    warnings = tuple(dict.fromkeys((
+        *_merged_list(rows, "warnings"),
+        *resolver_warnings,
+        *_policy_warnings(opportunity, rows, raw_reaction),
+    )))
     candidate_id = f"iar:{_digest(key)}"
     derivatives_metadata = _derivatives_metadata(derivatives_row)
     derivatives_state_snapshot = dict(derivatives_row.get("derivatives_state_snapshot") or {}) if derivatives_row else None
@@ -1802,7 +1894,27 @@ def _merge_family(
         "validated_symbol": symbol,
         "coin_id": coin_id,
         "validated_coin_id": coin_id,
-        "canonical_asset_id": coin_id or symbol,
+        "canonical_asset_id": canonical_asset_id,
+        "asset_registry_symbol": _best_text(rows, "asset_registry_symbol"),
+        "asset_registry_coin_id": _best_text(rows, "asset_registry_coin_id"),
+        "asset_registry_name": _best_text(rows, "asset_registry_name"),
+        "asset_registry_liquidity_tier": _best_text(rows, "asset_registry_liquidity_tier"),
+        "asset_registry_venues": list(dict.fromkeys(_merged_list(rows, "asset_registry_venues"))),
+        "asset_registry_spot_symbols": list(dict.fromkeys(_merged_list(rows, "asset_registry_spot_symbols"))),
+        "asset_registry_perp_symbols": list(dict.fromkeys(_merged_list(rows, "asset_registry_perp_symbols"))),
+        "asset_registry_coinalyze_symbols": list(dict.fromkeys(_merged_list(rows, "asset_registry_coinalyze_symbols"))),
+        "asset_registry_bybit_symbols": list(dict.fromkeys(_merged_list(rows, "asset_registry_bybit_symbols"))),
+        "asset_registry_binance_symbols": list(dict.fromkeys(_merged_list(rows, "asset_registry_binance_symbols"))),
+        "instrument_resolver_status": _best_text(rows, "instrument_resolver_status"),
+        "instrument_resolver_confidence": max(resolver_confidences) if resolver_confidences else 0.0,
+        "instrument_resolver_match_reason": _best_text(rows, "instrument_resolver_match_reason"),
+        "instrument_resolver_warnings": list(resolver_warnings),
+        "is_tradable_asset": is_tradable_asset,
+        "is_theme_or_sector": is_theme_or_sector,
+        "is_quote_asset": is_quote_asset,
+        "quote_asset_excluded": any(_truthy(row.get("quote_asset_excluded")) for row in rows),
+        "base_asset_excluded": any(_truthy(row.get("base_asset_excluded")) for row in rows),
+        "diagnostics_reason": _best_text(rows, "diagnostics_reason"),
         "source_origin": "merged" if len(origins) > 1 else origins[0],
         "source_origins": list(origins),
         "source_pack": source_pack,
@@ -1866,7 +1978,7 @@ def _merge_family(
         "triggered_fade_created": False,
         "paper_trade_created": False,
         "notification_send_enabled": False,
-        "candidate_role": _candidate_role_for(opportunity),
+        "candidate_role": _best_text(rows, "candidate_role", "asset_role") or _candidate_role_for(opportunity),
         "primary_impact_path": impact_path,
         "impact_path_type": impact_path,
         "effective_playbook_type": impact_path,
@@ -2016,7 +2128,14 @@ def _clear_namespace(namespace_dir: Path) -> None:
 
 
 def _candidate_family_key(row: Mapping[str, Any]) -> str:
-    asset = _text(row.get("coin_id") or row.get("validated_coin_id") or row.get("symbol") or row.get("validated_symbol") or "unknown").casefold()
+    asset = _text(
+        row.get("canonical_asset_id")
+        or row.get("coin_id")
+        or row.get("validated_coin_id")
+        or row.get("symbol")
+        or row.get("validated_symbol")
+        or "unknown"
+    ).casefold()
     family = _impact_family(row)
     return "|".join(part for part in (asset, family) if part)
 
@@ -2052,7 +2171,9 @@ def _policy_opportunity_type(
     *,
     official_row: Mapping[str, Any] | None,
 ) -> str:
-    if any(str(row.get("symbol") or "").upper() == "SECTOR" for row in rows):
+    if any(_truthy(row.get("is_theme_or_sector")) or str(row.get("symbol") or "").upper() == "SECTOR" for row in rows):
+        return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
+    if any(_truthy(row.get("quote_asset_excluded")) or _truthy(row.get("is_quote_asset")) for row in rows):
         return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
     if official_row and bool(official_row.get("major_pair_simple_announcement")):
         return event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value

@@ -39900,6 +39900,80 @@ def test_makefile_exposes_derivatives_targets():
     assert "--event-alpha-derivatives-report" in text
 
 
+def test_event_instrument_resolver_cross_provider_identity_and_guardrails():
+    import json
+
+    from crypto_rsi_scanner import config, event_asset_registry, event_instrument_resolver
+
+    with TemporaryDirectory() as tmp:
+        universe_path = Path(tmp) / "coingecko_universe.json"
+        universe_path.write_text(
+            json.dumps({"coins": [{"id": "chiliz", "symbol": "chz", "name": "Chiliz", "market_cap_rank": 80}]}),
+            encoding="utf-8",
+        )
+        official_rows = [
+            {
+                "row_type": "official_listing_candidate",
+                "provider": "binance_announcements",
+                "exchange": "binance",
+                "symbol": "CHZ",
+                "coin_id": "chiliz",
+                "pairs": ["CHZ/USDT"],
+                "listing_scope": "spot",
+            }
+        ]
+        coinalyze_rows = [
+            {
+                "row_type": "derivatives_state_snapshot",
+                "provider": "coinalyze",
+                "symbol": "CHZUSDT_PERP.A",
+                "market_symbol": "CHZUSDT_PERP.A",
+                "base_symbol": "CHZ",
+                "coin_id": "chiliz",
+            }
+        ]
+        registry = event_asset_registry.build_asset_registry(
+            fixture_path=config.EVENT_ASSET_REGISTRY_PATH,
+            coingecko_universe_path=universe_path,
+            official_exchange_rows=official_rows,
+            coinalyze_rows=coinalyze_rows,
+        )
+        rows = [
+            {"provider": "cryptopanic", "source_class": "cryptopanic_tagged", "symbol": "CHZ", "coin_id": "chiliz"},
+            *official_rows,
+            *coinalyze_rows,
+        ]
+        enriched, _resolutions = event_instrument_resolver.resolve_rows(rows, registry)
+        assert {row["canonical_asset_id"] for row in enriched} == {"chiliz"}
+        assert all(row["instrument_resolver_confidence"] >= 0.9 for row in enriched)
+        assert all("coinalyze_symbol_not_linked_to_asset" not in row.get("instrument_resolver_warnings", ()) for row in enriched)
+        chiliz = next(asset for asset in registry if asset.canonical_asset_id == "chiliz")
+        assert "CHZUSDT_PERP.A" in chiliz.coinalyze_symbols
+        assert "CHZ/USDT" in chiliz.binance_symbols
+
+        guardrail_rows, _guardrail_resolutions = event_instrument_resolver.resolve_rows(
+            [
+                {"row_type": "official_listing_candidate", "symbol": "BTC", "coin_id": "bitcoin", "major_pair_simple_announcement": True},
+                {"row_type": "official_listing_candidate", "symbol": "USDT", "coin_id": "tether", "opportunity_type": "EARLY_LONG_RESEARCH"},
+                {"row_type": "scheduled_catalyst_event", "symbol": "SECTOR", "coin_id": "ai_theme"},
+                {"row_type": "event_integrated_radar_candidate", "symbol": "VELVET", "coin_id": "velvet", "candidate_role": "direct_event"},
+            ],
+            registry,
+        )
+        btc, quote, sector, proxy = guardrail_rows
+        assert btc["canonical_asset_id"] == "bitcoin"
+        assert "major_pair_simple_announcement_capped" in btc["instrument_resolver_warnings"]
+        assert quote["is_tradable_asset"] is False
+        assert quote["quote_asset_excluded"] is True
+        assert "quote_asset_target_excluded" in quote["instrument_resolver_warnings"]
+        assert sector["is_theme_or_sector"] is True
+        assert sector["is_tradable_asset"] is False
+        assert sector["instrument_resolver_status"] == "resolved_theme"
+        assert proxy["canonical_asset_id"] == "velvet"
+        assert proxy["candidate_role"] == "proxy_instrument"
+        assert "proxy_asset_labeled_proxy" in proxy["instrument_resolver_warnings"]
+
+
 def test_integrated_radar_fixture_lanes_and_merge():
     import json
 
@@ -39923,6 +39997,11 @@ def test_integrated_radar_fixture_lanes_and_merge():
             if line.strip()
         ]
         by_symbol = {row["symbol"]: row for row in rows}
+        assert result.asset_registry_path and result.asset_registry_path.exists()
+        assert result.instrument_resolution_path and result.instrument_resolution_path.exists()
+        assert result.asset_resolution_report_path and result.asset_resolution_report_path.exists()
+        assert result.asset_registry_assets >= 6
+        assert result.instrument_resolution_rows >= len(rows)
 
         assert by_symbol["TESTLIST"]["opportunity_type"] == "EARLY_LONG_RESEARCH"
         assert by_symbol["TESTPERP"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH"
@@ -39937,10 +40016,16 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert "major_pair_simple_announcement_not_alpha" in by_symbol["BTC"]["why_not_alertable"]
         assert by_symbol["BTC"]["source_url"]
         assert by_symbol["BTC"]["official_exchange_event"]["event_type"] == "new_trading_pair"
+        assert by_symbol["BTC"]["canonical_asset_id"] == "bitcoin"
+        assert by_symbol["BTC"]["major_base_asset"] is True
 
         assert set(by_symbol["TESTPERP"]["source_origins"]) >= {"official_exchange", "market_anomaly", "derivatives"}
         assert set(by_symbol["TESTFADE"]["source_origins"]) >= {"official_exchange", "market_anomaly", "derivatives"}
+        assert by_symbol["TESTPERP"]["canonical_asset_id"] == "test-perp"
+        assert by_symbol["TESTPERP"]["instrument_resolver_confidence"] >= 0.9
+        assert by_symbol["TESTPERP"]["asset_registry_coinalyze_symbols"]
         assert by_symbol["TESTFADE"]["derivatives_snapshot"]
+        assert by_symbol["TESTFADE"]["canonical_asset_id"] == "test-fade"
         assert by_symbol["TESTFADE"]["crowding_class"] == "extreme"
         assert by_symbol["TESTFADE"]["fade_readiness"] == "ready_for_review"
         assert "open_interest_delta_24h_high" in by_symbol["TESTFADE"]["crowding_exhaustion_evidence"]
@@ -39951,6 +40036,8 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert by_symbol["TESTPERP"]["fade_readiness"] == "not_ready"
         assert "confirmed_long_derivatives_crowding_warning" in by_symbol["TESTPERP"]["warnings"]
         assert by_symbol["TESTPERP"]["integrated_market_confirmation_level"] == "confirmed_breakout"
+        assert by_symbol["SECTOR"]["is_theme_or_sector"] is True
+        assert by_symbol["SECTOR"]["is_tradable_asset"] is False
 
         cores = [
             json.loads(line)
@@ -39961,10 +40048,13 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert "SECTOR" not in core_by_symbol
         assert core_by_symbol["BTC"]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
         assert core_by_symbol["BTC"]["source_url"] == by_symbol["BTC"]["source_url"]
+        assert core_by_symbol["BTC"]["canonical_asset_id"] == "bitcoin"
         assert core_by_symbol["BTC"]["official_exchange_event_type"] == "new_trading_pair"
         assert core_by_symbol["BTC"]["official_exchange_event"]["event_type"] == "new_trading_pair"
         assert core_by_symbol["TESTLIST"]["official_exchange_event_type"] == "spot_listing"
         assert core_by_symbol["TESTPERP"]["official_exchange_event_type"] == "perp_listing"
+        assert core_by_symbol["TESTPERP"]["canonical_asset_id"] == "test-perp"
+        assert core_by_symbol["TESTPERP"]["asset_registry_coinalyze_symbols"]
         assert core_by_symbol["TESTPERP"]["crowding_class"] == "moderate"
         assert "confirmed_long_derivatives_crowding_warning" in core_by_symbol["TESTPERP"]["warnings"]
         assert core_by_symbol["TESTFADE"]["crowding_class"] == "extreme"
@@ -39994,9 +40084,12 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert "- Why now: simple major-pair announcement capped as unconfirmed research" in card_text_by_symbol["BTC"]
         assert "major_pair_simple_announcement_capped" in card_text_by_symbol["BTC"]
         assert "- Opportunity type: EARLY_LONG_RESEARCH" not in card_text_by_symbol["BTC"]
+        assert "- Canonical asset: bitcoin" in card_text_by_symbol["BTC"]
+        assert "- Canonical asset: test-fade" in card_text_by_symbol["TESTFADE"]
         assert "- Crowding class: extreme" in card_text_by_symbol["TESTFADE"]
         assert "- Fade readiness: ready_for_review" in card_text_by_symbol["TESTFADE"]
         assert "Derivatives crowding: n/a" not in card_text_by_symbol["TESTFADE"]
+        assert "- Canonical asset: test-perp" in card_text_by_symbol["TESTPERP"]
         assert "- Integrated market state: post_event_fade_setup" in card_text_by_symbol["TESTFADE"]
         assert "- Crowding class: moderate" in card_text_by_symbol["TESTPERP"]
         assert "confirmed_long_derivatives_crowding_warning" in card_text_by_symbol["TESTPERP"]
@@ -40337,6 +40430,69 @@ def test_integrated_market_anomaly_alone_does_not_confirm():
     assert rows[0]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
     assert rows[0]["created_alert"] is False
     assert rows[0]["triggered_fade_created"] is False
+
+
+def test_instrument_resolution_artifact_doctor_conflicts():
+    import json
+
+    from crypto_rsi_scanner import config, event_asset_registry, event_instrument_resolver
+
+    with TemporaryDirectory() as tmp:
+        namespace = Path(tmp)
+        registry = event_asset_registry.build_asset_registry(fixture_path=config.EVENT_ASSET_REGISTRY_PATH)
+        event_asset_registry.write_asset_registry_artifact(
+            registry,
+            namespace,
+            generated_at="2026-06-15T16:00:00Z",
+            profile="fixture",
+            artifact_namespace="instrument_resolution_test",
+            run_mode="fixture",
+            run_id="run",
+        )
+        bad_candidates = [
+            {
+                "row_type": "event_integrated_radar_candidate",
+                "symbol": "TESTPERP",
+                "coin_id": "test-perp",
+                "opportunity_type": "CONFIRMED_LONG_RESEARCH",
+            },
+            {
+                "row_type": "event_integrated_radar_candidate",
+                "symbol": "USDT",
+                "coin_id": "tether",
+                "canonical_asset_id": "tether",
+                "opportunity_type": "EARLY_LONG_RESEARCH",
+                "is_tradable_asset": True,
+                "quote_asset_excluded": True,
+            },
+            {
+                "row_type": "event_integrated_radar_candidate",
+                "symbol": "SECTOR",
+                "coin_id": "ai_theme",
+                "canonical_asset_id": "ai_theme",
+                "opportunity_type": "CONFIRMED_LONG_RESEARCH",
+                "is_tradable_asset": True,
+                "is_theme_or_sector": True,
+            },
+        ]
+        (namespace / "event_integrated_radar_candidates.jsonl").write_text(
+            "\n".join(json.dumps(row) for row in bad_candidates) + "\n",
+            encoding="utf-8",
+        )
+        (namespace / event_instrument_resolver.INSTRUMENT_RESOLUTION_JSONL).write_text(
+            json.dumps({
+                "row_type": "event_instrument_resolution",
+                "resolver_warnings": ["coinalyze_symbol_not_linked_to_asset"],
+            })
+            + "\n",
+            encoding="utf-8",
+        )
+
+        conflicts = event_instrument_resolver.artifact_conflicts(namespace)
+        assert conflicts["instrument_resolution_missing_canonical_id_when_fixture_has_it"] == 1
+        assert conflicts["instrument_resolution_quote_asset_misclassified"] == 1
+        assert conflicts["instrument_resolution_sector_visible_as_tradable"] == 1
+        assert conflicts["instrument_resolution_coinalyze_symbol_unlinked"] == 1
 
 
 def test_integrated_radar_outcomes_and_calibration_are_research_only():

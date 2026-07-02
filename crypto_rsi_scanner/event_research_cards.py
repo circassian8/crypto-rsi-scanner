@@ -154,17 +154,21 @@ def render_research_card(
     playbook = _value(entry, alert, "latest_playbook_type", "playbook_type") or "unknown"
     symbol = _value(entry, alert, "symbol", "asset_symbol") or "UNKNOWN"
     coin_id = _value(entry, alert, "coin_id", "asset_coin_id") or "unknown"
+    canonical_asset_id = _value(entry, alert, "canonical_asset_id", "canonical_asset_id")
     event_name = _value(entry, alert, "latest_event_name", "event_name") or "unknown event"
     tier = _value(entry, alert, "latest_tier", "tier") or "unknown"
     state = event_watchlist.final_state_value(entry) if entry is not None else str(alert.get("final_state_after_quality_gate") or alert.get("state") or "snapshot")
     generated_iso = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
+    summary_identity_lines = [f"- Asset: {symbol}/{coin_id}"]
+    if canonical_asset_id:
+        summary_identity_lines.append(f"- Canonical asset: {canonical_asset_id}")
     lines = [
         f"# {symbol} Event Research Card",
         "",
         "Research artifact only. Not a trade signal, paper trade, live RSI signal, or execution.",
         "",
         "## Summary",
-        f"- Asset: {symbol}/{coin_id}",
+        *summary_identity_lines,
         f"- Event: {event_name}",
         f"- State / alert tier: {state} / {tier}",
         f"- Playbook: {playbook}",
