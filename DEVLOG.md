@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Split RSI and CLI tests into pytest packages · Codex
+**Why:** The refactor baseline calls for `tests/test_indicators.py` to become a
+small umbrella runner. After the Event Alpha split, the remaining RSI,
+backtest, paper/risk, and CLI/Makefile tests still needed focused pytest homes.
+**Changes:**
+- Moved RSI/math, state-feature, setup/tier/regime, scanner scoring, and
+  universe hygiene tests into `tests/rsi/test_indicators_core.py`.
+- Moved backtest edge, PIT/volume membership, cache, fixture-loader, and
+  backtest CLI regressions into `tests/rsi/test_backtest.py`.
+- Moved outcome grading, paper scoreboard, refresh-paper, and risk/rendering
+  guard tests into `tests/rsi/test_paper_risk.py`.
+- Moved CLI dispatch smoke coverage into `tests/cli/test_parser.py` and
+  Makefile/export/CI/refactor-baseline checks into
+  `tests/cli/test_make_targets.py`.
+- Added `tests/rsi/_legacy_helpers.py` for mechanically moved legacy helper
+  globals, kept `tests/test_indicators.py` as the standalone runner, and added
+  split runner counts for Event Alpha, RSI, CLI, and remaining umbrella tests.
+- Added `make test-rsi`, `make test-cli`, `make test-pytest`, and a
+  skip-clean `make test-pytest-parallel`; `pytest-xdist` absence now prints a
+  friendly skip instead of rerunning serial pytest.
+- Added `research/TEST_SUITE_ORGANIZATION.md` and updated `ROADMAP.md` with the
+  current layout, size gate, and remaining legacy sections.
+**Verify:** `python3 tests/test_indicators.py` (717/717); `python3 -m pytest
+tests/rsi tests/cli tests/event_alpha` (679/679); `make test-rsi PYTHON=python3`
+(97/97); `make test-cli PYTHON=python3` (23/23); `make test-pytest PYTHON=python3`
+(723/723); `make test-pytest-parallel PYTHON=python3 || true` (xdist missing,
+friendly skip); `python3 -m compileall -q crypto_rsi_scanner tests`;
+`make verify PYTHON=python3`.
+**Notes/risks:** This is a test-layout refactor only. The umbrella runner is now
+1,770 lines, below the 2k final-phase size gate, with 44 local legacy tests
+remaining for future config/storage/telegram/ops splits. No live provider calls,
+Telegram sends, trading, paper trading, normal RSI writes, or Event
+Alpha-created `TRIGGERED_FADE` behavior were added.
+
 ## 2026-07-02 — Split Event Alpha tests into pytest package · Codex
 **Why:** The refactor baseline called for `tests/test_indicators.py` to become
 an umbrella compatibility runner instead of carrying the full Event Alpha test
