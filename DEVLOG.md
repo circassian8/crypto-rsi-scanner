@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Split Event Alpha tests into pytest package · Codex
+**Why:** The refactor baseline called for `tests/test_indicators.py` to become
+an umbrella compatibility runner instead of carrying the full Event Alpha test
+surface inline. Splitting the Event Alpha tests makes package refactors easier
+to verify with focused pytest runs while preserving the historical standalone
+test command.
+**Changes:**
+- Moved 537 Event Alpha tests out of `tests/test_indicators.py` into focused
+  `tests/event_alpha/` modules for integrated radar, notifications, provider
+  readiness, artifact doctor, artifact schema, outcomes, source coverage, and
+  namespace lifecycle.
+- Added `tests/event_alpha/_legacy_helpers.py` for mechanically moved fixture
+  helpers and `tests/event_alpha/conftest.py` to restore Event Alpha config
+  globals between pytest tests.
+- Updated the standalone runner in `tests/test_indicators.py` to load split
+  Event Alpha modules only when run as a script, support minimal `tmp_path`
+  fixtures, restore config state per test, and expose `--list-tests` for cheap
+  split-runner checks.
+- Added `make test-event-alpha PYTHON=python3` and a split wiring test that
+  verifies the standalone runner discovers the moved tests and the Make target
+  points at `python -m pytest tests/event_alpha`.
+- Reduced `tests/test_indicators.py` from roughly 42k lines to 4,987 lines; it
+  now keeps 149 local legacy/base tests and loads 559 Event Alpha package tests
+  for standalone compatibility.
+**Verify:** `python3 tests/test_indicators.py` (708/708); `python3 -m pytest
+tests/event_alpha` (559/559); `python3 -m compileall -q crypto_rsi_scanner
+tests`; `make test-event-alpha PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** This is a test-layout refactor only. Event Alpha remains
+fixture/no-send by default; no live provider calls, Telegram sends, trades,
+paper rows, normal RSI rows, or Event Alpha-created `TRIGGERED_FADE` behavior
+were added.
+
 ## 2026-07-02 — Move Event Alpha outcome modules into package homes · Codex
 **Why:** The outcome/calibration refactor slice needed integrated radar
 outcomes, calibration, feedback readiness, burn-in, quality, priors, and policy
