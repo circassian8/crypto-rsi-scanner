@@ -39592,6 +39592,230 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert "/Users/" not in daily
 
 
+def test_integrated_radar_loads_external_coinalyze_namespace():
+    import json
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner import (
+        event_alpha_artifacts,
+        event_alpha_namespace_status,
+        event_coinalyze_preflight,
+        event_derivatives_crowding,
+        event_integrated_radar,
+        event_live_provider_readiness,
+    )
+
+    payload = {
+        "derivatives": [
+            {
+                "symbol": "TESTFADE",
+                "coin_id": "test-fade",
+                "open_interest_delta_24h": 0.58,
+                "funding_rate": 0.0012,
+                "funding_zscore": 3.2,
+                "liquidation_long_usd": 2_800_000,
+                "liquidation_short_usd": 500_000,
+                "perp_volume": 90_000_000,
+                "spot_volume": 30_000_000,
+                "freshness_status": "fresh",
+            },
+            {
+                "symbol": "TESTPERP",
+                "coin_id": "test-perp",
+                "market": "TESTPERPUSDT_PERP.A",
+                "open_interest_delta_24h": 0.44,
+                "funding_rate": 0.0008,
+                "funding_zscore": 2.6,
+                "liquidation_long_usd": 800_000,
+                "liquidation_short_usd": 110_000,
+                "perp_volume": 42_000_000,
+                "spot_volume": 10_000_000,
+                "freshness_status": "fresh",
+            },
+        ],
+        "candidates": [
+            {
+                "symbol": "TESTFADE",
+                "coin_id": "test-fade",
+                "event_name": "TESTFADE listing blowoff",
+                "source_class": "official_exchange",
+                "source_pack": "listing_liquidity_pack",
+                "impact_path_type": "listing_liquidity_event",
+                "evidence_quality_score": 92,
+                "accepted_evidence_count": 1,
+                "market_snapshot": {
+                    "return_unit": "fraction",
+                    "return_4h": 0.21,
+                    "return_24h": 0.42,
+                    "volume_zscore_24h": 4.8,
+                    "liquidity_usd": 3_500_000,
+                    "spread_bps": 42,
+                    "event_age_hours": 3,
+                },
+            },
+            {
+                "symbol": "TESTPERP",
+                "coin_id": "test-perp",
+                "event_name": "TESTPERP perp breakout",
+                "source_class": "official_exchange",
+                "source_pack": "perp_listing_squeeze_pack",
+                "impact_path_type": "listing_liquidity_event",
+                "evidence_quality_score": 92,
+                "accepted_evidence_count": 1,
+                "market_snapshot": {
+                    "return_unit": "fraction",
+                    "return_4h": 0.11,
+                    "return_24h": 0.18,
+                    "volume_zscore_24h": 3.4,
+                    "liquidity_usd": 18_000_000,
+                    "spread_bps": 18,
+                    "event_age_hours": -1,
+                },
+            },
+        ],
+    }
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        coinalyze_dir = base / "external_coinalyze"
+        fixture_path = base / "coinalyze_payload.json"
+        fixture_path.write_text(json.dumps(payload), encoding="utf-8")
+        event_derivatives_crowding.run_derivatives_crowding_scan(
+            namespace_dir=coinalyze_dir,
+            derivatives_path=fixture_path,
+            profile="fixture",
+            artifact_namespace="external_coinalyze",
+            run_mode="fixture",
+            run_id="coinalyze-run",
+            observed_at=datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc),
+        )
+        (coinalyze_dir / event_coinalyze_preflight.REHEARSAL_JSON).write_text(
+            json.dumps({
+                "status": "live_rehearsal_success",
+                "provider_health_status": "observed_healthy",
+                "snapshots_written": 2,
+                "crowding_candidates_written": 2,
+                "fade_review_candidates_written": 1,
+            }),
+            encoding="utf-8",
+        )
+        context = event_alpha_artifacts.context_from_profile(
+            "fixture",
+            run_mode="fixture",
+            base_dir=base,
+            artifact_namespace="integrated_test",
+        )
+        result = event_integrated_radar.run_integrated_radar_cycle(
+            context=context,
+            fixture=True,
+            observed_at="2026-06-15T16:00:00Z",
+            coinalyze_namespace="external_coinalyze",
+        )
+        rows = [
+            json.loads(line)
+            for line in result.integrated_candidates_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        by_symbol = {row["symbol"]: row for row in rows}
+        assert by_symbol["TESTPERP"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH"
+        assert by_symbol["TESTPERP"]["coinalyze_derivatives_attached"] is True
+        assert by_symbol["TESTPERP"]["coinalyze_artifact_namespace"] == "external_coinalyze"
+        assert "confirmed_long_derivatives_crowding_warning" in by_symbol["TESTPERP"]["warnings"]
+        assert by_symbol["TESTFADE"]["opportunity_type"] == "FADE_SHORT_REVIEW"
+        assert by_symbol["TESTFADE"]["coinalyze_derivatives_attached"] is True
+        assert by_symbol["TESTFADE"]["crowding_class"] == "extreme"
+        assert "open_interest_delta_24h_high" in by_symbol["TESTFADE"]["crowding_exhaustion_evidence"]
+
+        manifest = json.loads(result.input_manifest_path.read_text(encoding="utf-8"))
+        assert manifest["coinalyze_artifact_namespace"] == "external_coinalyze"
+        assert manifest["coinalyze_derivatives_state_rows_loaded"] == 2
+        assert manifest["coinalyze_crowding_candidates_loaded"] == 2
+        assert manifest["coinalyze_fade_review_candidates_loaded"] == 1
+        assert manifest["coinalyze_provider_health_status"] == "observed_healthy"
+        assert manifest["coinalyze_freshness_status"] == "fresh"
+        assert manifest["coinalyze_skip_reason"] is None
+        coverage = json.loads(result.source_coverage_json_path.read_text(encoding="utf-8"))
+        assert coverage["coinalyze_derivatives_state_rows_loaded"] == 2
+        daily = result.daily_brief_path.read_text(encoding="utf-8")
+        assert "### Derivatives/OI/funding status" in daily
+        assert "namespace=external_coinalyze" in daily
+        assert "event_derivatives_state.jsonl" in daily
+        cards = "\n".join(path.read_text(encoding="utf-8") for path in result.research_card_paths if path.name != "index.md")
+        assert "Coinalyze source: namespace=external_coinalyze" in cards
+        assert "/Users/" not in cards
+
+        auto_context = event_alpha_artifacts.context_from_profile(
+            "fixture",
+            run_mode="fixture",
+            base_dir=base,
+            artifact_namespace="integrated_auto",
+        )
+        event_integrated_radar.run_integrated_radar_cycle(
+            context=auto_context,
+            fixture=True,
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        (auto_context.namespace_dir / event_live_provider_readiness.READINESS_JSON).write_text(
+            json.dumps({
+                "providers": [
+                    {
+                        "provider_name": "coinalyze",
+                        "latest_request_ledger_path": "event_fade_cache/external_coinalyze/event_coinalyze_request_ledger.jsonl",
+                    }
+                ]
+            }),
+            encoding="utf-8",
+        )
+        auto_result = event_integrated_radar.run_integrated_radar_cycle(
+            context=auto_context,
+            input_mode=event_integrated_radar.INPUT_MODE_LOAD_EXISTING,
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        auto_manifest = json.loads(auto_result.input_manifest_path.read_text(encoding="utf-8"))
+        assert auto_manifest["coinalyze_artifact_namespace"] == "external_coinalyze"
+        assert auto_manifest["coinalyze_derivatives_state_rows_loaded"] == 2
+        assert auto_manifest["sidecars"][-1]["coinalyze_artifact_selection_mode"] == "readiness_auto"
+
+        event_alpha_namespace_status.mark_namespace_stale(
+            coinalyze_dir,
+            namespace="external_coinalyze",
+            reason="test stale namespace",
+            superseded_by="new_coinalyze",
+            now=datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc),
+        )
+        stale_context = event_alpha_artifacts.context_from_profile(
+            "fixture",
+            run_mode="fixture",
+            base_dir=base,
+            artifact_namespace="integrated_stale",
+        )
+        stale_result = event_integrated_radar.run_integrated_radar_cycle(
+            context=stale_context,
+            fixture=True,
+            observed_at="2026-06-15T16:00:00Z",
+            coinalyze_namespace="external_coinalyze",
+        )
+        stale_manifest = json.loads(stale_result.input_manifest_path.read_text(encoding="utf-8"))
+        assert stale_manifest["coinalyze_derivatives_state_rows_loaded"] == 0
+        assert stale_manifest["coinalyze_skip_reason"] == "coinalyze_namespace_stale_deprecated"
+        assert "coinalyze_namespace_stale_deprecated" in stale_manifest["warnings"]
+
+        missing_context = event_alpha_artifacts.context_from_profile(
+            "fixture",
+            run_mode="fixture",
+            base_dir=base,
+            artifact_namespace="integrated_missing",
+        )
+        missing_result = event_integrated_radar.run_integrated_radar_cycle(
+            context=missing_context,
+            fixture=True,
+            observed_at="2026-06-15T16:00:00Z",
+            coinalyze_namespace="missing_coinalyze",
+        )
+        missing_manifest = json.loads(missing_result.input_manifest_path.read_text(encoding="utf-8"))
+        assert missing_manifest["coinalyze_artifact_namespace"] == "missing_coinalyze"
+        assert missing_manifest["coinalyze_skip_reason"] == "coinalyze_artifacts_missing_or_empty"
+
+
 def test_integrated_market_anomaly_alone_does_not_confirm():
     from crypto_rsi_scanner import event_integrated_radar
 
@@ -39701,10 +39925,13 @@ def test_makefile_exposes_integrated_radar_target():
     assert "--event-alpha-integrated-radar-run-sidecars" in text
     assert "--event-alpha-integrated-radar-load-existing" in text
     assert "--event-alpha-integrated-radar-auto" in text
+    assert "--event-alpha-integrated-radar-coinalyze-namespace" in text
     assert "--event-alpha-integrated-radar-fill-outcomes" in text
 
 
 def test_integrated_doctor_catches_core_and_card_mismatches():
+    import json
+
     from crypto_rsi_scanner import event_alpha_artifact_doctor
 
     candidate = {
@@ -39811,6 +40038,121 @@ def test_integrated_doctor_catches_core_and_card_mismatches():
     assert fade_conflicts["integrated_fade_card_crowding_unknown"] == 1
     assert fade_conflicts["derivatives_card_metric_claim_without_data"] == 2
     assert fade_conflicts["integrated_outcome_card_thesis_interpretation_missing"] == 1
+
+    coinalyze_candidate = {
+        "row_type": "event_integrated_radar_candidate",
+        "symbol": "TESTPERP",
+        "core_opportunity_id": "core-perp",
+        "opportunity_type": "CONFIRMED_LONG_RESEARCH",
+        "market_state_class": "confirmed_breakout",
+        "source_requirements_met": True,
+        "market_requirements_met": True,
+        "coinalyze_derivatives_attached": True,
+        "coinalyze_artifact_namespace": "external_coinalyze",
+        "derivatives_state_snapshot": {
+            "provider": "coinalyze",
+            "coinalyze_artifact_namespace": "external_coinalyze",
+            "coinalyze_source_artifact_path": "event_fade_cache/external_coinalyze/event_derivatives_state.jsonl",
+            "funding_rate": 0.0008,
+            "freshness_status": "fresh",
+        },
+        "crowding_class": "high",
+        "crowding_exhaustion_evidence": ["open_interest_delta_24h_high"],
+    }
+    with TemporaryDirectory() as tmp:
+        missing_coinalyze_card = Path(tmp) / "card_core_perp.md"
+        missing_coinalyze_card.write_text(
+            "\n".join([
+                "# TESTPERP Event Research Card",
+                "",
+                "## Opportunity Lane",
+                "- Opportunity type: CONFIRMED_LONG_RESEARCH",
+                "- Why now: official/structured source plus fresh market confirmation",
+                "",
+                "## Derivatives / Crowding",
+                "- Research-only. Not a trade signal.",
+                "- Provider: coinalyze",
+                "- Crowding class: high",
+                "",
+                "## Artifact Lineage",
+                "- Core opportunity ID: core-perp",
+            ]),
+            encoding="utf-8",
+        )
+        coinalyze_card_conflicts = event_alpha_artifact_doctor._integrated_radar_artifact_conflicts(  # noqa: SLF001
+            [coinalyze_candidate],
+            core_rows=[{**coinalyze_candidate, "row_type": "event_core_opportunity"}],
+            research_card_paths=(missing_coinalyze_card,),
+        )
+    assert coinalyze_card_conflicts["integrated_coinalyze_crowding_card_missing"] == 1
+
+    with TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        manifest = tmp_path / "event_integrated_radar_input_manifest.json"
+        manifest.write_text(
+            json.dumps({
+                "sidecars": [
+                    {
+                        "sidecar_name": "coinalyze",
+                        "mode": "loaded_external_coinalyze",
+                        "coinalyze_artifact_namespace": "external_coinalyze",
+                        "coinalyze_artifact_namespace_status": "stale_deprecated",
+                        "coinalyze_derivatives_state_rows_loaded": 2,
+                        "coinalyze_crowding_candidates_loaded": 2,
+                        "coinalyze_fade_review_candidates_loaded": 1,
+                        "coinalyze_freshness_status": "stale",
+                        "warnings": [],
+                    }
+                ]
+            }),
+            encoding="utf-8",
+        )
+        manifest_conflicts = event_alpha_artifact_doctor._integrated_radar_artifact_conflicts(  # noqa: SLF001
+            [
+                {
+                    "row_type": "event_integrated_radar_candidate",
+                    "candidate_id": "iar:no-coinalyze",
+                    "core_opportunity_id": "agg:no-coinalyze",
+                    "symbol": "TEST",
+                    "coin_id": "test",
+                    "opportunity_type": "EARLY_LONG_RESEARCH",
+                    "market_state_snapshot": {"market_state": "no_reaction"},
+                    "source_strength": "official_structured",
+                    "market_state_class": "no_reaction",
+                }
+            ],
+            core_rows=[],
+            manifest_path=manifest,
+        )
+    assert manifest_conflicts["integrated_coinalyze_loaded_no_rows_attached"] == 1
+    assert manifest_conflicts["integrated_coinalyze_stale_loaded_without_warning"] == 1
+    assert manifest_conflicts["integrated_coinalyze_loaded_from_stale_namespace"] == 1
+
+    with TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        manifest = tmp_path / "event_integrated_radar_input_manifest.json"
+        manifest.write_text(
+            json.dumps({
+                "sidecars": [
+                    {
+                        "sidecar_name": "coinalyze",
+                        "mode": "skipped_missing_artifact",
+                        "coinalyze_artifact_namespace": "missing_coinalyze",
+                        "coinalyze_derivatives_state_rows_loaded": 0,
+                        "coinalyze_crowding_candidates_loaded": 0,
+                        "coinalyze_fade_review_candidates_loaded": 0,
+                        "warnings": ["coinalyze_artifacts_missing_or_empty"],
+                    }
+                ]
+            }),
+            encoding="utf-8",
+        )
+        skip_conflicts = event_alpha_artifact_doctor._integrated_radar_artifact_conflicts(  # noqa: SLF001
+            [candidate],
+            core_rows=[{**candidate, "row_type": "event_core_opportunity"}],
+            manifest_path=manifest,
+        )
+    assert skip_conflicts["integrated_coinalyze_missing_skip_reason"] == 1
 
 
 def test_integrated_doctor_catches_delivery_and_outcome_conflicts():

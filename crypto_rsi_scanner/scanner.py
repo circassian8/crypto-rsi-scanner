@@ -7983,6 +7983,7 @@ def event_alpha_integrated_radar_cycle_report(
     artifact_namespace: str | None = None,
     fixture: bool = False,
     input_mode: str | None = None,
+    coinalyze_namespace: str | None = None,
 ) -> None:
     """Run the research-only integrated Event Alpha radar cycle and print a summary."""
     _setup_event_discovery_logging(verbose)
@@ -8001,6 +8002,7 @@ def event_alpha_integrated_radar_cycle_report(
         fixture=fixture,
         observed_at=_event_research_now(),
         input_mode=input_mode or event_integrated_radar.INPUT_MODE_AUTO,
+        coinalyze_namespace=coinalyze_namespace,
     )
     print(_event_alpha_context_block(context))
     print(
@@ -11429,6 +11431,11 @@ def cli() -> None:
         help="Build integrated radar candidates from existing local sidecar artifacts.",
     )
     parser.add_argument(
+        "--event-alpha-integrated-radar-coinalyze-namespace",
+        default=None,
+        help="Optional Coinalyze artifact namespace to load into integrated radar enrichment; auto-checks readiness/default rehearsal when omitted.",
+    )
+    parser.add_argument(
         "--event-alpha-integrated-radar-fill-outcomes",
         action="store_true",
         help="Fill research-only integrated radar outcome artifacts from local fixture/cache rows.",
@@ -12509,6 +12516,7 @@ def cli() -> None:
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             fixture=args.event_alpha_integrated_radar_fixture,
             input_mode=integrated_input_mode,
+            coinalyze_namespace=args.event_alpha_integrated_radar_coinalyze_namespace,
         )
         return
     if args.event_alpha_integrated_radar_fill_outcomes:

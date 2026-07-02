@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 from collections import Counter
 from dataclasses import dataclass
@@ -20,9 +21,11 @@ from typing import Any, Iterable, Mapping
 from . import (
     event_artifact_paths,
     event_alpha_artifacts,
+    event_alpha_namespace_status,
     event_alpha_run_ledger,
     event_alpha_router,
     event_alpha_source_coverage,
+    event_coinalyze_preflight,
     event_live_provider_readiness,
     event_core_opportunity_store,
     event_derivatives_crowding,
@@ -52,6 +55,12 @@ INPUT_MODE_AUTO = "auto"
 INPUT_MODE_RUN_SIDECARS = "run_sidecars"
 INPUT_MODE_LOAD_EXISTING = "load_existing"
 INPUT_MODES = {INPUT_MODE_AUTO, INPUT_MODE_RUN_SIDECARS, INPUT_MODE_LOAD_EXISTING}
+COINALYZE_AUTO_NAMESPACE = "auto"
+COINALYZE_EXTERNAL_SIDECARS = {
+    "coinalyze_derivatives_state",
+    "coinalyze_derivatives_crowding",
+    "coinalyze_fade_review",
+}
 
 
 @dataclass(frozen=True)
@@ -143,6 +152,7 @@ def run_integrated_radar_cycle(
     fixture: bool = False,
     observed_at: datetime | str | None = None,
     input_mode: str = INPUT_MODE_AUTO,
+    coinalyze_namespace: str | None = None,
 ) -> EventIntegratedRadarResult:
     """Run one integrated research-only radar cycle and write artifacts."""
     wall_started = datetime.now(timezone.utc)
@@ -163,6 +173,7 @@ def run_integrated_radar_cycle(
         run_mode=context.run_mode,
         run_id=run_id,
         input_mode=mode,
+        coinalyze_namespace=coinalyze_namespace,
     )
     manifest_path = namespace_dir / INPUT_MANIFEST_FILENAME
     _write_json(manifest_path, _input_manifest_document(
@@ -395,15 +406,27 @@ def build_integrated_candidates(
 ) -> tuple[dict[str, Any], ...]:
     """Merge sidecar rows into one candidate per canonical family."""
     observed = _as_utc(_parse_time(observed_at) or datetime.now(timezone.utc)).isoformat()
+    coinalyze_index = _coinalyze_match_index(sidecar_rows)
+    coinalyze_seen_by_family: dict[str, set[str]] = {}
     grouped: dict[str, list[dict[str, Any]]] = {}
     for origin, rows in sidecar_rows.items():
+        if origin in COINALYZE_EXTERNAL_SIDECARS or origin == "coinalyze":
+            continue
         for raw in rows:
             if not isinstance(raw, Mapping):
                 continue
             row = dict(raw)
             row["_source_origin"] = origin
             key = _candidate_family_key(row)
-            grouped.setdefault(key, []).append(row)
+            family = grouped.setdefault(key, [])
+            family.append(row)
+            for match in _matching_coinalyze_rows(row, coinalyze_index):
+                match_id = _coinalyze_match_id(match)
+                seen = coinalyze_seen_by_family.setdefault(key, set())
+                if match_id in seen:
+                    continue
+                seen.add(match_id)
+                family.append(match)
     merged = [
         _merge_family(
             key,
@@ -417,6 +440,149 @@ def build_integrated_candidates(
         for key, rows in grouped.items()
     ]
     return tuple(sorted(merged, key=_candidate_sort_key, reverse=True))
+
+
+def _coinalyze_match_index(sidecar_rows: Mapping[str, Iterable[Mapping[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+    out: dict[str, list[dict[str, Any]]] = {}
+    for origin in ("coinalyze_derivatives_state", "coinalyze_derivatives_crowding", "coinalyze_fade_review"):
+        for raw in sidecar_rows.get(origin, ()):
+            if not isinstance(raw, Mapping):
+                continue
+            row = _coinalyze_integration_row(raw, origin=origin)
+            for key in _asset_lookup_keys(row):
+                out.setdefault(key, []).append(row)
+    return out
+
+
+def _coinalyze_integration_row(row: Mapping[str, Any], *, origin: str) -> dict[str, Any]:
+    out = dict(row)
+    out["_source_origin"] = origin
+    out.setdefault("source_class", "derivatives_provider")
+    out.setdefault("source_pack", "derivatives_crowding_pack")
+    out.setdefault("impact_path_type", "derivatives_crowding_research")
+    out.setdefault("accepted_evidence_count", 1)
+    out.setdefault("evidence_quality_score", 82)
+    if str(out.get("row_type") or "") == "derivatives_state_snapshot":
+        state = dict(out)
+        out.update({
+            "row_type": "coinalyze_derivatives_state_integration",
+            "event_name": f"{out.get('symbol') or out.get('market') or 'Coinalyze'} derivatives state",
+            "derivatives_state_snapshot": state,
+            "crowding_class": _state_crowding_class(state),
+            "fade_readiness": "not_ready",
+            "crowding_exhaustion_evidence": _state_crowding_evidence(state),
+            "warnings": tuple(dict.fromkeys((*_list_values(out.get("warnings")), "coinalyze_state_attached_without_candidate"))),
+        })
+    return out
+
+
+def _matching_coinalyze_rows(row: Mapping[str, Any], index: Mapping[str, list[dict[str, Any]]]) -> tuple[dict[str, Any], ...]:
+    matches: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for key in _asset_lookup_keys(row):
+        for match in index.get(key, ()):
+            match_id = _coinalyze_match_id(match)
+            if match_id in seen:
+                continue
+            seen.add(match_id)
+            matches.append(dict(match))
+    return tuple(matches)
+
+
+def _coinalyze_match_id(row: Mapping[str, Any]) -> str:
+    for key in ("fade_review_candidate_id", "derivatives_state_id", "candidate_id"):
+        value = str(row.get(key) or "").strip()
+        if value:
+            return f"{key}:{value}"
+    return hashlib.sha256(json.dumps(row, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
+
+def _state_crowding_evidence(state: Mapping[str, Any]) -> tuple[str, ...]:
+    evidence: list[str] = []
+    oi4 = _percent_value(state.get("open_interest_delta_4h"))
+    oi24 = _percent_value(state.get("open_interest_delta_24h"))
+    funding = _percent_value(state.get("funding_rate"))
+    funding_z = _float_value(state.get("funding_zscore"))
+    liq = _float_value(state.get("liquidation_imbalance"))
+    perp_spot = _float_value(state.get("perp_spot_volume_ratio"))
+    if oi4 is not None and oi4 >= 30:
+        evidence.append("open_interest_delta_4h_high")
+    if oi24 is not None and oi24 >= 35:
+        evidence.append("open_interest_delta_24h_high")
+    if funding is not None and abs(funding) >= 0.05:
+        evidence.append("funding_elevated")
+    if funding_z is not None and abs(funding_z) >= 2:
+        evidence.append("funding_zscore_elevated")
+    if liq is not None and abs(liq) >= 1.5:
+        evidence.append("liquidation_imbalance_extreme")
+    if perp_spot is not None and perp_spot >= 3:
+        evidence.append("perp_spot_volume_divergence")
+    return tuple(evidence)
+
+
+def _state_crowding_class(state: Mapping[str, Any]) -> str:
+    count = len(_state_crowding_evidence(state))
+    if count >= 4:
+        return "extreme"
+    if count >= 2:
+        return "high"
+    if count == 1:
+        return "moderate"
+    return "none"
+
+
+def _percent_value(value: Any) -> float | None:
+    number = _float_value(value)
+    if number is None:
+        return None
+    return number * 100.0 if abs(number) <= 3.0 else number
+
+
+def _float_value(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _asset_lookup_keys(row: Mapping[str, Any]) -> set[str]:
+    values: list[Any] = []
+    for key in (
+        "coin_id",
+        "validated_coin_id",
+        "canonical_asset_id",
+        "symbol",
+        "validated_symbol",
+        "market",
+        "market_symbol",
+        "base_symbol",
+    ):
+        values.append(row.get(key))
+    state = row.get("derivatives_state_snapshot")
+    if isinstance(state, Mapping):
+        for key in ("coin_id", "symbol", "market", "market_symbol", "canonical_asset_id"):
+            values.append(state.get(key))
+    out: set[str] = set()
+    for value in values:
+        text = _text(value)
+        if not text:
+            continue
+        out.update(_asset_key_variants(text))
+    return out
+
+
+def _asset_key_variants(value: str) -> tuple[str, ...]:
+    raw = value.strip()
+    if not raw:
+        return ()
+    upper = raw.upper()
+    market = upper.split(".", 1)[0]
+    market = market.replace("_PERP", "")
+    for suffix in ("USDT_PERP", "USD_PERP", "USDC_PERP", "USDT", "USDC", "USD", "PERP"):
+        if market.endswith(suffix) and len(market) > len(suffix):
+            market = market[: -len(suffix)]
+            break
+    return tuple(dict.fromkeys((raw.casefold(), upper, market.casefold(), market)))
 
 
 def format_integrated_radar_report(
@@ -489,6 +655,11 @@ def format_integrated_daily_brief(
         "### Input Manifest",
     ]
     lines.extend(_input_manifest_lines(manifest_rows, compact=True))
+    lines.extend([
+        "",
+        "### Derivatives/OI/funding status",
+    ])
+    lines.extend(_coinalyze_status_lines(manifest_rows))
     lines.extend([
         "",
         "### Research Review Digest",
@@ -930,6 +1101,7 @@ def format_integrated_source_coverage_json(
         source for row in rows for source in (row.get("source_packs") or [row.get("source_pack") or "unknown"])
     )
     lane_counts = Counter(str(row.get("opportunity_type") or "unknown") for row in rows)
+    coinalyze = _coinalyze_manifest_summary(input_manifest)
     return {
         "schema_version": 1,
         "row_type": "event_alpha_source_coverage",
@@ -937,6 +1109,13 @@ def format_integrated_source_coverage_json(
         "candidate_count": len(rows),
         "lane_counts": dict(sorted(lane_counts.items())),
         "source_pack_counts": dict(source_counts.most_common()),
+        "coinalyze_artifact_namespace": coinalyze.get("coinalyze_artifact_namespace"),
+        "coinalyze_derivatives_state_rows_loaded": coinalyze.get("coinalyze_derivatives_state_rows_loaded", 0),
+        "coinalyze_crowding_candidates_loaded": coinalyze.get("coinalyze_crowding_candidates_loaded", 0),
+        "coinalyze_fade_review_candidates_loaded": coinalyze.get("coinalyze_fade_review_candidates_loaded", 0),
+        "coinalyze_provider_health_status": coinalyze.get("coinalyze_provider_health_status", "not_observed"),
+        "coinalyze_freshness_status": coinalyze.get("coinalyze_freshness_status", "missing"),
+        "coinalyze_skip_reason": coinalyze.get("coinalyze_skip_reason"),
         "live_provider_readiness_report_path": event_artifact_paths.artifact_display_path(readiness_md_path)
         if readiness_md_path
         else None,
@@ -984,6 +1163,7 @@ def _run_or_load_sidecars(
     run_mode: str,
     run_id: str,
     input_mode: str,
+    coinalyze_namespace: str | None,
 ) -> tuple[dict[str, tuple[dict[str, Any], ...]], tuple[dict[str, Any], ...]]:
     if fixture:
         rows = _run_fixture_sidecars(
@@ -994,7 +1174,7 @@ def _run_or_load_sidecars(
             run_mode=run_mode,
             run_id=run_id,
         )
-        return rows, tuple(
+        manifest = tuple(
             _manifest_item(
                 sidecar_name=name,
                 mode="ran_fixture",
@@ -1006,6 +1186,13 @@ def _run_or_load_sidecars(
                 wall_finished_at=datetime.now(timezone.utc),
             )
             for name, value in rows.items()
+        )
+        return _with_coinalyze_sidecar(
+            rows,
+            manifest,
+            namespace_dir=namespace_dir,
+            coinalyze_namespace=coinalyze_namespace,
+            observed_at=observed_at,
         )
     if input_mode == INPUT_MODE_RUN_SIDECARS:
         rows = {
@@ -1029,7 +1216,13 @@ def _run_or_load_sidecars(
             )
             for name, value in rows.items()
         )
-        return rows, manifest
+        return _with_coinalyze_sidecar(
+            rows,
+            manifest,
+            namespace_dir=namespace_dir,
+            coinalyze_namespace=coinalyze_namespace,
+            observed_at=observed_at,
+        )
     derivatives_rows = tuple(event_derivatives_crowding.load_derivatives_candidates(namespace_dir))
     derivatives_mode, derivatives_configured, derivatives_warnings = _derivatives_manifest_mode(namespace_dir, derivatives_rows)
     rows = {
@@ -1056,7 +1249,13 @@ def _run_or_load_sidecars(
         )
         for name, value in rows.items()
     )
-    return rows, manifest
+    return _with_coinalyze_sidecar(
+        rows,
+        manifest,
+        namespace_dir=namespace_dir,
+        coinalyze_namespace=coinalyze_namespace,
+        observed_at=observed_at,
+    )
 
 
 def _derivatives_manifest_mode(namespace_dir: Path, derivatives_rows: tuple[dict[str, Any], ...]) -> tuple[str, bool, tuple[str, ...]]:
@@ -1080,6 +1279,317 @@ def _derivatives_manifest_mode(namespace_dir: Path, derivatives_rows: tuple[dict
     if state_path.exists():
         return "loaded_existing", True, (f"coinalyze rehearsal status={status}",)
     return "skipped_missing_config", False, (f"coinalyze rehearsal status={status} without derivatives state",)
+
+
+def _with_coinalyze_sidecar(
+    rows: Mapping[str, tuple[dict[str, Any], ...]],
+    manifest: Iterable[Mapping[str, Any]],
+    *,
+    namespace_dir: Path,
+    coinalyze_namespace: str | None,
+    observed_at: datetime,
+) -> tuple[dict[str, tuple[dict[str, Any], ...]], tuple[dict[str, Any], ...]]:
+    bundle_rows, bundle_manifest = _load_external_coinalyze_artifacts(
+        namespace_dir=namespace_dir,
+        coinalyze_namespace=coinalyze_namespace,
+        observed_at=observed_at,
+    )
+    combined = dict(rows)
+    combined.update(bundle_rows)
+    return combined, (*tuple(dict(item) for item in manifest if isinstance(item, Mapping)), bundle_manifest)
+
+
+def _load_external_coinalyze_artifacts(
+    *,
+    namespace_dir: Path,
+    coinalyze_namespace: str | None,
+    observed_at: datetime,
+) -> tuple[dict[str, tuple[dict[str, Any], ...]], dict[str, Any]]:
+    selected_namespace, selection_mode, selection_warning = _select_coinalyze_namespace(
+        namespace_dir,
+        coinalyze_namespace=coinalyze_namespace,
+    )
+    empty_rows = {
+        "coinalyze_derivatives_state": (),
+        "coinalyze_derivatives_crowding": (),
+        "coinalyze_fade_review": (),
+    }
+    if not selected_namespace:
+        warnings = ("coinalyze_artifact_namespace_not_configured",)
+        if selection_warning:
+            warnings = (*warnings, selection_warning)
+        return empty_rows, _coinalyze_manifest_item(
+            namespace_dir=namespace_dir,
+            coinalyze_namespace=None,
+            coinalyze_dir=None,
+            mode="skipped_missing_config",
+            configured=False,
+            observed_at=observed_at,
+            warnings=warnings,
+            skip_reason="coinalyze_artifact_namespace_not_configured",
+            selection_mode=selection_mode,
+        )
+
+    coinalyze_dir = _resolve_sibling_namespace_dir(namespace_dir, selected_namespace)
+    if coinalyze_dir is None:
+        return empty_rows, _coinalyze_manifest_item(
+            namespace_dir=namespace_dir,
+            coinalyze_namespace=selected_namespace,
+            coinalyze_dir=None,
+            mode="skipped_invalid_namespace",
+            configured=True,
+            observed_at=observed_at,
+            warnings=("coinalyze_artifact_namespace_invalid",),
+            skip_reason="coinalyze_artifact_namespace_invalid",
+            selection_mode=selection_mode,
+        )
+
+    namespace_status = event_alpha_namespace_status.load_namespace_status(coinalyze_dir)
+    if event_alpha_namespace_status.is_stale_deprecated(namespace_status):
+        return empty_rows, _coinalyze_manifest_item(
+            namespace_dir=namespace_dir,
+            coinalyze_namespace=selected_namespace,
+            coinalyze_dir=coinalyze_dir,
+            mode="skipped_stale_namespace",
+            configured=True,
+            observed_at=observed_at,
+            warnings=("coinalyze_namespace_stale_deprecated",),
+            skip_reason="coinalyze_namespace_stale_deprecated",
+            provider_health_status=_coinalyze_rehearsal_value(coinalyze_dir, "provider_health_status") or "not_observed",
+            namespace_status=namespace_status.status if namespace_status else "active",
+            selection_mode=selection_mode,
+        )
+
+    state_rows = tuple(
+        _annotate_coinalyze_state_row(row, namespace=selected_namespace, coinalyze_dir=coinalyze_dir)
+        for row in event_derivatives_crowding.load_derivatives_state(coinalyze_dir)
+    )
+    crowding_rows = tuple(
+        _annotate_coinalyze_candidate_row(row, namespace=selected_namespace, coinalyze_dir=coinalyze_dir, sidecar="coinalyze_derivatives_crowding")
+        for row in event_derivatives_crowding.load_derivatives_candidates(coinalyze_dir)
+    )
+    fade_rows = tuple(
+        _annotate_coinalyze_candidate_row(row, namespace=selected_namespace, coinalyze_dir=coinalyze_dir, sidecar="coinalyze_fade_review")
+        for row in event_derivatives_crowding.load_fade_review_candidates(coinalyze_dir)
+    )
+    provider_health = _coinalyze_rehearsal_value(coinalyze_dir, "provider_health_status") or "not_observed"
+    freshness = _coinalyze_freshness_status(state_rows)
+    warnings: list[str] = []
+    if selection_warning:
+        warnings.append(selection_warning)
+    if freshness in {"stale", "expired", "unknown"}:
+        warnings.append(f"coinalyze_freshness_{freshness}")
+    if not (state_rows or crowding_rows or fade_rows):
+        warnings.append("coinalyze_artifacts_missing_or_empty")
+    mode = "loaded_external_coinalyze" if (state_rows or crowding_rows or fade_rows) else "skipped_missing_artifact"
+    skip_reason = None if mode == "loaded_external_coinalyze" else "coinalyze_artifacts_missing_or_empty"
+    return {
+        "coinalyze_derivatives_state": state_rows,
+        "coinalyze_derivatives_crowding": crowding_rows,
+        "coinalyze_fade_review": fade_rows,
+    }, _coinalyze_manifest_item(
+        namespace_dir=namespace_dir,
+        coinalyze_namespace=selected_namespace,
+        coinalyze_dir=coinalyze_dir,
+        mode=mode,
+        configured=True,
+        observed_at=observed_at,
+        rows=(*state_rows, *crowding_rows, *fade_rows),
+        warnings=warnings,
+        skip_reason=skip_reason,
+        provider_health_status=provider_health,
+        freshness_status=freshness,
+        state_rows_loaded=len(state_rows),
+        crowding_rows_loaded=len(crowding_rows),
+        fade_rows_loaded=len(fade_rows),
+        namespace_status=namespace_status.status if namespace_status else "active",
+        selection_mode=selection_mode,
+    )
+
+
+def _select_coinalyze_namespace(namespace_dir: Path, *, coinalyze_namespace: str | None) -> tuple[str | None, str, str | None]:
+    requested = str(coinalyze_namespace or "").strip()
+    if requested and requested.casefold() not in {"none", "false", "0", "off"}:
+        return requested, "explicit", None
+    readiness_namespace = _coinalyze_namespace_from_readiness(namespace_dir)
+    if readiness_namespace:
+        return readiness_namespace, "readiness_auto", None
+    default_dir = namespace_dir.parent / event_coinalyze_preflight.DEFAULT_REHEARSAL_NAMESPACE
+    if default_dir.exists():
+        return event_coinalyze_preflight.DEFAULT_REHEARSAL_NAMESPACE, "default_rehearsal_auto", None
+    return None, "auto_none", "coinalyze_readiness_namespace_not_found"
+
+
+def _coinalyze_namespace_from_readiness(namespace_dir: Path) -> str | None:
+    path = namespace_dir / event_live_provider_readiness.READINESS_JSON
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    providers = payload.get("providers") if isinstance(payload, Mapping) else None
+    if not isinstance(providers, Iterable) or isinstance(providers, (str, bytes, Mapping)):
+        return None
+    for provider in providers:
+        if not isinstance(provider, Mapping) or str(provider.get("provider_name") or "").casefold() != "coinalyze":
+            continue
+        for key in ("coinalyze_artifact_namespace", "latest_rehearsal_artifact_namespace"):
+            namespace = _safe_namespace_text(provider.get(key))
+            if namespace:
+                return namespace
+        for key in ("latest_request_ledger_path", "request_ledger_path"):
+            namespace = _namespace_from_artifact_path_label(provider.get(key))
+            if namespace:
+                return namespace
+        command = str(provider.get("no_send_rehearsal_command") or "")
+        match = re.search(r"(?:ARTIFACT_NAMESPACE=|--event-alpha-artifact-namespace\s+)([A-Za-z0-9_.-]+)", command)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _safe_namespace_text(value: Any) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    candidate = Path(text)
+    if candidate.is_absolute() or any(part == ".." for part in candidate.parts) or len(candidate.parts) != 1:
+        return None
+    return text
+
+
+def _namespace_from_artifact_path_label(value: Any) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    parts = Path(text).parts
+    for filename in (
+        event_coinalyze_preflight.REQUEST_LEDGER,
+        event_coinalyze_preflight.REHEARSAL_JSON,
+        event_derivatives_crowding.DERIVATIVES_STATE_FILENAME,
+    ):
+        if filename in parts:
+            index = parts.index(filename)
+            if index > 0:
+                return _safe_namespace_text(parts[index - 1])
+    return None
+
+
+def _resolve_sibling_namespace_dir(namespace_dir: Path, namespace: str) -> Path | None:
+    text = str(namespace or "").strip()
+    if not text:
+        return None
+    candidate = Path(text)
+    if candidate.is_absolute() or any(part == ".." for part in candidate.parts):
+        return None
+    if len(candidate.parts) != 1:
+        return None
+    return namespace_dir.parent / text
+
+
+def _coinalyze_manifest_item(
+    *,
+    namespace_dir: Path,
+    coinalyze_namespace: str | None,
+    coinalyze_dir: Path | None,
+    mode: str,
+    configured: bool,
+    observed_at: datetime,
+    rows: Iterable[Mapping[str, Any]] = (),
+    warnings: Iterable[str] = (),
+    skip_reason: str | None = None,
+    provider_health_status: str = "not_observed",
+    freshness_status: str = "missing",
+    state_rows_loaded: int = 0,
+    crowding_rows_loaded: int = 0,
+    fade_rows_loaded: int = 0,
+    namespace_status: str = "active",
+    selection_mode: str = "auto_none",
+) -> dict[str, Any]:
+    row = _manifest_item(
+        sidecar_name="coinalyze",
+        mode=mode,
+        namespace_dir=coinalyze_dir or namespace_dir,
+        rows=tuple(rows),
+        configured=configured,
+        sidecar_research_observed_at=observed_at,
+        wall_started_at=datetime.now(timezone.utc),
+        wall_finished_at=datetime.now(timezone.utc),
+        warnings=warnings,
+    )
+    state_path = (coinalyze_dir / event_derivatives_crowding.DERIVATIVES_STATE_FILENAME) if coinalyze_dir else None
+    crowding_path = (coinalyze_dir / event_derivatives_crowding.DERIVATIVES_CROWDING_CANDIDATES_FILENAME) if coinalyze_dir else None
+    fade_path = (coinalyze_dir / event_derivatives_crowding.FADE_SHORT_REVIEW_CANDIDATES_FILENAME) if coinalyze_dir else None
+    row.update({
+        "coinalyze_artifact_namespace": coinalyze_namespace,
+        "coinalyze_artifact_namespace_status": namespace_status,
+        "coinalyze_artifact_selection_mode": selection_mode,
+        "coinalyze_derivatives_state_path": event_artifact_paths.artifact_display_path(state_path) if state_path else None,
+        "coinalyze_crowding_candidates_path": event_artifact_paths.artifact_display_path(crowding_path) if crowding_path else None,
+        "coinalyze_fade_review_candidates_path": event_artifact_paths.artifact_display_path(fade_path) if fade_path else None,
+        "coinalyze_derivatives_state_rows_loaded": int(state_rows_loaded),
+        "coinalyze_crowding_candidates_loaded": int(crowding_rows_loaded),
+        "coinalyze_fade_review_candidates_loaded": int(fade_rows_loaded),
+        "coinalyze_provider_health_status": provider_health_status,
+        "coinalyze_freshness_status": freshness_status,
+        "coinalyze_skip_reason": skip_reason,
+    })
+    return row
+
+
+def _coinalyze_rehearsal_value(coinalyze_dir: Path, key: str) -> str | None:
+    try:
+        payload = json.loads((coinalyze_dir / event_coinalyze_preflight.REHEARSAL_JSON).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, Mapping):
+        return None
+    value = payload.get(key)
+    return str(value) if value not in (None, "") else None
+
+
+def _annotate_coinalyze_state_row(row: Mapping[str, Any], *, namespace: str, coinalyze_dir: Path) -> dict[str, Any]:
+    out = dict(row)
+    out.update({
+        "coinalyze_artifact_namespace": namespace,
+        "coinalyze_source_artifact_path": event_artifact_paths.artifact_display_path(coinalyze_dir / event_derivatives_crowding.DERIVATIVES_STATE_FILENAME),
+        "coinalyze_external_artifact_loaded": True,
+        "coinalyze_provider_health_status": _coinalyze_rehearsal_value(coinalyze_dir, "provider_health_status") or "not_observed",
+    })
+    return out
+
+
+def _annotate_coinalyze_candidate_row(row: Mapping[str, Any], *, namespace: str, coinalyze_dir: Path, sidecar: str) -> dict[str, Any]:
+    out = dict(row)
+    source_path = (
+        coinalyze_dir / event_derivatives_crowding.FADE_SHORT_REVIEW_CANDIDATES_FILENAME
+        if sidecar == "coinalyze_fade_review"
+        else coinalyze_dir / event_derivatives_crowding.DERIVATIVES_CROWDING_CANDIDATES_FILENAME
+    )
+    state = out.get("derivatives_state_snapshot")
+    if isinstance(state, Mapping):
+        out["derivatives_state_snapshot"] = _annotate_coinalyze_state_row(state, namespace=namespace, coinalyze_dir=coinalyze_dir)
+    out.update({
+        "coinalyze_artifact_namespace": namespace,
+        "coinalyze_source_artifact_path": event_artifact_paths.artifact_display_path(source_path),
+        "coinalyze_external_artifact_loaded": True,
+        "coinalyze_provider_health_status": _coinalyze_rehearsal_value(coinalyze_dir, "provider_health_status") or "not_observed",
+    })
+    return out
+
+
+def _coinalyze_freshness_status(rows: Iterable[Mapping[str, Any]]) -> str:
+    statuses = [
+        str(row.get("derivatives_snapshot_freshness_status") or row.get("freshness_status") or "").strip().casefold()
+        for row in rows
+        if isinstance(row, Mapping)
+    ]
+    statuses = [status for status in statuses if status]
+    if not statuses:
+        return "missing"
+    for status in ("expired", "stale", "unknown"):
+        if status in statuses:
+            return status
+    return "fresh" if "fresh" in statuses or "fixture_allowed_stale" in statuses else statuses[0]
 
 
 def _run_fixture_sidecars(
@@ -1276,6 +1786,7 @@ def _merge_family(
     warnings = tuple(dict.fromkeys((*_merged_list(rows, "warnings"), *_policy_warnings(opportunity, rows, raw_reaction))))
     candidate_id = f"iar:{_digest(key)}"
     derivatives_metadata = _derivatives_metadata(derivatives_row)
+    derivatives_state_snapshot = dict(derivatives_row.get("derivatives_state_snapshot") or {}) if derivatives_row else None
     integrated_market = _integrated_market_confirmation(opportunity, raw_reaction)
     candidate = {
         "schema_version": 1,
@@ -1324,14 +1835,19 @@ def _merge_family(
         "market_state_snapshot": raw_reaction.market_state_snapshot.to_dict(),
         "latest_market_snapshot": market_snapshot,
         "market_snapshot": market_snapshot,
-        "derivatives_state_snapshot": dict(derivatives_row.get("derivatives_state_snapshot") or {}) if derivatives_row else None,
-        "derivatives_snapshot": dict(derivatives_row.get("derivatives_state_snapshot") or {}) if derivatives_row else None,
+        "derivatives_state_snapshot": derivatives_state_snapshot,
+        "derivatives_snapshot": derivatives_state_snapshot,
         "crowding_class": derivatives_metadata.get("crowding_class"),
         "fade_readiness": derivatives_metadata.get("fade_readiness"),
         "crowding_exhaustion_evidence": derivatives_metadata.get("crowding_exhaustion_evidence") or [],
         "what_confirms_fade_review": derivatives_metadata.get("what_confirms_fade_review") or [],
         "what_invalidates_fade_review": derivatives_metadata.get("what_invalidates_fade_review") or [],
         "derivatives_warning_codes": derivatives_metadata.get("derivatives_warning_codes") or [],
+        "coinalyze_derivatives_attached": bool(derivatives_metadata.get("coinalyze_derivatives_attached")),
+        "coinalyze_artifact_namespace": derivatives_metadata.get("coinalyze_artifact_namespace"),
+        "coinalyze_source_artifact_path": derivatives_metadata.get("coinalyze_source_artifact_path"),
+        "coinalyze_provider_health_status": derivatives_metadata.get("coinalyze_provider_health_status"),
+        "coinalyze_freshness_status": derivatives_metadata.get("coinalyze_freshness_status"),
         "official_exchange_event": _compact_event(official_row) if official_row else None,
         "scheduled_catalyst_event": _compact_event(scheduled_row) if scheduled_row else None,
         "unlock_event": _compact_event(unlock_row) if unlock_row else None,
@@ -1549,6 +2065,12 @@ def _policy_opportunity_type(
     market_confirmed = reaction.market_state in {"confirmed_breakout", "stealth_accumulation"}
     if has_official and market_confirmed:
         return event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value
+    if (
+        has_official
+        and reaction.market_state == "no_reaction"
+        and _family_extreme_crowding_after_completed_move(rows, reaction)
+    ):
+        return event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value
     if has_official and reaction.market_state == "no_reaction":
         return event_market_reaction.EventOpportunityType.EARLY_LONG_RESEARCH.value
     if origin_set == {"market_anomaly"}:
@@ -1628,14 +2150,86 @@ def _market_requirements_met(opportunity: str, reaction: event_market_reaction.M
 
 
 def _fade_requirements_met(opportunity: str, rows: list[dict[str, Any]]) -> bool:
-    return any(bool(row.get("fade_requirements_met")) for row in rows) or any(
-        str(row.get("opportunity_type")) == event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value
+    del opportunity
+    return any(
+        (
+            bool(row.get("fade_requirements_met"))
+            or str(row.get("opportunity_type")) == event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value
+        )
+        and _row_derivatives_fresh_for_integration(row)
+        and _row_has_crowding_evidence(row)
+        and _row_completed_move(row)
         for row in rows
     )
 
 
 def _risk_requirements_met(opportunity: str, rows: list[dict[str, Any]]) -> bool:
     return any(str(row.get("opportunity_type")) == event_market_reaction.EventOpportunityType.RISK_ONLY.value for row in rows)
+
+
+def _row_derivatives_state(row: Mapping[str, Any]) -> Mapping[str, Any]:
+    state = row.get("derivatives_state_snapshot")
+    if isinstance(state, Mapping):
+        return state
+    snapshot = row.get("derivatives_snapshot")
+    if isinstance(snapshot, Mapping):
+        return snapshot
+    if str(row.get("row_type") or "") == "derivatives_state_snapshot":
+        return row
+    return {}
+
+
+def _row_derivatives_fresh_for_integration(row: Mapping[str, Any]) -> bool:
+    state = _row_derivatives_state(row)
+    status = str(
+        row.get("derivatives_snapshot_freshness_status")
+        or state.get("derivatives_snapshot_freshness_status")
+        or row.get("freshness_status")
+        or state.get("freshness_status")
+        or ""
+    ).strip().casefold()
+    return status in {"fresh", "fixture_allowed_stale"}
+
+
+def _row_has_crowding_evidence(row: Mapping[str, Any]) -> bool:
+    evidence = _list_values(row.get("crowding_exhaustion_evidence"))
+    if evidence:
+        return True
+    state = _row_derivatives_state(row)
+    return bool(_state_crowding_evidence(state))
+
+
+def _row_completed_move(row: Mapping[str, Any]) -> bool:
+    if bool(row.get("completed_move")):
+        return True
+    market = row.get("market_snapshot")
+    if not isinstance(market, Mapping):
+        market = row.get("market_state_snapshot") if isinstance(row.get("market_state_snapshot"), Mapping) else {}
+    market_state = str(row.get("market_state") or row.get("market_state_class") or market.get("market_state") or "").casefold()
+    r24 = _percent_value(market.get("return_24h") or market.get("price_change_24h"))
+    r4 = _percent_value(market.get("return_4h") or market.get("price_change_4h"))
+    age = _float_value(row.get("event_age_hours") or market.get("event_age_hours") or market.get("age_hours"))
+    return any((
+        market_state in {"blowoff_crowded", "post_event_fade_setup", "late_momentum"},
+        r24 is not None and r24 >= 25,
+        r4 is not None and r4 >= 15,
+        age is not None and age >= 0 and ((r24 or 0) >= 15 or (r4 or 0) >= 8),
+    ))
+
+
+def _family_extreme_crowding_after_completed_move(
+    rows: list[dict[str, Any]],
+    reaction: event_market_reaction.MarketReactionResult,
+) -> bool:
+    for row in rows:
+        crowding = str(row.get("crowding_class") or "").casefold()
+        if not crowding:
+            crowding = _state_crowding_class(_row_derivatives_state(row))
+        if crowding != "extreme":
+            continue
+        if _row_completed_move(row) or reaction.market_state in {"blowoff_crowded", "post_event_fade_setup", "late_momentum"}:
+            return True
+    return False
 
 
 def _best_market_snapshot(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1682,6 +2276,16 @@ def _derivatives_metadata(row: Mapping[str, Any] | None) -> dict[str, Any]:
     if not isinstance(row, Mapping):
         return {}
     warnings = list(dict.fromkeys((*_list_values(row.get("derivatives_warning_codes")), *_list_values(row.get("warnings")))))
+    state = row.get("derivatives_state_snapshot") if isinstance(row.get("derivatives_state_snapshot"), Mapping) else {}
+    coinalyze_namespace = row.get("coinalyze_artifact_namespace") or state.get("coinalyze_artifact_namespace")
+    coinalyze_source_path = row.get("coinalyze_source_artifact_path") or state.get("coinalyze_source_artifact_path")
+    coinalyze_provider_status = row.get("coinalyze_provider_health_status") or state.get("coinalyze_provider_health_status")
+    coinalyze_freshness = (
+        row.get("derivatives_snapshot_freshness_status")
+        or state.get("derivatives_snapshot_freshness_status")
+        or row.get("freshness_status")
+        or state.get("freshness_status")
+    )
     return {
         "crowding_class": row.get("crowding_class"),
         "fade_readiness": row.get("fade_readiness"),
@@ -1689,6 +2293,11 @@ def _derivatives_metadata(row: Mapping[str, Any] | None) -> dict[str, Any]:
         "what_confirms_fade_review": _list_values(row.get("what_confirms_fade_review")),
         "what_invalidates_fade_review": _list_values(row.get("what_invalidates_fade_review")),
         "derivatives_warning_codes": warnings,
+        "coinalyze_derivatives_attached": bool(coinalyze_namespace or coinalyze_source_path),
+        "coinalyze_artifact_namespace": coinalyze_namespace,
+        "coinalyze_source_artifact_path": coinalyze_source_path,
+        "coinalyze_provider_health_status": coinalyze_provider_status,
+        "coinalyze_freshness_status": coinalyze_freshness,
     }
 
 
@@ -1802,6 +2411,15 @@ def _policy_warnings(
         warnings.append("major_pair_simple_announcement_capped")
     if opportunity == event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value and not reaction.market_requirements_met:
         warnings.append("confirmed_long_requires_market_confirmation")
+    if opportunity == event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value:
+        if any(
+            (str(row.get("crowding_class") or _state_crowding_class(_row_derivatives_state(row))).casefold() in {"moderate", "high", "extreme"})
+            and _row_has_crowding_evidence(row)
+            for row in rows
+        ):
+            warnings.append("confirmed_long_derivatives_crowding_warning")
+    if opportunity == event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value and _family_extreme_crowding_after_completed_move(rows, reaction):
+        warnings.append("early_long_capped_by_extreme_crowding_after_completed_move")
     return tuple(warnings)
 
 
@@ -1811,6 +2429,8 @@ def _lane_why_not(opportunity: str, rows: list[dict[str, Any]]) -> tuple[str, ..
         out.append("major_pair_simple_announcement_not_alpha")
     if opportunity == event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value:
         out.append("strict_lane_requirements_not_met")
+    if any("early_long_capped_by_extreme_crowding_after_completed_move" in _list_values(row.get("warnings")) for row in rows):
+        out.append("early_long_capped_by_extreme_crowding_after_completed_move")
     if opportunity == event_market_reaction.EventOpportunityType.DIAGNOSTIC.value:
         out.append("diagnostic_context_hidden_from_default_operator_sections")
     return tuple(out)
@@ -1938,6 +2558,42 @@ def _input_manifest_lines(
             line += " warnings=" + "; ".join(str(warning) for warning in warnings[:3])
         lines.append(line)
     return lines
+
+
+def _coinalyze_status_lines(manifest: Iterable[Mapping[str, Any]]) -> list[str]:
+    summary = _coinalyze_manifest_summary(manifest)
+    namespace = summary.get("coinalyze_artifact_namespace")
+    skip_reason = summary.get("coinalyze_skip_reason")
+    if not namespace and skip_reason:
+        return [f"- Coinalyze: skipped ({skip_reason})."]
+    if not namespace:
+        return ["- Coinalyze: not loaded."]
+    state_path = summary.get("coinalyze_derivatives_state_path")
+    freshness = summary.get("coinalyze_freshness_status") or "missing"
+    health = summary.get("coinalyze_provider_health_status") or "not_observed"
+    state_rows = int(summary.get("coinalyze_derivatives_state_rows_loaded") or 0)
+    crowding_rows = int(summary.get("coinalyze_crowding_candidates_loaded") or 0)
+    fade_rows = int(summary.get("coinalyze_fade_review_candidates_loaded") or 0)
+    status = "loaded" if state_rows or crowding_rows or fade_rows else "skipped"
+    line = (
+        f"- Coinalyze: {status} namespace={namespace} "
+        f"state_rows={state_rows} crowding_candidates={crowding_rows} "
+        f"fade_review_candidates={fade_rows} freshness={freshness} provider_health={health}"
+    )
+    if state_path:
+        line += f" path={event_artifact_paths.artifact_display_path(state_path)}"
+    if skip_reason:
+        line += f" skip_reason={skip_reason}"
+    return [line]
+
+
+def _coinalyze_manifest_summary(manifest: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    for item in manifest:
+        if not isinstance(item, Mapping):
+            continue
+        if str(item.get("sidecar_name") or "") == "coinalyze":
+            return dict(item)
+    return {}
 
 
 def _manifest_rows(
@@ -2076,6 +2732,7 @@ def _input_manifest_document(
     research_observed_at: datetime,
 ) -> dict[str, Any]:
     rows = [dict(item) for item in manifest if isinstance(item, Mapping)]
+    coinalyze = _coinalyze_manifest_summary(rows)
     return {
         "schema_version": 1,
         "row_type": "event_integrated_radar_input_manifest",
@@ -2086,6 +2743,13 @@ def _input_manifest_document(
         "input_mode": input_mode,
         "sidecars": rows,
         "row_counts": {str(item.get("sidecar_name") or "unknown"): int((item.get("row_counts") or {}).get("rows") or 0) for item in rows},
+        "coinalyze_artifact_namespace": coinalyze.get("coinalyze_artifact_namespace"),
+        "coinalyze_derivatives_state_rows_loaded": coinalyze.get("coinalyze_derivatives_state_rows_loaded", 0),
+        "coinalyze_crowding_candidates_loaded": coinalyze.get("coinalyze_crowding_candidates_loaded", 0),
+        "coinalyze_fade_review_candidates_loaded": coinalyze.get("coinalyze_fade_review_candidates_loaded", 0),
+        "coinalyze_provider_health_status": coinalyze.get("coinalyze_provider_health_status", "not_observed"),
+        "coinalyze_freshness_status": coinalyze.get("coinalyze_freshness_status", "missing"),
+        "coinalyze_skip_reason": coinalyze.get("coinalyze_skip_reason"),
         "warnings": [warning for item in rows for warning in item.get("warnings", ())],
         "errors": [error for item in rows for error in item.get("errors", ())],
         "started_at": wall_started_at,
@@ -2112,6 +2776,10 @@ def _sidecar_count_summary(sidecars: Mapping[str, Iterable[Mapping[str, Any]]]) 
     market_rows = list(sidecars.get("market_anomaly", ()))
     official_rows = list(sidecars.get("official_exchange", ()))
     derivatives_rows = list(sidecars.get("derivatives", ()))
+    coinalyze_state_rows = list(sidecars.get("coinalyze_derivatives_state", ()))
+    coinalyze_crowding_rows = list(sidecars.get("coinalyze_derivatives_crowding", ()))
+    coinalyze_fade_rows = list(sidecars.get("coinalyze_fade_review", ()))
+    all_derivative_candidates = [*derivatives_rows, *coinalyze_crowding_rows, *coinalyze_fade_rows]
     return {
         "market_anomalies": len(market_rows),
         "market_state_snapshots": len(market_rows),
@@ -2130,9 +2798,12 @@ def _sidecar_count_summary(sidecars: Mapping[str, Iterable[Mapping[str, Any]]]) 
             1 for row in derivatives_rows
             if str(row.get("row_type") or "") == "derivatives_state_snapshot"
             or isinstance(row.get("derivatives_state_snapshot"), Mapping)
+        ) + len(coinalyze_state_rows),
+        "derivatives_crowding_candidates": len(derivatives_rows) + len(coinalyze_crowding_rows),
+        "fade_review_candidates": sum(
+            1 for row in all_derivative_candidates
+            if str(row.get("opportunity_type") or "") == event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value
         ),
-        "derivatives_crowding_candidates": len(derivatives_rows),
-        "fade_review_candidates": sum(1 for row in derivatives_rows if str(row.get("opportunity_type") or "") == event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value),
     }
 
 

@@ -156,6 +156,11 @@ class EventAlphaArtifactDoctorResult:
     integrated_candidate_card_source_url_missing: int = 0
     integrated_candidate_core_crowding_metadata_loss: int = 0
     derivatives_card_metric_claim_without_data: int = 0
+    integrated_coinalyze_crowding_card_missing: int = 0
+    integrated_coinalyze_loaded_no_rows_attached: int = 0
+    integrated_coinalyze_missing_skip_reason: int = 0
+    integrated_coinalyze_stale_loaded_without_warning: int = 0
+    integrated_coinalyze_loaded_from_stale_namespace: int = 0
     integrated_fade_card_crowding_unknown: int = 0
     integrated_fade_card_missing_disclaimer: int = 0
     integrated_confirmed_long_crowding_warning_hidden: int = 0
@@ -1262,6 +1267,11 @@ def diagnose_artifacts(
         "integrated_candidate_card_source_url_missing",
         "integrated_candidate_core_crowding_metadata_loss",
         "derivatives_card_metric_claim_without_data",
+        "integrated_coinalyze_crowding_card_missing",
+        "integrated_coinalyze_loaded_no_rows_attached",
+        "integrated_coinalyze_missing_skip_reason",
+        "integrated_coinalyze_stale_loaded_without_warning",
+        "integrated_coinalyze_loaded_from_stale_namespace",
         "integrated_fade_card_crowding_unknown",
         "integrated_fade_card_missing_disclaimer",
         "integrated_confirmed_long_crowding_warning_hidden",
@@ -2041,6 +2051,11 @@ def diagnose_artifacts(
         integrated_candidate_card_source_url_missing=integrated_conflicts["integrated_candidate_card_source_url_missing"],
         integrated_candidate_core_crowding_metadata_loss=integrated_conflicts["integrated_candidate_core_crowding_metadata_loss"],
         derivatives_card_metric_claim_without_data=integrated_conflicts["derivatives_card_metric_claim_without_data"],
+        integrated_coinalyze_crowding_card_missing=integrated_conflicts["integrated_coinalyze_crowding_card_missing"],
+        integrated_coinalyze_loaded_no_rows_attached=integrated_conflicts["integrated_coinalyze_loaded_no_rows_attached"],
+        integrated_coinalyze_missing_skip_reason=integrated_conflicts["integrated_coinalyze_missing_skip_reason"],
+        integrated_coinalyze_stale_loaded_without_warning=integrated_conflicts["integrated_coinalyze_stale_loaded_without_warning"],
+        integrated_coinalyze_loaded_from_stale_namespace=integrated_conflicts["integrated_coinalyze_loaded_from_stale_namespace"],
         integrated_fade_card_crowding_unknown=integrated_conflicts["integrated_fade_card_crowding_unknown"],
         integrated_fade_card_missing_disclaimer=integrated_conflicts["integrated_fade_card_missing_disclaimer"],
         integrated_confirmed_long_crowding_warning_hidden=integrated_conflicts["integrated_confirmed_long_crowding_warning_hidden"],
@@ -3384,6 +3399,11 @@ def _integrated_radar_artifact_conflicts(
         "integrated_candidate_card_source_url_missing": 0,
         "integrated_candidate_core_crowding_metadata_loss": 0,
         "derivatives_card_metric_claim_without_data": 0,
+        "integrated_coinalyze_crowding_card_missing": 0,
+        "integrated_coinalyze_loaded_no_rows_attached": 0,
+        "integrated_coinalyze_missing_skip_reason": 0,
+        "integrated_coinalyze_stale_loaded_without_warning": 0,
+        "integrated_coinalyze_loaded_from_stale_namespace": 0,
         "integrated_fade_card_crowding_unknown": 0,
         "integrated_fade_card_missing_disclaimer": 0,
         "integrated_confirmed_long_crowding_warning_hidden": 0,
@@ -3487,6 +3507,9 @@ def _integrated_radar_artifact_conflicts(
         out["integrated_input_manifest_missing"] += 1
     elif row_count and manifest_path is not None:
         out["integrated_manifest_mixed_timestamp_pair"] += _integrated_manifest_mixed_timestamp_pairs(manifest_path)
+        coinalyze_conflicts = _integrated_coinalyze_manifest_conflicts(manifest_path, materialized_rows)
+        for key, value in coinalyze_conflicts.items():
+            out[key] += value
     if row_count and source_coverage_json_path is not None and not Path(source_coverage_json_path).exists():
         out["integrated_source_coverage_json_missing"] += 1
     if row_count and daily_brief_path is not None:
@@ -3880,6 +3903,15 @@ def _integrated_candidate_core_card_conflicts(
             card_text,
         ):
             out["derivatives_card_metric_claim_without_data"] += 1
+    has_coinalyze_crowding = (
+        _integrated_row_has_coinalyze(candidate)
+        and (
+            str(candidate.get("crowding_class") or core.get("crowding_class") or "").casefold() in {"moderate", "high", "extreme"}
+            or bool(_tuple_value(candidate.get("crowding_exhaustion_evidence") or core.get("crowding_exhaustion_evidence")))
+        )
+    )
+    if has_coinalyze_crowding and "coinalyze source:" not in card_text.casefold():
+        out["integrated_coinalyze_crowding_card_missing"] += 1
     card_lane = _markdown_bullet_value(card_text, "Opportunity type", section="Opportunity Lane")
     core_lane_lit = str(core.get("opportunity_type") or "").strip()
     if candidate_lane and card_lane and card_lane != candidate_lane:
@@ -4004,6 +4036,82 @@ def _integrated_manifest_mixed_timestamp_pairs(path: str | Path) -> int:
         if started and finished and research and started == research and finished != research:
             conflicts += 1
     return conflicts
+
+
+def _integrated_coinalyze_manifest_conflicts(
+    path: str | Path,
+    rows: Iterable[Mapping[str, Any]],
+) -> dict[str, int]:
+    out = {
+        "integrated_coinalyze_loaded_no_rows_attached": 0,
+        "integrated_coinalyze_missing_skip_reason": 0,
+        "integrated_coinalyze_stale_loaded_without_warning": 0,
+        "integrated_coinalyze_loaded_from_stale_namespace": 0,
+    }
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return out
+    if not isinstance(data, Mapping):
+        return out
+    coinalyze = _coinalyze_manifest_row(data)
+    if not coinalyze:
+        return out
+    state_rows = _as_int(coinalyze.get("coinalyze_derivatives_state_rows_loaded") or data.get("coinalyze_derivatives_state_rows_loaded"))
+    crowding_rows = _as_int(coinalyze.get("coinalyze_crowding_candidates_loaded") or data.get("coinalyze_crowding_candidates_loaded"))
+    fade_rows = _as_int(coinalyze.get("coinalyze_fade_review_candidates_loaded") or data.get("coinalyze_fade_review_candidates_loaded"))
+    loaded_count = state_rows + crowding_rows + fade_rows
+    skip_reason = str(coinalyze.get("coinalyze_skip_reason") or data.get("coinalyze_skip_reason") or "").strip()
+    mode = str(coinalyze.get("mode") or "").strip().casefold()
+    warnings = {
+        str(item).strip().casefold()
+        for item in (*_tuple_value(coinalyze.get("warnings")), *_tuple_value(data.get("warnings")))
+        if str(item).strip()
+    }
+    namespace_status = str(
+        coinalyze.get("coinalyze_artifact_namespace_status")
+        or data.get("coinalyze_artifact_namespace_status")
+        or ""
+    ).strip().casefold()
+    freshness = str(
+        coinalyze.get("coinalyze_freshness_status")
+        or data.get("coinalyze_freshness_status")
+        or ""
+    ).strip().casefold()
+    attached = sum(1 for row in rows if _integrated_row_has_coinalyze(row))
+    if loaded_count > 0 and attached == 0 and not skip_reason:
+        out["integrated_coinalyze_loaded_no_rows_attached"] += 1
+    if (mode.startswith("skipped") or loaded_count == 0) and not skip_reason:
+        out["integrated_coinalyze_missing_skip_reason"] += 1
+    if loaded_count > 0 and freshness in {"stale", "expired"} and not any("coinalyze_freshness" in item for item in warnings):
+        out["integrated_coinalyze_stale_loaded_without_warning"] += 1
+    if loaded_count > 0 and namespace_status == event_alpha_namespace_status.STATUS_STALE_DEPRECATED:
+        out["integrated_coinalyze_loaded_from_stale_namespace"] += 1
+    return out
+
+
+def _coinalyze_manifest_row(data: Mapping[str, Any]) -> Mapping[str, Any]:
+    sidecars = data.get("sidecars")
+    if isinstance(sidecars, list):
+        for item in sidecars:
+            if isinstance(item, Mapping) and str(item.get("sidecar_name") or "") == "coinalyze":
+                return item
+    if data.get("coinalyze_artifact_namespace") or data.get("coinalyze_skip_reason"):
+        return data
+    return {}
+
+
+def _integrated_row_has_coinalyze(row: Mapping[str, Any]) -> bool:
+    state = row.get("derivatives_state_snapshot")
+    if not isinstance(state, Mapping):
+        state = row.get("derivatives_snapshot") if isinstance(row.get("derivatives_snapshot"), Mapping) else {}
+    return bool(
+        row.get("coinalyze_derivatives_attached")
+        or row.get("coinalyze_artifact_namespace")
+        or row.get("coinalyze_source_artifact_path")
+        or state.get("coinalyze_artifact_namespace")
+        or state.get("coinalyze_source_artifact_path")
+    )
 
 
 def _daily_brief_has_integrated_diagnostic_leak(text: str, rows: Iterable[Mapping[str, Any]]) -> bool:
@@ -6288,6 +6396,11 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"integrated_candidate_card_source_url_missing={result.integrated_candidate_card_source_url_missing} "
             f"integrated_candidate_core_crowding_metadata_loss={result.integrated_candidate_core_crowding_metadata_loss} "
             f"derivatives_card_metric_claim_without_data={result.derivatives_card_metric_claim_without_data} "
+            f"integrated_coinalyze_crowding_card_missing={result.integrated_coinalyze_crowding_card_missing} "
+            f"integrated_coinalyze_loaded_no_rows_attached={result.integrated_coinalyze_loaded_no_rows_attached} "
+            f"integrated_coinalyze_missing_skip_reason={result.integrated_coinalyze_missing_skip_reason} "
+            f"integrated_coinalyze_stale_loaded_without_warning={result.integrated_coinalyze_stale_loaded_without_warning} "
+            f"integrated_coinalyze_loaded_from_stale_namespace={result.integrated_coinalyze_loaded_from_stale_namespace} "
             f"integrated_fade_card_crowding_unknown={result.integrated_fade_card_crowding_unknown} "
             f"integrated_fade_card_missing_disclaimer={result.integrated_fade_card_missing_disclaimer} "
             f"integrated_confirmed_long_crowding_warning_hidden={result.integrated_confirmed_long_crowding_warning_hidden} "

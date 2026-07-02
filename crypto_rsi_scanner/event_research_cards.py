@@ -2043,6 +2043,16 @@ def _derivatives_crowding_lines(
         f"- Crowding class: {crowding or 'unknown'}",
         f"- Fade readiness: {_display_text(components.get('fade_readiness')) or 'unknown'}",
     ]
+    coinalyze_namespace = _display_text(state.get("coinalyze_artifact_namespace") or components.get("coinalyze_artifact_namespace"))
+    coinalyze_path = _display_text(state.get("coinalyze_source_artifact_path") or components.get("coinalyze_source_artifact_path"))
+    coinalyze_health = _display_text(state.get("coinalyze_provider_health_status") or components.get("coinalyze_provider_health_status"))
+    if coinalyze_namespace or coinalyze_path:
+        lines.append(
+            "- Coinalyze source: "
+            f"namespace={coinalyze_namespace or 'unknown'} "
+            f"path={coinalyze_path or 'unknown'} "
+            f"provider_health={coinalyze_health or 'not_observed'}"
+        )
     if evidence:
         lines.append("- Crowding / exhaustion evidence: " + "; ".join(evidence[:8]))
     if confirms:

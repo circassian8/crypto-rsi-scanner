@@ -55,6 +55,8 @@ EVENT_ALPHA_DERIVATIVES_CROWDING_PATH ?= fixtures/event_derivatives_crowding/der
 EVENT_ALPHA_ANOMALY_MIN_RETURN_24H ?= 0.03
 EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP ?= 0.05
 EVENT_ALPHA_INTEGRATED_RADAR_INPUT_ARG ?= --event-alpha-integrated-radar-auto
+EVENT_ALPHA_INTEGRATED_RADAR_COINALYZE_NAMESPACE ?=
+EVENT_ALPHA_INTEGRATED_RADAR_COINALYZE_ARG = $(if $(strip $(EVENT_ALPHA_INTEGRATED_RADAR_COINALYZE_NAMESPACE)),--event-alpha-integrated-radar-coinalyze-namespace $(EVENT_ALPHA_INTEGRATED_RADAR_COINALYZE_NAMESPACE),)
 # Other valid integrated radar input modes:
 # --event-alpha-integrated-radar-run-sidecars
 # --event-alpha-integrated-radar-load-existing
@@ -549,7 +551,7 @@ event-alpha-integrated-radar-cycle:
 	env $(EVENT_RESEARCH_NOW_ENV) \
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(ARTIFACT_NAMESPACE) \
-	$(PYTHON) main.py --event-alpha-integrated-radar-cycle $(EVENT_ALPHA_INTEGRATED_RADAR_INPUT_ARG) --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) $(EVENT_ALPHA_INCLUDE_TEST_ARG)
+	$(PYTHON) main.py --event-alpha-integrated-radar-cycle $(EVENT_ALPHA_INTEGRATED_RADAR_INPUT_ARG) $(EVENT_ALPHA_INTEGRATED_RADAR_COINALYZE_ARG) --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) $(EVENT_ALPHA_INCLUDE_TEST_ARG)
 
 event-alpha-integrated-radar-smoke: PROFILE = integrated_radar_smoke
 event-alpha-integrated-radar-smoke:

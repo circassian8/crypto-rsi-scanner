@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-02 — Load Coinalyze artifacts into integrated radar · Codex
+**Why:** Integrated radar could mention Coinalyze readiness but could not reuse
+bounded preflight/rehearsal derivatives artifacts for same-run candidate
+enrichment, so crowding/fade evidence stayed siloed in provider namespaces.
+**Changes:**
+- Added optional integrated radar Coinalyze namespace loading through
+  `--event-alpha-integrated-radar-coinalyze-namespace`, with readiness/default
+  rehearsal auto-discovery and safe missing/stale namespace skip reasons.
+- Loaded external `event_derivatives_state.jsonl`,
+  `event_derivatives_crowding_candidates.jsonl`, and
+  `event_fade_short_review_candidates.jsonl`, then matched Coinalyze rows to
+  integrated candidates by coin id, symbol, market symbol, and canonical ids.
+- Propagated Coinalyze provider health, freshness, namespace, and source-path
+  metadata into integrated candidates, source coverage, daily brief, and
+  research cards.
+- Tightened lane policy so external Coinalyze crowding adds confirmed-long
+  warnings, fade-review remains gated on fresh crowding/exhaustion plus a
+  completed move, and early-long is capped when an extreme crowded move already
+  happened.
+- Added strict artifact-doctor checks for hidden Coinalyze card evidence,
+  loaded-but-unattached manifests, missing skip reasons, stale loaded
+  artifacts, and stale namespaces.
+**Verify:** `python3 tests/test_indicators.py` (663/663); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** The default Coinalyze no-send rehearsal remained
+`missing_config` with zero requests and zero sends/trades/paper/RSI/
+`TRIGGERED_FADE` side effects. Integrated radar still performs no live provider
+calls by default; it only reads existing artifacts.
+
 ## 2026-07-02 — Make Coinalyze derivatives metric claims explicit · Codex
 **Why:** Coinalyze readiness and rehearsal reports listed derivatives metrics
 that were not all populated in live-capable snapshots, making crowding artifacts
