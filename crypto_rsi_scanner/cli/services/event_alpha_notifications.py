@@ -7,9 +7,11 @@ remain compatible during the refactor.
 
 from __future__ import annotations
 
+import logging
 from types import ModuleType
 from typing import Any, MutableMapping
 
+log = logging.getLogger(__name__)
 
 _SERVICE_FUNCTION_NAMES = (
     'bind_scanner_globals',

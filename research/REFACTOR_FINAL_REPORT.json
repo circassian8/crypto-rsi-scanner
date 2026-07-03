@@ -6,7 +6,14 @@
     "crypto_rsi_scanner/scanner.py": 13373,
     "tests/test_indicators.py": 42498
   },
-  "blockers": [],
+  "blockers": [
+    {
+      "blocker_reason": "Legacy implementation core remains over 3,000 lines; wrappers are not enough to mark the refactor complete.",
+      "next_migration_module": "focused legacy decomposition modules for this file",
+      "path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py",
+      "risk": "Moving too much at once can change CLI, doctor, notification, card, brief, or radar semantics."
+    }
+  ],
   "ci_static_safety": {
     "findings": [],
     "status": "pass",
@@ -32,13 +39,13 @@
     "crypto_rsi_scanner/cli/services/event_alpha_fade_review.py": 493,
     "crypto_rsi_scanner/cli/services/event_alpha_integrated.py": 479,
     "crypto_rsi_scanner/cli/services/event_alpha_namespace.py": 50,
-    "crypto_rsi_scanner/cli/services/event_alpha_notifications.py": 1709,
+    "crypto_rsi_scanner/cli/services/event_alpha_notifications.py": 1711,
     "crypto_rsi_scanner/cli/services/event_alpha_outcomes.py": 365,
     "crypto_rsi_scanner/cli/services/event_alpha_provider_preflights.py": 71,
     "crypto_rsi_scanner/cli/services/event_alpha_reports.py": 296,
     "crypto_rsi_scanner/cli/services/event_alpha_research.py": 994,
     "crypto_rsi_scanner/cli/services/inventory.py": 48,
-    "crypto_rsi_scanner/cli/services/scanner_legacy.py": 7744
+    "crypto_rsi_scanner/cli/services/scanner_legacy.py": 120
   },
   "commands_event_alpha_handle_lines": 2,
   "compatibility_preserved": true,
@@ -82,11 +89,11 @@
     "remaining_legacy_unregistered_details": []
   },
   "gate_summary": {
-    "blocked": 0,
+    "blocked": 1,
     "passed": 3,
-    "status": "pass"
+    "status": "blocked"
   },
-  "generated_at": "2026-07-03T03:10:31+00:00",
+  "generated_at": "2026-07-03T14:43:56+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -94,43 +101,484 @@
   "large_event_alpha_split_line_counts": {
     "core_opportunity_store_legacy": 2607,
     "core_opportunity_store_wrapper": 14,
-    "daily_brief_legacy": 3080,
+    "daily_brief_legacy": 85,
     "daily_brief_wrapper": 32,
     "evidence_acquisition_legacy": 2045,
     "evidence_acquisition_wrapper": 14,
     "impact_hypotheses_legacy": 3758,
     "impact_hypotheses_wrapper": 14,
-    "integrated_radar_legacy": 3401,
+    "integrated_radar_legacy": 83,
     "integrated_radar_wrapper": 32,
-    "notifications_pipeline_legacy": 4326,
+    "notifications_pipeline_legacy": 104,
     "notifications_pipeline_wrapper": 49,
-    "research_cards_legacy": 3416,
+    "research_cards_legacy": 88,
     "research_cards_wrapper": 14
   },
-  "legacy_artifact_doctor_core_lines": 6363,
+  "largest_legacy_files": [
+    {
+      "line_count": 3758,
+      "path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
+    },
+    {
+      "line_count": 2821,
+      "path": "crypto_rsi_scanner/event_alpha/radar/validation/legacy.py"
+    },
+    {
+      "line_count": 2607,
+      "path": "crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py"
+    },
+    {
+      "line_count": 2174,
+      "path": "crypto_rsi_scanner/backtest_parts/legacy.py"
+    },
+    {
+      "line_count": 2045,
+      "path": "crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py"
+    },
+    {
+      "line_count": 1887,
+      "path": "crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py"
+    },
+    {
+      "line_count": 1828,
+      "path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
+    },
+    {
+      "line_count": 1341,
+      "path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
+    },
+    {
+      "line_count": 933,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py"
+    },
+    {
+      "line_count": 888,
+      "path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
+    },
+    {
+      "line_count": 769,
+      "path": "crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py"
+    },
+    {
+      "line_count": 533,
+      "path": "crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py"
+    },
+    {
+      "line_count": 192,
+      "path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py"
+    },
+    {
+      "line_count": 190,
+      "path": "crypto_rsi_scanner/refactor_legacy_inventory.py"
+    },
+    {
+      "line_count": 120,
+      "path": "crypto_rsi_scanner/cli/services/scanner_legacy.py"
+    },
+    {
+      "line_count": 111,
+      "path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py"
+    },
+    {
+      "line_count": 104,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py"
+    },
+    {
+      "line_count": 95,
+      "path": "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"
+    },
+    {
+      "line_count": 88,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py"
+    },
+    {
+      "line_count": 85,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy.py"
+    }
+  ],
+  "legacy_artifact_doctor_core_lines": 95,
   "legacy_artifact_doctor_core_note": "Behavior-compatible doctor implementation preserved while public artifact_doctor.py is the small orchestrator.",
+  "legacy_classes_over_limit": 8,
+  "legacy_decomposition": {
+    "largest_legacy_files": [
+      {
+        "line_count": 3758,
+        "path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
+      },
+      {
+        "line_count": 2821,
+        "path": "crypto_rsi_scanner/event_alpha/radar/validation/legacy.py"
+      },
+      {
+        "line_count": 2607,
+        "path": "crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py"
+      },
+      {
+        "line_count": 2174,
+        "path": "crypto_rsi_scanner/backtest_parts/legacy.py"
+      },
+      {
+        "line_count": 2045,
+        "path": "crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py"
+      },
+      {
+        "line_count": 1887,
+        "path": "crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py"
+      },
+      {
+        "line_count": 1828,
+        "path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
+      },
+      {
+        "line_count": 1341,
+        "path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
+      },
+      {
+        "line_count": 933,
+        "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py"
+      },
+      {
+        "line_count": 888,
+        "path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
+      },
+      {
+        "line_count": 769,
+        "path": "crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py"
+      },
+      {
+        "line_count": 533,
+        "path": "crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py"
+      },
+      {
+        "line_count": 192,
+        "path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py"
+      },
+      {
+        "line_count": 190,
+        "path": "crypto_rsi_scanner/refactor_legacy_inventory.py"
+      },
+      {
+        "line_count": 120,
+        "path": "crypto_rsi_scanner/cli/services/scanner_legacy.py"
+      },
+      {
+        "line_count": 111,
+        "path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py"
+      },
+      {
+        "line_count": 104,
+        "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py"
+      },
+      {
+        "line_count": 95,
+        "path": "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"
+      },
+      {
+        "line_count": 88,
+        "path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py"
+      },
+      {
+        "line_count": 85,
+        "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy.py"
+      }
+    ],
+    "legacy_classes_over_limit": 8,
+    "legacy_classes_over_limit_rows": [
+      {
+        "class_name": "CoinalyzeDerivativesProvider",
+        "line_count": 189,
+        "module": "crypto_rsi_scanner.derivatives_providers.coinalyze.legacy",
+        "public": true,
+        "qualname": "CoinalyzeDerivativesProvider",
+        "source_path": "crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py"
+      },
+      {
+        "class_name": "HealthCheckedEventProvider",
+        "line_count": 78,
+        "module": "crypto_rsi_scanner.event_alpha.providers.provider_health_legacy",
+        "public": true,
+        "qualname": "HealthCheckedEventProvider",
+        "source_path": "crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py"
+      },
+      {
+        "class_name": "EvidenceAcquisitionResult",
+        "line_count": 120,
+        "module": "crypto_rsi_scanner.event_alpha.radar.evidence.legacy_acquisition",
+        "public": true,
+        "qualname": "EvidenceAcquisitionResult",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py"
+      },
+      {
+        "class_name": "EventImpactHypothesis",
+        "line_count": 191,
+        "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.legacy",
+        "public": true,
+        "qualname": "EventImpactHypothesis",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
+      },
+      {
+        "class_name": "EventWatchlistEntry",
+        "line_count": 85,
+        "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.legacy",
+        "public": true,
+        "qualname": "EventWatchlistEntry",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
+      },
+      {
+        "class_name": "BinanceAnnouncementProvider",
+        "line_count": 107,
+        "module": "crypto_rsi_scanner.event_providers.binance_announcements.legacy",
+        "public": true,
+        "qualname": "BinanceAnnouncementProvider",
+        "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py"
+      },
+      {
+        "class_name": "BybitAnnouncementProvider",
+        "line_count": 79,
+        "module": "crypto_rsi_scanner.event_providers.bybit_announcements.legacy",
+        "public": true,
+        "qualname": "BybitAnnouncementProvider",
+        "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py"
+      },
+      {
+        "class_name": "CryptoPanicProvider",
+        "line_count": 372,
+        "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
+        "public": true,
+        "qualname": "CryptoPanicProvider",
+        "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
+      }
+    ],
+    "legacy_decomposition_blockers": [
+      {
+        "line_count": 3758,
+        "path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
+      }
+    ],
+    "legacy_decomposition_gate_status": "blocked",
+    "legacy_file_count": 21,
+    "legacy_files_over_1500_lines": 7,
+    "legacy_files_over_3000_lines": 1,
+    "legacy_functions_over_limit": 17,
+    "legacy_functions_over_limit_rows": [
+      {
+        "function_name": "walk_coin",
+        "line_count": 153,
+        "module": "crypto_rsi_scanner.backtest_parts.legacy",
+        "public": true,
+        "qualname": "walk_coin",
+        "source_path": "crypto_rsi_scanner/backtest_parts/legacy.py"
+      },
+      {
+        "function_name": "main",
+        "line_count": 227,
+        "module": "crypto_rsi_scanner.backtest_parts.legacy",
+        "public": true,
+        "qualname": "main",
+        "source_path": "crypto_rsi_scanner/backtest_parts/legacy.py"
+      },
+      {
+        "function_name": "_row_from_core_opportunity",
+        "line_count": 406,
+        "module": "crypto_rsi_scanner.event_alpha.radar.core.legacy_store",
+        "public": false,
+        "qualname": "_row_from_core_opportunity",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py"
+      },
+      {
+        "function_name": "run_manual_discovery",
+        "line_count": 244,
+        "module": "crypto_rsi_scanner.event_alpha.radar.discovery.legacy",
+        "public": true,
+        "qualname": "run_manual_discovery",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py"
+      },
+      {
+        "function_name": "load_discovery_events",
+        "line_count": 183,
+        "module": "crypto_rsi_scanner.event_alpha.radar.discovery.legacy",
+        "public": true,
+        "qualname": "load_discovery_events",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py"
+      },
+      {
+        "function_name": "_execute_request",
+        "line_count": 167,
+        "module": "crypto_rsi_scanner.event_alpha.radar.evidence.legacy_acquisition",
+        "public": false,
+        "qualname": "_execute_request",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py"
+      },
+      {
+        "function_name": "_validate_raw_result",
+        "line_count": 170,
+        "module": "crypto_rsi_scanner.event_alpha.radar.evidence.legacy_acquisition",
+        "public": false,
+        "qualname": "_validate_raw_result",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py"
+      },
+      {
+        "function_name": "validate_hypotheses_with_raw_events",
+        "line_count": 152,
+        "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.legacy",
+        "public": true,
+        "qualname": "validate_hypotheses_with_raw_events",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
+      },
+      {
+        "function_name": "format_impact_hypothesis_report",
+        "line_count": 158,
+        "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.legacy",
+        "public": true,
+        "qualname": "format_impact_hypothesis_report",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
+      },
+      {
+        "function_name": "_hypothesis_from_rule",
+        "line_count": 199,
+        "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.legacy",
+        "public": false,
+        "qualname": "_hypothesis_from_rule",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
+      },
+      {
+        "function_name": "_refresh_one_hypothesis",
+        "line_count": 276,
+        "module": "crypto_rsi_scanner.event_alpha.radar.near_miss.legacy",
+        "public": false,
+        "qualname": "_refresh_one_hypothesis",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
+      },
+      {
+        "function_name": "_candidate_from_row",
+        "line_count": 158,
+        "module": "crypto_rsi_scanner.event_alpha.radar.near_miss.legacy",
+        "public": false,
+        "qualname": "_candidate_from_row",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
+      },
+      {
+        "function_name": "review_validation_sample",
+        "line_count": 280,
+        "module": "crypto_rsi_scanner.event_alpha.radar.validation.legacy",
+        "public": true,
+        "qualname": "review_validation_sample",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/legacy.py"
+      },
+      {
+        "function_name": "_entry_from_alert",
+        "line_count": 199,
+        "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.legacy",
+        "public": false,
+        "qualname": "_entry_from_alert",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
+      },
+      {
+        "function_name": "_entry_from_hypothesis",
+        "line_count": 352,
+        "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.legacy",
+        "public": false,
+        "qualname": "_entry_from_hypothesis",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
+      },
+      {
+        "function_name": "_entry_from_row",
+        "line_count": 164,
+        "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.legacy",
+        "public": false,
+        "qualname": "_entry_from_row",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
+      },
+      {
+        "function_name": "_fetch_live_events",
+        "line_count": 158,
+        "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
+        "public": false,
+        "qualname": "CryptoPanicProvider._fetch_live_events",
+        "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
+      }
+    ],
+    "legacy_line_blocking_limit": 3000,
+    "legacy_line_warning_limit": 1500,
+    "legacy_modules_with_multiple_public_classes": 8,
+    "legacy_modules_with_multiple_public_classes_rows": [
+      {
+        "module": "crypto_rsi_scanner.event_alpha.providers.provider_health_legacy",
+        "public_class_count": 7,
+        "source_path": "crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py"
+      },
+      {
+        "module": "crypto_rsi_scanner.event_alpha.radar.core.legacy_store",
+        "public_class_count": 7,
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py"
+      },
+      {
+        "module": "crypto_rsi_scanner.event_alpha.radar.evidence.legacy_acquisition",
+        "public_class_count": 7,
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py"
+      },
+      {
+        "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.legacy",
+        "public_class_count": 6,
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
+      },
+      {
+        "module": "crypto_rsi_scanner.event_alpha.radar.near_miss.legacy",
+        "public_class_count": 4,
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
+      },
+      {
+        "module": "crypto_rsi_scanner.event_alpha.radar.validation.legacy",
+        "public_class_count": 10,
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/legacy.py"
+      },
+      {
+        "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.legacy",
+        "public_class_count": 5,
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
+      },
+      {
+        "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
+        "public_class_count": 5,
+        "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
+      }
+    ],
+    "legacy_required_decomposition_blockers": [],
+    "legacy_required_decomposition_paths": [
+      "crypto_rsi_scanner/cli/services/scanner_legacy.py",
+      "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py",
+      "crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py"
+    ],
+    "legacy_total_lines": 22652
+  },
+  "legacy_decomposition_gate_status": "blocked",
+  "legacy_files_over_1500_lines": 7,
+  "legacy_files_over_3000_lines": 1,
+  "legacy_functions_over_limit": 17,
+  "legacy_modules_with_multiple_public_classes": 8,
+  "legacy_total_lines": 22652,
   "legacy_unregistered": 0,
   "line_counts": {
     "crypto_rsi_scanner/cli/commands_event_alpha.py": 14,
     "crypto_rsi_scanner/cli/parser.py": 225,
     "crypto_rsi_scanner/cli/services/event_alpha.py": 46,
-    "crypto_rsi_scanner/cli/services/scanner_legacy.py": 7744,
+    "crypto_rsi_scanner/cli/services/scanner_legacy.py": 120,
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 41,
-    "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py": 6363,
+    "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py": 95,
     "crypto_rsi_scanner/event_alpha_artifact_doctor.py": 19,
-    "crypto_rsi_scanner/scanner.py": 77,
+    "crypto_rsi_scanner/scanner.py": 90,
     "tests/test_indicators.py": 1771
   },
   "line_gates": [
     {
       "baseline_lines": 13373,
       "blocker_reason": "",
-      "current_lines": 77,
+      "current_lines": 90,
       "gate_status": "pass",
       "next_migration_module": "crypto_rsi_scanner/cli/services/scanner_legacy.py",
       "path": "crypto_rsi_scanner/scanner.py",
-      "reduced_by_lines": 13296,
-      "reduction_pct": 99.42,
+      "reduced_by_lines": 13283,
+      "reduction_pct": 99.33,
       "risk": "Burning down the transitional compatibility core can change CLI defaults, Make target behavior, provider guardrails, or research-only side-effect gates if moved without command snapshots.",
       "target_lines_lt": 2000
     },

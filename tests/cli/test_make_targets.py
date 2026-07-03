@@ -640,10 +640,10 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["standalone_runner_runtime_seconds"] == 56.78
     assert payload["line_counts"]["tests/test_indicators.py"] < 2000
     assert payload["line_counts"]["crypto_rsi_scanner/scanner.py"] < 2000
-    assert payload["line_counts"]["crypto_rsi_scanner/cli/services/scanner_legacy.py"] > 6500
+    assert payload["line_counts"]["crypto_rsi_scanner/cli/services/scanner_legacy.py"] < 3000
     assert payload["line_counts"]["crypto_rsi_scanner/event_alpha_artifact_doctor.py"] < 100
     assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"] < 1500
-    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"] > 1500
+    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"] < 3000
     assert payload["legacy_artifact_doctor_core_lines"] == payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"]
     assert payload["line_counts"]["crypto_rsi_scanner/cli/services/event_alpha.py"] < 1500
     assert payload["active_shims"] >= 115
@@ -670,6 +670,15 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     )
     assert not any(row["path"] == "crypto_rsi_scanner/event_alpha_artifact_doctor.py" for row in payload["blockers"])
     assert not any(row["path"] == "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py" for row in payload["blockers"])
+    assert not any(row["path"] == "crypto_rsi_scanner/cli/services/scanner_legacy.py" for row in payload["blockers"])
+    assert not any(
+        row["path"] == "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"
+        for row in payload["blockers"]
+    )
+    assert any(
+        row["path"] == "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
+        for row in payload["blockers"]
+    )
     phases = {row["phase"]: row["policy"] for row in payload["deprecation_plan"]}
     assert "v1" in phases and "active compatibility shims" in phases["v1"]
     assert "v2" in phases and "warn in development mode only" in phases["v2"]
@@ -796,6 +805,12 @@ def test_refactor_size_gates_static_baseline_and_new_violation_detection():
         assert any(row["category"] == "file_over_1500_lines" for row in blocked["new_violations"])
         assert json.loads(baseline_path.read_text(encoding="utf-8"))["violation_ids"] == []
 
+        (package / "feature_legacy.py").write_text("\n".join(["VALUE = 1"] * 3001) + "\n", encoding="utf-8")
+        legacy_blocked = refactor_size_gates.build_gate_report(root=root)
+        assert legacy_blocked["legacy_decomposition_gate_status"] == "blocked"
+        assert legacy_blocked["legacy_files_over_3000_lines"] == 1
+        assert legacy_blocked["largest_legacy_files"][0]["path"] == "crypto_rsi_scanner/feature_legacy.py"
+
 
 def test_refactor_size_gates_make_target_is_static_and_no_live_runtime_path():
     root = REPO_ROOT
@@ -816,6 +831,23 @@ def test_refactor_size_gates_make_target_is_static_and_no_live_runtime_path():
     )
     for item in forbidden:
         assert item not in module_text
+
+
+def test_refactor_reports_list_large_legacy_implementation_cores():
+    from crypto_rsi_scanner import refactor_final_report, refactor_size_gates
+
+    size_report = refactor_size_gates.build_gate_report(root=REPO_ROOT)
+    final_report = refactor_final_report.build_refactor_final_report(root=REPO_ROOT)
+    legacy_paths = {row["path"] for row in size_report["largest_legacy_files"]}
+    assert "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py" in legacy_paths
+    assert "crypto_rsi_scanner/event_alpha/radar/validation/legacy.py" in legacy_paths
+    assert "crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py" in legacy_paths
+    assert size_report["legacy_decomposition_gate_status"] == "blocked"
+    assert final_report["legacy_decomposition_gate_status"] == "blocked"
+    assert any(
+        blocker["path"] == "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
+        for blocker in final_report["blockers"]
+    )
 
 
 def test_shared_refactor_facades_preserve_import_paths():

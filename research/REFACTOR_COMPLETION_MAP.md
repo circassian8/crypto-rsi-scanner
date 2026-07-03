@@ -2,26 +2,30 @@
 
 Static map of the behavior-preserving Event Alpha refactor. It records package ownership, compatibility cores, size gates, and safety boundaries.
 
-- generated_at: `2026-07-03T03:16:08+00:00`
-- status: `accepted`
-- scanner.py lines: `77`
+- generated_at: `2026-07-03T14:44:05+00:00`
+- status: `pending_with_blockers`
+- scanner.py lines: `90`
 - scanner command bodies remaining: `0`
 - cli service bind sites: `6`
 - active shims: `124`
 - active shim logic violations: `0`
 - size gate status: `pass`
-- verification status: `pass`
+- legacy decomposition gate status: `blocked`
+- legacy files over 3000 lines: `1`
+- verification status: `not_run`
 
 ## Transitional Compatibility Cores
 
 | path | lines | reason |
 |---|---:|---|
-| `crypto_rsi_scanner/cli/services/scanner_legacy.py` | 7744 | Moved historical scanner command body; old root scanner is now a facade. |
-| `crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py` | 6363 | Preserves strict/WARN artifact doctor semantics while plugin migrations continue. |
+| `crypto_rsi_scanner/cli/services/scanner_legacy.py` | 120 | Moved historical scanner command body; old root scanner is now a facade. |
+| `crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py` | 95 | Preserves strict/WARN artifact doctor semantics while plugin migrations continue. |
 
 ## Known Remaining Blockers
 
-- none
+- `refactor_final_gate`: refactor final report has blocking line or organization gates
+- `legacy_decomposition_gate`: legacy implementation files over 3,000 lines remain
+- `verification_not_recorded`: release-candidate verification results were not supplied
 
 ## Safety Invariants
 

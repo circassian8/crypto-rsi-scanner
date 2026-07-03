@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-03 - Legacy implementation size gates define refactor completion
+**Status:** accepted
+**Decision:** Small public wrappers and compatibility aggregators are not enough
+to mark the refactor complete. `*_legacy.py` and `legacy_*` implementation cores
+are transitional only: files over 1,500 lines are warnings, and files over
+3,000 lines block the refactor final/completion reports until they are split or
+an explicit baseline decision is made.
+**Why:** The earlier refactor hid behavior-compatible monoliths behind small
+facades. Legacy-aware gates keep the migration honest while preserving CLI,
+Makefile, import, artifact, provider-readiness, and notification behavior.
+**Revisit when:** no legacy implementation file remains over 3,000 lines, or a
+specific large compatibility core is deliberately accepted with documented
+blockers, next split target, and parity tests.
+
 ## 2026-07-03 - Event Alpha refactor v2 accepted
 **Status:** accepted
 **Decision:** Event Alpha refactor v2 is accepted as the behavior-preserving

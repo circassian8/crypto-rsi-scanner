@@ -57,11 +57,24 @@ def _wrap_legacy_call(name: str, func: Any) -> Any:
 
 
 def _install_legacy_exports() -> None:
+    legacy_wrapped_names = set(getattr(_legacy, "_WRAPPED_LEGACY_CALLS", {}))
     for _name in dir(_legacy):
         if _name.startswith("__"):
             continue
+        if _name in {
+            "_LEGACY_MODULES",
+            "_LEGACY_MODULE_EXPORTS",
+            "_ORIGINAL_LEGACY_MODULE_VALUES",
+            "_WRAPPED_LEGACY_CALLS",
+            "_sync_legacy_module_globals",
+            "_wrap_legacy_call",
+            "_install_legacy_modules",
+        }:
+            continue
         _value = getattr(_legacy, _name)
-        if inspect.isfunction(_value) and getattr(_value, "__module__", None) == _legacy.__name__:
+        if inspect.isfunction(_value) and (
+            _name in legacy_wrapped_names or getattr(_value, "__module__", None) == _legacy.__name__
+        ):
             _ORIGINAL_LEGACY_FUNCTIONS[_name] = _value
             globals()[_name] = _wrap_legacy_call(_name, _value)
         else:

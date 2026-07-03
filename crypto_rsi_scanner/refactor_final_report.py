@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from . import refactor_baseline
+from . import refactor_legacy_inventory
 from .event_alpha import shims as event_alpha_shims
 from .event_alpha.doctor import check_registry
 from .event_alpha.namespace import lifecycle as namespace_lifecycle
@@ -483,6 +484,7 @@ def build_refactor_final_report(
     ci_static_safety = _ci_static_safety(root)
     classification = _remaining_module_classification(root)
     class_ownership = _class_ownership_summary(root)
+    legacy_inventory = refactor_legacy_inventory.build_legacy_inventory(root=root)
     cli_service_line_counts = _cli_service_line_counts(root)
     cli_event_alpha_service_lines = cli_service_line_counts.get("crypto_rsi_scanner/cli/services/event_alpha.py")
     cli_service_bind_calls = _cli_service_bind_scanner_globals_call_sites(root)
@@ -531,6 +533,19 @@ def build_refactor_final_report(
                 "risk": "Removing the runtime binding too early can break historical helper/config resolution for Makefile-backed commands.",
             }
         )
+    if legacy_inventory["legacy_decomposition_gate_status"] == "blocked":
+        for row in legacy_inventory["legacy_decomposition_blockers"]:
+            extra_blockers.append(
+                {
+                    "path": str(row.get("path")),
+                    "blocker_reason": (
+                        "Legacy implementation core remains over 3,000 lines; wrappers are not enough "
+                        "to mark the refactor complete."
+                    ),
+                    "next_migration_module": "focused legacy decomposition modules for this file",
+                    "risk": "Moving too much at once can change CLI, doctor, notification, card, brief, or radar semantics.",
+                }
+            )
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -580,6 +595,17 @@ def build_refactor_final_report(
         "migrated_modules_this_run_count": len(MIGRATED_MODULES_THIS_RUN),
         "remaining_module_classification": classification,
         "class_ownership_report": class_ownership,
+        "legacy_decomposition": legacy_inventory,
+        "legacy_decomposition_gate_status": legacy_inventory["legacy_decomposition_gate_status"],
+        "legacy_files_over_1500_lines": legacy_inventory["legacy_files_over_1500_lines"],
+        "legacy_files_over_3000_lines": legacy_inventory["legacy_files_over_3000_lines"],
+        "legacy_total_lines": legacy_inventory["legacy_total_lines"],
+        "largest_legacy_files": legacy_inventory["largest_legacy_files"],
+        "legacy_classes_over_limit": legacy_inventory["legacy_classes_over_limit"],
+        "legacy_functions_over_limit": legacy_inventory["legacy_functions_over_limit"],
+        "legacy_modules_with_multiple_public_classes": legacy_inventory[
+            "legacy_modules_with_multiple_public_classes"
+        ],
         "remaining_implementation_modules_by_package_target": classification["remaining_implementation_modules_by_package_target"],
         "intentionally_outside_event_alpha_modules": classification["intentionally_outside_event_alpha_modules"],
         "doctor_plugin_migration": doctor_plugin_migration,
@@ -681,13 +707,20 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             f"- class_ownership_report: `{data.get('class_ownership_report', {}).get('path')}`",
             f"- class_ownership_classes_over_limit: `{data.get('class_ownership_report', {}).get('classes_over_limit_count')}`",
             f"- class_ownership_functions_over_limit: `{data.get('class_ownership_report', {}).get('functions_over_limit_count')}`",
+            f"- legacy_decomposition_gate_status: `{data.get('legacy_decomposition_gate_status')}`",
+            f"- legacy_files_over_1500_lines: `{data.get('legacy_files_over_1500_lines')}`",
+            f"- legacy_files_over_3000_lines: `{data.get('legacy_files_over_3000_lines')}`",
+            f"- legacy_total_lines: `{data.get('legacy_total_lines')}`",
+            f"- legacy_classes_over_limit: `{data.get('legacy_classes_over_limit')}`",
+            f"- legacy_functions_over_limit: `{data.get('legacy_functions_over_limit')}`",
+            f"- legacy_modules_with_multiple_public_classes: `{data.get('legacy_modules_with_multiple_public_classes')}`",
             "",
             "## Newly Migrated Modules",
             "",
         ]
     )
-    for module in data.get("migrated_modules_this_run", []):
-        lines.append(f"- `{module}`")
+    _append_migrated_modules_section(lines, data)
+    _append_legacy_decomposition_section(lines, data)
     lines.extend(
         [
             "",
@@ -723,20 +756,7 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             "",
         ]
     )
-    if data["blockers"]:
-        for blocker in data["blockers"]:
-            lines.extend(
-                [
-                    f"### `{blocker['path']}`",
-                    "",
-                    f"- blocker_reason: {blocker['blocker_reason']}",
-                    f"- next_migration_module: `{blocker['next_migration_module']}`",
-                    f"- risk: {blocker['risk']}",
-                    "",
-                ]
-            )
-    else:
-        lines.append("- none")
+    _append_blocker_section(lines, data)
     lines.extend(
         [
             "## Compatibility And Code Removal",
@@ -769,6 +789,43 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
         ]
     )
     return "\n".join(lines)
+
+
+def _append_legacy_decomposition_section(lines: list[str], data: dict[str, Any]) -> None:
+    lines.extend(
+        [
+            "",
+            "## Legacy Decomposition Gate",
+            "",
+            "| path | lines |",
+            "|---|---:|",
+        ]
+    )
+    for row in data.get("largest_legacy_files", []):
+        if isinstance(row, dict):
+            lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
+
+
+def _append_migrated_modules_section(lines: list[str], data: dict[str, Any]) -> None:
+    for module in data.get("migrated_modules_this_run", []):
+        lines.append(f"- `{module}`")
+
+
+def _append_blocker_section(lines: list[str], data: dict[str, Any]) -> None:
+    if not data["blockers"]:
+        lines.append("- none")
+        return
+    for blocker in data["blockers"]:
+        lines.extend(
+            [
+                f"### `{blocker['path']}`",
+                "",
+                f"- blocker_reason: {blocker['blocker_reason']}",
+                f"- next_migration_module: `{blocker['next_migration_module']}`",
+                f"- risk: {blocker['risk']}",
+                "",
+            ]
+        )
 
 
 def write_refactor_final_report(

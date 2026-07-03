@@ -45,9 +45,9 @@ layout gives new code a home while old import paths continue to work.
   `event_alpha_outcomes.py`, `event_alpha_reports.py`,
   `event_alpha_provider_preflights.py`, `event_alpha_namespace.py`,
   `event_alpha_research.py`, and `event_alpha_fade_review.py`.
-  `cli/services/scanner_legacy.py` is the transitional compatibility core for
-  historical scanner command bodies; new command logic should move into focused
-  `cli/services/` or `cli/commands_*.py` modules instead.
+  `cli/services/scanner_legacy.py` is now a compatibility aggregator over
+  focused modules in `cli/services/legacy/`; new command logic should move into
+  focused `cli/services/` or `cli/commands_*.py` modules instead.
 - `crypto_rsi_scanner/storage_parts/`: shared SQLite storage mixins for
   connection setup, schema text, additive migrations, scan/signal/outcome rows,
   previous-flag/alert/subscriber/meta state, paper-trade rows, and scan-status
@@ -71,6 +71,10 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
 - Old top-level `crypto_rsi_scanner/event_*.py` shim modules should not gain
   new implementation logic. They may re-export symbols, hold compatibility
   comments, or contain temporary glue only when a tested migration requires it.
+- Legacy implementation files are transitional compatibility only. Files over
+  1,500 lines are warnings, and files over 3,000 lines block refactor
+  completion even when public wrappers are small. Run `make refactor-size-gates`
+  and `make refactor-final-report` after moving legacy code.
 - `crypto_rsi_scanner.event_alpha.shims` is the shim registry. It marks mapped
   modules as `active_shim`, `partial_shim`, or `not_migrated`; active shims are
   compatibility-only and `make event-alpha-shim-report` audits the boundary.

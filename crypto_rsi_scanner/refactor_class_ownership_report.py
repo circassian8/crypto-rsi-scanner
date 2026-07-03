@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from . import refactor_legacy_inventory
+
 
 REPORT_SCHEMA_VERSION = "refactor_class_ownership_report_v1"
 REPORT_JSON = "REFACTOR_CLASS_OWNERSHIP_REPORT.json"
@@ -107,6 +109,11 @@ def build_report(
         }
         for module, reason in sorted(MODULE_EXCEPTIONS.items())
     ]
+    legacy_inventory = refactor_legacy_inventory.build_legacy_inventory(
+        root=repo_root,
+        class_line_limit=class_line_limit,
+        function_line_limit=function_line_limit,
+    )
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
@@ -127,6 +134,21 @@ def build_report(
         "classes_over_limit": long_classes,
         "functions_over_limit": long_functions,
         "modules_with_multiple_public_classes": modules_with_multiple_public_classes,
+        "legacy_files_over_1500_lines": legacy_inventory["legacy_files_over_1500_lines"],
+        "legacy_files_over_3000_lines": legacy_inventory["legacy_files_over_3000_lines"],
+        "legacy_total_lines": legacy_inventory["legacy_total_lines"],
+        "largest_legacy_files": legacy_inventory["largest_legacy_files"],
+        "legacy_classes_over_limit": legacy_inventory["legacy_classes_over_limit"],
+        "legacy_functions_over_limit": legacy_inventory["legacy_functions_over_limit"],
+        "legacy_modules_with_multiple_public_classes": legacy_inventory[
+            "legacy_modules_with_multiple_public_classes"
+        ],
+        "legacy_classes_over_limit_rows": legacy_inventory["legacy_classes_over_limit_rows"],
+        "legacy_functions_over_limit_rows": legacy_inventory["legacy_functions_over_limit_rows"],
+        "legacy_modules_with_multiple_public_classes_rows": legacy_inventory[
+            "legacy_modules_with_multiple_public_classes_rows"
+        ],
+        "legacy_decomposition_gate_status": legacy_inventory["legacy_decomposition_gate_status"],
         "exceptions": exception_rows,
         "policy": {
             "public_class_over_75_lines": "should live in its own module unless documented here",
@@ -164,6 +186,10 @@ def format_report(report: dict[str, Any]) -> str:
         f"- classes_over_limit_count: `{report.get('classes_over_limit_count', 0)}`",
         f"- functions_over_limit_count: `{report.get('functions_over_limit_count', 0)}`",
         f"- modules_with_multiple_public_classes_count: `{report.get('modules_with_multiple_public_classes_count', 0)}`",
+        f"- legacy_decomposition_gate_status: `{report.get('legacy_decomposition_gate_status')}`",
+        f"- legacy_classes_over_limit: `{report.get('legacy_classes_over_limit', 0)}`",
+        f"- legacy_functions_over_limit: `{report.get('legacy_functions_over_limit', 0)}`",
+        f"- legacy_modules_with_multiple_public_classes: `{report.get('legacy_modules_with_multiple_public_classes', 0)}`",
         "",
         "## Policy",
         "",
@@ -178,6 +204,15 @@ def format_report(report: dict[str, Any]) -> str:
     for row in report.get("exceptions", []):
         if isinstance(row, dict):
             lines.append(f"- `{row.get('module')}`: {row.get('reason')}")
+    lines.extend([
+        "",
+        "## Legacy Implementation Cores",
+        "",
+        "| path | lines |",
+        "|---|---:|",
+    ])
+    for row in _limit_rows(report.get("largest_legacy_files"), 40):
+        lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
     lines.extend([
         "",
         "## Modules With Multiple Public Classes",

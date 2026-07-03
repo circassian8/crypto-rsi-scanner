@@ -17,6 +17,52 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-03 — Decompose first legacy implementation cores · Codex
+**Why:** The prior refactor made public wrappers small but still hid large
+implementation bodies in `*_legacy.py` files. This pass needed to make those
+legacy cores visible to gates and burn down the highest-impact ones without
+changing CLI behavior, artifact semantics, provider guards, or notification
+routes.
+**Changes:**
+- Added `crypto_rsi_scanner/refactor_legacy_inventory.py` and wired legacy
+  counters into size gates, class ownership, final report, and completion-map
+  artifacts. Legacy files over 1,500 lines now warn; legacy files over 3,000
+  lines block refactor completion.
+- Split `cli/services/scanner_legacy.py`,
+  `event_alpha/doctor/legacy_artifact_doctor.py`, and
+  `event_alpha/notifications/pipeline_legacy.py` into focused legacy package
+  modules while preserving old `scanner.*` monkeypatch/import compatibility.
+- Split the first artifact/radar batch for research cards, daily brief, and
+  integrated radar into focused `legacy_parts/` modules.
+- Refreshed refactor size/class/final/completion reports and tests. Current
+  report state is intentionally `pending_with_blockers` because
+  `event_alpha/radar/impact_hypotheses/legacy.py` is still over 3,000 lines.
+**Verify:** `python3 tests/test_indicators.py` (745/745);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (756 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make test-pytest-safe PYTHON=python3`; `make refactor-size-gates PYTHON=python3`;
+`make refactor-class-ownership-report PYTHON=python3`;
+`make refactor-final-report PYTHON=python3`; `make refactor-completion-map
+PYTHON=python3`; `make event-alpha-shim-report PYTHON=python3`;
+`make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`
+(WARN/no blockers); `make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added.
+
 ## 2026-07-03 — Accept Event Alpha refactor v2 release candidate · Codex
 **Why:** The final refactor cleanup needed to remove `scanner.py` as the command
 brain, make the release gates measurable, and prove behavior compatibility with

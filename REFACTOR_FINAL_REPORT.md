@@ -2,8 +2,8 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-03T03:10:31+00:00`
-- gate_status: `pass`
+- generated_at: `2026-07-03T14:43:56+00:00`
+- gate_status: `blocked`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
 
@@ -17,7 +17,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 | file | baseline lines | current lines | reduced by | reduction | target | status |
 |---|---:|---:|---:|---:|---:|---|
-| `crypto_rsi_scanner/scanner.py` | 13373 | 77 | 13296 | 99.42% | <2000 | `pass` |
+| `crypto_rsi_scanner/scanner.py` | 13373 | 90 | 13283 | 99.33% | <2000 | `pass` |
 | `tests/test_indicators.py` | 42498 | 1771 | 40727 | 95.83% | <2000 | `pass` |
 | `crypto_rsi_scanner/event_alpha_artifact_doctor.py` | 7145 | 19 | 7126 | 99.73% | <100 | `pass` |
 
@@ -32,12 +32,12 @@ Research-only refactor gate report. This report does not call providers, send Te
 - scanner_bind_scanner_globals_call_sites: `7`
 - cli_service_bind_scanner_globals_call_sites: `6`
 - cli_event_alpha_service_lines: `46`
-- scanner_legacy_service_lines: `7744`
+- scanner_legacy_service_lines: `120`
 - parser_build_parser_lines: `25`
 - commands_event_alpha_handle_lines: `2`
-- legacy_artifact_doctor_core_lines: `6363`
+- legacy_artifact_doctor_core_lines: `95`
 - legacy_artifact_doctor_core_note: Behavior-compatible doctor implementation preserved while public artifact_doctor.py is the small orchestrator.
-- large_event_alpha_split_line_counts: `{"core_opportunity_store_legacy": 2607, "core_opportunity_store_wrapper": 14, "daily_brief_legacy": 3080, "daily_brief_wrapper": 32, "evidence_acquisition_legacy": 2045, "evidence_acquisition_wrapper": 14, "impact_hypotheses_legacy": 3758, "impact_hypotheses_wrapper": 14, "integrated_radar_legacy": 3401, "integrated_radar_wrapper": 32, "notifications_pipeline_legacy": 4326, "notifications_pipeline_wrapper": 49, "research_cards_legacy": 3416, "research_cards_wrapper": 14}`
+- large_event_alpha_split_line_counts: `{"core_opportunity_store_legacy": 2607, "core_opportunity_store_wrapper": 14, "daily_brief_legacy": 85, "daily_brief_wrapper": 32, "evidence_acquisition_legacy": 2045, "evidence_acquisition_wrapper": 14, "impact_hypotheses_legacy": 3758, "impact_hypotheses_wrapper": 14, "integrated_radar_legacy": 83, "integrated_radar_wrapper": 32, "notifications_pipeline_legacy": 104, "notifications_pipeline_wrapper": 49, "research_cards_legacy": 88, "research_cards_wrapper": 14}`
 - cli_flag_snapshot_path: `research/CLI_FLAG_SNAPSHOT.json`
 - scanner_command_body_functions_remaining: `0`
 - remaining_implementation_modules_by_package_target: `{}`
@@ -45,6 +45,13 @@ Research-only refactor gate report. This report does not call providers, send Te
 - class_ownership_report: `research/REFACTOR_CLASS_OWNERSHIP_REPORT.json`
 - class_ownership_classes_over_limit: `31`
 - class_ownership_functions_over_limit: `64`
+- legacy_decomposition_gate_status: `blocked`
+- legacy_files_over_1500_lines: `7`
+- legacy_files_over_3000_lines: `1`
+- legacy_total_lines: `22652`
+- legacy_classes_over_limit: `8`
+- legacy_functions_over_limit: `17`
+- legacy_modules_with_multiple_public_classes: `8`
 
 ## Newly Migrated Modules
 
@@ -78,6 +85,31 @@ Research-only refactor gate report. This report does not call providers, send Te
 - `crypto_rsi_scanner.event_clock`
 - `crypto_rsi_scanner.event_models`
 
+## Legacy Decomposition Gate
+
+| path | lines |
+|---|---:|
+| `crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py` | 3758 |
+| `crypto_rsi_scanner/event_alpha/radar/validation/legacy.py` | 2821 |
+| `crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py` | 2607 |
+| `crypto_rsi_scanner/backtest_parts/legacy.py` | 2174 |
+| `crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py` | 2045 |
+| `crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py` | 1887 |
+| `crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py` | 1828 |
+| `crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py` | 1341 |
+| `crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py` | 933 |
+| `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` | 888 |
+| `crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py` | 769 |
+| `crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py` | 533 |
+| `crypto_rsi_scanner/event_providers/binance_announcements/legacy.py` | 192 |
+| `crypto_rsi_scanner/refactor_legacy_inventory.py` | 190 |
+| `crypto_rsi_scanner/cli/services/scanner_legacy.py` | 120 |
+| `crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py` | 111 |
+| `crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py` | 104 |
+| `crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py` | 95 |
+| `crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py` | 88 |
+| `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy.py` | 85 |
+
 ## Doctor Plugin Migration
 
 - legacy_unregistered: `0`
@@ -101,7 +133,12 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 ## Blockers
 
-- none
+### `crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py`
+
+- blocker_reason: Legacy implementation core remains over 3,000 lines; wrappers are not enough to mark the refactor complete.
+- next_migration_module: `focused legacy decomposition modules for this file`
+- risk: Moving too much at once can change CLI, doctor, notification, card, brief, or radar semantics.
+
 ## Compatibility And Code Removal
 
 - dead_duplicate_code_removed: `False`

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from . import refactor_class_ownership_report as ownership
+from . import refactor_legacy_inventory
 
 
 BASELINE_SCHEMA_VERSION = "refactor_size_baseline_v1"
@@ -26,6 +27,25 @@ DEFAULT_CLASS_LINE_LIMIT = ownership.DEFAULT_CLASS_LINE_LIMIT
 DEFAULT_FUNCTION_LINE_LIMIT = ownership.DEFAULT_FUNCTION_LINE_LIMIT
 MOVED_VIOLATION_ALIASES = {
     "file:crypto_rsi_scanner/cli/services/scanner_legacy.py": "file:crypto_rsi_scanner/scanner.py",
+    "class:crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py:EventAlphaArtifactDoctorResult": "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
+    "class:crypto_rsi_scanner/event_alpha/notifications/legacy/delivery_writer.py:_DeliveryWriter": "class:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:_DeliveryWriter",
+    "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py:EventIntegratedRadarResult": "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:EventIntegratedRadarResult",
+    "function:crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py:build_daily_brief": "function:crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy.py:build_daily_brief",
+    "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/evidence.py:_core_score_components": "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py:_core_score_components",
+    "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/outcomes.py:_impact_hypothesis_lines": "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py:_impact_hypothesis_lines",
+    "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/renderer.py:render_research_card": "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py:render_research_card",
+    "function:crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py:diagnose_artifacts": "function:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:diagnose_artifacts",
+    "function:crypto_rsi_scanner/event_alpha/doctor/legacy/notification_delivery_checks.py:_notification_delivery_conflicts": "function:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:_notification_delivery_conflicts",
+    "function:crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py:_integrated_radar_artifact_conflicts": "function:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:_integrated_radar_artifact_conflicts",
+    "function:crypto_rsi_scanner/event_alpha/doctor/legacy/reporting.py:format_artifact_doctor_report": "function:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:format_artifact_doctor_report",
+    "function:crypto_rsi_scanner/event_alpha/notifications/legacy/preview_writer.py:write_notification_plan_preview": "function:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:write_notification_plan_preview",
+    "function:crypto_rsi_scanner/event_alpha/notifications/legacy/research_review_selection.py:select_research_review_candidates_with_diagnostics": "function:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:select_research_review_candidates_with_diagnostics",
+    "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications": "function:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:send_notifications",
+    "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py:run_integrated_radar_cycle": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:run_integrated_radar_cycle",
+    "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py:_merge_family": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:_merge_family",
+    "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/report.py:format_integrated_daily_brief": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:format_integrated_daily_brief",
+    "public_classes:crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.models": "public_classes:crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy",
+    "public_classes:crypto_rsi_scanner.event_alpha.notifications.legacy.delivery_models": "public_classes:crypto_rsi_scanner.event_alpha.notifications.pipeline_legacy",
 }
 
 
@@ -42,6 +62,11 @@ def build_inventory(
 ) -> dict[str, Any]:
     repo_root = Path(root).expanduser() if root is not None else repo_root_from_module()
     class_report = ownership.build_report(
+        root=repo_root,
+        class_line_limit=class_line_limit,
+        function_line_limit=function_line_limit,
+    )
+    legacy_inventory = refactor_legacy_inventory.build_legacy_inventory(
         root=repo_root,
         class_line_limit=class_line_limit,
         function_line_limit=function_line_limit,
@@ -104,6 +129,7 @@ def build_inventory(
         "classes_over_limit": class_report.get("classes_over_limit", []),
         "functions_over_limit": class_report.get("functions_over_limit", []),
         "modules_with_multiple_public_classes": class_report.get("modules_with_multiple_public_classes", []),
+        **legacy_inventory,
         "violations": violations,
         "violation_ids": violation_ids,
     }
@@ -155,6 +181,7 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
         "no_live_provider_calls": True,
         "no_sends_trades_paper_rsi_or_triggered_fade": True,
         "gate_status": gate_status,
+        "legacy_decomposition_gate_status": inventory.get("legacy_decomposition_gate_status"),
         "baseline_path": f"research/{BASELINE_JSON}",
         "baseline_present": baseline_path.exists(),
         "policy": {
@@ -215,11 +242,20 @@ def format_gate_report(report: dict[str, Any]) -> str:
         f"- modules_with_multiple_public_classes_count: `{report.get('modules_with_multiple_public_classes_count', 0)}`",
         f"- new_violation_count: `{report.get('new_violation_count', 0)}`",
         f"- moved_existing_violation_count: `{report.get('moved_existing_violation_count', 0)}`",
+        f"- legacy_decomposition_gate_status: `{report.get('legacy_decomposition_gate_status')}`",
+        f"- legacy_files_over_1500_lines: `{report.get('legacy_files_over_1500_lines', 0)}`",
+        f"- legacy_files_over_3000_lines: `{report.get('legacy_files_over_3000_lines', 0)}`",
+        f"- legacy_total_lines: `{report.get('legacy_total_lines', 0)}`",
+        f"- legacy_classes_over_limit: `{report.get('legacy_classes_over_limit', 0)}`",
+        f"- legacy_functions_over_limit: `{report.get('legacy_functions_over_limit', 0)}`",
+        f"- legacy_modules_with_multiple_public_classes: `{report.get('legacy_modules_with_multiple_public_classes', 0)}`",
         "",
         "## Policy",
         "",
         "- Existing violations from `research/REFACTOR_SIZE_BASELINE.json` are warnings.",
         "- New file/function/class/module ownership violations are blockers.",
+        "- Legacy implementation files over 1,500 lines are warnings.",
+        "- Legacy implementation files over 3,000 lines block refactor-complete status.",
         "- Baseline updates require the explicit `make refactor-size-baseline-update` target.",
         "",
         "## New Violations",
@@ -238,6 +274,15 @@ def format_gate_report(report: dict[str, Any]) -> str:
     ])
     for row in _limit_rows(report.get("moved_existing_violation_aliases"), 40):
         lines.append(f"| `{row.get('current_violation_id')}` | `{row.get('baseline_violation_id')}` |")
+    lines.extend([
+        "",
+        "## Legacy Decomposition Gate",
+        "",
+        "| path | lines |",
+        "|---|---:|",
+    ])
+    for row in _limit_rows(report.get("largest_legacy_files"), 40):
+        lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
     lines.extend([
         "",
         "## Files Over 1500 Lines",
