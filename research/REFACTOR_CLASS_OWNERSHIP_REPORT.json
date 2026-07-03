@@ -1,5 +1,5 @@
 {
-  "class_count": 414,
+  "class_count": 420,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
@@ -255,16 +255,34 @@
       "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py"
     },
     {
-      "class_name": "Storage",
+      "class_name": "MigrationsMixin",
       "exception_reason": null,
-      "line_count": 453,
-      "module": "crypto_rsi_scanner.storage",
+      "line_count": 88,
+      "module": "crypto_rsi_scanner.storage_parts.migrations",
       "public": true,
-      "qualname": "Storage",
-      "source_path": "crypto_rsi_scanner/storage.py"
+      "qualname": "MigrationsMixin",
+      "source_path": "crypto_rsi_scanner/storage_parts/migrations.py"
+    },
+    {
+      "class_name": "SignalsMixin",
+      "exception_reason": null,
+      "line_count": 129,
+      "module": "crypto_rsi_scanner.storage_parts.signals",
+      "public": true,
+      "qualname": "SignalsMixin",
+      "source_path": "crypto_rsi_scanner/storage_parts/signals.py"
+    },
+    {
+      "class_name": "WatchlistMixin",
+      "exception_reason": null,
+      "line_count": 89,
+      "module": "crypto_rsi_scanner.storage_parts.watchlist",
+      "public": true,
+      "qualname": "WatchlistMixin",
+      "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 29,
+  "classes_over_limit_count": 31,
   "exceptions": [
     {
       "module": "crypto_rsi_scanner.event_core.models",
@@ -277,24 +295,24 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 4998,
+  "function_count": 5016,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
       "function_name": "walk_coin",
       "line_count": 153,
-      "module": "crypto_rsi_scanner.backtest",
+      "module": "crypto_rsi_scanner.backtest_parts.legacy",
       "public": true,
       "qualname": "walk_coin",
-      "source_path": "crypto_rsi_scanner/backtest.py"
+      "source_path": "crypto_rsi_scanner/backtest_parts/legacy.py"
     },
     {
       "function_name": "main",
       "line_count": 227,
-      "module": "crypto_rsi_scanner.backtest",
+      "module": "crypto_rsi_scanner.backtest_parts.legacy",
       "public": true,
       "qualname": "main",
-      "source_path": "crypto_rsi_scanner/backtest.py"
+      "source_path": "crypto_rsi_scanner/backtest_parts/legacy.py"
     },
     {
       "function_name": "dispatch_event_alpha_command",
@@ -794,7 +812,7 @@
     }
   ],
   "functions_over_limit_count": 64,
-  "generated_at": "2026-07-03T02:38:22.570649+00:00",
+  "generated_at": "2026-07-03T02:55:56.172472+00:00",
   "modules_with_multiple_public_classes": [
     {
       "exception_reason": null,
@@ -1210,7 +1228,7 @@
     "multiple_public_classes": "allowed for small value objects/enums in documented models modules",
     "public_class_over_75_lines": "should live in its own module unless documented here"
   },
-  "public_class_count": 401,
+  "public_class_count": 407,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -1229,7 +1247,7 @@
     "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy": 2,
     "crypto_rsi_scanner.event_alpha.artifacts.retention": 2,
     "crypto_rsi_scanner.event_alpha.artifacts.run_ledger": 2,
-    "crypto_rsi_scanner.event_alpha.artifacts.schema_v1": 1,
+    "crypto_rsi_scanner.event_alpha.artifacts.schema.legacy": 1,
     "crypto_rsi_scanner.event_alpha.config.health_guard": 2,
     "crypto_rsi_scanner.event_alpha.config.preflight": 1,
     "crypto_rsi_scanner.event_alpha.config.profiles": 1,
@@ -1356,6 +1374,12 @@
     "crypto_rsi_scanner.scanner": 1,
     "crypto_rsi_scanner.signal_registry": 2,
     "crypto_rsi_scanner.storage": 1,
+    "crypto_rsi_scanner.storage_parts.connection": 1,
+    "crypto_rsi_scanner.storage_parts.maintenance": 1,
+    "crypto_rsi_scanner.storage_parts.migrations": 1,
+    "crypto_rsi_scanner.storage_parts.papers": 1,
+    "crypto_rsi_scanner.storage_parts.signals": 1,
+    "crypto_rsi_scanner.storage_parts.watchlist": 1,
     "crypto_rsi_scanner.supply_providers.arkham": 1,
     "crypto_rsi_scanner.supply_providers.base": 1,
     "crypto_rsi_scanner.supply_providers.dune": 1,

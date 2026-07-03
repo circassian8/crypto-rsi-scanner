@@ -98,7 +98,7 @@
     "passed": 2,
     "status": "blocked"
   },
-  "generated_at": "2026-07-03T02:38:21+00:00",
+  "generated_at": "2026-07-03T02:53:24+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"

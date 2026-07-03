@@ -2,9 +2,9 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-03T02:38:22.570649+00:00`
-- public_class_count: `401`
-- classes_over_limit_count: `29`
+- generated_at: `2026-07-03T02:55:56.172472+00:00`
+- public_class_count: `407`
+- classes_over_limit_count: `31`
 - functions_over_limit_count: `64`
 - modules_with_multiple_public_classes_count: `81`
 
@@ -137,14 +137,16 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_providers.project_blog_rss` | `ProjectBlogRssProvider` | 96 | true |  |
 | `crypto_rsi_scanner.llm_providers.openai_provider` | `OpenAILLMRelationshipProvider` | 137 | true |  |
 | `crypto_rsi_scanner.llm_providers.openai_provider` | `OpenAILLMExtractionProvider` | 78 | true |  |
-| `crypto_rsi_scanner.storage` | `Storage` | 453 | true |  |
+| `crypto_rsi_scanner.storage_parts.migrations` | `MigrationsMixin` | 88 | true |  |
+| `crypto_rsi_scanner.storage_parts.signals` | `SignalsMixin` | 129 | true |  |
+| `crypto_rsi_scanner.storage_parts.watchlist` | `WatchlistMixin` | 89 | true |  |
 
 ## Functions Over 150 Lines
 
 | module | function | lines | public |
 |---|---|---:|---:|
-| `crypto_rsi_scanner.backtest` | `walk_coin` | 153 | true |
-| `crypto_rsi_scanner.backtest` | `main` | 227 | true |
+| `crypto_rsi_scanner.backtest_parts.legacy` | `walk_coin` | 153 | true |
+| `crypto_rsi_scanner.backtest_parts.legacy` | `main` | 227 | true |
 | `crypto_rsi_scanner.cli.event_alpha_command_registry` | `dispatch_event_alpha_command` | 809 | true |
 | `crypto_rsi_scanner.cli.parser_event_alpha` | `add_event_alpha_args` | 1190 | true |
 | `crypto_rsi_scanner.cli.services.event_alpha_fade_review` | `_write_event_fade_review_bundle` | 164 | false |

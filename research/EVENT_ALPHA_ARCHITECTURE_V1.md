@@ -13,7 +13,12 @@ layout gives new code a home while old import paths continue to work.
   aggregation/store views, evidence acquisition, opportunity verdicts, impact
   hypotheses, and incident artifacts.
 - `crypto_rsi_scanner/event_alpha/artifacts/`: artifact context, portable
-  path helpers, run-ledger rows, retention, locks, and schema v1.
+  path helpers, run-ledger rows, retention, locks, and the schema v1 facade.
+- `crypto_rsi_scanner/event_alpha/artifacts/schema/`: schema v1 package
+  surfaces for base registry objects, shared fields, validators, core
+  opportunities, integrated candidates, deliveries, source coverage, provider
+  readiness/preflight, derivatives, market rows, official exchange, scheduled
+  catalysts/unlocks, outcomes, calibration, namespace, and run-ledger rows.
 - `crypto_rsi_scanner/event_alpha/notifications/`: notification preview,
   no-send delivery, send-readiness, go/no-go, inbox, pack, SLO, pause,
   Telegram final-check, recipient-check, sender, and formatting helpers.
@@ -40,6 +45,15 @@ layout gives new code a home while old import paths continue to work.
   `event_alpha_outcomes.py`, `event_alpha_reports.py`,
   `event_alpha_provider_preflights.py`, `event_alpha_namespace.py`,
   `event_alpha_research.py`, and `event_alpha_fade_review.py`.
+- `crypto_rsi_scanner/storage_parts/`: shared SQLite storage mixins for
+  connection setup, schema text, additive migrations, scan/signal/outcome rows,
+  previous-flag/alert/subscriber/meta state, paper-trade rows, and scan-status
+  maintenance. `crypto_rsi_scanner/storage.py` remains the public `Storage`
+  facade.
+- `crypto_rsi_scanner/backtest_parts/`: RSI backtest package surfaces for CLI,
+  engine, results, costs, risk/membership, reports, and data helpers.
+  `crypto_rsi_scanner/backtest.py` remains the historical CLI/helper facade
+  over the compatibility core.
 
 `crypto_rsi_scanner/event_alpha/MODULE_MAP.md` lists old top-level module paths
 and their intended package locations.
@@ -72,9 +86,19 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
 - `tests/test_indicators.py` is a compatibility umbrella runner, not the home
   for new behavior tests.
 - New artifact fields require a schema v1 update before or with writer changes.
+- Schema implementation belongs in `event_alpha/artifacts/schema/`; the
+  historical `event_alpha/artifacts/schema_v1.py` module is a compatibility
+  aggregator.
 - New doctor checks require a check-registry entry with schema dependencies.
 - Every new namespace needs lifecycle status, retention policy, and explicit
   `safe_for_send_readiness`.
+- Shared storage and backtest changes must keep the `storage.py` and
+  `backtest.py` facades import-compatible. New implementation should land under
+  `storage_parts/` or `backtest_parts/` unless a later behavior-freeze pass
+  explicitly changes those contracts.
+- Progressive size gates are static-only: `make refactor-size-gates` warns for
+  violations already in `research/REFACTOR_SIZE_BASELINE.json` and blocks newly
+  introduced file/function/class/module ownership violations.
 
 ## Safety Invariants
 
@@ -328,7 +352,8 @@ small, tested slices only.
 
 ## How To Add A Radar Artifact
 
-1. Define the row contract in `event_alpha/artifacts/schema_v1.py`.
+1. Define the row contract in `event_alpha/artifacts/schema/` and keep
+   `event_alpha/artifacts/schema_v1.py` compatibility exports intact.
 2. Write artifacts under the active namespace through artifact path/context
    helpers, using relative operator paths.
 3. Attach canonical identity, source lineage, safety counters, freshness, and

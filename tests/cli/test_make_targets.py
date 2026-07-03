@@ -696,6 +696,80 @@ def test_refactor_final_report_make_target_is_available():
     assert "requests." not in module_text
 
 
+def test_refactor_size_gates_static_baseline_and_new_violation_detection():
+    import json
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from crypto_rsi_scanner import refactor_size_gates
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        package = root / "crypto_rsi_scanner"
+        tests_dir = root / "tests"
+        package.mkdir()
+        tests_dir.mkdir()
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        (package / "small.py").write_text("def ok():\n    return 1\n", encoding="utf-8")
+        (tests_dir / "test_small.py").write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+
+        baseline_path, baseline = refactor_size_gates.write_baseline(root=root)
+        assert baseline_path.name == "REFACTOR_SIZE_BASELINE.json"
+        assert baseline["schema_version"] == "refactor_size_baseline_v1"
+        assert baseline["violation_ids"] == []
+
+        report_path, markdown_path, report = refactor_size_gates.write_gate_report(root=root)
+        assert report_path.name == "REFACTOR_SIZE_GATES.json"
+        assert markdown_path.name == "REFACTOR_SIZE_GATES.md"
+        assert report["gate_status"] == "pass"
+        assert report["new_violation_count"] == 0
+
+        (package / "new_large.py").write_text("\n".join(["VALUE = 1"] * 1502) + "\n", encoding="utf-8")
+        blocked = refactor_size_gates.build_gate_report(root=root)
+        assert blocked["gate_status"] == "blocked"
+        assert any(row["category"] == "file_over_1500_lines" for row in blocked["new_violations"])
+        assert json.loads(baseline_path.read_text(encoding="utf-8"))["violation_ids"] == []
+
+
+def test_refactor_size_gates_make_target_is_static_and_no_live_runtime_path():
+    root = REPO_ROOT
+    makefile = (root / "Makefile").read_text(encoding="utf-8")
+    module_text = (root / "crypto_rsi_scanner" / "refactor_size_gates.py").read_text(encoding="utf-8").casefold()
+    assert "refactor-size-baseline-update:" in makefile
+    assert "refactor-size-gates:" in makefile
+    assert "$(python) -m crypto_rsi_scanner.refactor_size_gates --update-baseline" in makefile.casefold()
+    assert "$(python) -m crypto_rsi_scanner.refactor_size_gates" in makefile.casefold()
+    forbidden = (
+        "urlopen",
+        "requests.",
+        "aiohttp",
+        "from crypto_rsi_scanner.scanner import",
+        "import crypto_rsi_scanner.scanner",
+        "main.py --",
+        "event_alert_send",
+    )
+    for item in forbidden:
+        assert item not in module_text
+
+
+def test_shared_refactor_facades_preserve_import_paths():
+    from crypto_rsi_scanner.storage import Storage
+    from crypto_rsi_scanner.storage_parts.signals import SignalsMixin
+    from crypto_rsi_scanner import backtest
+    from crypto_rsi_scanner.backtest_parts import data as backtest_data
+    from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+    from crypto_rsi_scanner.event_alpha.artifacts.schema import validators
+
+    assert issubclass(Storage, SignalsMixin)
+    assert backtest.fixture_symbols is backtest_data.fixture_symbols
+    assert backtest._filter_usdt_bases([
+        {"baseAsset": "BTC", "quoteAsset": "USDT", "status": "TRADING"},
+        {"baseAsset": "USDT", "quoteAsset": "USDT", "status": "TRADING"},
+    ]) == ["BTC"]
+    assert schema_v1.validate_artifact_file is validators.validate_artifact_file
+    assert schema_v1.EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION == "event_alpha_schema_v1"
+
+
 def test_test_runtime_report_writes_json_and_markdown_without_live_side_effects():
     import json
     from pathlib import Path

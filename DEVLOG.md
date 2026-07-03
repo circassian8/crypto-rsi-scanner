@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-03 — Split shared storage, backtest, and schema facades · Codex
+**Why:** Shared RSI/backtest/storage code still had large public files, and this
+pass needed to reduce those modules without changing DB schema, paper-book
+behavior, backtest output, Event Alpha routes, or notification gates.
+**Changes:**
+- Replaced `crypto_rsi_scanner/storage.py` with a small `Storage` facade over
+  `storage_parts/` mixins for connection setup, schema text, migrations,
+  scan/signal/outcome rows, subscriber/meta state, paper rows, and scan-status
+  maintenance.
+- Replaced `crypto_rsi_scanner/backtest.py` with a compatibility facade over
+  `backtest_parts/`, preserving `python -m crypto_rsi_scanner.backtest`,
+  historical helper imports, and monkeypatch behavior used by tests.
+- Replaced `event_alpha/artifacts/schema_v1.py` with a compatibility aggregator
+  over `event_alpha/artifacts/schema/` modules for base fields, validators, and
+  artifact-family schema exports.
+- Added `refactor_size_gates.py`, `make refactor-size-baseline-update`, and
+  `make refactor-size-gates`; checked in `research/REFACTOR_SIZE_BASELINE.json`
+  plus the current size-gate JSON/Markdown report.
+- Added static tests for the progressive size gate and compatibility smoke
+  coverage for storage/backtest/schema facades; refreshed class/final refactor
+  reports, architecture docs, module map, roadmap, and decisions.
+**Verify:** `python3 tests/test_indicators.py` (742/742);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/rsi tests/cli
+tests/event_alpha tests/test_indicators.py -q` (753 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make backtest-costs PYTHON=python3`;
+`make refactor-size-gates PYTHON=python3`;
+`make refactor-class-ownership-report PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`;
+`make verify PYTHON=python3`; `git diff --check`.
+**Notes/risks:** This is intentionally behavior-preserving. `backtest_parts/
+legacy.py` and `event_alpha/artifacts/schema/legacy.py` remain compatibility
+cores and should be burned down only in smaller fixture-backed passes. No DB
+schema changes, paper behavior changes, live calls, Telegram sends, trading,
+execution, Event Alpha RSI writes, route-gate changes, or Event Alpha-created
+`TRIGGERED_FADE` behavior were added.
+
 ## 2026-07-03 — Split medium Event Alpha radar and provider packages · Codex
 **Why:** Medium Event Alpha radar modules and provider adapters still mixed
 models, parsing, loading, and compatibility surfaces in single files. This pass

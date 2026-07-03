@@ -16,6 +16,37 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-03 - Shared storage, backtest, and schema modules use facades plus parts
+**Status:** accepted
+**Decision:** Shared RSI/backtest/storage refactors should keep public facades
+stable while moving implementation ownership into focused package parts.
+`crypto_rsi_scanner.storage.Storage` remains the storage import contract over
+`storage_parts/`; `python -m crypto_rsi_scanner.backtest` and historical
+`crypto_rsi_scanner.backtest` helper imports remain compatible over
+`backtest_parts/`; `event_alpha/artifacts/schema_v1.py` remains the schema v1
+compatibility aggregator over `event_alpha/artifacts/schema/`.
+**Why:** These modules touch SQLite writes, paper-book reporting, PIT backtest
+research, and schema-backed doctor validation. Facades plus explicit parts let
+future work reduce large compatibility cores without changing DB schema,
+backtest output semantics, paper behavior, Event Alpha route gates,
+notification behavior, or no-live/no-send safety.
+**Revisit when:** a smaller helper family can be moved out of a compatibility
+core with fixture-backed parity tests, or a later v2 compatibility break
+explicitly retires old import paths.
+
+## 2026-07-03 - Progressive refactor size gates are baseline-relative
+**Status:** accepted
+**Decision:** `make refactor-size-gates` is the progressive size guard for this
+refactor track. Existing file/function/class/module ownership violations are
+warnings when recorded in `research/REFACTOR_SIZE_BASELINE.json`; newly
+introduced violations are blockers unless the baseline is explicitly refreshed
+with `make refactor-size-baseline-update`.
+**Why:** The repository still has known large compatibility cores. A
+baseline-relative gate prevents new sprawl while allowing conservative,
+behavior-preserving migrations to continue.
+**Revisit when:** the remaining compatibility cores are small enough to make
+the absolute thresholds blocking for all violations rather than only new ones.
+
 ## 2026-07-03 - Medium radar and provider modules use package ownership
 **Status:** accepted
 **Decision:** Medium Event Alpha radar and reusable provider adapters should use

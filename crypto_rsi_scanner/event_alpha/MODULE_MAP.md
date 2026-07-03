@@ -50,6 +50,11 @@ Current phase:
   New logic should land in their focused `models`, `provider`, `client`,
   `parser`, `loader`, `entries`, `review`, or `report` modules rather than in
   the legacy cores.
+- Shared refactor facades follow the same rule outside the top-level
+  `event_*.py` shim registry: `storage.py` owns only the public `Storage`
+  facade over `storage_parts/`, `backtest.py` owns the historical backtest
+  facade over `backtest_parts/`, and `event_alpha/artifacts/schema_v1.py` owns
+  compatibility exports over `event_alpha/artifacts/schema/`.
 
 Run `make event-alpha-shim-report PYTHON=python3` to write
 `event_alpha_shim_report.json` and `event_alpha_shim_report.md` under the

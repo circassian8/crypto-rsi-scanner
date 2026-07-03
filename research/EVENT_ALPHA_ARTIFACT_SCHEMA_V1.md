@@ -1,7 +1,9 @@
 # Event Alpha Artifact Schema V1
 
-Schema v1 lives in
-`crypto_rsi_scanner/event_alpha/artifacts/schema_v1.py` and declares
+Schema v1 implementation lives in
+`crypto_rsi_scanner/event_alpha/artifacts/schema/`. The historical
+`crypto_rsi_scanner/event_alpha/artifacts/schema_v1.py` path remains a
+compatibility aggregator and declares
 `EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION = "event_alpha_schema_v1"`.
 
 ## Contract
@@ -14,6 +16,8 @@ fields, safety fields, lineage fields, and secret-redaction fields.
 Schema v1 is also the behavior-freeze boundary for artifact sprawl:
 
 - New artifact field => update schema v1 in the same change.
+- New schema implementation logic => add it under
+  `event_alpha/artifacts/schema/`, not in the compatibility aggregator.
 - New enum value => update schema v1 and tests before writer rollout.
 - New path field => classify it as an operator-relative path field or a
   `_abs_debug` debug path field.
