@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-03 — Split CLI parser and registry-back Event Alpha dispatch · Codex
+**Why:** The CLI refactor needed a lower-risk step after the service split:
+make parser construction and Event Alpha dispatch measurable without changing
+flags, Make targets, provider guards, notification gates, or research-only
+behavior.
+**Changes:**
+- Split parser construction into `crypto_rsi_scanner/cli/parser_base.py` plus
+  category extension modules, with `build_parser()` now a small orchestrator.
+- Added `research/CLI_FLAG_SNAPSHOT.json` from the live parser, recording
+  long-form flag names, defaults, action types, destinations, and command
+  groups.
+- Moved the long Event Alpha dispatch branch chain into
+  `crypto_rsi_scanner/cli/event_alpha_command_registry.py` and reduced
+  `commands_event_alpha.handle()` to a registry bridge. Registry rows record
+  command flag, parsed attr, handler module/name, command group, no-send
+  requirement, live-provider allowance, fixture status, and safety notes.
+- Completed requested service export surfaces with compatibility wrappers for
+  scanner-owned notification, outcome, and research commands. Scanner body
+  extraction remains a documented blocker instead of a risky bulk move.
+- Updated refactor reports, architecture docs, ROADMAP, and DECISIONS with the
+  new parser/registry counters and remaining scanner/bind-site blockers.
+**Verify:** `python3 tests/test_indicators.py` (734/734);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/cli tests/event_alpha
+tests/test_indicators.py -q`; `python3 -m compileall -q crypto_rsi_scanner
+tests`; `make event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-preflight PYTHON=python3`; `make
+event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1
+PYTHON=python3`; and `make verify PYTHON=python3`.
+**Notes/risks:** `scanner.py` remains 7,744 lines and still exceeds the new
+`<5,500` prompt target. Event Alpha service modules still have 26
+`bind_scanner_globals(...)` call sites. Both are left as explicit refactor
+blockers to preserve behavior and safety.
+
 ## 2026-07-02 — Split Event Alpha CLI services and migrate 25 modules · Codex
 **Why:** The next refactor continuation needed to reduce the Event Alpha CLI
 service monolith, migrate the named small/medium Event Alpha modules, and keep

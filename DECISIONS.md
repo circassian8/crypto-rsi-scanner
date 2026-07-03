@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-03 - CLI parser split and Event Alpha command registry accepted
+**Status:** accepted
+**Decision:** The CLI parser may now be maintained through category extension
+modules and a generated flag snapshot, while `commands_event_alpha.handle()`
+stays as a small registry bridge. The command registry is metadata-first and
+keeps no-live-provider and no-send defaults explicit for Event Alpha commands.
+Scanner-owned command bodies remain behind compatibility wrappers until they
+can be moved safely with focused tests.
+**Why:** This reduces `build_parser()` to a small orchestrator and
+`commands_event_alpha.handle()` to a registry call without changing any CLI
+flags, defaults, Make targets, provider-readiness behavior, notification gates,
+or Event Alpha route gates. The remaining scanner and service-bind targets are
+measured blockers rather than reasons to move broad command bodies in one risky
+batch.
+**Revisit when:** a scanner-body extraction can move a narrow command family
+into service modules with old-name wrappers, no recursion, and command-specific
+dispatch tests proving behavior parity.
+
 ## 2026-07-02 - Event Alpha service split and 25-module migration accepted with bind-site blockers
 **Status:** accepted
 **Decision:** The current behavior-preserving refactor continuation is accepted:

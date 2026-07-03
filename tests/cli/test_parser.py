@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -227,3 +228,16 @@ def test_cli_dispatch_extracts_representative_routes_without_side_effects():
         },
     )
     assert calls[1] == ("run", {"top_n": 3, "dry_run": True, "verbose": False})
+
+
+def test_cli_flag_snapshot_exists_and_preserves_representative_defaults():
+    snapshot_path = ROOT / "research" / "CLI_FLAG_SNAPSHOT.json"
+    payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    rows = {row["flag"]: row for row in payload["flags"]}
+    assert payload["schema_version"] == "cli_flag_snapshot_v1"
+    assert payload["flag_count"] == len(payload["flags"])
+    assert rows["--dry-run"]["destination"] == "dry_run"
+    assert rows["--dry-run"]["default"] is False
+    assert rows["--event-alpha-coinalyze-preflight"]["command_group"] == "event_alpha_coinalyze"
+    assert rows["--event-alpha-coinalyze-allow-live-preflight"]["default"] is False
+    assert payload["safety"]["live_provider_calls_allowed_by_default"] is False

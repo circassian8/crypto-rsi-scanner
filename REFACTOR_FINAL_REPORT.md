@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-02T19:07:28+00:00`
+- generated_at: `2026-07-03T01:42:00+00:00`
 - gate_status: `blocked`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -17,7 +17,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 | file | baseline lines | current lines | reduced by | reduction | target | status |
 |---|---:|---:|---:|---:|---:|---|
-| `crypto_rsi_scanner/scanner.py` | 13373 | 7744 | 5629 | 42.09% | <6500 | `blocked` |
+| `crypto_rsi_scanner/scanner.py` | 13373 | 7744 | 5629 | 42.09% | <5500 | `blocked` |
 | `tests/test_indicators.py` | 42498 | 1771 | 40727 | 95.83% | <2000 | `pass` |
 | `crypto_rsi_scanner/event_alpha_artifact_doctor.py` | 7145 | 19 | 7126 | 99.73% | <100 | `pass` |
 
@@ -32,6 +32,9 @@ Research-only refactor gate report. This report does not call providers, send Te
 - scanner_bind_scanner_globals_call_sites: `7`
 - cli_service_bind_scanner_globals_call_sites: `26`
 - cli_event_alpha_service_lines: `46`
+- parser_build_parser_lines: `25`
+- commands_event_alpha_handle_lines: `2`
+- cli_flag_snapshot_path: `research/CLI_FLAG_SNAPSHOT.json`
 - scanner_command_body_functions_remaining: `105`
 - remaining_implementation_modules_by_package_target: `{"artifacts": 1, "radar": 1, "shared_event_infra": 2}`
 - intentionally_outside_event_alpha_modules: `["crypto_rsi_scanner.event_fade"]`

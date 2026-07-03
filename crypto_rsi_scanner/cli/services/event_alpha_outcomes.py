@@ -8,10 +8,21 @@ remain compatible during the refactor.
 from __future__ import annotations
 
 from types import ModuleType
-from typing import MutableMapping
+from typing import Any, MutableMapping
 
 
-_SERVICE_FUNCTION_NAMES = ('bind_scanner_globals', 'event_alpha_burn_in_readiness_report', 'event_alpha_export_burn_in_pack')
+_SERVICE_FUNCTION_NAMES = (
+    'bind_scanner_globals',
+    '_scanner_call',
+    'event_alpha_burn_in_readiness_report',
+    'event_alpha_export_burn_in_pack',
+    'event_alpha_integrated_radar_fill_outcomes_report',
+    'event_alpha_integrated_radar_outcome_report',
+    'event_alpha_integrated_radar_calibration_report',
+    'event_alpha_calibration_report',
+    'event_alpha_fill_outcomes',
+    'event_alpha_feedback_readiness_report',
+)
 
 
 def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: ModuleType | None = None) -> ModuleType:
@@ -21,6 +32,13 @@ def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: Mo
         if not name.startswith("__") and name not in _SERVICE_FUNCTION_NAMES:
             target[name] = value
     return scanner_module
+
+
+def _scanner_call(function_name: str, /, *args: Any, **kwargs: Any) -> Any:
+    from ... import scanner as scanner_module
+
+    return getattr(scanner_module, function_name)(*args, **kwargs)
+
 
 def event_alpha_burn_in_readiness_report(
     verbose: bool = False,
@@ -313,6 +331,30 @@ def event_alpha_export_burn_in_pack(
         date_range=f"{days}d",
     )
     print(event_alpha_burn_in_pack.format_burn_in_pack_result(result))
+
+
+def event_alpha_integrated_radar_fill_outcomes_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_integrated_radar_fill_outcomes_report", *args, **kwargs)
+
+
+def event_alpha_integrated_radar_outcome_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_integrated_radar_outcome_report", *args, **kwargs)
+
+
+def event_alpha_integrated_radar_calibration_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_integrated_radar_calibration_report", *args, **kwargs)
+
+
+def event_alpha_calibration_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_calibration_report", *args, **kwargs)
+
+
+def event_alpha_fill_outcomes(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_fill_outcomes", *args, **kwargs)
+
+
+def event_alpha_feedback_readiness_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_feedback_readiness_report", *args, **kwargs)
 
 
 __all__ = tuple(name for name in _SERVICE_FUNCTION_NAMES if name != 'bind_scanner_globals')

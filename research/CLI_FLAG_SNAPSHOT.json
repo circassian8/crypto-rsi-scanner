@@ -1,0 +1,1656 @@
+{
+  "flag_count": 235,
+  "flags": [
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "all",
+      "flag": "--all"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "all_history",
+      "flag": "--all-history"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "maintenance",
+      "default": false,
+      "destination": "backup_db",
+      "flag": "--backup-db"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "cohorts",
+      "flag": "--cohorts"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "confirm",
+      "flag": "--confirm"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": 7,
+      "destination": "event_alpha_burn_in_days",
+      "flag": "--days"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "rsi",
+      "default": false,
+      "destination": "dry_run",
+      "flag": "--dry-run"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alert_report",
+      "flag": "--event-alert-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alert_send",
+      "flag": "--event-alert-send"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_alert_store_path",
+      "flag": "--event-alpha-alert-store-path"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_alerts_report",
+      "flag": "--event-alpha-alerts-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_archive_stale_namespaces",
+      "flag": "--event-alpha-archive-stale-namespaces"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_artifact_doctor",
+      "default": false,
+      "destination": "event_alpha_artifact_doctor",
+      "flag": "--event-alpha-artifact-doctor"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_artifact_doctor_delivery_scope",
+      "flag": "--event-alpha-artifact-doctor-delivery-scope"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_artifact_doctor_strict",
+      "flag": "--event-alpha-artifact-doctor-strict"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_artifact_doctor_strict_legacy",
+      "flag": "--event-alpha-artifact-doctor-strict-legacy"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_artifact_namespace",
+      "flag": "--event-alpha-artifact-namespace"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_burn_in_checklist",
+      "flag": "--event-alpha-burn-in-checklist"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": 7,
+      "destination": "event_alpha_burn_in_days",
+      "flag": "--event-alpha-burn-in-days"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_burn_in_readiness",
+      "flag": "--event-alpha-burn-in-readiness"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_burn_in_review",
+      "flag": "--event-alpha-burn-in-review"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_burn_in_scorecard",
+      "flag": "--event-alpha-burn-in-scorecard"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_bybit_announcements_allow_live_preflight",
+      "flag": "--event-alpha-bybit-announcements-allow-live-preflight"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_official_exchange",
+      "default": false,
+      "destination": "event_alpha_bybit_announcements_no_send_rehearsal",
+      "flag": "--event-alpha-bybit-announcements-no-send-rehearsal"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_official_exchange",
+      "default": false,
+      "destination": "event_alpha_bybit_announcements_preflight",
+      "flag": "--event-alpha-bybit-announcements-preflight"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_official_exchange",
+      "default": false,
+      "destination": "event_alpha_bybit_announcements_preflight_smoke",
+      "flag": "--event-alpha-bybit-announcements-preflight-smoke"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_calibration_export_priors",
+      "flag": "--event-alpha-calibration-export-priors"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_calibration_report",
+      "flag": "--event-alpha-calibration-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_coinalyze_allow_live_preflight",
+      "flag": "--event-alpha-coinalyze-allow-live-preflight"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_coinalyze",
+      "default": false,
+      "destination": "event_alpha_coinalyze_no_send_rehearsal",
+      "flag": "--event-alpha-coinalyze-no-send-rehearsal"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_coinalyze",
+      "default": false,
+      "destination": "event_alpha_coinalyze_preflight",
+      "flag": "--event-alpha-coinalyze-preflight"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_coinalyze",
+      "default": false,
+      "destination": "event_alpha_coinalyze_preflight_smoke",
+      "flag": "--event-alpha-coinalyze-preflight-smoke"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_coinmarketcal_preflight",
+      "flag": "--event-alpha-coinmarketcal-preflight"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_cryptopanic_preflight",
+      "flag": "--event-alpha-cryptopanic-preflight"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_cycle",
+      "flag": "--event-alpha-cycle"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_daily_brief",
+      "flag": "--event-alpha-daily-brief"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_derivatives_crowding_path",
+      "flag": "--event-alpha-derivatives-crowding-path"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_derivatives_report",
+      "flag": "--event-alpha-derivatives-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_dex_onchain_readiness",
+      "flag": "--event-alpha-dex-onchain-readiness"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_dex_onchain_readiness_smoke",
+      "flag": "--event-alpha-dex-onchain-readiness-smoke"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_doctor_schema_only",
+      "flag": "--event-alpha-doctor-schema-only"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_doctor_skip_legacy_checks",
+      "flag": "--event-alpha-doctor-skip-legacy-checks"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_environment_doctor",
+      "flag": "--event-alpha-environment-doctor"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_explain_last_run",
+      "flag": "--event-alpha-explain-last-run"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_export_burn_in_pack",
+      "flag": "--event-alpha-export-burn-in-pack"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_export_eval_cases_from_feedback",
+      "flag": "--event-alpha-export-eval-cases-from-feedback"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_export_eval_cases_from_missed",
+      "flag": "--event-alpha-export-eval-cases-from-missed"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_export_notification_pack",
+      "flag": "--event-alpha-export-notification-pack"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_export_signal_quality_cases",
+      "flag": "--event-alpha-export-signal-quality-cases"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_feedback_readiness",
+      "flag": "--event-alpha-feedback-readiness"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_fill_outcomes",
+      "flag": "--event-alpha-fill-outcomes"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_generate_launchd",
+      "flag": "--event-alpha-generate-launchd"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_health_guard",
+      "flag": "--event-alpha-health-guard"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_include_legacy_artifacts",
+      "flag": "--event-alpha-include-legacy-artifacts"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_include_stale_artifacts",
+      "flag": "--event-alpha-include-stale-artifacts"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_include_test_artifacts",
+      "flag": "--event-alpha-include-test-artifacts"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_integrated_radar_auto",
+      "flag": "--event-alpha-integrated-radar-auto"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_integrated_radar_calibration_export_priors",
+      "flag": "--event-alpha-integrated-radar-calibration-export-priors"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_integrated_radar",
+      "default": false,
+      "destination": "event_alpha_integrated_radar_calibration_report",
+      "flag": "--event-alpha-integrated-radar-calibration-report"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_integrated_radar_coinalyze_namespace",
+      "flag": "--event-alpha-integrated-radar-coinalyze-namespace"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_integrated_radar",
+      "default": false,
+      "destination": "event_alpha_integrated_radar_cycle",
+      "flag": "--event-alpha-integrated-radar-cycle"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_integrated_radar",
+      "default": false,
+      "destination": "event_alpha_integrated_radar_fill_outcomes",
+      "flag": "--event-alpha-integrated-radar-fill-outcomes"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_integrated_radar_fixture",
+      "flag": "--event-alpha-integrated-radar-fixture"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_integrated_radar_load_existing",
+      "flag": "--event-alpha-integrated-radar-load-existing"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_integrated_radar",
+      "default": false,
+      "destination": "event_alpha_integrated_radar_outcome_report",
+      "flag": "--event-alpha-integrated-radar-outcome-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_integrated_radar_run_sidecars",
+      "flag": "--event-alpha-integrated-radar-run-sidecars"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_list_active_namespaces",
+      "flag": "--event-alpha-list-active-namespaces"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_provider_readiness",
+      "default": false,
+      "destination": "event_alpha_live_provider_readiness",
+      "flag": "--event-alpha-live-provider-readiness"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_provider_readiness",
+      "default": false,
+      "destination": "event_alpha_live_provider_readiness_smoke",
+      "flag": "--event-alpha-live-provider-readiness-smoke"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_mark_known_stale_namespaces",
+      "flag": "--event-alpha-mark-known-stale-namespaces"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_mark_namespace_stale",
+      "flag": "--event-alpha-mark-namespace-stale"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_market_anomaly_asset_registry",
+      "flag": "--event-alpha-market-anomaly-asset-registry"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_market_anomaly_rows",
+      "flag": "--event-alpha-market-anomaly-rows"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_market_anomaly_scan",
+      "flag": "--event-alpha-market-anomaly-scan"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_market_anomaly_universe",
+      "flag": "--event-alpha-market-anomaly-universe"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_messari_unlocks_preflight",
+      "flag": "--event-alpha-messari-unlocks-preflight"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_missed_report",
+      "flag": "--event-alpha-missed-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha",
+      "default": false,
+      "destination": "event_alpha_namespace_lifecycle_report",
+      "flag": "--event-alpha-namespace-lifecycle-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_near_miss_report",
+      "flag": "--event-alpha-near-miss-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_notification_checklist",
+      "flag": "--event-alpha-notification-checklist"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_notification_deliveries_report",
+      "flag": "--event-alpha-notification-deliveries-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_notification_inbox",
+      "flag": "--event-alpha-notification-inbox"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_notification_retry_failed",
+      "flag": "--event-alpha-notification-retry-failed"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_notification_runs_path",
+      "flag": "--event-alpha-notification-runs-path"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_notification_runs_report",
+      "flag": "--event-alpha-notification-runs-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_notification_slo_report",
+      "flag": "--event-alpha-notification-slo-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_notify_cycle",
+      "flag": "--event-alpha-notify-cycle"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_notify_fixture_smoke",
+      "flag": "--event-alpha-notify-fixture-smoke"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_notification",
+      "default": false,
+      "destination": "event_alpha_notify_go_no_go",
+      "flag": "--event-alpha-notify-go-no-go"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_notification",
+      "default": false,
+      "destination": "event_alpha_notify_preview",
+      "flag": "--event-alpha-notify-preview"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_notification",
+      "default": false,
+      "destination": "event_alpha_notify_preview_from_artifacts",
+      "flag": "--event-alpha-notify-preview-from-artifacts"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_official_exchange_binance",
+      "flag": "--event-alpha-official-exchange-binance"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_official_exchange_bybit",
+      "flag": "--event-alpha-official-exchange-bybit"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_official_exchange",
+      "default": false,
+      "destination": "event_alpha_official_exchange_report",
+      "flag": "--event-alpha-official-exchange-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_pause_notifications",
+      "flag": "--event-alpha-pause-notifications"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_policy_simulate",
+      "flag": "--event-alpha-policy-simulate"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_preflight",
+      "flag": "--event-alpha-preflight"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_priors_shadow_report",
+      "flag": "--event-alpha-priors-shadow-report"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_profile",
+      "flag": "--event-alpha-profile"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_profile_report",
+      "flag": "--event-alpha-profile-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_provider_health_report",
+      "flag": "--event-alpha-provider-health-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_provider_health_reset",
+      "flag": "--event-alpha-provider-health-reset"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_prune_artifacts",
+      "flag": "--event-alpha-prune-artifacts"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_prune_or_archive_stale_namespace",
+      "flag": "--event-alpha-prune-or-archive-stale-namespace"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_quality_coverage_report",
+      "flag": "--event-alpha-quality-coverage-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_quality_review",
+      "flag": "--event-alpha-quality-review"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_radar_report",
+      "flag": "--event-alpha-radar-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_replay",
+      "flag": "--event-alpha-replay"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_replay_compare",
+      "flag": "--event-alpha-replay-compare"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_replay_llm_advisory",
+      "flag": "--event-alpha-replay-llm-advisory"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_replay_market_rows",
+      "flag": "--event-alpha-replay-market-rows"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_replay_priors",
+      "flag": "--event-alpha-replay-priors"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_replay_profile",
+      "flag": "--event-alpha-replay-profile"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_replay_profile_alt",
+      "flag": "--event-alpha-replay-profile-alt"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_replay_raw_events",
+      "flag": "--event-alpha-replay-raw-events"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_resume_notifications",
+      "flag": "--event-alpha-resume-notifications"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_router_report",
+      "flag": "--event-alpha-router-report"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_run_ledger_path",
+      "flag": "--event-alpha-run-ledger-path"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": 20,
+      "destination": "event_alpha_run_limit",
+      "flag": "--event-alpha-run-limit"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_runs_report",
+      "flag": "--event-alpha-runs-report"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_scheduled_catalyst_coinmarketcal",
+      "flag": "--event-alpha-scheduled-catalyst-coinmarketcal"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_scheduled_catalyst_messari",
+      "flag": "--event-alpha-scheduled-catalyst-messari"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_scheduled_catalyst_report",
+      "flag": "--event-alpha-scheduled-catalyst-report"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_scheduled_catalyst_tokenomist",
+      "flag": "--event-alpha-scheduled-catalyst-tokenomist"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_scheduler_status",
+      "flag": "--event-alpha-scheduler-status"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_send_readiness",
+      "flag": "--event-alpha-send-readiness"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_send_test",
+      "flag": "--event-alpha-send-test"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_signal_quality_cases_path",
+      "flag": "--event-alpha-signal-quality-cases-path"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_signal_quality_eval",
+      "flag": "--event-alpha-signal-quality-eval"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_signal_quality_export_path",
+      "flag": "--event-alpha-signal-quality-export-path"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_source_coverage_report",
+      "flag": "--event-alpha-source-coverage-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_stale_archive",
+      "flag": "--event-alpha-stale-archive"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_stale_superseded_by",
+      "flag": "--event-alpha-stale-superseded-by"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_status",
+      "flag": "--event-alpha-status"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_telegram_final_check",
+      "flag": "--event-alpha-telegram-final-check"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_telegram_recipient_check",
+      "flag": "--event-alpha-telegram-recipient-check"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_tokenomist_preflight",
+      "flag": "--event-alpha-tokenomist-preflight"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_tuning_worksheet",
+      "flag": "--event-alpha-tuning-worksheet"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_unlock_calendar_preflight",
+      "flag": "--event-alpha-unlock-calendar-preflight"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_unlock_calendar_provider",
+      "flag": "--event-alpha-unlock-calendar-provider"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_alpha_v1_readiness",
+      "flag": "--event-alpha-v1-readiness"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_catalyst_search_report",
+      "flag": "--event-catalyst-search-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_discovery_binance_listen",
+      "flag": "--event-discovery-binance-listen"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_discovery_refresh",
+      "flag": "--event-discovery-refresh"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_discovery_report",
+      "flag": "--event-discovery-report"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": 10,
+      "destination": "event_discovery_run_limit",
+      "flag": "--event-discovery-run-limit"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_discovery_runs",
+      "flag": "--event-discovery-runs"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_discovery_status",
+      "flag": "--event-discovery-status"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_apply_review_template",
+      "flag": "--event-fade-apply-review-template"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_fade_auto_report",
+      "flag": "--event-fade-auto-report"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_cache_review_bundle",
+      "flag": "--event-fade-cache-review-bundle"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_check_review_template",
+      "flag": "--event-fade-check-review-template"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_export_cache_sample",
+      "flag": "--event-fade-export-cache-sample"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_export_outcome_prices",
+      "flag": "--event-fade-export-outcome-prices"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_export_review_template",
+      "flag": "--event-fade-export-review-template"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_export_sample",
+      "flag": "--event-fade-export-sample"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_fill_outcomes",
+      "flag": "--event-fade-fill-outcomes"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_labeling_queue",
+      "flag": "--event-fade-labeling-queue"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_merge_sample",
+      "flag": "--event-fade-merge-sample"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_fade_overwrite_outcomes",
+      "flag": "--event-fade-overwrite-outcomes"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_price_days",
+      "flag": "--event-fade-price-days"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_price_fixture_dir",
+      "flag": "--event-fade-price-fixture-dir"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": "1d",
+      "destination": "event_fade_price_interval",
+      "flag": "--event-fade-price-interval"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": 20,
+      "destination": "event_fade_queue_limit",
+      "flag": "--event-fade-queue-limit"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_fade_refresh_price_cache",
+      "flag": "--event-fade-refresh-price-cache"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_fade_report",
+      "flag": "--event-fade-report"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_review_bundle",
+      "flag": "--event-fade-review-bundle"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_fade_review_bundle_export_prices",
+      "flag": "--event-fade-review-bundle-export-prices"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_review_bundle_prices",
+      "flag": "--event-fade-review-bundle-prices"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_review_bundle_reviewed",
+      "flag": "--event-fade-review-bundle-reviewed"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_review_packet",
+      "flag": "--event-fade-review-packet"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_fade_review_sample",
+      "flag": "--event-fade-review-sample"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": "human",
+      "destination": "event_feedback_by",
+      "flag": "--event-feedback-by"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_ignore",
+      "flag": "--event-feedback-ignore"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_junk",
+      "flag": "--event-feedback-junk"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_label",
+      "flag": "--event-feedback-label"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_mark",
+      "flag": "--event-feedback-mark"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_missed",
+      "flag": "--event-feedback-missed"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_notes",
+      "flag": "--event-feedback-notes"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_path",
+      "flag": "--event-feedback-path"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_feedback_report",
+      "flag": "--event-feedback-report"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_traded",
+      "flag": "--event-feedback-traded"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_useful",
+      "flag": "--event-feedback-useful"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_watch",
+      "flag": "--event-feedback-watch"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_impact_hypotheses_inbox",
+      "flag": "--event-impact-hypotheses-inbox"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_impact_hypotheses_report",
+      "flag": "--event-impact-hypotheses-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_impact_hypothesis_smoke",
+      "flag": "--event-impact-hypothesis-smoke"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_impact_hypothesis_store_path",
+      "flag": "--event-impact-hypothesis-store-path"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_incident_store_path",
+      "flag": "--event-incident-store-path"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_incidents_report",
+      "flag": "--event-incidents-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_llm_extract_report",
+      "flag": "--event-llm-extract-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_llm_shadow_report",
+      "flag": "--event-llm-shadow-report"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_now",
+      "flag": "--event-now"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_opportunity_audit",
+      "flag": "--event-opportunity-audit"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_opportunity_audit_include_diagnostics",
+      "flag": "--event-opportunity-audit-include-diagnostics"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_research_card",
+      "flag": "--event-research-card"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_research_cards_write",
+      "flag": "--event-research-cards-write"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_source_reliability_report",
+      "flag": "--event-source-reliability-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_watchlist_monitor",
+      "flag": "--event-watchlist-monitor"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_watchlist_refresh",
+      "flag": "--event-watchlist-refresh"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "event_watchlist_report",
+      "flag": "--event-watchlist-report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "export",
+      "default": false,
+      "destination": "export_src",
+      "flag": "--export-src"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "export",
+      "default": false,
+      "destination": "export_src_with_artifacts",
+      "flag": "--export-src-with-artifacts"
+    },
+    {
+      "action_type": "_HelpAction",
+      "command_group": "option",
+      "default": "==SUPPRESS==",
+      "destination": "help",
+      "flag": "--help"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "ignore_notification_pause",
+      "flag": "--ignore-notification-pause"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "ignore_provider_backoff",
+      "flag": "--ignore-provider-backoff"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "include_diagnostic_incidents",
+      "flag": "--include-diagnostic-incidents"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "include_external_context_incidents",
+      "flag": "--include-external-context-incidents"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "include_legacy",
+      "flag": "--include-legacy"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "include_raw_incidents",
+      "flag": "--include-raw-incidents"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "install_maintenance_agent",
+      "flag": "--install-maintenance-agent"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "json",
+      "flag": "--json"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "latest_run",
+      "flag": "--latest-run"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "launchd_status",
+      "flag": "--launchd-status"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "listen",
+      "flag": "--listen"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "maintenance",
+      "default": false,
+      "destination": "maintenance",
+      "flag": "--maintenance"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "out",
+      "flag": "--out"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "provider_key",
+      "flag": "--provider-key"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "reason",
+      "flag": "--reason"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "paper",
+      "default": false,
+      "destination": "refresh_paper",
+      "flag": "--refresh-paper"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "refresh_universe_audit",
+      "flag": "--refresh-universe-audit"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "rsi",
+      "default": false,
+      "destination": "report",
+      "flag": "--report"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "restart_listener",
+      "flag": "--restart-listener"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "role",
+      "flag": "--role"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "rotate_logs",
+      "flag": "--rotate-logs"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "run_id",
+      "flag": "--run-id"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "paper",
+      "default": false,
+      "destination": "score",
+      "flag": "--score"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "service",
+      "flag": "--service"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "since",
+      "flag": "--since"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "maintenance",
+      "default": false,
+      "destination": "status",
+      "flag": "--status"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "top_n",
+      "flag": "--top-n"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "universe_audit",
+      "flag": "--universe-audit"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "verbose",
+      "flag": "--verbose"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "verify_restore",
+      "flag": "--verify-restore"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "option",
+      "default": false,
+      "destination": "with_llm",
+      "flag": "--with-llm"
+    }
+  ],
+  "safety": {
+    "live_provider_calls_allowed_by_default": false,
+    "research_only": true,
+    "telegram_sends_allowed_by_default": false
+  },
+  "schema_version": "cli_flag_snapshot_v1"
+}

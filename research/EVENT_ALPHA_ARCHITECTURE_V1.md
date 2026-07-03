@@ -54,8 +54,16 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
   modules as `active_shim`, `partial_shim`, or `not_migrated`; active shims are
   compatibility-only and `make event-alpha-shim-report` audits the boundary.
 - CLI parser construction belongs in `crypto_rsi_scanner/cli/parser.py`.
+  `build_parser()` is an orchestrator over `parser_base.py`,
+  `parser_event_alpha.py`, `parser_notifications.py`,
+  `parser_provider_readiness.py`, `parser_integrated_radar.py`,
+  `parser_rsi.py`, `parser_backtest.py`, `parser_paper.py`,
+  `parser_export.py`, and `parser_maintenance.py`.
 - CLI dispatch belongs in `crypto_rsi_scanner/cli/dispatch.py`.
 - Command groups belong in `crypto_rsi_scanner/cli/commands_*.py`.
+- Event Alpha command metadata belongs in
+  `crypto_rsi_scanner/cli/event_alpha_command_registry.py`; registry rows must
+  keep no-send/no-live-provider defaults explicit.
 - New tests belong in `tests/event_alpha/`, `tests/rsi/`, or `tests/cli/`.
 - `tests/test_indicators.py` is a compatibility umbrella runner, not the home
   for new behavior tests.
@@ -293,6 +301,10 @@ command-group modules. Event Alpha command bodies are being split into focused
 `event_alpha.py` service module re-exports them. The remaining bind sites to
 historical scanner globals are a measured blocker for the next CLI pass, not a
 reason to add new logic to the aggregator.
+
+`research/CLI_FLAG_SNAPSHOT.json` is the checked-in flag/default/destination
+snapshot for parser refactors. Any parser split must preserve this behavior
+unless a migration is explicit.
 
 Compatibility rules for CLI refactors:
 

@@ -8,10 +8,43 @@ remain compatible during the refactor.
 from __future__ import annotations
 
 from types import ModuleType
-from typing import MutableMapping
+from typing import Any, MutableMapping
 
 
-_SERVICE_FUNCTION_NAMES = ('bind_scanner_globals', '_cryptopanic_stats_for_pipeline_result', 'event_alpha_cycle', '_router_config_from_profile', '_event_catalyst_search_provider', '_event_evidence_acquisition_providers_from_runtime', '_send_event_alpha_routed_digest')
+_SERVICE_FUNCTION_NAMES = (
+    'bind_scanner_globals',
+    '_cryptopanic_stats_for_pipeline_result',
+    '_scanner_call',
+    'event_alpha_cycle',
+    '_router_config_from_profile',
+    '_event_catalyst_search_provider',
+    '_event_evidence_acquisition_providers_from_runtime',
+    '_send_event_alpha_routed_digest',
+    'event_impact_hypotheses_report',
+    'event_impact_hypotheses_inbox',
+    'event_incidents_report',
+    'event_catalyst_search_report',
+    'event_watchlist_report',
+    'event_watchlist_refresh',
+    'event_watchlist_monitor_report',
+    'event_alpha_router_report',
+    'event_alpha_near_miss_report',
+    'event_opportunity_audit_report',
+    'event_alpha_quality_review_report',
+    'event_alpha_quality_coverage_report',
+    'event_alpha_signal_quality_eval',
+    'event_alpha_export_signal_quality_cases',
+    'event_feedback_mark',
+    'event_feedback_shortcut',
+    'event_feedback_report',
+    'event_alpha_alerts_report',
+    'event_alpha_notification_inbox_report',
+    'event_alpha_missed_report',
+    'event_source_reliability_report',
+    'event_alpha_burn_in_scorecard',
+    'event_alpha_burn_in_checklist',
+    'event_alpha_export_burn_in_pack',
+)
 
 
 def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: ModuleType | None = None) -> ModuleType:
@@ -21,6 +54,13 @@ def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: Mo
         if not name.startswith("__") and name not in _SERVICE_FUNCTION_NAMES:
             target[name] = value
     return scanner_module
+
+
+def _scanner_call(function_name: str, /, *args: Any, **kwargs: Any) -> Any:
+    from ... import scanner as scanner_module
+
+    return getattr(scanner_module, function_name)(*args, **kwargs)
+
 
 def _cryptopanic_stats_for_pipeline_result(
     pipeline_result: event_alpha_pipeline.EventAlphaPipelineResult,
@@ -846,6 +886,104 @@ def _send_event_alpha_routed_digest(
         return result
     finally:
         storage.close()
+
+
+def event_impact_hypotheses_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_impact_hypotheses_report", *args, **kwargs)
+
+
+def event_impact_hypotheses_inbox(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_impact_hypotheses_inbox", *args, **kwargs)
+
+
+def event_incidents_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_incidents_report", *args, **kwargs)
+
+
+def event_catalyst_search_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_catalyst_search_report", *args, **kwargs)
+
+
+def event_watchlist_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_watchlist_report", *args, **kwargs)
+
+
+def event_watchlist_refresh(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_watchlist_refresh", *args, **kwargs)
+
+
+def event_watchlist_monitor_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_watchlist_monitor_report", *args, **kwargs)
+
+
+def event_alpha_router_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_router_report", *args, **kwargs)
+
+
+def event_alpha_near_miss_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_near_miss_report", *args, **kwargs)
+
+
+def event_opportunity_audit_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_opportunity_audit_report", *args, **kwargs)
+
+
+def event_alpha_quality_review_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_quality_review_report", *args, **kwargs)
+
+
+def event_alpha_quality_coverage_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_quality_coverage_report", *args, **kwargs)
+
+
+def event_alpha_signal_quality_eval(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_signal_quality_eval", *args, **kwargs)
+
+
+def event_alpha_export_signal_quality_cases(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_export_signal_quality_cases", *args, **kwargs)
+
+
+def event_feedback_mark(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_feedback_mark", *args, **kwargs)
+
+
+def event_feedback_shortcut(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_feedback_shortcut", *args, **kwargs)
+
+
+def event_feedback_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_feedback_report", *args, **kwargs)
+
+
+def event_alpha_alerts_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_alerts_report", *args, **kwargs)
+
+
+def event_alpha_notification_inbox_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_notification_inbox_report", *args, **kwargs)
+
+
+def event_alpha_missed_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_missed_report", *args, **kwargs)
+
+
+def event_source_reliability_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_source_reliability_report", *args, **kwargs)
+
+
+def event_alpha_burn_in_scorecard(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_burn_in_scorecard", *args, **kwargs)
+
+
+def event_alpha_burn_in_checklist(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_burn_in_checklist", *args, **kwargs)
+
+
+def event_alpha_export_burn_in_pack(*args: Any, **kwargs: Any) -> Any:
+    from . import event_alpha_outcomes
+
+    return event_alpha_outcomes.event_alpha_export_burn_in_pack(*args, **kwargs)
 
 
 __all__ = tuple(name for name in _SERVICE_FUNCTION_NAMES if name != 'bind_scanner_globals')

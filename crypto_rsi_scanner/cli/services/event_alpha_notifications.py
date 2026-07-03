@@ -8,10 +8,23 @@ remain compatible during the refactor.
 from __future__ import annotations
 
 from types import ModuleType
-from typing import MutableMapping
+from typing import Any, MutableMapping
 
 
-_SERVICE_FUNCTION_NAMES = ('bind_scanner_globals', '_event_alpha_notify_cycle_body', 'event_alpha_notify_preview', 'event_alpha_notify_preview_from_artifacts', 'event_alpha_notify_go_no_go', 'event_alpha_export_notification_pack', 'event_alpha_notify_fixture_smoke')
+_SERVICE_FUNCTION_NAMES = (
+    'bind_scanner_globals',
+    '_event_alpha_notify_cycle_body',
+    '_scanner_call',
+    'event_alpha_notify_preview',
+    'event_alpha_notify_preview_from_artifacts',
+    'event_alpha_notify_go_no_go',
+    'event_alpha_export_notification_pack',
+    'event_alpha_notify_fixture_smoke',
+    'event_alpha_send_readiness_report',
+    'event_alpha_telegram_final_check_report',
+    'event_alpha_notification_deliveries_report',
+    'event_alpha_notification_runs_report',
+)
 
 
 def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: ModuleType | None = None) -> ModuleType:
@@ -21,6 +34,13 @@ def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: Mo
         if not name.startswith("__") and name not in _SERVICE_FUNCTION_NAMES:
             target[name] = value
     return scanner_module
+
+
+def _scanner_call(function_name: str, /, *args: Any, **kwargs: Any) -> Any:
+    from ... import scanner as scanner_module
+
+    return getattr(scanner_module, function_name)(*args, **kwargs)
+
 
 def _event_alpha_notify_cycle_body(
     *,
@@ -1663,6 +1683,22 @@ def event_alpha_notify_fixture_smoke(
         f"FEEDBACK_TARGET='{canonical_core.get('core_opportunity_id') or decision.alert_id}'",
         "No live providers, Telegram sends, normal RSI alerts, paper trades, live DB rows, or execution were used.",
     ]))
+
+
+def event_alpha_send_readiness_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_send_readiness_report", *args, **kwargs)
+
+
+def event_alpha_telegram_final_check_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_telegram_final_check_report", *args, **kwargs)
+
+
+def event_alpha_notification_deliveries_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_notification_deliveries_report", *args, **kwargs)
+
+
+def event_alpha_notification_runs_report(*args: Any, **kwargs: Any) -> Any:
+    return _scanner_call("event_alpha_notification_runs_report", *args, **kwargs)
 
 
 __all__ = tuple(name for name in _SERVICE_FUNCTION_NAMES if name != 'bind_scanner_globals')

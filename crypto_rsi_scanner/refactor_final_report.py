@@ -27,7 +27,7 @@ REPORT_JSON = "REFACTOR_FINAL_REPORT.json"
 REPORT_MD = "REFACTOR_FINAL_REPORT.md"
 MAJOR_TARGETS = {
     "crypto_rsi_scanner/scanner.py": {
-        "target_lines_lt": 6500,
+        "target_lines_lt": 5500,
         "next_migration_module": "crypto_rsi_scanner/cli/commands_event_alpha.py plus service modules for remaining scanner-bound command bodies",
         "risk": "Broad scanner command extraction can change CLI defaults, Make target behavior, provider guardrails, or research-only side-effect gates if moved without command snapshots.",
         "blocker_reason": "scanner.py still contains many historical Event Alpha command bodies and runtime config adapters that were only partially routed through cli/dispatch.py.",
@@ -51,6 +51,8 @@ TRACKED_LINE_COUNT_PATHS = tuple(
             *MAJOR_TARGETS,
             "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py",
             "crypto_rsi_scanner/cli/services/event_alpha.py",
+            "crypto_rsi_scanner/cli/parser.py",
+            "crypto_rsi_scanner/cli/commands_event_alpha.py",
         )
     )
 )
@@ -191,6 +193,20 @@ def _scanner_function_is_service_wrapper(node: ast.FunctionDef) -> bool:
         and child.module.endswith("cli.services")
         for child in node.body
     )
+
+
+def _function_line_count(root: Path, relative_path: str, function_name: str) -> int | None:
+    path = root / relative_path
+    if not path.exists():
+        return None
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"), filename=path.as_posix())
+    except SyntaxError:
+        return None
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name == function_name and node.end_lineno:
+            return int(node.end_lineno - node.lineno + 1)
+    return None
 
 
 def _doctor_plugin_check_counts(root: Path) -> dict[str, int]:
@@ -425,6 +441,12 @@ def build_refactor_final_report(
     cli_service_line_counts = _cli_service_line_counts(root)
     cli_event_alpha_service_lines = cli_service_line_counts.get("crypto_rsi_scanner/cli/services/event_alpha.py")
     cli_service_bind_calls = _cli_service_bind_scanner_globals_call_sites(root)
+    parser_build_parser_lines = _function_line_count(root, "crypto_rsi_scanner/cli/parser.py", "build_parser")
+    commands_event_alpha_handle_lines = _function_line_count(
+        root,
+        "crypto_rsi_scanner/cli/commands_event_alpha.py",
+        "handle",
+    )
     legacy_unregistered = int(registry_summary.get("legacy_unregistered") or 0)
     doctor_plugin_migration = {
         "plugin_check_counts": _doctor_plugin_check_counts(root),
@@ -497,6 +519,9 @@ def build_refactor_final_report(
         "cli_service_bind_scanner_globals_call_sites": cli_service_bind_calls,
         "cli_event_alpha_service_lines": cli_event_alpha_service_lines,
         "cli_service_line_counts": cli_service_line_counts,
+        "parser_build_parser_lines": parser_build_parser_lines,
+        "commands_event_alpha_handle_lines": commands_event_alpha_handle_lines,
+        "cli_flag_snapshot_path": "research/CLI_FLAG_SNAPSHOT.json",
         "scanner_command_body_functions_remaining": len(scanner_command_bodies),
         "scanner_command_body_function_names": scanner_command_bodies,
         "migrated_modules_this_run": list(MIGRATED_MODULES_THIS_RUN),
@@ -590,6 +615,9 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             f"- scanner_bind_scanner_globals_call_sites: `{data['scanner_bind_scanner_globals_call_sites']}`",
             f"- cli_service_bind_scanner_globals_call_sites: `{data['cli_service_bind_scanner_globals_call_sites']}`",
             f"- cli_event_alpha_service_lines: `{data['cli_event_alpha_service_lines']}`",
+            f"- parser_build_parser_lines: `{data.get('parser_build_parser_lines')}`",
+            f"- commands_event_alpha_handle_lines: `{data.get('commands_event_alpha_handle_lines')}`",
+            f"- cli_flag_snapshot_path: `{data.get('cli_flag_snapshot_path')}`",
             f"- scanner_command_body_functions_remaining: `{data['scanner_command_body_functions_remaining']}`",
             f"- remaining_implementation_modules_by_package_target: `{json.dumps(data.get('remaining_implementation_modules_by_package_target', {}), sort_keys=True)}`",
             f"- intentionally_outside_event_alpha_modules: `{json.dumps(data.get('intentionally_outside_event_alpha_modules', []), sort_keys=True)}`",

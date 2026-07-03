@@ -35,6 +35,7 @@
     ]
   },
   "cli_event_alpha_service_lines": 46,
+  "cli_flag_snapshot_path": "research/CLI_FLAG_SNAPSHOT.json",
   "cli_service_bind_scanner_globals_call_sites": 26,
   "cli_service_line_counts": {
     "crypto_rsi_scanner/cli/services/__init__.py": 8,
@@ -42,13 +43,14 @@
     "crypto_rsi_scanner/cli/services/event_alpha_fade_review.py": 488,
     "crypto_rsi_scanner/cli/services/event_alpha_integrated.py": 474,
     "crypto_rsi_scanner/cli/services/event_alpha_namespace.py": 50,
-    "crypto_rsi_scanner/cli/services/event_alpha_notifications.py": 1668,
-    "crypto_rsi_scanner/cli/services/event_alpha_outcomes.py": 318,
+    "crypto_rsi_scanner/cli/services/event_alpha_notifications.py": 1704,
+    "crypto_rsi_scanner/cli/services/event_alpha_outcomes.py": 360,
     "crypto_rsi_scanner/cli/services/event_alpha_provider_preflights.py": 71,
     "crypto_rsi_scanner/cli/services/event_alpha_reports.py": 291,
-    "crypto_rsi_scanner/cli/services/event_alpha_research.py": 851,
+    "crypto_rsi_scanner/cli/services/event_alpha_research.py": 989,
     "crypto_rsi_scanner/cli/services/inventory.py": 48
   },
+  "commands_event_alpha_handle_lines": 2,
   "compatibility_preserved": true,
   "dead_duplicate_code_removal_note": "No obviously dead duplicate top-level Event Alpha code was removed in this pass; old module paths remain available until shim reports and import tests prove retirement is safe.",
   "dead_duplicate_code_removed": false,
@@ -169,13 +171,15 @@
     "passed": 2,
     "status": "blocked"
   },
-  "generated_at": "2026-07-02T19:07:28+00:00",
+  "generated_at": "2026-07-03T01:42:00+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
   ],
   "legacy_unregistered": 15,
   "line_counts": {
+    "crypto_rsi_scanner/cli/commands_event_alpha.py": 14,
+    "crypto_rsi_scanner/cli/parser.py": 225,
     "crypto_rsi_scanner/cli/services/event_alpha.py": 46,
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 6363,
     "crypto_rsi_scanner/event_alpha_artifact_doctor.py": 19,
@@ -193,7 +197,7 @@
       "reduced_by_lines": 5629,
       "reduction_pct": 42.09,
       "risk": "Broad scanner command extraction can change CLI defaults, Make target behavior, provider guardrails, or research-only side-effect gates if moved without command snapshots.",
-      "target_lines_lt": 6500
+      "target_lines_lt": 5500
     },
     {
       "baseline_lines": 42498,
@@ -269,6 +273,7 @@
   "normal_rsi_signal_rows_written": 0,
   "old_module_paths_removed": 0,
   "paper_trades_created": 0,
+  "parser_build_parser_lines": 25,
   "partial_shims": 0,
   "plugin_check_counts": {
     "integrated_radar": 3,
