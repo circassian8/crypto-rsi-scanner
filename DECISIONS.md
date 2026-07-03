@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-03 - Split binders accepted for Event Alpha legacy cores
+**Status:** accepted
+**Decision:** Large Event Alpha radar legacy cores may be decomposed into
+focused implementation modules while the old `legacy.py`/`legacy_*` files remain
+small compatibility binders that re-export public names and share legacy globals
+into the split modules for old monkeypatch/import behavior. Size-gate aliases
+must be updated when a known legacy violation moves so the progressive gate
+blocks new sprawl rather than behavior-preserving relocation.
+**Why:** This approach reduced the impact hypotheses, validation, core store,
+evidence acquisition, discovery, watchlist, and near-miss legacy blockers
+without changing CLI behavior, artifact schemas, provider readiness, route
+gates, no-send notification behavior, or research-only safety invariants.
+**Revisit when:** old import paths are formally deprecated in a future v2/v3
+compatibility break, or when the remaining split modules can be reduced further
+without requiring shared legacy globals.
+
 ## 2026-07-03 - Legacy implementation size gates define refactor completion
 **Status:** accepted
 **Decision:** Small public wrappers and compatibility aggregators are not enough

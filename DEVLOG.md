@@ -17,6 +17,58 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-03 — Decompose Event Alpha legacy radar cores · Codex
+**Why:** The refactor gates were still measuring real implementation sprawl in
+large internal `legacy.py`/`legacy_*` cores. This pass needed to split those
+cores without changing CLI behavior, artifact schemas, provider-readiness
+guards, notification routes, scoring, or research-only safety boundaries.
+**Changes:**
+- Split `event_alpha/radar/impact_hypotheses/legacy.py`,
+  `validation/legacy.py`, `core/legacy_store.py`,
+  `evidence/legacy_acquisition.py`, `discovery/legacy.py`,
+  `watchlist/legacy.py`, and `near_miss/legacy.py` into focused model,
+  builder/loader/store/executor, serialization, scoring, report, and helper
+  modules while keeping the old legacy modules as compatibility binders.
+- Preserved old package monkeypatch behavior for discovery classification and
+  kept old import paths working by sharing legacy globals into the split
+  modules.
+- Updated refactor size-gate aliases for moved classes/functions so the
+  progressive gate continues to block new sprawl without treating moved legacy
+  code as a new violation.
+- Refreshed size, class ownership, final, completion-map, release-candidate,
+  shim, and verification artifacts. `research/REFACTOR_COMPLETION_MAP.md/json`
+  and `research/REFACTOR_RELEASE_CANDIDATE_REPORT.md/json` are accepted; the
+  remaining legacy-size state is a warning, not a blocker.
+**Verify:** `python3 tests/test_indicators.py` (745/745);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (756 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make test-pytest-safe PYTHON=python3`; `make refactor-size-gates PYTHON=python3`;
+`make refactor-class-ownership-report PYTHON=python3`;
+`make refactor-final-report PYTHON=python3`; `make event-alpha-shim-report
+PYTHON=python3`; `make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;
+`make event-alpha-coinalyze-preflight-smoke PYTHON=python3`;
+`make event-alpha-coinalyze-preflight PYTHON=python3`;
+`make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`;
+`make backtest-costs PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added.
+
 ## 2026-07-03 — Decompose first legacy implementation cores · Codex
 **Why:** The prior refactor made public wrappers small but still hid large
 implementation bodies in `*_legacy.py` files. This pass needed to make those

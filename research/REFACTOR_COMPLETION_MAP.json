@@ -65,22 +65,9 @@
     "top_level_event_module_count": 125,
     "unmigrated_modules": 1
   },
-  "generated_at": "2026-07-03T14:44:05+00:00",
+  "generated_at": "2026-07-03T15:40:38+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
-  "known_remaining_blockers": [
-    {
-      "id": "refactor_final_gate",
-      "reason": "refactor final report has blocking line or organization gates"
-    },
-    {
-      "id": "legacy_decomposition_gate",
-      "reason": "legacy implementation files over 3,000 lines remain"
-    },
-    {
-      "id": "verification_not_recorded",
-      "reason": "release-candidate verification results were not supplied"
-    }
-  ],
+  "known_remaining_blockers": [],
   "live_provider_calls_allowed": false,
   "namespace_lifecycle_inventory": {
     "namespace_count": 46,
@@ -128,41 +115,13 @@
   "size_gate_report": "research/REFACTOR_SIZE_GATES.json",
   "size_gates": {
     "classes_over_limit_count": 31,
-    "files_over_limit_count": 21,
+    "files_over_limit_count": 15,
     "functions_over_limit_count": 64,
     "gate_status": "pass",
     "largest_legacy_files": [
       {
-        "line_count": 3758,
-        "path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
-      },
-      {
-        "line_count": 2821,
-        "path": "crypto_rsi_scanner/event_alpha/radar/validation/legacy.py"
-      },
-      {
-        "line_count": 2607,
-        "path": "crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py"
-      },
-      {
         "line_count": 2174,
         "path": "crypto_rsi_scanner/backtest_parts/legacy.py"
-      },
-      {
-        "line_count": 2045,
-        "path": "crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py"
-      },
-      {
-        "line_count": 1887,
-        "path": "crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py"
-      },
-      {
-        "line_count": 1828,
-        "path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
-      },
-      {
-        "line_count": 1341,
-        "path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
       },
       {
         "line_count": 933,
@@ -211,19 +170,47 @@
       {
         "line_count": 85,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy.py"
+      },
+      {
+        "line_count": 83,
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py"
+      },
+      {
+        "line_count": 59,
+        "path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
+      },
+      {
+        "line_count": 54,
+        "path": "crypto_rsi_scanner/event_alpha/radar/validation/legacy.py"
+      },
+      {
+        "line_count": 52,
+        "path": "crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py"
+      },
+      {
+        "line_count": 50,
+        "path": "crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py"
+      },
+      {
+        "line_count": 50,
+        "path": "crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py"
+      },
+      {
+        "line_count": 50,
+        "path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
       }
     ],
-    "legacy_classes_over_limit": 8,
-    "legacy_decomposition_gate_status": "blocked",
-    "legacy_files_over_1500_lines": 7,
-    "legacy_files_over_3000_lines": 1,
-    "legacy_functions_over_limit": 17,
-    "legacy_modules_with_multiple_public_classes": 8,
-    "legacy_total_lines": 22652,
-    "moved_existing_violation_count": 19,
+    "legacy_classes_over_limit": 5,
+    "legacy_decomposition_gate_status": "warning",
+    "legacy_files_over_1500_lines": 1,
+    "legacy_files_over_3000_lines": 0,
+    "legacy_functions_over_limit": 3,
+    "legacy_modules_with_multiple_public_classes": 2,
+    "legacy_total_lines": 6728,
+    "moved_existing_violation_count": 42,
     "new_violation_count": 0
   },
-  "status": "pending_with_blockers",
+  "status": "accepted",
   "telegram_sends": 0,
   "trades_created": 0,
   "transitional_compatibility_cores": [
@@ -242,9 +229,172 @@
   ],
   "triggered_fade_created": 0,
   "verification": {
-    "commands": [],
+    "commands": [
+      {
+        "command": "python3 tests/test_indicators.py",
+        "elapsed_seconds": 19.677,
+        "index": 1,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q",
+        "elapsed_seconds": 20.528,
+        "index": 2,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "python3 -m compileall -q crypto_rsi_scanner tests",
+        "elapsed_seconds": 0.042,
+        "index": 3,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make test-pytest-safe PYTHON=python3",
+        "elapsed_seconds": 20.582,
+        "index": 4,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-size-gates PYTHON=python3",
+        "elapsed_seconds": 1.132,
+        "index": 5,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-class-ownership-report PYTHON=python3",
+        "elapsed_seconds": 1.04,
+        "index": 6,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-final-report PYTHON=python3",
+        "elapsed_seconds": 0.168,
+        "index": 7,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-shim-report PYTHON=python3",
+        "elapsed_seconds": 0.056,
+        "index": 8,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-integrated-radar-smoke PYTHON=python3",
+        "elapsed_seconds": 1.848,
+        "index": 9,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-integrated-radar-doctor PYTHON=python3",
+        "elapsed_seconds": 0.777,
+        "index": 10,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-notification-format-smoke PYTHON=python3",
+        "elapsed_seconds": 2.032,
+        "index": 11,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-telegram-no-send-final-check-fast PYTHON=python3",
+        "elapsed_seconds": 2.762,
+        "index": 12,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-evidence-acquisition-smoke PYTHON=python3",
+        "elapsed_seconds": 4.337,
+        "index": 13,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3",
+        "elapsed_seconds": 4.123,
+        "index": 14,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-preflight-smoke PYTHON=python3",
+        "elapsed_seconds": 0.652,
+        "index": 15,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-preflight PYTHON=python3",
+        "elapsed_seconds": 0.631,
+        "index": 16,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3",
+        "elapsed_seconds": 0.633,
+        "index": 17,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+        "elapsed_seconds": 0.644,
+        "index": 18,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+        "elapsed_seconds": 4.426,
+        "index": 19,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+        "elapsed_seconds": 0.919,
+        "index": 20,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3",
+        "elapsed_seconds": 1.455,
+        "index": 21,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make backtest-costs PYTHON=python3",
+        "elapsed_seconds": 0.587,
+        "index": 22,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make verify PYTHON=python3",
+        "elapsed_seconds": 21.319,
+        "index": 23,
+        "returncode": 0,
+        "status": "pass"
+      }
+    ],
     "failed_commands": 0,
-    "status": "not_run",
-    "total_commands": 0
+    "status": "pass",
+    "total_commands": 23,
+    "total_elapsed_seconds": 110.37
   }
 }

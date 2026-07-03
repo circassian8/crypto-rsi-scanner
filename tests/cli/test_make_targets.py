@@ -675,7 +675,7 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
         row["path"] == "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"
         for row in payload["blockers"]
     )
-    assert any(
+    assert not any(
         row["path"] == "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
         for row in payload["blockers"]
     )
@@ -842,9 +842,9 @@ def test_refactor_reports_list_large_legacy_implementation_cores():
     assert "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py" in legacy_paths
     assert "crypto_rsi_scanner/event_alpha/radar/validation/legacy.py" in legacy_paths
     assert "crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py" in legacy_paths
-    assert size_report["legacy_decomposition_gate_status"] == "blocked"
-    assert final_report["legacy_decomposition_gate_status"] == "blocked"
-    assert any(
+    assert size_report["legacy_decomposition_gate_status"] in {"warning", "pass"}
+    assert final_report["legacy_decomposition_gate_status"] in {"warning", "pass"}
+    assert not any(
         blocker["path"] == "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
         for blocker in final_report["blockers"]
     )

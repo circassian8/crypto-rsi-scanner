@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from . import loader as _loader
 from . import legacy as _legacy
 
 for _name in dir(_legacy):
@@ -10,7 +11,9 @@ for _name in dir(_legacy):
 
 
 def _sync_legacy_overrides() -> None:
-    _legacy.classify_event_asset = globals().get("classify_event_asset", _legacy.classify_event_asset)
+    classifier = globals().get("classify_event_asset", _legacy.classify_event_asset)
+    _legacy.classify_event_asset = classifier
+    _loader.classify_event_asset = classifier
 
 
 def run_discovery(*args, **kwargs):
