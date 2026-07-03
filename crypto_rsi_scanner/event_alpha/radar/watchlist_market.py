@@ -10,7 +10,7 @@ from typing import Any, Callable, Iterable, Mapping, Protocol
 
 from ... import event_provider_health, event_watchlist
 from ...client import CoinGeckoClient
-from ...event_models import EventDiscoveryResult
+from crypto_rsi_scanner.event_core.models import EventDiscoveryResult
 from ...event_providers.coingecko_universe import _run_async
 
 

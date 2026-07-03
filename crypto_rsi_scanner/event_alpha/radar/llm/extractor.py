@@ -23,7 +23,7 @@ from ....event_llm_extraction_models import (
     EventLLMFalsePositiveTerm,
     EventLLMRawEventExtraction,
 )
-from ....event_models import RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 from .... import event_source_enrichment
 from ....event_resolver import clean_text, strip_publisher_suffix
 from ....llm_providers.base import LLMExtractionProvider, LLMProviderResult

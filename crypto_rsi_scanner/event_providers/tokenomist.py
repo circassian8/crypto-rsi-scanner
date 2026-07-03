@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from ..event_models import RawDiscoveredEvent
+from ..event_core.models import RawDiscoveredEvent
 from .manual_json import content_hash, parse_datetime
 
 log = logging.getLogger(__name__)

@@ -13,11 +13,11 @@ from ... import (
     event_alpha_router,
     event_near_miss,
     event_opportunity_verdict,
-    event_alpha_reason_text,
     event_source_packs,
     event_source_registry,
     event_watchlist,
 )
+from . import reason_text as event_alpha_reason_text
 from . import research_cards as event_research_cards
 
 

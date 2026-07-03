@@ -14,7 +14,7 @@ from typing import Any, Callable
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from ..event_models import RawDiscoveredEvent
+from ..event_core.models import RawDiscoveredEvent
 from ._news_common import _news_items, fetch_news_events, news_events_from_items
 
 log = logging.getLogger(__name__)

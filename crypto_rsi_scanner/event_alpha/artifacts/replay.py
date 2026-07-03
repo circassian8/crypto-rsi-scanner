@@ -17,7 +17,7 @@ from ... import (
     event_watchlist,
 )
 from ...event_alpha.outcomes import priors as event_alpha_priors
-from ...event_models import DiscoveredAsset, RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
 from ...event_providers.coingecko_universe import assets_from_markets
 from ...event_providers.manual_json import parse_datetime
 

@@ -158,3 +158,7 @@ Run `make event-alpha-shim-report PYTHON=python3` to write
 | `crypto_rsi_scanner.event_alpha_scheduler` | `crypto_rsi_scanner.event_alpha.config.scheduler` | config |
 | `crypto_rsi_scanner.event_alpha_environment_doctor` | `crypto_rsi_scanner.event_alpha.doctor.environment` | doctor |
 | `crypto_rsi_scanner.event_provider_status` | `crypto_rsi_scanner.event_alpha.notifications.provider_status` | notifications |
+| `crypto_rsi_scanner.event_alpha_missed` | `crypto_rsi_scanner.event_alpha.radar.missed` | radar |
+| `crypto_rsi_scanner.event_alpha_reason_text` | `crypto_rsi_scanner.event_alpha.artifacts.reason_text` | artifacts |
+| `crypto_rsi_scanner.event_clock` | `crypto_rsi_scanner.event_core.clock` | event_core |
+| `crypto_rsi_scanner.event_models` | `crypto_rsi_scanner.event_core.models` | event_core |

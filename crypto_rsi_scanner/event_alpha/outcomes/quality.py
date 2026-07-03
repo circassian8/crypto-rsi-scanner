@@ -11,10 +11,10 @@ from typing import Any, Iterable, Mapping
 from ... import (
     event_alpha_alert_store,
     event_alpha_quality_fields,
-    event_alpha_reason_text,
     event_alpha_router,
     event_watchlist,
 )
+from ..artifacts import reason_text as event_alpha_reason_text
 from ..artifacts import context as event_alpha_artifacts
 from ..radar import core_opportunities as event_core_opportunities
 from ..radar import opportunity_verdict as event_opportunity_verdict
@@ -1278,9 +1278,8 @@ from ... import (
     event_incident_graph,
     event_impact_path_validator,
     event_market_confirmation,
-    event_alpha_reason_text,
 )
-from ...event_models import NormalizedEvent, RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
 from ..radar import core_opportunities as event_core_opportunities
 from ..radar import incidents as event_incident_store
 from ..radar import opportunity_verdict as event_opportunity_verdict

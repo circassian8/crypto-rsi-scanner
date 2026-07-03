@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from crypto_rsi_scanner import event_catalyst_frame_validator, event_catalyst_frames, event_llm_catalyst_frames
-from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMCatalystFrameProvider
 
 

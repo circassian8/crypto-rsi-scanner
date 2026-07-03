@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable
 
-from ...event_models import RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 from ...event_resolver import clean_text
 
 

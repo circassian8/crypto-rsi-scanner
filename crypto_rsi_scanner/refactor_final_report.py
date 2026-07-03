@@ -82,6 +82,10 @@ MIGRATED_MODULES_THIS_RUN = (
     "crypto_rsi_scanner.event_alpha_scheduler",
     "crypto_rsi_scanner.event_alpha_environment_doctor",
     "crypto_rsi_scanner.event_provider_status",
+    "crypto_rsi_scanner.event_alpha_missed",
+    "crypto_rsi_scanner.event_alpha_reason_text",
+    "crypto_rsi_scanner.event_clock",
+    "crypto_rsi_scanner.event_models",
 )
 
 
@@ -372,6 +376,24 @@ def _remaining_module_classification(root: Path) -> dict[str, Any]:
     }
 
 
+def _class_ownership_summary(root: Path) -> dict[str, Any]:
+    path = root / "research" / "REFACTOR_CLASS_OWNERSHIP_REPORT.json"
+    data = _load_json(path)
+    if not data:
+        return {
+            "path": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
+            "present": False,
+        }
+    return {
+        "path": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
+        "present": True,
+        "public_class_count": int(data.get("public_class_count") or 0),
+        "classes_over_limit_count": int(data.get("classes_over_limit_count") or 0),
+        "functions_over_limit_count": int(data.get("functions_over_limit_count") or 0),
+        "modules_with_multiple_public_classes_count": int(data.get("modules_with_multiple_public_classes_count") or 0),
+    }
+
+
 def _line_gate_rows(
     *,
     root: Path,
@@ -438,6 +460,7 @@ def build_refactor_final_report(
     namespace_inventory = _namespace_inventory(root)
     ci_static_safety = _ci_static_safety(root)
     classification = _remaining_module_classification(root)
+    class_ownership = _class_ownership_summary(root)
     cli_service_line_counts = _cli_service_line_counts(root)
     cli_event_alpha_service_lines = cli_service_line_counts.get("crypto_rsi_scanner/cli/services/event_alpha.py")
     cli_service_bind_calls = _cli_service_bind_scanner_globals_call_sites(root)
@@ -527,6 +550,7 @@ def build_refactor_final_report(
         "migrated_modules_this_run": list(MIGRATED_MODULES_THIS_RUN),
         "migrated_modules_this_run_count": len(MIGRATED_MODULES_THIS_RUN),
         "remaining_module_classification": classification,
+        "class_ownership_report": class_ownership,
         "remaining_implementation_modules_by_package_target": classification["remaining_implementation_modules_by_package_target"],
         "intentionally_outside_event_alpha_modules": classification["intentionally_outside_event_alpha_modules"],
         "doctor_plugin_migration": doctor_plugin_migration,
@@ -621,6 +645,9 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             f"- scanner_command_body_functions_remaining: `{data['scanner_command_body_functions_remaining']}`",
             f"- remaining_implementation_modules_by_package_target: `{json.dumps(data.get('remaining_implementation_modules_by_package_target', {}), sort_keys=True)}`",
             f"- intentionally_outside_event_alpha_modules: `{json.dumps(data.get('intentionally_outside_event_alpha_modules', []), sort_keys=True)}`",
+            f"- class_ownership_report: `{data.get('class_ownership_report', {}).get('path')}`",
+            f"- class_ownership_classes_over_limit: `{data.get('class_ownership_report', {}).get('classes_over_limit_count')}`",
+            f"- class_ownership_functions_over_limit: `{data.get('class_ownership_report', {}).get('functions_over_limit_count')}`",
             "",
             "## Newly Migrated Modules",
             "",

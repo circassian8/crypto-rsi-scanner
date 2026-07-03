@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Iterable, Mapping
 
 from crypto_rsi_scanner import event_alerts, event_catalyst_search
-from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
 
 class EventAnomalyLifecycleState(str, Enum):

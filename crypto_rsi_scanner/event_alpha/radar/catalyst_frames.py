@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Iterable
 
 from ... import event_claim_semantics
-from ...event_models import NormalizedEvent, RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
 from ...event_resolver import clean_text
 
 

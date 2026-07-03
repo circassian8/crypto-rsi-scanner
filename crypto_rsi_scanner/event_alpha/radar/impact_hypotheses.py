@@ -29,7 +29,7 @@ from ... import (
     event_llm_catalyst_frames,
 )
 from ...event_llm_extractor import EventLLMExtractionReportRow
-from ...event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 from ...event_resolver import clean_text
 from . import incidents as event_incident_store
 from . import market_confirmation as event_market_confirmation

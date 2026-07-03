@@ -10,7 +10,7 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ..event_models import RawDiscoveredEvent
+from ..event_core.models import RawDiscoveredEvent
 from ..event_resolver import clean_text
 from .manual_json import content_hash, parse_datetime
 

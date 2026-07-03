@@ -153,6 +153,10 @@ def test_recently_migrated_old_and_new_import_paths_share_key_callables():
         ("crypto_rsi_scanner.event_alpha_scheduler", "crypto_rsi_scanner.event_alpha.config.scheduler", "build_scheduler_status"),
         ("crypto_rsi_scanner.event_alpha_environment_doctor", "crypto_rsi_scanner.event_alpha.doctor.environment", "build_environment_doctor"),
         ("crypto_rsi_scanner.event_provider_status", "crypto_rsi_scanner.event_alpha.notifications.provider_status", "build_event_discovery_provider_status"),
+        ("crypto_rsi_scanner.event_alpha_missed", "crypto_rsi_scanner.event_alpha.radar.missed", "detect_missed_opportunities"),
+        ("crypto_rsi_scanner.event_alpha_reason_text", "crypto_rsi_scanner.event_alpha.artifacts.reason_text", "humanize_event_alpha_reason"),
+        ("crypto_rsi_scanner.event_clock", "crypto_rsi_scanner.event_core.clock", "event_clock_status"),
+        ("crypto_rsi_scanner.event_models", "crypto_rsi_scanner.event_core.models", "RawDiscoveredEvent"),
     )
     for old_name, new_name, attr in pairs:
         old_module = importlib.import_module(old_name)
@@ -171,13 +175,30 @@ def test_remaining_event_module_classification_documents_fade_boundary():
 
     assert report["not_every_event_module_belongs_under_event_alpha"] is True
     assert report["recommended_status_counts"]["intentionally_outside_event_alpha"] == 1
-    assert report["recommended_status_counts"]["not_migrated"] <= 4
+    assert report["recommended_status_counts"]["not_migrated"] == 0
     assert rows["crypto_rsi_scanner.event_fade"]["recommended_status"] == "intentionally_outside_event_alpha"
     assert rows["crypto_rsi_scanner.event_fade"]["must_remain_outside_event_alpha_for_safety"] is True
     assert rows["crypto_rsi_scanner.event_incident_graph"]["recommended_status"] == "active_shim"
     assert rows["crypto_rsi_scanner.event_llm_budget"]["new_proposed_package_path"] == "crypto_rsi_scanner.event_alpha.radar.llm.budget"
+    assert rows["crypto_rsi_scanner.event_alpha_missed"]["recommended_status"] == "active_shim"
+    assert rows["crypto_rsi_scanner.event_alpha_reason_text"]["recommended_status"] == "active_shim"
+    assert rows["crypto_rsi_scanner.event_clock"]["recommended_status"] == "active_shim"
+    assert rows["crypto_rsi_scanner.event_models"]["recommended_status"] == "active_shim"
     assert rows["crypto_rsi_scanner.event_clock"]["shared_rsi_event_alpha_infrastructure"] is True
     assert rows["crypto_rsi_scanner.event_models"]["shared_rsi_event_alpha_infrastructure"] is True
     text = markdown_path.read_text(encoding="utf-8")
     assert "Event Alpha may produce `FADE_SHORT_REVIEW` research artifacts" in text
     assert "must not create `TRIGGERED_FADE`" in text
+
+
+def test_refactor_class_ownership_report_static_inventory():
+    from crypto_rsi_scanner import refactor_class_ownership_report
+
+    report = refactor_class_ownership_report.build_report()
+
+    assert report["research_only"] is True
+    assert report["no_live_provider_calls"] is True
+    assert report["no_sends_trades_paper_rsi_or_triggered_fade"] is True
+    assert "crypto_rsi_scanner.event_core.models" in report["public_classes_by_module"]
+    assert any(row["module"] == "crypto_rsi_scanner.event_core.models" for row in report["exceptions"])
+    assert any(row["module"] == "crypto_rsi_scanner.event_fade" for row in report["exceptions"])

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from ... import event_identity
-from ...event_models import DiscoveredAsset, EventAssetLink, EventClassification, NormalizedEvent
+from crypto_rsi_scanner.event_core.models import DiscoveredAsset, EventAssetLink, EventClassification, NormalizedEvent
 from ...event_resolver import clean_text, is_market_recap_event
 
 

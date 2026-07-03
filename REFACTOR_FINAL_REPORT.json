@@ -1,6 +1,6 @@
 {
   "active_shim_modules_with_implementation_logic": 0,
-  "active_shims": 120,
+  "active_shims": 124,
   "baseline_line_counts": {
     "crypto_rsi_scanner/event_alpha_artifact_doctor.py": 7145,
     "crypto_rsi_scanner/scanner.py": 13373,
@@ -33,6 +33,14 @@
       ".github/workflows/event-alpha-smoke.yml",
       ".github/workflows/verify.yml"
     ]
+  },
+  "class_ownership_report": {
+    "classes_over_limit_count": 29,
+    "functions_over_limit_count": 64,
+    "modules_with_multiple_public_classes_count": 81,
+    "path": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
+    "present": true,
+    "public_class_count": 397
   },
   "cli_event_alpha_service_lines": 46,
   "cli_flag_snapshot_path": "research/CLI_FLAG_SNAPSHOT.json",
@@ -76,7 +84,7 @@
     "legacy_unregistered_note": "Remaining imperative doctor append sites are documented for the next plugin migration batch.",
     "legacy_unregistered_status": "documented_blocker",
     "legacy_unregistered_target": 5,
-    "migrated_this_run": 25,
+    "migrated_this_run": 29,
     "plugin_check_counts": {
       "integrated_radar": 3,
       "namespace": 1,
@@ -171,7 +179,7 @@
     "passed": 2,
     "status": "blocked"
   },
-  "generated_at": "2026-07-03T01:42:00+00:00",
+  "generated_at": "2026-07-03T01:56:36+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -250,9 +258,13 @@
     "crypto_rsi_scanner.event_alpha_health_guard",
     "crypto_rsi_scanner.event_alpha_scheduler",
     "crypto_rsi_scanner.event_alpha_environment_doctor",
-    "crypto_rsi_scanner.event_provider_status"
+    "crypto_rsi_scanner.event_provider_status",
+    "crypto_rsi_scanner.event_alpha_missed",
+    "crypto_rsi_scanner.event_alpha_reason_text",
+    "crypto_rsi_scanner.event_clock",
+    "crypto_rsi_scanner.event_models"
   ],
-  "migrated_modules_this_run_count": 25,
+  "migrated_modules_this_run_count": 29,
   "namespace_lifecycle_inventory": {
     "namespace_count": 46,
     "status_counts": {
@@ -287,11 +299,7 @@
     "stale_artifacts": 1
   },
   "pytest_runtime_seconds": 11.538,
-  "remaining_implementation_modules_by_package_target": {
-    "artifacts": 1,
-    "radar": 1,
-    "shared_event_infra": 2
-  },
+  "remaining_implementation_modules_by_package_target": {},
   "remaining_module_classification": {
     "intentionally_outside_event_alpha_modules": [
       "crypto_rsi_scanner.event_fade"
@@ -299,15 +307,12 @@
     "module_count": 30,
     "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
     "recommended_status_counts": {
-      "active_shim": 25,
+      "active_shim": 29,
       "intentionally_outside_event_alpha": 1,
-      "not_migrated": 4
+      "not_migrated": 0,
+      "partial_shim": 0
     },
-    "remaining_implementation_modules_by_package_target": {
-      "artifacts": 1,
-      "radar": 1,
-      "shared_event_infra": 2
-    }
+    "remaining_implementation_modules_by_package_target": {}
   },
   "research_only": true,
   "runtime_note": "Runtimes are measured verification values supplied by the operator; null means not measured during report generation.",
@@ -422,7 +427,7 @@
   "scanner_command_body_functions_remaining": 105,
   "schema_version": "refactor_final_report_v1",
   "shim_status_counts": {
-    "active_shim": 120
+    "active_shim": 124
   },
   "standalone_runner_runtime_seconds": 11.191,
   "telegram_sends": 0,
@@ -431,5 +436,5 @@
   "trades_created": 0,
   "triggered_fade_created": 0,
   "unknown_namespace_count": 0,
-  "unmigrated_modules": 5
+  "unmigrated_modules": 1
 }

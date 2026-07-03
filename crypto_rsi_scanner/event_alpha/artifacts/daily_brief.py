@@ -23,7 +23,6 @@ from ... import (
     event_alpha_router,
     event_alpha_source_coverage,
     event_opportunity_verdict,
-    event_alpha_reason_text,
     event_market_units,
     event_market_anomaly_scanner,
     event_official_exchange,
@@ -32,6 +31,7 @@ from ... import (
     event_source_reliability,
     event_watchlist,
 )
+from . import reason_text as event_alpha_reason_text
 from . import research_cards as event_research_cards
 from ..outcomes import calibration as event_alpha_calibration
 from ..notifications import pipeline as event_alpha_notifications

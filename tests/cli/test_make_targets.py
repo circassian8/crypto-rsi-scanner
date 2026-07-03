@@ -651,8 +651,9 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["cli_event_alpha_service_lines"] == payload["line_counts"]["crypto_rsi_scanner/cli/services/event_alpha.py"]
     assert payload["cli_service_bind_scanner_globals_call_sites"] >= 1
     assert "crypto_rsi_scanner.event_fade" in payload["intentionally_outside_event_alpha_modules"]
-    assert payload["remaining_implementation_modules_by_package_target"]
+    assert payload["remaining_implementation_modules_by_package_target"] == {}
     assert payload["remaining_module_classification"]["path"] == "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json"
+    assert payload["class_ownership_report"]["path"] == "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json"
     assert any(row["path"] == "crypto_rsi_scanner/scanner.py" for row in payload["blockers"])
     assert any(
         row["path"] == "crypto_rsi_scanner/cli/services/event_alpha.py"
@@ -682,6 +683,8 @@ def test_refactor_final_report_make_target_is_available():
     module_text = (root / "crypto_rsi_scanner" / "refactor_final_report.py").read_text(encoding="utf-8").casefold()
 
     assert "refactor-final-report:" in makefile
+    assert "refactor-class-ownership-report:" in makefile
+    assert "$(python) -m crypto_rsi_scanner.refactor_class_ownership_report" in makefile.casefold()
     assert "$(python) -m crypto_rsi_scanner.refactor_final_report" in makefile.casefold()
     assert "PYTEST_RUNTIME_SECONDS" in makefile
     assert "STANDALONE_RUNTIME_SECONDS" in makefile

@@ -20,7 +20,7 @@ from ... import (
     event_evidence_quality,
     event_llm_evidence_planner,
 )
-from ...event_models import RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 from ...event_resolver import clean_text
 from ..providers import source_packs as event_source_packs
 from ..providers import source_registry as event_source_registry

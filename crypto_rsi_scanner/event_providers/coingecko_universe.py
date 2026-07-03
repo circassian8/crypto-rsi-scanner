@@ -10,7 +10,7 @@ from typing import Any, Callable, Mapping
 
 from .. import config, universe
 from ..client import CoinGeckoClient
-from ..event_models import DiscoveredAsset
+from ..event_core.models import DiscoveredAsset
 
 log = logging.getLogger(__name__)
 

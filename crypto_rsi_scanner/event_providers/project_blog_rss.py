@@ -15,7 +15,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .. import event_source_registry
-from ..event_models import RawDiscoveredEvent
+from ..event_core.models import RawDiscoveredEvent
 from ._news_common import fetch_news_events, news_events_from_items
 
 log = logging.getLogger(__name__)

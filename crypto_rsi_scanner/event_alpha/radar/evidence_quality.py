@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
-from ...event_models import RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 from ...event_resolver import clean_text
 
 

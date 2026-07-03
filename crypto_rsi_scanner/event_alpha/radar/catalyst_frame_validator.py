@@ -11,7 +11,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Iterable, Mapping
 
 from crypto_rsi_scanner import event_catalyst_frames, event_llm_catalyst_frames
-from crypto_rsi_scanner.event_models import NormalizedEvent, RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
 from crypto_rsi_scanner.event_resolver import clean_text
 
 

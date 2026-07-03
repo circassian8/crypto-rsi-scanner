@@ -17,6 +17,47 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-03 — Finish Event Alpha module migration ownership · Codex
+**Why:** The remaining top-level Event Alpha implementation holdouts needed
+package homes and the shared event clock/models needed neutral ownership without
+moving `event_fade.py` or changing any CLI/artifact/provider behavior.
+**Changes:**
+- Moved `event_alpha_missed.py` into
+  `crypto_rsi_scanner/event_alpha/radar/missed.py` and
+  `event_alpha_reason_text.py` into
+  `crypto_rsi_scanner/event_alpha/artifacts/reason_text.py`, with old paths as
+  active shims.
+- Added neutral `crypto_rsi_scanner/event_core/` for shared
+  `clock.py` and `models.py`, leaving `event_clock.py` and `event_models.py`
+  as active compatibility shims. `event_fade.py` remains intentionally outside
+  Event Alpha and is still the only top-level implementation excluded from shim
+  ownership.
+- Updated internal Event Alpha/provider imports to use
+  `event_core.models` and new reason-text package paths where safe.
+- Added `crypto_rsi_scanner/event_alpha/SHIM_REGISTRY.json`, refreshed
+  `MODULE_MAP.md`, remaining-module classification, final refactor reports, and
+  architecture/roadmap/decision docs.
+- Added `crypto_rsi_scanner/refactor_class_ownership_report.py` plus
+  `make refactor-class-ownership-report`, writing
+  `research/REFACTOR_CLASS_OWNERSHIP_REPORT.md/json`.
+**Verify:** `python3 tests/test_indicators.py` (736/736);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (747 passed); `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make event-alpha-shim-report PYTHON=python3`
+(124 registry entries, 0 active-shim logic violations); `make
+refactor-class-ownership-report PYTHON=python3`; `make refactor-final-report
+PYTHON=python3`; `make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`; `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`; `make
+event-alpha-official-exchange-smoke PYTHON=python3`; and `make verify
+PYTHON=python3`.
+**Notes/risks:** `research/REFACTOR_FINAL_REPORT.md/json` still reports the
+known non-critical refactor blockers: `scanner.py` remains 7,744 lines,
+Event Alpha service modules still have 26 `bind_scanner_globals(...)` call
+sites, and doctor `legacy_unregistered` remains 15. Official-exchange smoke
+continues to exit successfully with expected provider-readiness/source-coverage
+warnings and no blockers. No live provider calls or live sends were enabled.
+
 ## 2026-07-03 — Split CLI parser and registry-back Event Alpha dispatch · Codex
 **Why:** The CLI refactor needed a lower-risk step after the service split:
 make parser construction and Event Alpha dispatch measurable without changing

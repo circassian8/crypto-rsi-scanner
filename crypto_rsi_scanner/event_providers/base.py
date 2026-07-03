@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Protocol
 
-from ..event_models import DiscoveredAsset, RawDiscoveredEvent
+from ..event_core.models import DiscoveredAsset, RawDiscoveredEvent
 
 
 class EventProvider(Protocol):

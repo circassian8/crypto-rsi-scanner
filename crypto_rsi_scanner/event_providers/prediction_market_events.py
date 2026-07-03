@@ -14,7 +14,7 @@ from typing import Any, Callable, Mapping
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from ..event_models import RawDiscoveredEvent
+from ..event_core.models import RawDiscoveredEvent
 from ._external_common import fetch_external_events
 from ._news_common import infer_external_asset
 from .manual_json import content_hash, parse_datetime

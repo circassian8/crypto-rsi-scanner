@@ -14,7 +14,7 @@ from enum import Enum
 from typing import Any, Iterable, Mapping
 
 from ... import event_catalyst_frames, event_claim_semantics, event_identity, event_incident_graph
-from ...event_models import RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 from ...event_resolver import clean_text
 
 

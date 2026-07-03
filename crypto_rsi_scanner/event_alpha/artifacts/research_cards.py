@@ -19,12 +19,12 @@ from ... import (
     event_llm_evidence_planner,
     event_market_units,
     event_opportunity_verdict,
-    event_alpha_reason_text,
     event_source_packs,
     event_source_registry,
     event_watchlist,
     event_watchlist_monitor,
 )
+from . import reason_text as event_alpha_reason_text
 
 
 @dataclass(frozen=True)

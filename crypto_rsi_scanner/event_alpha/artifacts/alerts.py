@@ -22,7 +22,7 @@ from ...event_classification import (
     ROLE_PROXY_VENUE,
     ROLE_TICKER_WORD_COLLISION,
 )
-from ...event_models import DiscoveredEventFadeCandidate, EventDiscoveryResult
+from crypto_rsi_scanner.event_core.models import DiscoveredEventFadeCandidate, EventDiscoveryResult
 from ...event_resolver import SOURCE_PUBLISHER_NAMES, clean_text, is_market_recap_event
 
 

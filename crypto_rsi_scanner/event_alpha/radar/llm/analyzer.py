@@ -24,7 +24,7 @@ from ....event_llm_models import (
     EventLLMExternalCatalyst,
     EventLLMSourceQuality,
 )
-from ....event_models import (
+from crypto_rsi_scanner.event_core.models import (
     DiscoveredEventFadeCandidate,
     EventAssetLink,
     EventDiscoveryResult,

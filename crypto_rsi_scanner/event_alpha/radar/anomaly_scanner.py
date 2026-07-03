@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
 from crypto_rsi_scanner import event_market_enrichment
-from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
 
 @dataclass(frozen=True)

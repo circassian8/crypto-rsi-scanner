@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from ... import config
-from ...event_models import RawDiscoveredEvent
+from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 from ...event_resolver import clean_text
 from ...llm_providers.base import LLMProviderResult
 

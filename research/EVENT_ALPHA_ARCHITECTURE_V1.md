@@ -29,6 +29,9 @@ layout gives new code a home while old import paths continue to work.
 - `crypto_rsi_scanner/event_alpha/radar/llm/`: Event Alpha LLM budget and
   catalyst-frame evaluation helpers that remain research-only inputs to
   deterministic radar gates.
+- `crypto_rsi_scanner/event_core/`: shared event-research infrastructure used
+  by Event Alpha and lower-level providers. `clock.py` owns deterministic
+  research-clock helpers; `models.py` owns small shared event dataclasses.
 - `crypto_rsi_scanner/cli/`: CLI facade, parser snapshots, and command-group
   extraction targets. `cli/services/event_alpha.py` is now a compatibility
   aggregator over focused Event Alpha service modules such as
@@ -88,8 +91,9 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
   Future refactors must not move it under Event Alpha unless a new explicit
   decision preserves the deterministic `TRIGGERED_FADE` ownership boundary.
 - `event_clock.py` and `event_models.py` are shared event infrastructure, not
-  Event Alpha-specific implementation. They need a neutral shared package
-  decision before any move.
+  Event Alpha-specific implementation. Their implementations now live under
+  neutral `crypto_rsi_scanner/event_core/` modules, with old top-level imports
+  kept as active compatibility shims.
 - Provider calls and Telegram sends stay opt-in and guarded; tests and CI run
   no live provider calls and no live Telegram sends by default.
 - Tests and smokes require no API keys and must not print secrets.

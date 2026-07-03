@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from ..event_models import RawDiscoveredEvent
+from ..event_core.models import RawDiscoveredEvent
 
 log = logging.getLogger(__name__)
 

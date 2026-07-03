@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Iterable
 
 from crypto_rsi_scanner import event_identity
-from crypto_rsi_scanner.event_models import DiscoveredAsset, EventAssetLink, NormalizedEvent
+from crypto_rsi_scanner.event_core.models import DiscoveredAsset, EventAssetLink, NormalizedEvent
 
 GENERIC_ASSET_TERMS = {
     "bill",

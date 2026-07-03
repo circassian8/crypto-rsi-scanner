@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from ..event_models import RawDiscoveredEvent
+from ..event_core.models import RawDiscoveredEvent
 from ._external_common import fetch_external_events
 
 

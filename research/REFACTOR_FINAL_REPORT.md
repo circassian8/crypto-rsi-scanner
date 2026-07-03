@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-03T01:42:00+00:00`
+- generated_at: `2026-07-03T01:56:36+00:00`
 - gate_status: `blocked`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -24,11 +24,11 @@ Research-only refactor gate report. This report does not call providers, send Te
 ## Organization Counts
 
 - top_level_event_module_count: `125`
-- active_shims: `120`
+- active_shims: `124`
 - partial_shims: `0`
-- unmigrated_modules: `5`
+- unmigrated_modules: `1`
 - active_shim_modules_with_implementation_logic: `0`
-- migrated_modules_this_run_count: `25`
+- migrated_modules_this_run_count: `29`
 - scanner_bind_scanner_globals_call_sites: `7`
 - cli_service_bind_scanner_globals_call_sites: `26`
 - cli_event_alpha_service_lines: `46`
@@ -36,8 +36,11 @@ Research-only refactor gate report. This report does not call providers, send Te
 - commands_event_alpha_handle_lines: `2`
 - cli_flag_snapshot_path: `research/CLI_FLAG_SNAPSHOT.json`
 - scanner_command_body_functions_remaining: `105`
-- remaining_implementation_modules_by_package_target: `{"artifacts": 1, "radar": 1, "shared_event_infra": 2}`
+- remaining_implementation_modules_by_package_target: `{}`
 - intentionally_outside_event_alpha_modules: `["crypto_rsi_scanner.event_fade"]`
+- class_ownership_report: `research/REFACTOR_CLASS_OWNERSHIP_REPORT.json`
+- class_ownership_classes_over_limit: `29`
+- class_ownership_functions_over_limit: `64`
 
 ## Newly Migrated Modules
 
@@ -66,6 +69,10 @@ Research-only refactor gate report. This report does not call providers, send Te
 - `crypto_rsi_scanner.event_alpha_scheduler`
 - `crypto_rsi_scanner.event_alpha_environment_doctor`
 - `crypto_rsi_scanner.event_provider_status`
+- `crypto_rsi_scanner.event_alpha_missed`
+- `crypto_rsi_scanner.event_alpha_reason_text`
+- `crypto_rsi_scanner.event_clock`
+- `crypto_rsi_scanner.event_models`
 
 ## Doctor Plugin Migration
 
@@ -73,7 +80,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 - legacy_unregistered_target: `5`
 - legacy_unregistered_status: `documented_blocker`
 - plugin_check_counts: `{"integrated_radar": 3, "namespace": 1, "notifications": 1, "outcomes": 1, "paths": 1, "provider_readiness": 2, "safety": 1, "source_coverage": 1, "stale_artifacts": 1}`
-- migrated_this_run: `25`
+- migrated_this_run: `29`
 
 ### Remaining Legacy-Unregistered Doctor Sites
 

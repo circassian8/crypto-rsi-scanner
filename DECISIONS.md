@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-03 - Event Alpha module migration finished with neutral event_core
+**Status:** accepted
+**Decision:** Remaining Event Alpha-specific top-level implementation modules
+have package homes with active shims. Shared event infrastructure now lives in
+`crypto_rsi_scanner.event_core`: `event_core.clock` for deterministic research
+clock helpers and `event_core.models` for shared event dataclasses. The old
+`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import
+paths remain active shims. `event_fade.py` stays intentionally outside Event
+Alpha and remains the only top-level `event_*.py` implementation excluded from
+shim ownership.
+**Why:** This clears the Event Alpha module-migration backlog without burying
+shared provider/radar infrastructure under Event Alpha, preserves old imports,
+and keeps the `TRIGGERED_FADE` safety boundary unchanged: Event Alpha may write
+`FADE_SHORT_REVIEW` research artifacts, but `TRIGGERED_FADE` remains owned only
+by `event_fade.py` plus proxy-fade eligibility.
+**Revisit when:** a future v2 migration explicitly deprecates old import paths
+in development mode, or a dedicated behavior-freeze pass splits `event_fade.py`
+without moving TRIGGERED_FADE ownership into Event Alpha.
+
 ## 2026-07-03 - CLI parser split and Event Alpha command registry accepted
 **Status:** accepted
 **Decision:** The CLI parser may now be maintained through category extension

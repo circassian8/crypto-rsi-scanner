@@ -14,7 +14,7 @@ from typing import Any, Callable, Iterable, Mapping
 from ... import event_anomaly_scanner, event_fade, event_market_enrichment, event_provider_health
 from ...derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
 from ...event_classification import classify_event_asset
-from ...event_models import (
+from crypto_rsi_scanner.event_core.models import (
     DiscoveredAsset,
     DiscoveredEventFadeCandidate,
     EventAssetLink,
