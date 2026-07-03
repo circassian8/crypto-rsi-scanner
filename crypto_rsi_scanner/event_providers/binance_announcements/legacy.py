@@ -20,9 +20,9 @@ from urllib.parse import urlencode
 
 import aiohttp
 
-from .. import config
-from ..event_core.models import RawDiscoveredEvent
-from ._announcement_common import fetch_announcement_events, _announcement_items, _raw_event_from_item
+from ... import config
+from ...event_core.models import RawDiscoveredEvent
+from .._announcement_common import fetch_announcement_events, _announcement_items, _raw_event_from_item
 
 log = logging.getLogger(__name__)
 

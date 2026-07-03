@@ -11,8 +11,8 @@ from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import urlencode, urljoin
 from urllib.request import Request, urlopen
 
-from ..event_resolver import clean_text
-from ..event_providers.manual_json import parse_datetime
+from ...event_resolver import clean_text
+from ...event_providers.manual_json import parse_datetime
 
 log = logging.getLogger(__name__)
 

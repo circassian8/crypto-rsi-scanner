@@ -42,6 +42,14 @@ Current phase:
   cores are preserved as `pipeline_legacy`, `research_cards.legacy`,
   `daily_brief.legacy`, `integrated.legacy`, `impact_hypotheses.legacy`,
   `core.legacy_store`, and `evidence.legacy_acquisition`.
+- Medium radar and provider adapters now use package homes with compatibility
+  cores: `radar.validation`, `radar.discovery`, `radar.watchlist`,
+  `radar.near_miss`, `event_providers.cryptopanic`,
+  `derivatives_providers.coinalyze`, `event_providers.bybit_announcements`,
+  `event_providers.binance_announcements`, and `event_alpha.providers.health`.
+  New logic should land in their focused `models`, `provider`, `client`,
+  `parser`, `loader`, `entries`, `review`, or `report` modules rather than in
+  the legacy cores.
 
 Run `make event-alpha-shim-report PYTHON=python3` to write
 `event_alpha_shim_report.json` and `event_alpha_shim_report.md` under the

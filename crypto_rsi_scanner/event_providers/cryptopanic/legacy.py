@@ -18,8 +18,8 @@ from urllib.error import HTTPError
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
-from ..event_core.models import RawDiscoveredEvent
-from ._news_common import _news_items, fetch_news_events, news_events_from_items
+from ...event_core.models import RawDiscoveredEvent
+from .._news_common import _news_items, fetch_news_events, news_events_from_items
 
 log = logging.getLogger(__name__)
 
@@ -627,8 +627,8 @@ def redact_cryptopanic_url(url: str) -> str:
 
 def redact_cryptopanic_text(text: object) -> str:
     clean = str(text or "")
-    clean = re.sub(r"(?i)(auth_token=)[^&\\s<>]+", r"\1<redacted>", clean)
-    clean = re.sub(r"(?i)((?:api[_-]?token|token|auth)[\"'\\s:=]+)[A-Za-z0-9._-]{16,}", r"\1<redacted>", clean)
+    clean = re.sub(r"(?i)(auth_token=)[^&\s<>]+", r"\1<redacted>", clean)
+    clean = re.sub(r"(?i)((?:api[_-]?token|token|auth)[\"'\s:=]+)\s*[A-Za-z0-9._-]{16,}", r"\1<redacted>", clean)
     clean = re.sub(r"\b[A-Fa-f0-9]{32,}\b", "<redacted>", clean)
     return clean
 

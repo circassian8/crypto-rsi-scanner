@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-03 - Medium radar and provider modules use package ownership
+**Status:** accepted
+**Decision:** Medium Event Alpha radar and reusable provider adapters should use
+focused package homes with compatibility cores. Validation, discovery,
+watchlist, near-miss, CryptoPanic, Coinalyze, Bybit announcements, Binance
+announcements, and provider-health wrappers now expose package-level old import
+compatibility while new implementation work belongs in focused modules such as
+`models.py`, `provider.py`, `client.py`, `parser.py`, `loader.py`,
+`entries.py`, `review.py`, and `report.py`.
+**Why:** This continues the behavior-preserving refactor without changing
+provider request contracts, source parsing, artifact schemas, Event Alpha route
+gates, no-call defaults, no-send behavior, or research-only safety boundaries.
+It also keeps CryptoPanic and Coinalyze reusable adapters outside Event Alpha
+provider-readiness orchestration.
+**Revisit when:** a focused helper family can be moved out of a legacy core
+with fixture-backed parity tests, or an old import path can be retired through
+an explicit v2 compatibility break.
+
 ## 2026-07-03 - Large Event Alpha internals use wrapper plus legacy-core split
 **Status:** accepted
 **Decision:** The largest Event Alpha internals now expose small public wrappers

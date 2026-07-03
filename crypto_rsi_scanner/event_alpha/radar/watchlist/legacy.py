@@ -9,7 +9,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import event_alerts, event_alpha_quality_fields, event_fade, event_graph
+from .... import event_alerts, event_alpha_quality_fields, event_fade, event_graph
 
 WATCHLIST_SCHEMA_VERSION = "event_watchlist_v1"
 

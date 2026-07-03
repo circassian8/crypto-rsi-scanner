@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-03 — Split medium Event Alpha radar and provider packages · Codex
+**Why:** Medium Event Alpha radar modules and provider adapters still mixed
+models, parsing, loading, and compatibility surfaces in single files. This pass
+preserves behavior while giving those areas explicit package homes for future
+smaller migrations.
+**Changes:**
+- Converted radar validation, discovery, watchlist, and near-miss modules into
+  packages with focused model/loader/review/report/builder surfaces and preserved
+  legacy cores behind compatibility exports.
+- Converted CryptoPanic, Coinalyze, Bybit announcements, and Binance
+  announcements provider modules into provider/client/parser/model package
+  layouts while preserving old import paths.
+- Split Event Alpha provider-health wrapper exports into
+  `event_alpha/providers/health/` modules and kept the old provider-health path
+  as a compatibility surface.
+- Added old/new import and request-hygiene regression coverage, including
+  CryptoPanic unsupported-param hygiene, token redaction, Coinalyze no-call
+  default behavior, and provider health wrappers.
+- Refreshed architecture/module-map docs, roadmap, decisions, refactor
+  class-ownership report, and refactor final report.
+**Verify:** `python3 tests/test_indicators.py` (739/739);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (750 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-cryptopanic-preflight PYTHON=python3`;
+`make event-alpha-coinalyze-preflight-smoke PYTHON=python3`;
+`make event-alpha-official-exchange-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** This is intentionally behavior-preserving. The package
+`legacy.py` cores remain sizeable and should be reduced in later focused passes.
+No live provider calls by default, live Telegram sends, trading, paper trading,
+RSI signal writes, or Event Alpha-created `TRIGGERED_FADE` behavior was added.
+
 ## 2026-07-03 — Split large Event Alpha internals behind public wrappers · Codex
 **Why:** Several Event Alpha internals still had large public entrypoint files,
 which made future ownership boundaries unclear. This pass keeps behavior stable

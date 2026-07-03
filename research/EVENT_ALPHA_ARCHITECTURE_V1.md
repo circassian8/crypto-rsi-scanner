@@ -168,6 +168,15 @@ and should not grow the legacy cores:
   Evidence models, planner, executor, validators, scoring, providers, report,
   and serialization homes live under `event_alpha.radar.evidence/`; the
   compatibility core is `event_alpha.radar.evidence.legacy_acquisition`.
+- Medium radar packages now follow the same ownership pattern:
+  `event_alpha.radar.validation/` owns validation models, review, sample, and
+  report helpers; `event_alpha.radar.discovery/` owns discovery models, manual
+  execution, loaders, provider composition, and reports;
+  `event_alpha.radar.watchlist/` owns watchlist models, entry builders, market
+  helpers, enrichment helpers, and reports; and
+  `event_alpha.radar.near_miss/` owns near-miss models, refresh, candidate
+  selection, and reports. Their `legacy.py` cores preserve existing behavior
+  while individual helpers are migrated behind tests.
 
 This split is behavior-preserving. It does not change artifact schemas, card
 copy, daily-brief grouping, notification delivery rows, source/provider
@@ -226,6 +235,14 @@ Event Alpha provider/readiness orchestration code now lives in package modules:
 The lower-level reusable provider adapter packages remain in place:
 `crypto_rsi_scanner/event_providers/`, `crypto_rsi_scanner/derivatives_providers/`,
 and `crypto_rsi_scanner/supply_providers/` are not folded into Event Alpha.
+The medium provider adapters also use package ownership:
+`event_providers/cryptopanic/` owns the CryptoPanic provider/client/parser/
+request-ledger surfaces, `derivatives_providers/coinalyze/` owns the Coinalyze
+provider/client/parser surfaces, and official announcement adapters live under
+`event_providers/bybit_announcements/` and
+`event_providers/binance_announcements/`. Event Alpha provider-health wrappers
+live under `event_alpha.providers.health/` with
+`event_alpha.providers.provider_health` kept as the compatibility import.
 Current size gate after this provider move: `125` top-level `event_*.py` files,
 `29` compatibility shims, and `96` remaining top-level implementation files.
 

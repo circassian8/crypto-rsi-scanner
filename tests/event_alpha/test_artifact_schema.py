@@ -620,6 +620,86 @@ def test_event_alpha_schema_v1_validation_policy(tmp_path):
     assert core_stamped["schema_version"] == "event_core_opportunity_store_v1"
 
 
+def test_medium_event_alpha_and_provider_packages_preserve_imports_and_hygiene():
+    from crypto_rsi_scanner.event_alpha.radar import discovery, near_miss, validation, watchlist
+    from crypto_rsi_scanner.event_alpha.radar.discovery.loader import load_discovery_events
+    from crypto_rsi_scanner.event_alpha.radar.discovery.manual import run_manual_discovery
+    from crypto_rsi_scanner.event_alpha.radar.near_miss.models import EventNearMissCandidate
+    from crypto_rsi_scanner.event_alpha.radar.validation.models import EventFadeValidationReview
+    from crypto_rsi_scanner.event_alpha.radar.watchlist.entries import (
+        _entry_from_alert,
+        _entry_from_hypothesis,
+        _entry_from_row,
+    )
+    from crypto_rsi_scanner.event_alpha.radar.watchlist.models import EventWatchlistEntry
+    from crypto_rsi_scanner.event_providers.binance_announcements import BinanceAnnouncementProvider
+    from crypto_rsi_scanner.event_providers.binance_announcements.provider import (
+        BinanceAnnouncementProvider as NewBinanceAnnouncementProvider,
+    )
+    from crypto_rsi_scanner.event_providers.bybit_announcements import BybitAnnouncementProvider
+    from crypto_rsi_scanner.event_providers.bybit_announcements.provider import (
+        BybitAnnouncementProvider as NewBybitAnnouncementProvider,
+    )
+    from crypto_rsi_scanner.event_providers.cryptopanic import (
+        CryptoPanicProvider,
+        GROWTH_WEEKLY_UNSUPPORTED_PARAMS,
+        redact_cryptopanic_url,
+    )
+    from crypto_rsi_scanner.event_providers.cryptopanic.parser import plan_cryptopanic_currency_codes
+    from crypto_rsi_scanner.event_providers.cryptopanic.provider import (
+        CryptoPanicProvider as NewCryptoPanicProvider,
+    )
+    from crypto_rsi_scanner.event_providers.cryptopanic.request_ledger import _safe_body_excerpt
+    from crypto_rsi_scanner.derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
+    from crypto_rsi_scanner.derivatives_providers.coinalyze.parser import resolve_future_market_symbols
+    from crypto_rsi_scanner.derivatives_providers.coinalyze.provider import (
+        CoinalyzeDerivativesProvider as NewCoinalyzeDerivativesProvider,
+    )
+    from crypto_rsi_scanner.event_alpha.providers import provider_health
+    from crypto_rsi_scanner.event_alpha.providers.health.derivatives_provider import (
+        HealthCheckedDerivativesProvider,
+    )
+    from crypto_rsi_scanner.event_alpha.providers.health.event_provider import HealthCheckedEventProvider
+    from crypto_rsi_scanner.event_alpha.providers.health.universe_provider import HealthCheckedUniverseProvider
+
+    assert validation.EventFadeValidationReview is EventFadeValidationReview
+    assert callable(run_manual_discovery)
+    assert callable(discovery.run_manual_discovery)
+    assert discovery.load_discovery_events is load_discovery_events
+    assert watchlist.EventWatchlistEntry is EventWatchlistEntry
+    assert watchlist._entry_from_alert is _entry_from_alert
+    assert watchlist._entry_from_hypothesis is _entry_from_hypothesis
+    assert watchlist._entry_from_row is _entry_from_row
+    assert near_miss.EventNearMissCandidate is EventNearMissCandidate
+    assert CryptoPanicProvider is NewCryptoPanicProvider
+    assert CoinalyzeDerivativesProvider is NewCoinalyzeDerivativesProvider
+    assert BybitAnnouncementProvider is NewBybitAnnouncementProvider
+    assert BinanceAnnouncementProvider is NewBinanceAnnouncementProvider
+    assert provider_health.HealthCheckedEventProvider is HealthCheckedEventProvider
+    assert provider_health.HealthCheckedUniverseProvider is HealthCheckedUniverseProvider
+    assert provider_health.HealthCheckedDerivativesProvider is HealthCheckedDerivativesProvider
+
+    assert "search" in GROWTH_WEEKLY_UNSUPPORTED_PARAMS
+    planned = plan_cryptopanic_currency_codes(
+        [
+            {"symbol": "BTC", "identity_validated": True},
+            {"symbol": "BTC", "identity_validated": True},
+            {"symbol": "REAL", "identity_validated": False},
+        ]
+    )
+    assert planned.accepted == ("BTC",)
+    assert any(row["reason"] == "duplicate_request" for row in planned.rejected)
+    assert any(row["reason"] == "ticker_collision" for row in planned.rejected)
+    redacted_url = redact_cryptopanic_url("https://example.test/posts/?auth_token=super-secret-token&currencies=BTC")
+    assert "super-secret-token" not in redacted_url
+    assert "auth_token=%3Credacted%3E" in redacted_url
+    excerpt = _safe_body_excerpt("failure auth_token=super-secret-token api_token: abcdefghijklmnop1234")
+    assert "super-secret-token" not in str(excerpt)
+    assert "abcdefghijklmnop1234" not in str(excerpt)
+    assert CoinalyzeDerivativesProvider(None, live_enabled=False).fetch_snapshots() == {}
+    assert resolve_future_market_symbols([], ["BTC"]) == ()
+
+
 def test_event_alpha_cli_package_and_make_targets_are_available():
     from crypto_rsi_scanner.cli.dispatch import dispatch_command_name
     from crypto_rsi_scanner.cli.parser import build_parser, command_group, dispatch_key_from_args

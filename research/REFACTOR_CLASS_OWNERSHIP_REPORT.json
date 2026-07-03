@@ -15,10 +15,10 @@
       "class_name": "CoinalyzeDerivativesProvider",
       "exception_reason": null,
       "line_count": 189,
-      "module": "crypto_rsi_scanner.derivatives_providers.coinalyze",
+      "module": "crypto_rsi_scanner.derivatives_providers.coinalyze.legacy",
       "public": true,
       "qualname": "CoinalyzeDerivativesProvider",
-      "source_path": "crypto_rsi_scanner/derivatives_providers/coinalyze.py"
+      "source_path": "crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py"
     },
     {
       "class_name": "EventAlphaArtifactDoctorResult",
@@ -78,10 +78,10 @@
       "class_name": "HealthCheckedEventProvider",
       "exception_reason": null,
       "line_count": 78,
-      "module": "crypto_rsi_scanner.event_alpha.providers.provider_health",
+      "module": "crypto_rsi_scanner.event_alpha.providers.provider_health_legacy",
       "public": true,
       "qualname": "HealthCheckedEventProvider",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/provider_health.py"
+      "source_path": "crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py"
     },
     {
       "class_name": "CanonicalAsset",
@@ -168,10 +168,10 @@
       "class_name": "EventWatchlistEntry",
       "exception_reason": null,
       "line_count": 85,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist",
+      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.legacy",
       "public": true,
       "qualname": "EventWatchlistEntry",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist.py"
+      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
     },
     {
       "class_name": "CoinGeckoWatchlistMarketProvider",
@@ -186,28 +186,28 @@
       "class_name": "BinanceAnnouncementProvider",
       "exception_reason": null,
       "line_count": 107,
-      "module": "crypto_rsi_scanner.event_providers.binance_announcements",
+      "module": "crypto_rsi_scanner.event_providers.binance_announcements.legacy",
       "public": true,
       "qualname": "BinanceAnnouncementProvider",
-      "source_path": "crypto_rsi_scanner/event_providers/binance_announcements.py"
+      "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py"
     },
     {
       "class_name": "BybitAnnouncementProvider",
       "exception_reason": null,
       "line_count": 79,
-      "module": "crypto_rsi_scanner.event_providers.bybit_announcements",
+      "module": "crypto_rsi_scanner.event_providers.bybit_announcements.legacy",
       "public": true,
       "qualname": "BybitAnnouncementProvider",
-      "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements.py"
+      "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py"
     },
     {
       "class_name": "CryptoPanicProvider",
       "exception_reason": null,
       "line_count": 372,
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic",
+      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
       "public": true,
       "qualname": "CryptoPanicProvider",
-      "source_path": "crypto_rsi_scanner/event_providers/cryptopanic.py"
+      "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
     },
     {
       "class_name": "GdeltProvider",
@@ -277,7 +277,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 4995,
+  "function_count": 4998,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -587,18 +587,18 @@
     {
       "function_name": "run_manual_discovery",
       "line_count": 244,
-      "module": "crypto_rsi_scanner.event_alpha.radar.discovery",
+      "module": "crypto_rsi_scanner.event_alpha.radar.discovery.legacy",
       "public": true,
       "qualname": "run_manual_discovery",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/discovery.py"
+      "source_path": "crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py"
     },
     {
       "function_name": "load_discovery_events",
       "line_count": 183,
-      "module": "crypto_rsi_scanner.event_alpha.radar.discovery",
+      "module": "crypto_rsi_scanner.event_alpha.radar.discovery.legacy",
       "public": true,
       "qualname": "load_discovery_events",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/discovery.py"
+      "source_path": "crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py"
     },
     {
       "function_name": "_execute_request",
@@ -691,18 +691,18 @@
     {
       "function_name": "_refresh_one_hypothesis",
       "line_count": 276,
-      "module": "crypto_rsi_scanner.event_alpha.radar.near_miss",
+      "module": "crypto_rsi_scanner.event_alpha.radar.near_miss.legacy",
       "public": false,
       "qualname": "_refresh_one_hypothesis",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/near_miss.py"
+      "source_path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
     },
     {
       "function_name": "_candidate_from_row",
       "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.radar.near_miss",
+      "module": "crypto_rsi_scanner.event_alpha.radar.near_miss.legacy",
       "public": false,
       "qualname": "_candidate_from_row",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/near_miss.py"
+      "source_path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
     },
     {
       "function_name": "evaluate_opportunity",
@@ -747,42 +747,42 @@
     {
       "function_name": "review_validation_sample",
       "line_count": 280,
-      "module": "crypto_rsi_scanner.event_alpha.radar.validation",
+      "module": "crypto_rsi_scanner.event_alpha.radar.validation.legacy",
       "public": true,
       "qualname": "review_validation_sample",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/validation.py"
+      "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/legacy.py"
     },
     {
       "function_name": "_entry_from_alert",
       "line_count": 199,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist",
+      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.legacy",
       "public": false,
       "qualname": "_entry_from_alert",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist.py"
+      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
     },
     {
       "function_name": "_entry_from_hypothesis",
       "line_count": 352,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist",
+      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.legacy",
       "public": false,
       "qualname": "_entry_from_hypothesis",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist.py"
+      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
     },
     {
       "function_name": "_entry_from_row",
       "line_count": 164,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist",
+      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.legacy",
       "public": false,
       "qualname": "_entry_from_row",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist.py"
+      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
     },
     {
       "function_name": "_fetch_live_events",
       "line_count": 158,
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic",
+      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
       "public": false,
       "qualname": "CryptoPanicProvider._fetch_live_events",
-      "source_path": "crypto_rsi_scanner/event_providers/cryptopanic.py"
+      "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
     },
     {
       "function_name": "build_refactor_final_report",
@@ -794,7 +794,7 @@
     }
   ],
   "functions_over_limit_count": 64,
-  "generated_at": "2026-07-03T02:22:22.333244+00:00",
+  "generated_at": "2026-07-03T02:38:22.570649+00:00",
   "modules_with_multiple_public_classes": [
     {
       "exception_reason": null,
@@ -953,7 +953,7 @@
     },
     {
       "exception_reason": null,
-      "module": "crypto_rsi_scanner.event_alpha.providers.provider_health",
+      "module": "crypto_rsi_scanner.event_alpha.providers.provider_health_legacy",
       "public_class_count": 7
     },
     {
@@ -1093,7 +1093,7 @@
     },
     {
       "exception_reason": null,
-      "module": "crypto_rsi_scanner.event_alpha.radar.near_miss",
+      "module": "crypto_rsi_scanner.event_alpha.radar.near_miss.legacy",
       "public_class_count": 4
     },
     {
@@ -1128,12 +1128,12 @@
     },
     {
       "exception_reason": null,
-      "module": "crypto_rsi_scanner.event_alpha.radar.validation",
+      "module": "crypto_rsi_scanner.event_alpha.radar.validation.legacy",
       "public_class_count": 10
     },
     {
       "exception_reason": null,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist",
+      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.legacy",
       "public_class_count": 5
     },
     {
@@ -1168,7 +1168,7 @@
     },
     {
       "exception_reason": null,
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic",
+      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
       "public_class_count": 5
     },
     {
@@ -1218,7 +1218,7 @@
     "crypto_rsi_scanner.cli.parser": 1,
     "crypto_rsi_scanner.client": 1,
     "crypto_rsi_scanner.derivatives_providers.base": 1,
-    "crypto_rsi_scanner.derivatives_providers.coinalyze": 1,
+    "crypto_rsi_scanner.derivatives_providers.coinalyze.legacy": 1,
     "crypto_rsi_scanner.event_alpha.artifacts.alert_store": 4,
     "crypto_rsi_scanner.event_alpha.artifacts.alerts": 3,
     "crypto_rsi_scanner.event_alpha.artifacts.cache": 3,
@@ -1279,7 +1279,7 @@
     "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness": 2,
     "crypto_rsi_scanner.event_alpha.providers.official_exchange": 1,
     "crypto_rsi_scanner.event_alpha.providers.official_exchange_activation": 2,
-    "crypto_rsi_scanner.event_alpha.providers.provider_health": 7,
+    "crypto_rsi_scanner.event_alpha.providers.provider_health_legacy": 7,
     "crypto_rsi_scanner.event_alpha.providers.source_packs": 1,
     "crypto_rsi_scanner.event_alpha.providers.source_registry": 6,
     "crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight": 2,
@@ -1293,7 +1293,7 @@
     "crypto_rsi_scanner.event_alpha.radar.core.legacy_store": 7,
     "crypto_rsi_scanner.event_alpha.radar.core_opportunities": 2,
     "crypto_rsi_scanner.event_alpha.radar.derivatives_crowding": 1,
-    "crypto_rsi_scanner.event_alpha.radar.discovery": 1,
+    "crypto_rsi_scanner.event_alpha.radar.discovery.legacy": 1,
     "crypto_rsi_scanner.event_alpha.radar.evidence.legacy_acquisition": 7,
     "crypto_rsi_scanner.event_alpha.radar.evidence_quality": 3,
     "crypto_rsi_scanner.event_alpha.radar.graph": 3,
@@ -1320,7 +1320,7 @@
     "crypto_rsi_scanner.event_alpha.radar.market_reaction": 5,
     "crypto_rsi_scanner.event_alpha.radar.market_state": 1,
     "crypto_rsi_scanner.event_alpha.radar.missed": 2,
-    "crypto_rsi_scanner.event_alpha.radar.near_miss": 4,
+    "crypto_rsi_scanner.event_alpha.radar.near_miss.legacy": 4,
     "crypto_rsi_scanner.event_alpha.radar.opportunity_verdict": 6,
     "crypto_rsi_scanner.event_alpha.radar.pipeline": 2,
     "crypto_rsi_scanner.event_alpha.radar.playbooks": 3,
@@ -1328,19 +1328,19 @@
     "crypto_rsi_scanner.event_alpha.radar.scheduled_catalysts": 1,
     "crypto_rsi_scanner.event_alpha.radar.source_coverage": 2,
     "crypto_rsi_scanner.event_alpha.radar.source_enrichment": 9,
-    "crypto_rsi_scanner.event_alpha.radar.validation": 10,
-    "crypto_rsi_scanner.event_alpha.radar.watchlist": 5,
+    "crypto_rsi_scanner.event_alpha.radar.validation.legacy": 10,
+    "crypto_rsi_scanner.event_alpha.radar.watchlist.legacy": 5,
     "crypto_rsi_scanner.event_alpha.radar.watchlist_enrichment": 9,
     "crypto_rsi_scanner.event_alpha.radar.watchlist_market": 4,
     "crypto_rsi_scanner.event_alpha.shims": 2,
     "crypto_rsi_scanner.event_core.models": 7,
     "crypto_rsi_scanner.event_fade": 11,
     "crypto_rsi_scanner.event_providers.base": 2,
-    "crypto_rsi_scanner.event_providers.binance_announcements": 1,
-    "crypto_rsi_scanner.event_providers.bybit_announcements": 1,
+    "crypto_rsi_scanner.event_providers.binance_announcements.legacy": 1,
+    "crypto_rsi_scanner.event_providers.bybit_announcements.legacy": 1,
     "crypto_rsi_scanner.event_providers.coingecko_universe": 1,
     "crypto_rsi_scanner.event_providers.coinmarketcal": 1,
-    "crypto_rsi_scanner.event_providers.cryptopanic": 5,
+    "crypto_rsi_scanner.event_providers.cryptopanic.legacy": 5,
     "crypto_rsi_scanner.event_providers.external_ipo": 1,
     "crypto_rsi_scanner.event_providers.gdelt": 1,
     "crypto_rsi_scanner.event_providers.manual_json": 1,

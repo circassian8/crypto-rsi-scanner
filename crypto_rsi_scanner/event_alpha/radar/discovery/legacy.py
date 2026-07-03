@@ -11,9 +11,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
-from ... import event_anomaly_scanner, event_fade, event_market_enrichment, event_provider_health
-from ...derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
-from ...event_classification import classify_event_asset
+from .... import event_anomaly_scanner, event_fade, event_market_enrichment, event_provider_health
+from ....derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
+from ....event_classification import classify_event_asset
 from crypto_rsi_scanner.event_core.models import (
     DiscoveredAsset,
     DiscoveredEventFadeCandidate,
@@ -23,23 +23,23 @@ from crypto_rsi_scanner.event_core.models import (
     NormalizedEvent,
     RawDiscoveredEvent,
 )
-from ...event_providers.binance_announcements import BinanceAnnouncementProvider
-from ...event_providers.bybit_announcements import BybitAnnouncementProvider
-from ...event_providers.coinmarketcal import CoinMarketCalProvider
-from ...event_providers.coingecko_universe import CoinGeckoUniverseProvider
-from ...event_providers.cryptopanic import CryptoPanicProvider
-from ...event_providers.external_ipo import ExternalIpoProvider
-from ...event_providers.gdelt import DEFAULT_GDELT_QUERY, GdeltProvider
-from ...event_providers.manual_json import ManualJsonEventProvider, parse_datetime
-from ...event_providers.prediction_market_events import PredictionMarketEventsProvider
-from ...event_providers.project_blog_rss import ProjectBlogRssProvider
-from ...event_providers.sports_fixtures import SportsFixturesProvider
-from ...event_providers.tokenomist import TokenomistProvider
-from ...event_resolver import clean_text, load_asset_aliases, resolve_event_assets
-from ...supply_providers.arkham import ArkhamSupplyProvider
-from ...supply_providers.dune import DuneSupplyProvider
-from ...supply_providers.etherscan import EtherscanSupplyProvider
-from ...supply_providers.tokenomist import TokenomistSupplyProvider
+from ....event_providers.binance_announcements import BinanceAnnouncementProvider
+from ....event_providers.bybit_announcements import BybitAnnouncementProvider
+from ....event_providers.coinmarketcal import CoinMarketCalProvider
+from ....event_providers.coingecko_universe import CoinGeckoUniverseProvider
+from ....event_providers.cryptopanic import CryptoPanicProvider
+from ....event_providers.external_ipo import ExternalIpoProvider
+from ....event_providers.gdelt import DEFAULT_GDELT_QUERY, GdeltProvider
+from ....event_providers.manual_json import ManualJsonEventProvider, parse_datetime
+from ....event_providers.prediction_market_events import PredictionMarketEventsProvider
+from ....event_providers.project_blog_rss import ProjectBlogRssProvider
+from ....event_providers.sports_fixtures import SportsFixturesProvider
+from ....event_providers.tokenomist import TokenomistProvider
+from ....event_resolver import clean_text, load_asset_aliases, resolve_event_assets
+from ....supply_providers.arkham import ArkhamSupplyProvider
+from ....supply_providers.dune import DuneSupplyProvider
+from ....supply_providers.etherscan import EtherscanSupplyProvider
+from ....supply_providers.tokenomist import TokenomistSupplyProvider
 
 log = logging.getLogger(__name__)
 
