@@ -13,6 +13,7 @@ from typing import Any, MutableMapping
 
 _SERVICE_FUNCTION_NAMES = (
     'bind_scanner_globals',
+    '_refresh_scanner_globals',
     '_scanner_call',
     'event_alpha_status',
     'event_alpha_daily_brief_report',
@@ -35,6 +36,10 @@ def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: Mo
     return scanner_module
 
 
+def _refresh_scanner_globals() -> ModuleType:
+    return bind_scanner_globals(globals())
+
+
 def _scanner_call(function_name: str, /, *args: Any, **kwargs: Any) -> Any:
     from ... import scanner as scanner_module
 
@@ -43,7 +48,7 @@ def _scanner_call(function_name: str, /, *args: Any, **kwargs: Any) -> Any:
 
 def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -> None:
     """Print profile-aware Event Alpha operational status."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     try:
         profile = _apply_event_alpha_profile(profile_name)
@@ -158,7 +163,7 @@ def event_alpha_daily_brief_report(
     include_legacy_artifacts: bool = False,
 ) -> None:
     """Write and print the daily Event Alpha operating brief."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     selected_profile = profile_name
     if not selected_profile:

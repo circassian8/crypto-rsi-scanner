@@ -27,10 +27,10 @@ REPORT_JSON = "REFACTOR_FINAL_REPORT.json"
 REPORT_MD = "REFACTOR_FINAL_REPORT.md"
 MAJOR_TARGETS = {
     "crypto_rsi_scanner/scanner.py": {
-        "target_lines_lt": 5500,
-        "next_migration_module": "crypto_rsi_scanner/cli/commands_event_alpha.py plus service modules for remaining scanner-bound command bodies",
-        "risk": "Broad scanner command extraction can change CLI defaults, Make target behavior, provider guardrails, or research-only side-effect gates if moved without command snapshots.",
-        "blocker_reason": "scanner.py still contains many historical Event Alpha command bodies and runtime config adapters that were only partially routed through cli/dispatch.py.",
+        "target_lines_lt": 2000,
+        "next_migration_module": "crypto_rsi_scanner/cli/services/scanner_legacy.py",
+        "risk": "Burning down the transitional compatibility core can change CLI defaults, Make target behavior, provider guardrails, or research-only side-effect gates if moved without command snapshots.",
+        "blocker_reason": "scanner.py should be a small compatibility facade; command bodies must live under crypto_rsi_scanner.cli.",
     },
     "tests/test_indicators.py": {
         "target_lines_lt": 2000,
@@ -52,6 +52,7 @@ TRACKED_LINE_COUNT_PATHS = tuple(
             "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py",
             "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py",
             "crypto_rsi_scanner/cli/services/event_alpha.py",
+            "crypto_rsi_scanner/cli/services/scanner_legacy.py",
             "crypto_rsi_scanner/cli/parser.py",
             "crypto_rsi_scanner/cli/commands_event_alpha.py",
         )
@@ -667,6 +668,7 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             f"- scanner_bind_scanner_globals_call_sites: `{data['scanner_bind_scanner_globals_call_sites']}`",
             f"- cli_service_bind_scanner_globals_call_sites: `{data['cli_service_bind_scanner_globals_call_sites']}`",
             f"- cli_event_alpha_service_lines: `{data['cli_event_alpha_service_lines']}`",
+            f"- scanner_legacy_service_lines: `{data.get('line_counts', {}).get('crypto_rsi_scanner/cli/services/scanner_legacy.py')}`",
             f"- parser_build_parser_lines: `{data.get('parser_build_parser_lines')}`",
             f"- commands_event_alpha_handle_lines: `{data.get('commands_event_alpha_handle_lines')}`",
             f"- legacy_artifact_doctor_core_lines: `{data.get('legacy_artifact_doctor_core_lines')}`",

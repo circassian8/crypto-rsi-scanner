@@ -45,6 +45,9 @@ layout gives new code a home while old import paths continue to work.
   `event_alpha_outcomes.py`, `event_alpha_reports.py`,
   `event_alpha_provider_preflights.py`, `event_alpha_namespace.py`,
   `event_alpha_research.py`, and `event_alpha_fade_review.py`.
+  `cli/services/scanner_legacy.py` is the transitional compatibility core for
+  historical scanner command bodies; new command logic should move into focused
+  `cli/services/` or `cli/commands_*.py` modules instead.
 - `crypto_rsi_scanner/storage_parts/`: shared SQLite storage mixins for
   connection setup, schema text, additive migrations, scan/signal/outcome rows,
   previous-flag/alert/subscriber/meta state, paper-trade rows, and scan-status
@@ -390,15 +393,18 @@ small, tested slices only.
 
 ## CLI Split Direction
 
-`scanner.py` is now a compatibility wrapper for the package CLI entrypoint.
+`scanner.py` is now a small compatibility facade for the package CLI entrypoint
+and old helper imports. The historical command implementation has moved to
+`crypto_rsi_scanner.cli.services.scanner_legacy` as a measured transitional
+core, not as a new home for feature work.
 `crypto_rsi_scanner.cli.parser.build_parser()` owns argparse construction
 without calling `parse_args()` or any command branch, and
 `crypto_rsi_scanner.cli.dispatch.dispatch_args()` routes parsed args into
-command-group modules. Event Alpha command bodies are being split into focused
+command-group modules. Event Alpha command bodies are split into focused
 `crypto_rsi_scanner.cli.services.event_alpha_*` service modules while the old
-`event_alpha.py` service module re-exports them. The remaining bind sites to
-historical scanner globals are a measured blocker for the next CLI pass, not a
-reason to add new logic to the aggregator.
+`event_alpha.py` service module re-exports them. The remaining centralized
+service refresh helpers preserve monkeypatch compatibility until direct imports
+can replace them behind command-specific parity tests.
 
 `research/CLI_FLAG_SNAPSHOT.json` is the checked-in flag/default/destination
 snapshot for parser refactors. Any parser split must preserve this behavior
@@ -416,4 +422,4 @@ Compatibility rules for CLI refactors:
   official-exchange paths before parser changes land.
 - Dispatch tests must cover representative Event Alpha, provider readiness,
   notification preview, export, and default RSI scan routes before moving
-  command bodies out of scanner helpers.
+  command families out of `scanner_legacy.py`.

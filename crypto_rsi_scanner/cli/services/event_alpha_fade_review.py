@@ -11,7 +11,7 @@ from types import ModuleType
 from typing import MutableMapping
 
 
-_SERVICE_FUNCTION_NAMES = ('bind_scanner_globals', '_write_event_fade_review_bundle', '_event_fade_review_bundle_manifest', '_event_fade_review_bundle_readme', '_event_fade_review_guide')
+_SERVICE_FUNCTION_NAMES = ('bind_scanner_globals', '_refresh_scanner_globals', '_write_event_fade_review_bundle', '_event_fade_review_bundle_manifest', '_event_fade_review_bundle_readme', '_event_fade_review_guide')
 
 
 def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: ModuleType | None = None) -> ModuleType:
@@ -21,6 +21,11 @@ def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: Mo
         if not name.startswith("__") and name not in _SERVICE_FUNCTION_NAMES:
             target[name] = value
     return scanner_module
+
+
+def _refresh_scanner_globals() -> ModuleType:
+    return bind_scanner_globals(globals())
+
 
 def _write_event_fade_review_bundle(
     *,
@@ -39,7 +44,7 @@ def _write_event_fade_review_bundle(
     overwrite_outcomes: bool,
     generated_at: datetime | None = None,
 ) -> dict[str, Any]:
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     bundle_dir = Path(out_dir).expanduser()
     bundle_dir.mkdir(parents=True, exist_ok=True)
 
@@ -224,7 +229,7 @@ def _event_fade_review_bundle_manifest(
     warnings: tuple[str, ...] = (),
     generated_at: datetime | None = None,
 ) -> dict[str, Any]:
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     files = {
         "readme": readme_path.name,
         "validation_sample": copied_sample.name,
@@ -339,7 +344,7 @@ def _event_fade_review_bundle_readme(
     review_merge: event_validation.ValidationSampleMergeResult | None,
     warnings: tuple[str, ...] = (),
 ) -> str:
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     price_line = (
         f"- `{price_export.out_path.name}`: bundle-local OHLCV price fixture"
         if price_export is not None
@@ -407,7 +412,7 @@ def _event_fade_review_bundle_readme(
 
 
 def _event_fade_review_guide() -> str:
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     return "\n".join([
         "# Event-Fade Review Guide",
         "",

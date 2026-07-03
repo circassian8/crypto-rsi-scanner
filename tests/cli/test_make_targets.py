@@ -586,7 +586,7 @@ def test_refactor_baseline_json_contains_file_counts_and_inventory():
     payload = refactor_baseline.build_refactor_baseline(root=root)
     counts = payload["line_counts"]
     umbrella_lines = len((root / "tests" / "test_indicators.py").read_text(encoding="utf-8").splitlines())
-    assert counts["crypto_rsi_scanner/scanner.py"] > 4000
+    assert counts["crypto_rsi_scanner/scanner.py"] < 2000
     assert counts["tests/test_indicators.py"] == umbrella_lines
     assert counts["tests/test_indicators.py"] < 2000
     assert counts["crypto_rsi_scanner/event_alpha_artifact_doctor.py"] < 100
@@ -639,7 +639,8 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["pytest_runtime_seconds"] == 12.34
     assert payload["standalone_runner_runtime_seconds"] == 56.78
     assert payload["line_counts"]["tests/test_indicators.py"] < 2000
-    assert payload["line_counts"]["crypto_rsi_scanner/scanner.py"] > 6500
+    assert payload["line_counts"]["crypto_rsi_scanner/scanner.py"] < 2000
+    assert payload["line_counts"]["crypto_rsi_scanner/cli/services/scanner_legacy.py"] > 6500
     assert payload["line_counts"]["crypto_rsi_scanner/event_alpha_artifact_doctor.py"] < 100
     assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"] < 1500
     assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"] > 1500
@@ -656,8 +657,8 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["remaining_implementation_modules_by_package_target"] == {}
     assert payload["remaining_module_classification"]["path"] == "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json"
     assert payload["class_ownership_report"]["path"] == "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json"
-    assert any(row["path"] == "crypto_rsi_scanner/scanner.py" for row in payload["blockers"])
-    assert any(
+    assert not any(row["path"] == "crypto_rsi_scanner/scanner.py" for row in payload["blockers"])
+    assert not any(
         row["path"] == "crypto_rsi_scanner/cli/services/event_alpha.py"
         and "bind_scanner_globals" in row["blocker_reason"]
         for row in payload["blockers"]
@@ -694,6 +695,71 @@ def test_refactor_final_report_make_target_is_available():
     assert "subprocess" not in module_text
     assert "urlopen" not in module_text
     assert "requests." not in module_text
+
+
+def test_refactor_completion_map_generation_writes_release_candidate_reports():
+    import json
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from crypto_rsi_scanner import refactor_completion_map
+
+    verification = {
+        "commands": [
+            {
+                "command": "python3 tests/test_indicators.py",
+                "returncode": 0,
+                "status": "pass",
+                "elapsed_seconds": 1.0,
+            }
+        ],
+        "total_elapsed_seconds": 1.0,
+    }
+    with TemporaryDirectory() as tmp:
+        paths = refactor_completion_map.write_refactor_completion_map(
+            root=REPO_ROOT,
+            out_dir=Path(tmp),
+            verification_results=verification,
+        )
+        completion = json.loads(paths["completion_json"].read_text(encoding="utf-8"))
+        release = json.loads(paths["release_json"].read_text(encoding="utf-8"))
+        markdown = paths["completion_markdown"].read_text(encoding="utf-8")
+
+    assert completion["schema_version"] == "refactor_completion_map_v1"
+    assert completion["research_only"] is True
+    assert completion["live_provider_calls_allowed"] is False
+    assert completion["telegram_sends"] == 0
+    assert completion["trades_created"] == 0
+    assert completion["paper_trades_created"] == 0
+    assert completion["normal_rsi_signal_rows_written"] == 0
+    assert completion["triggered_fade_created"] == 0
+    assert completion["scanner_facade"]["line_count"] < 2000
+    assert completion["cli_refactor"]["scanner_command_body_functions_remaining"] == 0
+    assert completion["size_gates"]["gate_status"] == "pass"
+    assert completion["verification"]["status"] == "pass"
+    assert release["schema_version"] == "refactor_release_candidate_report_v2"
+    assert release["status"] in {"accepted", "pending_with_documented_refactor_blockers"}
+    assert "Refactor Completion Map" in markdown
+
+
+def test_refactor_completion_map_make_target_is_static_and_no_live_runtime_path():
+    root = REPO_ROOT
+    makefile = (root / "Makefile").read_text(encoding="utf-8")
+    module_text = (root / "crypto_rsi_scanner" / "refactor_completion_map.py").read_text(encoding="utf-8").casefold()
+    assert "refactor-completion-map:" in makefile
+    assert "$(python) -m crypto_rsi_scanner.refactor_completion_map" in makefile.casefold()
+    forbidden = (
+        "subprocess",
+        "urlopen",
+        "requests.",
+        "aiohttp",
+        "from crypto_rsi_scanner.scanner import",
+        "import crypto_rsi_scanner.scanner",
+        "main.py --",
+        "event_alert_send",
+    )
+    for item in forbidden:
+        assert item not in module_text
 
 
 def test_refactor_size_gates_static_baseline_and_new_violation_detection():

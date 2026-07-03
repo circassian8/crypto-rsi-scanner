@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-03 — Accept Event Alpha refactor v2 release candidate · Codex
+**Why:** The final refactor cleanup needed to remove `scanner.py` as the command
+brain, make the release gates measurable, and prove behavior compatibility with
+the full safe regression stack before provider activation work resumes.
+**Changes:**
+- Moved the historical scanner implementation to
+  `crypto_rsi_scanner/cli/services/scanner_legacy.py` and replaced
+  `crypto_rsi_scanner/scanner.py` with a 77-line compatibility facade that
+  preserves old imports, `python -m crypto_rsi_scanner.scanner`, and
+  monkeypatch-heavy tests.
+- Reduced Event Alpha CLI service `bind_scanner_globals(...)` call sites from
+  26 to 6 centralized refresh helpers while preserving runtime sync semantics.
+- Added `crypto_rsi_scanner/refactor_completion_map.py`,
+  `make refactor-completion-map`, `research/REFACTOR_COMPLETION_MAP.md/json`,
+  and refreshed `research/REFACTOR_RELEASE_CANDIDATE_REPORT.md/json` as
+  accepted with all 27 verification commands passing.
+- Updated static size gates to treat `cli/services/scanner_legacy.py` as the
+  moved existing scanner-size violation rather than a new violation, while still
+  reporting it as a transitional compatibility core.
+- Updated roadmap, decisions, architecture/module-map docs, and CLI static tests
+  for the scanner facade, accepted v2 release candidate, completion-map target,
+  and remaining compatibility-core burn-down work.
+**Verify:** `python3 tests/test_indicators.py` (744/744);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (755 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make test-pytest-safe PYTHON=python3`; `make refactor-completion-map
+PYTHON=python3`; `make refactor-size-gates PYTHON=python3`;
+`make refactor-class-ownership-report PYTHON=python3`; `make
+refactor-final-report PYTHON=python3`; `make event-alpha-shim-report
+PYTHON=python3`; `make event-alpha-namespace-lifecycle-report PYTHON=python3`;
+all requested Event Alpha smoke/preflight/doctor/report targets; and
+`make verify PYTHON=python3`.
+**Notes/risks:** This is behavior-preserving. `scanner_legacy.py` and
+`event_alpha/doctor/legacy_artifact_doctor.py` remain tracked compatibility
+cores for future focused burn-down. No live provider calls, Telegram sends,
+trading, paper-trading behavior changes, execution/order logic, Event Alpha RSI
+writes, Event Alpha-created `TRIGGERED_FADE`, or secret exposure were added.
+
 ## 2026-07-03 — Split shared storage, backtest, and schema facades · Codex
 **Why:** Shared RSI/backtest/storage code still had large public files, and this
 pass needed to reduce those modules without changing DB schema, paper-book

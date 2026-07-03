@@ -13,6 +13,7 @@ from typing import Any, MutableMapping
 
 _SERVICE_FUNCTION_NAMES = (
     'bind_scanner_globals',
+    '_refresh_scanner_globals',
     '_cryptopanic_stats_for_pipeline_result',
     '_scanner_call',
     'event_alpha_cycle',
@@ -56,6 +57,10 @@ def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: Mo
     return scanner_module
 
 
+def _refresh_scanner_globals() -> ModuleType:
+    return bind_scanner_globals(globals())
+
+
 def _scanner_call(function_name: str, /, *args: Any, **kwargs: Any) -> Any:
     from ... import scanner as scanner_module
 
@@ -68,7 +73,7 @@ def _cryptopanic_stats_for_pipeline_result(
     provider_health_path: str | Path,
 ) -> dict[str, Any]:
     """Summarize CryptoPanic usage without exposing the API token."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     acquisition = pipeline_result.evidence_acquisition_result
     accepted_keys: set[str] = set()
     rejected_keys: set[str] = set()
@@ -211,7 +216,7 @@ def event_alpha_cycle(
     profile_name: str | None = None,
 ) -> None:
     """Run one unified research-only Event Alpha cycle."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     profile = _apply_event_alpha_profile(profile_name)
     if profile is not None:
@@ -457,7 +462,7 @@ def event_alpha_cycle(
 
 
 def _router_config_from_profile(profile_name: str | None) -> event_alpha_router.EventAlphaRouterConfig | None:
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     if not profile_name:
         return None
     try:
@@ -562,7 +567,7 @@ def _router_config_from_profile(profile_name: str | None) -> event_alpha_router.
 def _event_catalyst_search_provider(
     search_cfg: event_catalyst_search.EventCatalystSearchConfig,
 ):
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     provider_names = tuple(
         name.strip().lower()
         for name in (search_cfg.providers or (search_cfg.provider,))
@@ -661,7 +666,7 @@ def _event_evidence_acquisition_providers_from_runtime(
     cfg: event_evidence_acquisition.EvidenceAcquisitionConfig,
 ):
     """Return source-pack provider dispatch for evidence acquisition."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     providers: dict[str, object | None] = {}
     fixture_provider = event_catalyst_search.FixtureCatalystSearchProvider(
         path=config.EVENT_CATALYST_SEARCH_FIXTURE_PATH,
@@ -792,7 +797,7 @@ def _send_event_alpha_routed_digest(
     pause_state: event_alpha_notification_pause.EventAlphaNotificationPauseState | None = None,
     core_opportunity_rows: Iterable[Mapping[str, object]] = (),
 ) -> event_alpha_pipeline.EventAlphaSendResult:
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     all_decisions = list(decisions)
     alertable = [decision for decision in all_decisions if decision.alertable]
     storage = Storage(config.DB_PATH)

@@ -55,6 +55,10 @@ Current phase:
   facade over `storage_parts/`, `backtest.py` owns the historical backtest
   facade over `backtest_parts/`, and `event_alpha/artifacts/schema_v1.py` owns
   compatibility exports over `event_alpha/artifacts/schema/`.
+- CLI refactor facades follow the same rule: `scanner.py` is a root
+  compatibility facade, `cli/services/scanner_legacy.py` is the measured
+  transitional core for historical scanner command bodies, and new command
+  logic belongs in focused `cli/services/` or `cli/commands_*.py` modules.
 
 Run `make event-alpha-shim-report PYTHON=python3` to write
 `event_alpha_shim_report.json` and `event_alpha_shim_report.md` under the

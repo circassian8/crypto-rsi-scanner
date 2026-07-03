@@ -295,7 +295,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5016,
+  "function_count": 5043,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -812,7 +812,7 @@
     }
   ],
   "functions_over_limit_count": 64,
-  "generated_at": "2026-07-03T02:55:56.172472+00:00",
+  "generated_at": "2026-07-03T03:10:31.785271+00:00",
   "modules_with_multiple_public_classes": [
     {
       "exception_reason": null,
@@ -1234,6 +1234,7 @@
     "crypto_rsi_scanner.backups": 3,
     "crypto_rsi_scanner.cli.event_alpha_command_registry": 1,
     "crypto_rsi_scanner.cli.parser": 1,
+    "crypto_rsi_scanner.cli.services.scanner_legacy": 1,
     "crypto_rsi_scanner.client": 1,
     "crypto_rsi_scanner.derivatives_providers.base": 1,
     "crypto_rsi_scanner.derivatives_providers.coinalyze.legacy": 1,
@@ -1371,7 +1372,6 @@
     "crypto_rsi_scanner.llm_providers.openai_provider": 2,
     "crypto_rsi_scanner.ops": 5,
     "crypto_rsi_scanner.refactor_class_ownership_report": 2,
-    "crypto_rsi_scanner.scanner": 1,
     "crypto_rsi_scanner.signal_registry": 2,
     "crypto_rsi_scanner.storage": 1,
     "crypto_rsi_scanner.storage_parts.connection": 1,

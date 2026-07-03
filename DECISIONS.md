@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-03 - Event Alpha refactor v2 accepted
+**Status:** accepted
+**Decision:** Event Alpha refactor v2 is accepted as the behavior-preserving
+baseline for resuming provider activation work. `crypto_rsi_scanner/scanner.py`
+is now a compatibility facade over `crypto_rsi_scanner.cli`, Event Alpha command
+dispatch and services live under `crypto_rsi_scanner/cli/`, top-level
+Event Alpha modules are active shims except the intentionally separate
+`event_fade.py`, artifact doctor is schema/plugin-backed at the public surface,
+and `research/REFACTOR_RELEASE_CANDIDATE_REPORT.md/json` is the canonical
+acceptance artifact.
+**Why:** The full safe regression gauntlet passed with no live provider calls by
+default, no live Telegram sends, no trading/paper/execution changes, no Event
+Alpha normal RSI signal writes, no Event Alpha-created `TRIGGERED_FADE`, and no
+secret leakage. Compatibility paths remain available while the remaining large
+legacy cores are tracked by size gates and completion maps.
+**Revisit when:** a future v2/v3 compatibility break proposes warnings or
+removal for old import paths, or a focused pass moves command families out of
+`cli/services/scanner_legacy.py` and replaces the remaining service refresh
+helpers with direct imports under parity tests.
+
 ## 2026-07-03 - Shared storage, backtest, and schema modules use facades plus parts
 **Status:** accepted
 **Decision:** Shared RSI/backtest/storage refactors should keep public facades

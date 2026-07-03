@@ -297,10 +297,18 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1704,
+      "line_count": 1709,
       "path": "crypto_rsi_scanner/cli/services/event_alpha_notifications.py",
       "severity": "warning",
       "violation_id": "file:crypto_rsi_scanner/cli/services/event_alpha_notifications.py"
+    },
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 7744,
+      "path": "crypto_rsi_scanner/cli/services/scanner_legacy.py",
+      "severity": "warning",
+      "violation_id": "file:crypto_rsi_scanner/cli/services/scanner_legacy.py"
     },
     {
       "category": "file_over_1500_lines",
@@ -429,14 +437,6 @@
       "path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py",
       "severity": "warning",
       "violation_id": "file:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
-    },
-    {
-      "category": "file_over_1500_lines",
-      "limit": 1500,
-      "line_count": 7744,
-      "path": "crypto_rsi_scanner/scanner.py",
-      "severity": "warning",
-      "violation_id": "file:crypto_rsi_scanner/scanner.py"
     },
     {
       "category": "file_over_1500_lines",
@@ -2227,7 +2227,7 @@
       "violation_id": "public_classes:crypto_rsi_scanner.signal_registry"
     }
   ],
-  "file_count": 590,
+  "file_count": 592,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -2237,8 +2237,13 @@
     },
     {
       "limit": 1500,
-      "line_count": 1704,
+      "line_count": 1709,
       "path": "crypto_rsi_scanner/cli/services/event_alpha_notifications.py"
+    },
+    {
+      "limit": 1500,
+      "line_count": 7744,
+      "path": "crypto_rsi_scanner/cli/services/scanner_legacy.py"
     },
     {
       "limit": 1500,
@@ -2319,11 +2324,6 @@
       "limit": 1500,
       "line_count": 1828,
       "path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
-    },
-    {
-      "limit": 1500,
-      "line_count": 7744,
-      "path": "crypto_rsi_scanner/scanner.py"
     },
     {
       "limit": 1500,
@@ -2884,7 +2884,7 @@
   ],
   "functions_over_limit_count": 64,
   "gate_status": "pass",
-  "generated_at": "2026-07-03T02:55:56.156727+00:00",
+  "generated_at": "2026-07-03T03:10:30.805060+00:00",
   "modules_with_multiple_public_classes": [
     {
       "exception_reason": null,
@@ -3293,6 +3293,13 @@
     }
   ],
   "modules_with_multiple_public_classes_count": 81,
+  "moved_existing_violation_aliases": [
+    {
+      "baseline_violation_id": "file:crypto_rsi_scanner/scanner.py",
+      "current_violation_id": "file:crypto_rsi_scanner/cli/services/scanner_legacy.py"
+    }
+  ],
+  "moved_existing_violation_count": 1,
   "new_violation_count": 0,
   "new_violations": [],
   "no_live_provider_calls": true,
@@ -3341,6 +3348,7 @@
     "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin",
     "file:crypto_rsi_scanner/backtest_parts/legacy.py",
     "file:crypto_rsi_scanner/cli/services/event_alpha_notifications.py",
+    "file:crypto_rsi_scanner/cli/services/scanner_legacy.py",
     "file:crypto_rsi_scanner/event_alpha/artifacts/alert_store.py",
     "file:crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy.py",
     "file:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py",
@@ -3357,7 +3365,6 @@
     "file:crypto_rsi_scanner/event_alpha/radar/source_coverage.py",
     "file:crypto_rsi_scanner/event_alpha/radar/validation/legacy.py",
     "file:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py",
-    "file:crypto_rsi_scanner/scanner.py",
     "file:tests/event_alpha/test_artifact_doctor.py",
     "file:tests/event_alpha/test_integrated_radar.py",
     "file:tests/event_alpha/test_namespace_lifecycle.py",
@@ -3524,10 +3531,18 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1704,
+      "line_count": 1709,
       "path": "crypto_rsi_scanner/cli/services/event_alpha_notifications.py",
       "severity": "warning",
       "violation_id": "file:crypto_rsi_scanner/cli/services/event_alpha_notifications.py"
+    },
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 7744,
+      "path": "crypto_rsi_scanner/cli/services/scanner_legacy.py",
+      "severity": "warning",
+      "violation_id": "file:crypto_rsi_scanner/cli/services/scanner_legacy.py"
     },
     {
       "category": "file_over_1500_lines",
@@ -3656,14 +3671,6 @@
       "path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py",
       "severity": "warning",
       "violation_id": "file:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
-    },
-    {
-      "category": "file_over_1500_lines",
-      "limit": 1500,
-      "line_count": 7744,
-      "path": "crypto_rsi_scanner/scanner.py",
-      "severity": "warning",
-      "violation_id": "file:crypto_rsi_scanner/scanner.py"
     },
     {
       "category": "file_over_1500_lines",

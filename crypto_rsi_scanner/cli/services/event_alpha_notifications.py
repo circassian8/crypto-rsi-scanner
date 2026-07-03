@@ -13,6 +13,7 @@ from typing import Any, MutableMapping
 
 _SERVICE_FUNCTION_NAMES = (
     'bind_scanner_globals',
+    '_refresh_scanner_globals',
     '_event_alpha_notify_cycle_body',
     '_scanner_call',
     'event_alpha_notify_preview',
@@ -36,6 +37,10 @@ def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: Mo
     return scanner_module
 
 
+def _refresh_scanner_globals() -> ModuleType:
+    return bind_scanner_globals(globals())
+
+
 def _scanner_call(function_name: str, /, *args: Any, **kwargs: Any) -> Any:
     from ... import scanner as scanner_module
 
@@ -53,7 +58,7 @@ def _event_alpha_notify_cycle_body(
     lock_holder: dict[str, object],
 ) -> None:
     """Run a day-1 Event Alpha notification burn-in cycle."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     selected_profile = profile_name or "notify_no_key"
     profile = _apply_event_alpha_profile(selected_profile)
@@ -563,7 +568,7 @@ def event_alpha_notify_preview(
     profile_name: str | None = None,
 ) -> None:
     """Preview day-1 notification readiness and lane cooldown state."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     selected_profile = profile_name or "notify_no_key"
     try:
@@ -654,7 +659,7 @@ def event_alpha_notify_preview_from_artifacts(
     artifact_namespace: str | None = None,
 ) -> None:
     """Regenerate notification preview and structured preview delivery rows from local artifacts only."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     selected_profile = profile_name or "notify_no_key"
     try:
@@ -739,7 +744,7 @@ def event_alpha_notify_go_no_go(
     include_legacy_artifacts: bool = False,
 ) -> None:
     """Print a concise day-1 notification go/no-go decision."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     try:
         context = resolve_event_alpha_artifact_context_for_report(
@@ -856,7 +861,7 @@ def event_alpha_export_notification_pack(
     artifact_namespace: str | None = None,
 ) -> None:
     """Export a redacted zip of notification artifacts and operator reports."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     try:
         context = _event_alpha_report_context(profile_name or "notify_no_key", artifact_namespace)
@@ -957,7 +962,7 @@ def event_alpha_notify_fixture_smoke(
     event_now: str | datetime | None = None,
 ) -> None:
     """Run a local fake-sender Event Alpha notification smoke."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     now = _event_research_now(event_now)
     fixture_profile = str(os.getenv("RSI_EVENT_ALPHA_NOTIFY_FIXTURE_PROFILE", "fixture") or "fixture")

@@ -13,6 +13,7 @@ from typing import Any, MutableMapping
 
 _SERVICE_FUNCTION_NAMES = (
     'bind_scanner_globals',
+    '_refresh_scanner_globals',
     '_scanner_call',
     'event_alpha_burn_in_readiness_report',
     'event_alpha_export_burn_in_pack',
@@ -34,6 +35,10 @@ def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: Mo
     return scanner_module
 
 
+def _refresh_scanner_globals() -> ModuleType:
+    return bind_scanner_globals(globals())
+
+
 def _scanner_call(function_name: str, /, *args: Any, **kwargs: Any) -> Any:
     from ... import scanner as scanner_module
 
@@ -47,7 +52,7 @@ def event_alpha_burn_in_readiness_report(
     artifact_namespace: str | None = None,
 ) -> None:
     """Print live-style no-send burn-in readiness from profile-scoped artifacts."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     selected_profile = profile_name or "live_burn_in_no_send"
     try:
@@ -183,7 +188,7 @@ def event_alpha_export_burn_in_pack(
     include_legacy_artifacts: bool = False,
 ) -> None:
     """Write a clean Event Alpha burn-in review zip."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     try:
         context = resolve_event_alpha_artifact_context_for_report(

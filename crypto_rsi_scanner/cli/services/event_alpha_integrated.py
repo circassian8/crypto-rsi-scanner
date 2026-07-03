@@ -11,7 +11,7 @@ from types import ModuleType
 from typing import MutableMapping
 
 
-_SERVICE_FUNCTION_NAMES = ('bind_scanner_globals', 'event_alpha_integrated_radar_cycle_report', 'event_alpha_market_anomaly_scan_report', 'event_alpha_official_exchange_report', 'event_alpha_scheduled_catalyst_report', 'event_alpha_derivatives_report', 'event_alpha_replay_report')
+_SERVICE_FUNCTION_NAMES = ('bind_scanner_globals', '_refresh_scanner_globals', 'event_alpha_integrated_radar_cycle_report', 'event_alpha_market_anomaly_scan_report', 'event_alpha_official_exchange_report', 'event_alpha_scheduled_catalyst_report', 'event_alpha_derivatives_report', 'event_alpha_replay_report')
 
 
 def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: ModuleType | None = None) -> ModuleType:
@@ -21,6 +21,11 @@ def bind_scanner_globals(target: MutableMapping[str, object], scanner_module: Mo
         if not name.startswith("__") and name not in _SERVICE_FUNCTION_NAMES:
             target[name] = value
     return scanner_module
+
+
+def _refresh_scanner_globals() -> ModuleType:
+    return bind_scanner_globals(globals())
+
 
 def event_alpha_integrated_radar_cycle_report(
     verbose: bool = False,
@@ -32,7 +37,7 @@ def event_alpha_integrated_radar_cycle_report(
     coinalyze_namespace: str | None = None,
 ) -> None:
     """Run the research-only integrated Event Alpha radar cycle and print a summary."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     selected_profile = profile_name or ("fixture" if fixture else config.EVENT_ALPHA_PROFILE or "notify_llm_deep")
     try:
@@ -73,7 +78,7 @@ def event_alpha_market_anomaly_scan_report(
     include_test_artifacts: bool = False,
 ) -> None:
     """Run the research-only broad market anomaly scanner and write artifacts."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     selected_profile = profile_name or "fixture"
     try:
@@ -156,7 +161,7 @@ def event_alpha_official_exchange_report(
     include_test_artifacts: bool = False,
 ) -> None:
     """Run the research-only official exchange announcement normalizer."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     selected_profile = profile_name or "fixture"
     try:
@@ -241,7 +246,7 @@ def event_alpha_scheduled_catalyst_report(
     include_test_artifacts: bool = False,
 ) -> None:
     """Run the research-only scheduled catalyst/unlock normalizer."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     selected_profile = profile_name or "fixture"
     try:
@@ -323,7 +328,7 @@ def event_alpha_derivatives_report(
     include_test_artifacts: bool = False,
 ) -> None:
     """Run the research-only derivatives crowding/fade-review normalizer."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     selected_profile = profile_name or "fixture"
     try:
@@ -389,7 +394,7 @@ def event_alpha_replay_report(
     verbose: bool = False,
 ) -> None:
     """Replay Event Alpha local artifacts without provider calls or sends."""
-    bind_scanner_globals(globals())
+    _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
     if replay_profile:
         _profile, error = _apply_event_alpha_report_profile(replay_profile)

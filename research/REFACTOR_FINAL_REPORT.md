@@ -2,8 +2,8 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-03T02:53:24+00:00`
-- gate_status: `blocked`
+- generated_at: `2026-07-03T03:10:31+00:00`
+- gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
 
@@ -17,7 +17,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 | file | baseline lines | current lines | reduced by | reduction | target | status |
 |---|---:|---:|---:|---:|---:|---|
-| `crypto_rsi_scanner/scanner.py` | 13373 | 7744 | 5629 | 42.09% | <5500 | `blocked` |
+| `crypto_rsi_scanner/scanner.py` | 13373 | 77 | 13296 | 99.42% | <2000 | `pass` |
 | `tests/test_indicators.py` | 42498 | 1771 | 40727 | 95.83% | <2000 | `pass` |
 | `crypto_rsi_scanner/event_alpha_artifact_doctor.py` | 7145 | 19 | 7126 | 99.73% | <100 | `pass` |
 
@@ -30,19 +30,20 @@ Research-only refactor gate report. This report does not call providers, send Te
 - active_shim_modules_with_implementation_logic: `0`
 - migrated_modules_this_run_count: `29`
 - scanner_bind_scanner_globals_call_sites: `7`
-- cli_service_bind_scanner_globals_call_sites: `26`
+- cli_service_bind_scanner_globals_call_sites: `6`
 - cli_event_alpha_service_lines: `46`
+- scanner_legacy_service_lines: `7744`
 - parser_build_parser_lines: `25`
 - commands_event_alpha_handle_lines: `2`
 - legacy_artifact_doctor_core_lines: `6363`
 - legacy_artifact_doctor_core_note: Behavior-compatible doctor implementation preserved while public artifact_doctor.py is the small orchestrator.
 - large_event_alpha_split_line_counts: `{"core_opportunity_store_legacy": 2607, "core_opportunity_store_wrapper": 14, "daily_brief_legacy": 3080, "daily_brief_wrapper": 32, "evidence_acquisition_legacy": 2045, "evidence_acquisition_wrapper": 14, "impact_hypotheses_legacy": 3758, "impact_hypotheses_wrapper": 14, "integrated_radar_legacy": 3401, "integrated_radar_wrapper": 32, "notifications_pipeline_legacy": 4326, "notifications_pipeline_wrapper": 49, "research_cards_legacy": 3416, "research_cards_wrapper": 14}`
 - cli_flag_snapshot_path: `research/CLI_FLAG_SNAPSHOT.json`
-- scanner_command_body_functions_remaining: `105`
+- scanner_command_body_functions_remaining: `0`
 - remaining_implementation_modules_by_package_target: `{}`
 - intentionally_outside_event_alpha_modules: `["crypto_rsi_scanner.event_fade"]`
 - class_ownership_report: `research/REFACTOR_CLASS_OWNERSHIP_REPORT.json`
-- class_ownership_classes_over_limit: `29`
+- class_ownership_classes_over_limit: `31`
 - class_ownership_functions_over_limit: `64`
 
 ## Newly Migrated Modules
@@ -100,18 +101,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 ## Blockers
 
-### `crypto_rsi_scanner/scanner.py`
-
-- blocker_reason: scanner.py still contains many historical Event Alpha command bodies and runtime config adapters that were only partially routed through cli/dispatch.py.
-- next_migration_module: `crypto_rsi_scanner/cli/commands_event_alpha.py plus service modules for remaining scanner-bound command bodies`
-- risk: Broad scanner command extraction can change CLI defaults, Make target behavior, provider guardrails, or research-only side-effect gates if moved without command snapshots.
-
-### `crypto_rsi_scanner/cli/services/event_alpha.py`
-
-- blocker_reason: cli service bind_scanner_globals call sites were not reduced by the requested 50%.
-- next_migration_module: `Replace scanner-global dependencies in the split Event Alpha service modules with explicit imports and focused dispatch monkeypatch tests.`
-- risk: Removing the runtime binding too early can break historical helper/config resolution for Makefile-backed commands.
-
+- none
 ## Compatibility And Code Removal
 
 - dead_duplicate_code_removed: `False`

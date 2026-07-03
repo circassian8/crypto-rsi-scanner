@@ -1,5 +1,4 @@
 {
-  "canonical_completion_map": "research/REFACTOR_COMPLETION_MAP.json",
   "canonical_final_report": "research/REFACTOR_FINAL_REPORT.json",
   "ci_status": {
     "findings": [],
@@ -8,6 +7,32 @@
       ".github/workflows/event-alpha-smoke.yml",
       ".github/workflows/verify.yml"
     ]
+  },
+  "cli_refactor": {
+    "cli_event_alpha_service_lines": 46,
+    "cli_service_bind_scanner_globals_call_sites": 6,
+    "commands_event_alpha_handle_lines": 2,
+    "parser_build_parser_lines": 25,
+    "scanner_bind_scanner_globals_call_sites": 7,
+    "scanner_command_body_functions_remaining": 0
+  },
+  "doctor_refactor": {
+    "legacy_doctor_core_lines": 6363,
+    "legacy_unregistered": 0,
+    "plugin_check_counts": {
+      "integrated_radar": 3,
+      "namespace": 1,
+      "notifications": 1,
+      "outcomes": 1,
+      "paths": 1,
+      "provider_readiness": 2,
+      "safety": 1,
+      "secrets": 0,
+      "source_coverage": 1,
+      "stale_artifacts": 1
+    },
+    "public_doctor_lines": 41,
+    "top_level_doctor_shim_lines": 19
   },
   "doctor_registry_coverage": {
     "legacy_unregistered": 0,
@@ -29,21 +54,7 @@
     },
     "remaining_legacy_unregistered_details": []
   },
-  "generated_at": "2026-07-03T03:16:09+00:00",
-  "generator": "crypto_rsi_scanner.refactor_completion_map",
-  "known_remaining_blockers": [],
-  "line_counts": {
-    "crypto_rsi_scanner/cli/commands_event_alpha.py": 14,
-    "crypto_rsi_scanner/cli/parser.py": 225,
-    "crypto_rsi_scanner/cli/services/event_alpha.py": 46,
-    "crypto_rsi_scanner/cli/services/scanner_legacy.py": 7744,
-    "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 41,
-    "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py": 6363,
-    "crypto_rsi_scanner/event_alpha_artifact_doctor.py": 19,
-    "crypto_rsi_scanner/scanner.py": 77,
-    "tests/test_indicators.py": 1771
-  },
-  "migrated_modules": {
+  "event_alpha_module_map": {
     "active_shim_modules_with_implementation_logic": 0,
     "active_shims": 124,
     "classification_report": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
@@ -54,36 +65,10 @@
     "top_level_event_module_count": 125,
     "unmigrated_modules": 1
   },
-  "monolith_size_reductions": {
-    "doctor": {
-      "legacy_doctor_core_lines": 6363,
-      "legacy_unregistered": 0,
-      "plugin_check_counts": {
-        "integrated_radar": 3,
-        "namespace": 1,
-        "notifications": 1,
-        "outcomes": 1,
-        "paths": 1,
-        "provider_readiness": 2,
-        "safety": 1,
-        "secrets": 0,
-        "source_coverage": 1,
-        "stale_artifacts": 1
-      },
-      "public_doctor_lines": 41,
-      "top_level_doctor_shim_lines": 19
-    },
-    "scanner_py": {
-      "line_count": 77,
-      "path": "crypto_rsi_scanner/scanner.py",
-      "status": "pass",
-      "target_lines_lt": 2000
-    },
-    "tests_umbrella": {
-      "path": "tests/test_indicators.py",
-      "target_lines_lt": 2000
-    }
-  },
+  "generated_at": "2026-07-03T03:16:08+00:00",
+  "generator": "crypto_rsi_scanner.refactor_completion_map",
+  "known_remaining_blockers": [],
+  "live_provider_calls_allowed": false,
   "namespace_lifecycle_inventory": {
     "namespace_count": 46,
     "status_counts": {
@@ -100,7 +85,9 @@
     "unknown_namespace_count": 0,
     "unknown_namespaces": []
   },
-  "rc_verdict": "Event Alpha refactor v2 accepted: critical behavior, safety, shim, size, scanner-facade, and regression checks passed.",
+  "normal_rsi_signal_rows_written": 0,
+  "paper_trades_created": 0,
+  "research_only": true,
   "safety_invariants": {
     "no_event_alpha_created_triggered_fade": true,
     "no_event_alpha_normal_rsi_signal_writes": true,
@@ -111,6 +98,12 @@
     "research_only": true,
     "triggered_fade_source": "event_fade.py + proxy_fade only"
   },
+  "scanner_facade": {
+    "line_count": 77,
+    "path": "crypto_rsi_scanner/scanner.py",
+    "status": "pass",
+    "target_lines_lt": 2000
+  },
   "schema_validation_coverage": {
     "doctor_artifact": null,
     "invalid_enum_fields": null,
@@ -118,19 +111,34 @@
     "schema_rows_validated": null,
     "schema_validation_errors": null
   },
-  "schema_version": "refactor_release_candidate_report_v2",
-  "shim_summary": {
-    "active_shim_modules_with_implementation_logic": 0,
-    "active_shims": 124,
-    "classification_report": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
-    "intentionally_outside_event_alpha_modules": [
-      "crypto_rsi_scanner.event_fade"
-    ],
-    "partial_shims": 0,
-    "top_level_event_module_count": 125,
-    "unmigrated_modules": 1
+  "schema_version": "refactor_completion_map_v1",
+  "size_gate_report": "research/REFACTOR_SIZE_GATES.json",
+  "size_gates": {
+    "classes_over_limit_count": 31,
+    "files_over_limit_count": 27,
+    "functions_over_limit_count": 64,
+    "gate_status": "pass",
+    "moved_existing_violation_count": 1,
+    "new_violation_count": 0
   },
   "status": "accepted",
+  "telegram_sends": 0,
+  "trades_created": 0,
+  "transitional_compatibility_cores": [
+    {
+      "line_count": 7744,
+      "next_work": "Move focused command families out of scanner_legacy.py in smaller parity-tested passes.",
+      "path": "crypto_rsi_scanner/cli/services/scanner_legacy.py",
+      "reason": "Moved historical scanner command body; old root scanner is now a facade."
+    },
+    {
+      "line_count": 6363,
+      "next_work": "Move legacy checks into focused doctor plugins with counter-preserving fixtures.",
+      "path": "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py",
+      "reason": "Preserves strict/WARN artifact doctor semantics while plugin migrations continue."
+    }
+  ],
+  "triggered_fade_created": 0,
   "verification": {
     "commands": [
       {

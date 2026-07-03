@@ -24,6 +24,9 @@ REPORT_MD = "REFACTOR_SIZE_GATES.md"
 DEFAULT_FILE_LINE_LIMIT = 1500
 DEFAULT_CLASS_LINE_LIMIT = ownership.DEFAULT_CLASS_LINE_LIMIT
 DEFAULT_FUNCTION_LINE_LIMIT = ownership.DEFAULT_FUNCTION_LINE_LIMIT
+MOVED_VIOLATION_ALIASES = {
+    "file:crypto_rsi_scanner/cli/services/scanner_legacy.py": "file:crypto_rsi_scanner/scanner.py",
+}
 
 
 def repo_root_from_module() -> Path:
@@ -126,10 +129,23 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
     baseline = _read_json(baseline_path)
     baseline_ids = set(baseline.get("violation_ids", [])) if isinstance(baseline, dict) else set()
     current_ids = set(inventory["violation_ids"])
-    new_ids = sorted(current_ids - baseline_ids)
-    resolved_ids = sorted(baseline_ids - current_ids)
+    aliased_current_ids = {_baseline_violation_id(value) for value in current_ids}
+    new_ids = sorted(value for value in current_ids if _baseline_violation_id(value) not in baseline_ids)
+    resolved_ids = sorted(baseline_ids - aliased_current_ids)
     new_rows = [row for row in inventory["violations"] if row["violation_id"] in set(new_ids)]
-    existing_rows = [row for row in inventory["violations"] if row["violation_id"] in baseline_ids]
+    existing_rows = [
+        row
+        for row in inventory["violations"]
+        if _baseline_violation_id(str(row.get("violation_id") or "")) in baseline_ids
+    ]
+    moved_existing = [
+        {
+            "current_violation_id": current_id,
+            "baseline_violation_id": baseline_id,
+        }
+        for current_id, baseline_id in sorted(MOVED_VIOLATION_ALIASES.items())
+        if current_id in current_ids and baseline_id in baseline_ids
+    ]
     gate_status = "pass" if not new_rows else "blocked"
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
@@ -149,6 +165,8 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
         "new_violation_count": len(new_rows),
         "existing_violation_count": len(existing_rows),
         "resolved_violation_count": len(resolved_ids),
+        "moved_existing_violation_count": len(moved_existing),
+        "moved_existing_violation_aliases": moved_existing,
         "new_violations": new_rows,
         "resolved_violation_ids": resolved_ids,
         "existing_violations": existing_rows,
@@ -196,6 +214,7 @@ def format_gate_report(report: dict[str, Any]) -> str:
         f"- functions_over_limit_count: `{report.get('functions_over_limit_count', 0)}`",
         f"- modules_with_multiple_public_classes_count: `{report.get('modules_with_multiple_public_classes_count', 0)}`",
         f"- new_violation_count: `{report.get('new_violation_count', 0)}`",
+        f"- moved_existing_violation_count: `{report.get('moved_existing_violation_count', 0)}`",
         "",
         "## Policy",
         "",
@@ -210,6 +229,15 @@ def format_gate_report(report: dict[str, Any]) -> str:
     ]
     for row in _limit_rows(report.get("new_violations"), 120):
         lines.append(_violation_row(row))
+    lines.extend([
+        "",
+        "## Moved Existing Violations",
+        "",
+        "| current id | baseline id |",
+        "|---|---|",
+    ])
+    for row in _limit_rows(report.get("moved_existing_violation_aliases"), 40):
+        lines.append(f"| `{row.get('current_violation_id')}` | `{row.get('baseline_violation_id')}` |")
     lines.extend([
         "",
         "## Files Over 1500 Lines",
@@ -277,6 +305,10 @@ def _limit_rows(rows: object, limit: int) -> list[dict[str, Any]]:
     if not isinstance(rows, list):
         return []
     return [row for row in rows[:limit] if isinstance(row, dict)]
+
+
+def _baseline_violation_id(violation_id: str) -> str:
+    return MOVED_VIOLATION_ALIASES.get(violation_id, violation_id)
 
 
 def _violation_row(row: dict[str, Any]) -> str:

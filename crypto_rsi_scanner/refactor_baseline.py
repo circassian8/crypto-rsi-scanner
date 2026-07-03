@@ -29,10 +29,10 @@ BEHAVIOR_FREEZE_CONTRACT = (
 )
 REFACTOR_SUCCESS_GATES = (
     {
-        "gate": "scanner.py reduced below 4000 lines by final phase",
+        "gate": "scanner.py reduced below 2000 lines by final phase",
         "metric": "line_count",
         "path": "crypto_rsi_scanner/scanner.py",
-        "target": "<4000",
+        "target": "<2000",
     },
     {
         "gate": "tests/test_indicators.py becomes umbrella runner below 2000 lines by final phase",
