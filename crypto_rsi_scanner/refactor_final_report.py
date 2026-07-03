@@ -57,6 +57,22 @@ TRACKED_LINE_COUNT_PATHS = tuple(
         )
     )
 )
+LARGE_EVENT_ALPHA_SPLIT_PATHS = {
+    "notifications_pipeline_wrapper": "crypto_rsi_scanner/event_alpha/notifications/pipeline.py",
+    "notifications_pipeline_legacy": "crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py",
+    "research_cards_wrapper": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/__init__.py",
+    "research_cards_legacy": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py",
+    "daily_brief_wrapper": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/__init__.py",
+    "daily_brief_legacy": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy.py",
+    "integrated_radar_wrapper": "crypto_rsi_scanner/event_alpha/radar/integrated_radar.py",
+    "integrated_radar_legacy": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py",
+    "impact_hypotheses_wrapper": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/__init__.py",
+    "impact_hypotheses_legacy": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py",
+    "core_opportunity_store_wrapper": "crypto_rsi_scanner/event_alpha/radar/core_opportunity_store.py",
+    "core_opportunity_store_legacy": "crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py",
+    "evidence_acquisition_wrapper": "crypto_rsi_scanner/event_alpha/radar/evidence_acquisition.py",
+    "evidence_acquisition_legacy": "crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py",
+}
 MIGRATED_MODULES_THIS_RUN = (
     "crypto_rsi_scanner.event_incident_graph",
     "crypto_rsi_scanner.event_identity",
@@ -446,6 +462,10 @@ def build_refactor_final_report(
         path: _line_count(root / path)
         for path in TRACKED_LINE_COUNT_PATHS
     }
+    large_event_alpha_split_line_counts = {
+        name: _line_count(root / path)
+        for name, path in LARGE_EVENT_ALPHA_SPLIT_PATHS.items()
+    }
     baseline_counts = _baseline_line_counts(root)
     event_modules = _top_level_event_modules(root)
     shim_report = event_alpha_shims.audit_registry(root=root)
@@ -527,6 +547,7 @@ def build_refactor_final_report(
         "dead_duplicate_code_removed": False,
         "dead_duplicate_code_removal_note": "No obviously dead duplicate top-level Event Alpha code was removed in this pass; old module paths remain available until shim reports and import tests prove retirement is safe.",
         "line_counts": current_counts,
+        "large_event_alpha_split_line_counts": large_event_alpha_split_line_counts,
         "baseline_line_counts": baseline_counts,
         "line_gates": line_gates,
         "gate_summary": {
@@ -650,6 +671,7 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             f"- commands_event_alpha_handle_lines: `{data.get('commands_event_alpha_handle_lines')}`",
             f"- legacy_artifact_doctor_core_lines: `{data.get('legacy_artifact_doctor_core_lines')}`",
             f"- legacy_artifact_doctor_core_note: {data.get('legacy_artifact_doctor_core_note')}",
+            f"- large_event_alpha_split_line_counts: `{json.dumps(data.get('large_event_alpha_split_line_counts', {}), sort_keys=True)}`",
             f"- cli_flag_snapshot_path: `{data.get('cli_flag_snapshot_path')}`",
             f"- scanner_command_body_functions_remaining: `{data['scanner_command_body_functions_remaining']}`",
             f"- remaining_implementation_modules_by_package_target: `{json.dumps(data.get('remaining_implementation_modules_by_package_target', {}), sort_keys=True)}`",

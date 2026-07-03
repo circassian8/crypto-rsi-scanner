@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-03 — Split large Event Alpha internals behind public wrappers · Codex
+**Why:** Several Event Alpha internals still had large public entrypoint files,
+which made future ownership boundaries unclear. This pass keeps behavior stable
+while giving notifications, research cards, daily brief, integrated radar,
+impact hypotheses, core opportunities, and evidence acquisition smaller package
+homes.
+**Changes:**
+- Replaced the public notification pipeline, research-card, daily-brief,
+  integrated-radar, impact-hypothesis, core-opportunity-store, and
+  evidence-acquisition entrypoints with thin compatibility wrappers while moving
+  preserved implementations into `legacy`/`legacy_*` cores.
+- Added focused package/module surfaces for notification selection, delivery,
+  preview, rendering, heartbeat, skip telemetry, daily-brief sections,
+  research-card sections, integrated radar cycle helpers, core serialization,
+  impact-hypothesis helpers, and evidence-acquisition helpers.
+- Added a regression test that asserts the public wrappers stay small and that
+  old import paths still resolve to the new package surfaces.
+- Refreshed refactor final/class-ownership reports, `MODULE_MAP.md`,
+  architecture docs, roadmap, and decisions with the wrapper/core split.
+**Verify:** `python3 tests/test_indicators.py` (738/738);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (749 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** This is intentionally behavior-preserving. The moved
+compatibility cores are still large and should be burned down with smaller
+fixture-backed migrations. The catalyst-frame e2e target exits successfully but
+still prints existing fixture-doctor blockers for that namespace. No live
+provider calls, live Telegram sends, trading, paper trading, RSI signal writes,
+or Event Alpha-created `TRIGGERED_FADE` behavior was added.
+
 ## 2026-07-03 — Split artifact doctor public orchestration · Codex
 **Why:** The top-level doctor shim was already clean, but the package-level
 artifact doctor still concentrated result models, execution, report rendering,

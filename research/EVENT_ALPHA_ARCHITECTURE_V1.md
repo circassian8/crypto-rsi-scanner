@@ -133,6 +133,46 @@ The top-level imports remain compatibility shims with no runtime deprecation
 warnings. Artifact paths and output schemas must stay unchanged unless a
 separate migration explicitly updates schema v1 consumers.
 
+## Internal Large-Module Split
+
+The largest Event Alpha internal modules have small public wrappers and
+behavior-compatible legacy cores. New code should use the focused module homes
+and should not grow the legacy cores:
+
+- `event_alpha.notifications.pipeline` is the public notification orchestrator.
+  Models, selection, preview writing, delivery writing, message rendering,
+  heartbeat wording, skip telemetry, plan building, and safety helpers have
+  focused modules under `event_alpha.notifications/`. The compatibility core is
+  `event_alpha.notifications.pipeline_legacy`.
+- `event_alpha.artifacts.research_cards` is now a package. Models, renderer,
+  index, lineage, and card section modules live under
+  `event_alpha.artifacts.research_cards/`; the compatibility core is
+  `event_alpha.artifacts.research_cards.legacy`.
+- `event_alpha.artifacts.daily_brief` is now a package. Builder, context,
+  models, renderer, and daily-brief section modules live under
+  `event_alpha.artifacts.daily_brief/`; the compatibility core is
+  `event_alpha.artifacts.daily_brief.legacy`.
+- `event_alpha.radar.integrated_radar` is the public integrated-radar wrapper.
+  Cycle, inputs, sidecars, merge, family, policy, artifact writer, report, and
+  manifest homes live under `event_alpha.radar.integrated/`; the compatibility
+  core is `event_alpha.radar.integrated.legacy`.
+- `event_alpha.radar.impact_hypotheses` is now a package. Models, rules,
+  builder, store, report, inbox, scoring, and lineage homes live under
+  `event_alpha.radar.impact_hypotheses/`; the compatibility core is
+  `event_alpha.radar.impact_hypotheses.legacy`.
+- `event_alpha.radar.core_opportunity_store` is the public store wrapper.
+  Core models, store operations, serialization, aggregation, merge, card links,
+  and validators live under `event_alpha.radar.core/`; the compatibility core
+  is `event_alpha.radar.core.legacy_store`.
+- `event_alpha.radar.evidence_acquisition` is the public evidence wrapper.
+  Evidence models, planner, executor, validators, scoring, providers, report,
+  and serialization homes live under `event_alpha.radar.evidence/`; the
+  compatibility core is `event_alpha.radar.evidence.legacy_acquisition`.
+
+This split is behavior-preserving. It does not change artifact schemas, card
+copy, daily-brief grouping, notification delivery rows, source/provider
+guardrails, or any research-only safety invariant.
+
 ## Radar Implementation Move
 
 Radar/core implementation code now lives in package modules:
@@ -283,8 +323,10 @@ small, tested slices only.
 
 ## How To Add A Notification Lane
 
-1. Put planning/rendering logic in `event_alpha/notifications/pipeline.py` or a
-   focused notification package module.
+1. Put planning/rendering logic in focused notification package modules such as
+   `plan_builder.py`, `message_rendering.py`, `preview_writer.py`,
+   `delivery_writer.py`, or `candidate_selection.py`; keep
+   `event_alpha/notifications/pipeline.py` as the public orchestrator.
 2. Preserve no-send rehearsal behavior and delivery rows with
    `status`/`status_detail`.
 3. Keep Telegram delivery guarded by `RSI_EVENT_ALERTS_ENABLED=1`, explicit send

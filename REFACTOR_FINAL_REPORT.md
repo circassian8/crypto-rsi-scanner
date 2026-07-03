@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-03T02:07:22+00:00`
+- generated_at: `2026-07-03T02:22:22+00:00`
 - gate_status: `blocked`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -36,6 +36,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 - commands_event_alpha_handle_lines: `2`
 - legacy_artifact_doctor_core_lines: `6363`
 - legacy_artifact_doctor_core_note: Behavior-compatible doctor implementation preserved while public artifact_doctor.py is the small orchestrator.
+- large_event_alpha_split_line_counts: `{"core_opportunity_store_legacy": 2607, "core_opportunity_store_wrapper": 14, "daily_brief_legacy": 3080, "daily_brief_wrapper": 32, "evidence_acquisition_legacy": 2045, "evidence_acquisition_wrapper": 14, "impact_hypotheses_legacy": 3758, "impact_hypotheses_wrapper": 14, "integrated_radar_legacy": 3401, "integrated_radar_wrapper": 32, "notifications_pipeline_legacy": 4326, "notifications_pipeline_wrapper": 49, "research_cards_legacy": 3416, "research_cards_wrapper": 14}`
 - cli_flag_snapshot_path: `research/CLI_FLAG_SNAPSHOT.json`
 - scanner_command_body_functions_remaining: `105`
 - remaining_implementation_modules_by_package_target: `{}`

@@ -17,7 +17,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import (
+from .... import (
     config,
     event_catalyst_frames,
     event_claim_semantics,
@@ -28,12 +28,12 @@ from ... import (
     event_impact_path_validator,
     event_llm_catalyst_frames,
 )
-from ...event_llm_extractor import EventLLMExtractionReportRow
+from ....event_llm_extractor import EventLLMExtractionReportRow
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
-from ...event_resolver import clean_text
-from . import incidents as event_incident_store
-from . import market_confirmation as event_market_confirmation
-from . import opportunity_verdict as event_opportunity_verdict
+from ....event_resolver import clean_text
+from .. import incidents as event_incident_store
+from .. import market_confirmation as event_market_confirmation
+from .. import opportunity_verdict as event_opportunity_verdict
 
 
 class ImpactCategory(str, Enum):

@@ -2,8 +2,8 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-03T01:56:32.337628+00:00`
-- public_class_count: `397`
+- generated_at: `2026-07-03T02:22:22.333244+00:00`
+- public_class_count: `401`
 - classes_over_limit_count: `29`
 - functions_over_limit_count: `64`
 - modules_with_multiple_public_classes_count: `81`
@@ -30,7 +30,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.artifacts.cache` | 3 |  |
 | `crypto_rsi_scanner.event_alpha.artifacts.locks` | 3 |  |
 | `crypto_rsi_scanner.event_alpha.artifacts.replay` | 4 |  |
-| `crypto_rsi_scanner.event_alpha.artifacts.research_cards` | 2 |  |
+| `crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy` | 2 |  |
 | `crypto_rsi_scanner.event_alpha.artifacts.retention` | 2 |  |
 | `crypto_rsi_scanner.event_alpha.artifacts.run_ledger` | 2 |  |
 | `crypto_rsi_scanner.event_alpha.config.health_guard` | 2 |  |
@@ -38,7 +38,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.doctor.environment` | 2 |  |
 | `crypto_rsi_scanner.event_alpha.notifications.delivery` | 3 |  |
 | `crypto_rsi_scanner.event_alpha.notifications.inbox` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.notifications.pipeline` | 6 |  |
+| `crypto_rsi_scanner.event_alpha.notifications.pipeline_legacy` | 6 |  |
 | `crypto_rsi_scanner.event_alpha.notifications.provider_status` | 2 |  |
 | `crypto_rsi_scanner.event_alpha.notifications.recipient_check` | 2 |  |
 | `crypto_rsi_scanner.event_alpha.notifications.router` | 5 |  |
@@ -61,13 +61,13 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.radar.anomaly_state` | 3 |  |
 | `crypto_rsi_scanner.event_alpha.radar.catalyst_search` | 15 |  |
 | `crypto_rsi_scanner.event_alpha.radar.claim_semantics` | 3 |  |
+| `crypto_rsi_scanner.event_alpha.radar.core.legacy_store` | 7 |  |
 | `crypto_rsi_scanner.event_alpha.radar.core_opportunities` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.radar.core_opportunity_store` | 7 |  |
-| `crypto_rsi_scanner.event_alpha.radar.evidence_acquisition` | 7 |  |
+| `crypto_rsi_scanner.event_alpha.radar.evidence.legacy_acquisition` | 7 |  |
 | `crypto_rsi_scanner.event_alpha.radar.evidence_quality` | 3 |  |
 | `crypto_rsi_scanner.event_alpha.radar.graph` | 3 |  |
 | `crypto_rsi_scanner.event_alpha.radar.identity` | 6 |  |
-| `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses` | 6 |  |
+| `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.legacy` | 6 |  |
 | `crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store` | 3 |  |
 | `crypto_rsi_scanner.event_alpha.radar.impact_path_validator` | 4 |  |
 | `crypto_rsi_scanner.event_alpha.radar.incident_graph` | 3 |  |
@@ -111,9 +111,9 @@ Static source inventory only. This report does not call providers, send Telegram
 |---|---|---:|---:|---|
 | `crypto_rsi_scanner.client` | `CoinGeckoClient` | 115 | true |  |
 | `crypto_rsi_scanner.derivatives_providers.coinalyze` | `CoinalyzeDerivativesProvider` | 189 | true |  |
-| `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` | `EventAlphaArtifactDoctorResult` | 402 | true |  |
+| `crypto_rsi_scanner.event_alpha.doctor.legacy_artifact_doctor` | `EventAlphaArtifactDoctorResult` | 402 | true |  |
 | `crypto_rsi_scanner.event_alpha.notifications.delivery` | `NotificationDeliveryRecord` | 123 | true |  |
-| `crypto_rsi_scanner.event_alpha.notifications.pipeline` | `_DeliveryWriter` | 534 | false |  |
+| `crypto_rsi_scanner.event_alpha.notifications.pipeline_legacy` | `_DeliveryWriter` | 534 | false |  |
 | `crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight` | `BybitAnnouncementsRehearsalReport` | 79 | true |  |
 | `crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight` | `CoinalyzeRehearsalReport` | 102 | true |  |
 | `crypto_rsi_scanner.event_alpha.providers.live_provider_readiness` | `LiveProviderReadinessProvider` | 99 | true |  |
@@ -121,9 +121,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.radar.asset_registry` | `CanonicalAsset` | 96 | true |  |
 | `crypto_rsi_scanner.event_alpha.radar.catalyst_search` | `FixtureCatalystSearchProvider` | 79 | true |  |
 | `crypto_rsi_scanner.event_alpha.radar.catalyst_search` | `EventProviderCatalystSearchProvider` | 88 | true |  |
-| `crypto_rsi_scanner.event_alpha.radar.evidence_acquisition` | `EvidenceAcquisitionResult` | 120 | true |  |
-| `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses` | `EventImpactHypothesis` | 191 | true |  |
-| `crypto_rsi_scanner.event_alpha.radar.integrated_radar` | `EventIntegratedRadarResult` | 88 | true |  |
+| `crypto_rsi_scanner.event_alpha.radar.evidence.legacy_acquisition` | `EvidenceAcquisitionResult` | 120 | true |  |
+| `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.legacy` | `EventImpactHypothesis` | 191 | true |  |
+| `crypto_rsi_scanner.event_alpha.radar.integrated.legacy` | `EventIntegratedRadarResult` | 88 | true |  |
 | `crypto_rsi_scanner.event_alpha.radar.llm.budget` | `EventLLMBudgetRunTracker` | 95 | true |  |
 | `crypto_rsi_scanner.event_alpha.radar.pipeline` | `EventAlphaPipelineResult` | 245 | true |  |
 | `crypto_rsi_scanner.event_alpha.radar.source_coverage` | `EventAlphaSourceCoverageReport` | 143 | true |  |
@@ -153,23 +153,23 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.cli.services.event_alpha_outcomes` | `event_alpha_export_burn_in_pack` | 159 | true |
 | `crypto_rsi_scanner.cli.services.event_alpha_research` | `event_alpha_cycle` | 251 | true |
 | `crypto_rsi_scanner.event_alpha.artifacts.alert_store` | `_snapshot_from_route_decision` | 168 | false |
-| `crypto_rsi_scanner.event_alpha.artifacts.daily_brief` | `build_daily_brief` | 884 | true |
+| `crypto_rsi_scanner.event_alpha.artifacts.daily_brief.legacy` | `build_daily_brief` | 884 | true |
 | `crypto_rsi_scanner.event_alpha.artifacts.locks` | `acquire_run_lock` | 174 | true |
 | `crypto_rsi_scanner.event_alpha.artifacts.opportunity_audit` | `format_opportunity_audit` | 227 | true |
-| `crypto_rsi_scanner.event_alpha.artifacts.research_cards` | `render_research_card` | 220 | true |
-| `crypto_rsi_scanner.event_alpha.artifacts.research_cards` | `_core_score_components` | 168 | false |
-| `crypto_rsi_scanner.event_alpha.artifacts.research_cards` | `_impact_hypothesis_lines` | 223 | false |
+| `crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy` | `render_research_card` | 220 | true |
+| `crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy` | `_core_score_components` | 168 | false |
+| `crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy` | `_impact_hypothesis_lines` | 223 | false |
 | `crypto_rsi_scanner.event_alpha.artifacts.run_ledger` | `format_run_ledger_report` | 159 | true |
 | `crypto_rsi_scanner.event_alpha.artifacts.run_ledger` | `_run_record` | 219 | false |
-| `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` | `diagnose_artifacts` | 1335 | true |
-| `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` | `_integrated_radar_artifact_conflicts` | 218 | false |
-| `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` | `_notification_delivery_conflicts` | 251 | false |
-| `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` | `format_artifact_doctor_report` | 462 | true |
+| `crypto_rsi_scanner.event_alpha.doctor.legacy_artifact_doctor` | `diagnose_artifacts` | 1335 | true |
+| `crypto_rsi_scanner.event_alpha.doctor.legacy_artifact_doctor` | `_integrated_radar_artifact_conflicts` | 218 | false |
+| `crypto_rsi_scanner.event_alpha.doctor.legacy_artifact_doctor` | `_notification_delivery_conflicts` | 251 | false |
+| `crypto_rsi_scanner.event_alpha.doctor.legacy_artifact_doctor` | `format_artifact_doctor_report` | 462 | true |
 | `crypto_rsi_scanner.event_alpha.notifications.go_no_go` | `build_go_no_go` | 159 | true |
 | `crypto_rsi_scanner.event_alpha.notifications.inbox` | `build_notification_inbox` | 186 | true |
-| `crypto_rsi_scanner.event_alpha.notifications.pipeline` | `select_research_review_candidates_with_diagnostics` | 156 | true |
-| `crypto_rsi_scanner.event_alpha.notifications.pipeline` | `write_notification_plan_preview` | 190 | true |
-| `crypto_rsi_scanner.event_alpha.notifications.pipeline` | `send_notifications` | 406 | true |
+| `crypto_rsi_scanner.event_alpha.notifications.pipeline_legacy` | `select_research_review_candidates_with_diagnostics` | 156 | true |
+| `crypto_rsi_scanner.event_alpha.notifications.pipeline_legacy` | `write_notification_plan_preview` | 190 | true |
+| `crypto_rsi_scanner.event_alpha.notifications.pipeline_legacy` | `send_notifications` | 406 | true |
 | `crypto_rsi_scanner.event_alpha.notifications.provider_status` | `build_event_discovery_provider_status` | 229 | true |
 | `crypto_rsi_scanner.event_alpha.notifications.readiness` | `build_send_readiness` | 193 | true |
 | `crypto_rsi_scanner.event_alpha.notifications.router` | `_route_entry` | 220 | false |
@@ -179,20 +179,20 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.providers.live_provider_readiness` | `_provider_rows` | 429 | false |
 | `crypto_rsi_scanner.event_alpha.providers.source_registry` | `source_descriptor_for` | 246 | true |
 | `crypto_rsi_scanner.event_alpha.providers.source_registry` | `assess_source` | 158 | true |
-| `crypto_rsi_scanner.event_alpha.radar.core_opportunity_store` | `_row_from_core_opportunity` | 406 | false |
+| `crypto_rsi_scanner.event_alpha.radar.core.legacy_store` | `_row_from_core_opportunity` | 406 | false |
 | `crypto_rsi_scanner.event_alpha.radar.derivatives_crowding` | `normalize_derivatives_state` | 166 | true |
 | `crypto_rsi_scanner.event_alpha.radar.discovery` | `run_manual_discovery` | 244 | true |
 | `crypto_rsi_scanner.event_alpha.radar.discovery` | `load_discovery_events` | 183 | true |
-| `crypto_rsi_scanner.event_alpha.radar.evidence_acquisition` | `_execute_request` | 167 | false |
-| `crypto_rsi_scanner.event_alpha.radar.evidence_acquisition` | `_validate_raw_result` | 170 | false |
-| `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses` | `validate_hypotheses_with_raw_events` | 152 | true |
-| `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses` | `format_impact_hypothesis_report` | 158 | true |
-| `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses` | `_hypothesis_from_rule` | 199 | false |
+| `crypto_rsi_scanner.event_alpha.radar.evidence.legacy_acquisition` | `_execute_request` | 167 | false |
+| `crypto_rsi_scanner.event_alpha.radar.evidence.legacy_acquisition` | `_validate_raw_result` | 170 | false |
+| `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.legacy` | `validate_hypotheses_with_raw_events` | 152 | true |
+| `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.legacy` | `format_impact_hypothesis_report` | 158 | true |
+| `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.legacy` | `_hypothesis_from_rule` | 199 | false |
 | `crypto_rsi_scanner.event_alpha.radar.impact_path_validator` | `validate_impact_path` | 181 | true |
 | `crypto_rsi_scanner.event_alpha.radar.impact_path_validator` | `_classify_path` | 271 | false |
-| `crypto_rsi_scanner.event_alpha.radar.integrated_radar` | `run_integrated_radar_cycle` | 288 | true |
-| `crypto_rsi_scanner.event_alpha.radar.integrated_radar` | `format_integrated_daily_brief` | 154 | true |
-| `crypto_rsi_scanner.event_alpha.radar.integrated_radar` | `_merge_family` | 245 | false |
+| `crypto_rsi_scanner.event_alpha.radar.integrated.legacy` | `run_integrated_radar_cycle` | 288 | true |
+| `crypto_rsi_scanner.event_alpha.radar.integrated.legacy` | `format_integrated_daily_brief` | 154 | true |
+| `crypto_rsi_scanner.event_alpha.radar.integrated.legacy` | `_merge_family` | 245 | false |
 | `crypto_rsi_scanner.event_alpha.radar.market_confirmation` | `evaluate_market_confirmation` | 281 | true |
 | `crypto_rsi_scanner.event_alpha.radar.near_miss` | `_refresh_one_hypothesis` | 276 | false |
 | `crypto_rsi_scanner.event_alpha.radar.near_miss` | `_candidate_from_row` | 158 | false |
@@ -206,4 +206,4 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.radar.watchlist` | `_entry_from_hypothesis` | 352 | false |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist` | `_entry_from_row` | 164 | false |
 | `crypto_rsi_scanner.event_providers.cryptopanic` | `CryptoPanicProvider._fetch_live_events` | 158 | false |
-| `crypto_rsi_scanner.refactor_final_report` | `build_refactor_final_report` | 161 | true |
+| `crypto_rsi_scanner.refactor_final_report` | `build_refactor_final_report` | 172 | true |

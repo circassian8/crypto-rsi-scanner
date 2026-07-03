@@ -34,7 +34,7 @@
     "modules_with_multiple_public_classes_count": 81,
     "path": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
     "present": true,
-    "public_class_count": 397
+    "public_class_count": 401
   },
   "cli_event_alpha_service_lines": 46,
   "cli_flag_snapshot_path": "research/CLI_FLAG_SNAPSHOT.json",
@@ -98,11 +98,27 @@
     "passed": 2,
     "status": "blocked"
   },
-  "generated_at": "2026-07-03T02:07:22+00:00",
+  "generated_at": "2026-07-03T02:22:22+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
   ],
+  "large_event_alpha_split_line_counts": {
+    "core_opportunity_store_legacy": 2607,
+    "core_opportunity_store_wrapper": 14,
+    "daily_brief_legacy": 3080,
+    "daily_brief_wrapper": 32,
+    "evidence_acquisition_legacy": 2045,
+    "evidence_acquisition_wrapper": 14,
+    "impact_hypotheses_legacy": 3758,
+    "impact_hypotheses_wrapper": 14,
+    "integrated_radar_legacy": 3401,
+    "integrated_radar_wrapper": 32,
+    "notifications_pipeline_legacy": 4326,
+    "notifications_pipeline_wrapper": 49,
+    "research_cards_legacy": 3416,
+    "research_cards_wrapper": 14
+  },
   "legacy_artifact_doctor_core_lines": 6363,
   "legacy_artifact_doctor_core_note": "Behavior-compatible doctor implementation preserved while public artifact_doctor.py is the small orchestrator.",
   "legacy_unregistered": 0,

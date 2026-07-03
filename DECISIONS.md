@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-03 - Large Event Alpha internals use wrapper plus legacy-core split
+**Status:** accepted
+**Decision:** The largest Event Alpha internals now expose small public wrappers
+or packages while preserving behavior in legacy cores. New implementation logic
+belongs in the focused module homes under `notifications/`,
+`artifacts/research_cards/`, `artifacts/daily_brief/`, `radar/integrated/`,
+`radar/impact_hypotheses/`, `radar/core/`, and `radar/evidence/`. The
+compatibility cores remain only to preserve current behavior while individual
+models, renderers, writers, selectors, and sections are migrated behind tests.
+**Why:** This makes the package ownership measurable without changing
+notification gates, delivery ledger schema, card copy, daily-brief grouping,
+integrated radar lane policy, provider guards, source coverage, route gates, or
+research-only safety invariants.
+**Revisit when:** a focused migration can move one section/helper family out of
+the legacy core with byte/semantic artifact comparisons or fixture tests.
+
 ## 2026-07-03 - Artifact doctor public orchestrator accepted with legacy core
 **Status:** accepted
 **Decision:** `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` is the

@@ -10,7 +10,7 @@ import re
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
-from ... import (
+from .... import (
     event_artifact_paths,
     event_alpha_router,
     event_core_opportunities,
@@ -24,7 +24,7 @@ from ... import (
     event_watchlist,
     event_watchlist_monitor,
 )
-from . import reason_text as event_alpha_reason_text
+from .. import reason_text as event_alpha_reason_text
 
 
 @dataclass(frozen=True)

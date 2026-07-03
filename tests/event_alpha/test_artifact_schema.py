@@ -65,6 +65,79 @@ def test_artifact_module_import_shims_match_new_package_paths():
     assert old_namespace_status.EventAlphaNamespaceStatus is new_namespace_status.EventAlphaNamespaceStatus
 
 
+def test_large_event_alpha_internal_modules_have_small_public_wrappers():
+    import inspect
+    from pathlib import Path
+
+    from crypto_rsi_scanner import (
+        event_alpha_daily_brief as old_daily_brief,
+        event_core_opportunity_store as old_core_store,
+        event_evidence_acquisition as old_evidence,
+        event_impact_hypotheses as old_hypotheses,
+        event_integrated_radar as old_integrated,
+        event_research_cards as old_research_cards,
+    )
+    from crypto_rsi_scanner.event_alpha.artifacts import daily_brief, research_cards
+    from crypto_rsi_scanner.event_alpha.artifacts.daily_brief import builder as daily_builder
+    from crypto_rsi_scanner.event_alpha.artifacts.research_cards import renderer as card_renderer
+    from crypto_rsi_scanner.event_alpha.notifications import (
+        delivery_writer,
+        heartbeat,
+        message_rendering,
+        models as notification_models,
+        pipeline,
+        preview_writer,
+        research_review_selection,
+        skip_telemetry,
+    )
+    from crypto_rsi_scanner.event_alpha.radar import (
+        core_opportunity_store,
+        evidence_acquisition,
+        impact_hypotheses,
+        integrated_radar,
+    )
+    from crypto_rsi_scanner.event_alpha.radar.core import models as core_models
+    from crypto_rsi_scanner.event_alpha.radar.evidence import models as evidence_models
+    from crypto_rsi_scanner.event_alpha.radar.impact_hypotheses import models as hypothesis_models
+    from crypto_rsi_scanner.event_alpha.radar.integrated import models as integrated_models
+
+    root = Path(__file__).resolve().parents[2]
+    assert sum(1 for _ in (root / "crypto_rsi_scanner/event_alpha/notifications/pipeline.py").open()) < 1500
+    assert sum(1 for _ in (root / "crypto_rsi_scanner/event_alpha/artifacts/research_cards/__init__.py").open()) < 300
+    assert sum(1 for _ in (root / "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/__init__.py").open()) < 300
+    assert sum(1 for _ in (root / "crypto_rsi_scanner/event_alpha/radar/integrated_radar.py").open()) < 300
+    assert sum(1 for _ in (root / "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/__init__.py").open()) < 300
+    assert sum(1 for _ in (root / "crypto_rsi_scanner/event_alpha/radar/core_opportunity_store.py").open()) < 300
+    assert sum(1 for _ in (root / "crypto_rsi_scanner/event_alpha/radar/evidence_acquisition.py").open()) < 300
+
+    assert len(inspect.getsourcelines(pipeline.send_notifications)[0]) < 120
+    assert len(inspect.getsourcelines(pipeline.write_notification_plan_preview)[0]) < 100
+    assert len(inspect.getsourcelines(pipeline.select_research_review_candidates_with_diagnostics)[0]) < 100
+    assert len(inspect.getsourcelines(daily_brief.build_daily_brief)[0]) < 120
+    assert len(inspect.getsourcelines(integrated_radar.run_integrated_radar_cycle)[0]) < 150
+
+    assert old_research_cards.render_research_card is research_cards.render_research_card
+    assert old_daily_brief.build_daily_brief is daily_brief.build_daily_brief
+    assert old_integrated.run_integrated_radar_cycle is integrated_radar.run_integrated_radar_cycle
+    assert old_hypotheses.EventImpactHypothesis is impact_hypotheses.EventImpactHypothesis
+    assert old_core_store.write_core_opportunities is core_opportunity_store.write_core_opportunities
+    assert old_evidence.run_evidence_acquisition is evidence_acquisition.run_evidence_acquisition
+
+    assert notification_models.EventAlphaNotificationPlan is pipeline.EventAlphaNotificationPlan
+    assert delivery_writer._DeliveryWriter is pipeline._DeliveryWriter
+    assert preview_writer.write_notification_plan_preview is not pipeline.write_notification_plan_preview
+    assert research_review_selection.select_research_review_candidates_with_diagnostics is not pipeline.select_research_review_candidates_with_diagnostics
+    assert skip_telemetry.EventAlphaResearchReviewSkippedItem is pipeline.EventAlphaResearchReviewSkippedItem
+    assert heartbeat.format_health_heartbeat is pipeline.format_health_heartbeat
+    assert message_rendering.format_preview is pipeline.format_preview
+    assert card_renderer.render_research_card is research_cards.render_research_card
+    assert daily_builder.build_daily_brief is not daily_brief.build_daily_brief
+    assert integrated_models.EventIntegratedRadarResult is integrated_radar.EventIntegratedRadarResult
+    assert hypothesis_models.EventImpactHypothesis is impact_hypotheses.EventImpactHypothesis
+    assert core_models.EventCoreOpportunityStoreWriteResult is core_opportunity_store.EventCoreOpportunityStoreWriteResult
+    assert evidence_models.EvidenceAcquisitionResult is evidence_acquisition.EvidenceAcquisitionResult
+
+
 def test_event_alpha_split_runner_and_make_target_are_wired():
     import subprocess
     import sys

@@ -34,6 +34,14 @@ Current phase:
   orchestrator/export surface. Behavior-compatible legacy internals are
   preserved in `crypto_rsi_scanner.event_alpha.doctor.legacy_artifact_doctor`
   until individual checks are migrated into focused doctor plugins.
+- Large internal Event Alpha modules now follow the same wrapper/core pattern:
+  public wrappers remain at `notifications.pipeline`,
+  `artifacts.research_cards`, `artifacts.daily_brief`,
+  `radar.integrated_radar`, `radar.impact_hypotheses`,
+  `radar.core_opportunity_store`, and `radar.evidence_acquisition`; behavior
+  cores are preserved as `pipeline_legacy`, `research_cards.legacy`,
+  `daily_brief.legacy`, `integrated.legacy`, `impact_hypotheses.legacy`,
+  `core.legacy_store`, and `evidence.legacy_acquisition`.
 
 Run `make event-alpha-shim-report PYTHON=python3` to write
 `event_alpha_shim_report.json` and `event_alpha_shim_report.md` under the
