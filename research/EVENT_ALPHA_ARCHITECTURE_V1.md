@@ -20,8 +20,9 @@ layout gives new code a home while old import paths continue to work.
 - `crypto_rsi_scanner/event_alpha/outcomes/`: integrated outcomes,
   calibration, feedback readiness/eval export, burn-in, quality review,
   signal-quality, priors, and policy simulation.
-- `crypto_rsi_scanner/event_alpha/doctor/`: schema doctor, check registry, and
-  compatibility doctor layers.
+- `crypto_rsi_scanner/event_alpha/doctor/`: schema doctor, check registry,
+  plugin check modules, report sections, namespace/safety/consistency phases,
+  and the public artifact-doctor orchestrator.
 - `crypto_rsi_scanner/event_alpha/namespace/`: namespace status and lifecycle
   reporting.
 - `crypto_rsi_scanner/event_alpha/config/`: Event Alpha profiles, preflight,
@@ -108,6 +109,15 @@ The artifact doctor is schema-first: it inspects namespace lifecycle state,
 validates schema v1 structure, runs schema safety checks, then runs legacy and
 consistency checks. Doctor checks that depend on fields must declare schema
 dependencies in the check registry.
+
+The public artifact doctor entrypoint is intentionally small:
+`event_alpha.doctor.artifact_doctor` re-exports compatibility helpers and routes
+`diagnose_artifacts()` through `execution.py` plus `context.py`, `discovery.py`,
+and `aggregation.py`. Report rendering enters through
+`doctor/report_sections/summary.py`, with focused section modules available for
+future migrations. The behavior-compatible core is preserved as
+`event_alpha.doctor.legacy_artifact_doctor` until each remaining check can move
+behind fixture-backed plugin tests without changing strict/WARN semantics.
 
 Artifact implementation code now lives in package modules:
 

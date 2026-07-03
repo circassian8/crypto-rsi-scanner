@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-03 — Split artifact doctor public orchestration · Codex
+**Why:** The top-level doctor shim was already clean, but the package-level
+artifact doctor still concentrated result models, execution, report rendering,
+and legacy check wiring in one large module. The refactor needed to reduce the
+public package entrypoint without changing doctor output semantics.
+**Changes:**
+- Moved the behavior-compatible implementation to
+  `crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py` and made
+  `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py` a 41-line public
+  orchestrator/export surface.
+- Added focused doctor modules for context, discovery, execution, aggregation,
+  result/counter/issue/status models, report sections, and secret-check plugin
+  scaffolding while preserving old result constructor patterns, attributes,
+  `to_dict()`, `from_dict()`, `add_blocker(...)`, `add_warning(...)`, and
+  compatibility exports.
+- Tightened the check-registry public-source baseline to
+  `legacy_unregistered=0` with a ceiling of 2, and updated tests to assert the
+  public package doctor is small while the preserved legacy core remains tracked
+  explicitly.
+- Refreshed `research/REFACTOR_FINAL_REPORT.md/json`, root report copies,
+  architecture docs, module map, roadmap, and decisions with the public
+  orchestrator versus legacy-core ownership split.
+**Verify:** `python3 tests/test_indicators.py` (737/737);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha/test_artifact_doctor.py
+tests/event_alpha/test_artifact_schema.py
+tests/event_alpha/test_namespace_lifecycle.py -q` (85 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3` (OK/no warnings); `make
+event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`
+(WARN/no blockers); `make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep STRICT=1 PYTHON=python3` (STALE/no blockers);
+`make event-alpha-doctor-check-registry PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** This is intentionally behavior-preserving: the compatibility
+core is still 6,363 lines and should be burned down in smaller fixture-backed
+plugin migrations. No live provider calls, live sends, trading, paper trading,
+RSI signal writes, or Event Alpha `TRIGGERED_FADE` creation were added.
+
 ## 2026-07-03 — Finish Event Alpha module migration ownership · Codex
 **Why:** The remaining top-level Event Alpha implementation holdouts needed
 package homes and the shared event clock/models needed neutral ownership without

@@ -641,7 +641,9 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["line_counts"]["tests/test_indicators.py"] < 2000
     assert payload["line_counts"]["crypto_rsi_scanner/scanner.py"] > 6500
     assert payload["line_counts"]["crypto_rsi_scanner/event_alpha_artifact_doctor.py"] < 100
-    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"] > 1500
+    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"] < 1500
+    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"] > 1500
+    assert payload["legacy_artifact_doctor_core_lines"] == payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"]
     assert payload["line_counts"]["crypto_rsi_scanner/cli/services/event_alpha.py"] < 1500
     assert payload["active_shims"] >= 115
     assert payload["partial_shims"] == 0
@@ -666,7 +668,7 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
         for row in payload["blockers"]
     )
     assert not any(row["path"] == "crypto_rsi_scanner/event_alpha_artifact_doctor.py" for row in payload["blockers"])
-    assert any(row["path"] == "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py" for row in payload["blockers"])
+    assert not any(row["path"] == "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py" for row in payload["blockers"])
     phases = {row["phase"]: row["policy"] for row in payload["deprecation_plan"]}
     assert "v1" in phases and "active compatibility shims" in phases["v1"]
     assert "v2" in phases and "warn in development mode only" in phases["v2"]

@@ -30,6 +30,10 @@ Current phase:
 - `crypto_rsi_scanner.event_alpha_artifact_doctor` is now an active
   compatibility shim; the implementation lives in
   `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor`.
+- `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` is the small public
+  orchestrator/export surface. Behavior-compatible legacy internals are
+  preserved in `crypto_rsi_scanner.event_alpha.doctor.legacy_artifact_doctor`
+  until individual checks are migrated into focused doctor plugins.
 
 Run `make event-alpha-shim-report PYTHON=python3` to write
 `event_alpha_shim_report.json` and `event_alpha_shim_report.md` under the

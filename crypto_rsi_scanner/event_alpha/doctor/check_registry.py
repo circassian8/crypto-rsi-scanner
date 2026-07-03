@@ -44,10 +44,10 @@ CATEGORIES: tuple[str, ...] = (
 )
 SEVERITIES: tuple[str, ...] = ("blocker", "warning", "info")
 
-# Current unmigrated legacy append-site ceiling in event_alpha_artifact_doctor.py.
-# The check-registry target fails if this grows, forcing new checks to declare a
-# registry entry and use a registry id in output.
-LEGACY_UNREGISTERED_BASELINE = 15
+# Public artifact_doctor.py is now an orchestrator. The check-registry target
+# still allows a tiny temporary ceiling for compatibility glue, but new checks
+# must declare a registry entry before emitting output.
+LEGACY_UNREGISTERED_BASELINE = 2
 
 
 @dataclass(frozen=True)

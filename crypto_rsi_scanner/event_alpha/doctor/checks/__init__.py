@@ -10,6 +10,7 @@ __all__ = [
     "paths",
     "provider_readiness",
     "safety",
+    "secrets",
     "source_coverage",
     "stale_artifacts",
 ]

@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-03T01:56:36+00:00`
+- generated_at: `2026-07-03T02:07:22+00:00`
 - gate_status: `blocked`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -34,6 +34,8 @@ Research-only refactor gate report. This report does not call providers, send Te
 - cli_event_alpha_service_lines: `46`
 - parser_build_parser_lines: `25`
 - commands_event_alpha_handle_lines: `2`
+- legacy_artifact_doctor_core_lines: `6363`
+- legacy_artifact_doctor_core_note: Behavior-compatible doctor implementation preserved while public artifact_doctor.py is the small orchestrator.
 - cli_flag_snapshot_path: `research/CLI_FLAG_SNAPSHOT.json`
 - scanner_command_body_functions_remaining: `105`
 - remaining_implementation_modules_by_package_target: `{}`
@@ -76,31 +78,17 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 ## Doctor Plugin Migration
 
-- legacy_unregistered: `15`
+- legacy_unregistered: `0`
 - legacy_unregistered_target: `5`
-- legacy_unregistered_status: `documented_blocker`
-- plugin_check_counts: `{"integrated_radar": 3, "namespace": 1, "notifications": 1, "outcomes": 1, "paths": 1, "provider_readiness": 2, "safety": 1, "source_coverage": 1, "stale_artifacts": 1}`
+- legacy_unregistered_status: `pass`
+- plugin_check_counts: `{"integrated_radar": 3, "namespace": 1, "notifications": 1, "outcomes": 1, "paths": 1, "provider_readiness": 2, "safety": 1, "secrets": 0, "source_coverage": 1, "stale_artifacts": 1}`
 - migrated_this_run: `29`
 
 ### Remaining Legacy-Unregistered Doctor Sites
 
 | check | next plugin | reason |
 |---|---|---|
-| `missing_operational_run_rows` | `namespace.py or stale_artifacts.py` | Run-row absence drives strict doctor status and needs fixture coverage before registry migration. |
-| `snapshot_availability_lineage_warnings` | `integrated_radar.py` | Snapshot availability distinguishes fixture, external, stale, and strict operational rows. |
-| `orphan_alert_snapshot_run_ids` | `integrated_radar.py` | Alert snapshot lineage counters are compatibility-sensitive in strict and non-strict modes. |
-| `legacy_alert_snapshot_lineage` | `stale_artifacts.py` | Legacy rows are intentionally tolerated in some scopes and blocked in others. |
-| `feedback_without_matching_alert_snapshot` | `outcomes.py` | Feedback lineage severity depends on strict mode and latest-run filtering. |
-| `outcomes_without_matching_alert_snapshot` | `outcomes.py` | Outcome lineage severity depends on strict mode and legacy artifact scope. |
-| `mixed_artifact_namespaces` | `namespace.py` | Namespace-mixing behavior must preserve strict blocker versus warning semantics. |
-| `multiple_artifact_namespaces_present` | `namespace.py` | Multiple namespaces are tolerated in audit modes but not strict current-run checks. |
-| `multiple_profiles_present` | `namespace.py` | Profile-mixing is currently warning-only and should stay compatible. |
-| `provider_health_missing_for_live_profile` | `provider_readiness.py` | Provider health rows are required only for selected live/burn-in profile families. |
-| `llm_budget_rows_missing_for_llm_profile` | `provider_readiness.py` | Budget telemetry is warning-only for LLM profiles and must not block no-key paths. |
-| `invalid_canonical_incident_rows` | `integrated_radar.py` | Incident linkage counters are shared with integrated-radar/card consistency checks. |
-| `alertable_run_external_snapshot_path` | `paths.py` | External snapshot paths are blockers for operational rows but allowed for some fixture rows. |
-| `fixture_snapshot_external_allowed` | `paths.py` | Fixture external snapshot rows remain warning-only under current doctor semantics. |
-| `snapshot_availability_unknown_or_missing` | `integrated_radar.py` | Unknown or missing snapshot availability depends on run_mode and strictness. |
+| none | none | none |
 
 ## Namespace And CI
 
@@ -116,12 +104,6 @@ Research-only refactor gate report. This report does not call providers, send Te
 - blocker_reason: scanner.py still contains many historical Event Alpha command bodies and runtime config adapters that were only partially routed through cli/dispatch.py.
 - next_migration_module: `crypto_rsi_scanner/cli/commands_event_alpha.py plus service modules for remaining scanner-bound command bodies`
 - risk: Broad scanner command extraction can change CLI defaults, Make target behavior, provider guardrails, or research-only side-effect gates if moved without command snapshots.
-
-### `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py`
-
-- blocker_reason: legacy_unregistered doctor append sites remain above the requested <=5 target.
-- next_migration_module: `crypto_rsi_scanner/event_alpha/doctor/checks/safety.py and integrated_radar.py`
-- risk: Moving the last imperative checks without enough fixtures can change blocker/WARN semantics.
 
 ### `crypto_rsi_scanner/cli/services/event_alpha.py`
 

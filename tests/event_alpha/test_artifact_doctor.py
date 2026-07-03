@@ -12,6 +12,38 @@ globals().update({
 })
 
 
+def test_event_alpha_artifact_doctor_public_entrypoints_are_split():
+    import inspect
+
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    from crypto_rsi_scanner.event_alpha.doctor import (
+        aggregation,
+        artifact_doctor,
+        check_registry,
+        context,
+        discovery,
+        execution,
+        result,
+    )
+    from crypto_rsi_scanner.event_alpha.doctor.checks import secrets
+    from crypto_rsi_scanner.event_alpha.doctor.report_sections import summary
+
+    assert artifact_doctor.diagnose_artifacts is execution.diagnose_artifacts
+    assert event_alpha_artifact_doctor.diagnose_artifacts is execution.diagnose_artifacts
+    assert artifact_doctor.format_artifact_doctor_report is summary.format_artifact_doctor_report
+    assert artifact_doctor.EventAlphaArtifactDoctorResult is result.EventAlphaArtifactDoctorResult
+    assert hasattr(artifact_doctor, "_read_jsonl")
+    assert hasattr(artifact_doctor, "event_alpha_shims")
+
+    assert len(inspect.getsourcelines(execution.diagnose_artifacts)[0]) < 150
+    assert len(inspect.getsourcelines(summary.format_artifact_doctor_report)[0]) < 80
+    assert check_registry.legacy_unregistered_count() == 0
+    assert context.build_doctor_context().args == ()
+    assert discovery.discover_namespace_artifacts(context.build_doctor_context()).kwargs == {}
+    assert aggregation.determine_doctor_status(SimpleNamespace(blockers=(), warnings=())) == "OK"
+    assert secrets.secret_leak_count(({"api_key": "redacted"},)) == 1
+
+
 def test_event_alpha_doctor_check_plugins_emit_regression_messages():
     from crypto_rsi_scanner.event_alpha.doctor.checks import (
         integrated_radar,

@@ -50,6 +50,7 @@ TRACKED_LINE_COUNT_PATHS = tuple(
         (
             *MAJOR_TARGETS,
             "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py",
+            "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py",
             "crypto_rsi_scanner/cli/services/event_alpha.py",
             "crypto_rsi_scanner/cli/parser.py",
             "crypto_rsi_scanner/cli/commands_event_alpha.py",
@@ -470,6 +471,7 @@ def build_refactor_final_report(
         "crypto_rsi_scanner/cli/commands_event_alpha.py",
         "handle",
     )
+    legacy_doctor_core_lines = current_counts.get("crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py")
     legacy_unregistered = int(registry_summary.get("legacy_unregistered") or 0)
     doctor_plugin_migration = {
         "plugin_check_counts": _doctor_plugin_check_counts(root),
@@ -544,6 +546,11 @@ def build_refactor_final_report(
         "cli_service_line_counts": cli_service_line_counts,
         "parser_build_parser_lines": parser_build_parser_lines,
         "commands_event_alpha_handle_lines": commands_event_alpha_handle_lines,
+        "legacy_artifact_doctor_core_lines": legacy_doctor_core_lines,
+        "legacy_artifact_doctor_core_note": (
+            "Behavior-compatible doctor implementation preserved while public "
+            "artifact_doctor.py is the small orchestrator."
+        ),
         "cli_flag_snapshot_path": "research/CLI_FLAG_SNAPSHOT.json",
         "scanner_command_body_functions_remaining": len(scanner_command_bodies),
         "scanner_command_body_function_names": scanner_command_bodies,
@@ -641,6 +648,8 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             f"- cli_event_alpha_service_lines: `{data['cli_event_alpha_service_lines']}`",
             f"- parser_build_parser_lines: `{data.get('parser_build_parser_lines')}`",
             f"- commands_event_alpha_handle_lines: `{data.get('commands_event_alpha_handle_lines')}`",
+            f"- legacy_artifact_doctor_core_lines: `{data.get('legacy_artifact_doctor_core_lines')}`",
+            f"- legacy_artifact_doctor_core_note: {data.get('legacy_artifact_doctor_core_note')}",
             f"- cli_flag_snapshot_path: `{data.get('cli_flag_snapshot_path')}`",
             f"- scanner_command_body_functions_remaining: `{data['scanner_command_body_functions_remaining']}`",
             f"- remaining_implementation_modules_by_package_target: `{json.dumps(data.get('remaining_implementation_modules_by_package_target', {}), sort_keys=True)}`",

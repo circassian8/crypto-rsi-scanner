@@ -14,12 +14,6 @@
       "risk": "Broad scanner command extraction can change CLI defaults, Make target behavior, provider guardrails, or research-only side-effect gates if moved without command snapshots."
     },
     {
-      "blocker_reason": "legacy_unregistered doctor append sites remain above the requested <=5 target.",
-      "next_migration_module": "crypto_rsi_scanner/event_alpha/doctor/checks/safety.py and integrated_radar.py",
-      "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py",
-      "risk": "Moving the last imperative checks without enough fixtures can change blocker/WARN semantics."
-    },
-    {
       "blocker_reason": "cli service bind_scanner_globals call sites were not reduced by the requested 50%.",
       "next_migration_module": "Replace scanner-global dependencies in the split Event Alpha service modules with explicit imports and focused dispatch monkeypatch tests.",
       "path": "crypto_rsi_scanner/cli/services/event_alpha.py",
@@ -80,9 +74,9 @@
     }
   ],
   "doctor_plugin_migration": {
-    "legacy_unregistered": 15,
-    "legacy_unregistered_note": "Remaining imperative doctor append sites are documented for the next plugin migration batch.",
-    "legacy_unregistered_status": "documented_blocker",
+    "legacy_unregistered": 0,
+    "legacy_unregistered_note": "",
+    "legacy_unregistered_status": "pass",
     "legacy_unregistered_target": 5,
     "migrated_this_run": 29,
     "plugin_check_counts": {
@@ -93,103 +87,31 @@
       "paths": 1,
       "provider_readiness": 2,
       "safety": 1,
+      "secrets": 0,
       "source_coverage": 1,
       "stale_artifacts": 1
     },
-    "remaining_legacy_unregistered_details": [
-      {
-        "check": "missing_operational_run_rows",
-        "next_plugin": "namespace.py or stale_artifacts.py",
-        "reason": "Run-row absence drives strict doctor status and needs fixture coverage before registry migration."
-      },
-      {
-        "check": "snapshot_availability_lineage_warnings",
-        "next_plugin": "integrated_radar.py",
-        "reason": "Snapshot availability distinguishes fixture, external, stale, and strict operational rows."
-      },
-      {
-        "check": "orphan_alert_snapshot_run_ids",
-        "next_plugin": "integrated_radar.py",
-        "reason": "Alert snapshot lineage counters are compatibility-sensitive in strict and non-strict modes."
-      },
-      {
-        "check": "legacy_alert_snapshot_lineage",
-        "next_plugin": "stale_artifacts.py",
-        "reason": "Legacy rows are intentionally tolerated in some scopes and blocked in others."
-      },
-      {
-        "check": "feedback_without_matching_alert_snapshot",
-        "next_plugin": "outcomes.py",
-        "reason": "Feedback lineage severity depends on strict mode and latest-run filtering."
-      },
-      {
-        "check": "outcomes_without_matching_alert_snapshot",
-        "next_plugin": "outcomes.py",
-        "reason": "Outcome lineage severity depends on strict mode and legacy artifact scope."
-      },
-      {
-        "check": "mixed_artifact_namespaces",
-        "next_plugin": "namespace.py",
-        "reason": "Namespace-mixing behavior must preserve strict blocker versus warning semantics."
-      },
-      {
-        "check": "multiple_artifact_namespaces_present",
-        "next_plugin": "namespace.py",
-        "reason": "Multiple namespaces are tolerated in audit modes but not strict current-run checks."
-      },
-      {
-        "check": "multiple_profiles_present",
-        "next_plugin": "namespace.py",
-        "reason": "Profile-mixing is currently warning-only and should stay compatible."
-      },
-      {
-        "check": "provider_health_missing_for_live_profile",
-        "next_plugin": "provider_readiness.py",
-        "reason": "Provider health rows are required only for selected live/burn-in profile families."
-      },
-      {
-        "check": "llm_budget_rows_missing_for_llm_profile",
-        "next_plugin": "provider_readiness.py",
-        "reason": "Budget telemetry is warning-only for LLM profiles and must not block no-key paths."
-      },
-      {
-        "check": "invalid_canonical_incident_rows",
-        "next_plugin": "integrated_radar.py",
-        "reason": "Incident linkage counters are shared with integrated-radar/card consistency checks."
-      },
-      {
-        "check": "alertable_run_external_snapshot_path",
-        "next_plugin": "paths.py",
-        "reason": "External snapshot paths are blockers for operational rows but allowed for some fixture rows."
-      },
-      {
-        "check": "fixture_snapshot_external_allowed",
-        "next_plugin": "paths.py",
-        "reason": "Fixture external snapshot rows remain warning-only under current doctor semantics."
-      },
-      {
-        "check": "snapshot_availability_unknown_or_missing",
-        "next_plugin": "integrated_radar.py",
-        "reason": "Unknown or missing snapshot availability depends on run_mode and strictness."
-      }
-    ]
+    "remaining_legacy_unregistered_details": []
   },
   "gate_summary": {
-    "blocked": 3,
+    "blocked": 2,
     "passed": 2,
     "status": "blocked"
   },
-  "generated_at": "2026-07-03T01:56:36+00:00",
+  "generated_at": "2026-07-03T02:07:22+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
   ],
-  "legacy_unregistered": 15,
+  "legacy_artifact_doctor_core_lines": 6363,
+  "legacy_artifact_doctor_core_note": "Behavior-compatible doctor implementation preserved while public artifact_doctor.py is the small orchestrator.",
+  "legacy_unregistered": 0,
   "line_counts": {
     "crypto_rsi_scanner/cli/commands_event_alpha.py": 14,
     "crypto_rsi_scanner/cli/parser.py": 225,
     "crypto_rsi_scanner/cli/services/event_alpha.py": 46,
-    "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 6363,
+    "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 41,
+    "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py": 6363,
     "crypto_rsi_scanner/event_alpha_artifact_doctor.py": 19,
     "crypto_rsi_scanner/scanner.py": 7744,
     "tests/test_indicators.py": 1771
@@ -295,6 +217,7 @@
     "paths": 1,
     "provider_readiness": 2,
     "safety": 1,
+    "secrets": 0,
     "source_coverage": 1,
     "stale_artifacts": 1
   },

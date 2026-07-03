@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-03 - Artifact doctor public orchestrator accepted with legacy core
+**Status:** accepted
+**Decision:** `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` is the
+small public artifact-doctor orchestrator/export surface. New doctor logic must
+land in focused modules such as `execution.py`, `context.py`, `discovery.py`,
+`aggregation.py`, `result.py`, `counters.py`, `issues.py`, `status.py`,
+`report_sections/`, and `checks/`. The behavior-compatible core remains in
+`crypto_rsi_scanner.event_alpha.doctor.legacy_artifact_doctor` until individual
+checks are migrated behind regression fixtures.
+**Why:** This meets the public size and registry gates while preserving doctor
+output semantics, counter names, stale namespace behavior, schema counters,
+strict/WARN handling, old imports, and old result constructor patterns.
+**Revisit when:** a focused migration can move one legacy check family into a
+plugin without changing `format_artifact_doctor_report()` output or strict mode
+status for existing fixture namespaces.
+
 ## 2026-07-03 - Event Alpha module migration finished with neutral event_core
 **Status:** accepted
 **Decision:** Remaining Event Alpha-specific top-level implementation modules
