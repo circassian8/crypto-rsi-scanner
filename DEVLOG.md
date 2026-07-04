@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Register multi-class model bundles in refactor gates · Codex
+**Why:** The class ownership report still counted every module with multiple
+public classes as unresolved debt, even when the module only held small
+dataclasses, enums, protocols, or result/config objects. Refactor v3 needed a
+measurable distinction between accepted model bundles and behaviorful
+multi-class modules.
+**Changes:**
+- Added an explicit accepted model-bundle registry to
+  `crypto_rsi_scanner/refactor_class_ownership_report.py` with generated
+  metadata for module path, class names, reason, max class line count, and
+  `accepted=true`.
+- Split the report fields into `multi_public_class_modules`,
+  `accepted_model_bundles`, and `unresolved_multi_class_modules`; the legacy
+  `modules_with_multiple_public_classes_count` now reflects unresolved modules.
+- Updated v3, size, and final refactor gates so a new unregistered multi-class
+  production module becomes a blocker, while registered model bundles stay
+  visible but resolved.
+- Added static tests proving accepted model-bundle detection and unregistered
+  multi-class module blocking.
+- Regenerated `research/REFACTOR_CLASS_OWNERSHIP_REPORT.md/json`,
+  `research/REFACTOR_SIZE_GATES.md/json`,
+  `research/REFACTOR_V3_CONTRACT.md/json`, and
+  `research/REFACTOR_FINAL_REPORT.md/json`.
+**Verify:** Passed `python3 tests/test_indicators.py` (`749/749 passed`);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (`760 passed`); `python3 -m compileall
+-q crypto_rsi_scanner tests`; `make refactor-class-ownership-report
+PYTHON=python3`; `make refactor-final-report PYTHON=python3`; and `make verify
+PYTHON=python3`.
+**Notes/risks:** Behavior-preserving static gate change only. Current counters:
+`multi_public_class_modules_count=80`, `accepted_model_bundles_count=79`,
+`unresolved_multi_class_modules_count=0`,
+`modules_with_multiple_public_classes_count=0`, and
+`public_classes_not_in_own_module=0`. No live provider calls, live Telegram
+sends, trading, paper-trading behavior changes, execution/order logic, Event
+Alpha RSI writes, or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Reduce class ownership debt to storage mixin exceptions · Codex
 **Why:** Refactor v3 still had advisory class ownership debt in provider
 adapters, OpenAI LLM providers, CoinGecko client paths, and canonical asset

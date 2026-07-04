@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-04 - Multi-class production modules require model-bundle registration
+**Status:** accepted
+**Decision:** Production modules may contain multiple public classes only when
+they are explicitly registered as accepted model bundles or documented module
+exceptions. The class ownership report must publish
+`multi_public_class_modules`, `accepted_model_bundles`, and
+`unresolved_multi_class_modules`; refactor gates treat unresolved modules as
+blockers while keeping accepted bundles visible for review.
+**Why:** A raw count mixed small dataclasses/enums/protocol DTOs with
+behaviorful modules, making the gate noisy. Explicit registration preserves old
+imports and behavior while making future unregistered multi-class modules fail
+the refactor gate.
+**Revisit when:** a registered bundle gains behaviorful public classes,
+contains a class over the advisory line limit, or a package split can preserve
+imports with low risk.
+
 ## 2026-07-04 - Storage mixins remain the only oversized class exceptions
 **Status:** accepted
 **Decision:** After the provider, LLM, CoinGecko, and canonical asset class

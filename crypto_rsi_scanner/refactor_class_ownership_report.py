@@ -27,14 +27,97 @@ DEFAULT_CLASS_LINE_LIMIT = 75
 DEFAULT_FUNCTION_LINE_LIMIT = 150
 
 MODULE_EXCEPTIONS = {
-    "crypto_rsi_scanner.event_core.models": (
-        "Shared event-research dataclass bundle. Multiple tiny value objects may remain together in "
-        "models.py during v1."
-    ),
     "crypto_rsi_scanner.event_fade": (
         "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because "
         "TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     ),
+}
+
+MODEL_BUNDLE_REASON = (
+    "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; "
+    "all classes remain below the class-size limit."
+)
+
+ACCEPTED_MODEL_BUNDLE_MODULES = {
+    "crypto_rsi_scanner.backups",
+    "crypto_rsi_scanner.event_alpha.artifacts.alert_store.models",
+    "crypto_rsi_scanner.event_alpha.artifacts.alerts",
+    "crypto_rsi_scanner.event_alpha.artifacts.cache",
+    "crypto_rsi_scanner.event_alpha.artifacts.locks",
+    "crypto_rsi_scanner.event_alpha.artifacts.replay",
+    "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.models",
+    "crypto_rsi_scanner.event_alpha.artifacts.retention",
+    "crypto_rsi_scanner.event_alpha.artifacts.run_ledger",
+    "crypto_rsi_scanner.event_alpha.config.health_guard",
+    "crypto_rsi_scanner.event_alpha.config.v1_readiness",
+    "crypto_rsi_scanner.event_alpha.doctor.environment",
+    "crypto_rsi_scanner.event_alpha.notifications.delivery",
+    "crypto_rsi_scanner.event_alpha.notifications.inbox.models",
+    "crypto_rsi_scanner.event_alpha.notifications.legacy.delivery_models",
+    "crypto_rsi_scanner.event_alpha.notifications.provider_status",
+    "crypto_rsi_scanner.event_alpha.notifications.recipient_check",
+    "crypto_rsi_scanner.event_alpha.notifications.router",
+    "crypto_rsi_scanner.event_alpha.notifications.runs",
+    "crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor",
+    "crypto_rsi_scanner.event_alpha.outcomes.burn_in",
+    "crypto_rsi_scanner.event_alpha.outcomes.feedback",
+    "crypto_rsi_scanner.event_alpha.outcomes.feedback_labels",
+    "crypto_rsi_scanner.event_alpha.outcomes.policy_simulator",
+    "crypto_rsi_scanner.event_alpha.outcomes.priors",
+    "crypto_rsi_scanner.event_alpha.outcomes.quality.models",
+    "crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight",
+    "crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight",
+    "crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness",
+    "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
+    "crypto_rsi_scanner.event_alpha.providers.official_exchange_activation",
+    "crypto_rsi_scanner.event_alpha.providers.provider_health_legacy",
+    "crypto_rsi_scanner.event_alpha.providers.source_registry",
+    "crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight",
+    "crypto_rsi_scanner.event_alpha.radar.anomaly_state",
+    "crypto_rsi_scanner.event_alpha.radar.catalyst_search.models",
+    "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
+    "crypto_rsi_scanner.event_alpha.radar.claim_semantics",
+    "crypto_rsi_scanner.event_alpha.radar.core.models",
+    "crypto_rsi_scanner.event_alpha.radar.core_opportunities",
+    "crypto_rsi_scanner.event_alpha.radar.evidence.models",
+    "crypto_rsi_scanner.event_alpha.radar.evidence_quality",
+    "crypto_rsi_scanner.event_alpha.radar.graph",
+    "crypto_rsi_scanner.event_alpha.radar.identity",
+    "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.models",
+    "crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store",
+    "crypto_rsi_scanner.event_alpha.radar.impact_path_validator",
+    "crypto_rsi_scanner.event_alpha.radar.incident_graph",
+    "crypto_rsi_scanner.event_alpha.radar.incidents.models",
+    "crypto_rsi_scanner.event_alpha.radar.llm.analyzer",
+    "crypto_rsi_scanner.event_alpha.radar.llm.budget",
+    "crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames",
+    "crypto_rsi_scanner.event_alpha.radar.llm.evidence_planner",
+    "crypto_rsi_scanner.event_alpha.radar.llm.extraction_models",
+    "crypto_rsi_scanner.event_alpha.radar.llm.extractor",
+    "crypto_rsi_scanner.event_alpha.radar.llm.models",
+    "crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner",
+    "crypto_rsi_scanner.event_alpha.radar.market_confirmation",
+    "crypto_rsi_scanner.event_alpha.radar.market_reaction",
+    "crypto_rsi_scanner.event_alpha.radar.missed",
+    "crypto_rsi_scanner.event_alpha.radar.near_miss.models",
+    "crypto_rsi_scanner.event_alpha.radar.opportunity_verdict",
+    "crypto_rsi_scanner.event_alpha.radar.pipeline",
+    "crypto_rsi_scanner.event_alpha.radar.playbooks",
+    "crypto_rsi_scanner.event_alpha.radar.price_history",
+    "crypto_rsi_scanner.event_alpha.radar.source_coverage.models",
+    "crypto_rsi_scanner.event_alpha.radar.source_enrichment",
+    "crypto_rsi_scanner.event_alpha.radar.validation.models",
+    "crypto_rsi_scanner.event_alpha.radar.watchlist.models",
+    "crypto_rsi_scanner.event_alpha.radar.watchlist_enrichment",
+    "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
+    "crypto_rsi_scanner.event_alpha.shims",
+    "crypto_rsi_scanner.event_core.models",
+    "crypto_rsi_scanner.event_providers.base",
+    "crypto_rsi_scanner.llm_providers.base",
+    "crypto_rsi_scanner.llm_providers.fixture",
+    "crypto_rsi_scanner.ops",
+    "crypto_rsi_scanner.refactor_class_ownership_report",
+    "crypto_rsi_scanner.signal_registry",
 }
 
 ACCEPTED_CLASS_EXCEPTIONS: dict[str, dict[str, str]] = {
@@ -239,14 +322,12 @@ def build_report(
     classes, functions = _collect_source_rows(package_root, repo_root=repo_root)
     public_classes = [row for row in classes if row.public]
     classes_by_module = Counter(row.module for row in public_classes)
-    modules_with_multiple_public_classes = [
-        {
-            "module": module,
-            "public_class_count": count,
-            "exception_reason": MODULE_EXCEPTIONS.get(module),
-        }
-        for module, count in sorted(classes_by_module.items())
-        if count > 1
+    multi_public_class_modules = _multi_public_class_module_rows(public_classes, classes_by_module)
+    accepted_model_bundles = [
+        row for row in multi_public_class_modules if row.get("resolution") == "accepted_model_bundle"
+    ]
+    unresolved_multi_class_modules = [
+        row for row in multi_public_class_modules if row.get("resolution") == "unresolved"
     ]
     long_classes = [
         _class_row_with_exception(row)
@@ -277,7 +358,8 @@ def build_report(
         root=repo_root,
         shim_dependency_report=_shim_dependency_report_snapshot(repo_root),
         class_ownership_report={
-            "modules_with_multiple_public_classes": modules_with_multiple_public_classes,
+            "modules_with_multiple_public_classes": unresolved_multi_class_modules,
+            "unresolved_multi_class_modules": unresolved_multi_class_modules,
             "accepted_class_exceptions_count": len(accepted_class_exceptions),
             "functions_over_limit_count": len(long_functions),
         },
@@ -316,16 +398,24 @@ def build_report(
         "storage_mixin_exception_status": _storage_mixin_exception_status(classes, long_classes),
         "near_threshold_file_status": _near_threshold_file_status(package_root, repo_root=repo_root),
         "near_threshold_file_status_floor": NEAR_THRESHOLD_LINE_FLOOR,
-        "modules_with_multiple_public_classes_status": "documented_advisory",
-        "modules_with_multiple_public_classes_revisit_condition": (
-            "Reduce package model/helper modules opportunistically when changing them; do not churn "
-            "stable compatibility modules solely to reduce this advisory count."
+        "modules_with_multiple_public_classes_status": (
+            "pass" if not unresolved_multi_class_modules else "blocked_unregistered_modules"
         ),
-        "modules_with_multiple_public_classes_count": len(modules_with_multiple_public_classes),
+        "modules_with_multiple_public_classes_revisit_condition": (
+            "Register tiny model bundles explicitly or split behaviorful public classes before adding "
+            "new multi-class production modules."
+        ),
+        "modules_with_multiple_public_classes_count": len(unresolved_multi_class_modules),
+        "multi_public_class_modules_count": len(multi_public_class_modules),
+        "accepted_model_bundles_count": len(accepted_model_bundles),
+        "unresolved_multi_class_modules_count": len(unresolved_multi_class_modules),
         "public_classes_by_module": dict(sorted(classes_by_module.items())),
         "classes_over_limit": long_classes,
         "functions_over_limit": long_functions,
-        "modules_with_multiple_public_classes": modules_with_multiple_public_classes,
+        "multi_public_class_modules": multi_public_class_modules,
+        "accepted_model_bundles": accepted_model_bundles,
+        "unresolved_multi_class_modules": unresolved_multi_class_modules,
+        "modules_with_multiple_public_classes": unresolved_multi_class_modules,
         "legacy_files_over_1500_lines": legacy_inventory["legacy_files_over_1500_lines"],
         "legacy_files_over_3000_lines": legacy_inventory["legacy_files_over_3000_lines"],
         "legacy_total_lines": legacy_inventory["legacy_total_lines"],
@@ -344,8 +434,11 @@ def build_report(
         "exceptions": exception_rows,
         "policy": {
             "public_class_over_75_lines": "should live in its own module unless documented here",
-            "multiple_public_classes": "allowed for small value objects/enums in documented models modules",
+            "multiple_public_classes": (
+                "blocker unless the module is registered as an accepted model bundle or module exception"
+            ),
             "internal_helper_class_over_75_lines": "should be split or documented",
+            "new_multi_public_class_module": "fails refactor gates unless registered as a model bundle",
         },
     }
 
@@ -383,6 +476,47 @@ def _provider_class_split_status(
             }
         )
     return sorted(rows, key=lambda item: (str(item["class_name"]), str(item["module"])))
+
+
+def _multi_public_class_module_rows(
+    public_classes: Iterable[ClassOwnershipRow],
+    classes_by_module: Counter[str],
+) -> list[dict[str, Any]]:
+    class_rows_by_module: dict[str, list[ClassOwnershipRow]] = {}
+    for row in public_classes:
+        class_rows_by_module.setdefault(row.module, []).append(row)
+
+    rows: list[dict[str, Any]] = []
+    for module, count in sorted(classes_by_module.items()):
+        if count <= 1:
+            continue
+        module_classes = sorted(class_rows_by_module.get(module, []), key=lambda row: row.qualname)
+        class_names = [row.qualname for row in module_classes]
+        max_line_count = max((row.line_count for row in module_classes), default=0)
+        model_bundle_reason = MODEL_BUNDLE_REASON if module in ACCEPTED_MODEL_BUNDLE_MODULES else ""
+        exception_reason = MODULE_EXCEPTIONS.get(module) or ""
+        accepted_model_bundle = bool(model_bundle_reason)
+        rows.append(
+            {
+                "module": module,
+                "public_class_count": count,
+                "class_names": class_names,
+                "max_class_line_count": max_line_count,
+                "accepted": accepted_model_bundle,
+                "accepted_model_bundle": accepted_model_bundle,
+                "model_bundle_reason": model_bundle_reason,
+                "reason": model_bundle_reason or exception_reason,
+                "exception_reason": exception_reason,
+                "resolution": (
+                    "accepted_model_bundle"
+                    if accepted_model_bundle
+                    else "module_exception"
+                    if exception_reason
+                    else "unresolved"
+                ),
+            }
+        )
+    return rows
 
 
 def _shim_dependency_report_snapshot(repo_root: Path) -> dict[str, Any]:
@@ -493,6 +627,9 @@ def format_report(report: dict[str, Any]) -> str:
         f"- functions_over_150_lines: `{report.get('functions_over_150_lines', 0)}`",
         f"- modules_with_multiple_public_classes_count: `{report.get('modules_with_multiple_public_classes_count', 0)}`",
         f"- modules_with_multiple_public_classes_status: `{report.get('modules_with_multiple_public_classes_status')}`",
+        f"- multi_public_class_modules_count: `{report.get('multi_public_class_modules_count', 0)}`",
+        f"- accepted_model_bundles_count: `{report.get('accepted_model_bundles_count', 0)}`",
+        f"- unresolved_multi_class_modules_count: `{report.get('unresolved_multi_class_modules_count', 0)}`",
         f"- legacy_decomposition_gate_status: `{report.get('legacy_decomposition_gate_status')}`",
         f"- legacy_classes_over_limit: `{report.get('legacy_classes_over_limit', 0)}`",
         f"- legacy_functions_over_limit: `{report.get('legacy_functions_over_limit', 0)}`",
@@ -501,7 +638,7 @@ def format_report(report: dict[str, Any]) -> str:
         "## Policy",
         "",
         "- Every public class over 75 lines should live in its own module unless documented as an exception.",
-        "- Multiple tiny value objects/enums may live in `models.py` only when documented.",
+        "- Multiple tiny value objects/enums/protocol DTOs may live together only when registered as accepted model bundles.",
         "- Internal helper classes over 75 lines should also be split or documented.",
         "- Refactor v3 expects public classes to live in their own modules unless the module is a documented model bundle.",
         "- Refactor v3 keeps accepted class exceptions pending until each exception is reaccepted for the v3 removal phase.",
@@ -581,18 +718,7 @@ def format_report(report: dict[str, Any]) -> str:
     ])
     for row in _limit_rows(report.get("largest_legacy_files"), 40):
         lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
-    lines.extend([
-        "",
-        "## Modules With Multiple Public Classes",
-        "",
-        "| module | public classes | exception |",
-        "|---|---:|---|",
-    ])
-    for row in _limit_rows(report.get("modules_with_multiple_public_classes"), 80):
-        lines.append(
-            f"| `{row.get('module')}` | {row.get('public_class_count', 0)} | "
-            f"{row.get('exception_reason') or ''} |"
-        )
+    _append_multi_class_sections(lines, report)
     lines.extend([
         "",
         "## Classes Over 75 Lines",
@@ -619,6 +745,51 @@ def format_report(report: dict[str, Any]) -> str:
             f"{str(bool(row.get('public'))).lower()} |"
     )
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _append_multi_class_sections(lines: list[str], report: dict[str, Any]) -> None:
+    lines.extend([
+        "",
+        "## Accepted Model Bundles",
+        "",
+        "| module | classes | max class lines | accepted | reason |",
+        "|---|---:|---:|---:|---|",
+    ])
+    for row in _limit_rows(report.get("accepted_model_bundles"), 120):
+        lines.append(
+            f"| `{row.get('module')}` | {row.get('public_class_count', 0)} | "
+            f"{row.get('max_class_line_count', 0)} | {str(bool(row.get('accepted'))).lower()} | "
+            f"{row.get('reason') or ''} |"
+        )
+    lines.extend([
+        "",
+        "## Unresolved Multi-Class Modules",
+        "",
+        "| module | public classes | max class lines | reason |",
+        "|---|---:|---:|---|",
+    ])
+    unresolved_rows = list(_limit_rows(report.get("unresolved_multi_class_modules"), 120))
+    if unresolved_rows:
+        for row in unresolved_rows:
+            lines.append(
+                f"| `{row.get('module')}` | {row.get('public_class_count', 0)} | "
+                f"{row.get('max_class_line_count', 0)} | {row.get('reason') or ''} |"
+            )
+    else:
+        lines.append("| none | 0 | 0 | all current multi-class modules are registered or explicitly excepted |")
+    lines.extend([
+        "",
+        "## Multi-Public-Class Module Inventory",
+        "",
+        "| module | public classes | max class lines | resolution | reason |",
+        "|---|---:|---:|---|---|",
+    ])
+    for row in _limit_rows(report.get("multi_public_class_modules"), 120):
+        lines.append(
+            f"| `{row.get('module')}` | {row.get('public_class_count', 0)} | "
+            f"{row.get('max_class_line_count', 0)} | {row.get('resolution') or ''} | "
+            f"{row.get('reason') or ''} |"
+        )
 
 
 def _append_v3_class_gate_section(lines: list[str], report: dict[str, Any]) -> None:

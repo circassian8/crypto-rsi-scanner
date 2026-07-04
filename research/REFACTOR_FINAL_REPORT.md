@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T20:31:24+00:00`
+- generated_at: `2026-07-04T20:53:52+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `115`
@@ -51,7 +51,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 - class_ownership_functions_over_limit: `0`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
-- modules_with_multiple_public_classes_status: `documented_advisory`
+- modules_with_multiple_public_classes_status: `pass`
 - production_size_gate_status: `pass`
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
@@ -73,7 +73,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 - v3_contract_path: `research/REFACTOR_V3_CONTRACT.md`
 - v3_gate_status: `pending`
 - v3_auto_accept_ready: `False`
-- v3_auto_accept_blockers: `["production_files_over_1200_lines", "public_classes_not_in_own_module", "class_exceptions_remaining"]`
+- v3_auto_accept_blockers: `["production_files_over_1200_lines", "class_exceptions_remaining"]`
 
 | gate | value | severity |
 |---|---:|---|
@@ -85,7 +85,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `deleted_shims` | 115 | informational |
 | `production_files_over_1200_lines` | 15 | target_gap |
 | `production_files_over_1500_lines` | 0 | blocker |
-| `public_classes_not_in_own_module` | 80 | blocker |
+| `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | blocker_until_reaccepted_for_v3 |
 | `functions_over_150_lines` | 0 | blocker |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
@@ -143,8 +143,8 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1223 |
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
+| `crypto_rsi_scanner/refactor_final_report.py` | 1166 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 1155 |
-| `crypto_rsi_scanner/refactor_final_report.py` | 1151 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py` | 1145 |
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 1135 |
 | `crypto_rsi_scanner/cli/services/legacy/rsi_scan.py` | 1103 |
@@ -186,7 +186,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `tests/rsi/test_indicators_core.py` | 694 |
 | `tests/rsi/test_backtest.py` | 561 |
 | `tests/rsi/test_paper_risk.py` | 379 |
-| `tests/event_alpha/test_shim_registry.py` | 245 |
+| `tests/event_alpha/test_shim_registry.py` | 278 |
 | `tests/cli/test_parser.py` | 243 |
 | `tests/event_alpha/test_legacy_import_compatibility.py` | 170 |
 | `tests/cli/test_event_alpha_command_registry.py` | 163 |
@@ -203,8 +203,11 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
-- modules_with_multiple_public_classes_status: `documented_advisory`
-- modules_with_multiple_public_classes_revisit_condition: Reduce package model/helper modules opportunistically when changing them; do not churn stable compatibility modules solely to reduce this advisory count.
+- modules_with_multiple_public_classes_status: `pass`
+- multi_public_class_modules_count: `80`
+- accepted_model_bundles_count: `79`
+- unresolved_multi_class_modules_count: `0`
+- modules_with_multiple_public_classes_revisit_condition: Register tiny model bundles explicitly or split behaviorful public classes before adding new multi-class production modules.
 
 ### Provider Class Split Status
 

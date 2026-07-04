@@ -241,5 +241,38 @@ def test_refactor_class_ownership_report_static_inventory():
     assert report["no_live_provider_calls"] is True
     assert report["no_sends_trades_paper_rsi_or_triggered_fade"] is True
     assert "crypto_rsi_scanner.event_core.models" in report["public_classes_by_module"]
-    assert any(row["module"] == "crypto_rsi_scanner.event_core.models" for row in report["exceptions"])
     assert any(row["module"] == "crypto_rsi_scanner.event_fade" for row in report["exceptions"])
+    bundles = {row["module"]: row for row in report["accepted_model_bundles"]}
+    assert "crypto_rsi_scanner.event_core.models" in bundles
+    assert bundles["crypto_rsi_scanner.event_core.models"]["accepted"] is True
+    assert bundles["crypto_rsi_scanner.event_core.models"]["class_names"]
+    assert bundles["crypto_rsi_scanner.event_core.models"]["max_class_line_count"] <= 75
+    assert report["multi_public_class_modules_count"] >= report["accepted_model_bundles_count"]
+    assert report["modules_with_multiple_public_classes_count"] == report["unresolved_multi_class_modules_count"]
+    assert report["unresolved_multi_class_modules_count"] == 0
+
+
+def test_refactor_class_ownership_report_flags_unregistered_multi_class_module(tmp_path):
+    from crypto_rsi_scanner import refactor_class_ownership_report
+
+    package_dir = tmp_path / "crypto_rsi_scanner"
+    package_dir.mkdir()
+    (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    (package_dir / "behaviorful_bundle.py").write_text(
+        "class FirstService:\n"
+        "    def run(self):\n"
+        "        return 'first'\n\n"
+        "class SecondService:\n"
+        "    def run(self):\n"
+        "        return 'second'\n",
+        encoding="utf-8",
+    )
+
+    report = refactor_class_ownership_report.build_report(root=tmp_path)
+
+    assert report["accepted_model_bundles_count"] == 0
+    assert report["modules_with_multiple_public_classes_count"] == 1
+    assert report["unresolved_multi_class_modules_count"] == 1
+    assert report["modules_with_multiple_public_classes_status"] == "blocked_unregistered_modules"
+    assert report["unresolved_multi_class_modules"][0]["module"] == "crypto_rsi_scanner.behaviorful_bundle"
+    assert report["unresolved_multi_class_modules"][0]["resolution"] == "unresolved"

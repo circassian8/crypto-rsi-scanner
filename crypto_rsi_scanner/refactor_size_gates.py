@@ -157,46 +157,7 @@ def build_inventory(
         else ("warning" if production_files_over_1500 else "pass")
     )
     test_size_gate_status = "warning" if test_files_over_1500 else "pass"
-    violations = []
-    violations.extend(
-        {
-            "violation_id": f"file:{row['path']}",
-            "category": "file_over_1500_lines",
-            "severity": "warning",
-            **row,
-        }
-        for row in long_files
-    )
-    violations.extend(
-        {
-            "violation_id": f"class:{row['source_path']}:{row['qualname']}",
-            "category": "class_over_75_lines",
-            "severity": "warning",
-            **row,
-        }
-        for row in class_report.get("classes_over_limit", [])
-        if isinstance(row, dict)
-    )
-    violations.extend(
-        {
-            "violation_id": f"function:{row['source_path']}:{row['qualname']}",
-            "category": "function_over_150_lines",
-            "severity": "warning",
-            **row,
-        }
-        for row in class_report.get("functions_over_limit", [])
-        if isinstance(row, dict)
-    )
-    violations.extend(
-        {
-            "violation_id": f"public_classes:{row['module']}",
-            "category": "public_classes_sharing_module",
-            "severity": "warning",
-            **row,
-        }
-        for row in class_report.get("modules_with_multiple_public_classes", [])
-        if isinstance(row, dict)
-    )
+    violations = _ownership_violation_rows(long_files, class_report)
     violation_ids = sorted({row["violation_id"] for row in violations})
     return {
         "file_line_limit": file_line_limit,
@@ -243,14 +204,65 @@ def build_inventory(
         "modules_with_multiple_public_classes_count": int(
             class_report.get("modules_with_multiple_public_classes_count", 0)
         ),
+        "multi_public_class_modules_count": int(class_report.get("multi_public_class_modules_count", 0)),
+        "accepted_model_bundles_count": int(class_report.get("accepted_model_bundles_count", 0)),
+        "unresolved_multi_class_modules_count": int(class_report.get("unresolved_multi_class_modules_count", 0)),
         "files_over_limit": long_files,
         "classes_over_limit": class_report.get("classes_over_limit", []),
         "functions_over_limit": class_report.get("functions_over_limit", []),
+        "multi_public_class_modules": class_report.get("multi_public_class_modules", []),
+        "accepted_model_bundles": class_report.get("accepted_model_bundles", []),
+        "unresolved_multi_class_modules": class_report.get("unresolved_multi_class_modules", []),
         "modules_with_multiple_public_classes": class_report.get("modules_with_multiple_public_classes", []),
         **legacy_inventory,
         "violations": violations,
         "violation_ids": violation_ids,
     }
+
+
+def _ownership_violation_rows(long_files: Iterable[Mapping[str, Any]], class_report: Mapping[str, Any]) -> list[dict[str, Any]]:
+    violations: list[dict[str, Any]] = []
+    violations.extend(
+        {
+            "violation_id": f"file:{row['path']}",
+            "category": "file_over_1500_lines",
+            "severity": "warning",
+            **row,
+        }
+        for row in long_files
+    )
+    violations.extend(
+        {
+            "violation_id": f"class:{row['source_path']}:{row['qualname']}",
+            "category": "class_over_75_lines",
+            "severity": "warning",
+            **row,
+        }
+        for row in class_report.get("classes_over_limit", [])
+        if isinstance(row, dict)
+    )
+    violations.extend(
+        {
+            "violation_id": f"function:{row['source_path']}:{row['qualname']}",
+            "category": "function_over_150_lines",
+            "severity": "warning",
+            **row,
+        }
+        for row in class_report.get("functions_over_limit", [])
+        if isinstance(row, dict)
+    )
+    unresolved = class_report.get("unresolved_multi_class_modules", class_report.get("modules_with_multiple_public_classes", []))
+    violations.extend(
+        {
+            "violation_id": f"public_classes:{row['module']}",
+            "category": "public_classes_sharing_module",
+            "severity": "warning",
+            **row,
+        }
+        for row in unresolved
+        if isinstance(row, dict)
+    )
+    return violations
 
 
 def build_baseline(*, root: str | Path | None = None) -> dict[str, Any]:
@@ -387,6 +399,9 @@ def format_gate_report(report: dict[str, Any]) -> str:
         f"- remaining_class_ownership_debt_count: `{report.get('remaining_class_ownership_debt_count', 0)}`",
         f"- modules_with_multiple_public_classes_count: `{report.get('modules_with_multiple_public_classes_count', 0)}`",
         f"- modules_with_multiple_public_classes_status: `{report.get('modules_with_multiple_public_classes_status')}`",
+        f"- multi_public_class_modules_count: `{report.get('multi_public_class_modules_count', 0)}`",
+        f"- accepted_model_bundles_count: `{report.get('accepted_model_bundles_count', 0)}`",
+        f"- unresolved_multi_class_modules_count: `{report.get('unresolved_multi_class_modules_count', 0)}`",
         f"- new_violation_count: `{report.get('new_violation_count', 0)}`",
         f"- moved_existing_violation_count: `{report.get('moved_existing_violation_count', 0)}`",
         f"- legacy_decomposition_gate_status: `{report.get('legacy_decomposition_gate_status')}`",
@@ -409,6 +424,7 @@ def format_gate_report(report: dict[str, Any]) -> str:
         "- Test file size debt is tracked separately and does not block production refactor completion.",
         "- Legacy implementation files over 1,500 lines are warnings.",
         "- Legacy implementation files over 3,000 lines block refactor-complete status.",
+        "- New production modules with multiple public classes are blockers unless registered as accepted model bundles.",
         "- Baseline updates require the explicit `make refactor-size-baseline-update` target.",
         "",
         "## New Violations",

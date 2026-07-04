@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T20:30:50.154244+00:00`
+- generated_at: `2026-07-04T20:53:23.946946+00:00`
 - public_class_count: `408`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `0`
@@ -12,11 +12,14 @@ Static source inventory only. This report does not call providers, send Telegram
 - remaining_class_ownership_debt_count: `0`
 - v3_gate_status: `pending`
 - v3_auto_accept_ready: `False`
-- public_classes_not_in_own_module: `80`
+- public_classes_not_in_own_module: `0`
 - class_exceptions_remaining: `3`
 - functions_over_150_lines: `0`
-- modules_with_multiple_public_classes_count: `80`
-- modules_with_multiple_public_classes_status: `documented_advisory`
+- modules_with_multiple_public_classes_count: `0`
+- modules_with_multiple_public_classes_status: `pass`
+- multi_public_class_modules_count: `80`
+- accepted_model_bundles_count: `79`
+- unresolved_multi_class_modules_count: `0`
 - legacy_decomposition_gate_status: `pass`
 - legacy_classes_over_limit: `0`
 - legacy_functions_over_limit: `0`
@@ -25,7 +28,7 @@ Static source inventory only. This report does not call providers, send Telegram
 ## Policy
 
 - Every public class over 75 lines should live in its own module unless documented as an exception.
-- Multiple tiny value objects/enums may live in `models.py` only when documented.
+- Multiple tiny value objects/enums/protocol DTOs may live together only when registered as accepted model bundles.
 - Internal helper classes over 75 lines should also be split or documented.
 - Refactor v3 expects public classes to live in their own modules unless the module is a documented model bundle.
 - Refactor v3 keeps accepted class exceptions pending until each exception is reaccepted for the v3 removal phase.
@@ -43,7 +46,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `deleted_shims` | 115 | informational |
 | `production_files_over_1200_lines` | 15 | target_gap |
 | `production_files_over_1500_lines` | 0 | blocker |
-| `public_classes_not_in_own_module` | 80 | blocker |
+| `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | blocker_until_reaccepted_for_v3 |
 | `functions_over_150_lines` | 0 | blocker |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
@@ -51,7 +54,6 @@ Static source inventory only. This report does not call providers, send Telegram
 
 ## Exceptions
 
-- `crypto_rsi_scanner.event_core.models`: Shared event-research dataclass bundle. Multiple tiny value objects may remain together in models.py during v1.
 - `crypto_rsi_scanner.event_fade`: Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade.
 
 ## Accepted Class Exceptions
@@ -125,90 +127,180 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` | 16 |
 | `crypto_rsi_scanner/event_providers/binance_announcements/legacy.py` | 12 |
 
-## Modules With Multiple Public Classes
+## Accepted Model Bundles
 
-| module | public classes | exception |
-|---|---:|---|
-| `crypto_rsi_scanner.backups` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.artifacts.alert_store.models` | 4 |  |
-| `crypto_rsi_scanner.event_alpha.artifacts.alerts` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.artifacts.cache` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.artifacts.locks` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.artifacts.replay` | 4 |  |
-| `crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.models` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.artifacts.retention` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.artifacts.run_ledger` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.config.health_guard` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.config.v1_readiness` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.doctor.environment` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.notifications.delivery` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.notifications.inbox.models` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.notifications.legacy.delivery_models` | 6 |  |
-| `crypto_rsi_scanner.event_alpha.notifications.provider_status` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.notifications.recipient_check` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.notifications.router` | 5 |  |
-| `crypto_rsi_scanner.event_alpha.notifications.runs` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.outcomes.burn_in` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.outcomes.feedback` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.outcomes.feedback_labels` | 4 |  |
-| `crypto_rsi_scanner.event_alpha.outcomes.policy_simulator` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.outcomes.priors` | 4 |  |
-| `crypto_rsi_scanner.event_alpha.outcomes.quality.models` | 9 |  |
-| `crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.providers.live_provider_readiness` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.providers.official_exchange_activation` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.providers.provider_health_legacy` | 7 |  |
-| `crypto_rsi_scanner.event_alpha.providers.source_registry` | 6 |  |
-| `crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.radar.anomaly_state` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.radar.catalyst_search.models` | 7 |  |
-| `crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers` | 8 |  |
-| `crypto_rsi_scanner.event_alpha.radar.claim_semantics` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.radar.core.models` | 7 |  |
-| `crypto_rsi_scanner.event_alpha.radar.core_opportunities` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.radar.evidence.models` | 7 |  |
-| `crypto_rsi_scanner.event_alpha.radar.evidence_quality` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.radar.graph` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.radar.identity` | 6 |  |
-| `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.models` | 6 |  |
-| `crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.radar.impact_path_validator` | 4 |  |
-| `crypto_rsi_scanner.event_alpha.radar.incident_graph` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.radar.incidents.models` | 4 |  |
-| `crypto_rsi_scanner.event_alpha.radar.llm.analyzer` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.radar.llm.budget` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames` | 5 |  |
-| `crypto_rsi_scanner.event_alpha.radar.llm.evidence_planner` | 7 |  |
-| `crypto_rsi_scanner.event_alpha.radar.llm.extraction_models` | 8 |  |
-| `crypto_rsi_scanner.event_alpha.radar.llm.extractor` | 4 |  |
-| `crypto_rsi_scanner.event_alpha.radar.llm.models` | 8 |  |
-| `crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.radar.market_confirmation` | 4 |  |
-| `crypto_rsi_scanner.event_alpha.radar.market_reaction` | 5 |  |
-| `crypto_rsi_scanner.event_alpha.radar.missed` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.radar.near_miss.models` | 4 |  |
-| `crypto_rsi_scanner.event_alpha.radar.opportunity_verdict` | 6 |  |
-| `crypto_rsi_scanner.event_alpha.radar.pipeline` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.radar.playbooks` | 3 |  |
-| `crypto_rsi_scanner.event_alpha.radar.price_history` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.radar.source_coverage.models` | 2 |  |
-| `crypto_rsi_scanner.event_alpha.radar.source_enrichment` | 9 |  |
-| `crypto_rsi_scanner.event_alpha.radar.validation.models` | 10 |  |
-| `crypto_rsi_scanner.event_alpha.radar.watchlist.models` | 5 |  |
-| `crypto_rsi_scanner.event_alpha.radar.watchlist_enrichment` | 9 |  |
-| `crypto_rsi_scanner.event_alpha.radar.watchlist_market` | 4 |  |
-| `crypto_rsi_scanner.event_alpha.shims` | 3 |  |
-| `crypto_rsi_scanner.event_core.models` | 7 | Shared event-research dataclass bundle. Multiple tiny value objects may remain together in models.py during v1. |
-| `crypto_rsi_scanner.event_fade` | 11 | Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade. |
-| `crypto_rsi_scanner.event_providers.base` | 2 |  |
-| `crypto_rsi_scanner.llm_providers.base` | 5 |  |
-| `crypto_rsi_scanner.llm_providers.fixture` | 4 |  |
-| `crypto_rsi_scanner.ops` | 5 |  |
-| `crypto_rsi_scanner.refactor_class_ownership_report` | 2 |  |
-| `crypto_rsi_scanner.signal_registry` | 2 |  |
+| module | classes | max class lines | accepted | reason |
+|---|---:|---:|---:|---|
+| `crypto_rsi_scanner.backups` | 3 | 25 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.alert_store.models` | 4 | 10 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.alerts` | 3 | 59 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.cache` | 3 | 11 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.locks` | 3 | 24 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.replay` | 4 | 16 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.models` | 2 | 5 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.retention` | 2 | 8 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.run_ledger` | 2 | 4 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.config.health_guard` | 2 | 10 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.config.v1_readiness` | 2 | 11 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.doctor.environment` | 2 | 10 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.delivery` | 3 | 50 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.inbox.models` | 3 | 34 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.legacy.delivery_models` | 6 | 37 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.provider_status` | 2 | 21 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.recipient_check` | 2 | 9 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.router` | 5 | 24 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.runs` | 2 | 4 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor` | 2 | 21 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.outcomes.burn_in` | 3 | 24 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.outcomes.feedback` | 2 | 33 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.outcomes.feedback_labels` | 4 | 50 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.outcomes.policy_simulator` | 2 | 7 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.outcomes.priors` | 4 | 11 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.outcomes.quality.models` | 9 | 8 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight` | 3 | 53 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight` | 3 | 74 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness` | 3 | 61 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.live_provider_readiness` | 2 | 51 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.official_exchange_activation` | 2 | 45 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.provider_health_legacy` | 7 | 75 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.source_registry` | 6 | 47 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight` | 2 | 49 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.anomaly_state` | 3 | 15 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.catalyst_search.models` | 7 | 22 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers` | 8 | 52 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.claim_semantics` | 3 | 12 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.core.models` | 7 | 48 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.core_opportunities` | 2 | 57 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.evidence.models` | 7 | 54 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.evidence_quality` | 3 | 10 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.graph` | 3 | 21 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.identity` | 6 | 29 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.models` | 6 | 14 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store` | 3 | 10 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.impact_path_validator` | 4 | 27 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.incident_graph` | 3 | 38 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.incidents.models` | 4 | 26 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.analyzer` | 3 | 18 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.budget` | 3 | 59 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames` | 5 | 25 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.evidence_planner` | 7 | 44 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.extraction_models` | 8 | 13 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.extractor` | 4 | 17 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.models` | 8 | 24 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner` | 2 | 20 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.market_confirmation` | 4 | 31 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.market_reaction` | 5 | 30 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.missed` | 2 | 21 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.near_miss.models` | 4 | 53 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.opportunity_verdict` | 6 | 12 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.pipeline` | 2 | 27 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.playbooks` | 3 | 18 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.price_history` | 2 | 9 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.source_coverage.models` | 2 | 45 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.source_enrichment` | 9 | 37 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.validation.models` | 10 | 60 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.watchlist.models` | 5 | 12 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.watchlist_enrichment` | 9 | 13 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.watchlist_market` | 4 | 30 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.shims` | 3 | 17 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_core.models` | 7 | 17 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_providers.base` | 2 | 5 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.llm_providers.base` | 5 | 5 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.llm_providers.fixture` | 4 | 54 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.ops` | 5 | 12 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.refactor_class_ownership_report` | 2 | 10 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.signal_registry` | 2 | 7 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+
+## Unresolved Multi-Class Modules
+
+| module | public classes | max class lines | reason |
+|---|---:|---:|---|
+| none | 0 | 0 | all current multi-class modules are registered or explicitly excepted |
+
+## Multi-Public-Class Module Inventory
+
+| module | public classes | max class lines | resolution | reason |
+|---|---:|---:|---|---|
+| `crypto_rsi_scanner.backups` | 3 | 25 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.alert_store.models` | 4 | 10 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.alerts` | 3 | 59 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.cache` | 3 | 11 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.locks` | 3 | 24 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.replay` | 4 | 16 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.models` | 2 | 5 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.retention` | 2 | 8 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.artifacts.run_ledger` | 2 | 4 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.config.health_guard` | 2 | 10 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.config.v1_readiness` | 2 | 11 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.doctor.environment` | 2 | 10 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.delivery` | 3 | 50 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.inbox.models` | 3 | 34 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.legacy.delivery_models` | 6 | 37 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.provider_status` | 2 | 21 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.recipient_check` | 2 | 9 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.router` | 5 | 24 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.runs` | 2 | 4 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor` | 2 | 21 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.outcomes.burn_in` | 3 | 24 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.outcomes.feedback` | 2 | 33 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.outcomes.feedback_labels` | 4 | 50 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.outcomes.policy_simulator` | 2 | 7 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.outcomes.priors` | 4 | 11 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.outcomes.quality.models` | 9 | 8 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight` | 3 | 53 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight` | 3 | 74 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness` | 3 | 61 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.live_provider_readiness` | 2 | 51 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.official_exchange_activation` | 2 | 45 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.provider_health_legacy` | 7 | 75 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.source_registry` | 6 | 47 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight` | 2 | 49 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.anomaly_state` | 3 | 15 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.catalyst_search.models` | 7 | 22 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers` | 8 | 52 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.claim_semantics` | 3 | 12 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.core.models` | 7 | 48 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.core_opportunities` | 2 | 57 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.evidence.models` | 7 | 54 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.evidence_quality` | 3 | 10 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.graph` | 3 | 21 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.identity` | 6 | 29 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.models` | 6 | 14 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store` | 3 | 10 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.impact_path_validator` | 4 | 27 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.incident_graph` | 3 | 38 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.incidents.models` | 4 | 26 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.analyzer` | 3 | 18 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.budget` | 3 | 59 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames` | 5 | 25 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.evidence_planner` | 7 | 44 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.extraction_models` | 8 | 13 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.extractor` | 4 | 17 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.llm.models` | 8 | 24 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner` | 2 | 20 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.market_confirmation` | 4 | 31 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.market_reaction` | 5 | 30 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.missed` | 2 | 21 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.near_miss.models` | 4 | 53 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.opportunity_verdict` | 6 | 12 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.pipeline` | 2 | 27 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.playbooks` | 3 | 18 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.price_history` | 2 | 9 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.source_coverage.models` | 2 | 45 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.source_enrichment` | 9 | 37 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.validation.models` | 10 | 60 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.watchlist.models` | 5 | 12 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.watchlist_enrichment` | 9 | 13 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.watchlist_market` | 4 | 30 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.shims` | 3 | 17 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_core.models` | 7 | 17 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_fade` | 11 | 25 | module_exception | Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade. |
+| `crypto_rsi_scanner.event_providers.base` | 2 | 5 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.llm_providers.base` | 5 | 5 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.llm_providers.fixture` | 4 | 54 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.ops` | 5 | 12 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.refactor_class_ownership_report` | 2 | 10 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.signal_registry` | 2 | 7 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 
 ## Classes Over 75 Lines
 

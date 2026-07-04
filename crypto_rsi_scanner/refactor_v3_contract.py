@@ -302,7 +302,10 @@ def _public_compatibility_shim_count(shim_report: Mapping[str, Any]) -> int:
 
 def _public_classes_not_in_own_module(class_report: Mapping[str, Any]) -> list[dict[str, Any]]:
     rows = []
-    for row in class_report.get("modules_with_multiple_public_classes", []):
+    source_rows = class_report.get("unresolved_multi_class_modules")
+    if not isinstance(source_rows, list):
+        source_rows = class_report.get("modules_with_multiple_public_classes", [])
+    for row in source_rows:
         if not isinstance(row, Mapping):
             continue
         module = str(row.get("module") or "")
