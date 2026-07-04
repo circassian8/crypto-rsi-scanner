@@ -17,6 +17,60 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split artifact doctor report formatter debt · Codex
+**Why:** The long-running refactor still tracks oversized function debt after
+production and legacy file-size gates passed. The legacy artifact-doctor report
+renderer was a pure string formatter over result counters, making it a safe
+behavior-preserving ownership slice.
+**Changes:**
+- Replaced the 462-line
+  `crypto_rsi_scanner/event_alpha/doctor/legacy/reporting.py`
+  `format_artifact_doctor_report()` body with counter field tables plus small
+  private section helpers; the public formatter is now a 14-line orchestrator
+  and no new helper exceeds the 150-line threshold.
+- Verified formatter output parity against a synthetic doctor result before
+  running tests.
+- Refreshed class ownership, size-gate, final, completion-map, release
+  candidate, and shim reports. Current advisory inventory is `14` classes and
+  `17` functions over limits, with `gate_status=pass` and
+  `new_violation_count=0`.
+- Updated `ROADMAP.md` to include `format_artifact_doctor_report()` in the
+  completed ownership burn-down list.
+**Verify:** Focused doctor tests passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha/test_artifact_doctor.py -q`
+reported `45 passed`. Full safe checks passed: `python3 tests/test_indicators.py`
+reported `745/745 passed`; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q` and
+`make test-pytest-safe PYTHON=python3` each reported `756 passed`;
+`python3 -m compileall -q crypto_rsi_scanner tests`, `make refactor-size-gates
+PYTHON=python3`, `make refactor-class-ownership-report PYTHON=python3`,
+`make refactor-final-report PYTHON=python3`, `make refactor-completion-map
+PYTHON=python3`, `make event-alpha-shim-report PYTHON=python3`,
+`make event-alpha-integrated-radar-smoke PYTHON=python3`,
+`make event-alpha-integrated-radar-doctor PYTHON=python3`,
+`make event-alpha-notification-format-smoke PYTHON=python3`,
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`,
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`,
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`,
+`make event-alpha-coinalyze-preflight-smoke PYTHON=python3`,
+`make event-alpha-coinalyze-preflight PYTHON=python3`,
+`make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`,
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`,
+`make event-alpha-daily-brief PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`,
+`make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`,
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`,
+`make backtest-costs PYTHON=python3`, and `make verify PYTHON=python3` passed.
+**Notes/risks:** Behavior-preserving only. The catalyst-frame e2e Make target
+returns success while its internal strict doctor intentionally surfaces fixture
+blockers; that pre-existing target behavior is unchanged. No live provider
+calls by default, live sends, trading, paper-trading behavior changes,
+execution/order logic, Event Alpha RSI writes, or Event Alpha-created
+`TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split daily brief builder function debt · Codex
 **Why:** The long-running refactor still tracks oversized function debt after
 production and legacy file-size gates passed. `build_daily_brief()` was the

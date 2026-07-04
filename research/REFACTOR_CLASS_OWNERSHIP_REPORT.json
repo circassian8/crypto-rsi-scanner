@@ -142,7 +142,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5403,
+  "function_count": 5409,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -168,14 +168,6 @@
       "public": false,
       "qualname": "_integrated_radar_artifact_conflicts",
       "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py"
-    },
-    {
-      "function_name": "format_artifact_doctor_report",
-      "line_count": 462,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.reporting",
-      "public": true,
-      "qualname": "format_artifact_doctor_report",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/reporting.py"
     },
     {
       "function_name": "send_notifications",
@@ -290,8 +282,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     }
   ],
-  "functions_over_limit_count": 18,
-  "generated_at": "2026-07-04T06:50:22.772256+00:00",
+  "functions_over_limit_count": 17,
+  "generated_at": "2026-07-04T07:02:14.646830+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -969,7 +961,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 18,
+  "production_functions_over_limit": 17,
   "production_functions_over_limit_rows": [
     {
       "function_name": "diagnose_artifacts",
@@ -994,14 +986,6 @@
       "public": false,
       "qualname": "_integrated_radar_artifact_conflicts",
       "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py"
-    },
-    {
-      "function_name": "format_artifact_doctor_report",
-      "line_count": 462,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.reporting",
-      "public": true,
-      "qualname": "format_artifact_doctor_report",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/reporting.py"
     },
     {
       "function_name": "send_notifications",
