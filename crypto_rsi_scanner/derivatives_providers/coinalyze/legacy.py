@@ -62,157 +62,253 @@ class CoinalyzeDerivativesProvider:
         self.last_warnings: tuple[str, ...] = ()
 
     def fetch_snapshots(self) -> dict[str, dict[str, Any]]:
-        self.last_warnings = ()
-        if self.path is None and self.live_enabled:
-            return self._fetch_live_snapshots()
-        if self.path is None:
-            return {}
-        try:
-            rows = _load_rows(self.path)
-        except Exception as exc:  # noqa: BLE001
-            warning = f"Coinalyze derivatives fixture load failed: {exc}"
-            self.last_warnings = (warning,)
-            if self.required:
-                raise
-            log.warning(warning)
-            return {}
-
-        out: dict[str, dict[str, Any]] = {}
-        for row in rows:
-            snapshot = _snapshot(row)
-            if snapshot is None:
-                continue
-            for key in _keys(row, snapshot):
-                out[key] = snapshot
-        return out
+        return _coinalyze_fetch_snapshots(self)
 
     def _fetch_live_snapshots(self) -> dict[str, dict[str, Any]]:
-        if not self.api_key:
-            warning = "Coinalyze live derivatives fetch skipped: missing API key"
-            self.last_warnings = (warning,)
-            if self.required:
-                raise ValueError("Coinalyze live derivatives fetch requires API key")
-            log.warning(warning)
-            return {}
-        try:
-            symbols = self._live_symbols()
-            if not symbols:
-                warning = "Coinalyze live derivatives fetch skipped: no symbols configured"
-                self.last_warnings = (warning,)
-                if self.required:
-                    raise ValueError("Coinalyze live derivatives fetch requires at least one symbol")
-                log.warning(warning)
-                return {}
-            rows = self._fetch_live_rows(symbols)
-        except Exception as exc:  # noqa: BLE001
-            safe_error = _safe_error(exc, self.api_key)
-            warning = f"Coinalyze live derivatives fetch failed: {safe_error}"
-            self.last_warnings = (warning,)
-            if self.required:
-                raise
-            log.warning(warning)
-            return {}
-        self.last_warnings = tuple(dict.fromkeys(self.last_warnings))
-        out: dict[str, dict[str, Any]] = {}
-        for row in rows:
-            snapshot = _snapshot(row)
-            if snapshot is None:
-                continue
-            for key in _keys(row, snapshot):
-                out[key] = snapshot
-        return out
+        return _coinalyze_fetch_live_snapshots(self)
 
     def _live_symbols(self) -> tuple[str, ...]:
-        if self.symbols:
-            return self.symbols
-        if not self.auto_symbols or not self.base_symbols:
-            return ()
-        markets = self._get("future-markets", {})
-        return resolve_future_market_symbols(markets, self.base_symbols)
+        return _coinalyze_live_symbols(self)
 
     def _fetch_live_rows(self, live_symbols: Iterable[str]) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        for symbols in _batches(live_symbols, 20):
-            by_symbol = _base_rows(symbols)
-            for item in self._get("open-interest", {"symbols": ",".join(symbols), "convert_to_usd": _bool_param(self.convert_to_usd)}):
-                symbol = str(item.get("symbol") or "")
-                if not symbol:
-                    continue
-                row = by_symbol.setdefault(symbol, _live_base_row(symbol))
-                row["open_interest"] = item.get("value")
-                row["open_interest_timestamp"] = _max_time(row.get("open_interest_timestamp"), item.get("update"))
-                row["open_interest_unit"] = "usd_notional" if self.convert_to_usd else "provider_native"
-                row["timestamp"] = _max_time(row.get("timestamp"), item.get("update"))
-            for item in self._get("funding-rate", {"symbols": ",".join(symbols)}):
-                symbol = str(item.get("symbol") or "")
-                if not symbol:
-                    continue
-                row = by_symbol.setdefault(symbol, _live_base_row(symbol))
-                row["funding_rate_8h"] = item.get("value")
-                row["funding_timestamp"] = _max_time(row.get("funding_timestamp"), item.get("update"))
-                row["funding_rate_unit"] = "decimal_rate"
-                row["timestamp"] = _max_time(row.get("timestamp"), item.get("update"))
-            for item in self._get_optional("predicted-funding-rate", {"symbols": ",".join(symbols)}):
-                symbol = str(item.get("symbol") or "")
-                if not symbol:
-                    continue
-                row = by_symbol.setdefault(symbol, _live_base_row(symbol))
-                row["predicted_funding_rate"] = item.get("value")
-                row["predicted_funding_timestamp"] = _max_time(row.get("predicted_funding_timestamp"), item.get("update"))
-                row["funding_rate_unit"] = "decimal_rate"
-                row["timestamp"] = _max_time(row.get("timestamp"), item.get("update"))
-            history_params = {
-                "symbols": ",".join(symbols),
-                "interval": self.history_interval,
-                "from": str(int(self.clock()) - max(1, self.lookback_hours) * 3600),
-                "to": str(int(self.clock())),
-            }
-            for item in self._get("open-interest-history", {**history_params, "convert_to_usd": _bool_param(self.convert_to_usd)}):
-                symbol = str(item.get("symbol") or "")
-                row = by_symbol.setdefault(symbol, _live_base_row(symbol))
-                row["open_interest_24h_change_pct"] = _history_change_pct(item.get("history"))
-                row["open_interest_history_timestamp"] = _latest_history_time(item.get("history"))
-                row["open_interest_unit"] = "usd_notional" if self.convert_to_usd else "provider_native"
-            for item in self._get("liquidation-history", {**history_params, "convert_to_usd": _bool_param(self.convert_to_usd)}):
-                symbol = str(item.get("symbol") or "")
-                row = by_symbol.setdefault(symbol, _live_base_row(symbol))
-                row["liquidations_24h"] = _liquidation_sum(item.get("history"))
-                row["long_liquidations"] = _history_sum(item.get("history"), "l")
-                row["short_liquidations"] = _history_sum(item.get("history"), "s")
-                row["liquidation_timestamp"] = _latest_history_time(item.get("history"))
-                row["liquidation_unit"] = "usd_notional" if self.convert_to_usd else "provider_native"
-            for item in self._get("long-short-ratio-history", history_params):
-                symbol = str(item.get("symbol") or "")
-                row = by_symbol.setdefault(symbol, _live_base_row(symbol))
-                row["long_short_ratio"] = _latest_history_value(item.get("history"), "r")
-                row["long_short_timestamp"] = _latest_history_time(item.get("history"))
-            for item in self._get("ohlcv-history", history_params):
-                symbol = str(item.get("symbol") or "")
-                row = by_symbol.setdefault(symbol, _live_base_row(symbol))
-                row["futures_price_24h_change_pct"] = _history_change_pct(item.get("history"))
-                row["futures_volume_24h"] = _history_sum(item.get("history"), "v")
-                row["ohlcv_timestamp"] = _latest_history_time(item.get("history"))
-                row["volume_unit"] = "provider_native"
-            rows.extend(by_symbol.values())
-        return rows
+        return _coinalyze_fetch_live_rows(self, live_symbols)
 
     def _get(self, path: str, params: Mapping[str, str]) -> list[Mapping[str, Any]]:
-        url = urljoin(self.base_url, path) + "?" + urlencode(params)
-        request = Request(url, headers={"Accept": "application/json", "api_key": self.api_key})
-        with self.opener(request, self.timeout) as response:
-            raw = json.loads(response.read().decode("utf-8"))
-        if not isinstance(raw, list):
-            raise ValueError(f"Coinalyze {path} response must be a list")
-        return [dict(item) for item in raw if isinstance(item, Mapping)]
+        return _coinalyze_get(self, path, params)
 
     def _get_optional(self, path: str, params: Mapping[str, str]) -> list[Mapping[str, Any]]:
-        try:
-            return self._get(path, params)
-        except Exception as exc:  # noqa: BLE001 - optional live metric must fail soft
-            warning = f"Coinalyze optional endpoint {path} skipped: {_safe_error(exc, self.api_key)}"
-            self.last_warnings = tuple(dict.fromkeys((*self.last_warnings, warning)))
+        return _coinalyze_get_optional(self, path, params)
+
+
+def _coinalyze_fetch_snapshots(provider: CoinalyzeDerivativesProvider) -> dict[str, dict[str, Any]]:
+    provider.last_warnings = ()
+    if provider.path is None and provider.live_enabled:
+        return provider._fetch_live_snapshots()
+    if provider.path is None:
+        return {}
+    try:
+        rows = _load_rows(provider.path)
+    except Exception as exc:  # noqa: BLE001
+        warning = f"Coinalyze derivatives fixture load failed: {exc}"
+        provider.last_warnings = (warning,)
+        if provider.required:
+            raise
+        log.warning(warning)
+        return {}
+    return _snapshots_by_key(rows)
+
+
+def _coinalyze_fetch_live_snapshots(provider: CoinalyzeDerivativesProvider) -> dict[str, dict[str, Any]]:
+    if not provider.api_key:
+        warning = "Coinalyze live derivatives fetch skipped: missing API key"
+        provider.last_warnings = (warning,)
+        if provider.required:
+            raise ValueError("Coinalyze live derivatives fetch requires API key")
+        log.warning(warning)
+        return {}
+    try:
+        symbols = provider._live_symbols()
+        if not symbols:
+            warning = "Coinalyze live derivatives fetch skipped: no symbols configured"
+            provider.last_warnings = (warning,)
+            if provider.required:
+                raise ValueError("Coinalyze live derivatives fetch requires at least one symbol")
             log.warning(warning)
-            return []
+            return {}
+        rows = provider._fetch_live_rows(symbols)
+    except Exception as exc:  # noqa: BLE001
+        safe_error = _safe_error(exc, provider.api_key)
+        warning = f"Coinalyze live derivatives fetch failed: {safe_error}"
+        provider.last_warnings = (warning,)
+        if provider.required:
+            raise
+        log.warning(warning)
+        return {}
+    provider.last_warnings = tuple(dict.fromkeys(provider.last_warnings))
+    return _snapshots_by_key(rows)
+
+
+def _snapshots_by_key(rows: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        snapshot = _snapshot(row)
+        if snapshot is None:
+            continue
+        for key in _keys(row, snapshot):
+            out[key] = snapshot
+    return out
+
+
+def _coinalyze_live_symbols(provider: CoinalyzeDerivativesProvider) -> tuple[str, ...]:
+    if provider.symbols:
+        return provider.symbols
+    if not provider.auto_symbols or not provider.base_symbols:
+        return ()
+    markets = provider._get("future-markets", {})
+    return resolve_future_market_symbols(markets, provider.base_symbols)
+
+
+def _coinalyze_fetch_live_rows(
+    provider: CoinalyzeDerivativesProvider,
+    live_symbols: Iterable[str],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for symbols in _batches(live_symbols, 20):
+        by_symbol = _base_rows(symbols)
+        _coinalyze_apply_open_interest(provider, symbols, by_symbol)
+        _coinalyze_apply_funding(provider, symbols, by_symbol)
+        _coinalyze_apply_predicted_funding(provider, symbols, by_symbol)
+        history_params = _coinalyze_history_params(provider, symbols)
+        _coinalyze_apply_open_interest_history(provider, history_params, by_symbol)
+        _coinalyze_apply_liquidation_history(provider, history_params, by_symbol)
+        _coinalyze_apply_long_short_history(provider, history_params, by_symbol)
+        _coinalyze_apply_ohlcv_history(provider, history_params, by_symbol)
+        rows.extend(by_symbol.values())
+    return rows
+
+
+def _coinalyze_get(
+    provider: CoinalyzeDerivativesProvider,
+    path: str,
+    params: Mapping[str, str],
+) -> list[Mapping[str, Any]]:
+    url = urljoin(provider.base_url, path) + "?" + urlencode(params)
+    request = Request(url, headers={"Accept": "application/json", "api_key": provider.api_key})
+    with provider.opener(request, provider.timeout) as response:
+        raw = json.loads(response.read().decode("utf-8"))
+    if not isinstance(raw, list):
+        raise ValueError(f"Coinalyze {path} response must be a list")
+    return [dict(item) for item in raw if isinstance(item, Mapping)]
+
+
+def _coinalyze_get_optional(
+    provider: CoinalyzeDerivativesProvider,
+    path: str,
+    params: Mapping[str, str],
+) -> list[Mapping[str, Any]]:
+    try:
+        return provider._get(path, params)
+    except Exception as exc:  # noqa: BLE001 - optional live metric must fail soft
+        warning = f"Coinalyze optional endpoint {path} skipped: {_safe_error(exc, provider.api_key)}"
+        provider.last_warnings = tuple(dict.fromkeys((*provider.last_warnings, warning)))
+        log.warning(warning)
+        return []
+
+
+def _coinalyze_apply_open_interest(
+    provider: CoinalyzeDerivativesProvider,
+    symbols: Iterable[str],
+    by_symbol: dict[str, dict[str, Any]],
+) -> None:
+    for item in provider._get("open-interest", {"symbols": ",".join(symbols), "convert_to_usd": _bool_param(provider.convert_to_usd)}):
+        symbol = str(item.get("symbol") or "")
+        if not symbol:
+            continue
+        row = by_symbol.setdefault(symbol, _live_base_row(symbol))
+        row["open_interest"] = item.get("value")
+        row["open_interest_timestamp"] = _max_time(row.get("open_interest_timestamp"), item.get("update"))
+        row["open_interest_unit"] = "usd_notional" if provider.convert_to_usd else "provider_native"
+        row["timestamp"] = _max_time(row.get("timestamp"), item.get("update"))
+
+
+def _coinalyze_apply_funding(
+    provider: CoinalyzeDerivativesProvider,
+    symbols: Iterable[str],
+    by_symbol: dict[str, dict[str, Any]],
+) -> None:
+    for item in provider._get("funding-rate", {"symbols": ",".join(symbols)}):
+        symbol = str(item.get("symbol") or "")
+        if not symbol:
+            continue
+        row = by_symbol.setdefault(symbol, _live_base_row(symbol))
+        row["funding_rate_8h"] = item.get("value")
+        row["funding_timestamp"] = _max_time(row.get("funding_timestamp"), item.get("update"))
+        row["funding_rate_unit"] = "decimal_rate"
+        row["timestamp"] = _max_time(row.get("timestamp"), item.get("update"))
+
+
+def _coinalyze_apply_predicted_funding(
+    provider: CoinalyzeDerivativesProvider,
+    symbols: Iterable[str],
+    by_symbol: dict[str, dict[str, Any]],
+) -> None:
+    for item in provider._get_optional("predicted-funding-rate", {"symbols": ",".join(symbols)}):
+        symbol = str(item.get("symbol") or "")
+        if not symbol:
+            continue
+        row = by_symbol.setdefault(symbol, _live_base_row(symbol))
+        row["predicted_funding_rate"] = item.get("value")
+        row["predicted_funding_timestamp"] = _max_time(row.get("predicted_funding_timestamp"), item.get("update"))
+        row["funding_rate_unit"] = "decimal_rate"
+        row["timestamp"] = _max_time(row.get("timestamp"), item.get("update"))
+
+
+def _coinalyze_history_params(
+    provider: CoinalyzeDerivativesProvider,
+    symbols: Iterable[str],
+) -> dict[str, str]:
+    return {
+        "symbols": ",".join(symbols),
+        "interval": provider.history_interval,
+        "from": str(int(provider.clock()) - max(1, provider.lookback_hours) * 3600),
+        "to": str(int(provider.clock())),
+    }
+
+
+def _coinalyze_apply_open_interest_history(
+    provider: CoinalyzeDerivativesProvider,
+    history_params: Mapping[str, str],
+    by_symbol: dict[str, dict[str, Any]],
+) -> None:
+    params = {**history_params, "convert_to_usd": _bool_param(provider.convert_to_usd)}
+    for item in provider._get("open-interest-history", params):
+        symbol = str(item.get("symbol") or "")
+        row = by_symbol.setdefault(symbol, _live_base_row(symbol))
+        row["open_interest_24h_change_pct"] = _history_change_pct(item.get("history"))
+        row["open_interest_history_timestamp"] = _latest_history_time(item.get("history"))
+        row["open_interest_unit"] = "usd_notional" if provider.convert_to_usd else "provider_native"
+
+
+def _coinalyze_apply_liquidation_history(
+    provider: CoinalyzeDerivativesProvider,
+    history_params: Mapping[str, str],
+    by_symbol: dict[str, dict[str, Any]],
+) -> None:
+    params = {**history_params, "convert_to_usd": _bool_param(provider.convert_to_usd)}
+    for item in provider._get("liquidation-history", params):
+        symbol = str(item.get("symbol") or "")
+        row = by_symbol.setdefault(symbol, _live_base_row(symbol))
+        row["liquidations_24h"] = _liquidation_sum(item.get("history"))
+        row["long_liquidations"] = _history_sum(item.get("history"), "l")
+        row["short_liquidations"] = _history_sum(item.get("history"), "s")
+        row["liquidation_timestamp"] = _latest_history_time(item.get("history"))
+        row["liquidation_unit"] = "usd_notional" if provider.convert_to_usd else "provider_native"
+
+
+def _coinalyze_apply_long_short_history(
+    provider: CoinalyzeDerivativesProvider,
+    history_params: Mapping[str, str],
+    by_symbol: dict[str, dict[str, Any]],
+) -> None:
+    for item in provider._get("long-short-ratio-history", history_params):
+        symbol = str(item.get("symbol") or "")
+        row = by_symbol.setdefault(symbol, _live_base_row(symbol))
+        row["long_short_ratio"] = _latest_history_value(item.get("history"), "r")
+        row["long_short_timestamp"] = _latest_history_time(item.get("history"))
+
+
+def _coinalyze_apply_ohlcv_history(
+    provider: CoinalyzeDerivativesProvider,
+    history_params: Mapping[str, str],
+    by_symbol: dict[str, dict[str, Any]],
+) -> None:
+    for item in provider._get("ohlcv-history", history_params):
+        symbol = str(item.get("symbol") or "")
+        row = by_symbol.setdefault(symbol, _live_base_row(symbol))
+        row["futures_price_24h_change_pct"] = _history_change_pct(item.get("history"))
+        row["futures_volume_24h"] = _history_sum(item.get("history"), "v")
+        row["ohlcv_timestamp"] = _latest_history_time(item.get("history"))
+        row["volume_unit"] = "provider_native"
 
 
 def _load_rows(path: Path) -> list[Mapping[str, Any]]:

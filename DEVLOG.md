@@ -17,6 +17,48 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Continue advisory refactor ownership burn-down · Codex
+**Why:** The production-size and legacy-decomposition gates were already
+passing, but the refactor objective still tracks oversized classes/functions as
+real follow-up debt. This pass reduces another low-risk slice while preserving
+CLI/Make behavior, old imports, artifact schemas, provider guards, notification
+gates, scoring, and Event Alpha research-only route boundaries.
+**Changes:**
+- Split `format_run_ledger_report()` and `_run_record()` in
+  `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` into focused report,
+  source, provider, notification, artifact-write, cache, and path helper
+  functions without changing run-ledger row fields.
+- Moved the large research-card core score component key list into a module
+  constant in
+  `crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/evidence.py`,
+  reducing `_core_score_components()` while preserving output keys.
+- Reduced `CoinalyzeDerivativesProvider` by moving fixture/live fetch,
+  endpoint application, optional endpoint, request, and snapshot-key mapping
+  logic into module-level helpers while keeping the public provider class and
+  old import behavior.
+- Split `acquire_run_lock()` result construction in
+  `crypto_rsi_scanner/event_alpha/artifacts/locks.py` into payload/status
+  helpers while preserving atomic create/recover/skip behavior and messages.
+- Refreshed refactor size, class ownership, and final reports. Current advisory
+  inventory is `28` classes and `52` functions over limits, with
+  `production_files_over_1500_lines=0`, `production_files_over_2000_lines=0`,
+  `legacy_files_over_1500_lines=0`, and `new_violation_count=0`.
+**Verify:** Focused parity tests passed for run-ledger/card paths, run-lock
+acquire/recover/release behavior, and Coinalyze provider fixture/live-mock
+paths. Also passed: `python3 -m compileall -q crypto_rsi_scanner tests`, `make
+refactor-size-gates PYTHON=python3`, `make refactor-class-ownership-report
+PYTHON=python3`, `make refactor-final-report PYTHON=python3`, `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`, and `make
+event-alpha-integrated-radar-smoke PYTHON=python3`. Final `make verify
+PYTHON=python3` was rerun before commit.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Remaining advisory ownership debt includes
+`EventAlphaArtifactDoctorResult`, `_event_alpha_notify_cycle_body()`,
+`build_daily_brief()`, `diagnose_artifacts()`, `render_research_card()`, and
+`_impact_hypothesis_lines()`.
+
 ## 2026-07-04 — Burn down advisory refactor ownership debt · Codex
 **Why:** The production-size refactor gates were passing, but the prompt still
 called out oversized classes and functions as real internal debt. This pass

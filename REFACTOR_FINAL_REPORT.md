@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T02:40:00+00:00`
+- generated_at: `2026-07-04T03:01:50+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -43,21 +43,21 @@ Research-only refactor gate report. This report does not call providers, send Te
 - remaining_implementation_modules_by_package_target: `{}`
 - intentionally_outside_event_alpha_modules: `["crypto_rsi_scanner.event_fade"]`
 - class_ownership_report: `research/REFACTOR_CLASS_OWNERSHIP_REPORT.json`
-- class_ownership_classes_over_limit: `29`
-- class_ownership_functions_over_limit: `56`
+- class_ownership_classes_over_limit: `28`
+- class_ownership_functions_over_limit: `52`
 - production_size_gate_status: `pass`
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
-- production_classes_over_limit: `29`
-- production_functions_over_limit: `56`
+- production_classes_over_limit: `28`
+- production_functions_over_limit: `52`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
 - legacy_decomposition_gate_status: `pass`
 - legacy_files_over_1500_lines: `0`
 - legacy_files_over_3000_lines: `0`
-- legacy_total_lines: `4598`
-- legacy_classes_over_limit: `5`
+- legacy_total_lines: `4694`
+- legacy_classes_over_limit: `4`
 - legacy_functions_over_limit: `1`
 - legacy_modules_with_multiple_public_classes: `2`
 
@@ -123,6 +123,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 993 |
 | `crypto_rsi_scanner/event_alpha/artifacts/alerts.py` | 985 |
 | `crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py` | 984 |
+| `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 980 |
 | `crypto_rsi_scanner/event_alpha/radar/impact_hypothesis_store.py` | 980 |
 | `crypto_rsi_scanner/event_alpha/radar/incident_graph.py` | 975 |
 | `crypto_rsi_scanner/event_alpha/radar/core_opportunities.py` | 970 |
@@ -136,7 +137,6 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py` | 918 |
 | `crypto_rsi_scanner/event_alpha/providers/official_exchange.py` | 913 |
 | `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` | 888 |
-| `crypto_rsi_scanner/event_alpha/outcomes/quality/reports.py` | 879 |
 
 ## Test Size Gate
 
@@ -175,7 +175,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py` | 933 |
 | `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` | 888 |
 | `crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py` | 769 |
-| `crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py` | 533 |
+| `crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py` | 629 |
 | `crypto_rsi_scanner/event_providers/binance_announcements/legacy.py` | 192 |
 | `crypto_rsi_scanner/refactor_legacy_inventory.py` | 190 |
 | `crypto_rsi_scanner/cli/services/scanner_legacy.py` | 120 |
@@ -210,7 +210,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 ## Namespace And CI
 
 - unknown_namespace_count: `0`
-- namespace_status_counts: `{"active_fixture_smoke": 18, "active_integrated_smoke": 1, "active_live_rehearsal": 9, "active_provider_preflight": 5, "active_provider_rehearsal": 5, "active_refactor_report": 1, "manual_review": 5, "quarantine": 1, "stale_deprecated": 1}`
+- namespace_status_counts: `{"active_fixture_smoke": 18, "active_integrated_smoke": 1, "active_live_rehearsal": 9, "active_provider_preflight": 5, "active_provider_rehearsal": 4, "active_refactor_report": 1, "manual_review": 5, "quarantine": 1, "stale_deprecated": 1}`
 - ci_static_safety: `pass`
 - test_runtime_report_path: `research/test_runtime_report.json`
 

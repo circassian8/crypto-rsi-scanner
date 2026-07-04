@@ -124,7 +124,109 @@ def acquire_run_lock(
         )
         return EventAlphaRunLock(path, run_id, profile, namespace, name, status, owned=False)
 
-    payload = {
+    payload = _run_lock_payload(
+        run_id=run_id,
+        profile=profile,
+        namespace=namespace,
+        name=name,
+        pid=pid,
+        observed=observed,
+        command=command,
+        hostname=hostname,
+    )
+
+    # Atomic acquisition: O_CREAT|O_EXCL means exactly one of two concurrent
+    # starts can create the lock, closing the read-then-write TOCTOU window.
+    created = _create_lock_exclusive(path, payload)
+    if created is True:
+        return _acquired_run_lock(
+            path,
+            run_id,
+            profile,
+            namespace,
+            name,
+            STATE_ACQUIRED,
+            owned=True,
+            stale_recovered=False,
+            holder=None,
+            message="notification run lock acquired",
+        )
+    if created is None:
+        return _degraded_run_lock(path, run_id, profile, namespace, name, None, stale_recovered=False)
+
+    # A lock already exists. Inspect the holder.
+    holder = _read_lock(path)
+    if holder is None:
+        # Vanished between create attempt and read; try once more atomically.
+        created = _create_lock_exclusive(path, payload)
+        if created is True:
+            return _acquired_run_lock(
+                path,
+                run_id,
+                profile,
+                namespace,
+                name,
+                STATE_ACQUIRED,
+                owned=True,
+                stale_recovered=False,
+                holder=None,
+                message="notification run lock acquired",
+            )
+        holder = _read_lock(path) or {}
+
+    if str(holder.get("run_id") or "") == str(run_id):
+        # Re-entrant: this run already holds the lock.
+        return _acquired_run_lock(
+            path,
+            run_id,
+            profile,
+            namespace,
+            name,
+            STATE_ACQUIRED,
+            owned=True,
+            stale_recovered=False,
+            holder=holder,
+            message="notification run lock already held by this run",
+        )
+
+    if _is_fresh(holder, observed, cfg.stale_minutes):
+        if cfg.allow_overlap:
+            return _acquired(
+                STATE_OVERLAP_ALLOWED,
+                owned=False,
+                stale_recovered=False,
+                holder=holder,
+                message="overlap allowed (RSI_EVENT_ALPHA_NOTIFY_ALLOW_OVERLAP=1); proceeding alongside existing lock",
+            )
+        return _active_run_lock(path, run_id, profile, namespace, name, holder)
+
+    # Stale holder: attempt an atomic takeover. Exactly one concurrent recoverer
+    # wins the O_EXCL recreate; the loser re-reads and skips/degrades.
+    return _stale_run_lock_recovery_result(
+        path,
+        run_id,
+        profile,
+        namespace,
+        name,
+        holder,
+        payload,
+        observed=observed,
+        cfg=cfg,
+    )
+
+
+def _run_lock_payload(
+    *,
+    run_id: str,
+    profile: str,
+    namespace: str,
+    name: str,
+    pid: int,
+    observed: datetime,
+    command: str,
+    hostname: str,
+) -> dict[str, Any]:
+    return {
         "schema_version": LOCK_SCHEMA_VERSION,
         "run_id": str(run_id),
         "profile": profile,
@@ -136,102 +238,123 @@ def acquire_run_lock(
         "hostname": hostname,
     }
 
-    def _acquired(state: str, *, owned: bool, stale_recovered: bool, holder: dict[str, Any] | None, message: str) -> EventAlphaRunLock:
-        return EventAlphaRunLock(
-            path,
-            run_id,
-            profile,
-            namespace,
-            name,
-            RunLockStatus(
-                state=state,
-                path=path,
-                acquired=True,
-                skipped_due_to_active_lock=False,
-                stale_recovered=stale_recovered,
-                holder=holder,
-                message=message,
-                warnings=(STALE_LOCK_RECOVERED_WARNING,) if stale_recovered else (),
+
+def _acquired_run_lock(
+    path: Path,
+    run_id: str,
+    profile: str,
+    namespace: str,
+    name: str,
+    state: str,
+    *,
+    owned: bool,
+    stale_recovered: bool,
+    holder: dict[str, Any] | None,
+    message: str,
+) -> EventAlphaRunLock:
+    return EventAlphaRunLock(
+        path,
+        run_id,
+        profile,
+        namespace,
+        name,
+        RunLockStatus(
+            state=state,
+            path=path,
+            acquired=True,
+            skipped_due_to_active_lock=False,
+            stale_recovered=stale_recovered,
+            holder=holder,
+            message=message,
+            warnings=(STALE_LOCK_RECOVERED_WARNING,) if stale_recovered else (),
+        ),
+        owned=owned,
+    )
+
+
+def _degraded_run_lock(
+    path: Path,
+    run_id: str,
+    profile: str,
+    namespace: str,
+    name: str,
+    holder: dict[str, Any] | None,
+    *,
+    stale_recovered: bool,
+) -> EventAlphaRunLock:
+    return EventAlphaRunLock(
+        path,
+        run_id,
+        profile,
+        namespace,
+        name,
+        RunLockStatus(
+            state=STATE_DISABLED,
+            path=path,
+            acquired=True,
+            skipped_due_to_active_lock=False,
+            stale_recovered=stale_recovered,
+            holder=holder,
+            message="run lock could not be written; proceeding without lock enforcement",
+            warnings=("notification_lock_write_failed",) + ((STALE_LOCK_RECOVERED_WARNING,) if stale_recovered else ()),
+        ),
+        owned=False,
+    )
+
+
+def _active_run_lock(
+    path: Path,
+    run_id: str,
+    profile: str,
+    namespace: str,
+    name: str,
+    holder: dict[str, Any],
+    *,
+    message: str | None = None,
+) -> EventAlphaRunLock:
+    return EventAlphaRunLock(
+        path,
+        run_id,
+        profile,
+        namespace,
+        name,
+        RunLockStatus(
+            state=STATE_ACTIVE,
+            path=path,
+            acquired=False,
+            skipped_due_to_active_lock=True,
+            stale_recovered=False,
+            holder=holder,
+            message=message
+            or (
+                "active notification lock held by "
+                f"run_id={holder.get('run_id') or 'unknown'} pid={holder.get('pid') or 'unknown'} "
+                f"acquired_at={holder.get('acquired_at') or 'unknown'}"
             ),
-            owned=owned,
-        )
+        ),
+        owned=False,
+    )
 
-    def _degraded(holder: dict[str, Any] | None, stale_recovered: bool) -> EventAlphaRunLock:
-        return EventAlphaRunLock(
-            path,
-            run_id,
-            profile,
-            namespace,
-            name,
-            RunLockStatus(
-                state=STATE_DISABLED,
-                path=path,
-                acquired=True,
-                skipped_due_to_active_lock=False,
-                stale_recovered=stale_recovered,
-                holder=holder,
-                message="run lock could not be written; proceeding without lock enforcement",
-                warnings=("notification_lock_write_failed",) + ((STALE_LOCK_RECOVERED_WARNING,) if stale_recovered else ()),
-            ),
-            owned=False,
-        )
 
-    # Atomic acquisition: O_CREAT|O_EXCL means exactly one of two concurrent
-    # starts can create the lock, closing the read-then-write TOCTOU window.
-    created = _create_lock_exclusive(path, payload)
-    if created is True:
-        return _acquired(STATE_ACQUIRED, owned=True, stale_recovered=False, holder=None, message="notification run lock acquired")
-    if created is None:
-        return _degraded(None, stale_recovered=False)
-
-    # A lock already exists. Inspect the holder.
-    holder = _read_lock(path)
-    if holder is None:
-        # Vanished between create attempt and read; try once more atomically.
-        created = _create_lock_exclusive(path, payload)
-        if created is True:
-            return _acquired(STATE_ACQUIRED, owned=True, stale_recovered=False, holder=None, message="notification run lock acquired")
-        holder = _read_lock(path) or {}
-
-    if str(holder.get("run_id") or "") == str(run_id):
-        # Re-entrant: this run already holds the lock.
-        return _acquired(STATE_ACQUIRED, owned=True, stale_recovered=False, holder=holder, message="notification run lock already held by this run")
-
-    if _is_fresh(holder, observed, cfg.stale_minutes):
-        if cfg.allow_overlap:
-            return _acquired(
-                STATE_OVERLAP_ALLOWED,
-                owned=False,
-                stale_recovered=False,
-                holder=holder,
-                message="overlap allowed (RSI_EVENT_ALPHA_NOTIFY_ALLOW_OVERLAP=1); proceeding alongside existing lock",
-            )
-        return EventAlphaRunLock(
-            path,
-            run_id,
-            profile,
-            namespace,
-            name,
-            RunLockStatus(
-                state=STATE_ACTIVE,
-                path=path,
-                acquired=False,
-                skipped_due_to_active_lock=True,
-                stale_recovered=False,
-                holder=holder,
-                message=(
-                    "active notification lock held by "
-                    f"run_id={holder.get('run_id') or 'unknown'} pid={holder.get('pid') or 'unknown'} "
-                    f"acquired_at={holder.get('acquired_at') or 'unknown'}"
-                ),
-            ),
-            owned=False,
-        )
-
-    # Stale holder: attempt an atomic takeover. Exactly one concurrent recoverer
-    # wins the O_EXCL recreate; the loser re-reads and skips/degrades.
+def _stale_run_lock_recovery_result(
+    path: Path,
+    run_id: str,
+    profile: str,
+    namespace: str,
+    name: str,
+    holder: dict[str, Any],
+    payload: dict[str, Any],
+    *,
+    observed: datetime,
+    cfg: EventAlphaRunLockConfig,
+) -> EventAlphaRunLock:
     if _steal_stale_lock(path, holder, payload):
-        return _acquired(
+        return _acquired_run_lock(
+            path,
+            run_id,
+            profile,
+            namespace,
+            name,
             STATE_STALE_RECOVERED,
             owned=True,
             stale_recovered=True,
@@ -243,26 +366,29 @@ def acquire_run_lock(
         )
     holder2 = _read_lock(path)
     if holder2 is not None and str(holder2.get("run_id") or "") == str(run_id):
-        return _acquired(STATE_ACQUIRED, owned=True, stale_recovered=True, holder=holder2, message="notification run lock acquired after stale recovery")
-    if holder2 is not None and _is_fresh(holder2, observed, cfg.stale_minutes) and not cfg.allow_overlap:
-        return EventAlphaRunLock(
+        return _acquired_run_lock(
             path,
             run_id,
             profile,
             namespace,
             name,
-            RunLockStatus(
-                state=STATE_ACTIVE,
-                path=path,
-                acquired=False,
-                skipped_due_to_active_lock=True,
-                stale_recovered=False,
-                holder=holder2,
-                message="active notification lock taken over by a concurrent recoverer",
-            ),
-            owned=False,
+            STATE_ACQUIRED,
+            owned=True,
+            stale_recovered=True,
+            holder=holder2,
+            message="notification run lock acquired after stale recovery",
         )
-    return _degraded(holder2, stale_recovered=True)
+    if holder2 is not None and _is_fresh(holder2, observed, cfg.stale_minutes) and not cfg.allow_overlap:
+        return _active_run_lock(
+            path,
+            run_id,
+            profile,
+            namespace,
+            name,
+            holder2,
+            message="active notification lock taken over by a concurrent recoverer",
+        )
+    return _degraded_run_lock(path, run_id, profile, namespace, name, holder2, stale_recovered=True)
 
 
 def release_run_lock(lock: EventAlphaRunLock | None) -> bool:

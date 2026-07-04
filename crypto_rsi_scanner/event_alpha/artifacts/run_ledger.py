@@ -206,147 +206,159 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
     rows.append(f"success={success} · failure={failed}")
     rows.append("")
     for row in result.rows:
-        rows.append(
-            f"{row.get('started_at', 'unknown')} profile={row.get('profile') or 'default'} "
-            f"mode={row.get('run_mode') or 'legacy'} namespace={row.get('artifact_namespace') or 'legacy'} "
-            f"clock={row.get('clock_mode') or 'unknown'} "
-            f"notification_burn_in={str(bool(row.get('notification_burn_in'))).lower()} "
-            f"success={str(bool(row.get('success'))).lower()} runtime={float(row.get('runtime_seconds') or 0):.2f}s"
-        )
-        rows.append(
-            "  "
-            f"raw={int(row.get('raw_events') or 0)} anomalies={int(row.get('market_anomalies') or 0)} "
-            f"queries={int(row.get('catalyst_queries') or 0)} accepted={int(row.get('catalyst_results_accepted') or 0)} "
-            f"rejected={int(row.get('catalyst_results_rejected') or 0)} candidates={int(row.get('candidates') or 0)} "
-            f"alerts={int(row.get('alerts') or 0)} routed={int(row.get('routed') or 0)} "
-            f"alertable={int(row.get('alertable') or 0)} sent={str(bool(row.get('sent'))).lower()} "
-            f"send={int(row.get('send_items_delivered') or 0)}/{int(row.get('send_items_attempted') or 0)} "
-            f"would_send={int(row.get('send_would_send_items') or 0)}"
-        )
-        rows.append(
-            "  "
-            f"hypotheses={int(row.get('impact_hypotheses') or 0)} "
-            f"validated={int(row.get('hypotheses_validated') or 0)} "
-            f"hypothesis_queries={int(row.get('hypothesis_search_queries') or 0)} "
-            f"hypothesis_results={int(row.get('hypothesis_search_results') or 0)} "
-            f"promotions={int(row.get('hypothesis_promotions') or 0)}"
-        )
-        rows.append(
-            "  "
-            f"evidence_acquisition attempted={int(row.get('evidence_acquisition_attempted') or 0)} "
-            f"accepted={int(row.get('evidence_acquisition_accepted') or 0)} "
-            f"rejected_only={int(row.get('evidence_acquisition_rejected_only') or 0)} "
-            f"upgraded={int(row.get('evidence_acquisition_upgraded') or 0)} "
-            f"rows={int(row.get('evidence_acquisition_rows_written') or 0)}"
-        )
-        if row.get("cryptopanic_configured") or row.get("cryptopanic_attempted") or row.get("cryptopanic_skip_reason"):
-            rows.append(
-                "  "
-                f"cryptopanic configured={str(bool(row.get('cryptopanic_configured'))).lower()} "
-                f"attempted={str(bool(row.get('cryptopanic_attempted'))).lower()} "
-                f"requests={int(row.get('cryptopanic_requests_used') or 0)} "
-                f"results={int(row.get('cryptopanic_results') or 0)} "
-                f"accepted={int(row.get('cryptopanic_accepted_evidence') or 0)} "
-                f"rejected={int(row.get('cryptopanic_rejected_evidence') or 0)} "
-                f"status={row.get('cryptopanic_effective_provider_status') or row.get('cryptopanic_provider_status') or 'not_observed'} "
-                f"skip={row.get('cryptopanic_skip_reason') or 'none'} "
-                f"raw_status={row.get('cryptopanic_raw_provider_status') or row.get('cryptopanic_provider_status') or 'not_observed'} "
-                f"successes={int(row.get('cryptopanic_successful_requests') or 0)} "
-                f"failures={int(row.get('cryptopanic_failed_requests') or 0)} "
-                f"stale_backoff_reconciled={str(bool(row.get('cryptopanic_stale_backoff_reconciled_after_success'))).lower()}"
-            )
-        rows.append(
-            "  "
-            f"catalyst_frames analyzed={int(row.get('catalyst_frames_analyzed') or 0)} "
-            f"validated={int(row.get('catalyst_frame_validations') or 0)} "
-            f"disagreements={int(row.get('catalyst_frame_disagreements') or 0)} "
-            f"unresolved={int(row.get('catalyst_frame_unresolved') or 0)} "
-            f"skipped={int(row.get('catalyst_frame_rows_skipped') or 0)}"
-        )
-        query_types = row.get("hypothesis_search_queries_by_type") or {}
-        result_types = row.get("hypothesis_search_results_by_type") or {}
-        if query_types or result_types:
-            rows.append(
-                "  hypothesis_query_types: "
-                f"queries={_format_reason_counts(query_types)} "
-                f"results={_format_reason_counts(result_types)}"
-            )
-        skip_reasons = row.get("catalyst_search_skip_reasons") or {}
-        if isinstance(skip_reasons, Mapping) and skip_reasons:
-            rows.append("  catalyst_search_skip_reasons: " + _format_reason_counts(skip_reasons))
-        hypothesis_skip_reasons = row.get("hypothesis_search_skip_reasons") or {}
-        if isinstance(hypothesis_skip_reasons, Mapping) and hypothesis_skip_reasons:
-            rows.append("  hypothesis_search_skip_reasons: " + _format_reason_counts(hypothesis_skip_reasons))
-        catalyst_frame_skip_reasons = row.get("catalyst_frame_skip_reasons") or {}
-        if isinstance(catalyst_frame_skip_reasons, Mapping) and catalyst_frame_skip_reasons:
-            rows.append(
-                "  catalyst_frame_skip_reasons: "
-                + _format_reason_counts(catalyst_frame_skip_reasons)
-            )
-        lane_attempted = row.get("send_lane_items_attempted") or {}
-        lane_delivered = row.get("send_lane_items_delivered") or {}
-        if lane_attempted or lane_delivered:
-            rows.append(
-                "  send_lanes: "
-                + ", ".join(
-                    f"{lane}={int(lane_delivered.get(lane) or 0)}/{int(lane_attempted.get(lane) or 0)}"
-                    for lane in sorted(set(lane_attempted) | set(lane_delivered))
-                )
-            )
-        if row.get("research_review_digest_enabled") or row.get("research_review_digest_candidates"):
-            rows.append(
-                "  research_review_digest: "
-                f"enabled={str(bool(row.get('research_review_digest_enabled'))).lower()} "
-                f"candidates={int(row.get('research_review_digest_candidates') or 0)} "
-                f"would_send={int(row.get('research_review_digest_would_send') or 0)} "
-                f"sent={int(row.get('research_review_digest_sent') or 0)} "
-                f"block={row.get('research_review_digest_block_reason') or 'none'}"
-            )
-        rows.append(
-            "  "
-            f"snapshots={int(row.get('snapshot_rows_written') or 0)} "
-            f"attempted={str(bool(row.get('snapshot_write_attempted'))).lower()} "
-            f"success={str(bool(row.get('snapshot_write_success'))).lower()} "
-            f"block={row.get('snapshot_write_block_reason') or 'none'}"
-        )
-        rows.append(
-            "  "
-            f"hypothesis_store={int(row.get('hypothesis_rows_written') or 0)} "
-            f"attempted={str(bool(row.get('hypothesis_write_attempted'))).lower()} "
-            f"success={str(bool(row.get('hypothesis_write_success'))).lower()} "
-            f"block={row.get('hypothesis_write_block_reason') or 'none'}"
-        )
-        rows.append(
-            "  "
-            f"incident_store={int(row.get('incident_rows_written') or 0)} "
-            f"attempted={str(bool(row.get('incident_write_attempted'))).lower()} "
-            f"success={str(bool(row.get('incident_write_success'))).lower()} "
-            f"block={row.get('incident_write_block_reason') or 'none'} "
-            f"linked_hypotheses={int(row.get('incident_linked_hypotheses') or 0)} "
-            f"linked_watchlist={int(row.get('incident_linked_watchlist_rows') or 0)}"
-        )
-        rows.append(
-            "  "
-            f"core_opportunity_store={int(row.get('core_opportunity_rows_written') or 0)} "
-            f"attempted={str(bool(row.get('core_opportunity_write_attempted'))).lower()} "
-            f"success={str(bool(row.get('core_opportunity_write_success'))).lower()} "
-            f"block={row.get('core_opportunity_write_block_reason') or 'none'}"
-        )
-        if row.get("send_block_reason"):
-            rows.append(f"  send_block: {row.get('send_block_reason')}")
-        rows.append(
-            "  "
-            f"provider_fetch={int(row.get('provider_fetch_count') or 0)} "
-            f"provider_cache={int(row.get('provider_cache_hits') or 0)}/{int(row.get('provider_cache_misses') or 0)} "
-            f"llm_cache={int(row.get('llm_cache_hits') or 0)}/{int(row.get('llm_cache_misses') or 0)} "
-            f"llm_calls={int(row.get('llm_calls_attempted') or 0)} skipped_budget={int(row.get('llm_skipped_due_budget') or 0)}"
-        )
-        warnings = [str(item) for item in row.get("warnings") or [] if str(item)]
-        if warnings:
-            rows.append("  warnings: " + "; ".join(warnings[:5]))
-        if row.get("failure"):
-            rows.append(f"  failure: {row.get('failure')}")
+        _append_run_ledger_report_row(rows, row)
     return "\n".join(rows).rstrip()
+
+
+def _append_run_ledger_report_row(rows: list[str], row: Mapping[str, Any]) -> None:
+    rows.append(
+        f"{row.get('started_at', 'unknown')} profile={row.get('profile') or 'default'} "
+        f"mode={row.get('run_mode') or 'legacy'} namespace={row.get('artifact_namespace') or 'legacy'} "
+        f"clock={row.get('clock_mode') or 'unknown'} "
+        f"notification_burn_in={str(bool(row.get('notification_burn_in'))).lower()} "
+        f"success={str(bool(row.get('success'))).lower()} runtime={float(row.get('runtime_seconds') or 0):.2f}s"
+    )
+    _append_run_ledger_activity_lines(rows, row)
+    _append_run_ledger_skip_and_lane_lines(rows, row)
+    _append_run_ledger_write_lines(rows, row)
+    if row.get("send_block_reason"):
+        rows.append(f"  send_block: {row.get('send_block_reason')}")
+    rows.append(
+        "  "
+        f"provider_fetch={int(row.get('provider_fetch_count') or 0)} "
+        f"provider_cache={int(row.get('provider_cache_hits') or 0)}/{int(row.get('provider_cache_misses') or 0)} "
+        f"llm_cache={int(row.get('llm_cache_hits') or 0)}/{int(row.get('llm_cache_misses') or 0)} "
+        f"llm_calls={int(row.get('llm_calls_attempted') or 0)} skipped_budget={int(row.get('llm_skipped_due_budget') or 0)}"
+    )
+    warnings = [str(item) for item in row.get("warnings") or [] if str(item)]
+    if warnings:
+        rows.append("  warnings: " + "; ".join(warnings[:5]))
+    if row.get("failure"):
+        rows.append(f"  failure: {row.get('failure')}")
+
+
+def _append_run_ledger_activity_lines(rows: list[str], row: Mapping[str, Any]) -> None:
+    rows.append(
+        "  "
+        f"raw={int(row.get('raw_events') or 0)} anomalies={int(row.get('market_anomalies') or 0)} "
+        f"queries={int(row.get('catalyst_queries') or 0)} accepted={int(row.get('catalyst_results_accepted') or 0)} "
+        f"rejected={int(row.get('catalyst_results_rejected') or 0)} candidates={int(row.get('candidates') or 0)} "
+        f"alerts={int(row.get('alerts') or 0)} routed={int(row.get('routed') or 0)} "
+        f"alertable={int(row.get('alertable') or 0)} sent={str(bool(row.get('sent'))).lower()} "
+        f"send={int(row.get('send_items_delivered') or 0)}/{int(row.get('send_items_attempted') or 0)} "
+        f"would_send={int(row.get('send_would_send_items') or 0)}"
+    )
+    rows.append(
+        "  "
+        f"hypotheses={int(row.get('impact_hypotheses') or 0)} "
+        f"validated={int(row.get('hypotheses_validated') or 0)} "
+        f"hypothesis_queries={int(row.get('hypothesis_search_queries') or 0)} "
+        f"hypothesis_results={int(row.get('hypothesis_search_results') or 0)} "
+        f"promotions={int(row.get('hypothesis_promotions') or 0)}"
+    )
+    rows.append(
+        "  "
+        f"evidence_acquisition attempted={int(row.get('evidence_acquisition_attempted') or 0)} "
+        f"accepted={int(row.get('evidence_acquisition_accepted') or 0)} "
+        f"rejected_only={int(row.get('evidence_acquisition_rejected_only') or 0)} "
+        f"upgraded={int(row.get('evidence_acquisition_upgraded') or 0)} "
+        f"rows={int(row.get('evidence_acquisition_rows_written') or 0)}"
+    )
+    if row.get("cryptopanic_configured") or row.get("cryptopanic_attempted") or row.get("cryptopanic_skip_reason"):
+        rows.append(
+            "  "
+            f"cryptopanic configured={str(bool(row.get('cryptopanic_configured'))).lower()} "
+            f"attempted={str(bool(row.get('cryptopanic_attempted'))).lower()} "
+            f"requests={int(row.get('cryptopanic_requests_used') or 0)} "
+            f"results={int(row.get('cryptopanic_results') or 0)} "
+            f"accepted={int(row.get('cryptopanic_accepted_evidence') or 0)} "
+            f"rejected={int(row.get('cryptopanic_rejected_evidence') or 0)} "
+            f"status={row.get('cryptopanic_effective_provider_status') or row.get('cryptopanic_provider_status') or 'not_observed'} "
+            f"skip={row.get('cryptopanic_skip_reason') or 'none'} "
+            f"raw_status={row.get('cryptopanic_raw_provider_status') or row.get('cryptopanic_provider_status') or 'not_observed'} "
+            f"successes={int(row.get('cryptopanic_successful_requests') or 0)} "
+            f"failures={int(row.get('cryptopanic_failed_requests') or 0)} "
+            f"stale_backoff_reconciled={str(bool(row.get('cryptopanic_stale_backoff_reconciled_after_success'))).lower()}"
+        )
+    rows.append(
+        "  "
+        f"catalyst_frames analyzed={int(row.get('catalyst_frames_analyzed') or 0)} "
+        f"validated={int(row.get('catalyst_frame_validations') or 0)} "
+        f"disagreements={int(row.get('catalyst_frame_disagreements') or 0)} "
+        f"unresolved={int(row.get('catalyst_frame_unresolved') or 0)} "
+        f"skipped={int(row.get('catalyst_frame_rows_skipped') or 0)}"
+    )
+
+
+def _append_run_ledger_skip_and_lane_lines(rows: list[str], row: Mapping[str, Any]) -> None:
+    query_types = row.get("hypothesis_search_queries_by_type") or {}
+    result_types = row.get("hypothesis_search_results_by_type") or {}
+    if query_types or result_types:
+        rows.append(
+            "  hypothesis_query_types: "
+            f"queries={_format_reason_counts(query_types)} "
+            f"results={_format_reason_counts(result_types)}"
+        )
+    for key, label in (
+        ("catalyst_search_skip_reasons", "catalyst_search_skip_reasons"),
+        ("hypothesis_search_skip_reasons", "hypothesis_search_skip_reasons"),
+        ("catalyst_frame_skip_reasons", "catalyst_frame_skip_reasons"),
+    ):
+        reasons = row.get(key) or {}
+        if isinstance(reasons, Mapping) and reasons:
+            rows.append(f"  {label}: " + _format_reason_counts(reasons))
+    lane_attempted = row.get("send_lane_items_attempted") or {}
+    lane_delivered = row.get("send_lane_items_delivered") or {}
+    if lane_attempted or lane_delivered:
+        rows.append(
+            "  send_lanes: "
+            + ", ".join(
+                f"{lane}={int(lane_delivered.get(lane) or 0)}/{int(lane_attempted.get(lane) or 0)}"
+                for lane in sorted(set(lane_attempted) | set(lane_delivered))
+            )
+        )
+    if row.get("research_review_digest_enabled") or row.get("research_review_digest_candidates"):
+        rows.append(
+            "  research_review_digest: "
+            f"enabled={str(bool(row.get('research_review_digest_enabled'))).lower()} "
+            f"candidates={int(row.get('research_review_digest_candidates') or 0)} "
+            f"would_send={int(row.get('research_review_digest_would_send') or 0)} "
+            f"sent={int(row.get('research_review_digest_sent') or 0)} "
+            f"block={row.get('research_review_digest_block_reason') or 'none'}"
+        )
+
+
+def _append_run_ledger_write_lines(rows: list[str], row: Mapping[str, Any]) -> None:
+    rows.append(
+        "  "
+        f"snapshots={int(row.get('snapshot_rows_written') or 0)} "
+        f"attempted={str(bool(row.get('snapshot_write_attempted'))).lower()} "
+        f"success={str(bool(row.get('snapshot_write_success'))).lower()} "
+        f"block={row.get('snapshot_write_block_reason') or 'none'}"
+    )
+    rows.append(
+        "  "
+        f"hypothesis_store={int(row.get('hypothesis_rows_written') or 0)} "
+        f"attempted={str(bool(row.get('hypothesis_write_attempted'))).lower()} "
+        f"success={str(bool(row.get('hypothesis_write_success'))).lower()} "
+        f"block={row.get('hypothesis_write_block_reason') or 'none'}"
+    )
+    rows.append(
+        "  "
+        f"incident_store={int(row.get('incident_rows_written') or 0)} "
+        f"attempted={str(bool(row.get('incident_write_attempted'))).lower()} "
+        f"success={str(bool(row.get('incident_write_success'))).lower()} "
+        f"block={row.get('incident_write_block_reason') or 'none'} "
+        f"linked_hypotheses={int(row.get('incident_linked_hypotheses') or 0)} "
+        f"linked_watchlist={int(row.get('incident_linked_watchlist_rows') or 0)}"
+    )
+    rows.append(
+        "  "
+        f"core_opportunity_store={int(row.get('core_opportunity_rows_written') or 0)} "
+        f"attempted={str(bool(row.get('core_opportunity_write_attempted'))).lower()} "
+        f"success={str(bool(row.get('core_opportunity_write_success'))).lower()} "
+        f"block={row.get('core_opportunity_write_block_reason') or 'none'}"
+    )
 
 
 def _run_record(
@@ -396,7 +408,70 @@ def _run_record(
         or str(getattr(result, "run_mode", "") or "") == "notification_burn_in"
         or str(profile or "").startswith("notify_")
     )
-    row = {
+    row = _run_record_base_fields(
+        result,
+        profile=profile,
+        run_id=run_id,
+        started_at=started_at,
+        finished_at=finished_at,
+        with_llm=with_llm,
+        notify_burn=notify_burn,
+        clock_status=clock_status,
+        market_anomalies=market_anomalies,
+        research_observed_at=research_observed_at,
+        wall_started_at=wall_started_at,
+        wall_finished_at=wall_finished_at,
+    )
+    row.update(_run_record_source_fields(
+        result,
+        catalyst=catalyst,
+        discovery=discovery,
+        extraction_rows=extraction_rows,
+        catalyst_frame_rows=catalyst_frame_rows,
+        catalyst_frame_counts=catalyst_frame_counts,
+        warnings=warnings,
+    ))
+    row.update(_run_record_evidence_and_provider_fields(result, acquisition=acquisition))
+    row.update(_run_record_notification_fields(
+        result,
+        profile=profile,
+        notify_burn=notify_burn,
+        send_requested=send_requested,
+    ))
+    row.update(_run_record_artifact_write_fields(
+        result,
+        raw_card_paths=raw_card_paths,
+        card_paths=card_paths,
+    ))
+    row.update(_run_record_cache_and_path_fields(
+        result,
+        catalyst=catalyst,
+        watchlist=watchlist,
+        router=router,
+        llm_stats=llm_stats,
+        warnings=warnings,
+        success=success,
+        failure=failure,
+    ))
+    return event_artifact_paths.normalize_operator_path_fields(row)
+
+
+def _run_record_base_fields(
+    result: Any,
+    *,
+    profile: str | None,
+    run_id: str,
+    started_at: datetime,
+    finished_at: datetime,
+    with_llm: bool,
+    notify_burn: bool,
+    clock_status: Mapping[str, Any],
+    market_anomalies: int,
+    research_observed_at: Any,
+    wall_started_at: Any,
+    wall_finished_at: Any,
+) -> dict[str, Any]:
+    return {
         "schema_id": "run_ledger_v1",
         "schema_version": RUN_LEDGER_SCHEMA_VERSION,
         "row_type": "event_alpha_run",
@@ -421,6 +496,20 @@ def _run_record(
         "cycle_completed": bool(getattr(result, "cycle_completed", True)),
         "partial_results": bool(getattr(result, "partial_results", False)),
         "market_anomalies": market_anomalies,
+    }
+
+
+def _run_record_source_fields(
+    result: Any,
+    *,
+    catalyst: Any,
+    discovery: Any,
+    extraction_rows: list[Any],
+    catalyst_frame_rows: list[Any],
+    catalyst_frame_counts: Mapping[str, Any],
+    warnings: list[str],
+) -> dict[str, Any]:
+    return {
         "market_state_snapshots": _int(getattr(result, "market_state_snapshots", 0)),
         "official_exchange_events": _int(getattr(result, "official_exchange_events", 0)),
         "official_listing_candidates": _int(getattr(result, "official_listing_candidates", 0)),
@@ -462,6 +551,11 @@ def _run_record(
         "hypothesis_search_results_by_type": _query_type_counts(getattr(result, "hypothesis_search_result", None), "result_events"),
         "hypothesis_search_skip_reasons": _hypothesis_search_skip_reasons(result, warnings=warnings),
         "hypothesis_promotions": _int(getattr(result, "hypothesis_promotions", 0)),
+    }
+
+
+def _run_record_evidence_and_provider_fields(result: Any, *, acquisition: Any) -> dict[str, Any]:
+    return {
         "evidence_acquisition_attempted": _int(getattr(result, "evidence_acquisition_attempted", 0)),
         "evidence_acquisition_accepted": _int(getattr(result, "evidence_acquisition_accepted", 0)),
         "evidence_acquisition_rejected_only": _int(getattr(result, "evidence_acquisition_rejected_only", 0)),
@@ -482,6 +576,17 @@ def _run_record(
         "cryptopanic_rejected_evidence": _int(getattr(result, "cryptopanic_rejected_evidence", 0)),
         "cryptopanic_provider_status": str(getattr(result, "cryptopanic_provider_status", "") or "not_observed"),
         "cryptopanic_skip_reason": getattr(result, "cryptopanic_skip_reason", None),
+    }
+
+
+def _run_record_notification_fields(
+    result: Any,
+    *,
+    profile: str | None,
+    notify_burn: bool,
+    send_requested: bool,
+) -> dict[str, Any]:
+    return {
         "candidates": _int(getattr(result, "candidates", 0)),
         "clusters": _int(getattr(result, "clusters", 0)),
         "alerts": len(list(getattr(result, "alerts", ()) or ())),
@@ -523,6 +628,16 @@ def _run_record(
         "notification_summary": _notification_summary(result, profile=profile, notify_burn=notify_burn),
         "send_block_reason": getattr(result, "send_block_reason", None),
         "sent": bool(getattr(result, "send_success", False)),
+    }
+
+
+def _run_record_artifact_write_fields(
+    result: Any,
+    *,
+    raw_card_paths: tuple[str, ...],
+    card_paths: tuple[str, ...],
+) -> dict[str, Any]:
+    return {
         "snapshot_write_attempted": bool(getattr(result, "snapshot_write_attempted", False)),
         "snapshot_write_success": bool(getattr(result, "snapshot_write_success", False)),
         "snapshot_rows_written": _int(getattr(result, "snapshot_rows_written", 0)),
@@ -550,6 +665,21 @@ def _run_record(
         "research_cards_written": _int(getattr(result, "research_cards_written", len(card_paths))),
         "research_card_paths": card_paths,
         "research_card_paths_abs_debug": raw_card_paths if raw_card_paths else (),
+    }
+
+
+def _run_record_cache_and_path_fields(
+    result: Any,
+    *,
+    catalyst: Any,
+    watchlist: Any,
+    router: Any,
+    llm_stats: Mapping[str, int],
+    warnings: list[str],
+    success: bool,
+    failure: str | None,
+) -> dict[str, Any]:
+    return {
         "provider_fetch_count": _int(getattr(catalyst, "provider_fetch_count", 0)),
         "provider_cache_hits": _int(getattr(catalyst, "provider_cache_hits", 0)),
         "provider_cache_misses": _int(getattr(catalyst, "provider_cache_misses", 0)),
@@ -567,7 +697,6 @@ def _run_record(
         "success": bool(success),
         "failure": failure,
     }
-    return event_artifact_paths.normalize_operator_path_fields(row)
 
 
 def _notification_summary(result: Any, *, profile: str | None, notify_burn: bool) -> dict[str, Any]:
