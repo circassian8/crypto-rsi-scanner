@@ -441,6 +441,10 @@ class _DoctorResultNamespaceSchemaFields:
     invalid_safety_fields: int = 0
     deprecated_field_usage: int = 0
     active_shim_modules_with_implementation_logic: int = 0
+    old_path_internal_imports: int = 0
+    old_path_test_imports: int = 0
+    old_path_docs_references: int = 0
+    old_path_import_allowed_exceptions: int = 0
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
 

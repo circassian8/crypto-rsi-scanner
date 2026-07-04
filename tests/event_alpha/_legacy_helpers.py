@@ -38,7 +38,8 @@ from crypto_rsi_scanner.indicators import (
     wilder_rsi,
 )
 from crypto_rsi_scanner.scanner import classify_tier
-from crypto_rsi_scanner import event_provider_status, formatting
+from crypto_rsi_scanner import formatting
+import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 
 
 
@@ -296,7 +297,7 @@ def _test_normalized_event(
 
 def _event_discovery_fixture_result():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
     from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
@@ -312,7 +313,7 @@ def _event_discovery_fixture_result():
 
 def _full_event_discovery_fixture_result():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
 
     events_path, aliases_path = _event_discovery_fixture_paths()
     binance_path, bybit_path = _exchange_announcement_fixture_paths()
@@ -391,7 +392,7 @@ def _full_event_discovery_config_values():
 
 def _llm_golden_result():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
     from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
@@ -410,7 +411,8 @@ def _llm_golden_result():
 
 def _llm_packet_for(result, event_id, coin_id):
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alerts, event_llm_analyzer
+    import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+    import crypto_rsi_scanner.event_alpha.radar.llm.analyzer as event_llm_analyzer
 
     alerts = event_alerts.build_event_alert_candidates(
         result,
@@ -441,7 +443,8 @@ def _llm_packet_for(result, event_id, coin_id):
 
 def _llm_golden_alerts_and_rows(min_prefilter_score=0):
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alerts, event_llm_analyzer
+    import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+    import crypto_rsi_scanner.event_alpha.radar.llm.analyzer as event_llm_analyzer
     from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMRelationshipProvider
 
     result = _llm_golden_result()
@@ -464,7 +467,7 @@ def _llm_golden_alerts_and_rows(min_prefilter_score=0):
 
 def _llm_extraction_rows():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_llm_extractor
+    import crypto_rsi_scanner.event_alpha.radar.llm.extractor as event_llm_extractor
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
     from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMExtractionProvider
 
@@ -512,7 +515,7 @@ def _fresh_storage():
 
 
 def _test_watchlist_entry(*, state: str, symbol: str, coin_id: str):
-    from crypto_rsi_scanner import event_watchlist
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     high_priority = state == event_watchlist.EventWatchlistState.HIGH_PRIORITY.value
     return event_watchlist.EventWatchlistEntry(
@@ -587,7 +590,8 @@ class _NotifyFakeStorage:
 
 
 def _notify_route_decision(symbol, lane, route):
-    from crypto_rsi_scanner import event_alpha_router, event_watchlist
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     entry = event_watchlist.EventWatchlistEntry(
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
@@ -625,7 +629,8 @@ def _notify_suppressed_decision(
     source="fixture_source",
     reason="raw/store-only evidence, no alertable watchlist state",
 ):
-    from crypto_rsi_scanner import event_alpha_router, event_watchlist
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     entry = event_watchlist.EventWatchlistEntry(
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
@@ -701,7 +706,8 @@ def _research_review_decision(symbol="DOGE", *, score=66, level="exploratory", p
 
 
 def _canonical_core_fixture_rows() -> list[dict[str, object]]:
-    from crypto_rsi_scanner import event_alpha_router, event_watchlist
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     base = {
         "profile": "market_refresh_smoke",

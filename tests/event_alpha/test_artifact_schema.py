@@ -32,14 +32,12 @@ def test_doctor_check_registry_declares_schema_dependencies():
 
 
 def test_artifact_module_import_shims_match_new_package_paths():
-    from crypto_rsi_scanner import (
-        event_alpha_artifacts as old_context,
-        event_alpha_namespace_status as old_namespace_status,
-        event_alpha_retention as old_retention,
-        event_alpha_run_ledger as old_run_ledger,
-        event_alpha_run_lock as old_locks,
-        event_artifact_paths as old_paths,
-    )
+    import crypto_rsi_scanner.event_alpha.artifacts.context as old_context
+    import crypto_rsi_scanner.event_alpha.namespace.status as old_namespace_status
+    import crypto_rsi_scanner.event_alpha.artifacts.retention as old_retention
+    import crypto_rsi_scanner.event_alpha.artifacts.run_ledger as old_run_ledger
+    import crypto_rsi_scanner.event_alpha.artifacts.locks as old_locks
+    import crypto_rsi_scanner.event_alpha.artifacts.paths as old_paths
     from crypto_rsi_scanner.event_alpha.artifacts import (
         context as new_context,
         locks as new_locks,
@@ -69,14 +67,12 @@ def test_large_event_alpha_internal_modules_have_small_public_wrappers():
     import inspect
     from pathlib import Path
 
-    from crypto_rsi_scanner import (
-        event_alpha_daily_brief as old_daily_brief,
-        event_core_opportunity_store as old_core_store,
-        event_evidence_acquisition as old_evidence,
-        event_impact_hypotheses as old_hypotheses,
-        event_integrated_radar as old_integrated,
-        event_research_cards as old_research_cards,
-    )
+    import crypto_rsi_scanner.event_alpha.artifacts.daily_brief as old_daily_brief
+    import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as old_core_store
+    import crypto_rsi_scanner.event_alpha.radar.evidence_acquisition as old_evidence
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as old_hypotheses
+    import crypto_rsi_scanner.event_alpha.radar.integrated_radar as old_integrated
+    import crypto_rsi_scanner.event_alpha.artifacts.research_cards as old_research_cards
     from crypto_rsi_scanner.event_alpha.artifacts import daily_brief, research_cards
     from crypto_rsi_scanner.event_alpha.artifacts.daily_brief import builder as daily_builder
     from crypto_rsi_scanner.event_alpha.artifacts.research_cards import renderer as card_renderer
@@ -178,7 +174,7 @@ def test_event_impact_hypothesis_store_reports_schema_and_promotion_diagnostics(
     from datetime import datetime, timezone
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import event_impact_hypothesis_store
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store as event_impact_hypothesis_store
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     rows = [
@@ -258,7 +254,7 @@ def test_event_impact_hypothesis_store_reports_schema_and_promotion_diagnostics(
 
 def test_event_llm_source_triage_schema_and_quote_validation():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_source_enrichment
+    import crypto_rsi_scanner.event_alpha.radar.source_enrichment as event_source_enrichment
     from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMSourceQualityProvider
 
@@ -418,14 +414,12 @@ def test_event_llm_source_triage_schema_and_quote_validation():
 def test_official_exchange_activation_schema_for_bybit_and_binance_fixture_artifacts():
     import json
 
-    from crypto_rsi_scanner import (
-        config,
-        event_alpha_artifact_doctor,
-        event_alpha_source_coverage,
-        event_official_exchange,
-        event_official_exchange_activation,
-        event_provider_status,
-    )
+    from crypto_rsi_scanner import config
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.radar.source_coverage as event_alpha_source_coverage
+    import crypto_rsi_scanner.event_alpha.providers.official_exchange as event_official_exchange
+    import crypto_rsi_scanner.event_alpha.providers.official_exchange_activation as event_official_exchange_activation
+    import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)

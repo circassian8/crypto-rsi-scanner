@@ -27,8 +27,12 @@ DEPENDENCY_REPORT_JSON = "EVENT_ALPHA_SHIM_DEPENDENCY_REPORT.json"
 DEPENDENCY_REPORT_MD = "EVENT_ALPHA_SHIM_DEPENDENCY_REPORT.md"
 REMOVAL_CANDIDATES_JSON = "EVENT_ALPHA_SHIM_REMOVAL_CANDIDATES.json"
 REMOVAL_CANDIDATES_MD = "EVENT_ALPHA_SHIM_REMOVAL_CANDIDATES.md"
+OLD_IMPORT_CHECK_JSON = "EVENT_ALPHA_OLD_IMPORT_CHECK.json"
+OLD_IMPORT_CHECK_MD = "EVENT_ALPHA_OLD_IMPORT_CHECK.md"
 SHIM_SCHEMA_VERSION = "event_alpha_shim_registry_v1"
 SHIM_DEPENDENCY_SCHEMA_VERSION = "event_alpha_shim_dependency_report_v1"
+OLD_IMPORT_CHECK_SCHEMA_VERSION = "event_alpha_old_import_check_v1"
+LEGACY_IMPORT_COMPATIBILITY_TEST = "tests/event_alpha/test_legacy_import_compatibility.py"
 
 STATUS_ACTIVE_SHIM = "active_shim"
 STATUS_PARTIAL_SHIM = "partial_shim"
@@ -37,6 +41,7 @@ SHIM_STATUSES = (STATUS_ACTIVE_SHIM, STATUS_PARTIAL_SHIM, STATUS_NOT_MIGRATED)
 
 _PARTIAL_SHIMS: dict[str, str] = {}
 _DEPENDENCY_WARNING_SUMMARY_CACHE: tuple[int, int, tuple[str, ...]] | None = None
+_OLD_IMPORT_COUNTER_SUMMARY_CACHE: tuple[int, int, int, int] | None = None
 
 PUBLIC_COMPATIBILITY_SHIMS = {
     "crypto_rsi_scanner.event_alpha_artifact_doctor",
@@ -336,6 +341,7 @@ def build_shim_dependency_report(
     audit = audit_entries(entries, root=repo_root, generated_at=generated_at)
     references = _scan_dependency_references(entries, repo_root=repo_root)
     rows = []
+    old_import_rows = []
     removal_groups: dict[str, list[dict[str, object]]] = {
         "remove_now_candidates": [],
         "migrate_imports_first": [],
@@ -347,6 +353,7 @@ def build_shim_dependency_report(
         grouped = references.get(entry.old_module, {})
         row = _dependency_row(entry, grouped)
         rows.append(row)
+        old_import_rows.append(_old_import_check_row(entry, grouped))
         _append_removal_group(removal_groups, row)
 
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
@@ -361,7 +368,8 @@ def build_shim_dependency_report(
     public_compatibility_count = sum(
         1 for row in rows if row.get("recommended_action") == "keep_public_entrypoint"
     )
-    old_path_docs_references = sum(len(row["docs_references"]) for row in rows) + sum(
+    old_import_check = _old_import_check_from_rows(old_import_rows)
+    old_path_docs_reference_total = sum(len(row["docs_references"]) for row in rows) + sum(
         len(row["artifact_doc_references"]) for row in rows
     )
     docs_deprecated_warnings = [
@@ -395,14 +403,21 @@ def build_shim_dependency_report(
         "dynamic_import_reference_count": sum(len(row["dynamic_import_references"]) for row in rows),
         "artifact_doc_reference_count": sum(len(row["artifact_doc_references"]) for row in rows),
         "safe_to_remove_count": safe_to_remove_count,
+        "old_path_internal_imports": old_import_check["old_path_internal_imports"],
+        "old_path_test_imports": old_import_check["old_path_test_imports"],
+        "old_path_docs_references": old_import_check["old_path_docs_references"],
+        "old_path_import_allowed_exceptions": old_import_check["old_path_import_allowed_exceptions"],
+        "old_path_docs_reference_total": old_path_docs_reference_total,
         "v3_gate_status": "pending" if nonessential_rows or internal_import_count or docs_deprecated_warnings else "pass",
         "v3_auto_accept_ready": not (nonessential_rows or internal_import_count or docs_deprecated_warnings),
         "v3_gates": {
             "nonessential_shims_remaining": len(nonessential_rows),
-            "old_path_internal_imports": internal_import_count,
+            "old_path_internal_imports": old_import_check["old_path_internal_imports"],
+            "old_path_test_imports": old_import_check["old_path_test_imports"],
             "public_compatibility_shims": public_compatibility_count,
             "shim_removal_blockers": len(nonessential_blocker_rows),
-            "old_path_docs_references": old_path_docs_references,
+            "old_path_docs_references": old_import_check["old_path_docs_references"],
+            "old_path_import_allowed_exceptions": old_import_check["old_path_import_allowed_exceptions"],
         },
         "nonessential_shim_rows": [_candidate_row(row) for row in nonessential_rows],
         "shim_removal_blocker_rows": [_candidate_row(row) for row in nonessential_blocker_rows],
@@ -452,6 +467,85 @@ def write_shim_dependency_report(
     return dep_json_path, dep_md_path, removal_json_path, removal_md_path, report
 
 
+def build_old_import_check_report(
+    *,
+    root: str | Path | None = None,
+    generated_at: datetime | None = None,
+) -> dict[str, object]:
+    """Return the v3 old flat-import lint report.
+
+    This is stricter than the dependency report: it only blocks import-like
+    references outside explicit compatibility boundaries. Plain text policy
+    references remain visible as counters without pretending they are imports.
+    """
+    repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
+    entries = registry_entries()
+    references = _scan_dependency_references(entries, repo_root=repo_root)
+    rows: list[dict[str, object]] = []
+    for entry in entries:
+        rows.append(_old_import_check_row(entry, references.get(entry.old_module, {})))
+    counters = _old_import_check_from_rows(rows)
+    generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
+    blocked_internal = [
+        row for row in rows if row.get("blocked_internal_import_references")
+    ]
+    blocked_tests = [
+        row for row in rows if row.get("blocked_test_import_references")
+    ]
+    blocked_dynamic = [
+        row for row in rows if row.get("blocked_dynamic_import_references")
+    ]
+    blocked_docs = [
+        row for row in rows if row.get("blocked_docs_references")
+    ]
+    blockers = [*blocked_internal, *blocked_tests, *blocked_dynamic, *blocked_docs]
+    return {
+        "schema_version": OLD_IMPORT_CHECK_SCHEMA_VERSION,
+        "row_type": "event_alpha_old_import_check",
+        "generated_at": generated,
+        "status": "BLOCKED" if blockers else "OK",
+        "research_only": True,
+        "no_send_rehearsal": True,
+        "strict_alerts_created": 0,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "paper_trades_created": 0,
+        "normal_rsi_signal_rows_written": 0,
+        "triggered_fade_created": 0,
+        "legacy_import_compatibility_test": LEGACY_IMPORT_COMPATIBILITY_TEST,
+        "allowed_public_wrapper_modules": sorted(PUBLIC_COMPATIBILITY_SHIMS),
+        "registry_entry_count": len(rows),
+        "old_path_internal_imports": counters["old_path_internal_imports"],
+        "old_path_test_imports": counters["old_path_test_imports"],
+        "old_path_docs_references": counters["old_path_docs_references"],
+        "old_path_import_allowed_exceptions": counters["old_path_import_allowed_exceptions"],
+        "old_path_text_references": counters["old_path_text_references"],
+        "blocked_module_count": len(blockers),
+        "blocked_internal_modules": [_candidate_row(row) for row in blocked_internal],
+        "blocked_test_modules": [_candidate_row(row) for row in blocked_tests],
+        "blocked_dynamic_modules": [_candidate_row(row) for row in blocked_dynamic],
+        "blocked_docs_modules": [_candidate_row(row) for row in blocked_docs],
+        "entries": rows,
+    }
+
+
+def write_old_import_check_report(
+    *,
+    out_dir: str | Path | None = None,
+    root: str | Path | None = None,
+    generated_at: datetime | None = None,
+) -> tuple[Path, Path, dict[str, object]]:
+    repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
+    target = Path(out_dir).expanduser() if out_dir is not None else repo_root / "research"
+    target.mkdir(parents=True, exist_ok=True)
+    report = build_old_import_check_report(root=repo_root, generated_at=generated_at)
+    json_path = target / OLD_IMPORT_CHECK_JSON
+    md_path = target / OLD_IMPORT_CHECK_MD
+    json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    md_path.write_text(format_old_import_check_report(report), encoding="utf-8")
+    return json_path, md_path, report
+
+
 def shim_dependency_warning_summary() -> tuple[int, int, tuple[str, ...]]:
     global _DEPENDENCY_WARNING_SUMMARY_CACHE
     if _DEPENDENCY_WARNING_SUMMARY_CACHE is not None:
@@ -470,6 +564,21 @@ def shim_dependency_warning_summary() -> tuple[int, int, tuple[str, ...]]:
     return _DEPENDENCY_WARNING_SUMMARY_CACHE
 
 
+def old_import_check_counter_summary() -> tuple[int, int, int, int]:
+    """Return blocked internal/test/docs imports plus allowed exception count."""
+    global _OLD_IMPORT_COUNTER_SUMMARY_CACHE
+    if _OLD_IMPORT_COUNTER_SUMMARY_CACHE is not None:
+        return _OLD_IMPORT_COUNTER_SUMMARY_CACHE
+    report = build_old_import_check_report()
+    _OLD_IMPORT_COUNTER_SUMMARY_CACHE = (
+        int(report.get("old_path_internal_imports") or 0),
+        int(report.get("old_path_test_imports") or 0),
+        int(report.get("old_path_docs_references") or 0),
+        int(report.get("old_path_import_allowed_exceptions") or 0),
+    )
+    return _OLD_IMPORT_COUNTER_SUMMARY_CACHE
+
+
 def format_shim_dependency_report(report: dict[str, object]) -> str:
     lines = [
         "# Event Alpha Shim Dependency Report",
@@ -485,6 +594,10 @@ def format_shim_dependency_report(report: dict[str, object]) -> str:
         f"- docs_reference_count: {report.get('docs_reference_count', 0)}",
         f"- dynamic_import_reference_count: {report.get('dynamic_import_reference_count', 0)}",
         f"- safe_to_remove_count: {report.get('safe_to_remove_count', 0)}",
+        f"- old_path_internal_imports: {report.get('old_path_internal_imports', 0)}",
+        f"- old_path_test_imports: {report.get('old_path_test_imports', 0)}",
+        f"- old_path_docs_references: {report.get('old_path_docs_references', 0)}",
+        f"- old_path_import_allowed_exceptions: {report.get('old_path_import_allowed_exceptions', 0)}",
         f"- active_shim_modules_with_implementation_logic: {report.get('active_shim_modules_with_implementation_logic', 0)}",
         f"- v3_gate_status: {report.get('v3_gate_status')}",
         f"- v3_auto_accept_ready: {report.get('v3_auto_accept_ready')}",
@@ -505,9 +618,11 @@ def format_shim_dependency_report(report: dict[str, object]) -> str:
     for gate in (
         "nonessential_shims_remaining",
         "old_path_internal_imports",
+        "old_path_test_imports",
         "public_compatibility_shims",
         "shim_removal_blockers",
         "old_path_docs_references",
+        "old_path_import_allowed_exceptions",
     ):
         lines.append(f"| `{gate}` | {v3_gates.get(gate, 0)} |")
     lines.extend(
@@ -542,6 +657,54 @@ def format_shim_dependency_report(report: dict[str, object]) -> str:
             if isinstance(row, dict):
                 lines.append(f"- `{row.get('old_module')}`: {row.get('reason')}")
     else:
+        lines.append("- none")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def format_old_import_check_report(report: dict[str, object]) -> str:
+    lines = [
+        "# Event Alpha Old Import Check",
+        "",
+        "Research artifact only. This lint-style check does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.",
+        "",
+        f"- generated_at: {report.get('generated_at')}",
+        f"- status: {report.get('status')}",
+        f"- registry_entry_count: {report.get('registry_entry_count', 0)}",
+        f"- old_path_internal_imports: {report.get('old_path_internal_imports', 0)}",
+        f"- old_path_test_imports: {report.get('old_path_test_imports', 0)}",
+        f"- old_path_docs_references: {report.get('old_path_docs_references', 0)}",
+        f"- old_path_import_allowed_exceptions: {report.get('old_path_import_allowed_exceptions', 0)}",
+        f"- old_path_text_references: {report.get('old_path_text_references', 0)}",
+        "",
+        "## Policy",
+        "",
+        "- Product code and ordinary tests must import canonical Event Alpha package paths.",
+        f"- Old flat shim imports are allowed only in `{LEGACY_IMPORT_COMPATIBILITY_TEST}`, shim modules themselves, `scanner.py`, and documented public compatibility wrappers.",
+        "- `event_fade.py` remains intentionally outside Event Alpha and is not an old Event Alpha shim.",
+        "",
+        "## Blockers",
+        "",
+    ]
+    blocked_sections = (
+        ("blocked_internal_modules", "Internal Imports"),
+        ("blocked_test_modules", "Test Imports"),
+        ("blocked_dynamic_modules", "Dynamic Imports"),
+        ("blocked_docs_modules", "Documentation References"),
+    )
+    any_blockers = False
+    for key, title in blocked_sections:
+        rows = report.get(key) if isinstance(report.get(key), list) else []
+        if not rows:
+            continue
+        any_blockers = True
+        lines.extend([f"### {title}", ""])
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            blockers = ", ".join(str(item) for item in row.get("removal_blockers", [])) or "old_path_reference"
+            lines.append(f"- `{row.get('old_module')}` -> `{row.get('new_module')}` ({blockers})")
+        lines.append("")
+    if not any_blockers:
         lines.append("- none")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -627,6 +790,114 @@ def _scan_dependency_references(
             )
         _scan_text_references(path, rel_path=rel_path, category=category, old_modules=old_modules, refs=refs)
     return refs
+
+
+def _old_import_check_row(
+    entry: ShimRegistryEntry,
+    grouped: dict[str, list[dict[str, object]]],
+) -> dict[str, object]:
+    internal_refs = grouped.get("internal_import_references", [])
+    test_refs = grouped.get("test_import_references", [])
+    dynamic_refs = grouped.get("dynamic_import_references", [])
+    docs_refs = grouped.get("docs_references", [])
+    artifact_refs = grouped.get("artifact_doc_references", [])
+    import_like_internal = [ref for ref in internal_refs if _ref_is_import_like(ref)]
+    import_like_tests = [ref for ref in test_refs if _ref_is_import_like(ref)]
+    import_like_dynamic = [ref for ref in dynamic_refs if _ref_is_import_like(ref)]
+    blocked_internal = [
+        ref for ref in import_like_internal if not _old_import_ref_is_allowed(entry, ref)
+    ]
+    blocked_tests = [
+        ref for ref in import_like_tests if not _old_import_ref_is_allowed(entry, ref)
+    ]
+    blocked_dynamic = [
+        ref for ref in import_like_dynamic if not _old_import_ref_is_allowed(entry, ref)
+    ]
+    text_refs = [
+        ref
+        for ref in [*internal_refs, *test_refs, *dynamic_refs, *docs_refs, *artifact_refs]
+        if not _ref_is_import_like(ref)
+    ]
+    docs_blocked = [
+        ref
+        for ref in [*docs_refs, *artifact_refs]
+        if not _docs_refs_are_policy_scoped([ref])
+    ]
+    allowed_refs = [
+        ref
+        for ref in [*import_like_internal, *import_like_tests, *import_like_dynamic]
+        if _old_import_ref_is_allowed(entry, ref)
+    ]
+    allowed_refs.extend(ref for ref in text_refs if _old_import_ref_is_allowed(entry, ref))
+    return {
+        "old_module": entry.old_module,
+        "new_module": entry.new_module,
+        "shim_status": entry.shim_status,
+        "allowed_exports": list(entry.allowed_exports),
+        "blocked_internal_import_references": blocked_internal,
+        "blocked_test_import_references": blocked_tests,
+        "blocked_dynamic_import_references": blocked_dynamic,
+        "blocked_docs_references": docs_blocked,
+        "allowed_import_exception_references": allowed_refs,
+        "text_references": text_refs,
+        "recommended_action": "migrate_imports" if blocked_internal or blocked_tests or blocked_dynamic else "ok",
+        "safe_to_remove": False,
+        "removal_blockers": [
+            label
+            for label, refs in (
+                ("old_path_internal_imports", blocked_internal),
+                ("old_path_test_imports", blocked_tests),
+                ("old_path_dynamic_imports", blocked_dynamic),
+                ("old_path_docs_references", docs_blocked),
+            )
+            if refs
+        ],
+        "retention_reason": _retention_reason(entry, "keep_public_entrypoint")
+        if entry.old_module in PUBLIC_COMPATIBILITY_SHIMS
+        else "",
+    }
+
+
+def _old_import_check_from_rows(rows: Iterable[dict[str, object]]) -> dict[str, int]:
+    rows_tuple = tuple(rows)
+    return {
+        "old_path_internal_imports": sum(
+            len(row.get("blocked_internal_import_references") or []) for row in rows_tuple
+        ),
+        "old_path_test_imports": sum(
+            len(row.get("blocked_test_import_references") or []) for row in rows_tuple
+        ),
+        "old_path_docs_references": sum(
+            len(row.get("blocked_docs_references") or []) for row in rows_tuple
+        ),
+        "old_path_import_allowed_exceptions": sum(
+            len(row.get("allowed_import_exception_references") or []) for row in rows_tuple
+        ),
+        "old_path_text_references": sum(len(row.get("text_references") or []) for row in rows_tuple),
+    }
+
+
+def _old_import_ref_is_allowed(entry: ShimRegistryEntry, ref: dict[str, object]) -> bool:
+    path = str(ref.get("path") or "")
+    if path == LEGACY_IMPORT_COMPATIBILITY_TEST:
+        return True
+    if path == "crypto_rsi_scanner/scanner.py":
+        return True
+    if path == str(Path(*entry.old_module.split(".")).with_suffix(".py")):
+        return True
+    if entry.old_module in PUBLIC_COMPATIBILITY_SHIMS and path.startswith("crypto_rsi_scanner/"):
+        return True
+    return False
+
+
+def _ref_is_import_like(ref: dict[str, object]) -> bool:
+    return str(ref.get("reference_type") or "") in {
+        "import",
+        "from_import",
+        "from_package_import",
+        "relative_import",
+        "dynamic_import",
+    }
 
 
 def _dependency_row(entry: ShimRegistryEntry, grouped: dict[str, list[dict[str, object]]]) -> dict[str, object]:
@@ -785,6 +1056,12 @@ def _skip_dependency_path(path: Path, *, repo_root: Path) -> bool:
         f"research/{DEPENDENCY_REPORT_MD}",
         f"research/{REMOVAL_CANDIDATES_JSON}",
         f"research/{REMOVAL_CANDIDATES_MD}",
+        f"research/{OLD_IMPORT_CHECK_JSON}",
+        f"research/{OLD_IMPORT_CHECK_MD}",
+        "research/REFACTOR_FINAL_REPORT.json",
+        "research/REFACTOR_FINAL_REPORT.md",
+        "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
+        "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
     }:
         return True
     return False
@@ -839,6 +1116,21 @@ def _scan_python_import_references(
                         detail = f"relative_from:{'.' * node.level}{node.module or ''}:{alias.name}"
                         _add_ref(refs, old_module, import_category, rel_path, node.lineno, "relative_import", detail, lines)
             else:
+                if node.module == "crypto_rsi_scanner":
+                    for alias in node.names:
+                        old_module = old_by_leaf.get(alias.name)
+                        if old_module:
+                            detail = f"from_package:{node.module}:{alias.name}"
+                            _add_ref(
+                                refs,
+                                old_module,
+                                import_category,
+                                rel_path,
+                                node.lineno,
+                                "from_package_import",
+                                detail,
+                                lines,
+                            )
                 old_module = _old_module_for_import_name(node.module or "", old_modules)
                 if old_module:
                     _add_ref(refs, old_module, import_category, rel_path, node.lineno, "from_import", node.module or "", lines)
@@ -1018,6 +1310,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Write checked-in shim dependency and removal-candidate research reports.",
     )
+    parser.add_argument(
+        "--old-import-check",
+        action="store_true",
+        help="Write/fail the old flat Event Alpha import check report.",
+    )
     args = parser.parse_args(argv)
     if args.dependency_report:
         dep_json, dep_md, removal_json, removal_md, report = write_shim_dependency_report(out_dir=args.out_dir)
@@ -1030,6 +1327,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"internal_import_reference_count={report.get('internal_import_reference_count', 0)}")
         print(f"safe_to_remove_count={report.get('safe_to_remove_count', 0)}")
         return 0
+    if args.old_import_check:
+        json_path, md_path, report = write_old_import_check_report(out_dir=args.out_dir)
+        print(json_path)
+        print(md_path)
+        print(f"status={report.get('status')}")
+        print(f"old_path_internal_imports={report.get('old_path_internal_imports', 0)}")
+        print(f"old_path_test_imports={report.get('old_path_test_imports', 0)}")
+        print(f"old_path_docs_references={report.get('old_path_docs_references', 0)}")
+        print(f"old_path_import_allowed_exceptions={report.get('old_path_import_allowed_exceptions', 0)}")
+        return 0 if report.get("status") == "OK" else 1
     json_path, md_path, report = write_shim_report(out_dir=args.out_dir)
     print(json_path)
     print(md_path)

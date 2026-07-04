@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-04 - Event Alpha old flat imports are compatibility-only
+**Status:** accepted
+**Decision:** Internal project code and ordinary tests must import canonical
+Event Alpha package paths under `crypto_rsi_scanner.event_alpha.*` or other new
+canonical packages. Old flat Event Alpha paths remain available only as
+compatibility shims, documented public wrappers, or explicit legacy import
+compatibility coverage in `tests/event_alpha/test_legacy_import_compatibility.py`.
+`make event-alpha-old-import-check` is the lint-style gate for this boundary and
+its counters are surfaced in shim, doctor, and refactor reports.
+**Why:** The refactor v3 phase should retire internal dependence on old flat
+modules without deleting public compatibility shims prematurely. A focused
+allowlist protects CLI/Make/import compatibility while preventing new code from
+drifting back to old paths.
+**Revisit when:** a future accepted shim-removal phase deletes old paths or
+declares a specific old module a permanent public compatibility entrypoint.
+
 ## 2026-07-04 - Event Alpha refactor v3 finalization contract
 **Status:** accepted
 **Decision:** Refactor v3 is the finalization phase after accepted v2

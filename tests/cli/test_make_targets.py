@@ -758,7 +758,9 @@ def test_event_alpha_shim_dependency_report_make_target_is_available():
     policy = root / "research" / "EVENT_ALPHA_SHIM_RETIREMENT_POLICY.md"
 
     assert "event-alpha-shim-dependency-report:" in makefile
+    assert "event-alpha-old-import-check:" in makefile
     assert "--dependency-report --out-dir research" in makefile
+    assert "--old-import-check --out-dir research" in makefile
     assert "RSI_EVENT_ALERTS_ENABLED=0" in makefile
     assert policy.exists()
     policy_text = policy.read_text(encoding="utf-8")

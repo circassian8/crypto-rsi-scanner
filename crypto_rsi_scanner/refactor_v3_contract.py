@@ -26,6 +26,7 @@ CLASS_BLOCKER_LINE_LIMIT = 75
 V3_GATE_NAMES = (
     "nonessential_shims_remaining",
     "old_path_internal_imports",
+    "old_path_test_imports",
     "public_compatibility_shims",
     "shim_removal_blockers",
     "production_files_over_1200_lines",
@@ -34,6 +35,7 @@ V3_GATE_NAMES = (
     "class_exceptions_remaining",
     "functions_over_150_lines",
     "old_path_docs_references",
+    "old_path_import_allowed_exceptions",
 )
 
 
@@ -129,12 +131,11 @@ def build_v3_gate_snapshot(
     shim_blocker_rows = [
         row for row in nonessential_shims if isinstance(row.get("removal_blockers"), list) and row["removal_blockers"]
     ]
-    old_path_docs_references = int(shim_report.get("docs_reference_count") or 0) + int(
-        shim_report.get("artifact_doc_reference_count") or 0
-    )
+    old_path_docs_references = int(shim_report.get("old_path_docs_references") or 0)
     gate_values = {
         "nonessential_shims_remaining": len(nonessential_shims),
-        "old_path_internal_imports": int(shim_report.get("internal_import_reference_count") or 0),
+        "old_path_internal_imports": int(shim_report.get("old_path_internal_imports") or 0),
+        "old_path_test_imports": int(shim_report.get("old_path_test_imports") or 0),
         "public_compatibility_shims": _public_compatibility_shim_count(shim_report),
         "shim_removal_blockers": len(shim_blocker_rows),
         "production_files_over_1200_lines": len(production_over_1200_rows),
@@ -147,11 +148,15 @@ def build_v3_gate_snapshot(
         "class_exceptions_remaining": int(class_report.get("accepted_class_exceptions_count") or 0),
         "functions_over_150_lines": int(class_report.get("functions_over_limit_count") or 0),
         "old_path_docs_references": old_path_docs_references,
+        "old_path_import_allowed_exceptions": int(
+            shim_report.get("old_path_import_allowed_exceptions") or 0
+        ),
     }
     blocker_names = [
         name
         for name in V3_GATE_NAMES
-        if name != "public_compatibility_shims" and int(gate_values.get(name) or 0) > 0
+        if name not in {"public_compatibility_shims", "old_path_import_allowed_exceptions"}
+        and int(gate_values.get(name) or 0) > 0
     ]
     return {
         "schema_version": "refactor_v3_gate_snapshot_v1",
@@ -163,6 +168,7 @@ def build_v3_gate_snapshot(
         "gate_severity": {
             "nonessential_shims_remaining": "blocker",
             "old_path_internal_imports": "blocker",
+            "old_path_test_imports": "blocker",
             "public_compatibility_shims": "informational",
             "shim_removal_blockers": "blocker",
             "production_files_over_1200_lines": "target_gap",
@@ -171,6 +177,7 @@ def build_v3_gate_snapshot(
             "class_exceptions_remaining": "blocker_until_reaccepted_for_v3",
             "functions_over_150_lines": "blocker",
             "old_path_docs_references": "blocker_unless_policy_scoped",
+            "old_path_import_allowed_exceptions": "informational",
         },
         "nonessential_shim_rows": nonessential_shims[:200],
         "shim_removal_blocker_rows": shim_blocker_rows[:200],

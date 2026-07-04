@@ -1,7 +1,7 @@
 {
   "active_shim_modules_with_implementation_logic": 0,
   "active_shim_violations": [],
-  "artifact_doc_reference_count": 87,
+  "artifact_doc_reference_count": 0,
   "docs_deprecated_reference_warnings": [],
   "docs_reference_count": 128,
   "dynamic_import_reference_count": 0,
@@ -37,8 +37,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_integrated_radar",
-          "line": 13,
-          "path": "tests/event_alpha/test_integrated_radar.py",
+          "line": 14,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_integrated_radar\", \"crypto_rsi_scanner.event_alpha.radar.integrated_radar\", \"run_integrated_radar_cycle\"),"
         }
@@ -75,8 +75,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_market_anomaly_scanner",
-          "line": 16,
-          "path": "tests/event_alpha/test_integrated_radar.py",
+          "line": 17,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_market_anomaly_scanner\", \"crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner\", \"scan_market_rows\"),"
         }
@@ -113,8 +113,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_market_state",
-          "line": 14,
-          "path": "tests/event_alpha/test_integrated_radar.py",
+          "line": 15,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_market_state\", \"crypto_rsi_scanner.event_alpha.radar.market_state\", \"MarketStateSnapshot\"),"
         }
@@ -151,8 +151,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_market_reaction",
-          "line": 15,
-          "path": "tests/event_alpha/test_integrated_radar.py",
+          "line": 16,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_market_reaction\", \"crypto_rsi_scanner.event_alpha.radar.market_reaction\", \"evaluate_market_reaction\"),"
         }
@@ -189,8 +189,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_core_opportunities",
-          "line": 17,
-          "path": "tests/event_alpha/test_integrated_radar.py",
+          "line": 18,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_core_opportunities\", \"crypto_rsi_scanner.event_alpha.radar.core_opportunities\", \"CoreOpportunity\"),"
         }
@@ -227,8 +227,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_core_opportunity_store",
-          "line": 18,
-          "path": "tests/event_alpha/test_integrated_radar.py",
+          "line": 19,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_core_opportunity_store\", \"crypto_rsi_scanner.event_alpha.radar.core_opportunity_store\", \"EventCoreOpportunityStoreConfig\"),"
         }
@@ -265,8 +265,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_evidence_acquisition",
-          "line": 19,
-          "path": "tests/event_alpha/test_integrated_radar.py",
+          "line": 20,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_evidence_acquisition\", \"crypto_rsi_scanner.event_alpha.radar.evidence_acquisition\", \"run_evidence_acquisition\"),"
         }
@@ -331,8 +331,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_opportunity_verdict",
-          "line": 20,
-          "path": "tests/event_alpha/test_integrated_radar.py",
+          "line": 21,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_opportunity_verdict\", \"crypto_rsi_scanner.event_alpha.radar.opportunity_verdict\", \"evaluate_opportunity\"),"
         }
@@ -369,8 +369,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_impact_hypotheses",
-          "line": 21,
-          "path": "tests/event_alpha/test_integrated_radar.py",
+          "line": 22,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_impact_hypotheses\", \"crypto_rsi_scanner.event_alpha.radar.impact_hypotheses\", \"generate_impact_hypotheses\"),"
         }
@@ -407,8 +407,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_impact_hypothesis_store",
-          "line": 22,
-          "path": "tests/event_alpha/test_integrated_radar.py",
+          "line": 23,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_impact_hypothesis_store\", \"crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store\", \"write_impact_hypotheses\"),"
         }
@@ -445,8 +445,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_incident_store",
-          "line": 23,
-          "path": "tests/event_alpha/test_integrated_radar.py",
+          "line": 24,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_incident_store\", \"crypto_rsi_scanner.event_alpha.radar.incidents\", \"write_incidents\"),"
         }
@@ -623,8 +623,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_research_cards",
-          "line": 168,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 103,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_research_cards\", \"crypto_rsi_scanner.event_alpha.artifacts.research_cards\", \"render_research_card\"),"
         }
@@ -661,8 +661,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_daily_brief",
-          "line": 169,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 104,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_daily_brief\", \"crypto_rsi_scanner.event_alpha.artifacts.daily_brief\", \"build_daily_brief\"),"
         }
@@ -699,8 +699,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_opportunity_audit",
-          "line": 177,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 112,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_opportunity_audit\", \"crypto_rsi_scanner.event_alpha.artifacts.opportunity_audit\", \"format_opportunity_audit\"),"
         }
@@ -714,7 +714,7 @@
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 2145,
+          "line": 2183,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -751,7 +751,7 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 20,
+          "line": 19,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "row[\"old_module\"] == \"crypto_rsi_scanner.event_alpha_artifact_doctor\""
@@ -817,8 +817,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_notifications",
-          "line": 13,
-          "path": "tests/event_alpha/test_notifications.py",
+          "line": 35,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_notifications\", \"crypto_rsi_scanner.event_alpha.notifications.pipeline\", \"build_notification_plan\"),"
         }
@@ -855,8 +855,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_notification_delivery",
-          "line": 14,
-          "path": "tests/event_alpha/test_notifications.py",
+          "line": 36,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_notification_delivery\", \"crypto_rsi_scanner.event_alpha.notifications.delivery\", \"build_record\"),"
         }
@@ -893,8 +893,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_notification_sender",
-          "line": 15,
-          "path": "tests/event_alpha/test_notifications.py",
+          "line": 37,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_notification_sender\", \"crypto_rsi_scanner.event_alpha.notifications.sender\", \"NotificationSendAttemptResult\"),"
         }
@@ -931,8 +931,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_notification_runs",
-          "line": 16,
-          "path": "tests/event_alpha/test_notifications.py",
+          "line": 38,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_notification_runs\", \"crypto_rsi_scanner.event_alpha.notifications.runs\", \"append_notification_run\"),"
         }
@@ -969,8 +969,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_notification_go_no_go",
-          "line": 17,
-          "path": "tests/event_alpha/test_notifications.py",
+          "line": 39,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_notification_go_no_go\", \"crypto_rsi_scanner.event_alpha.notifications.go_no_go\", \"build_go_no_go\"),"
         }
@@ -1007,8 +1007,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_notification_checklist",
-          "line": 18,
-          "path": "tests/event_alpha/test_notifications.py",
+          "line": 40,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_notification_checklist\", \"crypto_rsi_scanner.event_alpha.notifications.checklist\", \"build_notification_checklist\"),"
         }
@@ -1045,8 +1045,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_notification_inbox",
-          "line": 19,
-          "path": "tests/event_alpha/test_notifications.py",
+          "line": 41,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_notification_inbox\", \"crypto_rsi_scanner.event_alpha.notifications.inbox\", \"build_notification_inbox\"),"
         }
@@ -1083,8 +1083,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_notification_pack",
-          "line": 20,
-          "path": "tests/event_alpha/test_notifications.py",
+          "line": 42,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_notification_pack\", \"crypto_rsi_scanner.event_alpha.notifications.pack\", \"export_notification_pack\"),"
         }
@@ -1121,8 +1121,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_notification_pause",
-          "line": 21,
-          "path": "tests/event_alpha/test_notifications.py",
+          "line": 43,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_notification_pause\", \"crypto_rsi_scanner.event_alpha.notifications.pause\", \"read_pause_state\"),"
         }
@@ -1159,8 +1159,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_notification_slo",
-          "line": 22,
-          "path": "tests/event_alpha/test_notifications.py",
+          "line": 44,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_notification_slo\", \"crypto_rsi_scanner.event_alpha.notifications.slo\", \"build_slo_report\"),"
         }
@@ -1197,8 +1197,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_send_readiness",
-          "line": 23,
-          "path": "tests/event_alpha/test_notifications.py",
+          "line": 45,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_send_readiness\", \"crypto_rsi_scanner.event_alpha.notifications.readiness\", \"build_send_readiness\"),"
         }
@@ -1235,8 +1235,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_telegram_final_check",
-          "line": 24,
-          "path": "tests/event_alpha/test_notifications.py",
+          "line": 46,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_telegram_final_check\", \"crypto_rsi_scanner.event_alpha.notifications.final_check\", \"build_final_check\"),"
         }
@@ -1273,8 +1273,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_telegram_recipient_check",
-          "line": 25,
-          "path": "tests/event_alpha/test_notifications.py",
+          "line": 47,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_telegram_recipient_check\", \"crypto_rsi_scanner.event_alpha.notifications.recipient_check\", \"run_recipient_check\"),"
         }
@@ -1311,8 +1311,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_integrated_radar_outcomes",
-          "line": 12,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 58,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_integrated_radar_outcomes\", \"crypto_rsi_scanner.event_alpha.outcomes.integrated_radar_outcomes\", \"fill_integrated_radar_outcomes\"),"
         }
@@ -1349,8 +1349,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_calibration",
-          "line": 13,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 59,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_calibration\", \"crypto_rsi_scanner.event_alpha.outcomes.calibration\", \"format_calibration_report\"),"
         }
@@ -1387,8 +1387,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_eval_export",
-          "line": 14,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 60,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_eval_export\", \"crypto_rsi_scanner.event_alpha.outcomes.feedback\", \"export_cases_from_feedback\"),"
         }
@@ -1425,8 +1425,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_feedback_readiness",
-          "line": 15,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 61,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_feedback_readiness\", \"crypto_rsi_scanner.event_alpha.outcomes.feedback\", \"build_feedback_readiness\"),"
         }
@@ -1463,8 +1463,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_burn_in",
-          "line": 16,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 62,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_burn_in\", \"crypto_rsi_scanner.event_alpha.outcomes.burn_in\", \"build_burn_in_scorecard\"),"
         }
@@ -1501,8 +1501,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_burn_in_readiness",
-          "line": 17,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 63,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_burn_in_readiness\", \"crypto_rsi_scanner.event_alpha.outcomes.burn_in\", \"build_burn_in_readiness\"),"
         }
@@ -1539,8 +1539,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_burn_in_pack",
-          "line": 18,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 64,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_burn_in_pack\", \"crypto_rsi_scanner.event_alpha.outcomes.burn_in\", \"export_burn_in_pack\"),"
         }
@@ -1577,8 +1577,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_quality_review",
-          "line": 19,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 65,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_quality_review\", \"crypto_rsi_scanner.event_alpha.outcomes.quality\", \"build_quality_review\"),"
         }
@@ -1615,8 +1615,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_quality_coverage",
-          "line": 20,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 66,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_quality_coverage\", \"crypto_rsi_scanner.event_alpha.outcomes.quality\", \"build_latest_run_quality_coverage\"),"
         }
@@ -1653,8 +1653,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_signal_quality",
-          "line": 21,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 67,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_signal_quality\", \"crypto_rsi_scanner.event_alpha.outcomes.quality\", \"evaluate_signal_quality_cases\"),"
         }
@@ -1691,8 +1691,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_signal_quality_export",
-          "line": 22,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 68,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_signal_quality_export\", \"crypto_rsi_scanner.event_alpha.outcomes.quality\", \"export_signal_quality_cases\"),"
         }
@@ -1729,8 +1729,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_tuning",
-          "line": 23,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 69,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_tuning\", \"crypto_rsi_scanner.event_alpha.outcomes.quality\", \"build_tuning_worksheet\"),"
         }
@@ -1767,8 +1767,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_priors",
-          "line": 24,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 70,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_priors\", \"crypto_rsi_scanner.event_alpha.outcomes.priors\", \"apply_priors_to_alerts\"),"
         }
@@ -1805,8 +1805,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_policy_simulator",
-          "line": 25,
-          "path": "tests/event_alpha/test_outcomes.py",
+          "line": 71,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_policy_simulator\", \"crypto_rsi_scanner.event_alpha.outcomes.policy_simulator\", \"simulate_policy\"),"
         }
@@ -1843,8 +1843,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_cryptopanic",
-          "line": 18,
-          "path": "tests/event_alpha/test_provider_readiness.py",
+          "line": 86,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_cryptopanic\", \"crypto_rsi_scanner.event_alpha.providers.cryptopanic\", \"build_cryptopanic_preflight\"),"
         }
@@ -1881,8 +1881,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_official_exchange",
-          "line": 16,
-          "path": "tests/event_alpha/test_provider_readiness.py",
+          "line": 84,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_official_exchange\", \"crypto_rsi_scanner.event_alpha.providers.official_exchange\", \"run_official_exchange_scan\"),"
         }
@@ -1919,8 +1919,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_official_exchange_activation",
-          "line": 17,
-          "path": "tests/event_alpha/test_provider_readiness.py",
+          "line": 85,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_official_exchange_activation\", \"crypto_rsi_scanner.event_alpha.providers.official_exchange_activation\", \"build_activation_report\"),"
         }
@@ -1957,8 +1957,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_coinalyze_preflight",
-          "line": 14,
-          "path": "tests/event_alpha/test_provider_readiness.py",
+          "line": 82,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_coinalyze_preflight\", \"crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight\", \"build_preflight_report\"),"
         }
@@ -1995,8 +1995,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_live_provider_readiness",
-          "line": 15,
-          "path": "tests/event_alpha/test_provider_readiness.py",
+          "line": 83,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_live_provider_readiness\", \"crypto_rsi_scanner.event_alpha.providers.live_provider_readiness\", \"build_readiness_report\"),"
         }
@@ -2033,8 +2033,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_provider_health",
-          "line": 19,
-          "path": "tests/event_alpha/test_provider_readiness.py",
+          "line": 87,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_provider_health\", \"crypto_rsi_scanner.event_alpha.providers.provider_health\", \"record_provider_success\"),"
         }
@@ -2071,8 +2071,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_source_registry",
-          "line": 20,
-          "path": "tests/event_alpha/test_provider_readiness.py",
+          "line": 88,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_source_registry\", \"crypto_rsi_scanner.event_alpha.providers.source_registry\", \"assess_source\"),"
         }
@@ -2109,8 +2109,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_source_packs",
-          "line": 21,
-          "path": "tests/event_alpha/test_provider_readiness.py",
+          "line": 89,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_source_packs\", \"crypto_rsi_scanner.event_alpha.providers.source_packs\", \"get_source_pack\"),"
         }
@@ -2147,8 +2147,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_bybit_announcements_preflight",
-          "line": 22,
-          "path": "tests/event_alpha/test_provider_readiness.py",
+          "line": 90,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_bybit_announcements_preflight\", \"crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight\", \"build_preflight_report\"),"
         }
@@ -2185,8 +2185,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_unlock_calendar_preflight",
-          "line": 23,
-          "path": "tests/event_alpha/test_provider_readiness.py",
+          "line": 91,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_unlock_calendar_preflight\", \"crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight\", \"build_preflight_report\"),"
         }
@@ -2223,8 +2223,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_dex_onchain_readiness",
-          "line": 24,
-          "path": "tests/event_alpha/test_provider_readiness.py",
+          "line": 92,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_dex_onchain_readiness\", \"crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness\", \"run_dex_onchain_readiness\"),"
         }
@@ -2261,8 +2261,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_derivatives_crowding",
-          "line": 170,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 105,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_derivatives_crowding\", \"crypto_rsi_scanner.event_alpha.radar.derivatives_crowding\", \"run_derivatives_crowding_scan\"),"
         }
@@ -2299,8 +2299,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_scheduled_catalysts",
-          "line": 171,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 106,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_scheduled_catalysts\", \"crypto_rsi_scanner.event_alpha.radar.scheduled_catalysts\", \"run_scheduled_catalyst_scan\"),"
         }
@@ -2337,8 +2337,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_asset_registry",
-          "line": 172,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 107,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_asset_registry\", \"crypto_rsi_scanner.event_alpha.radar.asset_registry\", \"build_asset_registry\"),"
         }
@@ -2375,8 +2375,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_instrument_resolver",
-          "line": 173,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 108,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_instrument_resolver\", \"crypto_rsi_scanner.event_alpha.radar.instrument_resolver\", \"resolve_rows\"),"
         }
@@ -2413,8 +2413,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_market_confirmation",
-          "line": 174,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 109,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_market_confirmation\", \"crypto_rsi_scanner.event_alpha.radar.market_confirmation\", \"evaluate_market_confirmation\"),"
         }
@@ -2451,8 +2451,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_catalyst_search",
-          "line": 175,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 110,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_catalyst_search\", \"crypto_rsi_scanner.event_alpha.radar.catalyst_search\", \"run_catalyst_search\"),"
         }
@@ -2489,8 +2489,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_source_enrichment",
-          "line": 176,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 111,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_source_enrichment\", \"crypto_rsi_scanner.event_alpha.radar.source_enrichment\", \"enrich_source_text\"),"
         }
@@ -2527,8 +2527,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_validation",
-          "line": 178,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 113,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_validation\", \"crypto_rsi_scanner.event_alpha.radar.validation\", \"ValidationOutcomeCandle\"),"
         }
@@ -2565,8 +2565,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_discovery",
-          "line": 179,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 114,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_discovery\", \"crypto_rsi_scanner.event_alpha.radar.discovery\", \"EventDiscoveryConfig\"),"
         }
@@ -2603,8 +2603,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_near_miss",
-          "line": 180,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 115,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_near_miss\", \"crypto_rsi_scanner.event_alpha.radar.near_miss\", \"EventNearMissCandidate\"),"
         }
@@ -2641,8 +2641,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_classification",
-          "line": 181,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 116,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_classification\", \"crypto_rsi_scanner.event_alpha.radar.classification\", \"classify_event_asset\"),"
         }
@@ -2679,8 +2679,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_catalyst_frames",
-          "line": 182,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 117,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_catalyst_frames\", \"crypto_rsi_scanner.event_alpha.radar.catalyst_frames\", \"build_catalyst_frames\"),"
         }
@@ -2717,8 +2717,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_claim_semantics",
-          "line": 183,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 118,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_claim_semantics\", \"crypto_rsi_scanner.event_alpha.radar.claim_semantics\", \"extract_event_claims\"),"
         }
@@ -2755,8 +2755,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_playbooks",
-          "line": 184,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 119,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_playbooks\", \"crypto_rsi_scanner.event_alpha.radar.playbooks\", \"assess_event_playbook\"),"
         }
@@ -2793,8 +2793,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_impact_path_validator",
-          "line": 185,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 120,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_impact_path_validator\", \"crypto_rsi_scanner.event_alpha.radar.impact_path_validator\", \"validate_impact_path\"),"
         }
@@ -2831,8 +2831,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_evidence_quality",
-          "line": 186,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 121,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_evidence_quality\", \"crypto_rsi_scanner.event_alpha.radar.evidence_quality\", \"evaluate_evidence_quality\"),"
         }
@@ -2869,8 +2869,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_market_enrichment",
-          "line": 187,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 122,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_market_enrichment\", \"crypto_rsi_scanner.event_alpha.radar.market_enrichment\", \"load_market_enrichment_rows\"),"
         }
@@ -2907,8 +2907,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_extractor",
-          "line": 188,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 123,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_llm_extractor\", \"crypto_rsi_scanner.event_alpha.radar.llm.extractor\", \"analyze_raw_events\"),"
         }
@@ -2945,8 +2945,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_analyzer",
-          "line": 189,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 124,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_llm_analyzer\", \"crypto_rsi_scanner.event_alpha.radar.llm.analyzer\", \"analyze_event_candidates\"),"
         }
@@ -2983,8 +2983,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_evidence_planner",
-          "line": 190,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 125,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_llm_evidence_planner\", \"crypto_rsi_scanner.event_alpha.radar.llm.evidence_planner\", \"EvidencePlannerRequest\"),"
         }
@@ -3021,8 +3021,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_catalyst_frames",
-          "line": 191,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 126,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_llm_catalyst_frames\", \"crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames\", \"EventLLMCatalystFrameConfig\"),"
         }
@@ -3048,7 +3048,7 @@
       "makefile_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_extract_eval",
-          "line": 588,
+          "line": 589,
           "path": "Makefile",
           "reference_type": "text_reference",
           "snippet": "$(PYTHON) -m crypto_rsi_scanner.event_llm_extract_eval fixtures/event_discovery/llm_extraction_golden_cases.json"
@@ -3068,15 +3068,15 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_extract_eval",
-          "line": 1624,
+          "line": 1609,
           "path": "tests/event_alpha/test_integrated_radar.py",
           "reference_type": "text_reference",
           "snippet": "assert \"crypto_rsi_scanner.event_llm_extract_eval\" in text"
         },
         {
           "detail": "crypto_rsi_scanner.event_llm_extract_eval",
-          "line": 192,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 127,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_llm_extract_eval\", \"crypto_rsi_scanner.event_alpha.radar.llm.extract_eval\", \"run_fixture_eval\"),"
         }
@@ -3102,7 +3102,7 @@
       "makefile_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_eval",
-          "line": 585,
+          "line": 586,
           "path": "Makefile",
           "reference_type": "text_reference",
           "snippet": "$(PYTHON) -m crypto_rsi_scanner.event_llm_eval fixtures/event_discovery/llm_golden_cases.json"
@@ -3122,15 +3122,15 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_eval",
-          "line": 1272,
+          "line": 1254,
           "path": "tests/event_alpha/test_integrated_radar.py",
           "reference_type": "text_reference",
           "snippet": "assert \"python -m crypto_rsi_scanner.event_llm_eval\" in text or \"$(PYTHON) -m crypto_rsi_scanner.event_llm_eval\" in text"
         },
         {
           "detail": "crypto_rsi_scanner.event_llm_eval",
-          "line": 193,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 128,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_llm_eval\", \"crypto_rsi_scanner.event_alpha.radar.llm.eval\", \"run_fixture_eval\"),"
         }
@@ -3167,8 +3167,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_models",
-          "line": 194,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 129,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_llm_models\", \"crypto_rsi_scanner.event_alpha.radar.llm.models\", \"EventLLMAssetRole\"),"
         }
@@ -3205,8 +3205,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_extraction_models",
-          "line": 195,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 130,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_llm_extraction_models\", \"crypto_rsi_scanner.event_alpha.radar.llm.extraction_models\", \"EventLLMCatalystType\"),"
         }
@@ -3243,8 +3243,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_alert_store",
-          "line": 196,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 131,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_alert_store\", \"crypto_rsi_scanner.event_alpha.artifacts.alert_store\", \"write_alert_snapshots\"),"
         }
@@ -3281,8 +3281,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alerts",
-          "line": 197,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 132,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alerts\", \"crypto_rsi_scanner.event_alpha.artifacts.alerts\", \"build_event_alert_candidates\"),"
         }
@@ -3319,8 +3319,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_router",
-          "line": 198,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 133,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_router\", \"crypto_rsi_scanner.event_alpha.notifications.router\", \"EventAlphaRoute\"),"
         }
@@ -3357,8 +3357,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_pipeline",
-          "line": 199,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 134,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_pipeline\", \"crypto_rsi_scanner.event_alpha.radar.pipeline\", \"run_event_alpha_pipeline\"),"
         }
@@ -3395,8 +3395,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_watchlist",
-          "line": 200,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 135,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_watchlist\", \"crypto_rsi_scanner.event_alpha.radar.watchlist\", \"EventWatchlistState\"),"
         }
@@ -3433,8 +3433,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_watchlist_monitor",
-          "line": 201,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 136,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_watchlist_monitor\", \"crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor\", \"monitor_watchlist\"),"
         }
@@ -3471,8 +3471,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_watchlist_enrichment",
-          "line": 202,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 137,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_watchlist_enrichment\", \"crypto_rsi_scanner.event_alpha.radar.watchlist_enrichment\", \"EventWatchlistEnrichmentResult\"),"
         }
@@ -3509,8 +3509,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_watchlist_market",
-          "line": 203,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 138,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_watchlist_market\", \"crypto_rsi_scanner.event_alpha.radar.watchlist_market\", \"market_rows_for_watchlist\"),"
         }
@@ -3547,8 +3547,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_replay",
-          "line": 204,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 139,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_replay\", \"crypto_rsi_scanner.event_alpha.artifacts.replay\", \"replay_from_artifacts\"),"
         }
@@ -3585,8 +3585,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_feedback",
-          "line": 205,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 140,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_feedback\", \"crypto_rsi_scanner.event_alpha.outcomes.feedback_labels\", \"mark_feedback\"),"
         }
@@ -3596,29 +3596,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_incident_graph",
-          "line": 91,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_incident_graph`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_incident_graph",
-          "line": 21,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_incident_graph`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_incident_graph",
-          "line": 62,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_incident_graph` | 19 | radar | completed_prior_batch | medium | 9 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.radar.incident_graph` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_incident_graph",
@@ -3636,8 +3614,7 @@
       "old_module": "crypto_rsi_scanner.event_incident_graph",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -3646,14 +3623,14 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_incident_graph",
-          "line": 206,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 141,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_incident_graph\", \"crypto_rsi_scanner.event_alpha.radar.incident_graph\", \"build_incidents\"),"
         },
         {
           "detail": "crypto_rsi_scanner.event_incident_graph",
-          "line": 256,
+          "line": 214,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_incident_graph\"][\"recommended_status\"] == \"active_shim\""
@@ -3664,29 +3641,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_identity",
-          "line": 92,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_identity`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_identity",
-          "line": 22,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_identity`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_identity",
-          "line": 63,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_identity` | 19 | radar | completed_prior_batch | medium | 10 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.radar.identity` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_identity",
@@ -3704,8 +3659,7 @@
       "old_module": "crypto_rsi_scanner.event_identity",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -3714,8 +3668,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_identity",
-          "line": 207,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 142,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_identity\", \"crypto_rsi_scanner.event_alpha.radar.identity\", \"match_asset_identity\"),"
         }
@@ -3725,29 +3679,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_graph",
-          "line": 93,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_graph`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_graph",
-          "line": 23,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_graph`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_graph",
-          "line": 64,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_graph` | 19 | radar | completed_prior_batch | medium | 12 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.radar.graph` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_graph",
@@ -3765,8 +3697,7 @@
       "old_module": "crypto_rsi_scanner.event_graph",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -3775,8 +3706,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_graph",
-          "line": 208,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 143,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_graph\", \"crypto_rsi_scanner.event_alpha.radar.graph\", \"build_event_clusters\"),"
         }
@@ -3786,29 +3717,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_resolver",
-          "line": 94,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_resolver`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_resolver",
-          "line": 24,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_resolver`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_resolver",
-          "line": 65,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_resolver` | 19 | radar | completed_prior_batch | medium | 34 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.radar.resolver` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_resolver",
@@ -3826,8 +3735,7 @@
       "old_module": "crypto_rsi_scanner.event_resolver",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -3836,8 +3744,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_resolver",
-          "line": 209,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 144,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_resolver\", \"crypto_rsi_scanner.event_alpha.radar.resolver\", \"resolve_event_assets\"),"
         }
@@ -3847,29 +3755,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_price_history",
-          "line": 95,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_price_history`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_price_history",
-          "line": 25,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_price_history`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_price_history",
-          "line": 66,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_price_history` | 19 | radar | completed_prior_batch | medium | 6 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.radar.price_history` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_price_history",
@@ -3887,8 +3773,7 @@
       "old_module": "crypto_rsi_scanner.event_price_history",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -3897,8 +3782,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_price_history",
-          "line": 210,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 145,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_price_history\", \"crypto_rsi_scanner.event_alpha.radar.price_history\", \"export_outcome_price_fixture\"),"
         }
@@ -3908,29 +3793,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_catalyst_frame_validator",
-          "line": 96,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_catalyst_frame_validator`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_catalyst_frame_validator",
-          "line": 26,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_catalyst_frame_validator`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_catalyst_frame_validator",
-          "line": 67,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_catalyst_frame_validator` | 19 | radar | completed_prior_batch | medium | 6 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.radar.catalyst_frame_validator` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_catalyst_frame_validator",
@@ -3948,8 +3811,7 @@
       "old_module": "crypto_rsi_scanner.event_catalyst_frame_validator",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -3958,8 +3820,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_catalyst_frame_validator",
-          "line": 211,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 146,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_catalyst_frame_validator\", \"crypto_rsi_scanner.event_alpha.radar.catalyst_frame_validator\", \"validate_llm_catalyst_frames\"),"
         }
@@ -3969,29 +3831,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_anomaly_state",
-          "line": 97,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_anomaly_state`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_anomaly_state",
-          "line": 27,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_anomaly_state`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_anomaly_state",
-          "line": 68,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_anomaly_state` | 19 | radar | completed_prior_batch | low | 5 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.radar.anomaly_state` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_anomaly_state",
@@ -4009,8 +3849,7 @@
       "old_module": "crypto_rsi_scanner.event_anomaly_state",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -4019,8 +3858,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_anomaly_state",
-          "line": 212,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 147,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_anomaly_state\", \"crypto_rsi_scanner.event_alpha.radar.anomaly_state\", \"build_anomaly_lifecycle\"),"
         }
@@ -4030,29 +3869,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_anomaly_scanner",
-          "line": 98,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_anomaly_scanner`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_anomaly_scanner",
-          "line": 28,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_anomaly_scanner`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_anomaly_scanner",
-          "line": 69,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_anomaly_scanner` | 19 | radar | completed_prior_batch | low | 6 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.radar.anomaly_scanner` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_anomaly_scanner",
@@ -4070,8 +3887,7 @@
       "old_module": "crypto_rsi_scanner.event_anomaly_scanner",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -4080,8 +3896,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_anomaly_scanner",
-          "line": 213,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 148,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_anomaly_scanner\", \"crypto_rsi_scanner.event_alpha.radar.anomaly_scanner\", \"discover_market_anomalies\"),"
         }
@@ -4091,29 +3907,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_market_units",
-          "line": 99,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_market_units`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_market_units",
-          "line": 29,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_market_units`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_market_units",
-          "line": 70,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_market_units` | 19 | shared_radar_infra | completed_prior_batch | low | 9 | active_shim | shared | `crypto_rsi_scanner.event_alpha.radar.market_units` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_market_units",
@@ -4131,8 +3925,7 @@
       "old_module": "crypto_rsi_scanner.event_market_units",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -4141,8 +3934,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_market_units",
-          "line": 214,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 149,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_market_units\", \"crypto_rsi_scanner.event_alpha.radar.market_units\", \"normalize_return_fraction\"),"
         }
@@ -4152,29 +3945,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_llm_budget",
-          "line": 100,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_llm_budget`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_llm_budget",
-          "line": 30,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_llm_budget`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_llm_budget",
-          "line": 71,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_llm_budget` | 19 | radar_llm | completed_prior_batch | medium | 12 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.radar.llm.budget` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_budget",
@@ -4192,8 +3963,7 @@
       "old_module": "crypto_rsi_scanner.event_llm_budget",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -4202,14 +3972,14 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_budget",
-          "line": 215,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 150,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_llm_budget\", \"crypto_rsi_scanner.event_alpha.radar.llm.budget\", \"EventLLMBudgetRunTracker\"),"
         },
         {
           "detail": "crypto_rsi_scanner.event_llm_budget",
-          "line": 257,
+          "line": 215,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_llm_budget\"][\"new_proposed_package_path\"] == \"crypto_rsi_scanner.event_alpha.radar.llm.budget\""
@@ -4220,29 +3990,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
-          "line": 101,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_llm_catalyst_frames_eval`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
-          "line": 31,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_llm_catalyst_frames_eval`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
-          "line": 72,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_llm_catalyst_frames_eval` | 19 | radar_llm | completed_prior_batch | low | 4 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames_eval` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
@@ -4258,35 +4006,35 @@
       "makefile_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
-          "line": 596,
+          "line": 597,
           "path": "Makefile",
           "reference_type": "text_reference",
           "snippet": "$(PYTHON) -m crypto_rsi_scanner.event_llm_catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json"
         },
         {
           "detail": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
-          "line": 606,
+          "line": 607,
           "path": "Makefile",
           "reference_type": "text_reference",
           "snippet": "$(PYTHON) -m crypto_rsi_scanner.event_llm_catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json"
         },
         {
           "detail": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
-          "line": 618,
+          "line": 619,
           "path": "Makefile",
           "reference_type": "text_reference",
           "snippet": "$(PYTHON) -m crypto_rsi_scanner.event_llm_catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json"
         },
         {
           "detail": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
-          "line": 631,
+          "line": 632,
           "path": "Makefile",
           "reference_type": "text_reference",
           "snippet": "$(PYTHON) -m crypto_rsi_scanner.event_llm_catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json"
         },
         {
           "detail": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
-          "line": 874,
+          "line": 875,
           "path": "Makefile",
           "reference_type": "text_reference",
           "snippet": "$(PYTHON) -m crypto_rsi_scanner.event_llm_catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json"
@@ -4297,8 +4045,7 @@
       "recommended_action": "keep_public_entrypoint",
       "removal_blockers": [
         "test_import_references",
-        "makefile_references",
-        "artifact_doc_references"
+        "makefile_references"
       ],
       "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
       "safe_to_remove": false,
@@ -4307,8 +4054,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
-          "line": 216,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 151,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_llm_catalyst_frames_eval\", \"crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames_eval\", \"main\"),"
         }
@@ -4318,29 +4065,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_source_reliability",
-          "line": 102,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_source_reliability`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_source_reliability",
-          "line": 32,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_source_reliability`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_source_reliability",
-          "line": 73,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_source_reliability` | 19 | providers | completed_prior_batch | medium | 8 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.providers.source_reliability` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_source_reliability",
@@ -4358,8 +4083,7 @@
       "old_module": "crypto_rsi_scanner.event_source_reliability",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -4368,8 +4092,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_source_reliability",
-          "line": 217,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 152,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_source_reliability\", \"crypto_rsi_scanner.event_alpha.providers.source_reliability\", \"format_source_reliability_report\"),"
         }
@@ -4379,29 +4103,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_cache",
-          "line": 103,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_cache`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_cache",
-          "line": 33,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_cache`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_cache",
-          "line": 74,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_cache` | 19 | artifacts | completed_prior_batch | medium | 6 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.artifacts.cache` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_cache",
@@ -4419,8 +4121,7 @@
       "old_module": "crypto_rsi_scanner.event_cache",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -4429,8 +4130,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_cache",
-          "line": 218,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 153,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_cache\", \"crypto_rsi_scanner.event_alpha.artifacts.cache\", \"write_event_discovery_cache\"),"
         }
@@ -4440,29 +4141,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_explain",
-          "line": 104,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_explain`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_explain",
-          "line": 34,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_explain`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_explain",
-          "line": 75,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_explain` | 19 | artifacts | completed_prior_batch | low | 7 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.artifacts.explain` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_explain",
@@ -4480,8 +4159,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_explain",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -4490,8 +4168,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_explain",
-          "line": 219,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 154,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_explain\", \"crypto_rsi_scanner.event_alpha.artifacts.explain\", \"format_last_run_explanation\"),"
         }
@@ -4501,29 +4179,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_quality_fields",
-          "line": 105,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_quality_fields`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_quality_fields",
-          "line": 35,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_quality_fields`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_quality_fields",
-          "line": 76,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_quality_fields` | 19 | outcomes | completed_prior_batch | medium | 17 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.outcomes.quality_fields` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_quality_fields",
@@ -4541,8 +4197,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_quality_fields",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -4551,8 +4206,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_quality_fields",
-          "line": 220,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 155,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_quality_fields\", \"crypto_rsi_scanner.event_alpha.outcomes.quality_fields\", \"ensure_quality_fields\"),"
         }
@@ -4562,29 +4217,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_outcomes",
-          "line": 106,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_outcomes`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_outcomes",
-          "line": 36,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_outcomes`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_outcomes",
-          "line": 77,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_outcomes` | 19 | outcomes | completed_prior_batch | medium | 11 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.outcomes.outcome_artifacts` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_outcomes",
@@ -4602,8 +4235,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_outcomes",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -4612,8 +4244,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_outcomes",
-          "line": 221,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 156,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_outcomes\", \"crypto_rsi_scanner.event_alpha.outcomes.outcome_artifacts\", \"summarize_outcome_metrics\"),"
         }
@@ -4623,29 +4255,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_eval",
-          "line": 107,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_eval`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_eval",
-          "line": 37,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_eval`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_eval",
-          "line": 78,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_eval` | 19 | outcomes | completed_prior_batch | low | 8 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.outcomes.eval` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_eval",
@@ -4661,7 +4271,7 @@
       "makefile_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_eval",
-          "line": 591,
+          "line": 592,
           "path": "Makefile",
           "reference_type": "text_reference",
           "snippet": "$(PYTHON) -m crypto_rsi_scanner.event_alpha_eval fixtures/event_discovery/event_alpha_golden_cases.json"
@@ -4672,8 +4282,7 @@
       "recommended_action": "keep_public_entrypoint",
       "removal_blockers": [
         "test_import_references",
-        "makefile_references",
-        "artifact_doc_references"
+        "makefile_references"
       ],
       "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
       "safe_to_remove": false,
@@ -4682,8 +4291,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_eval",
-          "line": 222,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 157,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_eval\", \"crypto_rsi_scanner.event_alpha.outcomes.eval\", \"run_eval\"),"
         }
@@ -4693,29 +4302,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
-          "line": 108,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_burn_in_checklist`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
-          "line": 38,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_burn_in_checklist`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
-          "line": 79,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_burn_in_checklist` | 19 | outcomes | completed_prior_batch | low | 8 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
@@ -4733,8 +4320,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -4743,8 +4329,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
-          "line": 223,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 158,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_burn_in_checklist\", \"crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist\", \"build_burn_in_checklist\"),"
         }
@@ -4754,29 +4340,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_profiles",
-          "line": 109,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_profiles`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_profiles",
-          "line": 39,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_profiles`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_profiles",
-          "line": 80,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_profiles` | 19 | config | completed_prior_batch | medium | 14 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.config.profiles` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_profiles",
@@ -4794,8 +4358,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_profiles",
       "recommended_action": "keep_public_entrypoint",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
       "safe_to_remove": false,
@@ -4804,8 +4367,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_profiles",
-          "line": 224,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 159,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_profiles\", \"crypto_rsi_scanner.event_alpha.config.profiles\", \"get_profile\"),"
         }
@@ -4815,29 +4378,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_v1_readiness",
-          "line": 110,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_v1_readiness`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_v1_readiness",
-          "line": 40,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_v1_readiness`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_v1_readiness",
-          "line": 81,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_v1_readiness` | 19 | config | completed_prior_batch | low | 7 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.config.v1_readiness` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_v1_readiness",
@@ -4855,8 +4396,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_v1_readiness",
       "recommended_action": "keep_public_entrypoint",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
       "safe_to_remove": false,
@@ -4865,8 +4405,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_v1_readiness",
-          "line": 225,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 160,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_v1_readiness\", \"crypto_rsi_scanner.event_alpha.config.v1_readiness\", \"build_v1_readiness\"),"
         }
@@ -4876,29 +4416,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_preflight",
-          "line": 111,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_preflight`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_preflight",
-          "line": 41,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_preflight`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_preflight",
-          "line": 82,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_preflight` | 19 | config | completed_prior_batch | medium | 8 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.config.preflight` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_preflight",
@@ -4916,8 +4434,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_preflight",
       "recommended_action": "keep_public_entrypoint",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
       "safe_to_remove": false,
@@ -4926,8 +4443,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_preflight",
-          "line": 226,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 161,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_preflight\", \"crypto_rsi_scanner.event_alpha.config.preflight\", \"run_preflight\"),"
         }
@@ -4937,29 +4454,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_health_guard",
-          "line": 112,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_health_guard`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_health_guard",
-          "line": 42,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_health_guard`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_health_guard",
-          "line": 83,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_health_guard` | 19 | config | completed_prior_batch | medium | 7 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.config.health_guard` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_health_guard",
@@ -4977,8 +4472,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_health_guard",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -4987,8 +4481,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_health_guard",
-          "line": 227,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 162,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_health_guard\", \"crypto_rsi_scanner.event_alpha.config.health_guard\", \"evaluate_health_guard\"),"
         }
@@ -4998,29 +4492,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_scheduler",
-          "line": 113,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_scheduler`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_scheduler",
-          "line": 43,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_scheduler`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_scheduler",
-          "line": 84,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_scheduler` | 19 | config | completed_prior_batch | low | 6 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.config.scheduler` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_scheduler",
@@ -5038,8 +4510,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_scheduler",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -5048,8 +4519,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_scheduler",
-          "line": 228,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 163,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_scheduler\", \"crypto_rsi_scanner.event_alpha.config.scheduler\", \"build_scheduler_status\"),"
         }
@@ -5059,29 +4530,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_environment_doctor",
-          "line": 114,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_environment_doctor`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_environment_doctor",
-          "line": 44,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_environment_doctor`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_environment_doctor",
-          "line": 85,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_environment_doctor` | 19 | doctor | completed_prior_batch | low | 7 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.doctor.environment` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_environment_doctor",
@@ -5099,8 +4548,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_environment_doctor",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -5109,8 +4557,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_environment_doctor",
-          "line": 229,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 164,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_environment_doctor\", \"crypto_rsi_scanner.event_alpha.doctor.environment\", \"build_environment_doctor\"),"
         }
@@ -5120,29 +4568,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_provider_status",
-          "line": 115,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_provider_status`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_provider_status",
-          "line": 45,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_provider_status`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_provider_status",
-          "line": 86,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_provider_status` | 19 | notifications | completed_prior_batch | medium | 21 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.notifications.provider_status` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_provider_status",
@@ -5160,8 +4586,7 @@
       "old_module": "crypto_rsi_scanner.event_provider_status",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -5170,8 +4595,8 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_provider_status",
-          "line": 230,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 165,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_provider_status\", \"crypto_rsi_scanner.event_alpha.notifications.provider_status\", \"build_event_discovery_provider_status\"),"
         }
@@ -5181,29 +4606,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_missed",
-          "line": 116,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_missed`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_missed",
-          "line": 48,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_missed`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_missed",
-          "line": 87,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_missed` | 19 | radar | completed_final_event_alpha_batch | medium | 9 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.radar.missed` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_missed",
@@ -5221,8 +4624,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_missed",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -5231,14 +4633,14 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_missed",
-          "line": 231,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 166,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_missed\", \"crypto_rsi_scanner.event_alpha.radar.missed\", \"detect_missed_opportunities\"),"
         },
         {
           "detail": "crypto_rsi_scanner.event_alpha_missed",
-          "line": 258,
+          "line": 216,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_missed\"][\"recommended_status\"] == \"active_shim\""
@@ -5249,29 +4651,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_reason_text",
-          "line": 117,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_reason_text`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_reason_text",
-          "line": 49,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_reason_text`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_reason_text",
-          "line": 88,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_reason_text` | 19 | artifacts | completed_final_event_alpha_batch | low | 4 | active_shim | event_alpha_only | `crypto_rsi_scanner.event_alpha.artifacts.reason_text` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_reason_text",
@@ -5289,8 +4669,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_reason_text",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -5299,14 +4678,14 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_reason_text",
-          "line": 232,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 167,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_alpha_reason_text\", \"crypto_rsi_scanner.event_alpha.artifacts.reason_text\", \"humanize_event_alpha_reason\"),"
         },
         {
           "detail": "crypto_rsi_scanner.event_alpha_reason_text",
-          "line": 259,
+          "line": 217,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_reason_text\"][\"recommended_status\"] == \"active_shim\""
@@ -5317,29 +4696,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_clock",
-          "line": 118,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_clock`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_clock",
-          "line": 52,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_clock`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_clock",
-          "line": 89,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_clock` | 19 | shared_event_infra | completed_event_core_decision | low | 8 | active_shim | shared | `crypto_rsi_scanner.event_core.clock` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_clock",
@@ -5364,8 +4721,7 @@
       "old_module": "crypto_rsi_scanner.event_clock",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -5374,21 +4730,21 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 233,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 168,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_clock\", \"crypto_rsi_scanner.event_core.clock\", \"event_clock_status\"),"
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 260,
+          "line": 218,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_clock\"][\"recommended_status\"] == \"active_shim\""
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 262,
+          "line": 220,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_clock\"][\"shared_rsi_event_alpha_infrastructure\"] is True"
@@ -5399,29 +4755,7 @@
       "allowed_exports": [
         "*"
       ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_models",
-          "line": 119,
-          "path": "research/REFACTOR_FINAL_REPORT.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_models`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_models",
-          "line": 53,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_models`"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_models",
-          "line": 90,
-          "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_models` | 19 | shared_event_infra | completed_event_core_decision | medium | 54 | active_shim | shared | `crypto_rsi_scanner.event_core.models` |"
-        }
-      ],
+      "artifact_doc_references": [],
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_models",
@@ -5446,8 +4780,7 @@
       "old_module": "crypto_rsi_scanner.event_models",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -5456,21 +4789,21 @@
       "test_import_references": [
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 234,
-          "path": "tests/event_alpha/test_shim_registry.py",
+          "line": 169,
+          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
           "reference_type": "text_reference",
           "snippet": "(\"crypto_rsi_scanner.event_models\", \"crypto_rsi_scanner.event_core.models\", \"RawDiscoveredEvent\"),"
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 261,
+          "line": 219,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_models\"][\"recommended_status\"] == \"active_shim\""
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 263,
+          "line": 221,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_models\"][\"shared_rsi_event_alpha_infrastructure\"] is True"
@@ -5478,7 +4811,7 @@
       ]
     }
   ],
-  "generated_at": "2026-07-04T17:55:01.743461+00:00",
+  "generated_at": "2026-07-04T18:18:17.898083+00:00",
   "internal_import_reference_count": 0,
   "makefile_reference_count": 8,
   "no_send_rehearsal": true,
@@ -6441,8 +5774,7 @@
       "old_module": "crypto_rsi_scanner.event_incident_graph",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6453,8 +5785,7 @@
       "old_module": "crypto_rsi_scanner.event_identity",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6465,8 +5796,7 @@
       "old_module": "crypto_rsi_scanner.event_graph",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6477,8 +5807,7 @@
       "old_module": "crypto_rsi_scanner.event_resolver",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6489,8 +5818,7 @@
       "old_module": "crypto_rsi_scanner.event_price_history",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6501,8 +5829,7 @@
       "old_module": "crypto_rsi_scanner.event_catalyst_frame_validator",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6513,8 +5840,7 @@
       "old_module": "crypto_rsi_scanner.event_anomaly_state",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6525,8 +5851,7 @@
       "old_module": "crypto_rsi_scanner.event_anomaly_scanner",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6537,8 +5862,7 @@
       "old_module": "crypto_rsi_scanner.event_market_units",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6549,8 +5873,7 @@
       "old_module": "crypto_rsi_scanner.event_llm_budget",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6561,8 +5884,7 @@
       "old_module": "crypto_rsi_scanner.event_source_reliability",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6573,8 +5895,7 @@
       "old_module": "crypto_rsi_scanner.event_cache",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6585,8 +5906,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_explain",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6597,8 +5917,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_quality_fields",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6609,8 +5928,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_outcomes",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6621,8 +5939,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6633,8 +5950,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_health_guard",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6645,8 +5961,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_scheduler",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6657,8 +5972,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_environment_doctor",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6669,8 +5983,7 @@
       "old_module": "crypto_rsi_scanner.event_provider_status",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6681,8 +5994,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_missed",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6693,8 +6005,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_reason_text",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6705,8 +6016,7 @@
       "old_module": "crypto_rsi_scanner.event_clock",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6717,8 +6027,7 @@
       "old_module": "crypto_rsi_scanner.event_models",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -6726,6 +6035,11 @@
     }
   ],
   "normal_rsi_signal_rows_written": 0,
+  "old_path_docs_reference_total": 128,
+  "old_path_docs_references": 0,
+  "old_path_import_allowed_exceptions": 126,
+  "old_path_internal_imports": 0,
+  "old_path_test_imports": 0,
   "paper_trades_created": 0,
   "registry_entry_count": 124,
   "removal_candidate_counts": {
@@ -6823,8 +6137,7 @@
         "recommended_action": "keep_public_entrypoint",
         "removal_blockers": [
           "test_import_references",
-          "makefile_references",
-          "artifact_doc_references"
+          "makefile_references"
         ],
         "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
         "safe_to_remove": false,
@@ -6836,8 +6149,7 @@
         "recommended_action": "keep_public_entrypoint",
         "removal_blockers": [
           "test_import_references",
-          "makefile_references",
-          "artifact_doc_references"
+          "makefile_references"
         ],
         "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
         "safe_to_remove": false,
@@ -6848,8 +6160,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_profiles",
         "recommended_action": "keep_public_entrypoint",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
         "safe_to_remove": false,
@@ -6860,8 +6171,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_v1_readiness",
         "recommended_action": "keep_public_entrypoint",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
         "safe_to_remove": false,
@@ -6872,8 +6182,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_preflight",
         "recommended_action": "keep_public_entrypoint",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
         "safe_to_remove": false,
@@ -7852,8 +7161,7 @@
         "old_module": "crypto_rsi_scanner.event_incident_graph",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -7864,8 +7172,7 @@
         "old_module": "crypto_rsi_scanner.event_identity",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -7876,8 +7183,7 @@
         "old_module": "crypto_rsi_scanner.event_graph",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -7888,8 +7194,7 @@
         "old_module": "crypto_rsi_scanner.event_resolver",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -7900,8 +7205,7 @@
         "old_module": "crypto_rsi_scanner.event_price_history",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -7912,8 +7216,7 @@
         "old_module": "crypto_rsi_scanner.event_catalyst_frame_validator",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -7924,8 +7227,7 @@
         "old_module": "crypto_rsi_scanner.event_anomaly_state",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -7936,8 +7238,7 @@
         "old_module": "crypto_rsi_scanner.event_anomaly_scanner",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -7948,8 +7249,7 @@
         "old_module": "crypto_rsi_scanner.event_market_units",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -7960,8 +7260,7 @@
         "old_module": "crypto_rsi_scanner.event_llm_budget",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -7972,8 +7271,7 @@
         "old_module": "crypto_rsi_scanner.event_source_reliability",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -7984,8 +7282,7 @@
         "old_module": "crypto_rsi_scanner.event_cache",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -7996,8 +7293,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_explain",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -8008,8 +7304,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_quality_fields",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -8020,8 +7315,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_outcomes",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -8032,8 +7326,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -8044,8 +7337,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_health_guard",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -8056,8 +7348,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_scheduler",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -8068,8 +7359,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_environment_doctor",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -8080,8 +7370,7 @@
         "old_module": "crypto_rsi_scanner.event_provider_status",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -8092,8 +7381,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_missed",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -8104,8 +7392,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_reason_text",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -8116,8 +7403,7 @@
         "old_module": "crypto_rsi_scanner.event_clock",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -8128,8 +7414,7 @@
         "old_module": "crypto_rsi_scanner.event_models",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -9085,8 +8370,7 @@
       "old_module": "crypto_rsi_scanner.event_incident_graph",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9097,8 +8381,7 @@
       "old_module": "crypto_rsi_scanner.event_identity",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9109,8 +8392,7 @@
       "old_module": "crypto_rsi_scanner.event_graph",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9121,8 +8403,7 @@
       "old_module": "crypto_rsi_scanner.event_resolver",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9133,8 +8414,7 @@
       "old_module": "crypto_rsi_scanner.event_price_history",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9145,8 +8425,7 @@
       "old_module": "crypto_rsi_scanner.event_catalyst_frame_validator",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9157,8 +8436,7 @@
       "old_module": "crypto_rsi_scanner.event_anomaly_state",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9169,8 +8447,7 @@
       "old_module": "crypto_rsi_scanner.event_anomaly_scanner",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9181,8 +8458,7 @@
       "old_module": "crypto_rsi_scanner.event_market_units",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9193,8 +8469,7 @@
       "old_module": "crypto_rsi_scanner.event_llm_budget",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9205,8 +8480,7 @@
       "old_module": "crypto_rsi_scanner.event_source_reliability",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9217,8 +8491,7 @@
       "old_module": "crypto_rsi_scanner.event_cache",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9229,8 +8502,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_explain",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9241,8 +8513,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_quality_fields",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9253,8 +8524,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_outcomes",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9265,8 +8535,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9277,8 +8546,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_health_guard",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9289,8 +8557,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_scheduler",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9301,8 +8568,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_environment_doctor",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9313,8 +8579,7 @@
       "old_module": "crypto_rsi_scanner.event_provider_status",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9325,8 +8590,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_missed",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9337,8 +8601,7 @@
       "old_module": "crypto_rsi_scanner.event_alpha_reason_text",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9349,8 +8612,7 @@
       "old_module": "crypto_rsi_scanner.event_clock",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9361,8 +8623,7 @@
       "old_module": "crypto_rsi_scanner.event_models",
       "recommended_action": "keep_until_v3",
       "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
+        "test_import_references"
       ],
       "retention_reason": "compatibility or documentation references remain until the next major refactor.",
       "safe_to_remove": false,
@@ -9379,8 +8640,10 @@
   "v3_gate_status": "pending",
   "v3_gates": {
     "nonessential_shims_remaining": 111,
-    "old_path_docs_references": 215,
+    "old_path_docs_references": 0,
+    "old_path_import_allowed_exceptions": 126,
     "old_path_internal_imports": 0,
+    "old_path_test_imports": 0,
     "public_compatibility_shims": 13,
     "shim_removal_blockers": 109
   }

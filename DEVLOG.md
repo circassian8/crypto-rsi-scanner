@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Enforce canonical Event Alpha imports · Codex
+**Why:** Refactor v3 needs internal code and ordinary tests off old flat Event
+Alpha shim paths before any deletion phase. Compatibility imports should stay
+tested, but only in one explicit place.
+**Changes:**
+- Rewrote internal test imports to canonical package paths while preserving
+  local aliases, and moved old/new import equivalence checks into
+  `tests/event_alpha/test_legacy_import_compatibility.py`.
+- Added `make event-alpha-old-import-check`, which writes
+  `research/EVENT_ALPHA_OLD_IMPORT_CHECK.md/json` and fails on old flat Event
+  Alpha imports outside compatibility tests, shim modules, `scanner.py`, and
+  documented public wrappers.
+- Extended shim dependency, artifact doctor, and refactor v3 reports with
+  `old_path_internal_imports`, `old_path_test_imports`,
+  `old_path_docs_references`, and `old_path_import_allowed_exceptions`.
+- Updated `AGENTS.md`, `DECISIONS.md`, `ROADMAP.md`, v3 contract/report
+  artifacts, and refactor size/class/final reports to document the canonical
+  import boundary. Current old-import counters are
+  `old_path_internal_imports=0`, `old_path_test_imports=0`,
+  `old_path_docs_references=0`, and
+  `old_path_import_allowed_exceptions=126`.
+**Verify:** Passed `python3 tests/test_indicators.py` (`751/751 passed`);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (`762 passed`);
+`python3 -m compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-old-import-check PYTHON=python3`; `make
+event-alpha-shim-dependency-report PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; and `make verify
+PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No shims were deleted, and no live
+provider calls, live Telegram sends, trading, paper-trading behavior changes,
+execution/order logic, Event Alpha RSI writes, or Event Alpha-created
+`TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Define Event Alpha refactor v3 finalization contract · Codex
 **Why:** Refactor v2 accepted the compatibility-shim state, but the final
 refactor phase needs a stricter, measurable contract before old Event Alpha
@@ -36,11 +70,12 @@ shim paths are retired or explicitly kept as public entrypoints.
   current pending counts. Current v3 state is pending:
   `nonessential_shims_remaining=111`, `old_path_internal_imports=0`,
   `public_compatibility_shims=13`, `shim_removal_blockers=109`,
-  `production_files_over_1200_lines=14`,
+  `production_files_over_1200_lines=15`,
   `production_files_over_1500_lines=0`,
   `public_classes_not_in_own_module=82`,
-  `class_exceptions_remaining=14`, `functions_over_150_lines=0`, and
-  `old_path_docs_references=215`.
+  `class_exceptions_remaining=14`, `functions_over_150_lines=0`,
+  `old_path_docs_references=0`, `old_path_test_imports=0`, and
+  `old_path_import_allowed_exceptions=126`.
 **Verify:** Passed `python3 tests/test_indicators.py` (`750/750 passed`);
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
 tests/cli tests/test_indicators.py -q` (`761 passed`);

@@ -53,7 +53,7 @@ globals().update({
 })
 
 def test_event_alpha_artifact_doctor_scopes_readiness_to_claimed_provider_namespaces():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -81,7 +81,8 @@ def test_event_alpha_artifact_doctor_scopes_readiness_to_claimed_provider_namesp
 
 def test_event_clock_parses_research_now_values():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_clock, scanner
+    from crypto_rsi_scanner import scanner
+    import crypto_rsi_scanner.event_core.clock as event_clock
 
     parsed = event_clock.parse_event_now("2026-06-15T16:00:00Z")
     assert parsed == datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
@@ -116,7 +117,7 @@ def test_event_clock_parses_research_now_values():
 
 def test_event_discovery_calendar_and_unlock_events_are_direct_no_trade():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
@@ -159,7 +160,8 @@ def test_event_discovery_calendar_and_unlock_events_are_direct_no_trade():
 def test_event_alpha_notification_state_is_profile_namespace_scoped():
     from datetime import datetime, timezone
     from types import SimpleNamespace
-    from crypto_rsi_scanner import event_alpha_notifications, event_alpha_router
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as event_alpha_notifications
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     class FakeStorage:
         def __init__(self):
@@ -301,11 +303,9 @@ def test_event_alpha_notification_state_is_profile_namespace_scoped():
 
 def test_event_alpha_send_readiness_resolves_namespace_default_when_absolute_stale():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_artifact_doctor,
-        event_alpha_notification_delivery,
-        event_alpha_send_readiness,
-    )
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as event_alpha_notification_delivery
+    import crypto_rsi_scanner.event_alpha.notifications.readiness as event_alpha_send_readiness
 
     with TemporaryDirectory() as tmp:
         old_cwd = os.getcwd()
@@ -391,7 +391,9 @@ def test_event_alpha_notification_report_uses_profile_namespace_and_explicit_ove
     import tempfile
     from pathlib import Path
 
-    from crypto_rsi_scanner import config, event_alpha_artifacts, event_alpha_profiles, scanner
+    from crypto_rsi_scanner import config, scanner
+    import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+    import crypto_rsi_scanner.event_alpha.config.profiles as event_alpha_profiles
 
     profile = event_alpha_profiles.get_profile("notify_no_key")
     path_attrs = (
@@ -507,7 +509,8 @@ def test_event_alpha_notification_report_uses_profile_namespace_and_explicit_ove
 
 
 def test_daily_brief_custom_namespace_selects_test_run_and_core_rows():
-    from crypto_rsi_scanner import event_alpha_daily_brief, event_alpha_notifications as notif
+    import crypto_rsi_scanner.event_alpha.artifacts.daily_brief as event_alpha_daily_brief
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
 
     namespace = "notify_llm_deep_research_review_smoke"
     run_id = "2026-06-15T16:00:00+00:00|notify_llm_deep"
@@ -583,7 +586,8 @@ def test_event_alpha_notify_fixture_smoke_writes_namespaced_artifacts():
     import tempfile
     from pathlib import Path
 
-    from crypto_rsi_scanner import config, scanner, event_alpha_notification_delivery as delivery
+    from crypto_rsi_scanner import config, scanner
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
 
     attrs = (
         "EVENT_ALPHA_ARTIFACT_BASE_DIR",
@@ -683,12 +687,10 @@ def test_event_alpha_run_ledger_records_send_accounting():
     from dataclasses import replace
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import (
-        event_alpha_pipeline,
-        event_alpha_run_ledger,
-        event_alpha_router,
-        event_watchlist,
-    )
+    import crypto_rsi_scanner.event_alpha.radar.pipeline as event_alpha_pipeline
+    import crypto_rsi_scanner.event_alpha.artifacts.run_ledger as event_alpha_run_ledger
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
     from crypto_rsi_scanner.event_core.models import EventDiscoveryResult
 
     now = datetime(2026, 6, 18, 13, 0, tzinfo=timezone.utc)
@@ -764,7 +766,7 @@ def test_event_alpha_run_ledger_records_send_accounting():
 def test_event_alpha_run_lock_acquire_skip_recover_and_release():
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_run_lock as lock
+    import crypto_rsi_scanner.event_alpha.artifacts.locks as lock
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -796,7 +798,7 @@ def test_event_alpha_run_lock_acquire_skip_recover_and_release():
 def test_event_alpha_run_lock_release_after_failsoft_and_distinct_profile_paths():
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_run_lock as lock
+    import crypto_rsi_scanner.event_alpha.artifacts.locks as lock
 
     with tempfile.TemporaryDirectory() as tmp:
         no_key = _notify_artifact_context(tmp, "notify_no_key")
@@ -819,7 +821,7 @@ def test_event_alpha_run_lock_acquisition_is_atomic():
     # both acquire: O_CREAT|O_EXCL makes exactly one win.
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_run_lock as lock
+    import crypto_rsi_scanner.event_alpha.artifacts.locks as lock
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -837,7 +839,7 @@ def test_event_alpha_run_lock_acquisition_is_atomic():
 def test_event_alpha_run_lock_disabled_for_fixture_smoke():
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_run_lock as lock
+    import crypto_rsi_scanner.event_alpha.artifacts.locks as lock
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "fixture")
@@ -855,7 +857,8 @@ def test_event_alpha_notify_cycle_releases_lock_on_exception():
     # the cycle body raises after acquiring (best-effort release on exceptions).
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import scanner, event_alpha_run_lock as lock
+    from crypto_rsi_scanner import scanner
+    import crypto_rsi_scanner.event_alpha.artifacts.locks as lock
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -885,7 +888,7 @@ def test_event_alpha_delivery_ledger_records_dedupe_and_namespace_isolation():
     import tempfile
     from datetime import datetime, timezone, timedelta
     from pathlib import Path
-    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -912,7 +915,9 @@ def test_event_alpha_delivery_ledger_records_dedupe_and_namespace_isolation():
 
 def test_event_alpha_artifact_doctor_short_circuits_stale_namespace_marker():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_namespace_status, event_alpha_send_readiness
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.namespace.status as event_alpha_namespace_status
+    import crypto_rsi_scanner.event_alpha.notifications.readiness as event_alpha_send_readiness
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -1000,7 +1005,7 @@ def test_event_alpha_scheduled_make_targets_use_profile_lock_and_no_fixed_clock(
 
 
 def test_market_reaction_unlock_structured_source_risk_or_fade_depends_on_market():
-    from crypto_rsi_scanner import event_market_reaction
+    import crypto_rsi_scanner.event_alpha.radar.market_reaction as event_market_reaction
 
     no_reaction = event_market_reaction.evaluate_market_reaction({
         "source_class": "structured_unlock",
@@ -1038,7 +1043,7 @@ def test_market_reaction_unlock_structured_source_risk_or_fade_depends_on_market
 
 
 def test_scheduled_catalyst_fixture_lanes_and_unlock_artifacts():
-    from crypto_rsi_scanner import event_scheduled_catalysts
+    import crypto_rsi_scanner.event_alpha.radar.scheduled_catalysts as event_scheduled_catalysts
 
     with TemporaryDirectory() as tmp:
         result = event_scheduled_catalysts.run_scheduled_catalyst_scan(
@@ -1074,7 +1079,8 @@ def test_scheduled_catalyst_fixture_lanes_and_unlock_artifacts():
 def test_unlock_calendar_preflight_provider_rows_and_doctor_conflicts():
     import json
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_unlock_calendar_preflight
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight as event_unlock_calendar_preflight
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -1127,7 +1133,9 @@ def test_unlock_calendar_preflight_provider_rows_and_doctor_conflicts():
 
 def test_source_coverage_links_unlock_calendar_preflight_artifacts():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_source_coverage, event_provider_status, event_unlock_calendar_preflight
+    import crypto_rsi_scanner.event_alpha.radar.source_coverage as event_alpha_source_coverage
+    import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
+    import crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight as event_unlock_calendar_preflight
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -1160,7 +1168,8 @@ def test_source_coverage_links_unlock_calendar_preflight_artifacts():
 
 
 def test_cryptopanic_fan_narrative_is_not_structured_unlock_proof():
-    from crypto_rsi_scanner import event_market_reaction, event_source_packs
+    import crypto_rsi_scanner.event_alpha.radar.market_reaction as event_market_reaction
+    import crypto_rsi_scanner.event_alpha.providers.source_packs as event_source_packs
 
     row = {
         "provider": "cryptopanic",
@@ -1195,7 +1204,8 @@ def test_cryptopanic_fan_narrative_is_not_structured_unlock_proof():
 
 
 def test_research_card_renders_scheduled_unlock_details():
-    from crypto_rsi_scanner import event_research_cards, event_scheduled_catalysts
+    import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
+    import crypto_rsi_scanner.event_alpha.radar.scheduled_catalysts as event_scheduled_catalysts
 
     with TemporaryDirectory() as tmp:
         result = event_scheduled_catalysts.run_scheduled_catalyst_scan(
@@ -1224,14 +1234,12 @@ def test_integrated_radar_loads_external_coinalyze_namespace():
     import json
     from datetime import datetime, timezone
 
-    from crypto_rsi_scanner import (
-        event_alpha_artifacts,
-        event_alpha_namespace_status,
-        event_coinalyze_preflight,
-        event_derivatives_crowding,
-        event_integrated_radar,
-        event_live_provider_readiness,
-    )
+    import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+    import crypto_rsi_scanner.event_alpha.namespace.status as event_alpha_namespace_status
+    import crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight as event_coinalyze_preflight
+    import crypto_rsi_scanner.event_alpha.radar.derivatives_crowding as event_derivatives_crowding
+    import crypto_rsi_scanner.event_alpha.radar.integrated_radar as event_integrated_radar
+    import crypto_rsi_scanner.event_alpha.providers.live_provider_readiness as event_live_provider_readiness
 
     payload = {
         "derivatives": [
@@ -1447,7 +1455,9 @@ def test_integrated_radar_loads_external_coinalyze_namespace():
 def test_integrated_radar_performance_dashboard_cross_namespace_recommendations():
     import json
 
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_integrated_radar, event_integrated_radar_outcomes
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.radar.integrated_radar as event_integrated_radar
+    import crypto_rsi_scanner.event_alpha.outcomes.integrated_radar_outcomes as event_integrated_radar_outcomes
 
     def write_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -1660,7 +1670,9 @@ def test_event_alpha_coinalyze_stale_namespace_blocks_without_override():
     import contextlib
     import io
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import config, event_alpha_namespace_status, event_coinalyze_preflight, scanner
+    from crypto_rsi_scanner import config, scanner
+    import crypto_rsi_scanner.event_alpha.namespace.status as event_alpha_namespace_status
+    import crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight as event_coinalyze_preflight
 
     original_base = config.EVENT_ALPHA_ARTIFACT_BASE_DIR
     original_namespace = config.EVENT_ALPHA_ARTIFACT_NAMESPACE
@@ -1699,7 +1711,7 @@ def test_event_alpha_coinalyze_stale_namespace_blocks_without_override():
 
 def test_event_alpha_namespace_lifecycle_inventory_and_archive_plan():
     from crypto_rsi_scanner.event_alpha.namespace import lifecycle
-    from crypto_rsi_scanner import event_alpha_namespace_status
+    import crypto_rsi_scanner.event_alpha.namespace.status as event_alpha_namespace_status
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -1755,7 +1767,8 @@ def test_event_alpha_namespace_lifecycle_inventory_and_archive_plan():
 
 
 def test_event_alpha_namespace_lifecycle_doctor_policy_messages():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_namespace_status
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.namespace.status as event_alpha_namespace_status
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)

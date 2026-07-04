@@ -410,6 +410,10 @@ RESULT_FIELD_EXPRESSIONS: tuple[tuple[str, str], ...] = (
     ('invalid_safety_fields', 'schema_result.invalid_safety_fields'),
     ('deprecated_field_usage', 'schema_result.deprecated_field_usage'),
     ('active_shim_modules_with_implementation_logic', 'active_shim_logic_count'),
+    ('old_path_internal_imports', 'old_path_internal_imports'),
+    ('old_path_test_imports', 'old_path_test_imports'),
+    ('old_path_docs_references', 'old_path_docs_references'),
+    ('old_path_import_allowed_exceptions', 'old_path_import_allowed_exceptions'),
     ('blockers', 'tuple(dict.fromkeys(blockers))'),
     ('warnings', 'tuple(dict.fromkeys(warnings))'),
 )

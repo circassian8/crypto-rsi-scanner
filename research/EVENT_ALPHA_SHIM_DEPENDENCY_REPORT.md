@@ -2,7 +2,7 @@
 
 Research artifact only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: 2026-07-04T17:55:01.743461+00:00
+- generated_at: 2026-07-04T18:18:17.898083+00:00
 - status: OK
 - registry_entry_count: 124
 - internal_import_reference_count: 0
@@ -11,6 +11,10 @@ Research artifact only. This report does not call providers, send Telegram messa
 - docs_reference_count: 128
 - dynamic_import_reference_count: 0
 - safe_to_remove_count: 0
+- old_path_internal_imports: 0
+- old_path_test_imports: 0
+- old_path_docs_references: 0
+- old_path_import_allowed_exceptions: 126
 - active_shim_modules_with_implementation_logic: 0
 - v3_gate_status: pending
 - v3_auto_accept_ready: False
@@ -28,9 +32,11 @@ Research artifact only. This report does not call providers, send Telegram messa
 |---|---:|
 | `nonessential_shims_remaining` | 111 |
 | `old_path_internal_imports` | 0 |
+| `old_path_test_imports` | 0 |
 | `public_compatibility_shims` | 13 |
 | `shim_removal_blockers` | 109 |
-| `old_path_docs_references` | 215 |
+| `old_path_docs_references` | 0 |
+| `old_path_import_allowed_exceptions` | 126 |
 
 ## Registry Dependencies
 

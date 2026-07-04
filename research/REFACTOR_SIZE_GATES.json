@@ -405,7 +405,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 3981,
+      "line_count": 3995,
       "path": "tests/event_alpha/test_artifact_doctor.py",
       "severity": "warning",
       "source_kind": "test",
@@ -414,7 +414,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 16092,
+      "line_count": 16184,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "severity": "warning",
       "source_kind": "test",
@@ -423,7 +423,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1813,
+      "line_count": 1826,
       "path": "tests/event_alpha/test_namespace_lifecycle.py",
       "severity": "warning",
       "source_kind": "test",
@@ -432,7 +432,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 5038,
+      "line_count": 5002,
       "path": "tests/event_alpha/test_notifications.py",
       "severity": "warning",
       "source_kind": "test",
@@ -441,7 +441,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 4044,
+      "line_count": 4031,
       "path": "tests/event_alpha/test_outcomes.py",
       "severity": "warning",
       "source_kind": "test",
@@ -450,7 +450,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 5374,
+      "line_count": 5357,
       "path": "tests/event_alpha/test_provider_readiness.py",
       "severity": "warning",
       "source_kind": "test",
@@ -459,7 +459,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 2988,
+      "line_count": 2991,
       "path": "tests/event_alpha/test_source_coverage.py",
       "severity": "warning",
       "source_kind": "test",
@@ -468,7 +468,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1771,
+      "line_count": 1778,
       "path": "tests/test_indicators.py",
       "severity": "warning",
       "source_kind": "test",
@@ -1369,54 +1369,54 @@
       "violation_id": "public_classes:crypto_rsi_scanner.signal_registry"
     }
   ],
-  "file_count": 734,
+  "file_count": 735,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
       "limit": 1500,
-      "line_count": 3981,
+      "line_count": 3995,
       "path": "tests/event_alpha/test_artifact_doctor.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 16092,
+      "line_count": 16184,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1813,
+      "line_count": 1826,
       "path": "tests/event_alpha/test_namespace_lifecycle.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 5038,
+      "line_count": 5002,
       "path": "tests/event_alpha/test_notifications.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 4044,
+      "line_count": 4031,
       "path": "tests/event_alpha/test_outcomes.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 5374,
+      "line_count": 5357,
       "path": "tests/event_alpha/test_provider_readiness.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 2988,
+      "line_count": 2991,
       "path": "tests/event_alpha/test_source_coverage.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1771,
+      "line_count": 1778,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     }
@@ -1426,7 +1426,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T17:55:03.992976+00:00",
+  "generated_at": "2026-07-04T18:18:19.573725+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1560,6 +1560,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1353,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1319,
       "path": "crypto_rsi_scanner/config.py",
       "source_kind": "production"
@@ -1656,12 +1662,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 1046,
-      "path": "crypto_rsi_scanner/event_alpha/shims.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1044,
       "path": "crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py",
       "source_kind": "production"
@@ -1680,7 +1680,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1012,
+      "line_count": 1032,
       "path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py",
       "source_kind": "production"
     },
@@ -1754,67 +1754,67 @@
   "largest_test_files": [
     {
       "limit": 1500,
-      "line_count": 16092,
+      "line_count": 16184,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 5374,
+      "line_count": 5357,
       "path": "tests/event_alpha/test_provider_readiness.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 5038,
+      "line_count": 5002,
       "path": "tests/event_alpha/test_notifications.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 4044,
+      "line_count": 4031,
       "path": "tests/event_alpha/test_outcomes.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 3981,
+      "line_count": 3995,
       "path": "tests/event_alpha/test_artifact_doctor.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 2988,
+      "line_count": 2991,
       "path": "tests/event_alpha/test_source_coverage.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1813,
+      "line_count": 1826,
       "path": "tests/event_alpha/test_namespace_lifecycle.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1771,
+      "line_count": 1778,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1079,
+      "line_count": 1081,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 819,
+      "line_count": 825,
       "path": "tests/event_alpha/_legacy_helpers.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 734,
+      "line_count": 728,
       "path": "tests/event_alpha/test_artifact_schema.py",
       "source_kind": "test"
     },
@@ -1838,14 +1838,20 @@
     },
     {
       "limit": 1500,
-      "line_count": 279,
+      "line_count": 243,
+      "path": "tests/cli/test_parser.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 237,
       "path": "tests/event_alpha/test_shim_registry.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 243,
-      "path": "tests/cli/test_parser.py",
+      "line_count": 174,
+      "path": "tests/event_alpha/test_legacy_import_compatibility.py",
       "source_kind": "test"
     },
     {
@@ -1862,7 +1868,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 67,
+      "line_count": 68,
       "path": "tests/rsi/_legacy_helpers.py",
       "source_kind": "test"
     },
@@ -2494,6 +2500,13 @@
       "status": "accepted_near_threshold"
     },
     {
+      "line_count": 1353,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
       "line_count": 1319,
       "path": "crypto_rsi_scanner/config.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -2766,6 +2779,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1353,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1319,
       "path": "crypto_rsi_scanner/config.py",
       "source_kind": "production"
@@ -2801,7 +2820,7 @@
       "source_kind": "production"
     }
   ],
-  "production_files_over_1200_lines": 14,
+  "production_files_over_1200_lines": 15,
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
@@ -3086,8 +3105,7 @@
       "shim_removal_blockers",
       "production_files_over_1200_lines",
       "public_classes_not_in_own_module",
-      "class_exceptions_remaining",
-      "old_path_docs_references"
+      "class_exceptions_remaining"
     ],
     "contract_path": "research/REFACTOR_V3_CONTRACT.md",
     "gate_severity": {
@@ -3095,7 +3113,9 @@
       "functions_over_150_lines": "blocker",
       "nonessential_shims_remaining": "blocker",
       "old_path_docs_references": "blocker_unless_policy_scoped",
+      "old_path_import_allowed_exceptions": "informational",
       "old_path_internal_imports": "blocker",
+      "old_path_test_imports": "blocker",
       "production_files_over_1200_lines": "target_gap",
       "production_files_over_1500_lines": "blocker",
       "public_classes_not_in_own_module": "blocker",
@@ -3106,9 +3126,11 @@
       "class_exceptions_remaining": 14,
       "functions_over_150_lines": 0,
       "nonessential_shims_remaining": 111,
-      "old_path_docs_references": 215,
+      "old_path_docs_references": 0,
+      "old_path_import_allowed_exceptions": 126,
       "old_path_internal_imports": 0,
-      "production_files_over_1200_lines": 14,
+      "old_path_test_imports": 0,
+      "production_files_over_1200_lines": 15,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 82,
       "public_compatibility_shims": 13,
@@ -3899,8 +3921,7 @@
         "old_module": "crypto_rsi_scanner.event_incident_graph",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -3909,8 +3930,7 @@
         "old_module": "crypto_rsi_scanner.event_identity",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -3919,8 +3939,7 @@
         "old_module": "crypto_rsi_scanner.event_graph",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -3929,8 +3948,7 @@
         "old_module": "crypto_rsi_scanner.event_resolver",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -3939,8 +3957,7 @@
         "old_module": "crypto_rsi_scanner.event_price_history",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -3949,8 +3966,7 @@
         "old_module": "crypto_rsi_scanner.event_catalyst_frame_validator",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -3959,8 +3975,7 @@
         "old_module": "crypto_rsi_scanner.event_anomaly_state",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -3969,8 +3984,7 @@
         "old_module": "crypto_rsi_scanner.event_anomaly_scanner",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -3979,8 +3993,7 @@
         "old_module": "crypto_rsi_scanner.event_market_units",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -3989,8 +4002,7 @@
         "old_module": "crypto_rsi_scanner.event_llm_budget",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -3999,8 +4011,7 @@
         "old_module": "crypto_rsi_scanner.event_source_reliability",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -4009,8 +4020,7 @@
         "old_module": "crypto_rsi_scanner.event_cache",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -4019,8 +4029,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_explain",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -4029,8 +4038,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_quality_fields",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -4039,8 +4047,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_outcomes",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -4049,8 +4056,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -4059,8 +4065,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_health_guard",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -4069,8 +4074,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_scheduler",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -4079,8 +4083,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_environment_doctor",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -4089,8 +4092,7 @@
         "old_module": "crypto_rsi_scanner.event_provider_status",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -4099,8 +4101,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_missed",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -4109,8 +4110,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_reason_text",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -4119,8 +4119,7 @@
         "old_module": "crypto_rsi_scanner.event_clock",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -4129,8 +4128,7 @@
         "old_module": "crypto_rsi_scanner.event_models",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       }
@@ -4174,6 +4172,11 @@
       {
         "line_count": 1387,
         "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1353,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "threshold": 1200
       },
       {
@@ -5557,8 +5560,7 @@
         "old_module": "crypto_rsi_scanner.event_incident_graph",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5567,8 +5569,7 @@
         "old_module": "crypto_rsi_scanner.event_identity",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5577,8 +5578,7 @@
         "old_module": "crypto_rsi_scanner.event_graph",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5587,8 +5587,7 @@
         "old_module": "crypto_rsi_scanner.event_resolver",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5597,8 +5596,7 @@
         "old_module": "crypto_rsi_scanner.event_price_history",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5607,8 +5605,7 @@
         "old_module": "crypto_rsi_scanner.event_catalyst_frame_validator",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5617,8 +5614,7 @@
         "old_module": "crypto_rsi_scanner.event_anomaly_state",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5627,8 +5623,7 @@
         "old_module": "crypto_rsi_scanner.event_anomaly_scanner",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5637,8 +5632,7 @@
         "old_module": "crypto_rsi_scanner.event_market_units",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5647,8 +5641,7 @@
         "old_module": "crypto_rsi_scanner.event_llm_budget",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5657,8 +5650,7 @@
         "old_module": "crypto_rsi_scanner.event_source_reliability",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5667,8 +5659,7 @@
         "old_module": "crypto_rsi_scanner.event_cache",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5677,8 +5668,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_explain",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5687,8 +5677,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_quality_fields",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5697,8 +5686,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_outcomes",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5707,8 +5695,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5717,8 +5704,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_health_guard",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5727,8 +5713,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_scheduler",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5737,8 +5722,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_environment_doctor",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5747,8 +5731,7 @@
         "old_module": "crypto_rsi_scanner.event_provider_status",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5757,8 +5740,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_missed",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5767,8 +5749,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_reason_text",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5777,8 +5758,7 @@
         "old_module": "crypto_rsi_scanner.event_clock",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       },
@@ -5787,8 +5767,7 @@
         "old_module": "crypto_rsi_scanner.event_models",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "safe_to_remove": false
       }
@@ -5801,9 +5780,11 @@
     "class_exceptions_remaining": 14,
     "functions_over_150_lines": 0,
     "nonessential_shims_remaining": 111,
-    "old_path_docs_references": 215,
+    "old_path_docs_references": 0,
+    "old_path_import_allowed_exceptions": 126,
     "old_path_internal_imports": 0,
-    "production_files_over_1200_lines": 14,
+    "old_path_test_imports": 0,
+    "production_files_over_1200_lines": 15,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 82,
     "public_compatibility_shims": 13,
@@ -5919,7 +5900,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 3981,
+      "line_count": 3995,
       "path": "tests/event_alpha/test_artifact_doctor.py",
       "severity": "warning",
       "source_kind": "test",
@@ -5928,7 +5909,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 16092,
+      "line_count": 16184,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "severity": "warning",
       "source_kind": "test",
@@ -5937,7 +5918,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1813,
+      "line_count": 1826,
       "path": "tests/event_alpha/test_namespace_lifecycle.py",
       "severity": "warning",
       "source_kind": "test",
@@ -5946,7 +5927,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 5038,
+      "line_count": 5002,
       "path": "tests/event_alpha/test_notifications.py",
       "severity": "warning",
       "source_kind": "test",
@@ -5955,7 +5936,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 4044,
+      "line_count": 4031,
       "path": "tests/event_alpha/test_outcomes.py",
       "severity": "warning",
       "source_kind": "test",
@@ -5964,7 +5945,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 5374,
+      "line_count": 5357,
       "path": "tests/event_alpha/test_provider_readiness.py",
       "severity": "warning",
       "source_kind": "test",
@@ -5973,7 +5954,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 2988,
+      "line_count": 2991,
       "path": "tests/event_alpha/test_source_coverage.py",
       "severity": "warning",
       "source_kind": "test",
@@ -5982,7 +5963,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1771,
+      "line_count": 1778,
       "path": "tests/test_indicators.py",
       "severity": "warning",
       "source_kind": "test",

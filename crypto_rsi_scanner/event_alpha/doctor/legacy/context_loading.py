@@ -213,6 +213,12 @@ def _attach_shim_dependency_warnings(ctx: SimpleNamespace) -> None:
     shim_internal_import_count, safe_to_remove_shim_count, old_import_modules = (
         event_alpha_shims.shim_dependency_warning_summary()
     )
+    (
+        ctx.old_path_internal_imports,
+        ctx.old_path_test_imports,
+        ctx.old_path_docs_references,
+        ctx.old_path_import_allowed_exceptions,
+    ) = event_alpha_shims.old_import_check_counter_summary()
     if shim_internal_import_count:
         modules = ", ".join(old_import_modules[:5])
         ctx.warnings.append(
@@ -220,6 +226,20 @@ def _attach_shim_dependency_warnings(ctx: SimpleNamespace) -> None:
                 "paths.old_shim_internal_import",
                 f"old_shim_internal_import_references={shim_internal_import_count}"
                 + (f" modules={modules}" if modules else ""),
+            )
+        )
+    if ctx.old_path_test_imports:
+        ctx.warnings.append(
+            check_registry.format_check_message(
+                "paths.old_shim_internal_import",
+                f"old_path_test_imports={ctx.old_path_test_imports}",
+            )
+        )
+    if ctx.old_path_docs_references:
+        ctx.warnings.append(
+            check_registry.format_check_message(
+                "paths.old_shim_internal_import",
+                f"old_path_docs_references={ctx.old_path_docs_references}",
             )
         )
     if safe_to_remove_shim_count:

@@ -2,33 +2,9 @@
 
 from __future__ import annotations
 
-import importlib
 import json
 from datetime import datetime, timezone
 
-
-def test_outcome_old_and_new_import_paths_resolve_same_objects():
-    module_pairs = (
-        ("crypto_rsi_scanner.event_integrated_radar_outcomes", "crypto_rsi_scanner.event_alpha.outcomes.integrated_radar_outcomes", "fill_integrated_radar_outcomes"),
-        ("crypto_rsi_scanner.event_alpha_calibration", "crypto_rsi_scanner.event_alpha.outcomes.calibration", "format_calibration_report"),
-        ("crypto_rsi_scanner.event_alpha_eval_export", "crypto_rsi_scanner.event_alpha.outcomes.feedback", "export_cases_from_feedback"),
-        ("crypto_rsi_scanner.event_alpha_feedback_readiness", "crypto_rsi_scanner.event_alpha.outcomes.feedback", "build_feedback_readiness"),
-        ("crypto_rsi_scanner.event_alpha_burn_in", "crypto_rsi_scanner.event_alpha.outcomes.burn_in", "build_burn_in_scorecard"),
-        ("crypto_rsi_scanner.event_alpha_burn_in_readiness", "crypto_rsi_scanner.event_alpha.outcomes.burn_in", "build_burn_in_readiness"),
-        ("crypto_rsi_scanner.event_alpha_burn_in_pack", "crypto_rsi_scanner.event_alpha.outcomes.burn_in", "export_burn_in_pack"),
-        ("crypto_rsi_scanner.event_alpha_quality_review", "crypto_rsi_scanner.event_alpha.outcomes.quality", "build_quality_review"),
-        ("crypto_rsi_scanner.event_alpha_quality_coverage", "crypto_rsi_scanner.event_alpha.outcomes.quality", "build_latest_run_quality_coverage"),
-        ("crypto_rsi_scanner.event_alpha_signal_quality", "crypto_rsi_scanner.event_alpha.outcomes.quality", "evaluate_signal_quality_cases"),
-        ("crypto_rsi_scanner.event_alpha_signal_quality_export", "crypto_rsi_scanner.event_alpha.outcomes.quality", "export_signal_quality_cases"),
-        ("crypto_rsi_scanner.event_alpha_tuning", "crypto_rsi_scanner.event_alpha.outcomes.quality", "build_tuning_worksheet"),
-        ("crypto_rsi_scanner.event_alpha_priors", "crypto_rsi_scanner.event_alpha.outcomes.priors", "apply_priors_to_alerts"),
-        ("crypto_rsi_scanner.event_alpha_policy_simulator", "crypto_rsi_scanner.event_alpha.outcomes.policy_simulator", "simulate_policy"),
-    )
-
-    for old_path, new_path, attr in module_pairs:
-        old_module = importlib.import_module(old_path)
-        new_module = importlib.import_module(new_path)
-        assert getattr(old_module, attr) is getattr(new_module, attr)
 
 
 def test_integrated_radar_outcome_smoke_writes_research_only_artifacts(tmp_path):
@@ -157,7 +133,7 @@ def test_event_provider_status_formats_burn_in_readiness_summary_and_pack_gaps()
 def test_event_llm_budget_skips_lower_priority_rows_and_cache_hits_are_free():
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import event_llm_analyzer
+    import crypto_rsi_scanner.event_alpha.radar.llm.analyzer as event_llm_analyzer
     from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMRelationshipProvider
 
     result, alerts, _ = _llm_golden_alerts_and_rows(min_prefilter_score=0)
@@ -217,7 +193,7 @@ def test_event_llm_budget_skips_lower_priority_rows_and_cache_hits_are_free():
 
 def test_event_llm_extractor_prioritizes_high_value_raw_events_before_budget():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_llm_extractor
+    import crypto_rsi_scanner.event_alpha.radar.llm.extractor as event_llm_extractor
     from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
 
@@ -294,7 +270,7 @@ def test_event_llm_extractor_prioritizes_high_value_raw_events_before_budget():
 
 def test_event_catalyst_search_scores_filter_low_quality_results():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_catalyst_search
+    import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
     from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
@@ -364,12 +340,10 @@ def test_event_catalyst_search_scores_filter_low_quality_results():
 
 
 def test_event_market_evidence_and_opportunity_verdict_quality_layers():
-    from crypto_rsi_scanner import (
-        event_evidence_quality,
-        event_impact_path_validator,
-        event_market_confirmation,
-        event_opportunity_verdict,
-    )
+    import crypto_rsi_scanner.event_alpha.radar.evidence_quality as event_evidence_quality
+    import crypto_rsi_scanner.event_alpha.radar.impact_path_validator as event_impact_path_validator
+    import crypto_rsi_scanner.event_alpha.radar.market_confirmation as event_market_confirmation
+    import crypto_rsi_scanner.event_alpha.radar.opportunity_verdict as event_opportunity_verdict
     from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from datetime import datetime, timezone
 
@@ -636,7 +610,8 @@ def test_event_market_evidence_and_opportunity_verdict_quality_layers():
 
 def test_event_source_enrichment_article_quality_statuses_and_llm_body_gate():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_llm_extractor, event_source_enrichment
+    import crypto_rsi_scanner.event_alpha.radar.llm.extractor as event_llm_extractor
+    import crypto_rsi_scanner.event_alpha.radar.source_enrichment as event_source_enrichment
     from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
@@ -726,7 +701,7 @@ def test_event_source_enrichment_article_quality_statuses_and_llm_body_gate():
 
 def test_event_source_enrichment_triage_and_fixture_source_quality_judge():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_source_enrichment
+    import crypto_rsi_scanner.event_alpha.radar.source_enrichment as event_source_enrichment
     from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMSourceQualityProvider
 
@@ -898,7 +873,8 @@ def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_alpha_alert_store, event_alerts
+    import crypto_rsi_scanner.event_alpha.artifacts.alert_store as event_alpha_alert_store
+    import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
 
     now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
     alerts = event_alerts.build_event_alert_candidates(
@@ -981,7 +957,7 @@ def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
 
 
 def test_event_alpha_outcomes_playbook_specific_metrics():
-    from crypto_rsi_scanner import event_alpha_outcomes
+    import crypto_rsi_scanner.event_alpha.outcomes.outcome_artifacts as event_alpha_outcomes
 
     listing_row = {
         "observed_at": "2026-06-18T12:00:00+00:00",
@@ -1047,7 +1023,8 @@ def test_event_alpha_alert_store_snapshot_policy_filters_rows():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_alpha_alert_store, event_alerts
+    import crypto_rsi_scanner.event_alpha.artifacts.alert_store as event_alpha_alert_store
+    import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
 
     now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
     alerts = event_alerts.build_event_alert_candidates(_full_event_discovery_fixture_result(), now=now)
@@ -1115,7 +1092,9 @@ def test_event_alpha_alert_store_scanner_report_and_outcome_fill_commands():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import config, event_alpha_alert_store, event_alerts, scanner
+    from crypto_rsi_scanner import config, scanner
+    import crypto_rsi_scanner.event_alpha.artifacts.alert_store as event_alpha_alert_store
+    import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
 
     now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
     alerts = event_alerts.build_event_alert_candidates(_full_event_discovery_fixture_result(), now=now)
@@ -1170,21 +1149,19 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     from dataclasses import asdict
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import (
-        event_alpha_alert_store,
-        event_alpha_artifact_doctor,
-        event_alpha_daily_brief,
-        event_alpha_notification_inbox,
-        event_alpha_quality_review,
-        event_alpha_router,
-        event_evidence_quality,
-        event_impact_path_validator,
-        event_market_confirmation,
-        event_opportunity_verdict,
-        event_playbooks,
-        event_research_cards,
-        event_watchlist,
-    )
+    import crypto_rsi_scanner.event_alpha.artifacts.alert_store as event_alpha_alert_store
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.artifacts.daily_brief as event_alpha_daily_brief
+    import crypto_rsi_scanner.event_alpha.notifications.inbox as event_alpha_notification_inbox
+    import crypto_rsi_scanner.event_alpha.outcomes.quality as event_alpha_quality_review
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.evidence_quality as event_evidence_quality
+    import crypto_rsi_scanner.event_alpha.radar.impact_path_validator as event_impact_path_validator
+    import crypto_rsi_scanner.event_alpha.radar.market_confirmation as event_market_confirmation
+    import crypto_rsi_scanner.event_alpha.radar.opportunity_verdict as event_opportunity_verdict
+    import crypto_rsi_scanner.event_alpha.radar.playbooks as event_playbooks
+    import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     def quality(level, score, *, path="proxy_exposure", role="proxy_instrument", source="crypto_news", specificity="direct_value_capture"):
         return {
@@ -1638,7 +1615,9 @@ def test_event_alpha_feedback_marks_watchlist_rows_and_missed_items():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_feedback, event_playbooks, event_watchlist
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback_labels as event_feedback
+    import crypto_rsi_scanner.event_alpha.radar.playbooks as event_playbooks
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     entry = event_watchlist.EventWatchlistEntry(
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
@@ -1715,15 +1694,13 @@ def test_event_alpha_feedback_marks_watchlist_rows_and_missed_items():
 
 
 def test_event_alpha_missed_calibration_and_research_card_reports():
-    from crypto_rsi_scanner import (
-        event_alpha_calibration,
-        event_alpha_missed,
-        event_alpha_router,
-        event_graph,
-        event_playbooks,
-        event_research_cards,
-        event_watchlist,
-    )
+    import crypto_rsi_scanner.event_alpha.outcomes.calibration as event_alpha_calibration
+    import crypto_rsi_scanner.event_alpha.radar.missed as event_alpha_missed
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
+    import crypto_rsi_scanner.event_alpha.radar.playbooks as event_playbooks
+    import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
     from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from pathlib import Path
 
@@ -2020,7 +1997,7 @@ def test_event_alpha_missed_calibration_and_research_card_reports():
 
 
 def test_event_alpha_eval_fixture_passes():
-    from crypto_rsi_scanner import event_alpha_eval
+    import crypto_rsi_scanner.event_alpha.outcomes.eval as event_alpha_eval
 
     path = "fixtures/event_discovery/event_alpha_golden_cases.json"
     result = event_alpha_eval.run_eval(path)
@@ -2030,7 +2007,8 @@ def test_event_alpha_eval_fixture_passes():
 
 
 def test_event_fade_validation_outcome_fill_from_local_prices():
-    from crypto_rsi_scanner import event_discovery, event_validation
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.validation as event_validation
 
     rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
     prices = event_validation.load_outcome_price_fixture(_outcome_prices_fixture_path())
@@ -2068,7 +2046,9 @@ def test_event_fade_outcome_price_export_from_klines_fixture():
     import json
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import event_discovery, event_price_history, event_validation
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.price_history as event_price_history
+    import crypto_rsi_scanner.event_alpha.radar.validation as event_validation
 
     rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
     with tempfile.TemporaryDirectory() as tmp:
@@ -2099,7 +2079,8 @@ def test_event_fade_outcome_price_export_from_klines_fixture():
 
 
 def test_event_fade_validation_labeling_queue_prioritizes_missing_review_work():
-    from crypto_rsi_scanner import event_discovery, event_validation
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.validation as event_validation
 
     rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
     queue = event_validation.build_labeling_queue(rows, limit=10)
@@ -2135,7 +2116,8 @@ def test_event_fade_validation_labeling_queue_prioritizes_missing_review_work():
 
 
 def test_event_fade_validation_labeling_queue_flags_reviewed_trigger_outcomes():
-    from crypto_rsi_scanner import event_discovery, event_validation
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.validation as event_validation
 
     rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
     triggered = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
@@ -2159,7 +2141,8 @@ def test_event_fade_review_bundle_scanner_merges_prior_reviewed_sample():
     import json
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import event_discovery, scanner
+    from crypto_rsi_scanner import scanner
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
 
     rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
     reviewed = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
@@ -2227,7 +2210,8 @@ def test_event_fade_fill_outcomes_scanner_writes_outcome_jsonl():
     import json
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import event_discovery, scanner
+    from crypto_rsi_scanner import scanner
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
 
     rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
     with tempfile.TemporaryDirectory() as tmp:
@@ -2257,7 +2241,8 @@ def test_event_fade_export_outcome_prices_scanner_writes_price_fixture():
     import json
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import event_discovery, scanner
+    from crypto_rsi_scanner import scanner
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
 
     rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
     with tempfile.TemporaryDirectory() as tmp:
@@ -2288,7 +2273,9 @@ def test_event_fade_outcome_price_export_supports_1h_fixture_and_metadata():
     import json
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import event_discovery, event_price_history, event_validation
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.price_history as event_price_history
+    import crypto_rsi_scanner.event_alpha.radar.validation as event_validation
 
     rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
     with tempfile.TemporaryDirectory() as tmp:
@@ -2342,7 +2329,7 @@ def test_event_fade_outcome_price_export_supports_1h_fixture_and_metadata():
 def test_event_alpha_missed_uses_shared_identity_for_common_words():
     from datetime import datetime, timezone
 
-    from crypto_rsi_scanner import event_alpha_missed
+    import crypto_rsi_scanner.event_alpha.radar.missed as event_alpha_missed
     from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     raw = RawDiscoveredEvent(
@@ -2367,7 +2354,7 @@ def test_event_alpha_calibration_priors_export():
     import tempfile
     from pathlib import Path
 
-    from crypto_rsi_scanner import event_alpha_calibration
+    import crypto_rsi_scanner.event_alpha.outcomes.calibration as event_alpha_calibration
 
     alerts = [
         {"alert_key": "a", "playbook_type": "proxy_attention", "source": "rss", "tier": "WATCHLIST", "primary_horizon_return": 0.1},
@@ -2386,7 +2373,7 @@ def test_event_alpha_eval_export_from_feedback_and_missed():
     import tempfile
     from pathlib import Path
 
-    from crypto_rsi_scanner import event_alpha_eval_export
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback as event_alpha_eval_export
 
     out_dir = Path(tempfile.mkdtemp())
     feedback_result = event_alpha_eval_export.export_cases_from_feedback(
@@ -2411,7 +2398,8 @@ def test_event_alpha_priors_adjust_research_score_but_not_triggered_fade():
     import json
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import event_alerts, event_alpha_priors
+    import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+    import crypto_rsi_scanner.event_alpha.outcomes.priors as event_alpha_priors
 
     alerts = event_alerts.build_event_alert_candidates(
         _full_event_discovery_fixture_result(),
@@ -2447,7 +2435,11 @@ def test_event_alpha_priors_shadow_report_and_raw_replay_are_local():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_alerts, event_alpha_priors, event_alpha_replay, event_alpha_router, event_discovery
+    import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+    import crypto_rsi_scanner.event_alpha.outcomes.priors as event_alpha_priors
+    import crypto_rsi_scanner.event_alpha.artifacts.replay as event_alpha_replay
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
 
     result = _full_event_discovery_fixture_result()
     alerts = event_alerts.build_event_alert_candidates(result)
@@ -2512,12 +2504,10 @@ def test_event_alpha_priors_shadow_report_and_raw_replay_are_local():
 def test_event_alpha_daily_brief_replay_retention_and_unmatched_feedback():
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import (
-        event_alpha_daily_brief,
-        event_alpha_replay,
-        event_alpha_retention,
-        event_feedback,
-    )
+    import crypto_rsi_scanner.event_alpha.artifacts.daily_brief as event_alpha_daily_brief
+    import crypto_rsi_scanner.event_alpha.artifacts.replay as event_alpha_replay
+    import crypto_rsi_scanner.event_alpha.artifacts.retention as event_alpha_retention
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback_labels as event_feedback
 
     entry = _test_watchlist_entry(state="HIGH_PRIORITY", symbol="VELVET", coin_id="velvet")
     markdown = event_alpha_daily_brief.build_daily_brief(
@@ -2547,7 +2537,8 @@ def test_event_alpha_daily_brief_replay_retention_and_unmatched_feedback():
     assert "Calibration Recommendations" in markdown
     assert ".env" not in markdown
 
-    from crypto_rsi_scanner import event_research_cards, event_watchlist_monitor
+    import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
+    import crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor as event_watchlist_monitor
     entry_fade = __import__("dataclasses").replace(
         entry,
         latest_playbook_type="proxy_fade",
@@ -2646,7 +2637,8 @@ def test_event_alpha_daily_brief_replay_retention_and_unmatched_feedback():
 
 def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_burn_in, event_alpha_burn_in_checklist
+    import crypto_rsi_scanner.event_alpha.outcomes.burn_in as event_alpha_burn_in
+    import crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist as event_alpha_burn_in_checklist
 
     now = datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc)
     meta = {"profile": "no_key_live", "run_mode": "burn_in", "artifact_namespace": "no_key_live"}
@@ -2807,12 +2799,10 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
 
 
 def test_event_alpha_burn_in_readiness_requires_no_send_and_reviewable_artifacts():
-    from crypto_rsi_scanner import (
-        event_alpha_artifact_doctor,
-        event_alpha_burn_in_readiness,
-        event_alpha_feedback_readiness,
-        event_provider_status,
-    )
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.outcomes.burn_in as event_alpha_burn_in_readiness
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback as event_alpha_feedback_readiness
+    import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 
     with TemporaryDirectory() as tmp:
         brief = Path(tmp) / "event_alpha_daily_brief.md"
@@ -3010,7 +3000,7 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
 def test_event_alpha_signal_quality_fixture_passes_and_reports_stage_failure():
     import json
     import tempfile
-    from crypto_rsi_scanner import event_alpha_signal_quality as quality
+    import crypto_rsi_scanner.event_alpha.outcomes.quality as quality
 
     result = quality.evaluate_signal_quality_cases()
     assert result.failed_cases == 0
@@ -3035,7 +3025,7 @@ def test_event_alpha_signal_quality_fixture_passes_and_reports_stage_failure():
 
 
 def test_event_near_miss_dedupes_and_excludes_promoted_or_zero_quality_rows():
-    from crypto_rsi_scanner import event_near_miss
+    import crypto_rsi_scanner.event_alpha.radar.near_miss as event_near_miss
 
     base = {
         "incident_id": "incident:memecore",
@@ -3072,7 +3062,7 @@ def test_event_near_miss_dedupes_and_excludes_promoted_or_zero_quality_rows():
 
 
 def test_quality_review_possible_false_positives_require_suspicion_reason():
-    from crypto_rsi_scanner import event_alpha_quality_review
+    import crypto_rsi_scanner.event_alpha.outcomes.quality as event_alpha_quality_review
 
     strong = {
         "symbol": "VELVET",
@@ -3138,14 +3128,12 @@ def test_quality_review_possible_false_positives_require_suspicion_reason():
 def test_event_alpha_feedback_readiness_and_core_feedback_target():
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import (
-        event_alpha_artifact_doctor,
-        event_alpha_feedback_readiness,
-        event_feedback,
-        event_opportunity_audit,
-        event_research_cards,
-        event_watchlist,
-    )
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback as event_alpha_feedback_readiness
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback_labels as event_feedback
+    import crypto_rsi_scanner.event_alpha.artifacts.opportunity_audit as event_opportunity_audit
+    import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     entry = _test_watchlist_entry(
         state=event_watchlist.EventWatchlistState.WATCHLIST.value,
@@ -3305,11 +3293,9 @@ def test_event_alpha_quality_review_policy_simulation_and_export():
     import json
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import (
-        event_alpha_policy_simulator,
-        event_alpha_quality_review,
-        event_alpha_signal_quality_export,
-    )
+    import crypto_rsi_scanner.event_alpha.outcomes.policy_simulator as event_alpha_policy_simulator
+    import crypto_rsi_scanner.event_alpha.outcomes.quality as event_alpha_quality_review
+    import crypto_rsi_scanner.event_alpha.outcomes.quality as event_alpha_signal_quality_export
 
     rows = [
         {
@@ -3524,7 +3510,8 @@ def test_event_alpha_quality_make_targets_exist_and_do_not_send():
 
 def test_event_alpha_quality_coverage_checks_latest_raw_rows_only():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_quality_coverage, event_alpha_quality_fields
+    import crypto_rsi_scanner.event_alpha.outcomes.quality as event_alpha_quality_coverage
+    import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
 
     started = datetime(2026, 6, 25, 12, 0, tzinfo=timezone.utc)
     finished = datetime(2026, 6, 25, 12, 2, tzinfo=timezone.utc)
@@ -3598,12 +3585,10 @@ def test_event_alpha_quality_coverage_checks_latest_raw_rows_only():
 
 def test_event_alpha_quality_stale_warning_uses_quality_validation_reference():
     from pathlib import Path
-    from crypto_rsi_scanner import (
-        event_alpha_quality_coverage,
-        event_alpha_quality_fields,
-        event_alpha_quality_review,
-        event_impact_hypothesis_store,
-    )
+    import crypto_rsi_scanner.event_alpha.outcomes.quality as event_alpha_quality_coverage
+    import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
+    import crypto_rsi_scanner.event_alpha.outcomes.quality as event_alpha_quality_review
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store as event_impact_hypothesis_store
 
     stale_row = {
         "row_type": "event_impact_hypothesis",
@@ -3651,7 +3636,8 @@ def test_feedback_and_calibration_include_signal_quality_fields():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_alpha_calibration, event_feedback
+    import crypto_rsi_scanner.event_alpha.outcomes.calibration as event_alpha_calibration
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback_labels as event_feedback
 
     entry = _test_watchlist_entry(
         state="WATCHLIST",
@@ -3777,7 +3763,8 @@ def test_event_alpha_signal_quality_make_targets_exist():
 
 
 def test_quality_review_uses_core_opportunities_as_primary_sections():
-    from crypto_rsi_scanner import event_alpha_quality_review, event_core_opportunity_store
+    import crypto_rsi_scanner.event_alpha.outcomes.quality as event_alpha_quality_review
+    import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store
 
     rows = _canonical_core_fixture_rows()
     with TemporaryDirectory() as tmp:
@@ -3815,14 +3802,12 @@ def test_quality_review_uses_core_opportunities_as_primary_sections():
 
 
 def test_feedback_readiness_counts_canonical_review_items_not_diagnostics():
-    from crypto_rsi_scanner import (
-        event_alpha_feedback_readiness,
-        event_alpha_notification_inbox,
-        event_alpha_router,
-        event_core_opportunity_store,
-        event_research_cards,
-        event_watchlist,
-    )
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback as event_alpha_feedback_readiness
+    import crypto_rsi_scanner.event_alpha.notifications.inbox as event_alpha_notification_inbox
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store
+    import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -3906,7 +3891,7 @@ def test_feedback_readiness_counts_canonical_review_items_not_diagnostics():
 def test_daily_brief_evidence_acquisition_uses_canonical_post_policy_verdict():
     import json
 
-    from crypto_rsi_scanner import event_alpha_daily_brief
+    import crypto_rsi_scanner.event_alpha.artifacts.daily_brief as event_alpha_daily_brief
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -3986,7 +3971,9 @@ def test_daily_brief_evidence_acquisition_uses_canonical_post_policy_verdict():
 def test_integrated_radar_outcomes_and_calibration_are_research_only():
     import json
 
-    from crypto_rsi_scanner import event_alpha_artifacts, event_integrated_radar, event_integrated_radar_outcomes
+    import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+    import crypto_rsi_scanner.event_alpha.radar.integrated_radar as event_integrated_radar
+    import crypto_rsi_scanner.event_alpha.outcomes.integrated_radar_outcomes as event_integrated_radar_outcomes
 
     with TemporaryDirectory() as tmp:
         context = event_alpha_artifacts.context_from_profile(

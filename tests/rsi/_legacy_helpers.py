@@ -35,7 +35,8 @@ from crypto_rsi_scanner.indicators import (  # noqa: E402
     wilder_rsi,
 )
 from crypto_rsi_scanner.scanner import classify_tier  # noqa: E402
-from crypto_rsi_scanner import event_provider_status, formatting  # noqa: E402
+from crypto_rsi_scanner import formatting
+import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 
 
 def _market(**over):

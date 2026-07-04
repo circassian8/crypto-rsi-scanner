@@ -15,7 +15,7 @@ globals().update({
 def test_event_alpha_artifact_doctor_public_entrypoints_are_split():
     import inspect
 
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
     from crypto_rsi_scanner.event_alpha.doctor import (
         aggregation,
         artifact_doctor,
@@ -182,7 +182,8 @@ def test_event_alpha_doctor_check_plugins_emit_regression_messages():
 def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor_checked():
     import json
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_live_provider_readiness
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.providers.live_provider_readiness as event_live_provider_readiness
 
     source_coverage_text = "\n".join([
         "EVENT ALPHA SOURCE COVERAGE",
@@ -292,7 +293,7 @@ def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor
 
 def test_event_alpha_artifact_doctor_schema_only_catches_bad_fixture():
     import json
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -329,7 +330,7 @@ def test_event_alpha_artifact_doctor_schema_only_catches_bad_fixture():
 
 
 def test_event_alpha_artifact_doctor_skip_legacy_keeps_schema_phases_only():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -353,7 +354,8 @@ def test_event_alpha_artifact_doctor_skip_legacy_keeps_schema_phases_only():
 def test_event_alpha_coinalyze_preflight_smoke_artifacts_are_safe_and_doctor_checked():
     import json
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_coinalyze_preflight
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight as event_coinalyze_preflight
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -430,7 +432,8 @@ def test_event_alpha_coinalyze_preflight_smoke_artifacts_are_safe_and_doctor_che
 
 def test_event_alpha_coinalyze_rehearsal_doctor_blocks_missing_live_artifacts():
     import json
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_coinalyze_preflight
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight as event_coinalyze_preflight
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -502,7 +505,8 @@ def test_event_alpha_artifact_context_and_doctor_filter_modes():
     import os
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_artifacts
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
 
     env_keys = (
         "RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR",
@@ -693,11 +697,9 @@ def test_event_alpha_artifact_context_and_doctor_filter_modes():
 
 def test_event_alpha_doctor_flags_unconfirmed_narrative_digest_and_core_visibility():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_artifact_doctor,
-        event_alpha_notification_delivery as delivery,
-        event_core_opportunities,
-    )
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.radar.core_opportunities as event_core_opportunities
 
     fan_core = {
         "row_type": "event_core_opportunity",
@@ -825,7 +827,7 @@ def test_event_alpha_doctor_flags_unconfirmed_narrative_digest_and_core_visibili
 
 
 def test_event_alpha_artifact_doctor_flags_notification_identity_and_preview_conflicts():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     with TemporaryDirectory() as tmp:
         preview = Path(tmp) / "event_alpha_notification_preview.md"
@@ -904,7 +906,7 @@ def test_event_alpha_artifact_doctor_flags_notification_identity_and_preview_con
 
 
 def test_event_alpha_artifact_doctor_blocks_preview_run_summary_mismatch():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     with TemporaryDirectory() as tmp:
         namespace = "preview_mismatch_test"
@@ -972,11 +974,9 @@ def test_event_alpha_artifact_doctor_blocks_preview_run_summary_mismatch():
 
 def test_event_alpha_send_readiness_blocks_missing_preview_file():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_artifact_doctor,
-        event_alpha_notification_delivery,
-        event_alpha_send_readiness,
-    )
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as event_alpha_notification_delivery
+    import crypto_rsi_scanner.event_alpha.notifications.readiness as event_alpha_send_readiness
 
     with TemporaryDirectory() as tmp:
         old_cwd = os.getcwd()
@@ -1036,7 +1036,7 @@ def test_event_alpha_send_readiness_blocks_missing_preview_file():
 
 
 def test_event_alpha_artifact_doctor_blocks_digest_delivery_without_core_identity():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     with TemporaryDirectory() as tmp:
         preview = Path(tmp) / "event_alpha_notification_preview.md"
@@ -1098,7 +1098,7 @@ def test_event_alpha_artifact_doctor_blocks_digest_delivery_without_core_identit
 
 
 def test_event_alpha_artifact_doctor_accepts_multi_core_digest_and_core_route_derivation():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     with TemporaryDirectory() as tmp:
         preview = Path(tmp) / "event_alpha_notification_preview.md"
@@ -1210,7 +1210,7 @@ def test_event_alpha_artifact_doctor_accepts_multi_core_digest_and_core_route_de
 
 
 def test_event_alpha_artifact_doctor_scopes_delivery_identity_to_latest_run():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     with TemporaryDirectory() as tmp:
         preview = Path(tmp) / "event_alpha_notification_preview.md"
@@ -1332,7 +1332,8 @@ def test_event_alpha_artifact_doctor_scopes_delivery_identity_to_latest_run():
 
 
 def test_artifact_doctor_blocks_broken_daily_brief_selection():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_notifications as notif
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
 
     namespace = "notify_llm_deep_research_review_smoke"
     run_id = "2026-06-15T16:00:00+00:00|notify_llm_deep"
@@ -1418,13 +1419,11 @@ def test_event_alpha_research_review_digest_inbox_and_doctor_checks():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import (
-        event_alpha_artifact_doctor as doctor,
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notification_inbox as inbox,
-        event_alpha_notifications as notif,
-        event_alpha_router,
-    )
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as doctor
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.inbox as inbox
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     namespace = "research_review_digest_unit_doctor"
     with tempfile.TemporaryDirectory() as tmp:
@@ -1662,10 +1661,8 @@ def test_event_alpha_artifact_doctor_blocks_research_review_body_not_using_canon
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import (
-        event_alpha_artifact_doctor as doctor,
-        event_alpha_notification_delivery as delivery,
-    )
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as doctor
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
 
     namespace = "research_review_canonical_body_unit"
     with tempfile.TemporaryDirectory() as tmp:
@@ -1773,13 +1770,11 @@ def test_event_alpha_quality_fields_enforced_and_doctor_reports_legacy_missing()
     from datetime import datetime, timezone
     from pathlib import Path
     from types import SimpleNamespace
-    from crypto_rsi_scanner import (
-        event_alpha_alert_store,
-        event_alpha_artifact_doctor,
-        event_alpha_router,
-        event_impact_hypothesis_store,
-        event_watchlist,
-    )
+    import crypto_rsi_scanner.event_alpha.artifacts.alert_store as event_alpha_alert_store
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store as event_impact_hypothesis_store
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     hypothesis = SimpleNamespace(
         hypothesis_id="h-velvet-quality",
@@ -1894,11 +1889,9 @@ def test_event_alpha_quality_fields_enforced_and_doctor_reports_legacy_missing()
 
 def test_event_alpha_notification_run_summary_flows_to_runs_doctor_and_brief():
     from types import SimpleNamespace
-    from crypto_rsi_scanner import (
-        event_alpha_artifact_doctor,
-        event_alpha_daily_brief,
-        event_alpha_notification_runs as runs,
-    )
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.artifacts.daily_brief as event_alpha_daily_brief
+    import crypto_rsi_scanner.event_alpha.notifications.runs as runs
 
     started = "2026-06-20T12:00:00+00:00"
     delivered_result = SimpleNamespace(
@@ -1957,7 +1950,7 @@ def test_event_alpha_environment_doctor_blocks_missing_and_unwritable_inputs():
     import tempfile
     from pathlib import Path
     from types import SimpleNamespace
-    from crypto_rsi_scanner import event_alpha_environment_doctor as doctor
+    import crypto_rsi_scanner.event_alpha.doctor.environment as doctor
 
     with tempfile.TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -2046,7 +2039,8 @@ def test_event_alpha_live_path_caps_non_hypothesis_watchlist_and_doctor_sees_pat
     from pathlib import Path
     import tempfile
 
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_watchlist
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     now = datetime(2026, 6, 26, 15, 30, tzinfo=timezone.utc)
     quality = {
@@ -2135,7 +2129,8 @@ def test_event_alpha_live_path_caps_non_hypothesis_watchlist_and_doctor_sees_pat
 
 
 def test_event_alpha_artifact_doctor_reports_core_store_coverage():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_core_opportunity_store
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store
 
     rows = _canonical_core_fixture_rows()
     with TemporaryDirectory() as tmp:
@@ -2220,7 +2215,9 @@ def test_event_alpha_artifact_doctor_reports_core_store_coverage():
 
 
 def test_event_alpha_artifact_doctor_blocks_core_route_verdict_conflict():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_router, event_watchlist
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     conflict = {
         "row_type": "event_core_opportunity",
@@ -2266,7 +2263,9 @@ def test_event_alpha_artifact_doctor_blocks_core_route_verdict_conflict():
 
 
 def test_event_alpha_artifact_doctor_blocks_live_promoted_without_confirmation():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_router, event_watchlist
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     conflict = {
         "row_type": "event_core_opportunity",
@@ -2315,7 +2314,7 @@ def test_event_alpha_artifact_doctor_blocks_live_promoted_without_confirmation()
 
 
 def test_event_alpha_artifact_doctor_accepts_quality_blocked_local_card_group():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -2378,7 +2377,7 @@ def test_event_alpha_artifact_doctor_accepts_quality_blocked_local_card_group():
 
 
 def test_artifact_doctor_blocks_stale_acquisition_validated_digest():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     result = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=[{
@@ -2410,7 +2409,8 @@ def test_artifact_doctor_blocks_stale_acquisition_validated_digest():
 
 def test_artifact_doctor_detects_canonical_core_rendering_mismatch_and_acquisition_orphan():
     import json
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_core_opportunity_store
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store
 
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -2502,7 +2502,8 @@ def test_artifact_doctor_detects_canonical_core_rendering_mismatch_and_acquisiti
 
 
 def test_artifact_doctor_detects_orphan_core_cards_and_snapshot_ids():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_core_opportunity_store
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store
 
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -2557,7 +2558,9 @@ def test_artifact_doctor_detects_orphan_core_cards_and_snapshot_ids():
 
 
 def test_artifact_doctor_checks_core_first_review_surfaces():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_router, event_watchlist
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     quality = {
         "impact_path_strength": "strong",
@@ -2679,7 +2682,9 @@ def test_artifact_doctor_checks_core_first_review_surfaces():
 
 
 def test_artifact_doctor_blocks_bad_diagnostic_support_snapshot_and_duplicate_canonical_alerts():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_router, event_watchlist
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     core = {
         "row_type": "event_core_opportunity",
@@ -2751,7 +2756,10 @@ def test_artifact_doctor_blocks_bad_diagnostic_support_snapshot_and_duplicate_ca
 
 
 def test_artifact_doctor_detects_unreconciled_snapshot_core_mismatch():
-    from crypto_rsi_scanner import event_alpha_alert_store, event_alpha_artifact_doctor, event_alpha_router, event_watchlist
+    import crypto_rsi_scanner.event_alpha.artifacts.alert_store as event_alpha_alert_store
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     core = {
         "row_type": "event_core_opportunity",
@@ -2845,7 +2853,7 @@ def test_artifact_doctor_detects_unreconciled_snapshot_core_mismatch():
 
 
 def test_artifact_doctor_blocks_latest_delivery_rows_missing_explicit_status():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     with TemporaryDirectory() as tmp:
         old_cwd = os.getcwd()
@@ -2924,7 +2932,8 @@ def test_artifact_doctor_blocks_latest_delivery_rows_missing_explicit_status():
 
 
 def test_send_readiness_blocks_missing_delivery_status_fields():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_send_readiness
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.readiness as event_alpha_send_readiness
 
     doctor = event_alpha_artifact_doctor.EventAlphaArtifactDoctorResult(
         status="BLOCKED",
@@ -2973,7 +2982,8 @@ def test_send_readiness_blocks_missing_delivery_status_fields():
 
 
 def test_artifact_doctor_blocks_raw_core_source_only_narrative_stale_final_level():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_router
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     stale = {
         "row_type": "event_core_opportunity",
@@ -3018,7 +3028,7 @@ def test_artifact_doctor_blocks_raw_core_source_only_narrative_stale_final_level
 
 
 def test_artifact_doctor_flags_invalid_opportunity_lanes():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     rows = [
         {
@@ -3095,7 +3105,7 @@ def test_artifact_doctor_flags_invalid_opportunity_lanes():
 
 
 def test_artifact_doctor_flags_malformed_market_anomaly_artifacts():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     rows = [
         {
@@ -3164,7 +3174,8 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_429_403_and_doctor_con
     from datetime import datetime, timezone
     from urllib.error import HTTPError
 
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_bybit_announcements_preflight
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight as event_bybit_announcements_preflight
 
     original_max_pages = os.environ.get(event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES)
     try:
@@ -3245,7 +3256,8 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_429_403_and_doctor_con
 def test_official_exchange_artifact_doctor_conflicts():
     import json
 
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_official_exchange_activation
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.providers.official_exchange_activation as event_official_exchange_activation
 
     rows = [
         {
@@ -3401,7 +3413,7 @@ def test_official_exchange_artifact_doctor_conflicts():
 
 
 def test_scheduled_catalyst_artifact_doctor_conflicts():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     rows = [
         {
@@ -3474,7 +3486,7 @@ def test_scheduled_catalyst_artifact_doctor_conflicts():
 
 
 def test_derivatives_crowding_artifact_doctor_conflicts():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     rows = [
         {
@@ -3542,7 +3554,9 @@ def test_derivatives_crowding_artifact_doctor_conflicts():
 def test_instrument_resolution_artifact_doctor_conflicts():
     import json
 
-    from crypto_rsi_scanner import config, event_asset_registry, event_instrument_resolver
+    from crypto_rsi_scanner import config
+    import crypto_rsi_scanner.event_alpha.radar.asset_registry as event_asset_registry
+    import crypto_rsi_scanner.event_alpha.radar.instrument_resolver as event_instrument_resolver
 
     with TemporaryDirectory() as tmp:
         namespace = Path(tmp)
@@ -3605,7 +3619,7 @@ def test_instrument_resolution_artifact_doctor_conflicts():
 def test_integrated_doctor_catches_core_and_card_mismatches():
     import json
 
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     candidate = {
         "row_type": "event_integrated_radar_candidate",
@@ -3831,7 +3845,7 @@ def test_integrated_doctor_catches_core_and_card_mismatches():
 def test_integrated_doctor_catches_delivery_and_outcome_conflicts():
     import json
 
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     candidate = {
         "row_type": "event_integrated_radar_candidate",
@@ -3937,7 +3951,7 @@ def test_integrated_doctor_catches_delivery_and_outcome_conflicts():
 
 
 def test_integrated_doctor_requires_thesis_interpretation_for_fade_and_risk_outcomes():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     candidate = {
         "row_type": "event_integrated_radar_candidate",

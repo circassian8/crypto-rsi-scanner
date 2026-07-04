@@ -2,32 +2,11 @@
 
 from __future__ import annotations
 
-import importlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-
-def test_provider_old_and_new_import_paths_resolve_same_objects():
-    module_pairs = (
-        ("crypto_rsi_scanner.event_coinalyze_preflight", "crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight", "build_preflight_report"),
-        ("crypto_rsi_scanner.event_live_provider_readiness", "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness", "build_readiness_report"),
-        ("crypto_rsi_scanner.event_official_exchange", "crypto_rsi_scanner.event_alpha.providers.official_exchange", "run_official_exchange_scan"),
-        ("crypto_rsi_scanner.event_official_exchange_activation", "crypto_rsi_scanner.event_alpha.providers.official_exchange_activation", "build_activation_report"),
-        ("crypto_rsi_scanner.event_alpha_cryptopanic", "crypto_rsi_scanner.event_alpha.providers.cryptopanic", "build_cryptopanic_preflight"),
-        ("crypto_rsi_scanner.event_provider_health", "crypto_rsi_scanner.event_alpha.providers.provider_health", "record_provider_success"),
-        ("crypto_rsi_scanner.event_source_registry", "crypto_rsi_scanner.event_alpha.providers.source_registry", "assess_source"),
-        ("crypto_rsi_scanner.event_source_packs", "crypto_rsi_scanner.event_alpha.providers.source_packs", "get_source_pack"),
-        ("crypto_rsi_scanner.event_bybit_announcements_preflight", "crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight", "build_preflight_report"),
-        ("crypto_rsi_scanner.event_unlock_calendar_preflight", "crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight", "build_preflight_report"),
-        ("crypto_rsi_scanner.event_dex_onchain_readiness", "crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness", "run_dex_onchain_readiness"),
-    )
-
-    for old_path, new_path, attr in module_pairs:
-        old_module = importlib.import_module(old_path)
-        new_module = importlib.import_module(new_path)
-        assert getattr(old_module, attr) is getattr(new_module, attr)
 
 
 def test_coinalyze_preflight_smoke_new_package_path_writes_no_call_artifacts():
@@ -173,7 +152,7 @@ def test_event_provider_status_ready_with_live_source_and_redacted_credentials()
 def test_event_provider_health_preserves_cryptopanic_safe_error_class():
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_provider_health
+    import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
 
     with tempfile.TemporaryDirectory() as tmp:
         cfg = event_provider_health.EventProviderHealthConfig(path=Path(tmp) / "provider_health.jsonl")
@@ -226,11 +205,9 @@ def test_event_alpha_dex_onchain_readiness_artifacts_are_fixture_only_and_covere
     import json
     from datetime import datetime, timezone
 
-    from crypto_rsi_scanner import (
-        event_alpha_artifact_doctor,
-        event_alpha_source_coverage,
-        event_dex_onchain_readiness,
-    )
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.radar.source_coverage as event_alpha_source_coverage
+    import crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness as event_dex_onchain_readiness
 
     root = _event_alpha_legacy_helpers.REPO_ROOT
     with TemporaryDirectory() as tmp:
@@ -895,7 +872,7 @@ def test_event_discovery_structured_calendar_providers_parse_fixtures():
 
 def test_event_discovery_normalizes_and_dedupes_events():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
 
     events_path, _ = _event_discovery_fixture_paths()
@@ -918,7 +895,7 @@ def test_event_discovery_canonical_dedupe_merges_variant_headlines_and_payloads(
     import copy
     from dataclasses import replace
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider, content_hash
     from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
@@ -986,7 +963,7 @@ def test_event_discovery_canonical_dedupe_merges_variant_headlines_and_payloads(
 
 def test_event_discovery_resolves_real_assets_from_clean_universe_fixture():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
 
@@ -1017,7 +994,7 @@ def test_event_discovery_resolves_real_assets_from_clean_universe_fixture():
 
 def test_event_discovery_exchange_announcements_are_direct_no_trade():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
@@ -1288,7 +1265,7 @@ def test_event_discovery_coinalyze_live_provider_auto_resolves_future_markets_of
 
 
 def test_event_discovery_coinalyze_base_symbols_from_assets():
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_core.models import DiscoveredAsset
 
     assets = [
@@ -1312,7 +1289,7 @@ def test_event_discovery_coinalyze_live_provider_missing_config_fail_soft():
 
 def test_event_discovery_derivatives_enrich_candidates_without_overriding_raw():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
     from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
@@ -1397,7 +1374,7 @@ def test_event_discovery_supply_providers_parse_fixtures():
 
 def test_event_discovery_supply_enriches_without_overriding_raw_or_bypassing_gates():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
     from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
@@ -1956,7 +1933,7 @@ def test_cryptopanic_live_provider_records_safe_parse_and_http_diagnostics():
 
 
 def test_cryptopanic_catalyst_search_currency_filter_uses_validated_identity_or_empty():
-    from crypto_rsi_scanner import event_catalyst_search
+    import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
     from crypto_rsi_scanner.event_providers.cryptopanic import (
         normalize_cryptopanic_currency_code,
         plan_cryptopanic_currency_codes,
@@ -2221,7 +2198,7 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
 
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import event_provider_health
+    import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
 
     health_path = Path(tempfile.mkdtemp()) / "provider_health.json"
     health_cfg = event_provider_health.EventProviderHealthConfig(
@@ -2318,7 +2295,7 @@ def test_event_discovery_news_external_asset_inference_handles_generic_ipo_entit
 
 def test_event_discovery_proxy_article_with_text_date_becomes_dated_review_candidate():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_core.models import DiscoveredAsset
     from crypto_rsi_scanner.event_providers.project_blog_rss import ProjectBlogRssProvider
@@ -2401,7 +2378,7 @@ def test_event_discovery_explicit_event_time_can_trigger_but_text_date_is_review
     import copy
     from dataclasses import replace
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider, content_hash
     from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
@@ -2444,7 +2421,7 @@ def test_event_discovery_explicit_event_time_can_trigger_but_text_date_is_review
 def test_event_discovery_forces_no_trade_on_low_classifier_confidence():
     from dataclasses import replace
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_alpha.radar import discovery as discovery_impl
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
@@ -2484,7 +2461,7 @@ def test_event_discovery_forces_no_trade_on_low_classifier_confidence():
 
 def test_event_discovery_proxy_article_without_event_time_stays_reviewable_no_trade():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_core.models import DiscoveredAsset
     from crypto_rsi_scanner.event_providers.project_blog_rss import ProjectBlogRssProvider
@@ -2560,7 +2537,10 @@ def test_event_alpha_report_context_and_preflight_are_profile_scoped():
     import tempfile
     from pathlib import Path
 
-    from crypto_rsi_scanner import config, event_alpha_artifacts, event_alpha_preflight, event_alpha_profiles, scanner
+    from crypto_rsi_scanner import config, scanner
+    import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+    import crypto_rsi_scanner.event_alpha.config.preflight as event_alpha_preflight
+    import crypto_rsi_scanner.event_alpha.config.profiles as event_alpha_profiles
 
     base_attrs = (
         "EVENT_ALPHA_ARTIFACT_BASE_DIR",
@@ -2768,7 +2748,8 @@ def test_event_discovery_transform_applies_llm_hints_before_resolver_validation(
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_discovery, event_llm_extractor
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.llm.extractor as event_llm_extractor
     from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
 
     class Provider:
@@ -2863,7 +2844,8 @@ def test_event_market_enrichment_live_fail_soft_records_provider_health():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_market_enrichment, event_provider_health
+    import crypto_rsi_scanner.event_alpha.radar.market_enrichment as event_market_enrichment
+    import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
 
     class FailingClient:
         calls = 0
@@ -2964,7 +2946,7 @@ def test_event_catalyst_search_live_provider_adapters_are_evidence_only():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_catalyst_search
+    import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     query = event_catalyst_search.SearchQuery(
@@ -3016,7 +2998,7 @@ def test_event_catalyst_search_live_provider_adapters_are_evidence_only():
 
 def test_event_catalyst_search_gdelt_fetch_cap_prevents_repeated_live_failures():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_catalyst_search
+    import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     calls = {"count": 0}
@@ -3053,7 +3035,7 @@ def test_event_catalyst_search_gdelt_fetch_cap_prevents_repeated_live_failures()
 
 
 def test_event_candidate_discovery_rejects_common_word_false_positives():
-    from crypto_rsi_scanner import event_impact_hypotheses
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
     from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from datetime import datetime, timezone
 
@@ -3098,7 +3080,8 @@ def test_event_candidate_discovery_rejects_common_word_false_positives():
 
 def test_event_impact_candidate_discovery_suggests_then_requires_identity_validation():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_catalyst_search, event_impact_hypotheses
+    import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
     from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
@@ -3233,7 +3216,9 @@ def test_event_alpha_provider_health_report_and_reset_are_profile_scoped():
     import tempfile
     from pathlib import Path
 
-    from crypto_rsi_scanner import config, event_alpha_artifacts, event_alpha_profiles, scanner
+    from crypto_rsi_scanner import config, scanner
+    import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+    import crypto_rsi_scanner.event_alpha.config.profiles as event_alpha_profiles
 
     profile = event_alpha_profiles.get_profile("notify_no_key")
     path_attrs = (
@@ -3365,7 +3350,7 @@ def test_event_alpha_provider_health_report_and_reset_are_profile_scoped():
 
 def test_event_discovery_asset_role_demotes_proxy_context_noise():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
     from crypto_rsi_scanner.event_providers.manual_json import content_hash
@@ -3507,7 +3492,7 @@ def test_event_discovery_asset_role_demotes_proxy_context_noise():
 
 def test_event_discovery_news_pipeline_proxy_direct_late_and_ambiguous_safety():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
@@ -3743,7 +3728,7 @@ def test_event_discovery_prediction_market_external_asset_infers_generic_ipo_ent
 
 def test_event_discovery_external_catalysts_are_radar_first_and_link_narrowly():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
@@ -3787,7 +3772,7 @@ def test_event_discovery_external_catalysts_are_radar_first_and_link_narrowly():
 
 
 def test_event_discovery_pipeline_and_event_fade_safety():
-    from crypto_rsi_scanner import event_discovery
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
 
     result = _event_discovery_fixture_result()
@@ -3826,7 +3811,7 @@ def test_event_discovery_cache_writes_point_in_time_jsonl_artifacts():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_cache
+    import crypto_rsi_scanner.event_alpha.artifacts.cache as event_cache
 
     result = _full_event_discovery_fixture_result()
     observed_at = datetime(2026, 6, 16, 12, 30, tzinfo=timezone.utc)
@@ -4104,7 +4089,8 @@ def test_event_discovery_runs_scanner_reports_recent_diagnostics():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import config, event_cache, scanner
+    from crypto_rsi_scanner import config, scanner
+    import crypto_rsi_scanner.event_alpha.artifacts.cache as event_cache
     from crypto_rsi_scanner.event_core.models import EventDiscoveryResult
 
     original_cache_dir = config.EVENT_DISCOVERY_CACHE_DIR
@@ -4624,11 +4610,9 @@ def test_event_alpha_visible_core_coverage_readiness_and_doctor():
     import tempfile
     from pathlib import Path
 
-    from crypto_rsi_scanner import (
-        event_alpha_artifact_doctor,
-        event_alpha_feedback_readiness,
-        event_core_opportunities,
-    )
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback as event_alpha_feedback_readiness
+    import crypto_rsi_scanner.event_alpha.radar.core_opportunities as event_core_opportunities
 
     visible_row = {
         "row_type": "event_alpha_alert_snapshot",
@@ -4724,7 +4708,7 @@ def test_event_provider_health_backoff_and_report():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_provider_health
+    import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
 
     now = datetime(2026, 6, 18, 10, 0, tzinfo=timezone.utc)
     path = Path(tempfile.mkdtemp()) / "provider_health.json"
@@ -4812,7 +4796,7 @@ def test_event_provider_health_reset_and_ignore_backoff():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_provider_health
+    import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
 
     now = datetime(2026, 6, 20, 10, 0, tzinfo=timezone.utc)
     path = Path(tempfile.mkdtemp()) / "provider_health.json"
@@ -4885,7 +4869,7 @@ def test_event_provider_health_wraps_event_and_enrichment_providers():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_provider_health
+    import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
     from crypto_rsi_scanner.event_providers.coingecko_universe import CoinGeckoUniverseProvider
 
     now = datetime(2026, 6, 18, 10, 0, tzinfo=timezone.utc)
@@ -5005,7 +4989,7 @@ def test_event_provider_health_wrappers_use_injected_now_and_legacy_signatures()
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_provider_health
+    import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
 
     now = datetime(2026, 6, 19, 9, 30, tzinfo=timezone.utc)
     path = Path(tempfile.mkdtemp()) / "health.json"
@@ -5057,13 +5041,11 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
     import zipfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import (
-        event_alpha_burn_in_pack,
-        event_alpha_health_guard,
-        event_alpha_tuning,
-        event_alpha_v1_readiness,
-        event_research_cards,
-    )
+    import crypto_rsi_scanner.event_alpha.outcomes.burn_in as event_alpha_burn_in_pack
+    import crypto_rsi_scanner.event_alpha.config.health_guard as event_alpha_health_guard
+    import crypto_rsi_scanner.event_alpha.outcomes.quality as event_alpha_tuning
+    import crypto_rsi_scanner.event_alpha.config.v1_readiness as event_alpha_v1_readiness
+    import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
 
     now = datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc)
     run_rows = [
@@ -5214,7 +5196,7 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
 
 
 def test_daily_brief_declares_canonical_view_and_market_freshness_readiness():
-    from crypto_rsi_scanner import event_alpha_daily_brief
+    import crypto_rsi_scanner.event_alpha.artifacts.daily_brief as event_alpha_daily_brief
 
     row = {
         "run_id": "run-1",
@@ -5263,7 +5245,7 @@ def test_daily_brief_declares_canonical_view_and_market_freshness_readiness():
 def test_daily_brief_source_coverage_uses_json_effective_provider_health():
     import json
 
-    from crypto_rsi_scanner import event_alpha_daily_brief
+    import crypto_rsi_scanner.event_alpha.artifacts.daily_brief as event_alpha_daily_brief
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -5318,7 +5300,8 @@ def test_event_alpha_bybit_announcements_preflight_fixture_and_default_no_networ
     import json
     from datetime import datetime, timezone
 
-    from crypto_rsi_scanner import config, event_bybit_announcements_preflight
+    from crypto_rsi_scanner import config
+    import crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight as event_bybit_announcements_preflight
 
     fixture_path = Path("fixtures/event_discovery/official_exchange_bybit_announcements.json")
     original_path = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH

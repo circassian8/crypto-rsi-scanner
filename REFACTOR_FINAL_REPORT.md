@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T17:55:39+00:00`
+- generated_at: `2026-07-04T18:18:46+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -20,7 +20,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | file | baseline lines | current lines | reduced by | reduction | target | status |
 |---|---:|---:|---:|---:|---:|---|
 | `crypto_rsi_scanner/scanner.py` | 13373 | 90 | 13283 | 99.33% | <2000 | `pass` |
-| `tests/test_indicators.py` | 42498 | 1771 | 40727 | 95.83% | <2000 | `pass` |
+| `tests/test_indicators.py` | 42498 | 1778 | 40720 | 95.82% | <2000 | `pass` |
 | `crypto_rsi_scanner/event_alpha_artifact_doctor.py` | 7145 | 19 | 7126 | 99.73% | <100 | `pass` |
 
 ## Organization Counts
@@ -71,20 +71,22 @@ Research-only refactor gate report. This report does not call providers, send Te
 - v3_contract_path: `research/REFACTOR_V3_CONTRACT.md`
 - v3_gate_status: `pending`
 - v3_auto_accept_ready: `False`
-- v3_auto_accept_blockers: `["nonessential_shims_remaining", "shim_removal_blockers", "production_files_over_1200_lines", "public_classes_not_in_own_module", "class_exceptions_remaining", "old_path_docs_references"]`
+- v3_auto_accept_blockers: `["nonessential_shims_remaining", "shim_removal_blockers", "production_files_over_1200_lines", "public_classes_not_in_own_module", "class_exceptions_remaining"]`
 
 | gate | value | severity |
 |---|---:|---|
 | `nonessential_shims_remaining` | 111 | blocker |
 | `old_path_internal_imports` | 0 | blocker |
+| `old_path_test_imports` | 0 | blocker |
 | `public_compatibility_shims` | 13 | informational |
 | `shim_removal_blockers` | 109 | blocker |
-| `production_files_over_1200_lines` | 14 | target_gap |
+| `production_files_over_1200_lines` | 15 | target_gap |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 82 | blocker |
 | `class_exceptions_remaining` | 14 | blocker_until_reaccepted_for_v3 |
 | `functions_over_150_lines` | 0 | blocker |
-| `old_path_docs_references` | 215 | blocker_unless_policy_scoped |
+| `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
+| `old_path_import_allowed_exceptions` | 126 | informational |
 
 ## Newly Migrated Modules
 
@@ -130,6 +132,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1353 |
 | `crypto_rsi_scanner/config.py` | 1319 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
 | `crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py` | 1261 |
@@ -146,11 +149,10 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1069 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1059 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1047 |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1046 |
 | `crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py` | 1044 |
 | `crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py` | 1035 |
 | `crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py` | 1033 |
-| `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1012 |
+| `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1032 |
 | `crypto_rsi_scanner/event_alpha/radar/llm/extractor.py` | 1002 |
 | `crypto_rsi_scanner/event_alpha/radar/scheduled_catalysts.py` | 995 |
 | `crypto_rsi_scanner/event_alpha/providers/source_registry.py` | 989 |
@@ -167,25 +169,26 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 | path | lines |
 |---|---:|
-| `tests/event_alpha/test_integrated_radar.py` | 16092 |
-| `tests/event_alpha/test_provider_readiness.py` | 5374 |
-| `tests/event_alpha/test_notifications.py` | 5038 |
-| `tests/event_alpha/test_outcomes.py` | 4044 |
-| `tests/event_alpha/test_artifact_doctor.py` | 3981 |
-| `tests/event_alpha/test_source_coverage.py` | 2988 |
-| `tests/event_alpha/test_namespace_lifecycle.py` | 1813 |
-| `tests/test_indicators.py` | 1771 |
-| `tests/cli/test_make_targets.py` | 1079 |
-| `tests/event_alpha/_legacy_helpers.py` | 819 |
-| `tests/event_alpha/test_artifact_schema.py` | 734 |
+| `tests/event_alpha/test_integrated_radar.py` | 16184 |
+| `tests/event_alpha/test_provider_readiness.py` | 5357 |
+| `tests/event_alpha/test_notifications.py` | 5002 |
+| `tests/event_alpha/test_outcomes.py` | 4031 |
+| `tests/event_alpha/test_artifact_doctor.py` | 3995 |
+| `tests/event_alpha/test_source_coverage.py` | 2991 |
+| `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
+| `tests/test_indicators.py` | 1778 |
+| `tests/cli/test_make_targets.py` | 1081 |
+| `tests/event_alpha/_legacy_helpers.py` | 825 |
+| `tests/event_alpha/test_artifact_schema.py` | 728 |
 | `tests/rsi/test_indicators_core.py` | 694 |
 | `tests/rsi/test_backtest.py` | 561 |
 | `tests/rsi/test_paper_risk.py` | 379 |
-| `tests/event_alpha/test_shim_registry.py` | 279 |
 | `tests/cli/test_parser.py` | 243 |
+| `tests/event_alpha/test_shim_registry.py` | 237 |
+| `tests/event_alpha/test_legacy_import_compatibility.py` | 174 |
 | `tests/cli/test_event_alpha_command_registry.py` | 163 |
 | `tests/cli/test_dispatch.py` | 129 |
-| `tests/rsi/_legacy_helpers.py` | 67 |
+| `tests/rsi/_legacy_helpers.py` | 68 |
 | `tests/event_alpha/conftest.py` | 30 |
 | `tests/conftest.py` | 13 |
 | `tests/__init__.py` | 1 |
@@ -235,6 +238,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1353 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/config.py` | 1319 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 
 ## Legacy Decomposition Gate

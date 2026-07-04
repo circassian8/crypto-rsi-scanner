@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-04T17:55:01.743461+00:00",
+  "generated_at": "2026-07-04T18:18:17.898083+00:00",
   "groups": {
     "keep_public_compatibility": [
       {
@@ -88,8 +88,7 @@
         "recommended_action": "keep_public_entrypoint",
         "removal_blockers": [
           "test_import_references",
-          "makefile_references",
-          "artifact_doc_references"
+          "makefile_references"
         ],
         "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
         "safe_to_remove": false,
@@ -101,8 +100,7 @@
         "recommended_action": "keep_public_entrypoint",
         "removal_blockers": [
           "test_import_references",
-          "makefile_references",
-          "artifact_doc_references"
+          "makefile_references"
         ],
         "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
         "safe_to_remove": false,
@@ -113,8 +111,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_profiles",
         "recommended_action": "keep_public_entrypoint",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
         "safe_to_remove": false,
@@ -125,8 +122,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_v1_readiness",
         "recommended_action": "keep_public_entrypoint",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
         "safe_to_remove": false,
@@ -137,8 +133,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_preflight",
         "recommended_action": "keep_public_entrypoint",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
         "safe_to_remove": false,
@@ -1117,8 +1112,7 @@
         "old_module": "crypto_rsi_scanner.event_incident_graph",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1129,8 +1123,7 @@
         "old_module": "crypto_rsi_scanner.event_identity",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1141,8 +1134,7 @@
         "old_module": "crypto_rsi_scanner.event_graph",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1153,8 +1145,7 @@
         "old_module": "crypto_rsi_scanner.event_resolver",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1165,8 +1156,7 @@
         "old_module": "crypto_rsi_scanner.event_price_history",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1177,8 +1167,7 @@
         "old_module": "crypto_rsi_scanner.event_catalyst_frame_validator",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1189,8 +1178,7 @@
         "old_module": "crypto_rsi_scanner.event_anomaly_state",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1201,8 +1189,7 @@
         "old_module": "crypto_rsi_scanner.event_anomaly_scanner",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1213,8 +1200,7 @@
         "old_module": "crypto_rsi_scanner.event_market_units",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1225,8 +1211,7 @@
         "old_module": "crypto_rsi_scanner.event_llm_budget",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1237,8 +1222,7 @@
         "old_module": "crypto_rsi_scanner.event_source_reliability",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1249,8 +1233,7 @@
         "old_module": "crypto_rsi_scanner.event_cache",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1261,8 +1244,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_explain",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1273,8 +1255,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_quality_fields",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1285,8 +1266,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_outcomes",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1297,8 +1277,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1309,8 +1288,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_health_guard",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1321,8 +1299,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_scheduler",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1333,8 +1310,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_environment_doctor",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1345,8 +1321,7 @@
         "old_module": "crypto_rsi_scanner.event_provider_status",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1357,8 +1332,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_missed",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1369,8 +1343,7 @@
         "old_module": "crypto_rsi_scanner.event_alpha_reason_text",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1381,8 +1354,7 @@
         "old_module": "crypto_rsi_scanner.event_clock",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,
@@ -1393,8 +1365,7 @@
         "old_module": "crypto_rsi_scanner.event_models",
         "recommended_action": "keep_until_v3",
         "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
+          "test_import_references"
         ],
         "retention_reason": "compatibility or documentation references remain until the next major refactor.",
         "safe_to_remove": false,

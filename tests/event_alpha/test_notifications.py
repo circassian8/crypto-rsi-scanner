@@ -2,33 +2,10 @@
 
 from __future__ import annotations
 
-import importlib
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
-
-def test_notification_old_and_new_import_paths_resolve_same_objects():
-    module_pairs = (
-        ("crypto_rsi_scanner.event_alpha_notifications", "crypto_rsi_scanner.event_alpha.notifications.pipeline", "build_notification_plan"),
-        ("crypto_rsi_scanner.event_alpha_notification_delivery", "crypto_rsi_scanner.event_alpha.notifications.delivery", "build_record"),
-        ("crypto_rsi_scanner.event_alpha_notification_sender", "crypto_rsi_scanner.event_alpha.notifications.sender", "NotificationSendAttemptResult"),
-        ("crypto_rsi_scanner.event_alpha_notification_runs", "crypto_rsi_scanner.event_alpha.notifications.runs", "append_notification_run"),
-        ("crypto_rsi_scanner.event_alpha_notification_go_no_go", "crypto_rsi_scanner.event_alpha.notifications.go_no_go", "build_go_no_go"),
-        ("crypto_rsi_scanner.event_alpha_notification_checklist", "crypto_rsi_scanner.event_alpha.notifications.checklist", "build_notification_checklist"),
-        ("crypto_rsi_scanner.event_alpha_notification_inbox", "crypto_rsi_scanner.event_alpha.notifications.inbox", "build_notification_inbox"),
-        ("crypto_rsi_scanner.event_alpha_notification_pack", "crypto_rsi_scanner.event_alpha.notifications.pack", "export_notification_pack"),
-        ("crypto_rsi_scanner.event_alpha_notification_pause", "crypto_rsi_scanner.event_alpha.notifications.pause", "read_pause_state"),
-        ("crypto_rsi_scanner.event_alpha_notification_slo", "crypto_rsi_scanner.event_alpha.notifications.slo", "build_slo_report"),
-        ("crypto_rsi_scanner.event_alpha_send_readiness", "crypto_rsi_scanner.event_alpha.notifications.readiness", "build_send_readiness"),
-        ("crypto_rsi_scanner.event_alpha_telegram_final_check", "crypto_rsi_scanner.event_alpha.notifications.final_check", "build_final_check"),
-        ("crypto_rsi_scanner.event_alpha_telegram_recipient_check", "crypto_rsi_scanner.event_alpha.notifications.recipient_check", "run_recipient_check"),
-    )
-
-    for old_path, new_path, attr in module_pairs:
-        old_module = importlib.import_module(old_path)
-        new_module = importlib.import_module(new_path)
-        assert getattr(old_module, attr) is getattr(new_module, attr)
 
 
 def test_normal_notification_preview_and_heartbeat_wording_stay_no_send():
@@ -260,7 +237,8 @@ def test_event_impact_hypothesis_store_report_and_inbox_surface_review_fields():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_impact_hypotheses, event_impact_hypothesis_store
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store as event_impact_hypothesis_store
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     pending = event_impact_hypotheses.EventImpactHypothesis(
@@ -361,7 +339,7 @@ def test_event_impact_hypothesis_store_report_and_inbox_surface_review_fields():
 
 
 def test_notify_llm_profiles_enable_bounded_source_enrichment_only_for_llm():
-    from crypto_rsi_scanner import event_alpha_profiles
+    import crypto_rsi_scanner.event_alpha.config.profiles as event_alpha_profiles
 
     no_key = event_alpha_profiles.get_profile("notify_no_key")
     llm = event_alpha_profiles.get_profile("notify_llm")
@@ -388,7 +366,7 @@ def test_notify_llm_profiles_enable_bounded_source_enrichment_only_for_llm():
 
 
 def test_notify_no_key_profile_delivers_each_clean_run():
-    from crypto_rsi_scanner import event_alpha_profiles
+    import crypto_rsi_scanner.event_alpha.config.profiles as event_alpha_profiles
 
     no_key = event_alpha_profiles.get_profile("notify_no_key")
     overrides = no_key.config_overrides
@@ -408,13 +386,11 @@ def test_event_alpha_alert_store_persists_validated_route_snapshots_for_inbox_fe
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import (
-        event_alpha_alert_store,
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notification_inbox,
-        event_alpha_router,
-        event_watchlist,
-    )
+    import crypto_rsi_scanner.event_alpha.artifacts.alert_store as event_alpha_alert_store
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.inbox as event_alpha_notification_inbox
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     now = datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
     entry = event_watchlist.EventWatchlistEntry(
@@ -585,7 +561,9 @@ def test_event_alpha_notification_profiles_and_preflight_guards():
     import os
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import config, event_alpha_artifacts, event_alpha_profiles, scanner
+    from crypto_rsi_scanner import config, scanner
+    import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+    import crypto_rsi_scanner.event_alpha.config.profiles as event_alpha_profiles
 
     no_key = event_alpha_profiles.get_profile("notify_no_key")
     assert no_key.notification_burn_in is True
@@ -700,7 +678,8 @@ def test_event_alpha_notification_profiles_and_preflight_guards():
 def test_event_alpha_notification_lane_state_is_independent_and_dedupes_triggered():
     from datetime import datetime, timezone
     from types import SimpleNamespace
-    from crypto_rsi_scanner import event_alpha_notifications, event_alpha_router
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as event_alpha_notifications
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     class FakeStorage:
         def __init__(self):
@@ -783,7 +762,9 @@ def test_event_alpha_notification_lane_state_is_independent_and_dedupes_triggere
 
 
 def test_event_alpha_routed_notification_message_is_research_only_and_reviewable():
-    from crypto_rsi_scanner import event_alpha_router, event_playbooks, event_watchlist
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.playbooks as event_playbooks
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     entry = event_watchlist.EventWatchlistEntry(
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
@@ -847,13 +828,11 @@ def test_event_alpha_routed_notification_message_is_research_only_and_reviewable
 
 def test_event_alpha_notification_uses_canonical_core_identity_and_compact_message():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notification_sender,
-        event_alpha_notifications,
-        event_alpha_router,
-        event_watchlist,
-    )
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.sender as event_alpha_notification_sender
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as event_alpha_notifications
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     class FakeStorage:
         def __init__(self):
@@ -996,7 +975,9 @@ def test_event_alpha_notification_uses_canonical_core_identity_and_compact_messa
 
 def test_event_alpha_notification_blocks_rejected_only_core_digest():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_notifications, event_alpha_router, event_watchlist
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as event_alpha_notifications
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     class FakeStorage:
         def __init__(self):
@@ -1075,7 +1056,9 @@ def test_event_alpha_notification_blocks_rejected_only_core_digest():
 
 def test_event_alpha_notification_blocks_unconfirmed_broad_strategic_asset_digest():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_notifications, event_alpha_router, event_watchlist
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as event_alpha_notifications
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     class FakeStorage:
         def __init__(self):
@@ -1153,11 +1136,9 @@ def test_event_alpha_notification_blocks_unconfirmed_broad_strategic_asset_diges
 
 def test_event_alpha_send_readiness_resolves_preview_relpath_over_stale_absolute():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_artifact_doctor,
-        event_alpha_notification_delivery,
-        event_alpha_send_readiness,
-    )
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as event_alpha_notification_delivery
+    import crypto_rsi_scanner.event_alpha.notifications.readiness as event_alpha_send_readiness
 
     with TemporaryDirectory() as tmp:
         old_cwd = os.getcwd()
@@ -1247,11 +1228,9 @@ def test_event_alpha_send_readiness_resolves_preview_relpath_over_stale_absolute
 
 def test_event_alpha_send_readiness_accepts_clean_no_send_rehearsal():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_artifact_doctor,
-        event_alpha_notification_delivery,
-        event_alpha_send_readiness,
-    )
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as event_alpha_notification_delivery
+    import crypto_rsi_scanner.event_alpha.notifications.readiness as event_alpha_send_readiness
 
     with TemporaryDirectory() as tmp:
         preview = Path(tmp) / "event_alpha_notification_preview.md"
@@ -1351,7 +1330,8 @@ def test_event_alpha_send_readiness_accepts_clean_no_send_rehearsal():
 def test_event_alpha_notification_disabled_records_would_send_and_heartbeat():
     from datetime import datetime, timezone
     from types import SimpleNamespace
-    from crypto_rsi_scanner import event_alpha_notifications, event_alpha_router
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as event_alpha_notifications
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     class FakeStorage:
         def __init__(self):
@@ -1389,7 +1369,8 @@ def test_event_alpha_notification_disabled_records_would_send_and_heartbeat():
 
 def test_event_alpha_notification_no_candidate_rehearsal_writes_preview():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_notification_delivery, event_alpha_notifications
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as event_alpha_notification_delivery
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as event_alpha_notifications
 
     class FakeStorage:
         def __init__(self):
@@ -1428,12 +1409,10 @@ def test_event_alpha_notification_no_candidate_rehearsal_writes_preview():
 def test_event_alpha_notification_runs_and_checklist_report_guard_state():
     from datetime import datetime, timezone
     from types import SimpleNamespace
-    from crypto_rsi_scanner import (
-        event_alpha_notification_checklist,
-        event_alpha_notification_runs,
-        event_alpha_notifications,
-        event_provider_status,
-    )
+    import crypto_rsi_scanner.event_alpha.notifications.checklist as event_alpha_notification_checklist
+    import crypto_rsi_scanner.event_alpha.notifications.runs as event_alpha_notification_runs
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as event_alpha_notifications
+    import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 
     now = datetime(2026, 6, 19, 11, 0, tzinfo=timezone.utc)
     plan = event_alpha_notifications.EventAlphaNotificationPlan(
@@ -1566,7 +1545,8 @@ def test_event_alpha_notification_runs_and_checklist_report_guard_state():
 
 def test_event_alpha_notification_next_steps_cover_backoff_feedback_and_heartbeat():
     from types import SimpleNamespace
-    from crypto_rsi_scanner import event_alpha_router, scanner
+    from crypto_rsi_scanner import scanner
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     quiet = scanner.format_event_alpha_notification_next_steps(
         profile="notify_no_key",
@@ -1621,8 +1601,8 @@ def test_event_alpha_notification_inbox_queues_unreviewed_items():
     from pathlib import Path
 
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
-    from crypto_rsi_scanner import event_alpha_notification_inbox
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.inbox as event_alpha_notification_inbox
 
     with tempfile.TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -1774,13 +1754,11 @@ def test_event_alpha_notification_inbox_queues_unreviewed_items():
 
 def test_event_alpha_inbox_and_daily_brief_show_exploratory_digest_separately():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_daily_brief,
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notification_inbox,
-        event_alpha_notifications as notif,
-        event_alpha_router,
-    )
+    import crypto_rsi_scanner.event_alpha.artifacts.daily_brief as event_alpha_daily_brief
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.inbox as event_alpha_notification_inbox
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     decision = _notify_suppressed_decision("PUMP", score=72)
     delivery_row = delivery.build_record(
@@ -1840,8 +1818,8 @@ def test_event_alpha_inbox_and_daily_brief_show_exploratory_digest_separately():
 
 
 def test_event_alpha_telegram_recipient_check_is_guarded_and_redacted():
-    from crypto_rsi_scanner import event_alpha_telegram_recipient_check as check
-    from crypto_rsi_scanner import event_alpha_notification_sender as sender
+    import crypto_rsi_scanner.event_alpha.notifications.recipient_check as check
+    import crypto_rsi_scanner.event_alpha.notifications.sender as sender
 
     refused = check.run_recipient_check(
         ["123456"],
@@ -1894,7 +1872,7 @@ def test_event_alpha_telegram_recipient_check_is_guarded_and_redacted():
 def test_event_alpha_degraded_heartbeat_copy_and_delivery():
     from datetime import datetime, timezone
     from types import SimpleNamespace
-    from crypto_rsi_scanner import event_alpha_notifications
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as event_alpha_notifications
 
     class FakeStorage:
         def __init__(self):
@@ -1991,7 +1969,8 @@ def test_event_alpha_send_test_refuses_without_guard_and_does_not_send():
     import contextlib
     import io
     from pathlib import Path
-    from crypto_rsi_scanner import config, event_alpha_profiles, scanner
+    from crypto_rsi_scanner import config, scanner
+    import crypto_rsi_scanner.event_alpha.config.profiles as event_alpha_profiles
 
     base_attrs = (
         "EVENT_ALPHA_ARTIFACT_BASE_DIR",
@@ -2033,7 +2012,8 @@ def test_event_alpha_notify_cycle_pipeline_exception_fails_soft_and_writes_ledge
     import json
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import config, event_alpha_profiles, scanner
+    from crypto_rsi_scanner import config, scanner
+    import crypto_rsi_scanner.event_alpha.config.profiles as event_alpha_profiles
     from crypto_rsi_scanner.event_alpha.radar import pipeline as event_alpha_pipeline
 
     notify_profile = event_alpha_profiles.get_profile("notify_no_key")
@@ -2122,12 +2102,10 @@ def test_event_alpha_notify_cycle_pipeline_exception_fails_soft_and_writes_ledge
 
 
 def test_event_alpha_burn_in_readiness_blocks_send_and_delivery_rows():
-    from crypto_rsi_scanner import (
-        event_alpha_artifact_doctor,
-        event_alpha_burn_in_readiness,
-        event_alpha_feedback_readiness,
-        event_provider_status,
-    )
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.outcomes.burn_in as event_alpha_burn_in_readiness
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback as event_alpha_feedback_readiness
+    import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 
     provider_report = event_provider_status.EventDiscoveryProviderStatus(
         mode="research_only",
@@ -2211,11 +2189,9 @@ def test_event_alpha_burn_in_readiness_blocks_send_and_delivery_rows():
 def test_event_alpha_notification_send_records_delivered_and_marks_cooldown():
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notifications as notif,
-        event_alpha_router,
-    )
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -2240,11 +2216,9 @@ def test_event_alpha_notification_send_records_delivered_and_marks_cooldown():
 def test_event_alpha_notification_send_failed_does_not_mark_cooldown():
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notifications as notif,
-        event_alpha_router,
-    )
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -2268,12 +2242,10 @@ def test_event_alpha_notification_send_failed_does_not_mark_cooldown():
 def test_event_alpha_notification_structured_partial_delivery_marks_cooldown_by_default():
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notification_sender as sender,
-        event_alpha_notifications as notif,
-        event_alpha_router,
-    )
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.sender as sender
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -2316,12 +2288,10 @@ def test_event_alpha_notification_structured_partial_delivery_marks_cooldown_by_
 def test_event_alpha_notification_structured_partial_delivery_can_skip_cooldown():
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notification_sender as sender,
-        event_alpha_notifications as notif,
-        event_alpha_router,
-    )
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.sender as sender
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -2354,11 +2324,9 @@ def test_event_alpha_notification_structured_partial_delivery_can_skip_cooldown(
 def test_event_alpha_notification_send_dedupes_within_window():
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notifications as notif,
-        event_alpha_router,
-    )
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -2396,10 +2364,8 @@ def test_event_alpha_notification_heartbeat_dedupes_by_daily_status_bucket():
     import tempfile
     from datetime import datetime, timezone, timedelta
     from types import SimpleNamespace
-    from crypto_rsi_scanner import (
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notifications as notif,
-    )
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -2464,11 +2430,9 @@ def test_event_alpha_notification_heartbeat_dedupes_by_daily_status_bucket():
 def test_event_alpha_notification_daily_digest_uses_stable_dedupe_key_before_hash():
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notifications as notif,
-        event_alpha_router,
-    )
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -2516,11 +2480,9 @@ def test_event_alpha_notification_daily_digest_uses_stable_dedupe_key_before_has
 def test_event_alpha_notification_send_skips_recent_in_flight_but_retries_stale():
     import tempfile
     from datetime import datetime, timezone, timedelta
-    from crypto_rsi_scanner import (
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notifications as notif,
-        event_alpha_router,
-    )
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -2578,11 +2540,9 @@ def test_event_alpha_notification_send_skips_recent_in_flight_but_retries_stale(
 def test_event_alpha_notification_send_blocked_when_disabled_records_blocked():
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notifications as notif,
-        event_alpha_router,
-    )
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -2605,7 +2565,8 @@ def test_event_alpha_notification_send_blocked_when_disabled_records_blocked():
 
 def test_event_alpha_blocked_heartbeat_preview_uses_pipeline_summary():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_notification_delivery, event_alpha_notifications
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as event_alpha_notification_delivery
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as event_alpha_notifications
 
     with TemporaryDirectory() as tmp:
         delivery_path = Path(tmp) / "event_alpha_notification_deliveries.jsonl"
@@ -2670,10 +2631,8 @@ def test_event_alpha_blocked_heartbeat_preview_uses_pipeline_summary():
 def test_event_alpha_exploratory_digest_surfaces_suppressed_rows_without_alerting():
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import (
-        event_alpha_notification_delivery as delivery,
-        event_alpha_notifications as notif,
-    )
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -2739,7 +2698,7 @@ def test_event_alpha_exploratory_digest_surfaces_suppressed_rows_without_alertin
 
 def test_event_alpha_exploratory_digest_excludes_controls_and_has_own_cooldown():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_notifications as notif
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
 
     storage = _NotifyFakeStorage()
     now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
@@ -2782,7 +2741,7 @@ def test_event_alpha_exploratory_digest_excludes_controls_and_has_own_cooldown()
 
 def test_event_alpha_exploratory_digest_includes_all_compact_numbered_blocks():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_notifications as notif
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
 
     now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
     decisions = [
@@ -2807,7 +2766,8 @@ def test_event_alpha_exploratory_digest_includes_all_compact_numbered_blocks():
 def test_event_alpha_research_review_digest_surfaces_near_misses_without_alerting():
     import tempfile
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery, event_alpha_notifications as notif
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
 
     namespace = "research_review_digest_unit"
     with tempfile.TemporaryDirectory() as tmp:
@@ -2922,7 +2882,8 @@ def test_event_alpha_research_review_digest_surfaces_near_misses_without_alertin
 def test_event_alpha_research_review_digest_policy_excludes_controls_and_strict_alerts():
     from dataclasses import replace
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_notifications as notif, event_alpha_router
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
     good = _research_review_decision("DOGE", score=66)
@@ -2962,7 +2923,8 @@ def test_event_alpha_research_review_digest_policy_excludes_controls_and_strict_
 def test_event_alpha_notification_quality_modes_filter_lanes():
     from dataclasses import replace
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_notifications as notif, event_alpha_router
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
     storage = _NotifyFakeStorage()
@@ -3021,7 +2983,8 @@ def test_event_alpha_notification_quality_modes_filter_lanes():
 
 def test_research_card_copy_is_verdict_aware_for_market_dislocation():
     from dataclasses import replace
-    from crypto_rsi_scanner import event_research_cards, event_watchlist
+    import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     entry = replace(
         _test_watchlist_entry(state=event_watchlist.EventWatchlistState.RADAR.value, symbol="M", coin_id="memecore"),
@@ -3058,7 +3021,8 @@ def test_research_card_copy_is_verdict_aware_for_market_dislocation():
 
 def test_notify_llm_quality_profile_and_make_target_are_no_send():
     from pathlib import Path
-    from crypto_rsi_scanner import event_alpha_artifacts, event_alpha_profiles
+    import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+    import crypto_rsi_scanner.event_alpha.config.profiles as event_alpha_profiles
 
     profile = event_alpha_profiles.get_profile("notify_llm_quality")
     assert profile.with_llm is True
@@ -3162,7 +3126,7 @@ def test_notify_llm_quality_profile_and_make_target_are_no_send():
 
 def test_event_alpha_delivery_report_groups_by_state_and_redacts_secrets():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
 
     now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
     rows = [
@@ -3186,7 +3150,7 @@ def test_event_alpha_delivery_report_groups_by_state_and_redacts_secrets():
 def test_event_alpha_notification_go_no_go_reports_send_blockers():
     from types import SimpleNamespace
     from pathlib import Path
-    from crypto_rsi_scanner import event_alpha_notification_go_no_go as go
+    import crypto_rsi_scanner.event_alpha.notifications.go_no_go as go
 
     lock_status = SimpleNamespace(state="held", message="fresh notification lock held by run_id=r1")
     provider_status = SimpleNamespace(ready_event_source_count=2, ready_enrichment_count=1)
@@ -3244,9 +3208,9 @@ def test_event_alpha_notification_go_no_go_uses_send_readiness_for_final_recomme
     from dataclasses import replace
     from types import SimpleNamespace
     from pathlib import Path
-    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
-    from crypto_rsi_scanner import event_alpha_notification_go_no_go as go
-    from crypto_rsi_scanner import event_alpha_telegram_final_check as final_check
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.go_no_go as go
+    import crypto_rsi_scanner.event_alpha.notifications.final_check as final_check
 
     with TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
@@ -3735,10 +3699,10 @@ def test_event_alpha_pause_blocks_delivery_and_resume_requires_confirm():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
-    from crypto_rsi_scanner import event_alpha_notification_pause as pause
-    from crypto_rsi_scanner import event_alpha_notifications as notif
-    from crypto_rsi_scanner import event_alpha_router
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.pause as pause
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = _notify_artifact_context(tmp, "notify_no_key")
@@ -3781,10 +3745,10 @@ def test_event_alpha_scheduler_slo_and_notification_pack_are_redacted():
     from datetime import datetime, timedelta, timezone
     from pathlib import Path
     from types import SimpleNamespace
-    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
-    from crypto_rsi_scanner import event_alpha_notification_pack as pack
-    from crypto_rsi_scanner import event_alpha_notification_slo as slo
-    from crypto_rsi_scanner import event_alpha_scheduler as scheduler
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.pack as pack
+    import crypto_rsi_scanner.event_alpha.notifications.slo as slo
+    import crypto_rsi_scanner.event_alpha.config.scheduler as scheduler
 
     now = datetime(2026, 6, 20, 12, tzinfo=timezone.utc)
     run = {
@@ -3887,8 +3851,8 @@ def test_event_alpha_notification_operational_make_targets_exist():
 
 def test_event_alpha_notification_slo_distinguishes_preview_config_and_delivery_failures():
     from datetime import datetime, timedelta, timezone
-    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
-    from crypto_rsi_scanner import event_alpha_notification_slo as slo
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.slo as slo
 
     now = datetime(2026, 6, 20, 12, tzinfo=timezone.utc)
     base = {
@@ -4036,13 +4000,11 @@ def test_event_alpha_notification_slo_distinguishes_preview_config_and_delivery_
 
 
 def test_notification_inbox_prefers_canonical_core_items_and_hides_diagnostics():
-    from crypto_rsi_scanner import (
-        event_alpha_notification_inbox,
-        event_alpha_router,
-        event_core_opportunity_store,
-        event_research_cards,
-        event_watchlist,
-    )
+    import crypto_rsi_scanner.event_alpha.notifications.inbox as event_alpha_notification_inbox
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store
+    import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -4156,7 +4118,7 @@ def test_notification_inbox_prefers_canonical_core_items_and_hides_diagnostics()
 
 def test_notification_delivery_records_persist_explicit_status_fields():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
 
     delivered = delivery.build_record(
         run_id="run-delivered",
@@ -4202,7 +4164,7 @@ def test_notification_delivery_records_persist_explicit_status_fields():
 
 
 def test_notification_inbox_burn_in_review_collapses_low_value_rows():
-    from crypto_rsi_scanner import event_alpha_notification_inbox
+    import crypto_rsi_scanner.event_alpha.notifications.inbox as event_alpha_notification_inbox
 
     item = event_alpha_notification_inbox.EventAlphaNotificationInboxItem(
         alert_id="core_velvet",
@@ -4348,7 +4310,7 @@ def test_event_alpha_rehearsal_make_targets_include_fixture_and_fast_caps():
 
 
 def test_notification_runs_filters_cryptopanic_backoff_after_same_run_success():
-    from crypto_rsi_scanner import event_alpha_notification_runs
+    import crypto_rsi_scanner.event_alpha.notifications.runs as event_alpha_notification_runs
 
     row = event_alpha_notification_runs.notification_run_record(
         SimpleNamespace(
@@ -4385,7 +4347,7 @@ def test_notification_runs_filters_cryptopanic_backoff_after_same_run_success():
 def test_daily_brief_reflects_planned_research_review_delivery_without_decisions():
     import json
 
-    from crypto_rsi_scanner import event_alpha_daily_brief
+    import crypto_rsi_scanner.event_alpha.artifacts.daily_brief as event_alpha_daily_brief
 
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
@@ -4428,17 +4390,15 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
     import json
     from datetime import datetime, timezone
 
-    from crypto_rsi_scanner import (
-        config,
-        event_alpha_artifacts,
-        event_alpha_source_coverage,
-        event_bybit_announcements_preflight,
-        event_integrated_radar,
-        event_official_exchange,
-        event_official_exchange_activation,
-        event_provider_health,
-        event_provider_status,
-    )
+    from crypto_rsi_scanner import config
+    import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+    import crypto_rsi_scanner.event_alpha.radar.source_coverage as event_alpha_source_coverage
+    import crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight as event_bybit_announcements_preflight
+    import crypto_rsi_scanner.event_alpha.radar.integrated_radar as event_integrated_radar
+    import crypto_rsi_scanner.event_alpha.providers.official_exchange as event_official_exchange
+    import crypto_rsi_scanner.event_alpha.providers.official_exchange_activation as event_official_exchange_activation
+    import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
+    import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 
     class MockBybitResponse:
         status = 200
@@ -4572,7 +4532,9 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
 
 
 def test_notification_digest_labels_fade_short_review_lane():
-    from crypto_rsi_scanner import event_alpha_notifications as notif, event_alpha_router, event_watchlist
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as notif
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
     entry = event_watchlist.EventWatchlistEntry(
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
@@ -4634,8 +4596,8 @@ def test_notification_digest_labels_fade_short_review_lane():
 def test_event_alpha_notification_delivery_status_fallback_and_legacy_preview_wording():
     import json
 
-    from crypto_rsi_scanner import event_alpha_artifact_doctor
-    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
     from crypto_rsi_scanner.event_alpha.notifications.delivery import NotificationDeliveryRecord
 
     record = NotificationDeliveryRecord(
@@ -4715,7 +4677,7 @@ def test_event_alpha_notification_delivery_status_fallback_and_legacy_preview_wo
 
 
 def test_event_alpha_heartbeat_uses_strict_alert_and_research_candidate_copy():
-    from crypto_rsi_scanner import event_alpha_notifications
+    import crypto_rsi_scanner.event_alpha.notifications.pipeline as event_alpha_notifications
 
     message = event_alpha_notifications.format_health_heartbeat(
         profile="fixture",
@@ -4744,7 +4706,8 @@ def test_event_alpha_heartbeat_uses_strict_alert_and_research_candidate_copy():
 def test_event_alpha_coinalyze_rehearsal_guards_no_key_default_and_budget():
     import json
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import config, event_coinalyze_preflight
+    from crypto_rsi_scanner import config
+    import crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight as event_coinalyze_preflight
 
     original_key = config.EVENT_DISCOVERY_COINALYZE_API_KEY
     original_symbols = config.EVENT_DISCOVERY_COINALYZE_SYMBOLS
@@ -4822,7 +4785,8 @@ def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_reda
     from datetime import datetime, timezone
     from urllib.error import HTTPError
     from urllib.parse import urlparse
-    from crypto_rsi_scanner import config, event_coinalyze_preflight
+    from crypto_rsi_scanner import config
+    import crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight as event_coinalyze_preflight
 
     original_key = config.EVENT_DISCOVERY_COINALYZE_API_KEY
     original_symbols = config.EVENT_DISCOVERY_COINALYZE_SYMBOLS

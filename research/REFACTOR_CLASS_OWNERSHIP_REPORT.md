@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T17:54:31.539417+00:00`
+- generated_at: `2026-07-04T18:17:53.448947+00:00`
 - public_class_count: `408`
 - classes_over_limit_count: `14`
 - functions_over_limit_count: `0`
@@ -37,14 +37,16 @@ Static source inventory only. This report does not call providers, send Telegram
 |---|---:|---|
 | `nonessential_shims_remaining` | 111 | blocker |
 | `old_path_internal_imports` | 0 | blocker |
+| `old_path_test_imports` | 0 | blocker |
 | `public_compatibility_shims` | 13 | informational |
 | `shim_removal_blockers` | 109 | blocker |
-| `production_files_over_1200_lines` | 14 | target_gap |
+| `production_files_over_1200_lines` | 15 | target_gap |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 82 | blocker |
 | `class_exceptions_remaining` | 14 | blocker_until_reaccepted_for_v3 |
 | `functions_over_150_lines` | 0 | blocker |
-| `old_path_docs_references` | 215 | blocker_unless_policy_scoped |
+| `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
+| `old_path_import_allowed_exceptions` | 126 | informational |
 
 ## Exceptions
 
@@ -105,6 +107,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1353 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/config.py` | 1319 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 
 ## Legacy Implementation Cores

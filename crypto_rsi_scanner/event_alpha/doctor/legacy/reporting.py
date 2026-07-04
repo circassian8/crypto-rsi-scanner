@@ -428,7 +428,11 @@ def _header_lines(result: EventAlphaArtifactDoctorResult) -> list[str]:
         (
             "shim hygiene: "
             "active_shim_modules_with_implementation_logic="
-            f"{result.active_shim_modules_with_implementation_logic}"
+            f"{result.active_shim_modules_with_implementation_logic} "
+            f"old_path_internal_imports={result.old_path_internal_imports} "
+            f"old_path_test_imports={result.old_path_test_imports} "
+            f"old_path_docs_references={result.old_path_docs_references} "
+            f"old_path_import_allowed_exceptions={result.old_path_import_allowed_exceptions}"
         ),
     ]
 
