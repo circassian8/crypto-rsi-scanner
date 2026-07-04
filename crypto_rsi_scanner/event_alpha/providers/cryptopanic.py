@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from ... import event_provider_status
+import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 from ...event_providers import cryptopanic as cryptopanic_provider
 from . import provider_health as event_provider_health
 from . import source_packs as event_source_packs

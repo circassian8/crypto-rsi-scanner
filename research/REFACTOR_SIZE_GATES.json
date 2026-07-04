@@ -432,7 +432,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 5037,
+      "line_count": 5038,
       "path": "tests/event_alpha/test_notifications.py",
       "severity": "warning",
       "source_kind": "test",
@@ -441,7 +441,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 4041,
+      "line_count": 4044,
       "path": "tests/event_alpha/test_outcomes.py",
       "severity": "warning",
       "source_kind": "test",
@@ -450,7 +450,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 5373,
+      "line_count": 5374,
       "path": "tests/event_alpha/test_provider_readiness.py",
       "severity": "warning",
       "source_kind": "test",
@@ -1284,7 +1284,7 @@
       "category": "public_classes_sharing_module",
       "exception_reason": null,
       "module": "crypto_rsi_scanner.event_alpha.shims",
-      "public_class_count": 2,
+      "public_class_count": 3,
       "severity": "warning",
       "violation_id": "public_classes:crypto_rsi_scanner.event_alpha.shims"
     },
@@ -1392,19 +1392,19 @@
     },
     {
       "limit": 1500,
-      "line_count": 5037,
+      "line_count": 5038,
       "path": "tests/event_alpha/test_notifications.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 4041,
+      "line_count": 4044,
       "path": "tests/event_alpha/test_outcomes.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 5373,
+      "line_count": 5374,
       "path": "tests/event_alpha/test_provider_readiness.py",
       "source_kind": "test"
     },
@@ -1426,7 +1426,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T16:13:15.048255+00:00",
+  "generated_at": "2026-07-04T17:06:50.283930+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1518,7 +1518,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1489,
+      "line_count": 1487,
       "path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
       "source_kind": "production"
     },
@@ -1536,13 +1536,13 @@
     },
     {
       "limit": 1500,
-      "line_count": 1406,
+      "line_count": 1404,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1394,
+      "line_count": 1395,
       "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
       "source_kind": "production"
     },
@@ -1554,7 +1554,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1384,
+      "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
       "source_kind": "production"
     },
@@ -1590,7 +1590,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1222,
+      "line_count": 1223,
       "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
       "source_kind": "production"
     },
@@ -1656,7 +1656,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1041,
+      "line_count": 1044,
       "path": "crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py",
       "source_kind": "production"
     },
@@ -1674,6 +1674,18 @@
     },
     {
       "limit": 1500,
+      "line_count": 1012,
+      "path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1003,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1002,
       "path": "crypto_rsi_scanner/event_alpha/radar/llm/extractor.py",
       "source_kind": "production"
@@ -1687,18 +1699,12 @@
     {
       "limit": 1500,
       "line_count": 989,
-      "path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 989,
       "path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 985,
+      "line_count": 987,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/alerts.py",
       "source_kind": "production"
     },
@@ -1716,19 +1722,19 @@
     },
     {
       "limit": 1500,
-      "line_count": 975,
+      "line_count": 976,
       "path": "crypto_rsi_scanner/event_alpha/radar/incident_graph.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 970,
+      "line_count": 973,
       "path": "crypto_rsi_scanner/event_alpha/radar/core_opportunities.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 968,
+      "line_count": 966,
       "path": "crypto_rsi_scanner/event_alpha/radar/evidence/executor.py",
       "source_kind": "production"
     },
@@ -1743,12 +1749,6 @@
       "line_count": 941,
       "path": "crypto_rsi_scanner/event_alpha/radar/identity.py",
       "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 935,
-      "path": "crypto_rsi_scanner/event_alpha/config/profiles.py",
-      "source_kind": "production"
     }
   ],
   "largest_test_files": [
@@ -1760,19 +1760,19 @@
     },
     {
       "limit": 1500,
-      "line_count": 5373,
+      "line_count": 5374,
       "path": "tests/event_alpha/test_provider_readiness.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 5037,
+      "line_count": 5038,
       "path": "tests/event_alpha/test_notifications.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 4041,
+      "line_count": 4044,
       "path": "tests/event_alpha/test_outcomes.py",
       "source_kind": "test"
     },
@@ -1802,7 +1802,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1014,
+      "line_count": 1029,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
@@ -1838,14 +1838,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 243,
-      "path": "tests/cli/test_parser.py",
+      "line_count": 272,
+      "path": "tests/event_alpha/test_shim_registry.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 204,
-      "path": "tests/event_alpha/test_shim_registry.py",
+      "line_count": 243,
+      "path": "tests/cli/test_parser.py",
       "source_kind": "test"
     },
     {
@@ -2318,7 +2318,7 @@
     {
       "exception_reason": null,
       "module": "crypto_rsi_scanner.event_alpha.shims",
-      "public_class_count": 2
+      "public_class_count": 3
     },
     {
       "exception_reason": "Shared event-research dataclass bundle. Multiple tiny value objects may remain together in models.py during v1.",
@@ -2445,7 +2445,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1489,
+      "line_count": 1487,
       "path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -2466,14 +2466,14 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1406,
+      "line_count": 1404,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1394,
+      "line_count": 1395,
       "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -2487,7 +2487,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1384,
+      "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -3127,7 +3127,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 5037,
+      "line_count": 5038,
       "path": "tests/event_alpha/test_notifications.py",
       "severity": "warning",
       "source_kind": "test",
@@ -3136,7 +3136,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 4041,
+      "line_count": 4044,
       "path": "tests/event_alpha/test_outcomes.py",
       "severity": "warning",
       "source_kind": "test",
@@ -3145,7 +3145,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 5373,
+      "line_count": 5374,
       "path": "tests/event_alpha/test_provider_readiness.py",
       "severity": "warning",
       "source_kind": "test",
@@ -3979,7 +3979,7 @@
       "category": "public_classes_sharing_module",
       "exception_reason": null,
       "module": "crypto_rsi_scanner.event_alpha.shims",
-      "public_class_count": 2,
+      "public_class_count": 3,
       "severity": "warning",
       "violation_id": "public_classes:crypto_rsi_scanner.event_alpha.shims"
     },

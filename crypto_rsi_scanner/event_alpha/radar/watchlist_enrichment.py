@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Protocol
 
-from ... import event_watchlist
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
 
 @dataclass(frozen=True)

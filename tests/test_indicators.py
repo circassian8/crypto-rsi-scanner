@@ -295,7 +295,7 @@ def _test_normalized_event(
     source="test",
 ):
     from datetime import datetime, timezone
-    from crypto_rsi_scanner.event_models import NormalizedEvent
+    from crypto_rsi_scanner.event_core.models import NormalizedEvent
 
     return NormalizedEvent(
         event_id=event_id,
@@ -318,7 +318,7 @@ def _event_discovery_fixture_result():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
-    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+    from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
     events_path, aliases_path = _event_discovery_fixture_paths()
     now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
@@ -413,7 +413,7 @@ def _llm_golden_result():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
-    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+    from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
     path = _llm_golden_fixture_path()
     raw = ManualJsonEventProvider(path, required=True).fetch_events(

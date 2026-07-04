@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import event_alpha_artifact_doctor
+import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 from ..artifacts import context as event_alpha_artifacts
 from ..namespace import status as event_alpha_namespace_status
 from . import delivery

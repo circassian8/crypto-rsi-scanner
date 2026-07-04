@@ -1147,7 +1147,7 @@ def event_alpha_burn_in_checklist(*args: Any, **kwargs: Any) -> Any:
 
 
 def event_alpha_export_burn_in_pack(*args: Any, **kwargs: Any) -> Any:
-    from . import event_alpha_outcomes
+    import crypto_rsi_scanner.event_alpha.outcomes.outcome_artifacts as event_alpha_outcomes
 
     return event_alpha_outcomes.event_alpha_export_burn_in_pack(*args, **kwargs)
 

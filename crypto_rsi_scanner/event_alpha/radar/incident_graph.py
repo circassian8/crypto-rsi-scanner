@@ -14,9 +14,10 @@ from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
-from crypto_rsi_scanner import event_catalyst_frames, event_claim_semantics
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frames as event_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
 from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
-from crypto_rsi_scanner.event_resolver import clean_text
+from crypto_rsi_scanner.event_alpha.radar.resolver import clean_text
 
 
 INCIDENT_GRAPH_SCHEMA_VERSION = "event_incident_graph_v1"

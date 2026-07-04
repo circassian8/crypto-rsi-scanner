@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from ..event_providers.manual_json import parse_datetime
-from ..event_resolver import clean_text
+from crypto_rsi_scanner.event_alpha.radar.resolver import clean_text
 
 log = logging.getLogger(__name__)
 

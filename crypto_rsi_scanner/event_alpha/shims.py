@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import re
 import sys
 from collections import Counter
 from dataclasses import asdict, dataclass
@@ -22,7 +23,12 @@ from .artifacts import paths as event_artifact_paths
 
 REPORT_JSON = "event_alpha_shim_report.json"
 REPORT_MD = "event_alpha_shim_report.md"
+DEPENDENCY_REPORT_JSON = "EVENT_ALPHA_SHIM_DEPENDENCY_REPORT.json"
+DEPENDENCY_REPORT_MD = "EVENT_ALPHA_SHIM_DEPENDENCY_REPORT.md"
+REMOVAL_CANDIDATES_JSON = "EVENT_ALPHA_SHIM_REMOVAL_CANDIDATES.json"
+REMOVAL_CANDIDATES_MD = "EVENT_ALPHA_SHIM_REMOVAL_CANDIDATES.md"
 SHIM_SCHEMA_VERSION = "event_alpha_shim_registry_v1"
+SHIM_DEPENDENCY_SCHEMA_VERSION = "event_alpha_shim_dependency_report_v1"
 
 STATUS_ACTIVE_SHIM = "active_shim"
 STATUS_PARTIAL_SHIM = "partial_shim"
@@ -30,6 +36,30 @@ STATUS_NOT_MIGRATED = "not_migrated"
 SHIM_STATUSES = (STATUS_ACTIVE_SHIM, STATUS_PARTIAL_SHIM, STATUS_NOT_MIGRATED)
 
 _PARTIAL_SHIMS: dict[str, str] = {}
+_DEPENDENCY_WARNING_SUMMARY_CACHE: tuple[int, int, tuple[str, ...]] | None = None
+
+PUBLIC_COMPATIBILITY_SHIMS = {
+    "crypto_rsi_scanner.event_alpha_artifact_doctor",
+    "crypto_rsi_scanner.event_alpha_artifacts",
+    "crypto_rsi_scanner.event_artifact_paths",
+    "crypto_rsi_scanner.event_alpha_run_ledger",
+    "crypto_rsi_scanner.event_alpha_run_lock",
+    "crypto_rsi_scanner.event_alpha_retention",
+    "crypto_rsi_scanner.event_alpha_profiles",
+    "crypto_rsi_scanner.event_alpha_preflight",
+    "crypto_rsi_scanner.event_alpha_v1_readiness",
+}
+
+_DOC_COMPATIBILITY_FILES = {
+    "AGENTS.md",
+    "DECISIONS.md",
+    "DEVLOG.md",
+    "ROADMAP.md",
+    "research/EVENT_ALPHA_ARCHITECTURE_V1.md",
+    "research/EVENT_ALPHA_CONSOLIDATION_PLAN.md",
+    "research/EVENT_ALPHA_RUNBOOK.md",
+    "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
+}
 
 
 @dataclass(frozen=True)
@@ -68,6 +98,18 @@ class ShimAuditRow:
         data["allowed_exports"] = list(self.allowed_exports)
         data["violations"] = list(self.violations)
         return data
+
+
+@dataclass(frozen=True)
+class ShimReference:
+    path: str
+    line: int
+    reference_type: str
+    detail: str
+    snippet: str
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
 
 
 def registry_entries(module_map_path: str | Path | None = None) -> tuple[ShimRegistryEntry, ...]:
@@ -284,6 +326,219 @@ def write_shim_report(
     return json_path, md_path, report
 
 
+def build_shim_dependency_report(
+    *,
+    root: str | Path | None = None,
+    generated_at: datetime | None = None,
+) -> dict[str, object]:
+    repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
+    entries = registry_entries()
+    audit = audit_entries(entries, root=repo_root, generated_at=generated_at)
+    references = _scan_dependency_references(entries, repo_root=repo_root)
+    rows = []
+    removal_groups: dict[str, list[dict[str, object]]] = {
+        "remove_now_candidates": [],
+        "migrate_imports_first": [],
+        "keep_public_compatibility": [],
+        "keep_safety_exception": [_event_fade_safety_exception_row()],
+        "keep_until_next_major_refactor": [],
+    }
+    for entry in entries:
+        grouped = references.get(entry.old_module, {})
+        row = _dependency_row(entry, grouped)
+        rows.append(row)
+        _append_removal_group(removal_groups, row)
+
+    generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
+    internal_import_count = sum(len(row["internal_import_references"]) for row in rows)
+    safe_to_remove_count = sum(1 for row in rows if row["safe_to_remove"])
+    docs_deprecated_warnings = [
+        {
+            "old_module": row["old_module"],
+            "docs_reference_count": len(row["docs_references"]),
+            "reason": "docs/runbook references old shim path without an explicit compatibility/deprecated policy marker",
+        }
+        for row in rows
+        if row["docs_references"] and not row["docs_references_are_policy_scoped"]
+    ]
+    return {
+        "schema_version": SHIM_DEPENDENCY_SCHEMA_VERSION,
+        "row_type": "event_alpha_shim_dependency_report",
+        "generated_at": generated,
+        "status": "WARN" if internal_import_count or docs_deprecated_warnings else "OK",
+        "research_only": True,
+        "no_send_rehearsal": True,
+        "strict_alerts_created": 0,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "paper_trades_created": 0,
+        "normal_rsi_signal_rows_written": 0,
+        "triggered_fade_created": 0,
+        "registry_entry_count": len(rows),
+        "internal_import_reference_count": internal_import_count,
+        "test_import_reference_count": sum(len(row["test_import_references"]) for row in rows),
+        "makefile_reference_count": sum(len(row["makefile_references"]) for row in rows),
+        "docs_reference_count": sum(len(row["docs_references"]) for row in rows),
+        "script_reference_count": sum(len(row["script_references"]) for row in rows),
+        "dynamic_import_reference_count": sum(len(row["dynamic_import_references"]) for row in rows),
+        "artifact_doc_reference_count": sum(len(row["artifact_doc_references"]) for row in rows),
+        "safe_to_remove_count": safe_to_remove_count,
+        "docs_deprecated_reference_warnings": docs_deprecated_warnings,
+        "active_shim_modules_with_implementation_logic": audit.get(
+            "active_shim_modules_with_implementation_logic", 0
+        ),
+        "active_shim_violations": audit.get("active_shim_violations", []),
+        "removal_candidate_counts": {key: len(value) for key, value in removal_groups.items()},
+        "entries": rows,
+        "removal_candidates": removal_groups,
+    }
+
+
+def write_shim_dependency_report(
+    *,
+    out_dir: str | Path | None = None,
+    root: str | Path | None = None,
+    generated_at: datetime | None = None,
+) -> tuple[Path, Path, Path, Path, dict[str, object]]:
+    repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
+    target = Path(out_dir).expanduser() if out_dir is not None else repo_root / "research"
+    target.mkdir(parents=True, exist_ok=True)
+    report = build_shim_dependency_report(root=repo_root, generated_at=generated_at)
+    dep_json_path = target / DEPENDENCY_REPORT_JSON
+    dep_md_path = target / DEPENDENCY_REPORT_MD
+    removal_json_path = target / REMOVAL_CANDIDATES_JSON
+    removal_md_path = target / REMOVAL_CANDIDATES_MD
+    dep_json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    dep_md_path.write_text(format_shim_dependency_report(report), encoding="utf-8")
+    removal_payload = {
+        "schema_version": "event_alpha_shim_removal_candidates_v1",
+        "generated_at": report["generated_at"],
+        "research_only": True,
+        "no_send_rehearsal": True,
+        "strict_alerts_created": 0,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "paper_trades_created": 0,
+        "normal_rsi_signal_rows_written": 0,
+        "triggered_fade_created": 0,
+        "removal_candidate_counts": report["removal_candidate_counts"],
+        "groups": report["removal_candidates"],
+    }
+    removal_json_path.write_text(json.dumps(removal_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    removal_md_path.write_text(format_shim_removal_candidates(report), encoding="utf-8")
+    return dep_json_path, dep_md_path, removal_json_path, removal_md_path, report
+
+
+def shim_dependency_warning_summary() -> tuple[int, int, tuple[str, ...]]:
+    global _DEPENDENCY_WARNING_SUMMARY_CACHE
+    if _DEPENDENCY_WARNING_SUMMARY_CACHE is not None:
+        return _DEPENDENCY_WARNING_SUMMARY_CACHE
+    report = build_shim_dependency_report()
+    modules = tuple(
+        str(row.get("old_module"))
+        for row in report.get("entries", [])
+        if isinstance(row, dict) and row.get("internal_import_references")
+    )
+    _DEPENDENCY_WARNING_SUMMARY_CACHE = (
+        int(report.get("internal_import_reference_count") or 0),
+        int(report.get("safe_to_remove_count") or 0),
+        modules,
+    )
+    return _DEPENDENCY_WARNING_SUMMARY_CACHE
+
+
+def format_shim_dependency_report(report: dict[str, object]) -> str:
+    lines = [
+        "# Event Alpha Shim Dependency Report",
+        "",
+        "Research artifact only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.",
+        "",
+        f"- generated_at: {report.get('generated_at')}",
+        f"- status: {report.get('status')}",
+        f"- registry_entry_count: {report.get('registry_entry_count', 0)}",
+        f"- internal_import_reference_count: {report.get('internal_import_reference_count', 0)}",
+        f"- test_import_reference_count: {report.get('test_import_reference_count', 0)}",
+        f"- makefile_reference_count: {report.get('makefile_reference_count', 0)}",
+        f"- docs_reference_count: {report.get('docs_reference_count', 0)}",
+        f"- dynamic_import_reference_count: {report.get('dynamic_import_reference_count', 0)}",
+        f"- safe_to_remove_count: {report.get('safe_to_remove_count', 0)}",
+        f"- active_shim_modules_with_implementation_logic: {report.get('active_shim_modules_with_implementation_logic', 0)}",
+        "",
+        "## Policy",
+        "",
+        "- New implementation code must import new package paths, not old top-level Event Alpha shim paths.",
+        "- Old shims stay available during v1/v2 compatibility and may be removed only after zero internal references and an accepted removal release.",
+        "- `scanner.py` may remain a compatibility CLI entrypoint.",
+        "- `event_fade.py` remains intentionally outside Event Alpha; Event Alpha may write `FADE_SHORT_REVIEW` research but must not create `TRIGGERED_FADE`.",
+        "",
+        "## Registry Dependencies",
+        "",
+        "| old module | new module | status | internal | tests | make | docs | dynamic | safe | action |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---|",
+    ]
+    for row in report.get("entries", []):
+        if not isinstance(row, dict):
+            continue
+        lines.append(
+            "| "
+            f"`{row.get('old_module')}` | "
+            f"`{row.get('new_module')}` | "
+            f"{row.get('shim_status')} | "
+            f"{len(row.get('internal_import_references') or [])} | "
+            f"{len(row.get('test_import_references') or [])} | "
+            f"{len(row.get('makefile_references') or [])} | "
+            f"{len(row.get('docs_references') or [])} | "
+            f"{len(row.get('dynamic_import_references') or [])} | "
+            f"{str(bool(row.get('safe_to_remove'))).lower()} | "
+            f"{row.get('recommended_action')} |"
+        )
+    warnings = report.get("docs_deprecated_reference_warnings") or []
+    lines.extend(["", "## Warnings", ""])
+    if warnings:
+        for row in warnings:
+            if isinstance(row, dict):
+                lines.append(f"- `{row.get('old_module')}`: {row.get('reason')}")
+    else:
+        lines.append("- none")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def format_shim_removal_candidates(report: dict[str, object]) -> str:
+    lines = [
+        "# Event Alpha Shim Removal Candidates",
+        "",
+        "Research artifact only. No shims are deleted by this report.",
+        "",
+        f"- generated_at: {report.get('generated_at')}",
+        f"- registry_entry_count: {report.get('registry_entry_count', 0)}",
+        "",
+        "Event Alpha may produce `FADE_SHORT_REVIEW` research artifacts, but Event Alpha must not create `TRIGGERED_FADE`. `TRIGGERED_FADE` belongs only to `event_fade.py` plus `proxy_fade`.",
+    ]
+    groups = report.get("removal_candidates") or {}
+    titles = (
+        ("remove_now_candidates", "Remove Now Candidates"),
+        ("migrate_imports_first", "Migrate Imports First"),
+        ("keep_public_compatibility", "Keep Public Compatibility"),
+        ("keep_safety_exception", "Keep Safety Exception"),
+        ("keep_until_next_major_refactor", "Keep Until Next Major Refactor"),
+    )
+    for key, title in titles:
+        lines.extend(["", f"## {title}", ""])
+        rows = groups.get(key, []) if isinstance(groups, dict) else []
+        if not rows:
+            lines.append("- none")
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            blockers = ", ".join(str(item) for item in row.get("removal_blockers", [])) or "none"
+            lines.append(
+                f"- `{row.get('old_module')}` -> `{row.get('new_module')}` "
+                f"({row.get('recommended_action')}; blockers: {blockers})"
+            )
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def active_shim_violation_summary() -> tuple[int, tuple[str, ...]]:
     report = audit_registry()
     rows = report.get("active_shim_violations") or []
@@ -293,6 +548,377 @@ def active_shim_violation_summary() -> tuple[int, tuple[str, ...]]:
         if isinstance(row, dict) and row.get("old_module")
     )
     return int(report.get("active_shim_modules_with_implementation_logic") or 0), modules
+
+
+def _scan_dependency_references(
+    entries: Iterable[ShimRegistryEntry],
+    *,
+    repo_root: Path,
+) -> dict[str, dict[str, list[dict[str, object]]]]:
+    old_modules = {entry.old_module: entry for entry in entries}
+    old_by_leaf = {entry.old_module.rsplit(".", 1)[1]: entry.old_module for entry in entries}
+    refs: dict[str, dict[str, list[dict[str, object]]]] = {
+        old_module: {
+            "internal_import_references": [],
+            "test_import_references": [],
+            "makefile_references": [],
+            "docs_references": [],
+            "script_references": [],
+            "dynamic_import_references": [],
+            "artifact_doc_references": [],
+        }
+        for old_module in old_modules
+    }
+
+    for path in _dependency_scan_paths(repo_root):
+        rel_path = event_artifact_paths.artifact_display_path(path, repo_root=repo_root)
+        category = _reference_category(rel_path)
+        if path.suffix == ".py":
+            _scan_python_import_references(
+                path,
+                rel_path=rel_path,
+                category=category,
+                old_modules=old_modules,
+                old_by_leaf=old_by_leaf,
+                refs=refs,
+            )
+        _scan_text_references(path, rel_path=rel_path, category=category, old_modules=old_modules, refs=refs)
+    return refs
+
+
+def _dependency_row(entry: ShimRegistryEntry, grouped: dict[str, list[dict[str, object]]]) -> dict[str, object]:
+    internal_refs = grouped.get("internal_import_references", [])
+    test_refs = grouped.get("test_import_references", [])
+    make_refs = grouped.get("makefile_references", [])
+    docs_refs = grouped.get("docs_references", [])
+    script_refs = grouped.get("script_references", [])
+    dynamic_refs = grouped.get("dynamic_import_references", [])
+    artifact_refs = grouped.get("artifact_doc_references", [])
+    docs_policy_scoped = _docs_refs_are_policy_scoped(docs_refs)
+    blockers: list[str] = []
+    if internal_refs:
+        blockers.append("internal_import_references")
+    if test_refs:
+        blockers.append("test_import_references")
+    if make_refs:
+        blockers.append("makefile_references")
+    if script_refs:
+        blockers.append("script_references")
+    if dynamic_refs:
+        blockers.append("dynamic_import_references")
+    if docs_refs and not docs_policy_scoped:
+        blockers.append("docs_reference_without_compatibility_or_deprecated_context")
+    if artifact_refs:
+        blockers.append("artifact_doc_references")
+    action = _recommended_action(entry, blockers, make_refs, test_refs, docs_refs)
+    safe_to_remove = action == "remove_now" and not blockers
+    return {
+        "old_module": entry.old_module,
+        "new_module": entry.new_module,
+        "shim_status": entry.shim_status,
+        "allowed_exports": list(entry.allowed_exports),
+        "internal_import_references": internal_refs,
+        "test_import_references": test_refs,
+        "makefile_references": make_refs,
+        "docs_references": docs_refs,
+        "script_references": script_refs,
+        "dynamic_import_references": dynamic_refs,
+        "artifact_doc_references": artifact_refs,
+        "docs_references_are_policy_scoped": docs_policy_scoped,
+        "safe_to_remove": safe_to_remove,
+        "removal_blockers": blockers,
+        "recommended_action": action,
+        "retention_reason": _retention_reason(entry, action),
+    }
+
+
+def _append_removal_group(groups: dict[str, list[dict[str, object]]], row: dict[str, object]) -> None:
+    action = str(row.get("recommended_action") or "")
+    if action == "remove_now":
+        key = "remove_now_candidates"
+    elif action == "migrate_imports_then_remove":
+        key = "migrate_imports_first"
+    elif action == "keep_public_entrypoint":
+        key = "keep_public_compatibility"
+    else:
+        key = "keep_until_next_major_refactor"
+    groups.setdefault(key, []).append(_candidate_row(row))
+
+
+def _candidate_row(row: dict[str, object]) -> dict[str, object]:
+    return {
+        "old_module": row.get("old_module"),
+        "new_module": row.get("new_module"),
+        "shim_status": row.get("shim_status"),
+        "safe_to_remove": row.get("safe_to_remove"),
+        "removal_blockers": row.get("removal_blockers", []),
+        "recommended_action": row.get("recommended_action"),
+        "retention_reason": row.get("retention_reason"),
+    }
+
+
+def _event_fade_safety_exception_row() -> dict[str, object]:
+    return {
+        "old_module": "crypto_rsi_scanner.event_fade",
+        "new_module": "",
+        "shim_status": "intentionally_external",
+        "safe_to_remove": False,
+        "removal_blockers": ["safety_boundary_triggered_fade_owner"],
+        "recommended_action": "intentionally_external",
+        "retention_reason": (
+            "Event Alpha may produce FADE_SHORT_REVIEW research, but Event Alpha must not create "
+            "TRIGGERED_FADE; TRIGGERED_FADE belongs only to event_fade.py plus proxy_fade."
+        ),
+    }
+
+
+def _recommended_action(
+    entry: ShimRegistryEntry,
+    blockers: list[str],
+    make_refs: list[dict[str, object]],
+    test_refs: list[dict[str, object]],
+    docs_refs: list[dict[str, object]],
+) -> str:
+    if entry.old_module in PUBLIC_COMPATIBILITY_SHIMS or make_refs:
+        return "keep_public_entrypoint"
+    if "internal_import_references" in blockers:
+        return "migrate_imports_then_remove"
+    if blockers or test_refs or docs_refs:
+        return "keep_until_v3"
+    return "remove_now"
+
+
+def _retention_reason(entry: ShimRegistryEntry, action: str) -> str:
+    if action == "keep_public_entrypoint":
+        return "public CLI/Make/import compatibility retained during v1/v2."
+    if action == "migrate_imports_then_remove":
+        return "internal imports must be migrated before removal."
+    if action == "keep_until_v3":
+        return "compatibility or documentation references remain until the next major refactor."
+    if action == "remove_now":
+        return ""
+    return entry.notes
+
+
+def _dependency_scan_paths(repo_root: Path) -> tuple[Path, ...]:
+    roots = [
+        repo_root / "crypto_rsi_scanner",
+        repo_root / "tests",
+        repo_root / "scripts",
+        repo_root / "research",
+    ]
+    top_level = [
+        repo_root / "Makefile",
+        repo_root / "AGENTS.md",
+        repo_root / "DECISIONS.md",
+        repo_root / "DEVLOG.md",
+        repo_root / "ROADMAP.md",
+        repo_root / "README.md",
+    ]
+    paths: list[Path] = []
+    for base in roots:
+        if not base.exists():
+            continue
+        for path in base.rglob("*"):
+            if not path.is_file() or _skip_dependency_path(path, repo_root=repo_root):
+                continue
+            if base.name == "research":
+                if path.suffix == ".md":
+                    paths.append(path)
+                continue
+            if path.suffix in {".py", ".md", ".json", ".txt", ".yml", ".yaml"}:
+                paths.append(path)
+    paths.extend(path for path in top_level if path.exists())
+    return tuple(sorted(set(paths)))
+
+
+def _skip_dependency_path(path: Path, *, repo_root: Path) -> bool:
+    rel = event_artifact_paths.artifact_display_path(path, repo_root=repo_root)
+    if "__pycache__" in path.parts:
+        return True
+    if rel in {
+        "crypto_rsi_scanner/event_alpha/SHIM_REGISTRY.json",
+        f"research/{DEPENDENCY_REPORT_JSON}",
+        f"research/{DEPENDENCY_REPORT_MD}",
+        f"research/{REMOVAL_CANDIDATES_JSON}",
+        f"research/{REMOVAL_CANDIDATES_MD}",
+    }:
+        return True
+    return False
+
+
+def _reference_category(rel_path: str) -> str:
+    if rel_path == "Makefile":
+        return "makefile_references"
+    if rel_path.startswith("tests/"):
+        return "test_import_references"
+    if rel_path.startswith("scripts/"):
+        return "script_references"
+    if rel_path.startswith("research/"):
+        return "artifact_doc_references"
+    if rel_path.endswith(".md") or rel_path in {"AGENTS.md", "DECISIONS.md", "DEVLOG.md", "ROADMAP.md", "README.md"}:
+        return "docs_references"
+    return "internal_import_references"
+
+
+def _scan_python_import_references(
+    path: Path,
+    *,
+    rel_path: str,
+    category: str,
+    old_modules: dict[str, ShimRegistryEntry],
+    old_by_leaf: dict[str, str],
+    refs: dict[str, dict[str, list[dict[str, object]]]],
+) -> None:
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=rel_path)
+    except SyntaxError:
+        return
+    lines = path.read_text(encoding="utf-8").splitlines()
+    import_category = category if category != "artifact_doc_references" else "artifact_doc_references"
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                old_module = _old_module_for_import_name(alias.name, old_modules)
+                if old_module:
+                    _add_ref(refs, old_module, import_category, rel_path, node.lineno, "import", alias.name, lines)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                for alias in node.names:
+                    import_name = _resolve_relative_import_name(
+                        rel_path,
+                        level=node.level,
+                        module=node.module,
+                        alias_name=alias.name,
+                    )
+                    old_module = _old_module_for_import_name(import_name, old_modules)
+                    if old_module:
+                        detail = f"relative_from:{'.' * node.level}{node.module or ''}:{alias.name}"
+                        _add_ref(refs, old_module, import_category, rel_path, node.lineno, "relative_import", detail, lines)
+            else:
+                old_module = _old_module_for_import_name(node.module or "", old_modules)
+                if old_module:
+                    _add_ref(refs, old_module, import_category, rel_path, node.lineno, "from_import", node.module or "", lines)
+
+
+def _scan_text_references(
+    path: Path,
+    *,
+    rel_path: str,
+    category: str,
+    old_modules: dict[str, ShimRegistryEntry],
+    refs: dict[str, dict[str, list[dict[str, object]]]],
+) -> None:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return
+    if (
+        path.suffix == ".py"
+        and category != "test_import_references"
+        and "import_module" not in text
+        and "__import__" not in text
+    ):
+        return
+    lines = text.splitlines()
+    for lineno, line in enumerate(lines, start=1):
+        for old_module in old_modules:
+            if not _line_contains_module_reference(line, old_module):
+                continue
+            if path.suffix == ".py" and _line_is_static_import(line, old_module):
+                continue
+            ref_category = category
+            ref_type = "text_reference"
+            if path.suffix == ".py" and _line_looks_dynamic_import(line, old_module):
+                ref_category = "dynamic_import_references"
+                ref_type = "dynamic_import"
+            elif path.suffix == ".py" and category != "test_import_references":
+                continue
+            _add_ref(refs, old_module, ref_category, rel_path, lineno, ref_type, old_module, lines)
+
+
+def _old_module_for_import_name(name: str, old_modules: dict[str, ShimRegistryEntry]) -> str | None:
+    for old_module in old_modules:
+        if name == old_module or name.startswith(f"{old_module}."):
+            return old_module
+    return None
+
+
+def _resolve_relative_import_name(
+    rel_path: str,
+    *,
+    level: int,
+    module: str | None,
+    alias_name: str,
+) -> str:
+    current_module = rel_path[:-3].replace("/", ".") if rel_path.endswith(".py") else rel_path.replace("/", ".")
+    current_parts = current_module.split(".")
+    if current_parts and current_parts[-1] == "__init__":
+        package_parts = current_parts[:-1]
+    else:
+        package_parts = current_parts[:-1]
+    if level > 1:
+        package_parts = package_parts[: max(0, len(package_parts) - (level - 1))]
+    if module:
+        package_parts = [*package_parts, *module.split(".")]
+        return ".".join(package_parts)
+    return ".".join([*package_parts, alias_name])
+
+
+def _add_ref(
+    refs: dict[str, dict[str, list[dict[str, object]]]],
+    old_module: str,
+    category: str,
+    path: str,
+    line: int,
+    reference_type: str,
+    detail: str,
+    lines: list[str],
+) -> None:
+    if old_module not in refs or category not in refs[old_module]:
+        return
+    snippet = lines[line - 1].strip() if 0 <= line - 1 < len(lines) else ""
+    payload = ShimReference(
+        path=path,
+        line=line,
+        reference_type=reference_type,
+        detail=detail,
+        snippet=snippet[:220],
+    ).to_dict()
+    bucket = refs[old_module][category]
+    dedupe_key = (payload["path"], payload["line"], payload["reference_type"], payload["detail"])
+    if not any((row["path"], row["line"], row["reference_type"], row["detail"]) == dedupe_key for row in bucket):
+        bucket.append(payload)
+
+
+def _line_is_static_import(line: str, old_module: str) -> bool:
+    stripped = line.strip()
+    return bool(
+        re.match(rf"from\s+{re.escape(old_module)}(\s+|\.)", stripped)
+        or re.match(rf"import\s+{re.escape(old_module)}(\s|$|,|\.)", stripped)
+    )
+
+
+def _line_looks_dynamic_import(line: str, old_module: str) -> bool:
+    return old_module in line and ("import_module" in line or "__import__" in line)
+
+
+def _line_contains_module_reference(line: str, old_module: str) -> bool:
+    return bool(re.search(rf"(?<![\w.]){re.escape(old_module)}(?![\w.])", line))
+
+
+def _docs_refs_are_policy_scoped(refs: list[dict[str, object]]) -> bool:
+    if not refs:
+        return True
+    for ref in refs:
+        path = str(ref.get("path") or "")
+        snippet = str(ref.get("snippet") or "").casefold()
+        if path in _DOC_COMPATIBILITY_FILES:
+            continue
+        if "compatibility" in snippet or "deprecated" in snippet or "shim" in snippet:
+            continue
+        return False
+    return True
 
 
 def _module_map_path() -> Path:
@@ -344,7 +970,23 @@ def _default_report_dir() -> Path:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Write Event Alpha compatibility-shim audit artifacts.")
     parser.add_argument("--out-dir", default=str(_default_report_dir()))
+    parser.add_argument(
+        "--dependency-report",
+        action="store_true",
+        help="Write checked-in shim dependency and removal-candidate research reports.",
+    )
     args = parser.parse_args(argv)
+    if args.dependency_report:
+        dep_json, dep_md, removal_json, removal_md, report = write_shim_dependency_report(out_dir=args.out_dir)
+        print(dep_json)
+        print(dep_md)
+        print(removal_json)
+        print(removal_md)
+        print(f"status={report.get('status')}")
+        print(f"registry_entry_count={report.get('registry_entry_count', 0)}")
+        print(f"internal_import_reference_count={report.get('internal_import_reference_count', 0)}")
+        print(f"safe_to_remove_count={report.get('safe_to_remove_count', 0)}")
+        return 0
     json_path, md_path, report = write_shim_report(out_dir=args.out_dir)
     print(json_path)
     print(md_path)

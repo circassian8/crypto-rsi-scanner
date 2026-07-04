@@ -8,7 +8,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-from crypto_rsi_scanner import event_alpha_router, event_feedback, event_watchlist
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.outcomes.feedback_labels as event_feedback
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
 
 @dataclass(frozen=True)

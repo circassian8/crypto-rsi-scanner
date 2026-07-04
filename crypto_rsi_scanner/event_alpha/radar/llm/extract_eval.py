@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from .... import event_llm_extractor
+import crypto_rsi_scanner.event_alpha.radar.llm.extractor as event_llm_extractor
 from ....event_providers.manual_json import ManualJsonEventProvider
 from ....llm_providers.fixture import FixtureLLMExtractionProvider
 

@@ -13,8 +13,10 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Iterable
 
-from ... import event_fade, event_graph, event_playbooks
-from ...event_classification import (
+from ... import event_fade
+import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
+import crypto_rsi_scanner.event_alpha.radar.playbooks as event_playbooks
+from ..radar.classification import (
     ROLE_DIRECT_BENEFICIARY,
     ROLE_INFRASTRUCTURE,
     ROLE_MENTIONED_ASSET,
@@ -23,7 +25,7 @@ from ...event_classification import (
     ROLE_TICKER_WORD_COLLISION,
 )
 from crypto_rsi_scanner.event_core.models import DiscoveredEventFadeCandidate, EventDiscoveryResult
-from ...event_resolver import SOURCE_PUBLISHER_NAMES, clean_text, is_market_recap_event
+from ..radar.resolver import SOURCE_PUBLISHER_NAMES, clean_text, is_market_recap_event
 
 
 class EventAlertTier(str, Enum):

@@ -7,7 +7,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Iterable, Mapping
 
-from ... import event_watchlist
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
 
 def format_router_report(result: object) -> str:

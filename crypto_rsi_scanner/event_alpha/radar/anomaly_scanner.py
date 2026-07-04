@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
-from crypto_rsi_scanner import event_market_enrichment
+import crypto_rsi_scanner.event_alpha.radar.market_enrichment as event_market_enrichment
 from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
 

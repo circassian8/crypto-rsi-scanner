@@ -11,12 +11,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Protocol
 
-from .... import (
-    event_evidence_quality,
-    event_llm_evidence_planner,
-)
+import crypto_rsi_scanner.event_alpha.radar.evidence_quality as event_evidence_quality
+import crypto_rsi_scanner.event_alpha.radar.llm.evidence_planner as event_llm_evidence_planner
 from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
-from ....event_resolver import clean_text
+from ..resolver import clean_text
 from ...providers import source_packs as event_source_packs
 from ...providers import source_registry as event_source_registry
 from .. import catalyst_search as event_catalyst_search

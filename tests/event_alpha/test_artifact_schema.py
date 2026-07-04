@@ -259,7 +259,7 @@ def test_event_impact_hypothesis_store_reports_schema_and_promotion_diagnostics(
 def test_event_llm_source_triage_schema_and_quote_validation():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_source_enrichment
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMSourceQualityProvider
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
@@ -504,14 +504,14 @@ def test_official_exchange_activation_schema_for_bybit_and_binance_fixture_artif
 
 
 def test_event_alpha_consolidation_import_shims_and_schema_registry():
-    import crypto_rsi_scanner.event_integrated_radar as old_integrated_radar
-    import crypto_rsi_scanner.event_market_anomaly_scanner as old_market_anomaly
+    import crypto_rsi_scanner.event_alpha.radar.integrated_radar as old_integrated_radar
+    import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as old_market_anomaly
     from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
     from crypto_rsi_scanner.event_alpha.artifacts import paths as new_paths
     from crypto_rsi_scanner.event_alpha.doctor import schema_doctor
     from crypto_rsi_scanner.event_alpha.radar import integrated_radar as new_integrated_radar
     from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner as new_market_anomaly
-    from crypto_rsi_scanner.event_artifact_paths import artifact_display_path
+    from crypto_rsi_scanner.event_alpha.artifacts.paths import artifact_display_path
 
     assert new_integrated_radar.run_integrated_radar_cycle is old_integrated_radar.run_integrated_radar_cycle
     assert new_market_anomaly.scan_market_rows is old_market_anomaly.scan_market_rows

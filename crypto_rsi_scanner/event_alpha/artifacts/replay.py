@@ -9,13 +9,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import (
-    event_alerts,
-    event_alpha_router,
-    event_discovery,
-    event_llm_analyzer,
-    event_watchlist,
-)
+import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
+import crypto_rsi_scanner.event_alpha.radar.llm.analyzer as event_llm_analyzer
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...event_alpha.outcomes import priors as event_alpha_priors
 from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
 from ...event_providers.coingecko_universe import assets_from_markets

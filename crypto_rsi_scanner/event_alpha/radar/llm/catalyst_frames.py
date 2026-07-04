@@ -15,9 +15,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from .... import event_catalyst_frames, event_claim_semantics, event_source_enrichment
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frames as event_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
+import crypto_rsi_scanner.event_alpha.radar.source_enrichment as event_source_enrichment
 from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
-from ....event_resolver import clean_text
+from ..resolver import clean_text
 from ....llm_providers.base import LLMCatalystFrameProvider, LLMProviderResult
 
 

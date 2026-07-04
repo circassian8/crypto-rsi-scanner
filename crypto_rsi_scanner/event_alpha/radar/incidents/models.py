@@ -8,7 +8,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
-from .... import event_claim_semantics, event_incident_graph
+import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
+import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_graph
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, RawDiscoveredEvent
 
 INCIDENT_STORE_SCHEMA_VERSION = "event_incident_store_v1"

@@ -245,7 +245,7 @@ def event_alpha_export_burn_in_pack(
         include_legacy_artifacts=include_legacy_artifacts,
         days=days,
     )
-    from . import event_alpha_burn_in_checklist as checklist
+    import crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist as event_alpha_burn_in_checklist
 
     checklist_result = checklist.build_burn_in_checklist(scorecard)
     readiness = event_alpha_v1_readiness.build_v1_readiness(

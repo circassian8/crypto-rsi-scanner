@@ -8,26 +8,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-from ... import (
-    event_alerts,
-    event_alpha_router,
-    event_anomaly_state,
-    event_catalyst_frames,
-    event_catalyst_frame_validator,
-    event_llm_catalyst_frames,
-    event_catalyst_search,
-    event_evidence_acquisition,
-    event_graph,
-    event_impact_hypotheses,
-    event_llm_analyzer,
-    event_llm_extractor,
-    event_near_miss,
-    event_source_enrichment,
-    event_watchlist,
-    event_watchlist_enrichment,
-    event_watchlist_market,
-    event_watchlist_monitor,
-)
+import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.anomaly_state as event_anomaly_state
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frames as event_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frame_validator as event_catalyst_frame_validator
+import crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames as event_llm_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
+import crypto_rsi_scanner.event_alpha.radar.evidence_acquisition as event_evidence_acquisition
+import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
+import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+import crypto_rsi_scanner.event_alpha.radar.llm.analyzer as event_llm_analyzer
+import crypto_rsi_scanner.event_alpha.radar.llm.extractor as event_llm_extractor
+import crypto_rsi_scanner.event_alpha.radar.near_miss as event_near_miss
+import crypto_rsi_scanner.event_alpha.radar.source_enrichment as event_source_enrichment
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
+import crypto_rsi_scanner.event_alpha.radar.watchlist_enrichment as event_watchlist_enrichment
+import crypto_rsi_scanner.event_alpha.radar.watchlist_market as event_watchlist_market
+import crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor as event_watchlist_monitor
 from ...event_alpha.outcomes import priors as event_alpha_priors
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, RawDiscoveredEvent
 

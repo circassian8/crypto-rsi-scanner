@@ -13,9 +13,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable
 
-from ... import event_claim_semantics
+import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
 from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
-from ...event_resolver import clean_text
+from .resolver import clean_text
 
 
 CATALYST_FRAME_SCHEMA_VERSION = "event_catalyst_frames_v1"

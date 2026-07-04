@@ -218,7 +218,7 @@ def test_event_llm_budget_skips_lower_priority_rows_and_cache_hits_are_free():
 def test_event_llm_extractor_prioritizes_high_value_raw_events_before_budget():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_llm_extractor
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
@@ -295,7 +295,7 @@ def test_event_llm_extractor_prioritizes_high_value_raw_events_before_budget():
 def test_event_catalyst_search_scores_filter_low_quality_results():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_catalyst_search
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     anomaly = RawDiscoveredEvent(
@@ -370,7 +370,7 @@ def test_event_market_evidence_and_opportunity_verdict_quality_layers():
         event_market_confirmation,
         event_opportunity_verdict,
     )
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from datetime import datetime, timezone
 
     now = datetime(2026, 6, 25, 12, 0, tzinfo=timezone.utc)
@@ -637,7 +637,7 @@ def test_event_market_evidence_and_opportunity_verdict_quality_layers():
 def test_event_source_enrichment_article_quality_statuses_and_llm_body_gate():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_llm_extractor, event_source_enrichment
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
 
@@ -727,7 +727,7 @@ def test_event_source_enrichment_article_quality_statuses_and_llm_body_gate():
 def test_event_source_enrichment_triage_and_fixture_source_quality_judge():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_source_enrichment
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMSourceQualityProvider
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
@@ -1724,7 +1724,7 @@ def test_event_alpha_missed_calibration_and_research_card_reports():
         event_research_cards,
         event_watchlist,
     )
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from pathlib import Path
 
     entry = event_watchlist.EventWatchlistEntry(
@@ -2343,7 +2343,7 @@ def test_event_alpha_missed_uses_shared_identity_for_common_words():
     from datetime import datetime, timezone
 
     from crypto_rsi_scanner import event_alpha_missed
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     raw = RawDiscoveredEvent(
         raw_id="raw-hype",
@@ -3179,7 +3179,10 @@ def test_event_alpha_feedback_readiness_and_core_feedback_target():
         tmp_path = Path(tmp)
         card_path = tmp_path / "card_aave.md"
         card_path.write_text(card.markdown, encoding="utf-8")
-        core_id = __import__("crypto_rsi_scanner.event_core_opportunities", fromlist=["core_opportunity_id_for_row"]).core_opportunity_id_for_row(entry)
+        core_id = __import__(
+            "crypto_rsi_scanner.event_alpha.radar.core_opportunities",
+            fromlist=["core_opportunity_id_for_row"],
+        ).core_opportunity_id_for_row(entry)
         alert = {
             "alert_id": "ea:aave",
             "card_id": "card_aave",

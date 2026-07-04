@@ -17,6 +17,50 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Add Event Alpha shim dependency proof · Codex
+**Why:** Event Alpha implementation code has mostly moved under
+`crypto_rsi_scanner/event_alpha/`, but old top-level `event_*.py` shims must not
+be retired blindly. The repo needed a measured dependency inventory, retirement
+policy, and doctor enforcement before any removal phase.
+**Changes:**
+- Added `make event-alpha-shim-dependency-report`, which writes
+  `research/EVENT_ALPHA_SHIM_DEPENDENCY_REPORT.md/json` and
+  `research/EVENT_ALPHA_SHIM_REMOVAL_CANDIDATES.md/json`.
+- Extended `crypto_rsi_scanner.event_alpha.shims` with dependency scanning,
+  removal-candidate grouping, Markdown/JSON renderers, cached warning summaries,
+  and explicit `event_fade.py` safety-boundary reporting.
+- Added `research/EVENT_ALPHA_SHIM_RETIREMENT_POLICY.md`, documenting that old
+  shims are temporary compatibility, new code imports package paths, no shim is
+  removed in this phase, and Event Alpha may produce `FADE_SHORT_REVIEW`
+  research but must not create `TRIGGERED_FADE`.
+- Migrated remaining internal implementation imports from old flat Event Alpha
+  shim paths to new package homes, including resolver/classification/discovery,
+  LLM model/extractor, and CLI service imports. Current dependency report:
+  `status=OK`, `internal_import_reference_count=0`,
+  `test_import_reference_count=127`, `makefile_reference_count=8`,
+  `dynamic_import_reference_count=0`, `safe_to_remove_count=0`, and
+  `remove_now_candidates=0`.
+- Added doctor registry/check wiring for old-shim internal imports,
+  retained-safe-to-remove shims, and active-shim implementation logic; fixed the
+  scanner so relative imports are resolved to their actual package before being
+  classified as old-shim references.
+- Updated shim/make-target tests, `ROADMAP.md`, and `DECISIONS.md`.
+**Verify:** Passed the requested safe gauntlet: `python3 tests/test_indicators.py`
+reported `749/749 passed`;
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` reported `760 passed`;
+`python3 -m compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-shim-report PYTHON=python3`; `make
+event-alpha-shim-dependency-report PYTHON=python3`; `make refactor-size-gates
+PYTHON=python3`; `make refactor-class-ownership-report PYTHON=python3`; `make
+refactor-final-report PYTHON=python3`; integrated radar smoke/doctor;
+notification format smoke; Telegram no-send final check; strict CryptoPanic
+artifact doctor; and `make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No shims were deleted. No live
+provider calls by default, live Telegram sends, trading, paper-trading behavior
+changes, execution/order logic, Event Alpha RSI writes, or Event
+Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Document final class ownership exceptions · Codex
 **Why:** The final refactor cleanup still reported 14 oversized classes, but
 splitting the remaining provider adapters, storage mixins, LLM providers, and

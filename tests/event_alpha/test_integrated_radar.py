@@ -302,7 +302,7 @@ def test_event_resolver_aliases_and_rejects_ticker_collision():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
-    from crypto_rsi_scanner.event_resolver import load_asset_aliases, resolve_event_assets
+    from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases, resolve_event_assets
 
     events_path, aliases_path = _event_discovery_fixture_paths()
     raw = ManualJsonEventProvider(events_path, required=True).fetch_events(
@@ -325,8 +325,8 @@ def test_event_resolver_aliases_and_rejects_ticker_collision():
 
 def test_event_resolver_rejects_generic_live_universe_identity_terms():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, NormalizedEvent
-    from crypto_rsi_scanner.event_resolver import resolve_event_assets
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, NormalizedEvent
+    from crypto_rsi_scanner.event_alpha.radar.resolver import resolve_event_assets
 
     event = NormalizedEvent(
         event_id="spacex-tokenized-access",
@@ -381,8 +381,8 @@ def test_event_resolver_rejects_generic_live_universe_identity_terms():
 
 
 def test_event_resolver_strips_publisher_suffixes_and_source_origin_noise():
-    from crypto_rsi_scanner.event_models import DiscoveredAsset
-    from crypto_rsi_scanner.event_resolver import resolve_event_assets
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset
+    from crypto_rsi_scanner.event_alpha.radar.resolver import resolve_event_assets
 
     btc = DiscoveredAsset(
         coin_id="bitcoin",
@@ -441,8 +441,8 @@ def test_event_resolver_strips_publisher_suffixes_and_source_origin_noise():
 
 
 def test_event_resolver_rejects_common_word_and_ticker_collisions():
-    from crypto_rsi_scanner.event_models import DiscoveredAsset
-    from crypto_rsi_scanner.event_resolver import resolve_event_assets
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset
+    from crypto_rsi_scanner.event_alpha.radar.resolver import resolve_event_assets
 
     assets = [
         DiscoveredAsset("usat", "USAT", "USA Token", aliases=("usa", "usat", "usa token")),
@@ -499,8 +499,8 @@ def test_event_resolver_rejects_common_word_and_ticker_collisions():
 
 
 def test_event_resolver_penalizes_market_recap_resolution_confidence():
-    from crypto_rsi_scanner.event_models import DiscoveredAsset
-    from crypto_rsi_scanner.event_resolver import resolve_event_assets
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset
+    from crypto_rsi_scanner.event_alpha.radar.resolver import resolve_event_assets
 
     event = _test_normalized_event(
         "Weekly market recap: HYPE token and SpaceX pre-IPO markets lead top stories",
@@ -518,7 +518,7 @@ def test_event_resolver_penalizes_market_recap_resolution_confidence():
 def test_event_alerts_rank_proxy_candidates_without_human_review_fields():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alerts, event_discovery
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
     from crypto_rsi_scanner.event_providers.manual_json import content_hash
 
     def raw_proxy(raw_id, title, body, symbol, coin_id, external_asset, event_type="ipo_proxy"):
@@ -620,7 +620,7 @@ def test_event_alerts_proxy_venue_digest_only_unless_enabled():
     from dataclasses import replace
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alerts, event_discovery
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
     from crypto_rsi_scanner.event_providers.manual_json import content_hash
 
     payload = {
@@ -780,7 +780,7 @@ def test_event_alerts_rejection_gates_override_inconsistent_triggered_signal():
 
 def test_event_llm_model_enums_and_invalid_output_rejection():
     from crypto_rsi_scanner import event_llm_analyzer
-    from crypto_rsi_scanner.event_llm_models import (
+    from crypto_rsi_scanner.event_alpha.radar.llm.models import (
         ASSET_ROLE_VALUES,
         RECOMMENDED_ALERT_ACTION_VALUES,
         RELATIONSHIP_TYPE_VALUES,
@@ -1346,7 +1346,7 @@ def test_event_llm_golden_eval_passes_and_detects_mismatch():
 
 def test_event_llm_extractor_models_fixture_outputs_and_quote_validation():
     from crypto_rsi_scanner import event_llm_extractor
-    from crypto_rsi_scanner.event_llm_extraction_models import (
+    from crypto_rsi_scanner.event_alpha.radar.llm.extraction_models import (
         ASSET_MENTION_TYPE_VALUES,
         CATALYST_TYPE_VALUES,
     )
@@ -1404,7 +1404,7 @@ def test_event_llm_extractor_identifies_source_noise_and_word_collisions():
 def test_event_llm_extractor_runtime_deadline_skips_uncached_provider_calls():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_llm_extractor
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
@@ -1458,7 +1458,7 @@ def test_event_llm_extractor_calls_run_with_bounded_parallelism():
     import time
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_llm_extractor
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
@@ -1535,7 +1535,7 @@ def test_event_llm_extractor_openai_missing_key_fails_soft():
 def test_event_llm_extractor_enrichment_still_requires_resolver_validation():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery, event_llm_extractor
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
 
     class Provider:
@@ -1726,7 +1726,7 @@ def test_event_market_enrichment_from_coingecko_rows():
 def test_event_market_enrichment_fills_candidates_without_overriding_raw_market():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery, event_market_enrichment
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     raw = RawDiscoveredEvent(
@@ -1809,7 +1809,7 @@ def test_event_market_enrichment_fills_candidates_without_overriding_raw_market(
 def test_event_anomaly_scanner_creates_store_only_research_rows():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alerts, event_anomaly_scanner, event_discovery, event_market_enrichment
-    from crypto_rsi_scanner.event_models import DiscoveredAsset
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     rows = [{
@@ -1973,7 +1973,7 @@ def test_event_alpha_cycle_search_loop_uses_fixture_evidence_and_respects_limits
         event_market_enrichment,
         event_playbooks,
     )
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     rows = [
@@ -2101,7 +2101,7 @@ def test_event_anomaly_lifecycle_tracks_found_validated_and_expired_states():
         event_catalyst_search,
         event_discovery,
     )
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     anomaly = RawDiscoveredEvent(
@@ -2179,7 +2179,7 @@ def test_event_anomaly_lifecycle_tracks_found_validated_and_expired_states():
 def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_noise():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alerts, event_discovery, event_playbooks
-    from crypto_rsi_scanner.event_models import (
+    from crypto_rsi_scanner.event_core.models import (
         DiscoveredAsset,
         DiscoveredEventFadeCandidate,
         EventAssetLink,
@@ -2480,7 +2480,7 @@ def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_nois
 def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alerts, event_graph
-    from crypto_rsi_scanner.event_models import (
+    from crypto_rsi_scanner.event_core.models import (
         DiscoveredAsset,
         DiscoveredEventFadeCandidate,
         EventAssetLink,
@@ -2602,7 +2602,7 @@ def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
 def test_event_graph_accepts_direct_supply_and_derivatives_without_boosting_infrastructure():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alerts, event_graph
-    from crypto_rsi_scanner.event_models import (
+    from crypto_rsi_scanner.event_core.models import (
         DiscoveredAsset,
         DiscoveredEventFadeCandidate,
         EventAssetLink,
@@ -2694,7 +2694,7 @@ def test_event_graph_accepts_direct_supply_and_derivatives_without_boosting_infr
 def test_event_impact_hypotheses_generate_seed_categories_and_queries():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import config, event_impact_hypotheses
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
 
@@ -2789,7 +2789,7 @@ def test_event_impact_hypotheses_generate_seed_categories_and_queries():
 def test_event_impact_hypothesis_matching_uses_context_not_substrings():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_impact_hypotheses
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
 
@@ -2877,7 +2877,7 @@ def test_event_impact_hypothesis_matching_uses_context_not_substrings():
 def test_event_impact_hypothesis_category_refinements_for_validated_news():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_impact_hypotheses
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 
     now = datetime(2026, 6, 23, 12, 0, tzinfo=timezone.utc)
 
@@ -2982,7 +2982,7 @@ def test_event_impact_hypothesis_validation_is_identity_safe():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_catalyst_search, event_impact_hypotheses
     from crypto_rsi_scanner import event_watchlist
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from pathlib import Path
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
@@ -3077,7 +3077,7 @@ def test_event_impact_hypothesis_validation_is_identity_safe():
 def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrence():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import config, event_impact_hypotheses
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
 
@@ -3232,7 +3232,7 @@ def test_event_impact_hypothesis_persists_upgrade_and_downgrade_paths():
     from datetime import datetime, timezone
     from pathlib import Path
     from crypto_rsi_scanner import event_impact_hypotheses, event_impact_hypothesis_store
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
     hypothesis = event_impact_hypotheses.EventImpactHypothesis(
@@ -3516,12 +3516,12 @@ def test_event_impact_hypothesis_watchlist_uses_validated_asset_not_first_candid
 def test_event_impact_hypothesis_external_entities_never_become_crypto_candidates():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_impact_hypotheses
-    from crypto_rsi_scanner.event_llm_extraction_models import (
+    from crypto_rsi_scanner.event_alpha.radar.llm.extraction_models import (
         EventLLMCryptoAssetMention,
         EventLLMRawEventExtraction,
     )
-    from crypto_rsi_scanner.event_llm_extractor import EventLLMExtractionReportRow
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_alpha.radar.llm.extractor import EventLLMExtractionReportRow
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     names = ("OpenAI", "Anthropic", "SpaceX", "Stripe", "Databricks", "Anduril", "Figma", "Fannie Mae", "Freddie Mac")
@@ -3730,7 +3730,7 @@ def test_event_alpha_pipeline_writes_non_alertable_hypothesis_rows():
         event_alerts,
         event_watchlist,
     )
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     raw = RawDiscoveredEvent(
@@ -3834,7 +3834,7 @@ def test_event_alpha_pipeline_hypothesis_search_validates_before_token_watchlist
         event_catalyst_search,
         event_watchlist,
     )
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     raw = RawDiscoveredEvent(
@@ -4028,12 +4028,12 @@ def test_event_alpha_daily_brief_summarizes_rejected_hypothesis_samples():
 def test_event_impact_hypothesis_generation_uses_llm_suggested_assets_but_not_validation():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_impact_hypotheses
-    from crypto_rsi_scanner.event_llm_extraction_models import (
+    from crypto_rsi_scanner.event_alpha.radar.llm.extraction_models import (
         EventLLMCryptoAssetMention,
         EventLLMRawEventExtraction,
     )
-    from crypto_rsi_scanner.event_llm_extractor import EventLLMExtractionReportRow
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_alpha.radar.llm.extractor import EventLLMExtractionReportRow
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     raw = RawDiscoveredEvent(
@@ -4099,12 +4099,12 @@ def test_event_impact_hypothesis_generation_uses_llm_suggested_assets_but_not_va
 def test_event_impact_hypothesis_separates_external_entities_from_crypto_candidates():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_impact_hypotheses
-    from crypto_rsi_scanner.event_llm_extraction_models import (
+    from crypto_rsi_scanner.event_alpha.radar.llm.extraction_models import (
         EventLLMCryptoAssetMention,
         EventLLMRawEventExtraction,
     )
-    from crypto_rsi_scanner.event_llm_extractor import EventLLMExtractionReportRow
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_alpha.radar.llm.extractor import EventLLMExtractionReportRow
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     raw = RawDiscoveredEvent(
@@ -4178,7 +4178,7 @@ def test_event_impact_hypothesis_separates_external_entities_from_crypto_candida
 def test_event_impact_hypothesis_search_skip_reason_buckets_are_specific():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_catalyst_search, event_impact_hypotheses
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     empty_provider = event_catalyst_search.FixtureCatalystSearchProvider(rows_by_query={})
@@ -4285,7 +4285,7 @@ def test_event_alpha_pipeline_operating_cycle_runs_extraction_before_discovery()
         event_llm_extractor,
         event_watchlist,
     )
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
 
     now = datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc)
@@ -4683,7 +4683,7 @@ def test_event_watchlist_refresh_tracks_escalations_and_suppresses_duplicates():
     from datetime import datetime, timezone
     from pathlib import Path
     from crypto_rsi_scanner import event_alerts, event_discovery, event_watchlist
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     raw = RawDiscoveredEvent(
@@ -4778,7 +4778,7 @@ def test_event_watchlist_expiration_and_backward_compatible_reads():
     from datetime import datetime, timezone
     from pathlib import Path
     from crypto_rsi_scanner import event_alerts, event_discovery, event_watchlist
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     raw = RawDiscoveredEvent(
@@ -6147,7 +6147,7 @@ def test_event_alpha_pipeline_routes_monitor_updates_without_new_source():
         event_playbooks,
         event_watchlist,
     )
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult
 
     def entry(symbol, *, event_time, state=None):
         return event_watchlist.EventWatchlistEntry(
@@ -9137,7 +9137,7 @@ def test_event_alpha_research_review_skipped_sample_dedupes_by_family():
 def test_event_catalyst_frames_separate_main_background_and_negation():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_catalyst_frames, event_claim_semantics, event_incident_graph
-    from crypto_rsi_scanner.event_models import NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
 
     now = datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc)
 
@@ -9230,7 +9230,7 @@ def test_aave_kraken_hypothesis_uses_strategic_frame_in_cards_and_audit():
         event_research_cards,
         event_watchlist,
     )
-    from crypto_rsi_scanner.event_models import (
+    from crypto_rsi_scanner.event_core.models import (
         DiscoveredAsset,
         DiscoveredEventFadeCandidate,
         EventAssetLink,
@@ -9345,7 +9345,7 @@ def test_llm_catalyst_frame_fixture_validation_and_downstream_use():
         event_incident_graph,
         event_llm_catalyst_frames,
     )
-    from crypto_rsi_scanner.event_models import NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMCatalystFrameProvider
 
     now = datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc)
@@ -9462,7 +9462,7 @@ def test_llm_catalyst_frame_fixture_validation_and_downstream_use():
 def test_llm_catalyst_frame_runtime_deadline_skips_and_bounds_timeout():
     from datetime import datetime, timedelta, timezone
     from crypto_rsi_scanner import event_llm_catalyst_frames
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
 
     now = datetime(2026, 6, 29, 12, 0, tzinfo=timezone.utc)
@@ -9534,7 +9534,7 @@ def test_event_alpha_operating_cycle_applies_llm_catalyst_frame_validation():
         event_incident_graph,
         event_llm_catalyst_frames,
     )
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMCatalystFrameProvider
 
     now = datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc)
@@ -9617,7 +9617,7 @@ def test_event_alpha_operating_cycle_applies_llm_catalyst_frame_validation():
 def test_llm_catalyst_frame_validator_rejects_bad_quotes_and_identity_noise():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_catalyst_frame_validator, event_llm_catalyst_frames
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMCatalystFrameProvider
 
     now = datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc)
@@ -9889,7 +9889,7 @@ def test_catalyst_frame_missing_provider_records_skip_and_status():
     from datetime import datetime, timezone
     from pathlib import Path
     from crypto_rsi_scanner import event_alpha_pipeline, event_alpha_run_ledger, event_llm_catalyst_frames
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 
     now = datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc)
     raw = RawDiscoveredEvent(
@@ -9965,7 +9965,7 @@ def test_catalyst_frame_missing_key_and_disabled_modes_record_clear_skip_reasons
     from pathlib import Path
 
     from crypto_rsi_scanner import event_alpha_pipeline, event_alpha_run_ledger, event_llm_catalyst_frames
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.openai_provider import OpenAILLMRelationshipProvider
 
     now = datetime(2026, 6, 27, 12, 30, tzinfo=timezone.utc)
@@ -10079,7 +10079,7 @@ def test_catalyst_frame_missing_key_and_disabled_modes_record_clear_skip_reasons
 def test_incident_asset_roles_demote_unvalidated_taxonomy_candidates():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_incident_graph, event_incident_store
-    from crypto_rsi_scanner.event_models import NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
 
     now = datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc)
     raw = RawDiscoveredEvent(
@@ -10800,7 +10800,7 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
         event_research_cards,
         event_watchlist,
     )
-    from crypto_rsi_scanner.event_models import (
+    from crypto_rsi_scanner.event_core.models import (
         DiscoveredAsset,
         DiscoveredEventFadeCandidate,
         EventAssetLink,
@@ -11647,7 +11647,7 @@ def test_event_incident_relevance_gates_raw_external_observations():
     from datetime import datetime, timezone
     from pathlib import Path
     from crypto_rsi_scanner import event_alpha_artifact_doctor, event_incident_graph, event_incident_store
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 
     now = datetime(2026, 6, 26, 12, 0, tzinfo=timezone.utc)
 
@@ -12318,7 +12318,7 @@ def test_event_incident_primary_subject_validator_quarantines_garbage_before_per
     import tempfile
 
     from crypto_rsi_scanner import event_incident_graph, event_incident_store
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 
     invalid_subjects = (
         "About",
@@ -14333,7 +14333,7 @@ def test_event_impact_path_uses_asset_knowledge_for_roles_and_broad_context():
     from types import SimpleNamespace
 
     from crypto_rsi_scanner import event_impact_path_validator
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 20, tzinfo=timezone.utc)
 
@@ -14418,8 +14418,8 @@ def test_event_impact_path_uses_asset_knowledge_for_roles_and_broad_context():
 def test_event_resolver_outputs_identity_metadata_and_rejects_generic_hype():
     from datetime import datetime, timezone
 
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, NormalizedEvent
-    from crypto_rsi_scanner.event_resolver import resolve_event_assets
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, NormalizedEvent
+    from crypto_rsi_scanner.event_alpha.radar.resolver import resolve_event_assets
 
     now = datetime(2026, 6, 20, tzinfo=timezone.utc)
     assets = [

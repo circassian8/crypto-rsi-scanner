@@ -13,18 +13,18 @@ from typing import Any, Iterable, Mapping
 
 from .... import (
     config,
-    event_catalyst_frames,
-    event_claim_semantics,
-    event_evidence_quality,
-    event_graph,
-    event_identity,
-    event_incident_graph,
-    event_impact_path_validator,
-    event_llm_catalyst_frames,
 )
-from ....event_llm_extractor import EventLLMExtractionReportRow
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frames as event_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
+import crypto_rsi_scanner.event_alpha.radar.evidence_quality as event_evidence_quality
+import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
+import crypto_rsi_scanner.event_alpha.radar.identity as event_identity
+import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_graph
+import crypto_rsi_scanner.event_alpha.radar.impact_path_validator as event_impact_path_validator
+import crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames as event_llm_catalyst_frames
+from ..llm.extractor import EventLLMExtractionReportRow
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
-from ....event_resolver import clean_text
+from ..resolver import clean_text
 from .. import incidents as event_incident_store
 from .. import market_confirmation as event_market_confirmation
 from .. import opportunity_verdict as event_opportunity_verdict

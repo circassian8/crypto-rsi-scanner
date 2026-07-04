@@ -8,12 +8,12 @@ from .._scanner_bindings import bind_scanner_globals
 from ..services import (
     event_alpha_integrated as _service_integrated,
     event_alpha_namespace as _service_namespace,
-    event_alpha_notifications as _service_notifications,
-    event_alpha_outcomes as _service_outcomes,
     event_alpha_provider_preflights as _service_provider_preflights,
     event_alpha_reports as _service_reports,
     event_alpha_research as _service_research,
 )
+import crypto_rsi_scanner.event_alpha.notifications.pipeline as event_alpha_notifications
+import crypto_rsi_scanner.event_alpha.outcomes.outcome_artifacts as event_alpha_outcomes
 
 @dataclass(frozen=True)
 class EventAlphaCommandRegistration:

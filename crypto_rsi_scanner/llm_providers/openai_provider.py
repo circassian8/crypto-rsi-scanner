@@ -8,16 +8,16 @@ from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from ..event_llm_models import (
+from crypto_rsi_scanner.event_alpha.radar.llm.models import (
     ASSET_ROLE_VALUES,
     RECOMMENDED_ALERT_ACTION_VALUES,
     RELATIONSHIP_TYPE_VALUES,
 )
-from ..event_llm_extraction_models import (
+from crypto_rsi_scanner.event_alpha.radar.llm.extraction_models import (
     ASSET_MENTION_TYPE_VALUES,
     CATALYST_TYPE_VALUES,
 )
-from ..event_llm_catalyst_frames import structured_output_schema as _catalyst_frame_schema
+from crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames import structured_output_schema as _catalyst_frame_schema
 from .base import LLMProviderResult
 
 log = logging.getLogger(__name__)

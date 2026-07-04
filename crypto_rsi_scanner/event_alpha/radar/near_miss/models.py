@@ -7,16 +7,14 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
-from .... import (
-    event_alpha_router,
-    event_alpha_quality_fields,
-    event_core_opportunities,
-    event_llm_evidence_planner,
-    event_market_confirmation,
-    event_opportunity_verdict,
-    event_source_packs,
-    event_source_registry,
-)
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
+import crypto_rsi_scanner.event_alpha.radar.core_opportunities as event_core_opportunities
+import crypto_rsi_scanner.event_alpha.radar.llm.evidence_planner as event_llm_evidence_planner
+import crypto_rsi_scanner.event_alpha.radar.market_confirmation as event_market_confirmation
+import crypto_rsi_scanner.event_alpha.radar.opportunity_verdict as event_opportunity_verdict
+import crypto_rsi_scanner.event_alpha.providers.source_packs as event_source_packs
+import crypto_rsi_scanner.event_alpha.providers.source_registry as event_source_registry
 
 
 @dataclass(frozen=True)

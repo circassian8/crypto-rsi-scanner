@@ -7,7 +7,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Iterable, Mapping
 
-from ... import event_alpha_quality_fields, event_opportunity_verdict, event_playbooks, event_watchlist
+import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
+import crypto_rsi_scanner.event_alpha.radar.opportunity_verdict as event_opportunity_verdict
+import crypto_rsi_scanner.event_alpha.radar.playbooks as event_playbooks
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from . import router_rendering
 
 

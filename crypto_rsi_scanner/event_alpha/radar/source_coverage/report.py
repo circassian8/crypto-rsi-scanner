@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
-from .... import event_provider_status
+import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 from ....event_providers import cryptopanic as cryptopanic_provider
 from ...artifacts import paths as event_artifact_paths
 from ...providers import bybit_announcements_preflight as event_bybit_announcements_preflight

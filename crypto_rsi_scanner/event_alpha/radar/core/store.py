@@ -10,9 +10,9 @@ from typing import Any, Iterable, Mapping
 
 from .... import (
     config,
-    event_alpha_router,
-    event_watchlist,
 )
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import paths as event_artifact_paths
 from .. import core_opportunities as event_core_opportunities
 from .. import market_reaction as event_market_reaction

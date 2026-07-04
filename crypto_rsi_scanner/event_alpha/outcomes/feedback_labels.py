@@ -9,7 +9,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import event_alpha_router, event_core_opportunities, event_research_cards, event_watchlist
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.core_opportunities as event_core_opportunities
+import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
 
 FEEDBACK_SCHEMA_VERSION = "event_alpha_feedback_v1"

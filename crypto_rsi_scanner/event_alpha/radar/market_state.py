@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
-from ... import event_market_units
+import crypto_rsi_scanner.event_alpha.radar.market_units as event_market_units
 
 
 @dataclass(frozen=True)

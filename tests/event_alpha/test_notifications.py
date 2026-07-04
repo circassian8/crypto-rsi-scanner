@@ -2033,7 +2033,8 @@ def test_event_alpha_notify_cycle_pipeline_exception_fails_soft_and_writes_ledge
     import json
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import config, event_alpha_profiles, event_alpha_pipeline, scanner
+    from crypto_rsi_scanner import config, event_alpha_profiles, scanner
+    from crypto_rsi_scanner.event_alpha.radar import pipeline as event_alpha_pipeline
 
     notify_profile = event_alpha_profiles.get_profile("notify_no_key")
     base_attrs = (
@@ -4635,7 +4636,7 @@ def test_event_alpha_notification_delivery_status_fallback_and_legacy_preview_wo
 
     from crypto_rsi_scanner import event_alpha_artifact_doctor
     from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
-    from crypto_rsi_scanner.event_alpha_notification_delivery import NotificationDeliveryRecord
+    from crypto_rsi_scanner.event_alpha.notifications.delivery import NotificationDeliveryRecord
 
     record = NotificationDeliveryRecord(
         delivery_id="delivery-1",

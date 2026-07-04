@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import event_alpha_quality_fields
+import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
 
 
 IMPACT_HYPOTHESIS_STORE_SCHEMA_VERSION = "event_impact_hypothesis_store_v1"

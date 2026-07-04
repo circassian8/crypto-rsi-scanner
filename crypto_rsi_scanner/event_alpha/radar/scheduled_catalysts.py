@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import event_market_reaction
+import crypto_rsi_scanner.event_alpha.radar.market_reaction as event_market_reaction
 from ..artifacts import schema_v1
 from ...event_providers.manual_json import parse_datetime
 

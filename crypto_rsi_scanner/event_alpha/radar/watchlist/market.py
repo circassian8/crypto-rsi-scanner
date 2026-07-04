@@ -9,7 +9,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from .... import event_alerts, event_alpha_quality_fields, event_fade, event_graph
+from .... import event_fade
+import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
+import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
 from .models import *  # noqa: F403 - split modules share legacy model names
 
 

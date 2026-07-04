@@ -15,7 +15,7 @@ from typing import Iterable
 from urllib.parse import urlparse
 
 from crypto_rsi_scanner.event_core.models import DiscoveredEventFadeCandidate, EventDiscoveryResult, NormalizedEvent
-from crypto_rsi_scanner.event_resolver import clean_text
+from crypto_rsi_scanner.event_alpha.radar.resolver import clean_text
 
 EVENT_GRAPH_SCHEMA_VERSION = "event_graph_v1"
 

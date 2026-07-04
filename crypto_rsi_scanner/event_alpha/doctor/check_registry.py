@@ -474,6 +474,20 @@ CHECKS: tuple[DoctorCheck, ...] = (
         (),
         "Old top-level modules marked active_shim must not accumulate implementation logic.",
     ),
+    _check(
+        "paths.old_shim_internal_import",
+        CATEGORY_PATHS,
+        "warning",
+        (),
+        "Internal implementation code should import new Event Alpha package paths instead of old top-level shim paths.",
+    ),
+    _check(
+        "paths.safe_to_remove_shim_retained",
+        CATEGORY_PATHS,
+        "warning",
+        (),
+        "A shim marked safe_to_remove should either be removed in a removal phase or carry an explicit retention reason.",
+    ),
 )
 
 CHECK_BY_ID: dict[str, DoctorCheck] = {check.check_id: check for check in CHECKS}

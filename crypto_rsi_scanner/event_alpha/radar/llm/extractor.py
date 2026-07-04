@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
-from .... import event_llm_budget
-from ....event_llm_extraction_models import (
+import crypto_rsi_scanner.event_alpha.radar.llm.budget as event_llm_budget
+from .extraction_models import (
     ASSET_MENTION_TYPE_VALUES,
     CATALYST_TYPE_VALUES,
     EventLLMCryptoAssetMention,
@@ -24,8 +24,8 @@ from ....event_llm_extraction_models import (
     EventLLMRawEventExtraction,
 )
 from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
-from .... import event_source_enrichment
-from ....event_resolver import clean_text, strip_publisher_suffix
+import crypto_rsi_scanner.event_alpha.radar.source_enrichment as event_source_enrichment
+from ..resolver import clean_text, strip_publisher_suffix
 from ....llm_providers.base import LLMExtractionProvider, LLMProviderResult
 
 log = logging.getLogger(__name__)

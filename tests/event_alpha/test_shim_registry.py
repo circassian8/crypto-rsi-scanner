@@ -73,6 +73,59 @@ def test_shim_report_writer_outputs_json_and_markdown():
         assert "active_shim" in text
 
 
+def test_shim_dependency_report_writer_outputs_references_and_candidates():
+    with TemporaryDirectory() as tmp:
+        dep_json, dep_md, removal_json, removal_md, report = shims.write_shim_dependency_report(out_dir=tmp)
+
+        assert dep_json == Path(tmp) / shims.DEPENDENCY_REPORT_JSON
+        assert dep_md == Path(tmp) / shims.DEPENDENCY_REPORT_MD
+        assert removal_json == Path(tmp) / shims.REMOVAL_CANDIDATES_JSON
+        assert removal_md == Path(tmp) / shims.REMOVAL_CANDIDATES_MD
+        assert report["schema_version"] == shims.SHIM_DEPENDENCY_SCHEMA_VERSION
+        assert report["registry_entry_count"] >= 50
+        assert "internal_import_reference_count" in report
+        assert "safe_to_remove_count" in report
+        assert "removal_candidates" in report
+        assert dep_json.exists()
+        assert dep_md.exists()
+        assert removal_json.exists()
+        assert removal_md.exists()
+        text = dep_md.read_text(encoding="utf-8")
+        removal_text = removal_md.read_text(encoding="utf-8")
+        assert "Event Alpha Shim Dependency Report" in text
+        assert "Event Alpha Shim Removal Candidates" in removal_text
+        assert "FADE_SHORT_REVIEW" in removal_text
+        assert "must not create `TRIGGERED_FADE`" in removal_text
+
+
+def test_shim_dependency_report_flags_internal_old_import_fixture():
+    entry = shims.ShimRegistryEntry(
+        old_module="crypto_rsi_scanner.event_alpha_fixture_active",
+        new_module="crypto_rsi_scanner.event_alpha.new_home",
+        shim_status=shims.STATUS_ACTIVE_SHIM,
+        allowed_exports=("*",),
+    )
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        package = root / "crypto_rsi_scanner" / "event_alpha" / "fixture"
+        package.mkdir(parents=True)
+        (root / "crypto_rsi_scanner" / "__init__.py").write_text("", encoding="utf-8")
+        (root / "crypto_rsi_scanner" / "event_alpha" / "__init__.py").write_text("", encoding="utf-8")
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        (package / "consumer.py").write_text(
+            "from ... import event_alpha_fixture_active\n",
+            encoding="utf-8",
+        )
+        report = shims.build_shim_dependency_report(root=root, generated_at=None)
+        # The real registry is used by default; verify the lower-level scanner through audit entries.
+        refs = shims._scan_dependency_references((entry,), repo_root=root)  # noqa: SLF001
+
+    row = refs["crypto_rsi_scanner.event_alpha_fixture_active"]["internal_import_references"][0]
+    assert row["reference_type"] == "relative_import"
+    assert row["path"] == "crypto_rsi_scanner/event_alpha/fixture/consumer.py"
+    assert report["research_only"] is True
+
+
 def test_artifact_doctor_warns_when_active_shim_contains_logic():
     from crypto_rsi_scanner import event_alpha_artifact_doctor
 
@@ -86,6 +139,21 @@ def test_artifact_doctor_warns_when_active_shim_contains_logic():
         event_alpha_artifact_doctor.event_alpha_shims.active_shim_violation_summary = original
 
     assert any("paths.active_shim_contains_logic" in warning for warning in result.warnings)
+
+
+def test_artifact_doctor_warns_when_internal_code_imports_old_shim():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    original = event_alpha_artifact_doctor.event_alpha_shims.shim_dependency_warning_summary
+    event_alpha_artifact_doctor.event_alpha_shims.shim_dependency_warning_summary = (
+        lambda: (1, 0, ("crypto_rsi_scanner.event_alpha_fixture_active",))
+    )
+    try:
+        result = event_alpha_artifact_doctor.diagnose_artifacts()
+    finally:
+        event_alpha_artifact_doctor.event_alpha_shims.shim_dependency_warning_summary = original
+
+    assert any("paths.old_shim_internal_import" in warning for warning in result.warnings)
 
 
 def test_recently_migrated_old_and_new_import_paths_share_key_callables():

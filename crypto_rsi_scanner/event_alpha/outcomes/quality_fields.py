@@ -214,7 +214,7 @@ def _attach_upgrade_path(out: dict[str, Any]) -> None:
     if not _is_missing_value(out.get("upgrade_requirements")) and not _is_missing_value(out.get("downgrade_warnings")):
         return
     try:
-        from crypto_rsi_scanner import event_opportunity_verdict
+        import crypto_rsi_scanner.event_alpha.radar.opportunity_verdict as event_opportunity_verdict
 
         upgrade = event_opportunity_verdict.explain_upgrade_path(components=out)
     except Exception:

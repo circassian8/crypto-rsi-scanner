@@ -7,7 +7,8 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Iterable, Mapping
 
-from crypto_rsi_scanner import event_alerts, event_catalyst_search
+import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
 from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
 

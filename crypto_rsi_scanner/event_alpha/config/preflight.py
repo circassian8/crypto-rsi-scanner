@@ -7,7 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-from crypto_rsi_scanner import event_alpha_artifacts, event_alpha_profiles, event_clock, event_provider_status
+import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+import crypto_rsi_scanner.event_alpha.config.profiles as event_alpha_profiles
+import crypto_rsi_scanner.event_core.clock as event_clock
+import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 
 
 @dataclass(frozen=True)

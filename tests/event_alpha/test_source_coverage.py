@@ -597,7 +597,7 @@ def test_event_catalyst_search_scaffold_attaches_evidence_without_bypassing_disc
         event_market_enrichment,
         event_playbooks,
     )
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     rows = [{
@@ -703,7 +703,7 @@ def test_event_catalyst_search_skip_reasons_flow_to_ledger_and_brief():
         event_catalyst_search,
         event_discovery,
     )
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
 
@@ -829,7 +829,7 @@ def test_event_catalyst_search_proxy_evidence_still_requires_deterministic_valid
         event_discovery,
         event_playbooks,
     )
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     anomaly = RawDiscoveredEvent(
@@ -932,7 +932,7 @@ def test_event_catalyst_search_proxy_evidence_still_requires_deterministic_valid
 def test_event_catalyst_search_requires_identity_before_attaching_catalyst_terms():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_catalyst_search
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     anomaly = RawDiscoveredEvent(
@@ -994,7 +994,7 @@ def test_event_catalyst_search_requires_identity_before_attaching_catalyst_terms
 def test_event_catalyst_search_rejects_common_word_symbol_without_strong_identity():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_catalyst_search
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     anomaly = RawDiscoveredEvent(
@@ -1030,7 +1030,7 @@ def test_event_catalyst_search_rejects_common_word_symbol_without_strong_identit
 def test_event_catalyst_search_identity_can_come_from_resolver_validated_llm_extraction():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_catalyst_search
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     raw = RawDiscoveredEvent(
@@ -1071,7 +1071,7 @@ def test_event_catalyst_search_identity_can_come_from_resolver_validated_llm_ext
 def test_event_catalyst_search_identity_field_safety_rejects_url_and_source_noise():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_catalyst_search
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
 
@@ -1203,7 +1203,7 @@ def test_event_source_enrichment_extracts_and_reuses_cache():
     from datetime import datetime, timezone
     from pathlib import Path
     from crypto_rsi_scanner import event_llm_extractor, event_source_enrichment
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     raw = RawDiscoveredEvent(
@@ -1283,7 +1283,7 @@ def test_event_source_enrichment_extracts_and_reuses_cache():
 def test_event_source_enrichment_uses_fixture_text_for_example_test_urls():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_source_enrichment
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     raw = RawDiscoveredEvent(
@@ -1315,7 +1315,7 @@ def test_event_source_enrichment_uses_fixture_text_for_example_test_urls():
 def test_event_alpha_pipeline_source_enrichment_runs_before_llm_extraction():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alpha_pipeline, event_discovery, event_llm_extractor, event_source_enrichment
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, RawDiscoveredEvent
     from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
@@ -1964,7 +1964,7 @@ def test_event_evidence_acquisition_executes_fixture_searches():
         event_evidence_acquisition,
         event_impact_hypotheses,
     )
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     rune = event_impact_hypotheses.EventImpactHypothesis(
         hypothesis_id="hyp:rune-acquisition",
@@ -2331,7 +2331,7 @@ def test_event_evidence_acquisition_accepts_official_exchange_announcements_only
 def test_event_evidence_acquisition_rejects_cryptopanic_tag_mismatch_and_heat_only():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_catalyst_search, event_evidence_acquisition, event_impact_hypotheses
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     rune = event_impact_hypotheses.EventImpactHypothesis(
         hypothesis_id="hyp:rune-hot-rejected",

@@ -706,6 +706,21 @@ def test_refactor_final_report_make_target_is_available():
     assert "requests." not in module_text
 
 
+def test_event_alpha_shim_dependency_report_make_target_is_available():
+    root = REPO_ROOT
+    makefile = (root / "Makefile").read_text(encoding="utf-8")
+    policy = root / "research" / "EVENT_ALPHA_SHIM_RETIREMENT_POLICY.md"
+
+    assert "event-alpha-shim-dependency-report:" in makefile
+    assert "--dependency-report --out-dir research" in makefile
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in makefile
+    assert policy.exists()
+    policy_text = policy.read_text(encoding="utf-8")
+    assert "Old top-level Event Alpha modules are temporary compatibility shims" in policy_text
+    assert "must not create\n`TRIGGERED_FADE`" in policy_text
+    assert "event_fade.py" in policy_text
+
+
 def test_refactor_completion_map_generation_writes_release_candidate_reports():
     import json
     from pathlib import Path

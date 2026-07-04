@@ -13,7 +13,7 @@ from enum import Enum
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlparse
 
-from ...event_resolver import clean_text
+from crypto_rsi_scanner.event_alpha.radar.resolver import clean_text
 
 
 class SourceClass(str, Enum):

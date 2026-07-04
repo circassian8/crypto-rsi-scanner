@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import event_alerts
+import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
 
 
 @dataclass(frozen=True)

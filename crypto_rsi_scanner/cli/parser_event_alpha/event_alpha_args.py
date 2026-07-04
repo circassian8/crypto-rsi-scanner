@@ -1209,7 +1209,8 @@ def _add_event_alpha_args_section_9(parser: argparse.ArgumentParser, event_alpha
 
 def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
     """Add the historical scanner CLI flags without executing commands."""
-    from ... import event_alpha_profiles, event_feedback
+    import crypto_rsi_scanner.event_alpha.config.profiles as event_alpha_profiles
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback_labels as event_feedback
 
     _add_event_alpha_args_section_1(parser, event_alpha_profiles, event_feedback)
     _add_event_alpha_args_section_2(parser, event_alpha_profiles, event_feedback)

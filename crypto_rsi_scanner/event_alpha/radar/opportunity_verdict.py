@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Mapping
 
-from ... import event_evidence_quality, event_impact_path_validator
+import crypto_rsi_scanner.event_alpha.radar.evidence_quality as event_evidence_quality
+import crypto_rsi_scanner.event_alpha.radar.impact_path_validator as event_impact_path_validator
 from . import market_confirmation as event_market_confirmation
 
 

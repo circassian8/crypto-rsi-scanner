@@ -5,7 +5,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
-from .... import event_alpha_artifacts, event_alpha_namespace_status
+import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+import crypto_rsi_scanner.event_alpha.namespace.status as event_alpha_namespace_status
 from .result_models import EventAlphaArtifactDoctorResult
 
 # Static compatibility table extracted from the original result constructor.

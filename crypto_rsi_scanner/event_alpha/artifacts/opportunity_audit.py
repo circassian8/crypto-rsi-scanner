@@ -6,17 +6,15 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import (
-    event_core_opportunities,
-    event_core_opportunity_store,
-    event_alpha_quality_fields,
-    event_alpha_router,
-    event_near_miss,
-    event_opportunity_verdict,
-    event_source_packs,
-    event_source_registry,
-    event_watchlist,
-)
+import crypto_rsi_scanner.event_alpha.radar.core_opportunities as event_core_opportunities
+import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store
+import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.near_miss as event_near_miss
+import crypto_rsi_scanner.event_alpha.radar.opportunity_verdict as event_opportunity_verdict
+import crypto_rsi_scanner.event_alpha.providers.source_packs as event_source_packs
+import crypto_rsi_scanner.event_alpha.providers.source_registry as event_source_registry
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from . import reason_text as event_alpha_reason_text
 from . import research_cards as event_research_cards
 

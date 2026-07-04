@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from crypto_rsi_scanner import event_discovery
+import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult
 
 CACHE_SCHEMA_VERSION = "event_discovery_cache_v1"

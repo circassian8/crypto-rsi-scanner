@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
-from ... import event_alpha_alert_store, event_alpha_quality_fields, event_alpha_router
+import crypto_rsi_scanner.event_alpha.artifacts.alert_store as event_alpha_alert_store
+import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 
 _SIMULATOR_EXCLUDED_CLASSIFICATIONS = {
     event_alpha_alert_store.SNAPSHOT_LEGACY_CONFLICT,

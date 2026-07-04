@@ -118,7 +118,7 @@ def test_event_discovery_calendar_and_unlock_events_are_direct_no_trade():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
-    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+    from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
     _events_path, aliases_path = _event_discovery_fixture_paths()
     coinmarketcal_path, tokenomist_path = _structured_calendar_fixture_paths()
@@ -689,7 +689,7 @@ def test_event_alpha_run_ledger_records_send_accounting():
         event_alpha_router,
         event_watchlist,
     )
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult
 
     now = datetime(2026, 6, 18, 13, 0, tzinfo=timezone.utc)
 

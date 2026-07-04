@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
 
-from crypto_rsi_scanner import event_alpha_artifacts, event_alpha_run_ledger
+import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+import crypto_rsi_scanner.event_alpha.artifacts.run_ledger as event_alpha_run_ledger
 
 
 def format_last_run_explanation(

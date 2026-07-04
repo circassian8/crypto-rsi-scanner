@@ -12,7 +12,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
-from .... import event_source_packs
+import crypto_rsi_scanner.event_alpha.providers.source_packs as event_source_packs
 
 
 @dataclass(frozen=True)

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from crypto_rsi_scanner import event_source_packs
+import crypto_rsi_scanner.event_alpha.providers.source_packs as event_source_packs
 
 
 @dataclass(frozen=True)

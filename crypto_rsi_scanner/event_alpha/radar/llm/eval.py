@@ -9,9 +9,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from .... import event_alerts, event_discovery, event_llm_analyzer
+import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
+import crypto_rsi_scanner.event_alpha.radar.llm.analyzer as event_llm_analyzer
 from ....event_providers.manual_json import ManualJsonEventProvider
-from ....event_resolver import load_asset_aliases
+from ..resolver import load_asset_aliases
 from ....llm_providers.fixture import FixtureLLMRelationshipProvider
 
 

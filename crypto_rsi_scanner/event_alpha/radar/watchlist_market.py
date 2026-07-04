@@ -8,7 +8,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Protocol
 
-from ... import event_provider_health, event_watchlist
+import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...client import CoinGeckoClient
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult
 from ...event_providers.coingecko_universe import _run_async

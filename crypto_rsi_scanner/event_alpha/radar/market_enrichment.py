@@ -10,10 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import config, event_provider_health, universe
+from ... import config, universe
+import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
 from ...client import CoinGeckoClient
 from ...event_providers.coingecko_universe import load_market_rows
-from ...event_resolver import clean_text
+from .resolver import clean_text
 
 log = logging.getLogger(__name__)
 

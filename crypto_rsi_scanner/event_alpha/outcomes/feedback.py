@@ -177,11 +177,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import (
-    event_alpha_alert_store,
-    event_alpha_router,
-    event_watchlist,
-)
+import crypto_rsi_scanner.event_alpha.artifacts.alert_store as event_alpha_alert_store
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ..artifacts import research_cards as event_research_cards
 from ..notifications import inbox as event_alpha_notification_inbox
 from ..radar import core_opportunities as event_core_opportunities

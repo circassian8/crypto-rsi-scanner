@@ -8,7 +8,7 @@ import unicodedata
 from pathlib import Path
 from typing import Iterable
 
-from crypto_rsi_scanner import event_identity
+import crypto_rsi_scanner.event_alpha.radar.identity as event_identity
 from crypto_rsi_scanner.event_core.models import DiscoveredAsset, EventAssetLink, NormalizedEvent
 
 GENERIC_ASSET_TERMS = {

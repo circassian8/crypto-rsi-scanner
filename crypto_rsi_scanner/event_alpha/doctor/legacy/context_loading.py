@@ -173,19 +173,7 @@ def _load_doctor_context_inputs(options: Mapping[str, Any]) -> SimpleNamespace:
     ctx.warnings.extend(ctx.namespace_phase.warnings)
     ctx.blockers.extend(ctx.safety_result.blockers)
     ctx.warnings.extend(ctx.safety_result.warnings)
-    active_shim_logic_count, active_shim_logic_modules = event_alpha_shims.active_shim_violation_summary()
-    ctx.active_shim_logic_count = active_shim_logic_count
-    ctx.active_shim_logic_modules = active_shim_logic_modules
-    if active_shim_logic_count:
-        modules = ", ".join(active_shim_logic_modules[:5])
-        ctx.warnings.append(
-            check_registry.format_check_message(
-                "paths.active_shim_contains_logic",
-                "active_shim_modules_with_implementation_logic="
-                f"{active_shim_logic_count}"
-                + (f" modules={modules}" if modules else ""),
-            )
-        )
+    _attach_shim_dependency_warnings(ctx)
     run_snapshot_context = _inspect_run_snapshot_context(
         runs=ctx.runs,
         alerts=ctx.alerts,
@@ -206,6 +194,41 @@ def _load_doctor_context_inputs(options: Mapping[str, Any]) -> SimpleNamespace:
     ctx.latest_run = run_snapshot_context.latest_run
     ctx.effective_delivery_scope = run_snapshot_context.effective_delivery_scope
     return ctx
+
+
+def _attach_shim_dependency_warnings(ctx: SimpleNamespace) -> None:
+    active_shim_logic_count, active_shim_logic_modules = event_alpha_shims.active_shim_violation_summary()
+    ctx.active_shim_logic_count = active_shim_logic_count
+    ctx.active_shim_logic_modules = active_shim_logic_modules
+    if active_shim_logic_count:
+        modules = ", ".join(active_shim_logic_modules[:5])
+        ctx.warnings.append(
+            check_registry.format_check_message(
+                "paths.active_shim_contains_logic",
+                "active_shim_modules_with_implementation_logic="
+                f"{active_shim_logic_count}"
+                + (f" modules={modules}" if modules else ""),
+            )
+        )
+    shim_internal_import_count, safe_to_remove_shim_count, old_import_modules = (
+        event_alpha_shims.shim_dependency_warning_summary()
+    )
+    if shim_internal_import_count:
+        modules = ", ".join(old_import_modules[:5])
+        ctx.warnings.append(
+            check_registry.format_check_message(
+                "paths.old_shim_internal_import",
+                f"old_shim_internal_import_references={shim_internal_import_count}"
+                + (f" modules={modules}" if modules else ""),
+            )
+        )
+    if safe_to_remove_shim_count:
+        ctx.warnings.append(
+            check_registry.format_check_message(
+                "paths.safe_to_remove_shim_retained",
+                f"safe_to_remove_shims_still_present={safe_to_remove_shim_count}",
+            )
+        )
 
 
 def _apply_namespace_profile_checks(ctx: SimpleNamespace) -> None:

@@ -20,9 +20,9 @@ from typing import Any, Iterable, Mapping
 
 from ..... import (
     config,
-    event_alpha_router,
-    event_watchlist,
 )
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ....artifacts import context as event_alpha_artifacts
 from ....artifacts import research_cards as event_research_cards
 from ....artifacts import paths as event_artifact_paths

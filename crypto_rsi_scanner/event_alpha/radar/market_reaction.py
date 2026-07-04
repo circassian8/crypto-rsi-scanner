@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
-from ... import event_market_units
+import crypto_rsi_scanner.event_alpha.radar.market_units as event_market_units
 
 
 class EventMarketState(str, Enum):

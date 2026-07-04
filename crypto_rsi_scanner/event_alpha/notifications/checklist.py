@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from ... import event_provider_status
+import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 from . import pipeline as event_alpha_notifications
 
 

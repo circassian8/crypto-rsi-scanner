@@ -13,7 +13,10 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any, Mapping
 
-from ... import event_alpha_quality_fields, event_alpha_router, event_playbooks, event_watchlist
+import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.playbooks as event_playbooks
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
 
 @dataclass(frozen=True)

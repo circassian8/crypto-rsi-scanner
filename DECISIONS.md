@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-04 - Event Alpha shim retirement requires dependency proof
+**Status:** accepted
+**Decision:** Old Event Alpha top-level shims remain available until the shim
+dependency report proves zero internal references and a dedicated removal phase
+is declared. New implementation code must import new package paths, and the
+artifact doctor warns on internal imports from old shim paths. `event_fade.py`
+remains intentionally outside Event Alpha and is not a shim-removal candidate.
+**Why:** The project still has compatibility tests, Makefile module entrypoints,
+and docs that deliberately exercise or document old imports. Removing shims
+without an explicit dependency inventory would risk old CLI/Make/import
+behavior and could blur the `TRIGGERED_FADE` ownership boundary.
+**Revisit when:** `research/EVENT_ALPHA_SHIM_DEPENDENCY_REPORT.md/json` shows a
+shim has no internal, test, Makefile, docs, script, dynamic, or artifact
+references, and a later accepted refactor release declares that old import
+compatibility may be retired.
+
 ## 2026-07-04 - Final class ownership exceptions are documented
 **Status:** accepted
 **Decision:** The remaining 14 oversized classes are accepted refactor v2

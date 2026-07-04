@@ -6,7 +6,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
-from crypto_rsi_scanner import event_alpha_artifacts, event_alpha_burn_in_checklist, event_alpha_profiles
+import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+import crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist as event_alpha_burn_in_checklist
+import crypto_rsi_scanner.event_alpha.config.profiles as event_alpha_profiles
 from crypto_rsi_scanner.event_alpha.outcomes import burn_in as event_alpha_burn_in
 
 

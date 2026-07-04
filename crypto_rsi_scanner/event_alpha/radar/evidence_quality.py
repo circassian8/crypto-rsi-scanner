@@ -8,7 +8,7 @@ from typing import Any, Mapping
 from urllib.parse import urlparse
 
 from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
-from ...event_resolver import clean_text
+from .resolver import clean_text
 
 
 class SourceClass(str, Enum):

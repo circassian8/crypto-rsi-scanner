@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
-from crypto_rsi_scanner import event_alpha_artifacts, event_watchlist
+import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
 
 @dataclass(frozen=True)

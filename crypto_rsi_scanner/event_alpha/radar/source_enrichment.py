@@ -17,7 +17,7 @@ from urllib.request import Request, urlopen
 
 from ... import config
 from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
-from ...event_resolver import clean_text
+from .resolver import clean_text
 from ...llm_providers.base import LLMProviderResult
 
 

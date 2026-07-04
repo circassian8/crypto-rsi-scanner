@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import event_market_enrichment, event_watchlist
+import crypto_rsi_scanner.event_alpha.radar.market_enrichment as event_market_enrichment
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 
 
 ACTIVE_STATES = {

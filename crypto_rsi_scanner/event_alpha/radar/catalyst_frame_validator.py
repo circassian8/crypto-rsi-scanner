@@ -10,9 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Any, Iterable, Mapping
 
-from crypto_rsi_scanner import event_catalyst_frames, event_llm_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frames as event_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames as event_llm_catalyst_frames
 from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
-from crypto_rsi_scanner.event_resolver import clean_text
+from crypto_rsi_scanner.event_alpha.radar.resolver import clean_text
 
 
 RESOLUTION_LLM_WINS = "llm_wins"

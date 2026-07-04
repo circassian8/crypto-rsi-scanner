@@ -12,9 +12,9 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
-from .... import event_llm_budget
-from .... import event_alerts
-from ....event_llm_models import (
+import crypto_rsi_scanner.event_alpha.radar.llm.budget as event_llm_budget
+import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+from .models import (
     ASSET_ROLE_VALUES,
     RECOMMENDED_ALERT_ACTION_VALUES,
     RELATIONSHIP_TYPE_VALUES,
@@ -30,7 +30,7 @@ from crypto_rsi_scanner.event_core.models import (
     EventDiscoveryResult,
     RawDiscoveredEvent,
 )
-from ....event_resolver import clean_text, strip_publisher_suffix
+from ..resolver import clean_text, strip_publisher_suffix
 from ....llm_providers.base import LLMProviderResult, LLMRelationshipProvider
 
 log = logging.getLogger(__name__)

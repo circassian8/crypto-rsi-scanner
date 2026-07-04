@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import re
 
-from ... import event_identity
+import crypto_rsi_scanner.event_alpha.radar.identity as event_identity
 from crypto_rsi_scanner.event_core.models import DiscoveredAsset, EventAssetLink, EventClassification, NormalizedEvent
-from ...event_resolver import clean_text, is_market_recap_event
+from .resolver import clean_text, is_market_recap_event
 
 
 CLASSIFIER_VERSION = "rules_v3"

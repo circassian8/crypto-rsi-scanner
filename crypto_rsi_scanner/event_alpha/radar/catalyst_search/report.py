@@ -11,13 +11,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Protocol
 from urllib.parse import urlparse
-from .... import event_identity
+import crypto_rsi_scanner.event_alpha.radar.identity as event_identity
 from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 from ....event_providers.cryptopanic import CryptoPanicProvider, normalize_cryptopanic_currency_code
 from ....event_providers.gdelt import GdeltProvider
 from ....event_providers.prediction_market_events import PredictionMarketEventsProvider
 from ....event_providers.project_blog_rss import ProjectBlogRssProvider
-from ....event_resolver import clean_text
+from ..resolver import clean_text
 from .models import *  # noqa: F403
 
 def format_catalyst_search_report(result: CatalystSearchRunResult | None) -> str:

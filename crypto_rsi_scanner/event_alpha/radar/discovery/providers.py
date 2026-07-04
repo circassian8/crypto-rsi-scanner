@@ -11,9 +11,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
-from .... import event_anomaly_scanner, event_fade, event_market_enrichment, event_provider_health
+from .... import event_fade
+import crypto_rsi_scanner.event_alpha.radar.anomaly_scanner as event_anomaly_scanner
+import crypto_rsi_scanner.event_alpha.radar.market_enrichment as event_market_enrichment
+import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
 from ....derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
-from ....event_classification import classify_event_asset
+from ..classification import classify_event_asset
 from crypto_rsi_scanner.event_core.models import (
     DiscoveredAsset,
     DiscoveredEventFadeCandidate,
@@ -35,7 +38,7 @@ from ....event_providers.prediction_market_events import PredictionMarketEventsP
 from ....event_providers.project_blog_rss import ProjectBlogRssProvider
 from ....event_providers.sports_fixtures import SportsFixturesProvider
 from ....event_providers.tokenomist import TokenomistProvider
-from ....event_resolver import clean_text, load_asset_aliases, resolve_event_assets
+from ..resolver import clean_text, load_asset_aliases, resolve_event_assets
 from ....supply_providers.arkham import ArkhamSupplyProvider
 from ....supply_providers.dune import DuneSupplyProvider
 from ....supply_providers.etherscan import EtherscanSupplyProvider

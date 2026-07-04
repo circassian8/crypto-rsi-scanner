@@ -13,9 +13,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Iterable, Mapping
 
-from ... import event_catalyst_frames, event_claim_semantics, event_identity, event_incident_graph
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frames as event_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
+import crypto_rsi_scanner.event_alpha.radar.identity as event_identity
+import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_graph
 from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
-from ...event_resolver import clean_text
+from .resolver import clean_text
 
 
 class ImpactPathType(str, Enum):

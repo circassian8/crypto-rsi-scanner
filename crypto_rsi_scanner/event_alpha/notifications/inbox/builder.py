@@ -7,13 +7,11 @@ import re
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping
-from .... import (
-    event_alpha_alert_store,
-    event_alpha_quality_fields,
-    event_alpha_router,
-    event_core_opportunities,
-    event_watchlist,
-)
+import crypto_rsi_scanner.event_alpha.artifacts.alert_store as event_alpha_alert_store
+import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.core_opportunities as event_core_opportunities
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import research_cards as event_research_cards
 from ...radar import core_opportunity_store as event_core_opportunity_store
 from .. import delivery

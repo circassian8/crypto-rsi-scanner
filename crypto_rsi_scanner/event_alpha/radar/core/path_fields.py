@@ -10,9 +10,9 @@ from typing import Any, Iterable, Mapping
 
 from .... import (
     config,
-    event_alpha_router,
-    event_watchlist,
 )
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import paths as event_artifact_paths
 from .. import core_opportunities as event_core_opportunities
 from .. import market_reaction as event_market_reaction
@@ -24,7 +24,7 @@ def _load_alert_rows(path: str | Path | None) -> list[dict[str, Any]]:
     if path is None:
         return []
     try:
-        from .... import event_alpha_alert_store
+        import crypto_rsi_scanner.event_alpha.artifacts.alert_store as event_alpha_alert_store
 
         return [dict(row) for row in event_alpha_alert_store.load_alert_snapshots(path).rows]
     except Exception:  # noqa: BLE001 - partial artifact views should fail soft.
@@ -67,7 +67,7 @@ def _load_feedback_rows(path: str | Path | None) -> list[dict[str, Any]]:
     if path is None:
         return []
     try:
-        from .... import event_feedback
+        import crypto_rsi_scanner.event_alpha.outcomes.feedback_labels as event_feedback
 
         return [asdict(record) for record in event_feedback.load_feedback(path).records]
     except Exception:  # noqa: BLE001 - partial artifact views should fail soft.

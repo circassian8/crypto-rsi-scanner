@@ -404,7 +404,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ... import event_alpha_artifact_doctor, event_provider_status
+import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 from ..artifacts import run_ledger as event_alpha_run_ledger
 from . import feedback as event_alpha_feedback_readiness
 

@@ -1045,7 +1045,7 @@ def event_alpha_burn_in_checklist(
 ) -> None:
     """Print the operational burn-in acceptance checklist."""
     _setup_event_discovery_logging(verbose)
-    from ... import event_alpha_burn_in_checklist as checklist
+    import crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist as event_alpha_burn_in_checklist
 
     try:
         context = resolve_event_alpha_artifact_context_for_report(

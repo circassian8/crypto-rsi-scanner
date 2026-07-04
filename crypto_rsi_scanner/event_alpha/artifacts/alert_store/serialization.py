@@ -9,17 +9,15 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
-from .... import (
-    event_alerts,
-    event_alpha_outcomes,
-    event_alpha_quality_fields,
-    event_alpha_router,
-    event_core_opportunities,
-    event_research_cards,
-    event_watchlist,
-    event_graph,
-    event_playbooks,
-)
+import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+import crypto_rsi_scanner.event_alpha.outcomes.outcome_artifacts as event_alpha_outcomes
+import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.core_opportunities as event_core_opportunities
+import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
+import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
+import crypto_rsi_scanner.event_alpha.radar.playbooks as event_playbooks
 from ....event_alpha.notifications import delivery as event_alpha_notification_delivery
 from .models import *  # noqa: F403
 

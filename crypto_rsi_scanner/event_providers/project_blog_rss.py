@@ -14,7 +14,7 @@ from typing import Any, Callable, Iterable, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .. import event_source_registry
+import crypto_rsi_scanner.event_alpha.providers.source_registry as event_source_registry
 from ..event_core.models import RawDiscoveredEvent
 from ._news_common import fetch_news_events, news_events_from_items
 

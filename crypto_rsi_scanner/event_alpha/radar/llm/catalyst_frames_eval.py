@@ -8,7 +8,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from crypto_rsi_scanner import event_catalyst_frame_validator, event_catalyst_frames, event_llm_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frame_validator as event_catalyst_frame_validator
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frames as event_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames as event_llm_catalyst_frames
 from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMCatalystFrameProvider
 

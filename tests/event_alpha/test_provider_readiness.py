@@ -921,7 +921,7 @@ def test_event_discovery_canonical_dedupe_merges_variant_headlines_and_payloads(
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider, content_hash
-    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+    from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
     events_path, aliases_path = _event_discovery_fixture_paths()
     raw = ManualJsonEventProvider(events_path, required=True).fetch_events(
@@ -1019,7 +1019,7 @@ def test_event_discovery_exchange_announcements_are_direct_no_trade():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
-    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+    from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
     events_path, aliases_path = _event_discovery_fixture_paths()
     binance_path, bybit_path = _exchange_announcement_fixture_paths()
@@ -1289,7 +1289,7 @@ def test_event_discovery_coinalyze_live_provider_auto_resolves_future_markets_of
 
 def test_event_discovery_coinalyze_base_symbols_from_assets():
     from crypto_rsi_scanner import event_discovery
-    from crypto_rsi_scanner.event_models import DiscoveredAsset
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset
 
     assets = [
         DiscoveredAsset(coin_id="testlist", symbol="TESTLIST", name="Test List", aliases=("Test List",)),
@@ -1315,7 +1315,7 @@ def test_event_discovery_derivatives_enrich_candidates_without_overriding_raw():
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
-    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+    from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
     events_path, aliases_path = _event_discovery_fixture_paths()
     binance_path, bybit_path = _exchange_announcement_fixture_paths()
@@ -1400,7 +1400,7 @@ def test_event_discovery_supply_enriches_without_overriding_raw_or_bypassing_gat
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
-    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+    from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
     events_path, aliases_path = _event_discovery_fixture_paths()
     binance_path, _bybit_path = _exchange_announcement_fixture_paths()
@@ -2320,7 +2320,7 @@ def test_event_discovery_proxy_article_with_text_date_becomes_dated_review_candi
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
-    from crypto_rsi_scanner.event_models import DiscoveredAsset
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset
     from crypto_rsi_scanner.event_providers.project_blog_rss import ProjectBlogRssProvider
 
     class FakeResponse:
@@ -2404,7 +2404,7 @@ def test_event_discovery_explicit_event_time_can_trigger_but_text_date_is_review
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider, content_hash
-    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+    from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
     events_path, aliases_path = _event_discovery_fixture_paths()
     raw = ManualJsonEventProvider(events_path, required=True).fetch_events(
@@ -2448,7 +2448,7 @@ def test_event_discovery_forces_no_trade_on_low_classifier_confidence():
     from crypto_rsi_scanner.event_alpha.radar import discovery as discovery_impl
     from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
-    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+    from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
     events_path, aliases_path = _event_discovery_fixture_paths()
     raw = ManualJsonEventProvider(events_path, required=True).fetch_events(
@@ -2486,7 +2486,7 @@ def test_event_discovery_proxy_article_without_event_time_stays_reviewable_no_tr
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
-    from crypto_rsi_scanner.event_models import DiscoveredAsset
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset
     from crypto_rsi_scanner.event_providers.project_blog_rss import ProjectBlogRssProvider
 
     class FakeResponse:
@@ -2933,7 +2933,8 @@ def test_event_market_enrichment_live_fail_soft_records_provider_health():
 
 def test_event_discovery_market_enrichment_failure_continues_fail_soft():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_discovery, event_market_enrichment
+    from crypto_rsi_scanner.event_alpha.radar import discovery as event_discovery
+    from crypto_rsi_scanner.event_alpha.radar import market_enrichment as event_market_enrichment
 
     original_loader = event_market_enrichment.load_market_enrichment_rows_safe
 
@@ -3053,7 +3054,7 @@ def test_event_catalyst_search_gdelt_fetch_cap_prevents_repeated_live_failures()
 
 def test_event_candidate_discovery_rejects_common_word_false_positives():
     from crypto_rsi_scanner import event_impact_hypotheses
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from datetime import datetime, timezone
 
     now = datetime(2026, 6, 25, 12, 0, tzinfo=timezone.utc)
@@ -3098,7 +3099,7 @@ def test_event_candidate_discovery_rejects_common_word_false_positives():
 def test_event_impact_candidate_discovery_suggests_then_requires_identity_validation():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_catalyst_search, event_impact_hypotheses
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     hypothesis = event_impact_hypotheses.EventImpactHypothesis(
@@ -3366,7 +3367,7 @@ def test_event_discovery_asset_role_demotes_proxy_context_noise():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
-    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
     from crypto_rsi_scanner.event_providers.manual_json import content_hash
 
     def raw_event(raw_id, title, body, external_asset="SpaceX"):
@@ -3508,7 +3509,7 @@ def test_event_discovery_news_pipeline_proxy_direct_late_and_ambiguous_safety():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
-    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+    from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
     _events_path, aliases_path = _event_discovery_fixture_paths()
     cryptopanic_path, gdelt_path, blog_path = _news_fixture_paths()
@@ -3744,7 +3745,7 @@ def test_event_discovery_external_catalysts_are_radar_first_and_link_narrowly():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
     from crypto_rsi_scanner.event_fade import FadeSignalType
-    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+    from crypto_rsi_scanner.event_alpha.radar.resolver import load_asset_aliases
 
     _events_path, aliases_path = _event_discovery_fixture_paths()
     ipo_path, sports_path, prediction_path = _external_catalyst_fixture_paths()
@@ -4033,7 +4034,7 @@ def test_event_discovery_refresh_scanner_warns_and_caches_zero_output_diagnostic
     import tempfile
     from pathlib import Path
     from crypto_rsi_scanner import config, scanner
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult
 
     attrs = (
         "EVENT_DISCOVERY_EVENTS_PATH",
@@ -4104,7 +4105,7 @@ def test_event_discovery_runs_scanner_reports_recent_diagnostics():
     from datetime import datetime, timezone
     from pathlib import Path
     from crypto_rsi_scanner import config, event_cache, scanner
-    from crypto_rsi_scanner.event_models import EventDiscoveryResult
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult
 
     original_cache_dir = config.EVENT_DISCOVERY_CACHE_DIR
     with tempfile.TemporaryDirectory() as tmp:
@@ -4151,7 +4152,7 @@ def test_event_discovery_binance_listen_scanner_writes_raw_cache():
     from datetime import datetime, timezone
     from pathlib import Path
     from crypto_rsi_scanner import config, scanner
-    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
     from crypto_rsi_scanner.event_providers.manual_json import content_hash
 
     payload = {

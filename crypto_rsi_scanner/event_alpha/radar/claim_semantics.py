@@ -13,7 +13,7 @@ from enum import Enum
 from typing import Iterable
 
 from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
-from ...event_resolver import clean_text
+from .resolver import clean_text
 
 
 CLAIM_SEMANTICS_SCHEMA_VERSION = "event_claim_semantics_v1"

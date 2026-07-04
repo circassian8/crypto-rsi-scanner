@@ -16,7 +16,9 @@ from typing import Any, Callable, Iterable, Mapping
 import re
 
 from .. import delivery, sender
-from .... import event_alpha_pipeline, event_alpha_router, event_watchlist
+import crypto_rsi_scanner.event_alpha.radar.pipeline as event_alpha_pipeline
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import paths as event_artifact_paths
 
 LANE_DAILY_DIGEST = "daily_digest"

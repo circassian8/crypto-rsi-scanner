@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Mapping
 
 from ... import event_fade
-from ...event_classification import (
+from .classification import (
     ROLE_AMBIGUOUS,
     ROLE_DIRECT_BENEFICIARY,
     ROLE_INFRASTRUCTURE,
@@ -17,7 +17,7 @@ from ...event_classification import (
     ROLE_TICKER_WORD_COLLISION,
 )
 from crypto_rsi_scanner.event_core.models import DiscoveredEventFadeCandidate
-from ...event_resolver import SOURCE_PUBLISHER_NAMES, clean_text, is_market_recap_event
+from .resolver import SOURCE_PUBLISHER_NAMES, clean_text, is_market_recap_event
 
 
 class EventPlaybookType(str, Enum):

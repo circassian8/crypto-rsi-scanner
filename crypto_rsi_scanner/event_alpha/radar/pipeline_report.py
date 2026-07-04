@@ -4,15 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from ... import (
-    event_alerts,
-    event_alpha_router,
-    event_anomaly_state,
-    event_catalyst_search,
-    event_evidence_acquisition,
-    event_impact_hypotheses,
-    event_watchlist_monitor,
-)
+import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.anomaly_state as event_anomaly_state
+import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
+import crypto_rsi_scanner.event_alpha.radar.evidence_acquisition as event_evidence_acquisition
+import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+import crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor as event_watchlist_monitor
 from .pipeline import EventAlphaPipelineResult
 
 

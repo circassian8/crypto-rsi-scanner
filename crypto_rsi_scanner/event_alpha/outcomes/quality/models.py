@@ -4,12 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
-from .... import (
-    event_alpha_alert_store,
-    event_alpha_quality_fields,
-    event_alpha_router,
-    event_watchlist,
-)
+import crypto_rsi_scanner.event_alpha.artifacts.alert_store as event_alpha_alert_store
+import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
+import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import reason_text as event_alpha_reason_text
 from ...artifacts import context as event_alpha_artifacts
 from ...radar import core_opportunities as event_core_opportunities
@@ -17,17 +15,15 @@ from ...radar import opportunity_verdict as event_opportunity_verdict
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from .... import event_alpha_quality_fields
+import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
 from ...artifacts import run_ledger as event_alpha_run_ledger
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from .... import (
-    event_claim_semantics,
-    event_evidence_quality,
-    event_incident_graph,
-    event_impact_path_validator,
-    event_market_confirmation,
-)
+import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
+import crypto_rsi_scanner.event_alpha.radar.evidence_quality as event_evidence_quality
+import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_graph
+import crypto_rsi_scanner.event_alpha.radar.impact_path_validator as event_impact_path_validator
+import crypto_rsi_scanner.event_alpha.radar.market_confirmation as event_market_confirmation
 from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
 from ...radar import incidents as event_incident_store
 
