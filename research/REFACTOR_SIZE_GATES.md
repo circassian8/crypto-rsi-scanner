@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T09:20:01.151423+00:00`
+- generated_at: `2026-07-04T09:33:50.723810+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -11,11 +11,11 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `3`
+- production_functions_over_limit: `2`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
 - classes_over_limit_count: `14`
-- functions_over_limit_count: `3`
+- functions_over_limit_count: `2`
 - modules_with_multiple_public_classes_count: `82`
 - new_violation_count: `0`
 - moved_existing_violation_count: `17`
@@ -96,7 +96,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py` | 1498 |
-| `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1498 |
+| `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1489 |
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1473 |
 | `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1451 |
 | `crypto_rsi_scanner/cli/services/legacy/utility_commands.py` | 1440 |
@@ -207,7 +207,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin` | 89 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py:diagnose_artifacts` | 1048 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications` | 406 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/pipeline.py:run_event_alpha_operating_cycle` | 347 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.backups` | 3 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store.models` | 4 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.event_alpha.artifacts.alerts` | 3 |

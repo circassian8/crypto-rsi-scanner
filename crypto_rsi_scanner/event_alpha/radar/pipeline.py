@@ -212,6 +212,20 @@ class _PipelineWatchlistRoutePhase:
     warnings: tuple[str, ...] = ()
 
 
+@dataclass
+class _OperatingCycleContext:
+    observed: datetime
+    warnings: list[str] = field(default_factory=list)
+    catalyst_search_result: event_catalyst_search.CatalystSearchRunResult | None = None
+    extraction_rows: list[event_llm_extractor.EventLLMExtractionReportRow] = field(default_factory=list)
+    catalyst_frame_rows: list[event_llm_catalyst_frames.EventLLMCatalystFrameReportRow] = field(default_factory=list)
+    source_raw_events: tuple[RawDiscoveredEvent, ...] = ()
+    llm_transform: RawEventTransform | None = None
+    catalyst_frame_transform: RawEventTransform | None = None
+    relationship_provider: object | None = None
+    relationship_cfg: event_llm_analyzer.EventLLMConfig | None = None
+
+
 class _PipelineDiscoveryProperties:
     @property
     def raw_events(self) -> int:
@@ -849,225 +863,38 @@ def run_event_alpha_operating_cycle(
     decisions, and optional research digest callback.
     """
     observed = _as_utc(now or datetime.now(timezone.utc))
-    warnings: list[str] = []
-    catalyst_search_result: event_catalyst_search.CatalystSearchRunResult | None = None
-    extraction_rows: list[event_llm_extractor.EventLLMExtractionReportRow] = []
-    catalyst_frame_rows: list[event_llm_catalyst_frames.EventLLMCatalystFrameReportRow] = []
-    source_raw_events: tuple[RawDiscoveredEvent, ...] = ()
-    llm_transform: RawEventTransform | None = None
-    catalyst_frame_transform: RawEventTransform | None = None
-    relationship_provider_to_use = None
-    relationship_cfg_to_use = None
-
-    if with_llm:
-        if extraction_cfg is not None and extraction_provider is not None:
-            mode = extraction_cfg.mode.strip().lower()
-            if mode == "shadow":
-                def _shadow_llm_extractions(
-                    raw_events: tuple[RawDiscoveredEvent, ...],
-                ) -> tuple[RawDiscoveredEvent, ...]:
-                    nonlocal extraction_rows
-                    extraction_rows = event_llm_extractor.analyze_raw_events(
-                        raw_events,
-                        extraction_provider,
-                        cfg=extraction_cfg,
-                    )
-                    return tuple(raw_events)
-
-                llm_transform = _shadow_llm_extractions
-            elif mode == "advisory":
-                def _enrich_with_llm_extractions(
-                    raw_events: tuple[RawDiscoveredEvent, ...],
-                ) -> tuple[RawDiscoveredEvent, ...]:
-                    nonlocal extraction_rows
-                    extraction_rows = event_llm_extractor.analyze_raw_events(
-                        raw_events,
-                        extraction_provider,
-                        cfg=extraction_cfg,
-                    )
-                    return event_llm_extractor.enrich_raw_events_with_extractions(raw_events, extraction_rows)
-
-                llm_transform = _enrich_with_llm_extractions
-            elif mode in {"off", "disabled", "none"}:
-                warnings.append("Event LLM extractor skipped: mode is off")
-            else:
-                warnings.append(
-                    f"Event LLM extractor skipped: unsupported mode {extraction_cfg.mode!r}; use shadow or advisory"
-                )
-        elif extraction_cfg is not None:
-            warnings.append("Event LLM extractor skipped: no extraction provider available")
-
-        if catalyst_frame_cfg is not None and catalyst_frame_cfg.enabled:
-            if catalyst_frame_provider is None:
-                warnings.append("Event LLM catalyst-frame analysis skipped: no provider available")
-                provider_name = str(catalyst_frame_cfg.provider or "").strip().lower()
-                provider_skip_reason = "missing_api_key" if provider_name == "openai" else "profile_disabled"
-                def _mark_missing_llm_catalyst_frames(
-                    raw_events: tuple[RawDiscoveredEvent, ...],
-                ) -> tuple[RawDiscoveredEvent, ...]:
-                    return tuple(
-                        _raw_with_catalyst_frame_status(
-                            raw,
-                            status="missing_required_frame_analysis" if event_llm_catalyst_frames.frame_requirement_for_raw(raw)[0] else "not_required",
-                            skip_reason=provider_skip_reason,
-                        )
-                        for raw in raw_events
-                    )
-
-                catalyst_frame_transform = _mark_missing_llm_catalyst_frames
-            else:
-                def _enrich_with_llm_catalyst_frames(
-                    raw_events: tuple[RawDiscoveredEvent, ...],
-                ) -> tuple[RawDiscoveredEvent, ...]:
-                    nonlocal catalyst_frame_rows
-                    catalyst_frame_rows = event_llm_catalyst_frames.analyze_raw_events(
-                        raw_events,
-                        catalyst_frame_provider,
-                        cfg=catalyst_frame_cfg,
-                    )
-                    enriched: list[RawDiscoveredEvent] = []
-                    analyses_by_raw_id = {
-                        row.raw_event.raw_id: row.analysis
-                        for row in catalyst_frame_rows
-                        if row.analysis is not None
-                    }
-                    row_warnings_by_raw_id = {
-                        row.raw_event.raw_id: tuple(row.warnings)
-                        for row in catalyst_frame_rows
-                    }
-                    selected_raw_ids = {row.raw_event.raw_id for row in catalyst_frame_rows}
-                    if not selected_raw_ids and any(
-                        event_llm_catalyst_frames.frame_requirement_for_raw(raw)[0]
-                        for raw in raw_events
-                    ):
-                        warnings.append("Event LLM catalyst-frame analysis skipped: no required rows selected")
-                    for raw in raw_events:
-                        required, required_reason = event_llm_catalyst_frames.frame_requirement_for_raw(raw)
-                        analysis = analyses_by_raw_id.get(raw.raw_id)
-                        if analysis is None:
-                            row_warnings = row_warnings_by_raw_id.get(raw.raw_id, ())
-                            status = "missing_required_frame_analysis" if required else "not_required"
-                            skip_reason = _catalyst_frame_skip_reason(
-                                row_warnings,
-                                selected=raw.raw_id in selected_raw_ids,
-                                required=required,
-                            )
-                            enriched.append(_raw_with_catalyst_frame_status(
-                                raw,
-                                status=status,
-                                required=required,
-                                required_reason=required_reason,
-                                skip_reason=skip_reason,
-                                warnings=row_warnings,
-                            ))
-                            continue
-                        rule_frames = event_catalyst_frames.build_catalyst_frames((raw,))
-                        validation = event_catalyst_frame_validator.validate_llm_catalyst_frames(
-                            analysis,
-                            (raw,),
-                            rule_frames=rule_frames,
-                        )
-                        status = "unresolved" if validation.resolution == event_catalyst_frame_validator.RESOLUTION_UNRESOLVED else "validated"
-                        enriched.append(_raw_with_catalyst_frame_status(
-                            event_catalyst_frame_validator.apply_validation_to_raw_event(
-                            raw,
-                            analysis,
-                            validation,
-                            ),
-                            status=status,
-                            required=required,
-                            required_reason=required_reason,
-                            skip_reason=None,
-                            warnings=validation.frame_warnings,
-                        ))
-                    return tuple(enriched)
-
-                catalyst_frame_transform = _enrich_with_llm_catalyst_frames
-        elif catalyst_frame_cfg is not None and not catalyst_frame_cfg.enabled:
-            def _mark_disabled_llm_catalyst_frames(
-                raw_events: tuple[RawDiscoveredEvent, ...],
-            ) -> tuple[RawDiscoveredEvent, ...]:
-                return tuple(
-                    _raw_with_catalyst_frame_status(
-                        raw,
-                        status="missing_required_frame_analysis" if event_llm_catalyst_frames.frame_requirement_for_raw(raw)[0] else "not_required",
-                        skip_reason="disabled",
-                    )
-                    for raw in raw_events
-                )
-
-            catalyst_frame_transform = _mark_disabled_llm_catalyst_frames
-        if relationship_cfg is not None and relationship_provider is not None:
-            if relationship_cfg.mode in {"shadow", "advisory"}:
-                relationship_provider_to_use = relationship_provider
-                relationship_cfg_to_use = relationship_cfg
-            else:
-                warnings.append(
-                    f"Event LLM mode {relationship_cfg.mode!r} is not supported; use shadow or advisory"
-                )
-        elif relationship_cfg is not None:
-            warnings.append("Event LLM relationship analysis skipped: no relationship provider available")
-
-    def _combined_raw_event_transform(
-        raw_events: tuple[RawDiscoveredEvent, ...],
-    ) -> tuple[RawDiscoveredEvent, ...]:
-        nonlocal catalyst_search_result, source_raw_events
-        source_raw_events = tuple(raw_events)
-        transformed = tuple(raw_events)
-        if catalyst_search_cfg is not None and catalyst_search_cfg.enabled:
-            if catalyst_search_provider is None:
-                warnings.append("catalyst search skipped: no provider available")
-                catalyst_search_result = event_catalyst_search.CatalystSearchRunResult(
-                    provider=catalyst_search_cfg.provider,
-                    warnings=("catalyst search skipped: no provider available",),
-                    skip_reasons={"provider_unavailable": 1},
-                )
-            else:
-                catalyst_search_result = event_catalyst_search.run_catalyst_search(
-                    transformed,
-                    catalyst_search_provider,
-                    cfg=catalyst_search_cfg,
-                    now=observed,
-                )
-                warnings.extend(f"catalyst search: {warning}" for warning in catalyst_search_result.warnings)
-                transformed = _merge_catalyst_search_events(transformed, catalyst_search_result)
-        if source_enrichment_cfg is not None and source_enrichment_cfg.enabled:
-            transformed = _enrich_source_events(
-                transformed,
-                cfg=source_enrichment_cfg,
-                fetch_fn=source_enrichment_fetch_fn,
-                warnings=warnings,
-            )
-        if llm_transform is not None:
-            transformed = tuple(llm_transform(transformed))
-        if catalyst_frame_transform is not None:
-            transformed = tuple(catalyst_frame_transform(transformed))
-        source_raw_events = tuple(transformed)
-        return transformed
-
-    raw_event_transform: RawEventTransform | None = None
-    if (
-        llm_transform is not None
-        or catalyst_frame_transform is not None
-        or (catalyst_search_cfg is not None and catalyst_search_cfg.enabled)
-        or (source_enrichment_cfg is not None and source_enrichment_cfg.enabled)
-    ):
-        raw_event_transform = _combined_raw_event_transform
+    context = _build_operating_cycle_context(
+        observed=observed,
+        with_llm=with_llm,
+        extraction_provider=extraction_provider,
+        extraction_cfg=extraction_cfg,
+        catalyst_frame_provider=catalyst_frame_provider,
+        catalyst_frame_cfg=catalyst_frame_cfg,
+        relationship_provider=relationship_provider,
+        relationship_cfg=relationship_cfg,
+    )
+    raw_event_transform = _operating_cycle_raw_event_transform(
+        context,
+        catalyst_search_provider=catalyst_search_provider,
+        catalyst_search_cfg=catalyst_search_cfg,
+        source_enrichment_cfg=source_enrichment_cfg,
+        source_enrichment_fetch_fn=source_enrichment_fetch_fn,
+    )
 
     discovery_result = load_discovery_result(observed, raw_event_transform)
-    warnings.extend(str(warning) for warning in getattr(discovery_result, "warnings", ()) or () if str(warning))
+    context.warnings.extend(str(warning) for warning in getattr(discovery_result, "warnings", ()) or () if str(warning))
     result = run_event_alpha_pipeline(
         discovery_result,
         alert_cfg=alert_cfg,
         now=observed,
-        catalyst_search_result=catalyst_search_result,
+        catalyst_search_result=context.catalyst_search_result,
         hypothesis_search_provider=hypothesis_search_provider,
         hypothesis_search_cfg=hypothesis_search_cfg,
-        source_raw_events=source_raw_events,
-        extraction_rows=extraction_rows,
-        catalyst_frame_rows=catalyst_frame_rows,
-        relationship_provider=relationship_provider_to_use,
-        relationship_cfg=relationship_cfg_to_use,
+        source_raw_events=context.source_raw_events,
+        extraction_rows=context.extraction_rows,
+        catalyst_frame_rows=context.catalyst_frame_rows,
+        relationship_provider=context.relationship_provider,
+        relationship_cfg=context.relationship_cfg,
         watchlist_cfg=watchlist_cfg,
         router_cfg=router_cfg,
         priors_cfg=priors_cfg,
@@ -1095,50 +922,370 @@ def run_event_alpha_operating_cycle(
         evidence_acquisition_provider=evidence_acquisition_provider,
         evidence_acquisition_providers_by_hint=evidence_acquisition_providers_by_hint,
         evidence_acquisition_context=evidence_acquisition_context,
-        extra_warnings=warnings,
+        extra_warnings=context.warnings,
     )
-    if send:
-        if send_callback is None:
-            warnings = [*result.warnings, "research send skipped: no send callback supplied"]
-            return _with_send_result(
-                result,
-                EventAlphaSendResult(requested=True, block_reason="no send callback supplied"),
-                warnings=warnings,
+    return _apply_operating_cycle_send(result, send=send, send_callback=send_callback)
+
+
+def _build_operating_cycle_context(
+    *,
+    observed: datetime,
+    with_llm: bool,
+    extraction_provider: object | None,
+    extraction_cfg: event_llm_extractor.EventLLMExtractorConfig | None,
+    catalyst_frame_provider: object | None,
+    catalyst_frame_cfg: event_llm_catalyst_frames.EventLLMCatalystFrameConfig | None,
+    relationship_provider: object | None,
+    relationship_cfg: event_llm_analyzer.EventLLMConfig | None,
+) -> _OperatingCycleContext:
+    context = _OperatingCycleContext(observed=observed)
+    if not with_llm:
+        return context
+    context.llm_transform = _operating_cycle_extraction_transform(
+        context,
+        extraction_provider=extraction_provider,
+        extraction_cfg=extraction_cfg,
+    )
+    context.catalyst_frame_transform = _operating_cycle_catalyst_frame_transform(
+        context,
+        catalyst_frame_provider=catalyst_frame_provider,
+        catalyst_frame_cfg=catalyst_frame_cfg,
+    )
+    _set_operating_cycle_relationship_inputs(
+        context,
+        relationship_provider=relationship_provider,
+        relationship_cfg=relationship_cfg,
+    )
+    return context
+
+
+def _operating_cycle_extraction_transform(
+    context: _OperatingCycleContext,
+    *,
+    extraction_provider: object | None,
+    extraction_cfg: event_llm_extractor.EventLLMExtractorConfig | None,
+) -> RawEventTransform | None:
+    if extraction_cfg is None:
+        return None
+    if extraction_provider is None:
+        context.warnings.append("Event LLM extractor skipped: no extraction provider available")
+        return None
+    mode = extraction_cfg.mode.strip().lower()
+    if mode == "shadow":
+        def _shadow_llm_extractions(raw_events: tuple[RawDiscoveredEvent, ...]) -> tuple[RawDiscoveredEvent, ...]:
+            context.extraction_rows = event_llm_extractor.analyze_raw_events(
+                raw_events,
+                extraction_provider,
+                cfg=extraction_cfg,
             )
-        if result.router_result is None:
-            warnings = [*result.warnings, "research send skipped: no router decisions available"]
-            return _with_send_result(
-                result,
-                EventAlphaSendResult(requested=True, block_reason="no router decisions available"),
-                warnings=warnings,
+            return tuple(raw_events)
+
+        return _shadow_llm_extractions
+    if mode == "advisory":
+        def _enrich_with_llm_extractions(raw_events: tuple[RawDiscoveredEvent, ...]) -> tuple[RawDiscoveredEvent, ...]:
+            context.extraction_rows = event_llm_extractor.analyze_raw_events(
+                raw_events,
+                extraction_provider,
+                cfg=extraction_cfg,
             )
-        decisions = result.router_result.alertable_decisions
-        if not decisions:
-            warnings = [*result.warnings, "research send skipped: no alertable route decisions"]
-            return _with_send_result(
-                result,
-                EventAlphaSendResult(requested=True, block_reason="no alertable route decisions"),
-                warnings=warnings,
+            return event_llm_extractor.enrich_raw_events_with_extractions(raw_events, context.extraction_rows)
+
+        return _enrich_with_llm_extractions
+    if mode in {"off", "disabled", "none"}:
+        context.warnings.append("Event LLM extractor skipped: mode is off")
+    else:
+        context.warnings.append(
+            f"Event LLM extractor skipped: unsupported mode {extraction_cfg.mode!r}; use shadow or advisory"
+        )
+    return None
+
+
+def _operating_cycle_catalyst_frame_transform(
+    context: _OperatingCycleContext,
+    *,
+    catalyst_frame_provider: object | None,
+    catalyst_frame_cfg: event_llm_catalyst_frames.EventLLMCatalystFrameConfig | None,
+) -> RawEventTransform | None:
+    if catalyst_frame_cfg is None:
+        return None
+    if not catalyst_frame_cfg.enabled:
+        return _operating_cycle_catalyst_frame_marker(skip_reason="disabled")
+    if catalyst_frame_provider is None:
+        context.warnings.append("Event LLM catalyst-frame analysis skipped: no provider available")
+        provider_name = str(catalyst_frame_cfg.provider or "").strip().lower()
+        provider_skip_reason = "missing_api_key" if provider_name == "openai" else "profile_disabled"
+        return _operating_cycle_catalyst_frame_marker(skip_reason=provider_skip_reason)
+    return _operating_cycle_catalyst_frame_enrichment(
+        context,
+        catalyst_frame_provider=catalyst_frame_provider,
+        catalyst_frame_cfg=catalyst_frame_cfg,
+    )
+
+
+def _operating_cycle_catalyst_frame_marker(*, skip_reason: str) -> RawEventTransform:
+    def _mark_llm_catalyst_frames(raw_events: tuple[RawDiscoveredEvent, ...]) -> tuple[RawDiscoveredEvent, ...]:
+        return tuple(
+            _raw_with_catalyst_frame_status(
+                raw,
+                status="missing_required_frame_analysis"
+                if event_llm_catalyst_frames.frame_requirement_for_raw(raw)[0]
+                else "not_required",
+                skip_reason=skip_reason,
             )
-        try:
-            raw_send_result = send_callback(decisions)
-            send_result = _normalize_send_result(raw_send_result, decisions)
-        except Exception as exc:  # pragma: no cover - defensive fail-soft guard
-            warnings = [*result.warnings, f"research send failed: {exc}"]
-            return _with_send_result(
-                result,
-                EventAlphaSendResult(
-                    requested=True,
-                    attempted=True,
-                    success=False,
-                    items_attempted=len(decisions),
-                    items_delivered=0,
-                    block_reason=str(exc),
-                ),
-                warnings=warnings,
+            for raw in raw_events
+        )
+
+    return _mark_llm_catalyst_frames
+
+
+def _operating_cycle_catalyst_frame_enrichment(
+    context: _OperatingCycleContext,
+    *,
+    catalyst_frame_provider: object,
+    catalyst_frame_cfg: event_llm_catalyst_frames.EventLLMCatalystFrameConfig,
+) -> RawEventTransform:
+    def _enrich_with_llm_catalyst_frames(
+        raw_events: tuple[RawDiscoveredEvent, ...],
+    ) -> tuple[RawDiscoveredEvent, ...]:
+        context.catalyst_frame_rows = event_llm_catalyst_frames.analyze_raw_events(
+            raw_events,
+            catalyst_frame_provider,
+            cfg=catalyst_frame_cfg,
+        )
+        selected_raw_ids = {row.raw_event.raw_id for row in context.catalyst_frame_rows}
+        if not selected_raw_ids and any(
+            event_llm_catalyst_frames.frame_requirement_for_raw(raw)[0]
+            for raw in raw_events
+        ):
+            context.warnings.append("Event LLM catalyst-frame analysis skipped: no required rows selected")
+        return _operating_cycle_apply_catalyst_frame_rows(context, raw_events, selected_raw_ids=selected_raw_ids)
+
+    return _enrich_with_llm_catalyst_frames
+
+
+def _operating_cycle_apply_catalyst_frame_rows(
+    context: _OperatingCycleContext,
+    raw_events: tuple[RawDiscoveredEvent, ...],
+    *,
+    selected_raw_ids: set[str],
+) -> tuple[RawDiscoveredEvent, ...]:
+    analyses_by_raw_id = {
+        row.raw_event.raw_id: row.analysis
+        for row in context.catalyst_frame_rows
+        if row.analysis is not None
+    }
+    row_warnings_by_raw_id = {
+        row.raw_event.raw_id: tuple(row.warnings)
+        for row in context.catalyst_frame_rows
+    }
+    enriched: list[RawDiscoveredEvent] = []
+    for raw in raw_events:
+        required, required_reason = event_llm_catalyst_frames.frame_requirement_for_raw(raw)
+        analysis = analyses_by_raw_id.get(raw.raw_id)
+        if analysis is None:
+            row_warnings = row_warnings_by_raw_id.get(raw.raw_id, ())
+            skip_reason = _catalyst_frame_skip_reason(
+                row_warnings,
+                selected=raw.raw_id in selected_raw_ids,
+                required=required,
             )
-        return _with_send_result(result, send_result)
-    return _with_send_result(result, EventAlphaSendResult(requested=False))
+            enriched.append(_raw_with_catalyst_frame_status(
+                raw,
+                status="missing_required_frame_analysis" if required else "not_required",
+                required=required,
+                required_reason=required_reason,
+                skip_reason=skip_reason,
+                warnings=row_warnings,
+            ))
+            continue
+        enriched.append(_operating_cycle_validated_catalyst_frame_raw(
+            raw,
+            analysis=analysis,
+            required=required,
+            required_reason=required_reason,
+        ))
+    return tuple(enriched)
+
+
+def _operating_cycle_validated_catalyst_frame_raw(
+    raw: RawDiscoveredEvent,
+    *,
+    analysis: event_llm_catalyst_frames.EventLLMCatalystFrameAnalysis,
+    required: bool,
+    required_reason: str | None,
+) -> RawDiscoveredEvent:
+    rule_frames = event_catalyst_frames.build_catalyst_frames((raw,))
+    validation = event_catalyst_frame_validator.validate_llm_catalyst_frames(
+        analysis,
+        (raw,),
+        rule_frames=rule_frames,
+    )
+    status = (
+        "unresolved"
+        if validation.resolution == event_catalyst_frame_validator.RESOLUTION_UNRESOLVED
+        else "validated"
+    )
+    return _raw_with_catalyst_frame_status(
+        event_catalyst_frame_validator.apply_validation_to_raw_event(raw, analysis, validation),
+        status=status,
+        required=required,
+        required_reason=required_reason,
+        skip_reason=None,
+        warnings=validation.frame_warnings,
+    )
+
+
+def _set_operating_cycle_relationship_inputs(
+    context: _OperatingCycleContext,
+    *,
+    relationship_provider: object | None,
+    relationship_cfg: event_llm_analyzer.EventLLMConfig | None,
+) -> None:
+    if relationship_cfg is not None and relationship_provider is not None:
+        if relationship_cfg.mode in {"shadow", "advisory"}:
+            context.relationship_provider = relationship_provider
+            context.relationship_cfg = relationship_cfg
+        else:
+            context.warnings.append(
+                f"Event LLM mode {relationship_cfg.mode!r} is not supported; use shadow or advisory"
+            )
+    elif relationship_cfg is not None:
+        context.warnings.append("Event LLM relationship analysis skipped: no relationship provider available")
+
+
+def _operating_cycle_raw_event_transform(
+    context: _OperatingCycleContext,
+    *,
+    catalyst_search_provider: event_catalyst_search.CatalystSearchProvider | None,
+    catalyst_search_cfg: event_catalyst_search.EventCatalystSearchConfig | None,
+    source_enrichment_cfg: event_source_enrichment.EventSourceEnrichmentConfig | None,
+    source_enrichment_fetch_fn: SourceFetchFn | None,
+) -> RawEventTransform | None:
+    enabled = (
+        context.llm_transform is not None
+        or context.catalyst_frame_transform is not None
+        or (catalyst_search_cfg is not None and catalyst_search_cfg.enabled)
+        or (source_enrichment_cfg is not None and source_enrichment_cfg.enabled)
+    )
+    if not enabled:
+        return None
+
+    def _combined_raw_event_transform(raw_events: tuple[RawDiscoveredEvent, ...]) -> tuple[RawDiscoveredEvent, ...]:
+        context.source_raw_events = tuple(raw_events)
+        transformed = _operating_cycle_catalyst_search_events(
+            context,
+            tuple(raw_events),
+            catalyst_search_provider=catalyst_search_provider,
+            catalyst_search_cfg=catalyst_search_cfg,
+        )
+        transformed = _operating_cycle_source_enrichment_events(
+            transformed,
+            source_enrichment_cfg=source_enrichment_cfg,
+            source_enrichment_fetch_fn=source_enrichment_fetch_fn,
+            warnings=context.warnings,
+        )
+        if context.llm_transform is not None:
+            transformed = tuple(context.llm_transform(transformed))
+        if context.catalyst_frame_transform is not None:
+            transformed = tuple(context.catalyst_frame_transform(transformed))
+        context.source_raw_events = tuple(transformed)
+        return transformed
+
+    return _combined_raw_event_transform
+
+
+def _operating_cycle_catalyst_search_events(
+    context: _OperatingCycleContext,
+    raw_events: tuple[RawDiscoveredEvent, ...],
+    *,
+    catalyst_search_provider: event_catalyst_search.CatalystSearchProvider | None,
+    catalyst_search_cfg: event_catalyst_search.EventCatalystSearchConfig | None,
+) -> tuple[RawDiscoveredEvent, ...]:
+    if catalyst_search_cfg is None or not catalyst_search_cfg.enabled:
+        return tuple(raw_events)
+    if catalyst_search_provider is None:
+        context.warnings.append("catalyst search skipped: no provider available")
+        context.catalyst_search_result = event_catalyst_search.CatalystSearchRunResult(
+            provider=catalyst_search_cfg.provider,
+            warnings=("catalyst search skipped: no provider available",),
+            skip_reasons={"provider_unavailable": 1},
+        )
+        return tuple(raw_events)
+    context.catalyst_search_result = event_catalyst_search.run_catalyst_search(
+        raw_events,
+        catalyst_search_provider,
+        cfg=catalyst_search_cfg,
+        now=context.observed,
+    )
+    context.warnings.extend(f"catalyst search: {warning}" for warning in context.catalyst_search_result.warnings)
+    return _merge_catalyst_search_events(raw_events, context.catalyst_search_result)
+
+
+def _operating_cycle_source_enrichment_events(
+    raw_events: tuple[RawDiscoveredEvent, ...],
+    *,
+    source_enrichment_cfg: event_source_enrichment.EventSourceEnrichmentConfig | None,
+    source_enrichment_fetch_fn: SourceFetchFn | None,
+    warnings: list[str],
+) -> tuple[RawDiscoveredEvent, ...]:
+    if source_enrichment_cfg is None or not source_enrichment_cfg.enabled:
+        return tuple(raw_events)
+    return _enrich_source_events(
+        raw_events,
+        cfg=source_enrichment_cfg,
+        fetch_fn=source_enrichment_fetch_fn,
+        warnings=warnings,
+    )
+
+
+def _apply_operating_cycle_send(
+    result: EventAlphaPipelineResult,
+    *,
+    send: bool,
+    send_callback: ResearchAlertSender | None,
+) -> EventAlphaPipelineResult:
+    if not send:
+        return _with_send_result(result, EventAlphaSendResult(requested=False))
+    if send_callback is None:
+        warnings = [*result.warnings, "research send skipped: no send callback supplied"]
+        return _with_send_result(
+            result,
+            EventAlphaSendResult(requested=True, block_reason="no send callback supplied"),
+            warnings=warnings,
+        )
+    if result.router_result is None:
+        warnings = [*result.warnings, "research send skipped: no router decisions available"]
+        return _with_send_result(
+            result,
+            EventAlphaSendResult(requested=True, block_reason="no router decisions available"),
+            warnings=warnings,
+        )
+    decisions = result.router_result.alertable_decisions
+    if not decisions:
+        warnings = [*result.warnings, "research send skipped: no alertable route decisions"]
+        return _with_send_result(
+            result,
+            EventAlphaSendResult(requested=True, block_reason="no alertable route decisions"),
+            warnings=warnings,
+        )
+    try:
+        raw_send_result = send_callback(decisions)
+        send_result = _normalize_send_result(raw_send_result, decisions)
+    except Exception as exc:  # pragma: no cover - defensive fail-soft guard
+        warnings = [*result.warnings, f"research send failed: {exc}"]
+        return _with_send_result(
+            result,
+            EventAlphaSendResult(
+                requested=True,
+                attempted=True,
+                success=False,
+                items_attempted=len(decisions),
+                items_delivered=0,
+                block_reason=str(exc),
+            ),
+            warnings=warnings,
+        )
+    return _with_send_result(result, send_result)
 
 
 def _with_send_result(
@@ -1276,165 +1423,9 @@ def _enrich_source_events(
 
 def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
     """Format a concise Event Alpha cycle summary."""
-    lines = [
-        "=" * 76,
-        "EVENT ALPHA PIPELINE REPORT (research-only; no trades, paper rows, or live RSI routing)",
-        "=" * 76,
-        (
-            f"raw_events={result.raw_events} · catalyst_queries={result.catalyst_queries} · "
-            f"catalyst_results={result.catalyst_results} · "
-            f"anomaly_lifecycle={result.anomaly_lifecycle_entries} · "
-            f"extractions={result.extractions}/{len(result.extraction_rows)} · "
-            f"extraction_hints_applied={result.extraction_hint_events} · "
-            f"catalyst_frames={result.catalyst_frame_analyses}/{len(result.catalyst_frame_rows)} · "
-            f"catalyst_frame_validations={result.catalyst_frame_validations_applied} · "
-            f"candidates={result.candidates} · clusters={result.clusters} · alerts={len(result.alerts)}"
-        ),
-        (
-            f"impact_hypotheses={len(result.impact_hypotheses)} · "
-            f"hypotheses_validated={result.hypotheses_validated} · "
-            f"hypothesis_search_queries={result.hypothesis_search_queries} · "
-            f"hypothesis_search_results={result.hypothesis_search_results} · "
-            f"hypothesis_promotions={result.hypothesis_promotions} · "
-            f"near_misses={result.near_misses} · near_miss_upgrades={result.near_miss_upgrades} · "
-            f"evidence_acquisition={result.evidence_acquisition_attempted} "
-            f"accepted={result.evidence_acquisition_accepted} "
-            f"upgraded={result.evidence_acquisition_upgraded}"
-        ),
-        (
-            "hypothesis_search_query_types="
-            + (
-                _query_type_summary(result.hypothesis_search_result.queries)
-                if result.hypothesis_search_result is not None
-                else "none"
-            )
-        ),
-        (
-            "catalyst_search_skip_reasons="
-            + (
-                ", ".join(f"{key}={value}" for key, value in sorted(result.catalyst_search_skip_reasons.items()))
-                if result.catalyst_search_skip_reasons
-                else "none"
-            )
-        ),
-        (
-            "hypothesis_search_skip_reasons="
-            + (
-                ", ".join(f"{key}={value}" for key, value in sorted(result.hypothesis_search_skip_reasons.items()))
-                if result.hypothesis_search_skip_reasons
-                else "none"
-            )
-        ),
-        (
-            f"watchlist_entries={result.watchlist_entries} · "
-            f"watchlist_escalations={result.watchlist_escalations} · "
-            f"watchlist_monitor_active={result.watchlist_monitor_active_entries} · "
-            f"watchlist_monitor_material={result.watchlist_monitor_material_updates} · "
-            f"routed={result.routed} · alertable={result.alertable}"
-        ),
-        (
-            f"send_requested={str(result.send_requested).lower()} · "
-            f"send_attempted={str(result.send_attempted).lower()} · "
-            f"send_success={str(result.send_success).lower()} · "
-            f"send_items={result.send_items_delivered}/{result.send_items_attempted}"
-            + (f" · send_block={result.send_block_reason}" if result.send_block_reason else "")
-        ),
-        (
-            f"cycle_completed={str(result.cycle_completed).lower()} · "
-            f"partial_results={str(result.partial_results).lower()}"
-        ),
-        (
-            f"artifact_writes: hypotheses={result.hypothesis_rows_written} "
-            f"success={str(result.hypothesis_write_success).lower()} · "
-            f"incidents={result.incident_rows_written} "
-            f"success={str(result.incident_write_success).lower()} · "
-            f"snapshots={result.snapshot_rows_written} "
-            f"success={str(result.snapshot_write_success).lower()}"
-        ),
-    ]
-    if result.warnings:
-        lines.append("warnings: " + "; ".join(result.warnings))
-    if result.catalyst_search_result is not None:
-        lines.append("")
-        lines.append(event_catalyst_search.format_catalyst_search_report(result.catalyst_search_result))
-    if result.hypothesis_search_result is not None:
-        lines.append("")
-        lines.append("Impact hypothesis validation search:")
-        lines.append(event_catalyst_search.format_catalyst_search_report(result.hypothesis_search_result))
-    if result.anomaly_lifecycle_result is not None:
-        lines.append("")
-        lines.append(event_anomaly_state.format_anomaly_lifecycle_report(result.anomaly_lifecycle_result))
-    if result.evidence_acquisition_result is not None and result.evidence_acquisition_result.results:
-        lines.append("")
-        lines.append("Evidence acquisition execution:")
-        lines.append(event_evidence_acquisition.format_acquisition_report(
-            event_evidence_acquisition._artifact_row(result_item, context={}, observed_at="")
-            for result_item in result.evidence_acquisition_result.results
-        ))
-    if result.impact_hypotheses:
-        lines.append("")
-        lines.append(event_impact_hypotheses.format_impact_hypothesis_report(result.impact_hypotheses))
-    if result.watchlist_monitor_result is not None:
-        lines.append("")
-        lines.append(event_watchlist_monitor.format_watchlist_monitor_report(result.watchlist_monitor_result))
-    lines.append("")
-    lines.append(_tier_summary(result.alerts))
-    if result.router_result is not None:
-        lines.append(_route_summary(result.router_result))
-    if result.watchlist_result is not None and result.watchlist_result.alert_entries:
-        lines.append("")
-        lines.append("Watchlist escalations:")
-        for entry in result.watchlist_result.alert_entries[:10]:
-            lines.append(
-                f"- {entry.state} {entry.symbol}/{entry.coin_id} "
-                f"score={entry.latest_score} playbook={entry.latest_playbook_type or 'unknown'}"
-            )
-    elif result.watchlist_result is not None and result.watchlist_result.entries:
-        lines.append("")
-        lines.append("Watchlist sample:")
-        for entry in result.watchlist_result.entries[:5]:
-            lines.append(
-                f"- {entry.state} {entry.symbol}/{entry.coin_id} "
-                f"score={entry.latest_score} playbook={entry.latest_playbook_type or 'unknown'}"
-            )
-    if result.router_result is not None and result.router_result.alertable_decisions:
-        lines.append("")
-        lines.append("Alertable route decisions:")
-        for decision in result.router_result.alertable_decisions[:10]:
-            entry = decision.entry
-            lines.append(
-                f"- {decision.route.value} {entry.symbol}/{entry.coin_id} "
-                f"state={entry.state} score={entry.latest_score} reason={decision.reason}"
-            )
-    return "\n".join(lines).rstrip()
+    from .pipeline_report import format_event_alpha_pipeline_report as _format_report
 
-
-def _tier_summary(alerts: Iterable[event_alerts.EventAlertCandidate]) -> str:
-    counts: dict[str, int] = {}
-    for alert in alerts:
-        counts[alert.tier.value] = counts.get(alert.tier.value, 0) + 1
-    if not counts:
-        return "alert_tiers: none"
-    return "alert_tiers: " + ", ".join(f"{tier}={count}" for tier, count in sorted(counts.items()))
-
-
-def _route_summary(result: event_alpha_router.EventAlphaRouterResult) -> str:
-    counts: dict[str, int] = {}
-    for decision in result.decisions:
-        counts[decision.route.value] = counts.get(decision.route.value, 0) + 1
-    if not counts:
-        return "routes: none"
-    return "routes: " + ", ".join(f"{route}={count}" for route, count in sorted(counts.items()))
-
-
-def _query_type_summary(queries: Iterable[object]) -> str:
-    counts: dict[str, int] = {}
-    for query in queries:
-        query_type = str(getattr(query, "query_type", "") or "candidate_validation")
-        counts[query_type] = counts.get(query_type, 0) + 1
-    if not counts:
-        return "none"
-    return ", ".join(f"{key}={value}" for key, value in sorted(counts.items()))
+    return _format_report(result)
 
 
 def _llm_budget_warnings(rows: Iterable[object], *, label: str) -> list[str]:

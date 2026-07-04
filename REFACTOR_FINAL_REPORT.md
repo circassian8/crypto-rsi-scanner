@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T09:20:03+00:00`
+- generated_at: `2026-07-04T09:33:52+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -44,13 +44,13 @@ Research-only refactor gate report. This report does not call providers, send Te
 - intentionally_outside_event_alpha_modules: `["crypto_rsi_scanner.event_fade"]`
 - class_ownership_report: `research/REFACTOR_CLASS_OWNERSHIP_REPORT.json`
 - class_ownership_classes_over_limit: `14`
-- class_ownership_functions_over_limit: `3`
+- class_ownership_functions_over_limit: `2`
 - production_size_gate_status: `pass`
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `3`
+- production_functions_over_limit: `2`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
 - legacy_decomposition_gate_status: `pass`
@@ -98,7 +98,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py` | 1498 |
-| `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1498 |
+| `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1489 |
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1473 |
 | `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1451 |
 | `crypto_rsi_scanner/cli/services/legacy/utility_commands.py` | 1440 |
