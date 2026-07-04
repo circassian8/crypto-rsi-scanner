@@ -131,7 +131,7 @@
     }
   ],
   "classes_over_limit_count": 14,
-  "existing_violation_count": 108,
+  "existing_violation_count": 107,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -394,17 +394,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "run_integrated_radar_cycle",
-      "line_count": 288,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.cycle",
-      "public": true,
-      "qualname": "run_integrated_radar_cycle",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py:run_integrated_radar_cycle"
     },
     {
       "category": "function_over_150_lines",
@@ -1146,14 +1135,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py"
     },
     {
-      "function_name": "run_integrated_radar_cycle",
-      "line_count": 288,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.cycle",
-      "public": true,
-      "qualname": "run_integrated_radar_cycle",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py"
-    },
-    {
       "function_name": "run_event_alpha_operating_cycle",
       "line_count": 347,
       "module": "crypto_rsi_scanner.event_alpha.radar.pipeline",
@@ -1162,9 +1143,9 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py"
     }
   ],
-  "functions_over_limit_count": 4,
+  "functions_over_limit_count": 3,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T09:11:03.570268+00:00",
+  "generated_at": "2026-07-04T09:20:01.151423+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -2120,10 +2101,6 @@
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications"
     },
     {
-      "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:run_integrated_radar_cycle",
-      "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py:run_integrated_radar_cycle"
-    },
-    {
       "baseline_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store",
       "current_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store.models"
     },
@@ -2184,7 +2161,7 @@
       "current_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.models"
     }
   ],
-  "moved_existing_violation_count": 18,
+  "moved_existing_violation_count": 17,
   "new_violation_count": 0,
   "new_violations": [],
   "no_live_provider_calls": true,
@@ -2330,7 +2307,7 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 4,
+  "production_functions_over_limit": 3,
   "production_functions_over_limit_rows": [
     {
       "function_name": "diagnose_artifacts",
@@ -2349,14 +2326,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py"
     },
     {
-      "function_name": "run_integrated_radar_cycle",
-      "line_count": 288,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.cycle",
-      "public": true,
-      "qualname": "run_integrated_radar_cycle",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py"
-    },
-    {
       "function_name": "run_event_alpha_operating_cycle",
       "line_count": 347,
       "module": "crypto_rsi_scanner.event_alpha.radar.pipeline",
@@ -2367,7 +2336,7 @@
   ],
   "production_size_gate_status": "pass",
   "research_only": true,
-  "resolved_violation_count": 96,
+  "resolved_violation_count": 97,
   "resolved_violation_ids": [
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
     "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
@@ -2452,6 +2421,7 @@
     "function:crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py:validate_impact_path",
     "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:_merge_family",
     "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:format_integrated_daily_brief",
+    "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:run_integrated_radar_cycle",
     "function:crypto_rsi_scanner/event_alpha/radar/market_confirmation.py:evaluate_market_confirmation",
     "function:crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py:_candidate_from_row",
     "function:crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py:_refresh_one_hypothesis",
@@ -2496,7 +2466,6 @@
     "file:tests/test_indicators.py",
     "function:crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py:diagnose_artifacts",
     "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications",
-    "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py:run_integrated_radar_cycle",
     "function:crypto_rsi_scanner/event_alpha/radar/pipeline.py:run_event_alpha_operating_cycle",
     "public_classes:crypto_rsi_scanner.backups",
     "public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store.models",
@@ -2843,17 +2812,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "run_integrated_radar_cycle",
-      "line_count": 288,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.cycle",
-      "public": true,
-      "qualname": "run_integrated_radar_cycle",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py:run_integrated_radar_cycle"
     },
     {
       "category": "function_over_150_lines",

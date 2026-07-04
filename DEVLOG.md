@@ -17,6 +17,47 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split integrated radar cycle phases · Codex
+**Why:** The refactor goal still tracks advisory oversized-function debt after
+production and legacy file-size gates passed. `run_integrated_radar_cycle()` had
+clear setup/input/artifact/result phases and strong integrated radar fixture
+coverage, making it a safe behavior-preserving split target.
+**Changes:**
+- Split `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py`
+  so `run_integrated_radar_cycle()` is now a 54-line orchestrator over private
+  helpers for cycle setup, input resolution, candidate artifact writes,
+  operator artifact writes, result assembly, and run-ledger append.
+- Preserved fixture namespace clearing, sidecar/input manifest semantics,
+  asset/instrument resolution artifacts, candidate/report/core/card/readiness/
+  source-coverage/delivery/daily/preview writes, result counters, and no-send/
+  no-live safety behavior.
+- Regenerated refactor class ownership, size-gate, final, completion-map,
+  release-candidate, and shim reports. Current advisory inventory is `14`
+  classes and `3` functions over limits, with
+  `production_files_over_1500_lines=0`, `legacy_files_over_1500_lines=0`,
+  `new_violation_count=0`, and no active shim implementation leaks.
+- Updated `ROADMAP.md` with the three current remaining oversized functions.
+**Verify:** Focused checks passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha/test_integrated_radar.py -q -k 'integrated_radar_cycle or
+integrated_radar_fixture or fixture_lanes or pipeline_runs_watchlist'` reported
+`5 passed, 235 deselected`; broader integrated/source-coverage tests reported
+`275 passed`; `python3 -m compileall -q crypto_rsi_scanner tests` passed. Full
+safe harness passed: `python3 tests/test_indicators.py`;
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q`; `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make test-pytest-safe PYTHON=python3`; refactor
+size/class/final/completion reports; shim report; integrated radar
+smoke/doctor; notification format smoke; Telegram no-send final check; evidence
+acquisition smoke; catalyst-frame e2e; Coinalyze preflight
+smoke/preflight/no-send rehearsal; source coverage, daily brief, and notify
+preview from artifacts for `notify_llm_deep_cryptopanic_rehearsal`; strict
+CryptoPanic artifact doctor; `make backtest-costs PYTHON=python3`; and `make
+verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+live sends, trading, paper-trading behavior changes, execution/order logic,
+Event Alpha RSI writes, or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split near-miss refresh helper · Codex
 **Why:** The refactor goal still tracks advisory oversized-function debt after
 production and legacy file-size gates passed. `_refresh_one_hypothesis()` was a
