@@ -65,7 +65,7 @@
     "top_level_event_module_count": 125,
     "unmigrated_modules": 1
   },
-  "generated_at": "2026-07-04T07:59:41+00:00",
+  "generated_at": "2026-07-04T08:12:54+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
   "known_remaining_blockers": [],
   "live_provider_calls_allowed": false,
@@ -116,7 +116,7 @@
   "size_gates": {
     "classes_over_limit_count": 14,
     "files_over_limit_count": 8,
-    "functions_over_limit_count": 12,
+    "functions_over_limit_count": 10,
     "gate_status": "pass",
     "largest_legacy_files": [
       {
@@ -341,6 +341,12 @@
       },
       {
         "limit": 1500,
+        "line_count": 1041,
+        "path": "crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
         "line_count": 1035,
         "path": "crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py",
         "source_kind": "production"
@@ -433,12 +439,6 @@
         "limit": 1500,
         "line_count": 933,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 924,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_confirmation.py",
         "source_kind": "production"
       }
     ],
@@ -607,7 +607,7 @@
     "production_files_over_1500_lines": 0,
     "production_files_over_2000_lines": 0,
     "production_files_over_3000_lines": 0,
-    "production_functions_over_limit": 12,
+    "production_functions_over_limit": 10,
     "production_size_gate_status": "pass",
     "test_files_over_1500_lines": 8,
     "test_size_gate_status": "warning"

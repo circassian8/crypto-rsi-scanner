@@ -1,5 +1,5 @@
 {
-  "class_count": 470,
+  "class_count": 471,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
@@ -142,7 +142,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5476,
+  "function_count": 5487,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -160,22 +160,6 @@
       "public": true,
       "qualname": "send_notifications",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py"
-    },
-    {
-      "function_name": "validate_impact_path",
-      "line_count": 181,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_path_validator",
-      "public": true,
-      "qualname": "validate_impact_path",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py"
-    },
-    {
-      "function_name": "_classify_path",
-      "line_count": 271,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_path_validator",
-      "public": false,
-      "qualname": "_classify_path",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py"
     },
     {
       "function_name": "run_integrated_radar_cycle",
@@ -242,8 +226,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     }
   ],
-  "functions_over_limit_count": 12,
-  "generated_at": "2026-07-04T08:01:01.616448+00:00",
+  "functions_over_limit_count": 10,
+  "generated_at": "2026-07-04T08:12:52.430781+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -921,7 +905,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 12,
+  "production_functions_over_limit": 10,
   "production_functions_over_limit_rows": [
     {
       "function_name": "diagnose_artifacts",
@@ -938,22 +922,6 @@
       "public": true,
       "qualname": "send_notifications",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py"
-    },
-    {
-      "function_name": "validate_impact_path",
-      "line_count": 181,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_path_validator",
-      "public": true,
-      "qualname": "validate_impact_path",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py"
-    },
-    {
-      "function_name": "_classify_path",
-      "line_count": 271,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_path_validator",
-      "public": false,
-      "qualname": "_classify_path",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py"
     },
     {
       "function_name": "run_integrated_radar_cycle",

@@ -100,6 +100,18 @@ _PROXY_CATEGORIES = {
     "political_meme_proxy",
 }
 _INFRA_CATEGORIES = {"prediction_market_infra"}
+_ImpactClassification = tuple[str, str, str, str]
+
+
+@dataclass(frozen=True)
+class _ImpactPathContext:
+    text: str
+    claims: tuple[event_claim_semantics.EventClaim, ...]
+    main_frame: event_catalyst_frames.EventCatalystFrame | None
+    supporting_frames: tuple[event_catalyst_frames.EventCatalystFrame, ...]
+    primary_subject: str | None
+    affected_ecosystem: str | None
+    cause_status: str | None
 
 
 def validate_impact_path(
@@ -111,6 +123,110 @@ def validate_impact_path(
     score_components: Mapping[str, float] | None = None,
 ) -> ImpactPathValidation:
     """Classify source specificity, candidate role, and impact path strength."""
+    context = _impact_path_context(raw)
+    category = str(getattr(hypothesis, "impact_category", "") or "")
+    external = clean_text(getattr(hypothesis, "external_asset", "") or "")
+    components = dict(score_components or getattr(hypothesis, "score_components", {}) or {})
+    market_confirmation, llm_resolver, event_window, liquidity, specificity = _impact_score_inputs(
+        raw,
+        components,
+        context.text,
+        category,
+        symbol=symbol,
+        coin_id=coin_id,
+    )
+    path_type, role, strength, reason = _classify_path(
+        context.text,
+        category,
+        symbol=symbol,
+        coin_id=coin_id,
+        external=external,
+        specificity=specificity,
+        market_confirmation=market_confirmation,
+        claims=context.claims,
+        primary_subject=context.primary_subject,
+        affected_ecosystem=context.affected_ecosystem,
+        main_frame=context.main_frame,
+        supporting_frames=context.supporting_frames,
+    )
+    role, role_confidence, role_evidence = _refine_candidate_role(
+        role,
+        text=context.text,
+        symbol=symbol,
+        coin_id=coin_id,
+        category=category,
+        primary_subject=context.primary_subject,
+        affected_ecosystem=context.affected_ecosystem,
+    )
+    role_validation = _validate_refined_asset_role(
+        components,
+        context.text,
+        role,
+        llm_resolver=llm_resolver,
+        impact_category=category,
+        impact_path_type=path_type,
+        market_confirmation=market_confirmation,
+        role_evidence=role_evidence,
+        symbol=symbol,
+        coin_id=coin_id,
+    )
+    path_type, role, strength, reason, role_confidence, role_evidence = _apply_role_validation_result(
+        path_type,
+        role,
+        strength,
+        reason,
+        role_confidence,
+        role_evidence,
+        role_validation,
+    )
+    required_evidence_met, market_confirmation_required, digest_eligible, why_digest_ineligible = _impact_path_digest_policy(
+        path_type,
+        strength,
+        reason,
+        role_validation=role_validation,
+        market_confirmation=market_confirmation,
+    )
+    opportunity_components = _opportunity_score_components(
+        strength,
+        specificity=specificity,
+        market_confirmation=market_confirmation,
+        event_window=event_window,
+        liquidity=liquidity,
+        llm_resolver=llm_resolver,
+        identity_confidence=role_validation.identity_confidence,
+    )
+    opportunity_score = calculate_opportunity_score_v2(opportunity_components)
+    return ImpactPathValidation(
+        impact_path_type=path_type,
+        impact_path_strength=strength,
+        candidate_role=role,
+        evidence_specificity_score=round(specificity, 2),
+        required_evidence_met=required_evidence_met,
+        market_confirmation_required=market_confirmation_required,
+        digest_eligible_by_impact_path=digest_eligible,
+        why_digest_ineligible=why_digest_ineligible,
+        impact_path_reason=reason or path_type,
+        opportunity_score_v2=round(opportunity_score, 2),
+        opportunity_score_components={key: round(value, 2) for key, value in opportunity_components.items()},
+        primary_subject=context.primary_subject,
+        affected_entity=context.primary_subject,
+        affected_ecosystem=context.affected_ecosystem,
+        role_confidence=role_confidence,
+        role_evidence=role_evidence,
+        cause_status=context.cause_status,
+        claim_polarities=tuple(dict.fromkeys(claim.polarity for claim in context.claims)),
+        asset_kind=role_validation.asset_kind,
+        role_source=role_validation.role_source,
+        identity_confidence=role_validation.identity_confidence,
+        identity_evidence=role_validation.identity_evidence,
+        collision_risk=role_validation.collision_risk,
+        role_validation_failures=role_validation.failures,
+        role_validation_warnings=role_validation.warnings,
+        role_capabilities=role_validation.role_capabilities.as_dict(),
+    )
+
+
+def _impact_path_context(raw: RawDiscoveredEvent | None) -> _ImpactPathContext:
     text = clean_text(_raw_text(raw) if raw is not None else "")
     claims = event_claim_semantics.extract_event_claims((raw,)) if raw is not None else ()
     frames = event_catalyst_frames.build_catalyst_frames((raw,) if raw is not None else ())
@@ -133,9 +249,26 @@ def validate_impact_path(
         and any(frame.frame_role == event_catalyst_frames.ROLE_NEGATED for frame in supporting_frames)
     ):
         cause_status = event_claim_semantics.CauseStatus.RULED_OUT.value
-    category = str(getattr(hypothesis, "impact_category", "") or "")
-    external = clean_text(getattr(hypothesis, "external_asset", "") or "")
-    components = dict(score_components or getattr(hypothesis, "score_components", {}) or {})
+    return _ImpactPathContext(
+        text=text,
+        claims=claims,
+        main_frame=main_frame,
+        supporting_frames=supporting_frames,
+        primary_subject=primary_subject,
+        affected_ecosystem=affected_ecosystem,
+        cause_status=cause_status,
+    )
+
+
+def _impact_score_inputs(
+    raw: RawDiscoveredEvent | None,
+    components: Mapping[str, float],
+    text: str,
+    category: str,
+    *,
+    symbol: str | None,
+    coin_id: str | None,
+) -> tuple[float, float, float, float, float]:
     market_confirmation = _component_score(components, "market_confirmation")
     if raw is not None:
         market_confirmation = max(market_confirmation, _market_confirmation_score((raw,)))
@@ -154,30 +287,22 @@ def validate_impact_path(
         min(100.0, market_confirmation),
     )
     specificity = _evidence_specificity_score(raw, text, category, symbol=symbol, coin_id=coin_id)
+    return market_confirmation, llm_resolver, event_window, liquidity, specificity
 
-    path_type, role, strength, reason = _classify_path(
-        text,
-        category,
-        symbol=symbol,
-        coin_id=coin_id,
-        external=external,
-        specificity=specificity,
-        market_confirmation=market_confirmation,
-        claims=claims,
-        primary_subject=primary_subject,
-        affected_ecosystem=affected_ecosystem,
-        main_frame=main_frame,
-        supporting_frames=supporting_frames,
-    )
-    role, role_confidence, role_evidence = _refine_candidate_role(
-        role,
-        text=text,
-        symbol=symbol,
-        coin_id=coin_id,
-        category=category,
-        primary_subject=primary_subject,
-        affected_ecosystem=affected_ecosystem,
-    )
+
+def _validate_refined_asset_role(
+    components: Mapping[str, float],
+    text: str,
+    role: str,
+    *,
+    llm_resolver: float,
+    impact_category: str,
+    impact_path_type: str,
+    market_confirmation: float,
+    role_evidence: tuple[str, ...],
+    symbol: str | None,
+    coin_id: str | None,
+) -> event_identity.AssetRoleValidation:
     role_source = str(
         components.get("role_source")
         or components.get("asset_role_source")
@@ -196,36 +321,72 @@ def validate_impact_path(
         _component_score(components, "identity_confidence"),
         _component_score(components, "resolver_identity_confidence"),
     )
-    role_validation = event_identity.validate_asset_role(
+    return event_identity.validate_asset_role(
         knowledge,
         role,
-        impact_category=category,
-        impact_path_type=path_type,
+        impact_category=impact_category,
+        impact_path_type=impact_path_type,
         role_source=role_source,
         source_text=text,
         market_confirmation=market_confirmation,
         identity_confidence=identity_confidence if identity_confidence > 0 else None,
         identity_evidence=(*role_evidence, symbol or "", coin_id or ""),
     )
-    if not role_validation.accepted:
-        role = role_validation.final_role
-        role_confidence = min(float(role_confidence or 0.0), 0.45)
-        role_evidence = tuple(dict.fromkeys((*role_evidence, *role_validation.failures)))
-        if "broad_macro_asset_context_only" in role_validation.failures:
-            path_type = ImpactPathType.MACRO_ATTENTION_ONLY.value
-            strength = ImpactPathStrength.WEAK.value
-            reason = "broad_macro_asset_context_only"
-        elif "taxonomy_candidate_not_affected_asset" in role_validation.failures:
-            path_type = ImpactPathType.GENERIC_COOCCURRENCE_ONLY.value
-            strength = ImpactPathStrength.NONE.value
-            reason = "taxonomy_candidate_not_affected_asset"
-        elif "stable_or_wrapped_asset_not_market_anomaly_candidate" in role_validation.failures:
-            path_type = ImpactPathType.GENERIC_COOCCURRENCE_ONLY.value
-            strength = ImpactPathStrength.NONE.value
-            reason = "stable_or_wrapped_asset_not_market_anomaly_candidate"
-        else:
-            strength = ImpactPathStrength.WEAK.value if strength != ImpactPathStrength.NONE.value else strength
-            reason = role_validation.failures[0]
+
+
+def _apply_role_validation_result(
+    path_type: str,
+    role: str,
+    strength: str,
+    reason: str,
+    role_confidence: float | None,
+    role_evidence: tuple[str, ...],
+    role_validation: event_identity.AssetRoleValidation,
+) -> tuple[str, str, str, str, float | None, tuple[str, ...]]:
+    if role_validation.accepted:
+        return path_type, role, strength, reason, role_confidence, role_evidence
+    role = role_validation.final_role
+    role_confidence = min(float(role_confidence or 0.0), 0.45)
+    role_evidence = tuple(dict.fromkeys((*role_evidence, *role_validation.failures)))
+    if "broad_macro_asset_context_only" in role_validation.failures:
+        return (
+            ImpactPathType.MACRO_ATTENTION_ONLY.value,
+            role,
+            ImpactPathStrength.WEAK.value,
+            "broad_macro_asset_context_only",
+            role_confidence,
+            role_evidence,
+        )
+    if "taxonomy_candidate_not_affected_asset" in role_validation.failures:
+        return (
+            ImpactPathType.GENERIC_COOCCURRENCE_ONLY.value,
+            role,
+            ImpactPathStrength.NONE.value,
+            "taxonomy_candidate_not_affected_asset",
+            role_confidence,
+            role_evidence,
+        )
+    if "stable_or_wrapped_asset_not_market_anomaly_candidate" in role_validation.failures:
+        return (
+            ImpactPathType.GENERIC_COOCCURRENCE_ONLY.value,
+            role,
+            ImpactPathStrength.NONE.value,
+            "stable_or_wrapped_asset_not_market_anomaly_candidate",
+            role_confidence,
+            role_evidence,
+        )
+    strength = ImpactPathStrength.WEAK.value if strength != ImpactPathStrength.NONE.value else strength
+    return path_type, role, strength, role_validation.failures[0], role_confidence, role_evidence
+
+
+def _impact_path_digest_policy(
+    path_type: str,
+    strength: str,
+    reason: str,
+    *,
+    role_validation: event_identity.AssetRoleValidation,
+    market_confirmation: float,
+) -> tuple[bool, bool, bool, str | None]:
     required_evidence_met = strength in {ImpactPathStrength.STRONG.value, ImpactPathStrength.MEDIUM.value}
     market_confirmation_required = strength == ImpactPathStrength.MEDIUM.value
     digest_eligible = strength == ImpactPathStrength.STRONG.value or (
@@ -243,46 +404,28 @@ def validate_impact_path(
     elif market_confirmation_required and market_confirmation < 40.0:
         digest_eligible = False
         why_digest_ineligible = "medium_impact_path_requires_market_confirmation"
+    return required_evidence_met, market_confirmation_required, digest_eligible, why_digest_ineligible
 
-    strength_score = _strength_score(strength)
-    opportunity_components = {
-        "impact_path_strength": strength_score,
+
+def _opportunity_score_components(
+    strength: str,
+    *,
+    specificity: float,
+    market_confirmation: float,
+    event_window: float,
+    liquidity: float,
+    llm_resolver: float,
+    identity_confidence: float,
+) -> dict[str, float]:
+    return {
+        "impact_path_strength": _strength_score(strength),
         "source_evidence_specificity": specificity,
         "market_confirmation": market_confirmation,
         "timing_event_window": event_window,
         "liquidity_tradability": liquidity,
         "llm_resolver_confidence": llm_resolver,
-        "identity_confidence": role_validation.identity_confidence,
+        "identity_confidence": identity_confidence,
     }
-    opportunity_score = calculate_opportunity_score_v2(opportunity_components)
-    return ImpactPathValidation(
-        impact_path_type=path_type,
-        impact_path_strength=strength,
-        candidate_role=role,
-        evidence_specificity_score=round(specificity, 2),
-        required_evidence_met=required_evidence_met,
-        market_confirmation_required=market_confirmation_required,
-        digest_eligible_by_impact_path=digest_eligible,
-        why_digest_ineligible=why_digest_ineligible,
-        impact_path_reason=reason or path_type,
-        opportunity_score_v2=round(opportunity_score, 2),
-        opportunity_score_components={key: round(value, 2) for key, value in opportunity_components.items()},
-        primary_subject=primary_subject,
-        affected_entity=primary_subject,
-        affected_ecosystem=affected_ecosystem,
-        role_confidence=role_confidence,
-        role_evidence=role_evidence,
-        cause_status=cause_status,
-        claim_polarities=tuple(dict.fromkeys(claim.polarity for claim in claims)),
-        asset_kind=role_validation.asset_kind,
-        role_source=role_validation.role_source,
-        identity_confidence=role_validation.identity_confidence,
-        identity_evidence=role_validation.identity_evidence,
-        collision_risk=role_validation.collision_risk,
-        role_validation_failures=role_validation.failures,
-        role_validation_warnings=role_validation.warnings,
-        role_capabilities=role_validation.role_capabilities.as_dict(),
-    )
 
 
 def calculate_opportunity_score_v2(components: Mapping[str, float]) -> float:
@@ -317,7 +460,7 @@ def _classify_path(
     affected_ecosystem: str | None = None,
     main_frame: event_catalyst_frames.EventCatalystFrame | None = None,
     supporting_frames: tuple[event_catalyst_frames.EventCatalystFrame, ...] = (),
-) -> tuple[str, str, str, str]:
+) -> _ImpactClassification:
     asset_present = _asset_terms_present(text, symbol=symbol, coin_id=coin_id)
     asset_matches_main_subject = _subject_matches_asset(main_frame.subject if main_frame else None, symbol=symbol, coin_id=coin_id)
     negated_direct_security = any(
@@ -325,6 +468,66 @@ def _classify_path(
         and _subject_matches_asset(frame.subject, symbol=symbol, coin_id=coin_id)
         for frame in supporting_frames
     )
+    classification = _classify_frame_or_guardrail_path(
+        text,
+        category,
+        symbol=symbol,
+        coin_id=coin_id,
+        specificity=specificity,
+        asset_present=asset_present,
+        asset_matches_main_subject=asset_matches_main_subject,
+        negated_direct_security=negated_direct_security,
+        main_frame=main_frame,
+    )
+    if classification is not None:
+        return classification
+    classification = _classify_proxy_path(
+        text,
+        category,
+        external=external,
+        specificity=specificity,
+        market_confirmation=market_confirmation,
+        asset_present=asset_present,
+    )
+    if classification is not None:
+        return classification
+    classification = _classify_direct_category_path(
+        text,
+        category,
+        specificity=specificity,
+        asset_present=asset_present,
+    )
+    if classification is not None:
+        return classification
+    if category == "security_or_regulatory_shock":
+        return _classify_security_or_regulatory_path(
+            text,
+            claims,
+            symbol=symbol,
+            coin_id=coin_id,
+            market_confirmation=market_confirmation,
+            asset_present=asset_present,
+            asset_matches_main_subject=asset_matches_main_subject,
+            negated_direct_security=negated_direct_security,
+            primary_subject=primary_subject,
+            affected_ecosystem=affected_ecosystem,
+            main_frame=main_frame,
+        )
+    return _classify_infra_stable_or_fallback_path(text, category, asset_present=asset_present)
+
+
+def _classify_frame_or_guardrail_path(
+    text: str,
+    category: str,
+    *,
+    symbol: str | None,
+    coin_id: str | None,
+    specificity: float,
+    asset_present: bool,
+    asset_matches_main_subject: bool,
+    negated_direct_security: bool,
+    main_frame: event_catalyst_frames.EventCatalystFrame | None,
+) -> _ImpactClassification | None:
     if main_frame is not None and main_frame.frame_type in {
         event_catalyst_frames.TYPE_ACQUISITION_OR_STAKE,
         event_catalyst_frames.TYPE_STRATEGIC_INVESTMENT,
@@ -372,7 +575,18 @@ def _classify_path(
             ImpactPathStrength.NONE.value,
             "candidate_not_named_in_strong_evidence",
         )
+    return None
 
+
+def _classify_proxy_path(
+    text: str,
+    category: str,
+    *,
+    external: str,
+    specificity: float,
+    market_confirmation: float,
+    asset_present: bool,
+) -> _ImpactClassification | None:
     if category in {"rwa_preipo_proxy", "ai_ipo_proxy", "tokenized_stock_venue"}:
         if _any_term_hit(text, ("offers", "lets users trade", "trade", "listed", "market", "venue")) and _any_term_hit(
             text,
@@ -411,7 +625,16 @@ def _classify_path(
                 strength,
                 "political_meme_event",
             )
+    return None
 
+
+def _classify_direct_category_path(
+    text: str,
+    category: str,
+    *,
+    specificity: float,
+    asset_present: bool,
+) -> _ImpactClassification | None:
     if category == "strategic_investment_or_valuation" and _any_term_hit(
         text,
         ("stake", "strategic investment", "valuation", "acquisition", "acquire", "buy"),
@@ -441,88 +664,116 @@ def _classify_path(
             ImpactPathStrength.STRONG.value,
             "listing_liquidity_event",
         )
+    return None
 
-    if category == "security_or_regulatory_shock":
-        if main_frame is not None and main_frame.frame_type not in {
-            event_catalyst_frames.TYPE_EXPLOIT_SECURITY,
-            event_catalyst_frames.TYPE_PRIOR_EXPLOIT_CONTEXT,
-            event_catalyst_frames.TYPE_DENIED_EXPLOIT,
-            event_catalyst_frames.TYPE_MARKET_DISLOCATION,
-            event_catalyst_frames.TYPE_POLICY_CONTEXT,
-        }:
-            return (
-                ImpactPathType.STRATEGIC_INVESTMENT_OR_VALUATION.value
-                if main_frame.event_archetype == event_catalyst_frames.TYPE_STRATEGIC_INVESTMENT
-                else ImpactPathType.DIRECT_TOKEN_EVENT.value,
-                CandidateRole.DIRECT_SUBJECT.value if (asset_present or asset_matches_main_subject) else CandidateRole.GENERIC_MENTION.value,
-                ImpactPathStrength.MEDIUM.value,
-                str(main_frame.frame_type or "main_catalyst_not_security"),
-            )
-        exploit_confirmed = event_claim_semantics.has_confirmed_claim(claims, "exploit")
-        exploit_ruled_out = event_claim_semantics.has_ruled_out_claim(claims, "exploit")
-        exploit_suspected = any(
-            claim.claim_type == "exploit"
-            and claim.cause_status == event_claim_semantics.CauseStatus.SUSPECTED.value
-            for claim in claims
+
+def _classify_security_or_regulatory_path(
+    text: str,
+    claims: tuple[event_claim_semantics.EventClaim, ...],
+    *,
+    symbol: str | None,
+    coin_id: str | None,
+    market_confirmation: float,
+    asset_present: bool,
+    asset_matches_main_subject: bool,
+    negated_direct_security: bool,
+    primary_subject: str | None,
+    affected_ecosystem: str | None,
+    main_frame: event_catalyst_frames.EventCatalystFrame | None,
+) -> _ImpactClassification:
+    if main_frame is not None and main_frame.frame_type not in {
+        event_catalyst_frames.TYPE_EXPLOIT_SECURITY,
+        event_catalyst_frames.TYPE_PRIOR_EXPLOIT_CONTEXT,
+        event_catalyst_frames.TYPE_DENIED_EXPLOIT,
+        event_catalyst_frames.TYPE_MARKET_DISLOCATION,
+        event_catalyst_frames.TYPE_POLICY_CONTEXT,
+    }:
+        return (
+            ImpactPathType.STRATEGIC_INVESTMENT_OR_VALUATION.value
+            if main_frame.event_archetype == event_catalyst_frames.TYPE_STRATEGIC_INVESTMENT
+            else ImpactPathType.DIRECT_TOKEN_EVENT.value,
+            CandidateRole.DIRECT_SUBJECT.value if (asset_present or asset_matches_main_subject) else CandidateRole.GENERIC_MENTION.value,
+            ImpactPathStrength.MEDIUM.value,
+            str(main_frame.frame_type or "main_catalyst_not_security"),
         )
-        if (exploit_ruled_out and not exploit_confirmed) or (
-            event_claim_semantics.text_has_unknown_cause(text)
-            and not exploit_confirmed
-        ):
+    exploit_confirmed = event_claim_semantics.has_confirmed_claim(claims, "exploit")
+    exploit_ruled_out = event_claim_semantics.has_ruled_out_claim(claims, "exploit")
+    exploit_suspected = any(
+        claim.claim_type == "exploit"
+        and claim.cause_status == event_claim_semantics.CauseStatus.SUSPECTED.value
+        for claim in claims
+    )
+    if (exploit_ruled_out and not exploit_confirmed) or (
+        event_claim_semantics.text_has_unknown_cause(text)
+        and not exploit_confirmed
+    ):
+        return (
+            ImpactPathType.MARKET_DISLOCATION_UNKNOWN.value,
+            CandidateRole.DIRECT_SUBJECT.value if asset_present else CandidateRole.GENERIC_MENTION.value,
+            ImpactPathStrength.WEAK.value,
+            "cause_unknown_market_dislocation",
+        )
+    if exploit_suspected and not exploit_confirmed:
+        role = _security_role(text, symbol=symbol, coin_id=coin_id, primary_subject=primary_subject, affected_ecosystem=affected_ecosystem)
+        return (
+            ImpactPathType.EXPLOIT_SECURITY_EVENT.value,
+            role,
+            ImpactPathStrength.WEAK.value,
+            "alleged_exploit_unconfirmed",
+        )
+    if _any_term_hit(text, ("exploit", "hack", "security incident", "attack", "breach", "resumes trading", "halted trading")):
+        if negated_direct_security:
             return (
                 ImpactPathType.MARKET_DISLOCATION_UNKNOWN.value,
-                CandidateRole.DIRECT_SUBJECT.value if asset_present else CandidateRole.GENERIC_MENTION.value,
+                CandidateRole.DIRECT_SUBJECT.value if (asset_present or asset_matches_main_subject) else CandidateRole.GENERIC_MENTION.value,
                 ImpactPathStrength.WEAK.value,
-                "cause_unknown_market_dislocation",
+                "direct_exploit_negated",
             )
-        if exploit_suspected and not exploit_confirmed:
-            role = _security_role(text, symbol=symbol, coin_id=coin_id, primary_subject=primary_subject, affected_ecosystem=affected_ecosystem)
+        role = _security_role(text, symbol=symbol, coin_id=coin_id, primary_subject=primary_subject, affected_ecosystem=affected_ecosystem)
+        strength = ImpactPathStrength.STRONG.value if role == CandidateRole.DIRECT_SUBJECT.value else (
+            ImpactPathStrength.MEDIUM.value if market_confirmation >= 40 else ImpactPathStrength.WEAK.value
+        )
+        return (
+            ImpactPathType.EXPLOIT_SECURITY_EVENT.value,
+            role,
+            strength,
+            "exploit_security_event" if role == CandidateRole.DIRECT_SUBJECT.value else "ecosystem_security_event",
+        )
+    if _any_term_hit(text, ("quantum", "cryptography", "technology risk")):
+        return (
+            ImpactPathType.TECHNOLOGY_RISK.value,
+            CandidateRole.MACRO_AFFECTED_ASSET.value,
+            ImpactPathStrength.WEAK.value,
+            "generic_policy_only",
+        )
+    if _any_term_hit(text, ("lawsuit", "sec", "cftc", "regulatory", "regulation", "probe", "charges", "investigation")):
+        if _any_term_hit(text, ("against", "charges", "lawsuit", "probe", "investigation")) and asset_present:
             return (
-                ImpactPathType.EXPLOIT_SECURITY_EVENT.value,
-                role,
-                ImpactPathStrength.WEAK.value,
-                "alleged_exploit_unconfirmed",
+                ImpactPathType.REGULATORY_POLICY_EXPOSURE.value,
+                CandidateRole.DIRECT_SUBJECT.value,
+                ImpactPathStrength.MEDIUM.value,
+                "direct_token_event",
             )
-        if _any_term_hit(text, ("exploit", "hack", "security incident", "attack", "breach", "resumes trading", "halted trading")):
-            if negated_direct_security:
-                return (
-                    ImpactPathType.MARKET_DISLOCATION_UNKNOWN.value,
-                    CandidateRole.DIRECT_SUBJECT.value if (asset_present or asset_matches_main_subject) else CandidateRole.GENERIC_MENTION.value,
-                    ImpactPathStrength.WEAK.value,
-                    "direct_exploit_negated",
-                )
-            role = _security_role(text, symbol=symbol, coin_id=coin_id, primary_subject=primary_subject, affected_ecosystem=affected_ecosystem)
-            strength = ImpactPathStrength.STRONG.value if role == CandidateRole.DIRECT_SUBJECT.value else (
-                ImpactPathStrength.MEDIUM.value if market_confirmation >= 40 else ImpactPathStrength.WEAK.value
-            )
-            return (
-                ImpactPathType.EXPLOIT_SECURITY_EVENT.value,
-                role,
-                strength,
-                "exploit_security_event" if role == CandidateRole.DIRECT_SUBJECT.value else "ecosystem_security_event",
-            )
-        if _any_term_hit(text, ("quantum", "cryptography", "technology risk")):
-            return (
-                ImpactPathType.TECHNOLOGY_RISK.value,
-                CandidateRole.MACRO_AFFECTED_ASSET.value,
-                ImpactPathStrength.WEAK.value,
-                "generic_policy_only",
-            )
-        if _any_term_hit(text, ("lawsuit", "sec", "cftc", "regulatory", "regulation", "probe", "charges", "investigation")):
-            if _any_term_hit(text, ("against", "charges", "lawsuit", "probe", "investigation")) and asset_present:
-                return (
-                    ImpactPathType.REGULATORY_POLICY_EXPOSURE.value,
-                    CandidateRole.DIRECT_SUBJECT.value,
-                    ImpactPathStrength.MEDIUM.value,
-                    "direct_token_event",
-                )
-            return (
-                ImpactPathType.MARKET_STRUCTURE_POLICY.value,
-                CandidateRole.MACRO_AFFECTED_ASSET.value,
-                ImpactPathStrength.WEAK.value,
-                "generic_policy_only",
-            )
+        return (
+            ImpactPathType.MARKET_STRUCTURE_POLICY.value,
+            CandidateRole.MACRO_AFFECTED_ASSET.value,
+            ImpactPathStrength.WEAK.value,
+            "generic_policy_only",
+        )
+    return (
+        ImpactPathType.GENERIC_COOCCURRENCE_ONLY.value,
+        CandidateRole.GENERIC_MENTION.value,
+        ImpactPathStrength.WEAK.value if asset_present else ImpactPathStrength.NONE.value,
+        "weak_cooccurrence_only" if asset_present else "no_value_capture_explained",
+    )
 
+
+def _classify_infra_stable_or_fallback_path(
+    text: str,
+    category: str,
+    *,
+    asset_present: bool,
+) -> _ImpactClassification:
     if category == "prediction_market_infra":
         if _any_term_hit(text, ("oracle", "settlement", "resolution", "infrastructure", "data provider", "powers", "secures")):
             return (

@@ -17,6 +17,52 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split impact path validator ownership · Codex
+**Why:** The refactor goal still tracks advisory oversized-function debt after
+production and legacy size gates passed. `validate_impact_path()` and
+`_classify_path()` were pure impact-path metadata functions with direct fixture
+coverage, making them safe behavior-preserving split targets.
+**Changes:**
+- Split `crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py` so
+  `validate_impact_path()` is now a 110-line coordinator over helpers for raw
+  context extraction, score inputs, asset-role validation, digest eligibility,
+  and opportunity score components.
+- Split `_classify_path()` into an ordered 68-line dispatcher over frame/
+  guardrail, proxy, direct-category, security/regulatory, and infra/stablecoin/
+  fallback classification helpers while preserving branch precedence and return
+  tuples.
+- Preserved impact-path types, candidate roles, strength/reason strings, role
+  validation failures, digest ineligibility reasons, score component keys, and
+  quality/opportunity downstream fields.
+- Regenerated refactor class ownership, size-gate, final, completion-map,
+  release-candidate, and shim reports. Current advisory inventory is `14`
+  classes and `10` functions over limits, with production and legacy size gates
+  passing and no active shim implementation leaks.
+- Updated `ROADMAP.md` to include `validate_impact_path()` and
+  `_classify_path()` in the completed ownership burn-down list.
+**Verify:** Focused impact-path tests passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha/test_integrated_radar.py::test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrence -q`
+and `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha/test_outcomes.py::test_event_market_evidence_and_opportunity_verdict_quality_layers -q`
+each reported `1 passed`; broader files reported `240 passed` for integrated
+radar and `50 passed` for outcomes. Full safe harness passed: `python3
+tests/test_indicators.py` reported `745/745 passed`;
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` reported `756 passed`;
+`python3 -m compileall -q crypto_rsi_scanner tests`; `make test-pytest-safe
+PYTHON=python3`; refactor size/class/final/completion reports; shim report;
+integrated radar smoke/doctor; notification format smoke; Telegram no-send
+final check; evidence acquisition smoke; catalyst-frame e2e; Coinalyze
+preflight smoke/preflight/no-send rehearsal; source coverage, daily brief, and
+notify preview from artifacts for `notify_llm_deep_cryptopanic_rehearsal`;
+strict CryptoPanic artifact doctor; and `make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. The strict CryptoPanic rehearsal
+doctor remains `WARN` with known non-blocking quality/incident warnings and no
+blockers. No live provider calls by default, live sends, trading, paper-trading
+behavior changes, execution/order logic, Event Alpha RSI writes, or Event
+Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split impact hypothesis rule builder · Codex
 **Why:** The refactor goal still has advisory oversized-function debt after the
 production and legacy size gates passed. `_hypothesis_from_rule()` was a
