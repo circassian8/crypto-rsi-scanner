@@ -1,5 +1,5 @@
 {
-  "class_count": 494,
+  "class_count": 497,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
@@ -142,7 +142,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5560,
+  "function_count": 5575,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -152,18 +152,10 @@
       "public": true,
       "qualname": "diagnose_artifacts",
       "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py"
-    },
-    {
-      "function_name": "send_notifications",
-      "line_count": 406,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.legacy.send_plan",
-      "public": true,
-      "qualname": "send_notifications",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py"
     }
   ],
-  "functions_over_limit_count": 2,
-  "generated_at": "2026-07-04T09:33:51.742118+00:00",
+  "functions_over_limit_count": 1,
+  "generated_at": "2026-07-04T09:44:13.416693+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -841,7 +833,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 2,
+  "production_functions_over_limit": 1,
   "production_functions_over_limit_rows": [
     {
       "function_name": "diagnose_artifacts",
@@ -850,14 +842,6 @@
       "public": true,
       "qualname": "diagnose_artifacts",
       "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py"
-    },
-    {
-      "function_name": "send_notifications",
-      "line_count": 406,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.legacy.send_plan",
-      "public": true,
-      "qualname": "send_notifications",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py"
     }
   ],
   "public_class_count": 407,

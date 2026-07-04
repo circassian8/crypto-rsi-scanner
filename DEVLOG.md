@@ -17,6 +17,50 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split notification send plan phases · Codex
+**Why:** The refactor goal still tracks advisory oversized-function debt after
+production and legacy file-size gates passed. `send_notifications()` contained
+context setup, guard handling, lane rendering, delivery-ledger writes, cooldown
+updates, heartbeat handling, and result assembly in one function.
+**Changes:**
+- Split `crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py` so
+  `send_notifications()` is now a 63-line orchestrator over private helpers for
+  send context construction, disabled/paused/no-digest outcomes, digest lane
+  preparation, duplicate skipping, delivery attempt recording, heartbeat
+  delivery, cooldown updates, and final result assembly.
+- Preserved the public API, delivery ledger `status`/`status_detail` behavior,
+  content/dedupe/in-flight checks, partial-delivery cooldown semantics,
+  heartbeat dedupe, paused notification error class, disabled send-guard
+  preview copy, and no-send/no-live safety behavior.
+- Regenerated refactor class ownership, size-gate, final, completion-map,
+  release-candidate, and shim reports. Current advisory inventory is `14`
+  classes and `1` function over limits, with
+  `production_files_over_1500_lines=0`, `legacy_files_over_1500_lines=0`,
+  `new_violation_count=0`, and no active shim implementation leaks.
+- Updated `ROADMAP.md` with the one current remaining oversized function.
+**Verify:** Focused checks passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha/test_notifications.py tests/event_alpha/test_namespace_lifecycle.py
+-q -k 'send_notifications or notification_send or heartbeat or
+blocked_when_disabled or pause_blocks_delivery or notify_fixture_smoke or
+delivery_status or notification_state_is_profile_namespace_scoped'` reported
+`17 passed, 80 deselected`; broader notification/artifact-doctor tests reported
+`112 passed`; `python3 -m compileall -q crypto_rsi_scanner tests` passed. Full
+safe harness passed: `python3 tests/test_indicators.py`;
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q`; `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make test-pytest-safe PYTHON=python3`; refactor
+size/class/final/completion reports; shim report; integrated radar
+smoke/doctor; notification format smoke; Telegram no-send final check; evidence
+acquisition smoke; catalyst-frame e2e; Coinalyze preflight
+smoke/preflight/no-send rehearsal; source coverage, daily brief, and notify
+preview from artifacts for `notify_llm_deep_cryptopanic_rehearsal`; strict
+CryptoPanic artifact doctor; `make backtest-costs PYTHON=python3`; and `make
+verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+live sends, trading, paper-trading behavior changes, execution/order logic,
+Event Alpha RSI writes, or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split Event Alpha operating cycle phases · Codex
 **Why:** The refactor goal still tracks advisory oversized-function debt after
 production and legacy file-size gates passed. `run_event_alpha_operating_cycle()`

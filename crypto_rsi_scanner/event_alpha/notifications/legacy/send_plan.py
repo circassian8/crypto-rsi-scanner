@@ -75,6 +75,43 @@ def record_lane_sent(
         for alert_id in alert_ids:
             storage.set_meta(_triggered_alert_meta_key(alert_id, cfg), now.isoformat())
 
+@dataclass
+class _SendContext:
+    storage: Any
+    cfg: EventAlphaNotificationConfig
+    send_fn: SendFn
+    observed: datetime
+    profile: str | None
+    pipeline_result: Any | None
+    card_map: dict[str, str | Path]
+    plan: EventAlphaNotificationPlan
+    writer: _DeliveryWriter | None
+
+    @property
+    def lane_attempts(self) -> dict[str, int]:
+        return self.plan.lane_counts
+
+    @property
+    def would_send(self) -> int:
+        return self.plan.would_send_count
+
+
+@dataclass(frozen=True)
+class _PreparedLaneSend:
+    lane: str
+    items: list[Any]
+    message: str
+    identity: DeliveryIdentity
+    alert_ids: list[str]
+    route_label: str
+
+
+@dataclass
+class _SendExecutionState:
+    delivered_by_lane: dict[str, int] = field(default_factory=lambda: {lane: 0 for lane in LANES})
+    attempted: bool = False
+    block_reasons: list[str] = field(default_factory=list)
+
 def send_notifications(
     decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
     *,
@@ -100,125 +137,207 @@ def send_notifications(
     delivery, never after a dedupe-skip or a failed send.
     """
     observed = _as_utc(now or datetime.now(timezone.utc))
+    context = _build_send_context(
+        decisions,
+        storage=storage,
+        cfg=cfg,
+        send_fn=send_fn,
+        now=observed,
+        profile=profile,
+        pipeline_result=pipeline_result,
+        card_path_by_alert_id=card_path_by_alert_id,
+        include_health_heartbeat=include_health_heartbeat,
+        core_opportunity_rows=core_opportunity_rows,
+        delivery_cfg=delivery_cfg,
+        run_id=run_id,
+        namespace=namespace,
+    )
+    blocked = _blocked_send_result(context, pause_state=pause_state)
+    if blocked is not None:
+        return blocked
+    if context.would_send <= 0:
+        return _no_due_send_result(context)
+
+    state = _SendExecutionState()
+    _send_due_digest_lanes(context, state)
+    _send_health_heartbeat(context, state)
+    delivered = sum(state.delivered_by_lane.values())
+    return _send_result(
+        context,
+        requested=True,
+        attempted=state.attempted,
+        success=delivered > 0 and not state.block_reasons,
+        items_attempted=context.would_send,
+        items_delivered=delivered,
+        block_reason="; ".join(state.block_reasons) or None,
+        lane_items_attempted=context.lane_attempts,
+        lane_items_delivered=state.delivered_by_lane,
+        would_send_items=context.would_send,
+        heartbeat_sent=state.delivered_by_lane[LANE_HEALTH_HEARTBEAT] > 0,
+    )
+
+
+def _build_send_context(
+    decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
+    *,
+    storage: Any,
+    cfg: EventAlphaNotificationConfig,
+    send_fn: SendFn,
+    now: datetime,
+    profile: str | None,
+    pipeline_result: Any | None,
+    card_path_by_alert_id: Mapping[str, str | Path] | None,
+    include_health_heartbeat: bool,
+    core_opportunity_rows: Iterable[Mapping[str, Any] | object],
+    delivery_cfg: delivery.NotificationDeliveryConfig | None,
+    run_id: str | None,
+    namespace: str | None,
+) -> _SendContext:
     plan = build_notification_plan(
         decisions,
         storage=storage,
         cfg=cfg,
-        now=observed,
+        now=now,
         include_health_heartbeat=include_health_heartbeat,
         core_opportunity_rows=core_opportunity_rows,
     )
-    lane_attempts = plan.lane_counts
-    would_send = plan.would_send_count
-    card_map = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
     writer = (
-        _DeliveryWriter(delivery_cfg, run_id=run_id, profile=profile, namespace=namespace, now=observed)
+        _DeliveryWriter(delivery_cfg, run_id=run_id, profile=profile, namespace=namespace, now=now)
         if delivery_cfg is not None
         else None
     )
+    return _SendContext(
+        storage=storage,
+        cfg=cfg,
+        send_fn=send_fn,
+        observed=now,
+        profile=profile,
+        pipeline_result=pipeline_result,
+        card_map={str(key): value for key, value in (card_path_by_alert_id or {}).items()},
+        plan=plan,
+        writer=writer,
+    )
 
-    def _result(**kwargs: Any) -> event_alpha_pipeline.EventAlphaSendResult:
-        counts = writer.counts if writer else {}
-        research_review_sent = kwargs.pop(
-            "research_review_digest_sent",
-            int((kwargs.get("lane_items_delivered") or {}).get(LANE_RESEARCH_REVIEW_DIGEST, 0)),
-        )
-        return event_alpha_pipeline.EventAlphaSendResult(
-            heartbeat_due=plan.heartbeat_due,
-            cooldown_blocks=dict(plan.blocked_by_lane),
-            notification_scope=plan.notification_scope,
-            notification_scope_value=plan.scope_value,
-            delivery_records_written=int(counts.get("records", 0)),
-            deliveries_delivered=int(counts.get(delivery.STATE_DELIVERED, 0)),
-            deliveries_partial_delivered=int(counts.get(delivery.STATE_PARTIAL_DELIVERED, 0)),
-            deliveries_failed=int(counts.get(delivery.STATE_FAILED, 0)),
-            deliveries_skipped_duplicate=int(counts.get(delivery.STATE_SKIPPED_DUPLICATE, 0)),
-            deliveries_skipped_in_flight=int(counts.get(delivery.STATE_SKIPPED_IN_FLIGHT, 0)),
-            deliveries_blocked=int(counts.get(delivery.STATE_BLOCKED, 0)),
-            research_review_digest_enabled=bool(cfg.research_review_digest_enabled),
-            research_review_digest_candidates=len(plan.research_review_items),
-            research_review_digest_would_send=int(lane_attempts.get(LANE_RESEARCH_REVIEW_DIGEST, 0)),
-            research_review_digest_sent=int(research_review_sent or 0),
-            research_review_digest_block_reason=plan.blocked_by_lane.get(LANE_RESEARCH_REVIEW_DIGEST),
-            **kwargs,
-        )
 
-    if not cfg.enabled or cfg.mode != "research_only":
-        block_reason = "event alerts disabled" if not cfg.enabled else "event alert mode is not research_only"
-        if writer:
-            writer.record_blocked(
-                plan,
-                profile=profile,
-                card_map=card_map,
-                reason=block_reason,
-                pipeline_result=_notification_preview_result(pipeline_result, plan=plan, block_reason=block_reason),
-            )
-            if not writer.preview_sections:
-                writer.write_no_digest_preview(
-                    profile=profile,
-                    pipeline_result=_notification_preview_result(pipeline_result, plan=plan, block_reason=block_reason),
-                    reason=block_reason,
-                )
-        return _result(
+def _send_result(context: _SendContext, **kwargs: Any) -> event_alpha_pipeline.EventAlphaSendResult:
+    counts = context.writer.counts if context.writer else {}
+    research_review_sent = kwargs.pop(
+        "research_review_digest_sent",
+        int((kwargs.get("lane_items_delivered") or {}).get(LANE_RESEARCH_REVIEW_DIGEST, 0)),
+    )
+    return event_alpha_pipeline.EventAlphaSendResult(
+        heartbeat_due=context.plan.heartbeat_due,
+        cooldown_blocks=dict(context.plan.blocked_by_lane),
+        notification_scope=context.plan.notification_scope,
+        notification_scope_value=context.plan.scope_value,
+        delivery_records_written=int(counts.get("records", 0)),
+        deliveries_delivered=int(counts.get(delivery.STATE_DELIVERED, 0)),
+        deliveries_partial_delivered=int(counts.get(delivery.STATE_PARTIAL_DELIVERED, 0)),
+        deliveries_failed=int(counts.get(delivery.STATE_FAILED, 0)),
+        deliveries_skipped_duplicate=int(counts.get(delivery.STATE_SKIPPED_DUPLICATE, 0)),
+        deliveries_skipped_in_flight=int(counts.get(delivery.STATE_SKIPPED_IN_FLIGHT, 0)),
+        deliveries_blocked=int(counts.get(delivery.STATE_BLOCKED, 0)),
+        research_review_digest_enabled=bool(context.cfg.research_review_digest_enabled),
+        research_review_digest_candidates=len(context.plan.research_review_items),
+        research_review_digest_would_send=int(context.lane_attempts.get(LANE_RESEARCH_REVIEW_DIGEST, 0)),
+        research_review_digest_sent=int(research_review_sent or 0),
+        research_review_digest_block_reason=context.plan.blocked_by_lane.get(LANE_RESEARCH_REVIEW_DIGEST),
+        **kwargs,
+    )
+
+
+def _blocked_send_result(
+    context: _SendContext,
+    *,
+    pause_state: Any | None,
+) -> event_alpha_pipeline.EventAlphaSendResult | None:
+    if not context.cfg.enabled or context.cfg.mode != "research_only":
+        block_reason = "event alerts disabled" if not context.cfg.enabled else "event alert mode is not research_only"
+        _record_blocked_send(context, block_reason=block_reason)
+        return _send_result(
+            context,
             requested=True,
             attempted=False,
-            items_attempted=would_send,
+            items_attempted=context.would_send,
             items_delivered=0,
             block_reason=block_reason,
-            lane_items_attempted=lane_attempts,
+            lane_items_attempted=context.lane_attempts,
             lane_items_delivered={lane: 0 for lane in LANES},
-            would_send_items=would_send,
+            would_send_items=context.would_send,
         )
     if bool(getattr(pause_state, "paused", False)):
         reason = str(getattr(pause_state, "reason", "") or "notifications paused")
         block_reason = f"notifications paused: {reason}"
-        if writer:
-            writer.record_blocked(
-                plan,
-                profile=profile,
-                card_map=card_map,
-                reason=block_reason,
-                error_class="notifications_paused",
-                pipeline_result=_notification_preview_result(pipeline_result, plan=plan, block_reason=block_reason),
-            )
-            if not writer.preview_sections:
-                writer.write_no_digest_preview(
-                    profile=profile,
-                    pipeline_result=_notification_preview_result(pipeline_result, plan=plan, block_reason=block_reason),
-                    reason=block_reason,
-                )
-        return _result(
+        _record_blocked_send(context, block_reason=block_reason, error_class="notifications_paused")
+        return _send_result(
+            context,
             requested=True,
             attempted=False,
-            items_attempted=would_send,
+            items_attempted=context.would_send,
             items_delivered=0,
             block_reason=block_reason,
-            lane_items_attempted=lane_attempts,
+            lane_items_attempted=context.lane_attempts,
             lane_items_delivered={lane: 0 for lane in LANES},
-            would_send_items=would_send,
+            would_send_items=context.would_send,
         )
-    if would_send <= 0:
-        reason = "; ".join(plan.blocked_by_lane.values()) or plan.heartbeat_reason or "no due notifications"
-        if writer:
-            writer.write_no_digest_preview(
-                profile=profile,
-                pipeline_result=_notification_preview_result(pipeline_result, plan=plan, block_reason=reason),
-                reason=reason,
-            )
-        return _result(
-            requested=True,
-            attempted=False,
-            items_attempted=0,
-            items_delivered=0,
-            block_reason=reason,
-            lane_items_attempted=lane_attempts,
-            lane_items_delivered={lane: 0 for lane in LANES},
-            would_send_items=0,
+    return None
+
+
+def _record_blocked_send(
+    context: _SendContext,
+    *,
+    block_reason: str,
+    error_class: str | None = None,
+) -> None:
+    if not context.writer:
+        return
+    kwargs = {
+        "profile": context.profile,
+        "card_map": context.card_map,
+        "reason": block_reason,
+        "pipeline_result": _notification_preview_result(
+            context.pipeline_result,
+            plan=context.plan,
+            block_reason=block_reason,
+        ),
+    }
+    if error_class is not None:
+        kwargs["error_class"] = error_class
+    context.writer.record_blocked(context.plan, **kwargs)
+    if not context.writer.preview_sections:
+        context.writer.write_no_digest_preview(
+            profile=context.profile,
+            pipeline_result=_notification_preview_result(
+                context.pipeline_result,
+                plan=context.plan,
+                block_reason=block_reason,
+            ),
+            reason=block_reason,
         )
 
-    delivered_by_lane = {lane: 0 for lane in LANES}
-    attempted = False
-    block_reasons: list[str] = []
+
+def _no_due_send_result(context: _SendContext) -> event_alpha_pipeline.EventAlphaSendResult:
+    reason = "; ".join(context.plan.blocked_by_lane.values()) or context.plan.heartbeat_reason or "no due notifications"
+    if context.writer:
+        context.writer.write_no_digest_preview(
+            profile=context.profile,
+            pipeline_result=_notification_preview_result(context.pipeline_result, plan=context.plan, block_reason=reason),
+            reason=reason,
+        )
+    return _send_result(
+        context,
+        requested=True,
+        attempted=False,
+        items_attempted=0,
+        items_delivered=0,
+        block_reason=reason,
+        lane_items_attempted=context.lane_attempts,
+        lane_items_delivered={lane: 0 for lane in LANES},
+        would_send_items=0,
+    )
+
+
+def _send_due_digest_lanes(context: _SendContext, state: _SendExecutionState) -> None:
     for lane in (
         LANE_TRIGGERED_FADE,
         LANE_INSTANT_ESCALATION,
@@ -226,260 +345,214 @@ def send_notifications(
         LANE_RESEARCH_REVIEW_DIGEST,
         LANE_EXPLORATORY_DIGEST,
     ):
-        research_review = lane == LANE_RESEARCH_REVIEW_DIGEST
-        exploratory = lane == LANE_EXPLORATORY_DIGEST
-        if research_review:
-            items = list(plan.research_review_items)
-        else:
-            items = list(plan.exploratory_items if exploratory else plan.decisions_by_lane.get(lane, []))
-        if not items:
+        prepared = _prepare_lane_send(context, lane)
+        if prepared is None:
             continue
-        if research_review:
-            message = format_research_review_telegram_digest(
-                items,
-                profile=profile,
-                card_path_by_alert_id=card_map,
-                core_row_by_alert_id=plan.core_row_by_alert_id,
-                cfg=cfg,
-                eligible_count=plan.research_review_eligible_count,
-                skipped_items=plan.research_review_skipped_items,
-            )
-            identity = _delivery_identity_for_decisions(
-                [item.decision for item in items],
-                core_row_by_alert_id=plan.core_row_by_alert_id,
-                card_path_by_alert_id=card_map,
-                lane=lane,
-                preview_path=writer.preview_path if writer else None,
-            )
-            alert_ids = list(identity.notification_item_ids)
-            route_label = "RESEARCH_REVIEW_DIGEST"
-        elif exploratory:
-            message = format_exploratory_telegram_digest(
-                items,
-                profile=profile,
-                card_path_by_alert_id=card_map,
-                cfg=cfg,
-            )
-            identity = _delivery_identity_for_decisions(
-                [item.decision for item in items],
-                core_row_by_alert_id=plan.core_row_by_alert_id,
-                card_path_by_alert_id=card_map,
-                lane=lane,
-                preview_path=writer.preview_path if writer else None,
-            )
-            alert_ids = list(identity.notification_item_ids)
-            route_label = "EXPLORATORY_DIGEST"
-        else:
-            message = format_core_opportunity_telegram_digest(
-                items,
-                profile=profile,
-                card_path_by_alert_id=card_map,
-                core_row_by_alert_id=plan.core_row_by_alert_id,
-                pipeline_result=pipeline_result,
-                max_items=cfg.daily_digest_max_items if lane == LANE_DAILY_DIGEST else None,
-            )
-            identity = _delivery_identity_for_decisions(
-                items,
-                core_row_by_alert_id=plan.core_row_by_alert_id,
-                card_path_by_alert_id=card_map,
-                lane=lane,
-                preview_path=writer.preview_path if writer else None,
-            )
-            alert_ids = list(identity.notification_item_ids)
-            route_label = _route_label(items)
-        if writer:
-            writer.write_preview(
-                message=message,
-                lane=lane,
-                route=route_label,
-                identity=identity,
-                would_send=True,
-                sent=False,
-            )
-        if writer and writer.skip_as_duplicate(
-            message=message,
-            lane=lane,
-            alert_ids=alert_ids,
-            route=route_label,
-            identity=identity,
-        ):
+        _write_lane_preview(context, prepared)
+        if _skip_duplicate_lane(context, prepared):
             continue
-        attempted = True
-        if writer:
-            writer.record_planned(message=message, lane=lane, alert_ids=alert_ids, route=route_label, identity=identity)
-            writer.record_sending(message=message, lane=lane, alert_ids=alert_ids, route=route_label, identity=identity)
-        attempt = _call_send_fn(send_fn, message)
-        terminal_state = delivery.state_for_send_counts(
-            delivered_count=attempt.delivered_count,
-            failed_count=attempt.failed_count,
-        )
-        partial_marks_cooldown = bool(writer.cfg.partial_marks_cooldown) if writer else True
-        if terminal_state == delivery.STATE_DELIVERED:
-            delivered_by_lane[lane] = len(items)
-            record_lane_sent(
-                storage,
-                lane,
-                item_count=len(items),
-                now=observed,
-                alert_ids=alert_ids,
-                cfg=cfg,
-            )
-            if writer:
-                writer.record_attempt_result(
-                    message=message,
-                    lane=lane,
-                    alert_ids=alert_ids,
-                    route=route_label,
-                    attempt=attempt,
-                    identity=identity,
-                )
-        elif terminal_state == delivery.STATE_PARTIAL_DELIVERED:
-            block_reasons.append(f"{lane}: partial delivery ({attempt.delivered_count}/{attempt.recipient_count} recipient(s))")
-            if partial_marks_cooldown:
-                record_lane_sent(
-                    storage,
-                    lane,
-                    item_count=len(items),
-                    now=observed,
-                    alert_ids=alert_ids,
-                    cfg=cfg,
-                )
-            if writer:
-                writer.record_attempt_result(
-                    message=message,
-                    lane=lane,
-                    alert_ids=alert_ids,
-                    route=route_label,
-                    attempt=attempt,
-                    identity=identity,
-                )
-        else:
-            block_reasons.append(f"{lane}: {attempt.error_message_safe or 'no channel delivered'}")
-            if writer:
-                writer.record_attempt_result(
-                    message=message,
-                    lane=lane,
-                    alert_ids=alert_ids,
-                    route=route_label,
-                    attempt=attempt,
-                    identity=identity,
-                )
-    if plan.heartbeat_due:
-        heartbeat_message = format_health_heartbeat(
-            profile=profile,
-            result=_notification_preview_result(
-                pipeline_result,
-                plan=plan,
-                delivered_by_lane=delivered_by_lane,
-            ),
-            now=observed,
-        )
-        heartbeat_identity = DeliveryIdentity(
-            notification_item_ids=("heartbeat",),
-            source_alert_ids=("heartbeat",),
-            requested_alert_id="heartbeat",
-            alert_id="heartbeat",
-            identity_reconciled=False,
-            identity_reconciliation_reason="heartbeat",
-            notification_preview_path=str(writer.preview_path) if writer else None,
-            notification_preview_relpath=delivery.notification_preview_relpath_for_path(writer.preview_path if writer else None),
-        )
-        if writer:
-            writer.write_preview(
-                message=heartbeat_message,
-                lane=LANE_HEALTH_HEARTBEAT,
-                route="HEALTH_HEARTBEAT",
-                identity=heartbeat_identity,
-                would_send=True,
-                sent=False,
-            )
-        # Same delivery-ledger dedupe as the digest lanes for idempotency. In
-        # practice the heartbeat carries a timestamp so its content hash differs
-        # each run, but this keeps every lane consistently deduped.
-        heartbeat_dup = bool(
-            writer
-            and writer.skip_as_duplicate(
-                message=heartbeat_message,
-                lane=LANE_HEALTH_HEARTBEAT,
-                alert_ids=["heartbeat"],
-                route="HEALTH_HEARTBEAT",
-                identity=heartbeat_identity,
-            )
-        )
-        if not heartbeat_dup:
-            attempted = True
-            if writer:
-                writer.record_planned(
-                    message=heartbeat_message,
-                    lane=LANE_HEALTH_HEARTBEAT,
-                    alert_ids=["heartbeat"],
-                    route="HEALTH_HEARTBEAT",
-                    identity=heartbeat_identity,
-                )
-                writer.record_sending(
-                    message=heartbeat_message,
-                    lane=LANE_HEALTH_HEARTBEAT,
-                    alert_ids=["heartbeat"],
-                    route="HEALTH_HEARTBEAT",
-                    identity=heartbeat_identity,
-                )
-            attempt = _call_send_fn(send_fn, heartbeat_message)
-            terminal_state = delivery.state_for_send_counts(
-                delivered_count=attempt.delivered_count,
-                failed_count=attempt.failed_count,
-            )
-            partial_marks_cooldown = bool(writer.cfg.partial_marks_cooldown) if writer else True
-            if terminal_state == delivery.STATE_DELIVERED:
-                delivered_by_lane[LANE_HEALTH_HEARTBEAT] = 1
-                record_lane_sent(storage, LANE_HEALTH_HEARTBEAT, item_count=1, now=observed, cfg=cfg)
-                if writer:
-                    writer.record_attempt_result(
-                        message=heartbeat_message,
-                        lane=LANE_HEALTH_HEARTBEAT,
-                        alert_ids=["heartbeat"],
-                        route="HEALTH_HEARTBEAT",
-                        attempt=attempt,
-                        identity=heartbeat_identity,
-                    )
-            elif terminal_state == delivery.STATE_PARTIAL_DELIVERED:
-                block_reasons.append(
-                    f"health_heartbeat: partial delivery ({attempt.delivered_count}/{attempt.recipient_count} recipient(s))"
-                )
-                if partial_marks_cooldown:
-                    record_lane_sent(storage, LANE_HEALTH_HEARTBEAT, item_count=1, now=observed, cfg=cfg)
-                if writer:
-                    writer.record_attempt_result(
-                        message=heartbeat_message,
-                        lane=LANE_HEALTH_HEARTBEAT,
-                        alert_ids=["heartbeat"],
-                        route="HEALTH_HEARTBEAT",
-                        attempt=attempt,
-                        identity=heartbeat_identity,
-                    )
-            else:
-                block_reasons.append(f"health_heartbeat: {attempt.error_message_safe or 'no channel delivered'}")
-                if writer:
-                    writer.record_attempt_result(
-                        message=heartbeat_message,
-                        lane=LANE_HEALTH_HEARTBEAT,
-                        alert_ids=["heartbeat"],
-                        route="HEALTH_HEARTBEAT",
-                        attempt=attempt,
-                        identity=heartbeat_identity,
-                    )
+        state.attempted = True
+        _record_lane_sending(context, prepared)
+        attempt = _call_send_fn(context.send_fn, prepared.message)
+        _handle_lane_attempt_result(context, state, prepared, attempt, block_label=prepared.lane)
 
-    delivered = sum(delivered_by_lane.values())
-    return _result(
-        requested=True,
-        attempted=attempted,
-        success=delivered > 0 and not block_reasons,
-        items_attempted=would_send,
-        items_delivered=delivered,
-        block_reason="; ".join(block_reasons) or None,
-        lane_items_attempted=lane_attempts,
-        lane_items_delivered=delivered_by_lane,
-        would_send_items=would_send,
-        heartbeat_sent=delivered_by_lane[LANE_HEALTH_HEARTBEAT] > 0,
+
+def _prepare_lane_send(context: _SendContext, lane: str) -> _PreparedLaneSend | None:
+    research_review = lane == LANE_RESEARCH_REVIEW_DIGEST
+    exploratory = lane == LANE_EXPLORATORY_DIGEST
+    if research_review:
+        items = list(context.plan.research_review_items)
+    else:
+        items = list(context.plan.exploratory_items if exploratory else context.plan.decisions_by_lane.get(lane, []))
+    if not items:
+        return None
+    if research_review:
+        message = format_research_review_telegram_digest(
+            items,
+            profile=context.profile,
+            card_path_by_alert_id=context.card_map,
+            core_row_by_alert_id=context.plan.core_row_by_alert_id,
+            cfg=context.cfg,
+            eligible_count=context.plan.research_review_eligible_count,
+            skipped_items=context.plan.research_review_skipped_items,
+        )
+        decisions = [item.decision for item in items]
+        route_label = "RESEARCH_REVIEW_DIGEST"
+    elif exploratory:
+        message = format_exploratory_telegram_digest(
+            items,
+            profile=context.profile,
+            card_path_by_alert_id=context.card_map,
+            cfg=context.cfg,
+        )
+        decisions = [item.decision for item in items]
+        route_label = "EXPLORATORY_DIGEST"
+    else:
+        message = format_core_opportunity_telegram_digest(
+            items,
+            profile=context.profile,
+            card_path_by_alert_id=context.card_map,
+            core_row_by_alert_id=context.plan.core_row_by_alert_id,
+            pipeline_result=context.pipeline_result,
+            max_items=context.cfg.daily_digest_max_items if lane == LANE_DAILY_DIGEST else None,
+        )
+        decisions = items
+        route_label = _route_label(items)
+    identity = _delivery_identity_for_decisions(
+        decisions,
+        core_row_by_alert_id=context.plan.core_row_by_alert_id,
+        card_path_by_alert_id=context.card_map,
+        lane=lane,
+        preview_path=context.writer.preview_path if context.writer else None,
+    )
+    return _PreparedLaneSend(
+        lane=lane,
+        items=items,
+        message=message,
+        identity=identity,
+        alert_ids=list(identity.notification_item_ids),
+        route_label=route_label,
+    )
+
+
+def _write_lane_preview(context: _SendContext, prepared: _PreparedLaneSend) -> None:
+    if context.writer:
+        context.writer.write_preview(
+            message=prepared.message,
+            lane=prepared.lane,
+            route=prepared.route_label,
+            identity=prepared.identity,
+            would_send=True,
+            sent=False,
+        )
+
+
+def _skip_duplicate_lane(context: _SendContext, prepared: _PreparedLaneSend) -> bool:
+    return bool(
+        context.writer
+        and context.writer.skip_as_duplicate(
+            message=prepared.message,
+            lane=prepared.lane,
+            alert_ids=prepared.alert_ids,
+            route=prepared.route_label,
+            identity=prepared.identity,
+        )
+    )
+
+
+def _record_lane_sending(context: _SendContext, prepared: _PreparedLaneSend) -> None:
+    if not context.writer:
+        return
+    context.writer.record_planned(
+        message=prepared.message,
+        lane=prepared.lane,
+        alert_ids=prepared.alert_ids,
+        route=prepared.route_label,
+        identity=prepared.identity,
+    )
+    context.writer.record_sending(
+        message=prepared.message,
+        lane=prepared.lane,
+        alert_ids=prepared.alert_ids,
+        route=prepared.route_label,
+        identity=prepared.identity,
+    )
+
+
+def _send_health_heartbeat(context: _SendContext, state: _SendExecutionState) -> None:
+    if not context.plan.heartbeat_due:
+        return
+    prepared = _prepare_heartbeat_send(context, state.delivered_by_lane)
+    _write_lane_preview(context, prepared)
+    # Same delivery-ledger dedupe as the digest lanes for idempotency. In
+    # practice the heartbeat carries a timestamp so its content hash differs
+    # each run, but this keeps every lane consistently deduped.
+    if _skip_duplicate_lane(context, prepared):
+        return
+    state.attempted = True
+    _record_lane_sending(context, prepared)
+    attempt = _call_send_fn(context.send_fn, prepared.message)
+    _handle_lane_attempt_result(context, state, prepared, attempt, block_label="health_heartbeat")
+
+
+def _prepare_heartbeat_send(
+    context: _SendContext,
+    delivered_by_lane: Mapping[str, int],
+) -> _PreparedLaneSend:
+    heartbeat_message = format_health_heartbeat(
+        profile=context.profile,
+        result=_notification_preview_result(
+            context.pipeline_result,
+            plan=context.plan,
+            delivered_by_lane=delivered_by_lane,
+        ),
+        now=context.observed,
+    )
+    heartbeat_identity = DeliveryIdentity(
+        notification_item_ids=("heartbeat",),
+        source_alert_ids=("heartbeat",),
+        requested_alert_id="heartbeat",
+        alert_id="heartbeat",
+        identity_reconciled=False,
+        identity_reconciliation_reason="heartbeat",
+        notification_preview_path=str(context.writer.preview_path) if context.writer else None,
+        notification_preview_relpath=delivery.notification_preview_relpath_for_path(
+            context.writer.preview_path if context.writer else None
+        ),
+    )
+    return _PreparedLaneSend(
+        lane=LANE_HEALTH_HEARTBEAT,
+        items=["heartbeat"],
+        message=heartbeat_message,
+        identity=heartbeat_identity,
+        alert_ids=["heartbeat"],
+        route_label="HEALTH_HEARTBEAT",
+    )
+
+
+def _handle_lane_attempt_result(
+    context: _SendContext,
+    state: _SendExecutionState,
+    prepared: _PreparedLaneSend,
+    attempt: sender.NotificationSendAttemptResult,
+    *,
+    block_label: str,
+) -> None:
+    terminal_state = delivery.state_for_send_counts(
+        delivered_count=attempt.delivered_count,
+        failed_count=attempt.failed_count,
+    )
+    partial_marks_cooldown = bool(context.writer.cfg.partial_marks_cooldown) if context.writer else True
+    if terminal_state == delivery.STATE_DELIVERED:
+        state.delivered_by_lane[prepared.lane] = len(prepared.items)
+        _record_lane_sent_for_attempt(context, prepared)
+    elif terminal_state == delivery.STATE_PARTIAL_DELIVERED:
+        state.block_reasons.append(
+            f"{block_label}: partial delivery ({attempt.delivered_count}/{attempt.recipient_count} recipient(s))"
+        )
+        if partial_marks_cooldown:
+            _record_lane_sent_for_attempt(context, prepared)
+    else:
+        state.block_reasons.append(f"{block_label}: {attempt.error_message_safe or 'no channel delivered'}")
+    if context.writer:
+        context.writer.record_attempt_result(
+            message=prepared.message,
+            lane=prepared.lane,
+            alert_ids=prepared.alert_ids,
+            route=prepared.route_label,
+            attempt=attempt,
+            identity=prepared.identity,
+        )
+
+
+def _record_lane_sent_for_attempt(context: _SendContext, prepared: _PreparedLaneSend) -> None:
+    record_lane_sent(
+        context.storage,
+        prepared.lane,
+        item_count=len(prepared.items),
+        now=context.observed,
+        alert_ids=prepared.alert_ids,
+        cfg=context.cfg,
     )
 
 def _call_send_fn(send_fn: SendFn, message: str) -> sender.NotificationSendAttemptResult:
