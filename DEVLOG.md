@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split notification delivery doctor conflicts · Codex
+**Why:** The refactor burn-down still had oversized function debt after the
+production and legacy size gates passed. `_notification_delivery_conflicts()`
+was a pure artifact-doctor counter aggregator, making it a safe
+behavior-preserving split.
+**Changes:**
+- Split `crypto_rsi_scanner/event_alpha/doctor/legacy/notification_delivery_checks.py`
+  so `_notification_delivery_conflicts()` is now a 39-line orchestrator over
+  focused helpers for scope counts, preview-body checks, research-review digest
+  checks, and strict delivery/core identity checks.
+- Preserved the existing counter names, strict/latest-run scope behavior,
+  notification preview resolution, and research-review family-summary checks.
+- Regenerated refactor class ownership, size-gate, final, completion-map,
+  release-candidate, and shim reports. Current advisory inventory is `14`
+  classes and `16` functions over limits, with size gates passing and no active
+  shim implementation leaks.
+- Updated `ROADMAP.md` to include `_notification_delivery_conflicts()` in the
+  completed ownership burn-down list.
+**Verify:** Focused doctor/notification tests passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha/test_artifact_doctor.py tests/event_alpha/test_notifications.py -q`
+reported `112 passed`. Full safe checks passed: `python3 tests/test_indicators.py`
+reported `745/745 passed`; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q` reported
+`756 passed`; `python3 -m compileall -q crypto_rsi_scanner tests`,
+`make refactor-size-gates PYTHON=python3`, `make refactor-class-ownership-report
+PYTHON=python3`, `make event-alpha-integrated-radar-smoke PYTHON=python3`,
+`make event-alpha-integrated-radar-doctor PYTHON=python3`,
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`,
+and `make verify PYTHON=python3` passed.
+**Notes/risks:** Behavior-preserving only. The strict CryptoPanic rehearsal
+doctor remains `WARN` with known non-blocking quality/incident warnings and no
+blockers. No live provider calls by default, live sends, trading, paper-trading
+behavior changes, execution/order logic, Event Alpha RSI writes, or Event
+Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split artifact doctor report formatter debt · Codex
 **Why:** The long-running refactor still tracks oversized function debt after
 production and legacy file-size gates passed. The legacy artifact-doctor report

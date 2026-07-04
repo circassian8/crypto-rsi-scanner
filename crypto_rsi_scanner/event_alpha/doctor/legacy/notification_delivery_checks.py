@@ -11,7 +11,41 @@ def _notification_delivery_conflicts(
     latest_run_id: str | None = None,
     strict_scope: str = "all_rows",
 ) -> dict[str, int]:
-    out = {
+    out = _empty_notification_delivery_conflicts()
+    scope = _normalize_delivery_strict_scope(strict_scope, latest_run_id=latest_run_id, strict=True)
+    for row in _delivery.latest_rows_by_delivery(delivery_rows):
+        row_run_id = str(row.get("run_id") or "").strip()
+        is_latest_run = bool(latest_run_id and row_run_id == latest_run_id)
+        _add_delivery_scope_counts(out, row, latest_run_id=latest_run_id, is_latest_run=is_latest_run)
+        if scope == "latest_run" and latest_run_id and not is_latest_run:
+            continue
+
+        _add_counter_map(out, _delivery_status_field_conflicts(row))
+        telegram_body = _delivery_preview_body(row, out, is_latest_run=is_latest_run)
+        lane = str(row.get("lane") or "")
+        scalar_core_ids = _tuple_value(row.get("core_opportunity_id"))
+        core_ids = _tuple_value(row.get("core_opportunity_ids")) or scalar_core_ids
+        alert_ids = _tuple_value(row.get("alert_id"))
+        cores = tuple(core_rows_by_id[core_id] for core_id in core_ids if core_id in core_rows_by_id)
+        missing_core_ids = tuple(core_id for core_id in core_ids if core_id not in core_rows_by_id)
+        if lane == "research_review_digest":
+            _add_research_review_digest_conflicts(out, row, telegram_body, core_ids=core_ids, cores=cores)
+        if lane not in {"daily_digest", "instant_escalation", "triggered_fade"}:
+            continue
+        _add_strict_delivery_identity_conflicts(
+            out,
+            row,
+            lane=lane,
+            scalar_core_ids=scalar_core_ids,
+            core_ids=core_ids,
+            alert_ids=alert_ids,
+            missing_core_ids=missing_core_ids,
+        )
+        _add_strict_delivery_core_conflicts(out, lane=lane, cores=cores)
+    return out
+
+def _empty_notification_delivery_conflicts() -> dict[str, int]:
+    return {
         "latest_run_delivery_rows": 0,
         "legacy_delivery_rows": 0,
         "stale_delivery_rows": 0,
@@ -51,210 +85,253 @@ def _notification_delivery_conflicts(
         "delivery_state_inconsistent": 0,
         "delivery_would_send_sent_failed_inconsistent": 0,
     }
-    scope = _normalize_delivery_strict_scope(strict_scope, latest_run_id=latest_run_id, strict=True)
-    latest = _delivery.latest_rows_by_delivery(delivery_rows)
-    for row in latest:
-        row_run_id = str(row.get("run_id") or "").strip()
-        is_latest_run = bool(latest_run_id and row_run_id == latest_run_id)
-        if latest_run_id:
-            if is_latest_run:
-                out["latest_run_delivery_rows"] += 1
-            else:
-                out["stale_delivery_rows"] += 1
-                if _delivery_is_legacy_pre_core_identity(row):
-                    out["legacy_delivery_rows"] += 1
-                if _delivery_lacks_core_identity(row):
-                    out["stale_delivery_identity_missing_core"] += 1
-                    if _delivery_is_legacy_pre_core_identity(row):
-                        out["legacy_pre_core_delivery_identity"] += 1
-        if scope == "latest_run" and latest_run_id and not is_latest_run:
+
+def _add_counter_map(out: dict[str, int], increments: Mapping[str, int]) -> None:
+    for key, value in increments.items():
+        out[key] += value
+
+def _add_delivery_scope_counts(
+    out: dict[str, int],
+    row: Mapping[str, Any],
+    *,
+    latest_run_id: str | None,
+    is_latest_run: bool,
+) -> None:
+    if not latest_run_id:
+        return
+    if is_latest_run:
+        out["latest_run_delivery_rows"] += 1
+        return
+    out["stale_delivery_rows"] += 1
+    if _delivery_is_legacy_pre_core_identity(row):
+        out["legacy_delivery_rows"] += 1
+    if _delivery_lacks_core_identity(row):
+        out["stale_delivery_identity_missing_core"] += 1
+        if _delivery_is_legacy_pre_core_identity(row):
+            out["legacy_pre_core_delivery_identity"] += 1
+
+def _delivery_preview_body(row: Mapping[str, Any], out: dict[str, int], *, is_latest_run: bool) -> str:
+    preview_relpath = str(row.get("notification_preview_relpath") or "").strip()
+    if not preview_relpath and is_latest_run:
+        out["notification_preview_relpath_missing"] += 1
+    path, _source = _delivery.resolve_notification_preview_path(
+        row,
+        artifact_namespace=row.get("artifact_namespace") or row.get("namespace"),
+    )
+    if path is None:
+        out["notification_preview_missing"] += 1
+        out["notification_preview_path_unresolvable"] += 1
+        return ""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        out["notification_preview_missing"] += 1
+        out["notification_preview_path_unresolvable"] += 1
+        return ""
+    telegram_body = "\n".join(_telegram_preview_bodies(text)) or text
+    if re.search(r"/Users/|/tmp/|/private/tmp/", telegram_body):
+        out["telegram_message_contains_absolute_path"] += 1
+    if re.search(r"\b(alert_id|card_id|research_card|route|lane)=", telegram_body):
+        out["telegram_message_contains_raw_debug_dump"] += 1
+    return telegram_body
+
+def _add_research_review_digest_conflicts(
+    out: dict[str, int],
+    row: Mapping[str, Any],
+    telegram_body: str,
+    *,
+    core_ids: tuple[str, ...],
+    cores: tuple[Mapping[str, Any], ...],
+) -> None:
+    if "Not alertable" not in telegram_body or "Missing confirmation" not in telegram_body:
+        out["research_review_digest_missing_confirmation_label"] += 1
+    if re.search(r"/Users/|/tmp/|/private/tmp/", telegram_body):
+        out["research_review_digest_absolute_path"] += 1
+    if len(re.findall(r"(?m)^\d+\.\s*<b>", telegram_body)) > 10:
+        out["research_review_digest_too_many_items"] += 1
+    if not str(row.get("feedback_target") or "").strip():
+        out["research_review_digest_missing_feedback_target"] += 1
+    _add_research_review_skip_conflicts(out, row, telegram_body)
+    if core_ids:
+        _add_research_review_body_conflicts(out, row, telegram_body)
+    for digest_core in cores:
+        if _research_review_core_is_alertable(digest_core):
+            out["research_review_digest_contains_strict_alertable"] += 1
+        if _research_review_core_is_hard_gated(digest_core):
+            out["research_review_digest_contains_hard_gated_candidate"] += 1
+
+def _add_research_review_skip_conflicts(out: dict[str, int], row: Mapping[str, Any], telegram_body: str) -> None:
+    summary = row.get("channel_summary") if isinstance(row.get("channel_summary"), Mapping) else {}
+    skipped_count = _as_int(row.get("skipped_candidate_count") or summary.get("skipped_candidate_count"))
+    if skipped_count <= 0:
+        return
+    reason_counts = _research_review_skip_reason_counts(row, summary)
+    skipped_items = _research_review_skipped_items(row, summary)
+    display_family_summary = _research_review_display_family_summary(row, summary)
+    family_summary = _research_review_family_summary(row, summary, display_family_summary)
+    has_reason_counts = isinstance(reason_counts, Mapping) and any(str(key).strip() for key in reason_counts)
+    if not has_reason_counts:
+        out["research_review_digest_skipped_without_reason"] += 1
+    has_family_summary = _has_research_review_family_summary(family_summary)
+    if skipped_count > 10 and not has_family_summary:
+        out["research_review_digest_missing_family_summary"] += 1
+    if re.search(r"(?im)\+\d+\s+more skipped candidates", telegram_body) and not has_family_summary:
+        out["research_review_digest_missing_family_summary"] += 1
+    if not has_family_summary:
+        return
+    family_keys = _research_review_family_keys(family_summary)
+    if _display_family_summary_has_duplicate_visible_label(display_family_summary):
+        out["research_review_digest_duplicate_visible_family_summary"] += 1
+    if _research_review_material_skipped_items_missing_family(skipped_items, family_keys):
+        out["research_review_digest_missing_family_summary"] += 1
+
+def _research_review_skip_reason_counts(row: Mapping[str, Any], summary: Mapping[str, Any]) -> object:
+    if isinstance(row.get("skipped_reason_counts"), Mapping):
+        return row.get("skipped_reason_counts")
+    return summary.get("skipped_reason_counts") or summary.get("skip_reason_counts")
+
+def _research_review_skipped_items(row: Mapping[str, Any], summary: Mapping[str, Any]) -> object:
+    if isinstance(row.get("skipped_candidates_sample"), list):
+        return row.get("skipped_candidates_sample")
+    return summary.get("skipped_candidates_sample") or summary.get("skipped_candidates") or []
+
+def _research_review_display_family_summary(row: Mapping[str, Any], summary: Mapping[str, Any]) -> list[object] | None:
+    if isinstance(row.get("skipped_display_family_summary"), list):
+        return row.get("skipped_display_family_summary")
+    value = summary.get("skipped_display_family_summary")
+    return value if isinstance(value, list) else None
+
+def _research_review_family_summary(
+    row: Mapping[str, Any],
+    summary: Mapping[str, Any],
+    display_family_summary: list[object] | None,
+) -> object:
+    if isinstance(display_family_summary, list):
+        return display_family_summary
+    if isinstance(row.get("skipped_family_summary"), list):
+        return row.get("skipped_family_summary")
+    value = summary.get("skipped_family_summary")
+    return value if isinstance(value, list) else []
+
+def _has_research_review_family_summary(family_summary: object) -> bool:
+    return isinstance(family_summary, list) and any(
+        isinstance(item, Mapping)
+        and str(item.get("display_family_id") or item.get("candidate_family_id") or item.get("label") or "").strip()
+        for item in family_summary
+    )
+
+def _research_review_family_keys(family_summary: object) -> set[str]:
+    if not isinstance(family_summary, list):
+        return set()
+    keys = {
+        str(item.get("display_family_id") or item.get("candidate_family_id") or item.get("label") or "").strip()
+        for item in family_summary
+        if isinstance(item, Mapping)
+    }
+    keys.update(
+        str(item.get("label") or f"{item.get('symbol')}/{item.get('coin_id')}" or "").strip()
+        for item in family_summary
+        if isinstance(item, Mapping)
+    )
+    return keys
+
+def _display_family_summary_has_duplicate_visible_label(display_family_summary: object) -> bool:
+    if not isinstance(display_family_summary, list):
+        return False
+    visible_labels: list[str] = []
+    for family_item in display_family_summary:
+        if not isinstance(family_item, Mapping) or bool(family_item.get("display_hidden")):
             continue
-        status_conflicts = _delivery_status_field_conflicts(row)
-        for key, value in status_conflicts.items():
-            out[key] += value
-        preview_relpath = str(row.get("notification_preview_relpath") or "").strip()
-        if not preview_relpath and is_latest_run:
-            out["notification_preview_relpath_missing"] += 1
-        path, _source = _delivery.resolve_notification_preview_path(
-            row,
-            artifact_namespace=row.get("artifact_namespace") or row.get("namespace"),
-        )
-        telegram_body = ""
-        if path is None:
-            out["notification_preview_missing"] += 1
-            out["notification_preview_path_unresolvable"] += 1
-        else:
-            try:
-                text = path.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                out["notification_preview_missing"] += 1
-                out["notification_preview_path_unresolvable"] += 1
-            else:
-                telegram_body = "\n".join(_telegram_preview_bodies(text)) or text
-                if re.search(r"/Users/|/tmp/|/private/tmp/", telegram_body):
-                    out["telegram_message_contains_absolute_path"] += 1
-                if re.search(r"\b(alert_id|card_id|research_card|route|lane)=", telegram_body):
-                    out["telegram_message_contains_raw_debug_dump"] += 1
-        lane = str(row.get("lane") or "")
-        scalar_core_ids = _tuple_value(row.get("core_opportunity_id"))
-        core_ids = _tuple_value(row.get("core_opportunity_ids")) or scalar_core_ids
-        alert_ids = _tuple_value(row.get("alert_id"))
-        cores = tuple(core_rows_by_id[core_id] for core_id in core_ids if core_id in core_rows_by_id)
-        missing_core_ids = tuple(core_id for core_id in core_ids if core_id not in core_rows_by_id)
-        core = cores[0] if len(cores) == 1 else None
-        if lane == "research_review_digest":
-            if "Not alertable" not in telegram_body or "Missing confirmation" not in telegram_body:
-                out["research_review_digest_missing_confirmation_label"] += 1
-            if re.search(r"/Users/|/tmp/|/private/tmp/", telegram_body):
-                out["research_review_digest_absolute_path"] += 1
-            if len(re.findall(r"(?m)^\d+\.\s*<b>", telegram_body)) > 10:
-                out["research_review_digest_too_many_items"] += 1
-            if not str(row.get("feedback_target") or "").strip():
-                out["research_review_digest_missing_feedback_target"] += 1
-            summary = row.get("channel_summary") if isinstance(row.get("channel_summary"), Mapping) else {}
-            skipped_count = _as_int(row.get("skipped_candidate_count") or summary.get("skipped_candidate_count") if isinstance(summary, Mapping) else 0)
-            if skipped_count > 0:
-                reason_counts = (
-                    row.get("skipped_reason_counts")
-                    if isinstance(row.get("skipped_reason_counts"), Mapping)
-                    else summary.get("skipped_reason_counts") or summary.get("skip_reason_counts")
-                    if isinstance(summary, Mapping)
-                    else {}
-                )
-                skipped_items = (
-                    row.get("skipped_candidates_sample")
-                    if isinstance(row.get("skipped_candidates_sample"), list)
-                    else summary.get("skipped_candidates_sample") or summary.get("skipped_candidates")
-                    if isinstance(summary, Mapping)
-                    else []
-                )
-                display_family_summary = (
-                    row.get("skipped_display_family_summary")
-                    if isinstance(row.get("skipped_display_family_summary"), list)
-                    else summary.get("skipped_display_family_summary")
-                    if isinstance(summary, Mapping) and isinstance(summary.get("skipped_display_family_summary"), list)
-                    else None
-                )
-                family_summary = (
-                    display_family_summary
-                    if isinstance(display_family_summary, list)
-                    else row.get("skipped_family_summary")
-                    if isinstance(row.get("skipped_family_summary"), list)
-                    else summary.get("skipped_family_summary")
-                    if isinstance(summary, Mapping) and isinstance(summary.get("skipped_family_summary"), list)
-                    else []
-                )
-                has_reason_counts = isinstance(reason_counts, Mapping) and any(str(key).strip() for key in reason_counts)
-                if not has_reason_counts:
-                    out["research_review_digest_skipped_without_reason"] += 1
-                has_family_summary = isinstance(family_summary, list) and any(
-                    isinstance(item, Mapping) and str(item.get("display_family_id") or item.get("candidate_family_id") or item.get("label") or "").strip()
-                    for item in family_summary
-                )
-                if skipped_count > 10 and not has_family_summary:
-                    out["research_review_digest_missing_family_summary"] += 1
-                if re.search(r"(?im)\+\d+\s+more skipped candidates", telegram_body) and not has_family_summary:
-                    out["research_review_digest_missing_family_summary"] += 1
-                if has_family_summary:
-                    family_keys = {
-                        str(item.get("display_family_id") or item.get("candidate_family_id") or item.get("label") or "").strip()
-                        for item in family_summary
-                        if isinstance(item, Mapping)
-                    }
-                    family_keys.update(
-                        str(item.get("label") or f"{item.get('symbol')}/{item.get('coin_id')}" or "").strip()
-                        for item in family_summary
-                        if isinstance(item, Mapping)
-                    )
-                    if isinstance(display_family_summary, list):
-                        visible_labels: list[str] = []
-                        for family_item in display_family_summary:
-                            if not isinstance(family_item, Mapping) or bool(family_item.get("display_hidden")):
-                                continue
-                            label = str(
-                                family_item.get("display_label")
-                                or family_item.get("label")
-                                or f"{family_item.get('symbol')}/{family_item.get('coin_id')}"
-                                or ""
-                            ).strip().casefold()
-                            if label:
-                                visible_labels.append(label)
-                        if len(visible_labels) != len(set(visible_labels)):
-                            out["research_review_digest_duplicate_visible_family_summary"] += 1
-                    material_missing = [
-                        item for item in skipped_items
-                        if isinstance(item, Mapping)
-                        and (
-                            _as_int(item.get("skipped_count")) >= 10
-                            or _as_float(item.get("score") or item.get("rank_score")) >= 60
-                        )
-                        and str(
-                            item.get("display_family_id")
-                            or f"{item.get('symbol')}/{item.get('coin_id')}"
-                            or item.get("candidate_family_id")
-                            or ""
-                        ).strip()
-                        and str(
-                            item.get("display_family_id")
-                            or f"{item.get('symbol')}/{item.get('coin_id')}"
-                            or item.get("candidate_family_id")
-                            or ""
-                        ).strip() not in family_keys
-                    ]
-                    if material_missing:
-                        out["research_review_digest_missing_family_summary"] += 1
-            if core_ids:
-                body_lower = telegram_body.casefold()
-                card_paths = _tuple_value(row.get("canonical_card_paths")) or _tuple_value(row.get("canonical_card_path"))
-                feedback_targets = _tuple_value(row.get("feedback_targets")) or _tuple_value(row.get("feedback_target"))
-                for card_path in card_paths:
-                    basename = Path(str(card_path)).name
-                    if basename and basename.casefold() not in body_lower:
-                        out["notification_body_card_mismatch_canonical"] += 1
-                for target in feedback_targets:
-                    if target and str(target).casefold() not in body_lower:
-                        out["notification_body_feedback_mismatch_canonical"] += 1
-                if re.search(r"(?im)^\s*feedback target:\s*hyp:", telegram_body):
-                    out["research_review_body_uses_hypothesis_target_when_core_exists"] += 1
-            for digest_core in cores:
-                if _research_review_core_is_alertable(digest_core):
-                    out["research_review_digest_contains_strict_alertable"] += 1
-                if _research_review_core_is_hard_gated(digest_core):
-                    out["research_review_digest_contains_hard_gated_candidate"] += 1
-        if lane not in {"daily_digest", "instant_escalation", "triggered_fade"}:
+        label = str(
+            family_item.get("display_label")
+            or family_item.get("label")
+            or f"{family_item.get('symbol')}/{family_item.get('coin_id')}"
+            or ""
+        ).strip().casefold()
+        if label:
+            visible_labels.append(label)
+    return len(visible_labels) != len(set(visible_labels))
+
+def _research_review_material_skipped_items_missing_family(skipped_items: object, family_keys: set[str]) -> bool:
+    if not isinstance(skipped_items, list):
+        return False
+    for item in skipped_items:
+        if not isinstance(item, Mapping):
             continue
-        if lane == "daily_digest" and len(scalar_core_ids) > 1 and not _tuple_value(row.get("core_opportunity_ids")):
-            out["multi_item_delivery_missing_arrays"] += 1
-        requires_core = _delivery_requires_core_identity(row)
-        if requires_core:
-            if not core_ids:
-                out["delivery_core_id_missing"] += 1
-            if not str(row.get("feedback_target") or "").strip():
-                out["delivery_feedback_target_missing"] += 1
-            if not str(row.get("canonical_card_path") or "").strip():
-                out["delivery_card_path_missing"] += 1
-        if missing_core_ids:
-            out["delivery_identity_mismatch_core_store"] += 1
-        if (
-            requires_core
-            and alert_ids
-            and lane != "triggered_fade"
-            and (not core_ids or set(alert_ids) != set(core_ids))
-        ):
-            out["delivery_alert_id_not_canonical"] += 1
-        if cores and lane in {"daily_digest", "instant_escalation"}:
-            for delivery_core in cores:
-                if _delivery_core_lacks_live_confirmation(delivery_core):
-                    out["digest_item_without_live_confirmation"] += 1
-                if lane == "daily_digest" and _delivery_core_is_unconfirmed_narrative(delivery_core):
-                    out["unconfirmed_narrative_daily_digest"] += 1
-                    if _delivery_core_is_single_source_no_market_fan_token(delivery_core):
-                        out["single_source_no_market_fan_token_digest"] += 1
-                if str(delivery_core.get("evidence_acquisition_status") or "") == "rejected_results_only":
-                    out["digest_item_rejected_results_only"] += 1
-                if _delivery_core_is_strategic_broad_asset_context(delivery_core):
-                    out["strategic_broad_asset_digest_without_confirmation"] += 1
-    return out
+        if _as_int(item.get("skipped_count")) < 10 and _as_float(item.get("score") or item.get("rank_score")) < 60:
+            continue
+        family_key = str(
+            item.get("display_family_id")
+            or f"{item.get('symbol')}/{item.get('coin_id')}"
+            or item.get("candidate_family_id")
+            or ""
+        ).strip()
+        if family_key and family_key not in family_keys:
+            return True
+    return False
+
+def _add_research_review_body_conflicts(
+    out: dict[str, int],
+    row: Mapping[str, Any],
+    telegram_body: str,
+) -> None:
+    body_lower = telegram_body.casefold()
+    card_paths = _tuple_value(row.get("canonical_card_paths")) or _tuple_value(row.get("canonical_card_path"))
+    feedback_targets = _tuple_value(row.get("feedback_targets")) or _tuple_value(row.get("feedback_target"))
+    for card_path in card_paths:
+        basename = Path(str(card_path)).name
+        if basename and basename.casefold() not in body_lower:
+            out["notification_body_card_mismatch_canonical"] += 1
+    for target in feedback_targets:
+        if target and str(target).casefold() not in body_lower:
+            out["notification_body_feedback_mismatch_canonical"] += 1
+    if re.search(r"(?im)^\s*feedback target:\s*hyp:", telegram_body):
+        out["research_review_body_uses_hypothesis_target_when_core_exists"] += 1
+
+def _add_strict_delivery_identity_conflicts(
+    out: dict[str, int],
+    row: Mapping[str, Any],
+    *,
+    lane: str,
+    scalar_core_ids: tuple[str, ...],
+    core_ids: tuple[str, ...],
+    alert_ids: tuple[str, ...],
+    missing_core_ids: tuple[str, ...],
+) -> None:
+    if lane == "daily_digest" and len(scalar_core_ids) > 1 and not _tuple_value(row.get("core_opportunity_ids")):
+        out["multi_item_delivery_missing_arrays"] += 1
+    requires_core = _delivery_requires_core_identity(row)
+    if requires_core:
+        if not core_ids:
+            out["delivery_core_id_missing"] += 1
+        if not str(row.get("feedback_target") or "").strip():
+            out["delivery_feedback_target_missing"] += 1
+        if not str(row.get("canonical_card_path") or "").strip():
+            out["delivery_card_path_missing"] += 1
+    if missing_core_ids:
+        out["delivery_identity_mismatch_core_store"] += 1
+    if requires_core and alert_ids and lane != "triggered_fade" and (not core_ids or set(alert_ids) != set(core_ids)):
+        out["delivery_alert_id_not_canonical"] += 1
+
+def _add_strict_delivery_core_conflicts(
+    out: dict[str, int],
+    *,
+    lane: str,
+    cores: tuple[Mapping[str, Any], ...],
+) -> None:
+    if not cores or lane not in {"daily_digest", "instant_escalation"}:
+        return
+    for delivery_core in cores:
+        if _delivery_core_lacks_live_confirmation(delivery_core):
+            out["digest_item_without_live_confirmation"] += 1
+        if lane == "daily_digest" and _delivery_core_is_unconfirmed_narrative(delivery_core):
+            out["unconfirmed_narrative_daily_digest"] += 1
+            if _delivery_core_is_single_source_no_market_fan_token(delivery_core):
+                out["single_source_no_market_fan_token_digest"] += 1
+        if str(delivery_core.get("evidence_acquisition_status") or "") == "rejected_results_only":
+            out["digest_item_rejected_results_only"] += 1
+        if _delivery_core_is_strategic_broad_asset_context(delivery_core):
+            out["strategic_broad_asset_digest_without_confirmation"] += 1
 
 def _delivery_status_field_conflicts(row: Mapping[str, Any]) -> dict[str, int]:
     out = {
