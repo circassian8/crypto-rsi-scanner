@@ -131,7 +131,7 @@
     }
   ],
   "classes_over_limit_count": 14,
-  "existing_violation_count": 120,
+  "existing_violation_count": 119,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -383,17 +383,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py:diagnose_artifacts"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "_integrated_radar_artifact_conflicts",
-      "line_count": 218,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.provider_readiness_checks",
-      "public": false,
-      "qualname": "_integrated_radar_artifact_conflicts",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py:_integrated_radar_artifact_conflicts"
     },
     {
       "category": "function_over_150_lines",
@@ -1270,14 +1259,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py"
     },
     {
-      "function_name": "_integrated_radar_artifact_conflicts",
-      "line_count": 218,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.provider_readiness_checks",
-      "public": false,
-      "qualname": "_integrated_radar_artifact_conflicts",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py"
-    },
-    {
       "function_name": "send_notifications",
       "line_count": 406,
       "module": "crypto_rsi_scanner.event_alpha.notifications.legacy.send_plan",
@@ -1390,9 +1371,9 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     }
   ],
-  "functions_over_limit_count": 16,
+  "functions_over_limit_count": 15,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T07:15:37.066853+00:00",
+  "generated_at": "2026-07-04T07:23:11.178385+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -2344,10 +2325,6 @@
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py:diagnose_artifacts"
     },
     {
-      "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:_integrated_radar_artifact_conflicts",
-      "current_violation_id": "function:crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py:_integrated_radar_artifact_conflicts"
-    },
-    {
       "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:send_notifications",
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications"
     },
@@ -2436,7 +2413,7 @@
       "current_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.models"
     }
   ],
-  "moved_existing_violation_count": 24,
+  "moved_existing_violation_count": 23,
   "new_violation_count": 0,
   "new_violations": [],
   "no_live_provider_calls": true,
@@ -2582,7 +2559,7 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 16,
+  "production_functions_over_limit": 15,
   "production_functions_over_limit_rows": [
     {
       "function_name": "diagnose_artifacts",
@@ -2591,14 +2568,6 @@
       "public": true,
       "qualname": "diagnose_artifacts",
       "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py"
-    },
-    {
-      "function_name": "_integrated_radar_artifact_conflicts",
-      "line_count": 218,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.provider_readiness_checks",
-      "public": false,
-      "qualname": "_integrated_radar_artifact_conflicts",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py"
     },
     {
       "function_name": "send_notifications",
@@ -2715,7 +2684,7 @@
   ],
   "production_size_gate_status": "pass",
   "research_only": true,
-  "resolved_violation_count": 84,
+  "resolved_violation_count": 85,
   "resolved_violation_ids": [
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
     "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
@@ -2771,6 +2740,7 @@
     "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py:render_research_card",
     "function:crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py:_run_record",
     "function:crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py:format_run_ledger_report",
+    "function:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:_integrated_radar_artifact_conflicts",
     "function:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:_notification_delivery_conflicts",
     "function:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:format_artifact_doctor_report",
     "function:crypto_rsi_scanner/event_alpha/notifications/go_no_go.py:build_go_no_go",
@@ -2831,7 +2801,6 @@
     "file:tests/event_alpha/test_source_coverage.py",
     "file:tests/test_indicators.py",
     "function:crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py:diagnose_artifacts",
-    "function:crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py:_integrated_radar_artifact_conflicts",
     "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications",
     "function:crypto_rsi_scanner/event_alpha/notifications/router.py:_route_entry",
     "function:crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py:evaluate_signal_quality_case",
@@ -3180,17 +3149,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py:diagnose_artifacts"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "_integrated_radar_artifact_conflicts",
-      "line_count": 218,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.provider_readiness_checks",
-      "public": false,
-      "qualname": "_integrated_radar_artifact_conflicts",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py:_integrated_radar_artifact_conflicts"
     },
     {
       "category": "function_over_150_lines",

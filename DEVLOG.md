@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split integrated radar doctor conflicts · Codex
+**Why:** The refactor goal still has advisory oversized-function debt after the
+production and legacy size gates passed. `_integrated_radar_artifact_conflicts()`
+was a pure artifact-doctor counter aggregator over integrated radar artifacts,
+cards, manifests, delivery rows, outcomes, and operator Markdown, making it a
+safe behavior-preserving split.
+**Changes:**
+- Split `crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py`
+  so `_integrated_radar_artifact_conflicts()` is now a 38-line orchestrator over
+  helpers for candidate row checks, manifest/source-coverage checks,
+  daily-brief/preview/operator path checks, delivery rows, outcome rows, and
+  calibration/performance checks.
+- Preserved the existing integrated radar counter names and delegated to the
+  same lower-level core/card, Coinalyze manifest, delivery, outcome,
+  calibration, performance, and structured path checkers.
+- Regenerated refactor class ownership, size-gate, final, completion-map,
+  release-candidate, and shim reports. Current advisory inventory is `14`
+  classes and `15` functions over limits, with size gates passing and no active
+  shim implementation leaks.
+- Updated `ROADMAP.md` to include `_integrated_radar_artifact_conflicts()` in
+  the completed ownership burn-down list.
+**Verify:** Focused tests passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha/test_artifact_doctor.py -q`
+reported `45 passed`, and the integrated/source coverage slice reported
+`275 passed`. Full safe checks passed: `python3 tests/test_indicators.py`
+reported `745/745 passed`; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q` reported
+`756 passed`; `python3 -m compileall -q crypto_rsi_scanner tests`,
+`make refactor-size-gates PYTHON=python3`, `make refactor-class-ownership-report
+PYTHON=python3`, `make event-alpha-integrated-radar-smoke PYTHON=python3`,
+`make event-alpha-integrated-radar-doctor PYTHON=python3`,
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`,
+and `make verify PYTHON=python3` passed.
+**Notes/risks:** Behavior-preserving only. The strict CryptoPanic rehearsal
+doctor remains `WARN` with known non-blocking quality/incident warnings and no
+blockers. No live provider calls by default, live sends, trading, paper-trading
+behavior changes, execution/order logic, Event Alpha RSI writes, or Event
+Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split notification delivery doctor conflicts · Codex
 **Why:** The refactor burn-down still had oversized function debt after the
 production and legacy size gates passed. `_notification_delivery_conflicts()`

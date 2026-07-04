@@ -356,7 +356,35 @@ def _integrated_radar_artifact_conflicts(
     outcome_path: str | Path | None = None,
     preview_path: str | Path | None = None,
 ) -> dict[str, int]:
-    out = {
+    out = _empty_integrated_radar_artifact_conflicts()
+    materialized_rows = [dict(row) for row in rows if isinstance(row, Mapping)]
+    materialized_core_rows = tuple(core_rows)
+    core_by_id = {
+        str(row.get("core_opportunity_id") or ""): dict(row)
+        for row in materialized_core_rows
+        if isinstance(row, Mapping) and row.get("core_opportunity_id")
+    }
+    card_text_by_core = _card_text_by_core(research_card_paths)
+    row_count = 0
+    for row in materialized_rows:
+        row_count += 1
+        _add_integrated_candidate_conflicts(row, core_by_id, card_text_by_core, out)
+
+    _add_integrated_manifest_conflicts(out, row_count, manifest_path, materialized_rows)
+    _add_integrated_source_coverage_conflicts(out, row_count, source_coverage_json_path)
+    _add_integrated_daily_brief_conflicts(out, row_count, daily_brief_path, manifest_path, materialized_rows)
+    _add_integrated_preview_conflicts(out, row_count, preview_path)
+    _add_integrated_operator_path_conflicts(out, research_card_paths, daily_brief_path=daily_brief_path, preview_path=preview_path)
+    delivery_rows = _integrated_delivery_rows(out, row_count, delivery_path, preview_path=preview_path)
+    outcome_rows = _integrated_outcome_rows(out, materialized_rows, outcome_path)
+    _add_integrated_calibration_performance_conflicts(out, outcome_path)
+    out["operator_structured_path_absolute"] += _structured_operator_path_conflicts(
+        (*materialized_rows, *materialized_core_rows, *delivery_rows, *outcome_rows)
+    )
+    return out
+
+def _empty_integrated_radar_artifact_conflicts() -> dict[str, int]:
+    return {
         "integrated_candidate_missing_opportunity_type": 0,
         "integrated_candidate_missing_market_state_snapshot": 0,
         "integrated_confirmed_long_without_source_market": 0,
@@ -435,86 +463,117 @@ def _integrated_radar_artifact_conflicts(
         "integrated_created_normal_rsi_signal": 0,
         "integrated_created_triggered_fade": 0,
     }
-    materialized_rows = [dict(row) for row in rows if isinstance(row, Mapping)]
-    core_by_id = {str(row.get("core_opportunity_id") or ""): dict(row) for row in core_rows if isinstance(row, Mapping) and row.get("core_opportunity_id")}
-    card_text_by_core = _card_text_by_core(research_card_paths)
-    row_count = 0
-    for row in materialized_rows:
-        row_count += 1
-        lane = str(row.get("opportunity_type") or "").strip().upper()
-        if not lane:
-            out["integrated_candidate_missing_opportunity_type"] += 1
-            continue
-        source_origins = {str(item).strip().casefold() for item in row.get("source_origins") or () if str(item).strip()}
-        source_packs = {str(item).strip().casefold() for item in row.get("source_packs") or () if str(item).strip()}
-        if not source_origins:
-            source_origin = str(row.get("source_origin") or "").strip().casefold()
-            if source_origin:
-                source_origins.add(source_origin)
-        if not source_packs:
-            source_pack = str(row.get("source_pack") or "").strip().casefold()
-            if source_pack:
-                source_packs.add(source_pack)
-        snapshot = row.get("market_state_snapshot")
-        if lane not in {"UNCONFIRMED_RESEARCH", "DIAGNOSTIC"} and (not isinstance(snapshot, Mapping) or not snapshot):
-            out["integrated_candidate_missing_market_state_snapshot"] += 1
-        source_met = _truthy(row.get("source_requirements_met"))
-        market_met = _truthy(row.get("market_requirements_met"))
-        fade_met = _truthy(row.get("fade_requirements_met"))
-        risk_met = _truthy(row.get("risk_requirements_met"))
-        source_strength = str(row.get("source_strength") or "").casefold()
-        market_state = str(row.get("market_state_class") or row.get("market_state") or "").casefold()
-        if lane == "CONFIRMED_LONG_RESEARCH" and (not source_met or not market_met):
-            out["integrated_confirmed_long_without_source_market"] += 1
-        if lane == "EARLY_LONG_RESEARCH" and (
-            source_strength not in {"strong", "official_structured"}
-            or market_state != "no_reaction"
-        ):
-            out["integrated_early_long_without_fresh_strong_source"] += 1
-        if lane == "FADE_SHORT_REVIEW" and (
-            not fade_met
-            or market_state not in {"blowoff_crowded", "post_event_fade_setup", "late_momentum"}
-        ):
-            out["integrated_fade_without_crowding_exhaustion"] += 1
-        if lane == "RISK_ONLY" and not (
-            risk_met
-            or row.get("unlock_event")
-            or "unlock_supply_pack" in source_packs
-            or str(row.get("event_type") or "").casefold() in {"unlock", "delisting", "exploit"}
-        ):
-            out["integrated_risk_without_evidence"] += 1
-        if lane == "CONFIRMED_LONG_RESEARCH" and source_origins == {"market_anomaly"}:
-            out["integrated_market_anomaly_confirmed"] += 1
-        if lane == "CONFIRMED_LONG_RESEARCH" and any("cryptopanic" in item for item in source_packs) and not (
-            source_origins - {"source_news", "news", "cryptopanic"}
-        ):
-            out["integrated_cryptopanic_confirmed"] += 1
-        if lane == "EARLY_LONG_RESEARCH" and _truthy(row.get("major_pair_simple_announcement")):
-            out["integrated_major_pair_early_long"] += 1
-        dex_class = str(row.get("dex_onchain_classification") or row.get("dex_anomaly_class") or "").strip()
-        row_warnings = {str(item) for item in _tuple_value(row.get("warnings"))}
-        if (
-            lane == "CONFIRMED_LONG_RESEARCH"
-            and (
-                dex_class == event_dex_onchain_readiness.SUSPICIOUS_LOW_LIQUIDITY_PUMP
-                or "dex_low_liquidity_confirmation_cap" in row_warnings
-            )
-        ):
-            out["integrated_dex_low_liquidity_promoted_confirmed"] += 1
-        if _truthy(row.get("normal_rsi_signal_written")):
-            out["integrated_created_normal_rsi_signal"] += 1
-        if _truthy(row.get("triggered_fade_created")) or str(row.get("signal_type") or "").upper() == "TRIGGERED_FADE":
-            out["integrated_created_triggered_fade"] += 1
-        _integrated_candidate_core_card_conflicts(row, core_by_id, card_text_by_core, out)
+
+def _add_integrated_candidate_conflicts(
+    row: Mapping[str, Any],
+    core_by_id: Mapping[str, Mapping[str, Any]],
+    card_text_by_core: Mapping[str, str],
+    out: dict[str, int],
+) -> None:
+    lane = str(row.get("opportunity_type") or "").strip().upper()
+    if not lane:
+        out["integrated_candidate_missing_opportunity_type"] += 1
+        return
+    source_origins, source_packs = _integrated_source_sets(row)
+    snapshot = row.get("market_state_snapshot")
+    if lane not in {"UNCONFIRMED_RESEARCH", "DIAGNOSTIC"} and (not isinstance(snapshot, Mapping) or not snapshot):
+        out["integrated_candidate_missing_market_state_snapshot"] += 1
+    source_met = _truthy(row.get("source_requirements_met"))
+    market_met = _truthy(row.get("market_requirements_met"))
+    fade_met = _truthy(row.get("fade_requirements_met"))
+    risk_met = _truthy(row.get("risk_requirements_met"))
+    source_strength = str(row.get("source_strength") or "").casefold()
+    market_state = str(row.get("market_state_class") or row.get("market_state") or "").casefold()
+    if lane == "CONFIRMED_LONG_RESEARCH" and (not source_met or not market_met):
+        out["integrated_confirmed_long_without_source_market"] += 1
+    if lane == "EARLY_LONG_RESEARCH" and (
+        source_strength not in {"strong", "official_structured"}
+        or market_state != "no_reaction"
+    ):
+        out["integrated_early_long_without_fresh_strong_source"] += 1
+    if lane == "FADE_SHORT_REVIEW" and (
+        not fade_met
+        or market_state not in {"blowoff_crowded", "post_event_fade_setup", "late_momentum"}
+    ):
+        out["integrated_fade_without_crowding_exhaustion"] += 1
+    if lane == "RISK_ONLY" and not (
+        risk_met
+        or row.get("unlock_event")
+        or "unlock_supply_pack" in source_packs
+        or str(row.get("event_type") or "").casefold() in {"unlock", "delisting", "exploit"}
+    ):
+        out["integrated_risk_without_evidence"] += 1
+    if lane == "CONFIRMED_LONG_RESEARCH" and source_origins == {"market_anomaly"}:
+        out["integrated_market_anomaly_confirmed"] += 1
+    if lane == "CONFIRMED_LONG_RESEARCH" and any("cryptopanic" in item for item in source_packs) and not (
+        source_origins - {"source_news", "news", "cryptopanic"}
+    ):
+        out["integrated_cryptopanic_confirmed"] += 1
+    if lane == "EARLY_LONG_RESEARCH" and _truthy(row.get("major_pair_simple_announcement")):
+        out["integrated_major_pair_early_long"] += 1
+    _add_integrated_dex_and_side_effect_conflicts(row, lane, out)
+    _integrated_candidate_core_card_conflicts(row, core_by_id, card_text_by_core, out)
+
+def _integrated_source_sets(row: Mapping[str, Any]) -> tuple[set[str], set[str]]:
+    source_origins = {str(item).strip().casefold() for item in row.get("source_origins") or () if str(item).strip()}
+    source_packs = {str(item).strip().casefold() for item in row.get("source_packs") or () if str(item).strip()}
+    if not source_origins:
+        source_origin = str(row.get("source_origin") or "").strip().casefold()
+        if source_origin:
+            source_origins.add(source_origin)
+    if not source_packs:
+        source_pack = str(row.get("source_pack") or "").strip().casefold()
+        if source_pack:
+            source_packs.add(source_pack)
+    return source_origins, source_packs
+
+def _add_integrated_dex_and_side_effect_conflicts(
+    row: Mapping[str, Any],
+    lane: str,
+    out: dict[str, int],
+) -> None:
+    dex_class = str(row.get("dex_onchain_classification") or row.get("dex_anomaly_class") or "").strip()
+    row_warnings = {str(item) for item in _tuple_value(row.get("warnings"))}
+    if (
+        lane == "CONFIRMED_LONG_RESEARCH"
+        and (
+            dex_class == event_dex_onchain_readiness.SUSPICIOUS_LOW_LIQUIDITY_PUMP
+            or "dex_low_liquidity_confirmation_cap" in row_warnings
+        )
+    ):
+        out["integrated_dex_low_liquidity_promoted_confirmed"] += 1
+    if _truthy(row.get("normal_rsi_signal_written")):
+        out["integrated_created_normal_rsi_signal"] += 1
+    if _truthy(row.get("triggered_fade_created")) or str(row.get("signal_type") or "").upper() == "TRIGGERED_FADE":
+        out["integrated_created_triggered_fade"] += 1
+
+def _add_integrated_manifest_conflicts(
+    out: dict[str, int],
+    row_count: int,
+    manifest_path: str | Path | None,
+    materialized_rows: Iterable[Mapping[str, Any]],
+) -> None:
     if row_count and manifest_path is not None and not Path(manifest_path).exists():
         out["integrated_input_manifest_missing"] += 1
     elif row_count and manifest_path is not None:
         out["integrated_manifest_mixed_timestamp_pair"] += _integrated_manifest_mixed_timestamp_pairs(manifest_path)
-        coinalyze_conflicts = _integrated_coinalyze_manifest_conflicts(manifest_path, materialized_rows)
-        for key, value in coinalyze_conflicts.items():
-            out[key] += value
+        _add_integrated_conflicts(out, _integrated_coinalyze_manifest_conflicts(manifest_path, materialized_rows))
+
+def _add_integrated_source_coverage_conflicts(
+    out: dict[str, int],
+    row_count: int,
+    source_coverage_json_path: str | Path | None,
+) -> None:
     if row_count and source_coverage_json_path is not None and not Path(source_coverage_json_path).exists():
         out["integrated_source_coverage_json_missing"] += 1
+
+def _add_integrated_daily_brief_conflicts(
+    out: dict[str, int],
+    row_count: int,
+    daily_brief_path: str | Path | None,
+    manifest_path: str | Path | None,
+    materialized_rows: Iterable[Mapping[str, Any]],
+) -> None:
     if row_count and daily_brief_path is not None:
         try:
             daily_text = Path(daily_brief_path).read_text(encoding="utf-8", errors="replace")
@@ -528,6 +587,12 @@ def _integrated_radar_artifact_conflicts(
             out["integrated_manifest_daily_brief_unavailable"] += 1
         if _daily_brief_has_integrated_diagnostic_leak(daily_text, materialized_rows):
             out["integrated_diagnostic_visible_in_default_operator_section"] += 1
+
+def _add_integrated_preview_conflicts(
+    out: dict[str, int],
+    row_count: int,
+    preview_path: str | Path | None,
+) -> None:
     if row_count and preview_path is not None:
         try:
             preview_text = Path(preview_path).read_text(encoding="utf-8")
@@ -539,6 +604,14 @@ def _integrated_radar_artifact_conflicts(
             out["integrated_legacy_preview_alerts_wording"] += 1
         if event_artifact_paths.has_operator_absolute_path(preview_text):
             out["integrated_operator_markdown_absolute_path"] += 1
+
+def _add_integrated_operator_path_conflicts(
+    out: dict[str, int],
+    research_card_paths: Iterable[Path],
+    *,
+    daily_brief_path: str | Path | None,
+    preview_path: str | Path | None,
+) -> None:
     for operator_path in (*research_card_paths, *(path for path in (daily_brief_path, preview_path) if path is not None)):
         try:
             text = Path(operator_path).read_text(encoding="utf-8", errors="replace")
@@ -546,22 +619,42 @@ def _integrated_radar_artifact_conflicts(
             continue
         if event_artifact_paths.has_operator_absolute_path(text):
             out["integrated_operator_markdown_absolute_path"] += 1
+
+def _integrated_delivery_rows(
+    out: dict[str, int],
+    row_count: int,
+    delivery_path: str | Path | None,
+    *,
+    preview_path: str | Path | None,
+) -> list[Mapping[str, Any]]:
     delivery_rows = _read_jsonl(delivery_path) if delivery_path is not None and Path(delivery_path).exists() else []
     if row_count and delivery_path is not None and not Path(delivery_path).exists():
         out["integrated_delivery_ledger_missing"] += 1
     if delivery_rows:
-        out.update(_merge_conflicts(out, _integrated_delivery_conflicts(delivery_rows, preview_path=preview_path)))
+        _add_integrated_conflicts(out, _integrated_delivery_conflicts(delivery_rows, preview_path=preview_path))
+    return delivery_rows
+
+def _integrated_outcome_rows(
+    out: dict[str, int],
+    materialized_rows: Iterable[Mapping[str, Any]],
+    outcome_path: str | Path | None,
+) -> list[Mapping[str, Any]]:
     outcome_rows = _read_jsonl(outcome_path) if outcome_path is not None and Path(outcome_path).exists() else []
     if outcome_rows:
-        out.update(_merge_conflicts(out, _integrated_outcome_conflicts(materialized_rows, outcome_rows)))
+        _add_integrated_conflicts(out, _integrated_outcome_conflicts(materialized_rows, outcome_rows))
+    return outcome_rows
+
+def _add_integrated_calibration_performance_conflicts(
+    out: dict[str, int],
+    outcome_path: str | Path | None,
+) -> None:
     if outcome_path is not None:
         priors_path = Path(outcome_path).parent / event_integrated_radar.INTEGRATED_CALIBRATION_PRIORS_FILENAME
-        out.update(_merge_conflicts(out, _integrated_calibration_conflicts(priors_path)))
-        out.update(_merge_conflicts(out, _integrated_performance_dashboard_conflicts(Path(outcome_path).parent)))
-    out["operator_structured_path_absolute"] += _structured_operator_path_conflicts(
-        (*materialized_rows, *core_rows, *delivery_rows, *outcome_rows)
-    )
-    return out
+        _add_integrated_conflicts(out, _integrated_calibration_conflicts(priors_path))
+        _add_integrated_conflicts(out, _integrated_performance_dashboard_conflicts(Path(outcome_path).parent))
+
+def _add_integrated_conflicts(out: dict[str, int], updates: Mapping[str, int]) -> None:
+    out.update(_merge_conflicts(out, updates))
 
 def _merge_conflicts(base: Mapping[str, int], updates: Mapping[str, int]) -> dict[str, int]:
     out = dict(base)
