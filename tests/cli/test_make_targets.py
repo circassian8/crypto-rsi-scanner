@@ -706,9 +706,10 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
         for row in payload["blockers"]
     )
     phases = {row["phase"]: row["policy"] for row in payload["deprecation_plan"]}
-    assert "v1" in phases and "active compatibility shims" in phases["v1"]
-    assert "v2" in phases and "warn in development mode only" in phases["v2"]
-    assert "v3" in phases and "removed" in phases["v3"]
+    assert "v3_public_compatibility" in phases and "retained public" in phases["v3_public_compatibility"]
+    assert "deleted_import_tombstones" in phases and "allowed to fail" in phases["deleted_import_tombstones"]
+    assert "v4_dev_warning" in phases and "warn in development mode only" in phases["v4_dev_warning"]
+    assert "v4_removal" in phases and "removed" in phases["v4_removal"]
     assert "Refactor Final Report" in markdown
     assert "Refactor V3 Finalization Gates" in markdown
     assert "Newly Migrated Modules" in markdown
@@ -768,7 +769,8 @@ def test_event_alpha_shim_dependency_report_make_target_is_available():
     assert "RSI_EVENT_ALERTS_ENABLED=0" in makefile
     assert policy.exists()
     policy_text = policy.read_text(encoding="utf-8")
-    assert "Old top-level Event Alpha modules are temporary compatibility shims" in policy_text
+    assert "Only retained public old top-level Event Alpha modules remain" in policy_text
+    assert "Deleted old Event Alpha imports are tombstoned" in policy_text
     assert "must not create\n`TRIGGERED_FADE`" in policy_text
     assert "event_fade.py" in policy_text
 

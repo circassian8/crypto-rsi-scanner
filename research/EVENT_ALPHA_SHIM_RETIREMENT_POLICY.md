@@ -6,22 +6,26 @@ rows, or create `TRIGGERED_FADE`.
 
 ## Policy
 
-- Old top-level Event Alpha modules are temporary compatibility shims during the
-  v1/v2 migration.
+- Only retained public old top-level Event Alpha modules remain as
+  compatibility shims. They are documented in
+  `research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json`.
+- Deleted old Event Alpha imports are tombstoned and are allowed to fail.
 - New implementation code must import new package paths under
   `crypto_rsi_scanner.event_alpha.*` or `crypto_rsi_scanner.event_core.*`.
-- Old shims may be removed only after the dependency report shows zero internal
-  import references and one accepted refactor release has passed with the new
-  package paths.
+- Any future retained-public shim removal requires an explicit
+  compatibility-breaking decision, release notes, and updated compatibility
+  tests.
 - `scanner.py` may remain a compatibility CLI entrypoint.
 - Public compatibility shims must be listed explicitly in the shim dependency
-  report before they are retained.
+  report and in `research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json`
+  before they are retained.
 - A shim marked `active_shim` must contain only compatibility imports,
   `globals().update(...)`, `__all__`, comments, and a module docstring.
-- Tests may keep targeted old-import compatibility coverage until the declared
-  removal phase. New behavior tests should import the new package paths.
-- Docs and runbooks may mention old paths only when they clearly describe them
-  as compatibility or deprecated paths.
+- Tests may keep targeted old-import compatibility coverage only for retained
+  public entrypoints. New behavior tests should import the new package paths.
+- Docs and runbooks should show canonical package paths; old paths may appear
+  only when they clearly describe retained compatibility or tombstoned paths.
+- Artifact doctor warns if a deleted shim file is reintroduced.
 
 ## Safety Boundary
 

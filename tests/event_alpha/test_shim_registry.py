@@ -114,6 +114,26 @@ def test_shim_dependency_report_writer_outputs_references_and_candidates():
         assert "must not create `TRIGGERED_FADE`" in removal_text
 
 
+def test_public_compatibility_entrypoint_artifact_documents_retained_shims():
+    import json
+
+    artifact = json.loads(Path("research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json").read_text(encoding="utf-8"))
+    markdown = Path("research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md").read_text(encoding="utf-8")
+    retained = {old for old, _new in __import__(
+        "tests.event_alpha.test_legacy_import_compatibility",
+        fromlist=["RETAINED_OLD_SHIM_MODULES"],
+    ).RETAINED_OLD_SHIM_MODULES}
+    rows = {row["path"]: row for row in artifact["entrypoints"]}
+
+    assert artifact["retained_public_shims_count"] == len(retained) == 9
+    assert artifact["old_import_tombstone_policy"]["deleted_old_imports_allowed_to_fail"] is True
+    assert artifact["old_import_tombstone_policy"]["compatibility_tests_cover_retained_public_entrypoints_only"] is True
+    assert set(rows) == retained
+    assert all(row["expected_lifetime"] for row in rows.values())
+    assert all(row["owner_note"] for row in rows.values())
+    assert "Deleted old imports are allowed to fail" in markdown
+
+
 def test_old_import_check_report_allows_only_compatibility_boundaries():
     with TemporaryDirectory() as tmp:
         json_path, md_path, report = shims.write_old_import_check_report(out_dir=tmp)
@@ -200,6 +220,33 @@ def test_artifact_doctor_warns_when_internal_code_imports_old_shim():
         event_alpha_artifact_doctor.event_alpha_shims.shim_dependency_warning_summary = original
 
     assert any("paths.old_shim_internal_import" in warning for warning in result.warnings)
+
+
+def test_artifact_doctor_warns_when_deleted_shim_path_is_reintroduced(tmp_path):
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    from crypto_rsi_scanner.event_alpha.doctor.legacy import context_loading
+
+    old_module = "crypto_rsi_scanner.event_deleted_fixture"
+    path = tmp_path / "crypto_rsi_scanner" / "event_deleted_fixture.py"
+    path.parent.mkdir()
+    path.write_text('"""deleted shim fixture."""\n', encoding="utf-8")
+    entry = shims.ShimRegistryEntry(
+        old_module=old_module,
+        new_module="crypto_rsi_scanner.event_alpha.deleted_fixture",
+        shim_status="deleted_shim",
+        allowed_exports=(),
+    )
+    original_entries = context_loading.event_alpha_shims.deleted_shim_entries
+    original_repo_root = context_loading.event_artifact_paths.repo_root
+    context_loading.event_alpha_shims.deleted_shim_entries = lambda root=None: (entry,)
+    context_loading.event_artifact_paths.repo_root = lambda: tmp_path
+    try:
+        result = event_alpha_artifact_doctor.diagnose_artifacts()
+    finally:
+        context_loading.event_alpha_shims.deleted_shim_entries = original_entries
+        context_loading.event_artifact_paths.repo_root = original_repo_root
+
+    assert any("paths.deleted_shim_reintroduced" in warning for warning in result.warnings)
 
 
 

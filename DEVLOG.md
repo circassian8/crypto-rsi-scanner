@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Finalize Event Alpha public shim surface · Codex
+**Why:** The v3 shim deletion pass needed to prove no nonessential old Event
+Alpha shims remain while preserving the few intentional public entrypoints and
+making deleted old paths stay tombstoned.
+**Changes:**
+- Re-ran shim dependency and old-import checks; no further shim qualified for
+  deletion (`safe_to_remove_count=0`), and final counters remain
+  `nonessential_shims_remaining=0`, `retained_public_shims_count=9`,
+  `removed_shims_count=115`, `old_path_internal_imports=0`,
+  `old_path_test_imports=0`, and `old_path_docs_references=0`.
+- Added `research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json` to
+  document every retained public old path, its canonical package path, reason,
+  expected lifetime, owner note, and tombstone policy.
+- Updated the shim registry, module map, architecture/runbook/retirement docs,
+  roadmap, and decisions so deleted old imports are allowed to fail and new
+  code/docs use canonical package paths.
+- Added an artifact-doctor registry warning for reintroduced deleted shim files
+  and tests covering the retained-entrypoint artifact plus the deleted-shim
+  reintroduction warning.
+- Updated the refactor final report deprecation plan to describe the current
+  retained-public/tombstone state instead of broad v1 shim compatibility.
+**Verify:** Passed `python3 tests/test_indicators.py` (`751/751 passed`);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (`762 passed`); `python3 -m compileall
+-q crypto_rsi_scanner tests`; `make event-alpha-old-import-check
+PYTHON=python3`; `make event-alpha-shim-dependency-report PYTHON=python3`;
+`make event-alpha-shim-report PYTHON=python3`; `make refactor-final-report
+PYTHON=python3`; and `make verify PYTHON=python3`.
+**Notes/risks:** `research/REFACTOR_FINAL_REPORT.json` still marks
+`v3_gate_status=pending` for remaining accepted non-shim v3 debt, but the shim
+surface itself is clean: `nonessential_shims_remaining=0` and
+`safe_to_remove_count=0`. No live provider calls, live Telegram sends, trading,
+paper-trading behavior changes, execution/order logic, Event Alpha RSI writes,
+or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-05 — Tighten v3 size gates and split near-threshold modules · Codex
 **Why:** Refactor v3 needed the stricter maintainability target to move from
 “under 1,500 lines” toward documented 1,200-line warnings without changing

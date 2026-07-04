@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-05 - Retained Event Alpha shims are public entrypoints only
+**Status:** accepted
+**Decision:** The remaining old flat Event Alpha modules are retained only as
+documented public compatibility entrypoints. Deleted old import paths are
+tombstoned and allowed to fail; compatibility tests cover retained public
+entrypoints only; docs should point to canonical package paths; artifact doctor
+warns if a deleted shim file is reintroduced.
+**Why:** The dependency and old-import reports show no nonessential shim is safe
+or necessary to delete in this pass: `safe_to_remove_count=0`,
+`nonessential_shims_remaining=0`, `retained_public_shims_count=9`, and
+`removed_shims_count=115`. Keeping only documented public wrappers preserves
+external/operator compatibility without reopening internal old-path imports.
+**Revisit when:** a v4/deprecation release intentionally removes a retained
+public compatibility entrypoint, or a public consumer requirement justifies
+changing the retained entrypoint list.
+
 ## 2026-07-05 - Refactor v3 production size warning threshold is 1,200 lines
 **Status:** accepted
 **Decision:** Production source files over 1,200 lines are v3 maintainability

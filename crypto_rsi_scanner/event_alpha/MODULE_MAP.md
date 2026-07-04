@@ -35,6 +35,13 @@ Current phase:
 - The second v3 deletion pass removed the remaining non-public shims after
   Makefile entrypoints and compatibility tests were moved to canonical package
   paths. This active map now lists only retained public compatibility wrappers.
+- Retained wrappers are public compatibility entrypoints documented in
+  `research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json` with path,
+  reason, expected lifetime, and owner note.
+- Deleted old imports are tombstoned: deleted import paths are allowed to fail,
+  docs should show the canonical package path, and compatibility tests cover
+  only retained public entrypoints. Artifact doctor warns if a deleted shim file
+  is reintroduced.
 - `crypto_rsi_scanner.event_alpha_artifact_doctor` is now an active
   compatibility shim; the implementation lives in
   `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor`.

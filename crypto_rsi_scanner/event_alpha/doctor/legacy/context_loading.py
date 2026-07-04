@@ -242,6 +242,16 @@ def _attach_shim_dependency_warnings(ctx: SimpleNamespace) -> None:
                 f"old_path_docs_references={ctx.old_path_docs_references}",
             )
         )
+    reintroduced = _reintroduced_deleted_shim_modules()
+    if reintroduced:
+        modules = ", ".join(reintroduced[:5])
+        ctx.warnings.append(
+            check_registry.format_check_message(
+                "paths.deleted_shim_reintroduced",
+                f"deleted_shim_paths_reintroduced={len(reintroduced)}"
+                + (f" modules={modules}" if modules else ""),
+            )
+        )
     if safe_to_remove_shim_count:
         ctx.warnings.append(
             check_registry.format_check_message(
@@ -249,6 +259,16 @@ def _attach_shim_dependency_warnings(ctx: SimpleNamespace) -> None:
                 f"safe_to_remove_shims_still_present={safe_to_remove_shim_count}",
             )
         )
+
+
+def _reintroduced_deleted_shim_modules() -> tuple[str, ...]:
+    repo_root = event_artifact_paths.repo_root()
+    modules: list[str] = []
+    for entry in event_alpha_shims.deleted_shim_entries(root=repo_root):
+        path = repo_root / Path(*entry.old_module.split(".")).with_suffix(".py")
+        if path.exists():
+            modules.append(entry.old_module)
+    return tuple(modules)
 
 
 def _apply_namespace_profile_checks(ctx: SimpleNamespace) -> None:

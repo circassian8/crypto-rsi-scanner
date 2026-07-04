@@ -339,15 +339,16 @@ top-level `event_*.py` shims:
 | `event_alpha/namespace/` | namespace status and lifecycle reporting |
 | `cli/` | parser, dispatch, and command-group modules |
 
-Retained old import paths remain as compatibility shims only. Non-public shims
-can be deleted after `make event-alpha-shim-dependency-report` and
-`make event-alpha-old-import-check` prove zero internal, Makefile, script,
-dynamic, artifact-doc, and unscoped documentation dependencies; deleted paths
-are recorded in `research/EVENT_ALPHA_DELETED_SHIMS.md/json`. New code should
-import the new package path, and old top-level shims should not gain new
-implementation logic. `crypto_rsi_scanner.event_alpha.shims` is the shim
-registry: modules marked `active_shim` must stay compatibility-only, while
-`partial_shim` is reserved for explicit migration bridges. Run
+Only retained public old import paths remain as compatibility shims. The
+retained entrypoints, reasons, expected lifetimes, and owner notes are listed
+in `research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json`; deleted
+old imports are tombstoned and are allowed to fail. New code should import the
+new package path, docs should show canonical package paths, and old top-level
+shims should not gain new implementation logic. Deleted paths are recorded in
+`research/EVENT_ALPHA_DELETED_SHIMS.md/json`; artifact doctor warns if a
+deleted shim file is reintroduced. `crypto_rsi_scanner.event_alpha.shims` is
+the shim registry: modules marked `active_shim` must stay compatibility-only,
+while `partial_shim` is reserved for explicit migration bridges. Run
 `make event-alpha-shim-report` to audit shim source and
 `make event-alpha-old-import-check` to fail old flat Event Alpha imports outside
 documented public wrappers and

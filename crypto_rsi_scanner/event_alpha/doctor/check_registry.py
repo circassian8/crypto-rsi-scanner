@@ -488,6 +488,13 @@ CHECKS: tuple[DoctorCheck, ...] = (
         (),
         "A shim marked safe_to_remove should either be removed in a removal phase or carry an explicit retention reason.",
     ),
+    _check(
+        "paths.deleted_shim_reintroduced",
+        CATEGORY_PATHS,
+        "warning",
+        (),
+        "Deleted old Event Alpha shim paths must not be reintroduced.",
+    ),
 )
 
 CHECK_BY_ID: dict[str, DoctorCheck] = {check.check_id: check for check in CHECKS}

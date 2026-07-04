@@ -631,19 +631,24 @@ def _report_blocker_rows(
 def _old_import_deprecation_plan() -> list[dict[str, str]]:
     return [
         {
-            "phase": "v1",
+            "phase": "v3_public_compatibility",
             "status": "current",
-            "policy": "Old top-level Event Alpha imports remain active compatibility shims; new work imports new package paths.",
+            "policy": "Only retained public Event Alpha compatibility entrypoints remain; new work imports canonical package paths.",
         },
         {
-            "phase": "v2",
-            "status": "future",
-            "policy": "Old imports may warn in development mode only after old/new import tests, Make targets, and operator docs prove compatibility.",
+            "phase": "deleted_import_tombstones",
+            "status": "current",
+            "policy": "Deleted old Event Alpha imports are allowed to fail; docs show canonical paths and compatibility tests cover retained public entrypoints only.",
         },
         {
-            "phase": "v3",
+            "phase": "v4_dev_warning",
             "status": "future",
-            "policy": "Old imports can be removed only through an explicit compatibility-breaking migration with full verification and release notes.",
+            "policy": "Retained public old imports may warn in development mode only after an accepted compatibility-breaking migration and release notes.",
+        },
+        {
+            "phase": "v4_removal",
+            "status": "future",
+            "policy": "Retained public old imports can be removed only through an explicit compatibility-breaking migration with full verification and release notes.",
         },
     ]
 

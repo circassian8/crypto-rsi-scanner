@@ -1,0 +1,78 @@
+{
+  "entrypoints": [
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.context",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.artifacts.context. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_artifacts",
+      "reason": "Historical artifact-context helper import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.paths",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.artifacts.paths. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_artifact_paths",
+      "reason": "Historical artifact-path helper import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.run_ledger",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.artifacts.run_ledger. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_run_ledger",
+      "reason": "Historical run-ledger helper import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.retention",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.artifacts.retention. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_retention",
+      "reason": "Historical artifact-retention helper import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.locks",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.artifacts.locks. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_run_lock",
+      "reason": "Historical run-lock helper import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.doctor.artifact_doctor",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_artifact_doctor",
+      "reason": "Historical artifact-doctor import and entrypoint path retained for public compatibility while the implementation lives under event_alpha/doctor."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.config.profiles",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.config.profiles. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_profiles",
+      "reason": "Historical Event Alpha profile import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.config.v1_readiness. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_v1_readiness",
+      "reason": "Historical Event Alpha v1-readiness import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.config.preflight",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.config.preflight. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_preflight",
+      "reason": "Historical Event Alpha preflight import path retained for external scripts, older operator snippets, and public import compatibility."
+    }
+  ],
+  "generated_at": "2026-07-05T00:00:00+00:00",
+  "old_import_tombstone_policy": {
+    "compatibility_tests_cover_retained_public_entrypoints_only": true,
+    "deleted_old_imports_allowed_to_fail": true,
+    "docs_show_new_path": true,
+    "doctor_warns_if_deleted_path_reintroduced": true
+  },
+  "removed_shims_count": 115,
+  "retained_public_shims_count": 9,
+  "row_type": "event_alpha_public_compatibility_entrypoints",
+  "schema_version": "event_alpha_public_compatibility_entrypoints_v1"
+}

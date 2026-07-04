@@ -66,6 +66,7 @@ _DOC_COMPATIBILITY_FILES = {
     "ROADMAP.md",
     "research/EVENT_ALPHA_ARCHITECTURE_V1.md",
     "research/EVENT_ALPHA_CONSOLIDATION_PLAN.md",
+    "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
     "research/EVENT_ALPHA_RUNBOOK.md",
     "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
 }

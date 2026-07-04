@@ -32,9 +32,13 @@ Package ownership for new code:
 - `event_alpha/namespace`: namespace status and lifecycle reporting.
 - `cli/`: parser, dispatch, and command-group modules.
 
-Old import shims are compatibility surfaces only. New code should import the
-new package path. Old top-level modules should not receive new implementation
-logic during the v1 migration.
+Only retained public old import paths remain as compatibility surfaces. The
+retained entrypoints are documented in
+`research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json`; deleted old
+imports are tombstoned and are allowed to fail. New code and docs should use
+canonical package paths, compatibility tests cover only retained public
+entrypoints, and old top-level modules should not receive new implementation
+logic. Artifact doctor warns if a deleted old shim path is reintroduced.
 
 CLI rules:
 

@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T21:41:19+00:00`
+- generated_at: `2026-07-04T22:23:28+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `115`
@@ -130,8 +130,8 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 | path | lines |
 |---|---:|
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1499 |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py` | 1498 |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1498 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 |
@@ -142,7 +142,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1239 |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1223 |
-| `crypto_rsi_scanner/refactor_final_report.py` | 1188 |
+| `crypto_rsi_scanner/refactor_final_report.py` | 1193 |
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 1155 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py` | 1145 |
@@ -154,11 +154,11 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py` | 1078 |
 | `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1069 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1059 |
+| `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1052 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1047 |
 | `crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py` | 1044 |
 | `crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py` | 1035 |
 | `crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py` | 1033 |
-| `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1032 |
 | `crypto_rsi_scanner/event_alpha/radar/llm/extractor.py` | 1002 |
 | `crypto_rsi_scanner/event_alpha/radar/scheduled_catalysts.py` | 995 |
 | `crypto_rsi_scanner/event_alpha/providers/source_registry.py` | 989 |
@@ -175,8 +175,8 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 | path | lines | reason | revisit |
 |---|---:|---|---|
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1499 | Static shim registry/data table; large by design and non-behavioral. | When another shim retirement pass removes retained public compatibility entries. |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py` | 1498 | Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged. | When identity/source/market/derivatives merge golden fixtures can be compared before and after split. |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1498 | Static shim registry/data table; large by design and non-behavioral. | When another shim retirement pass removes retained public compatibility entries. |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 | Dense operator audit renderer with many cross-section helper dependencies. | When audit sections are split with golden Markdown fixture comparison. |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | Verdict scoring and live-confirmation policy share many ordered caps and guardrails. | When verdict snapshots cover each opportunity level and cap reason. |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 | Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to canonical non-legacy service modules. |
@@ -206,13 +206,13 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `tests/event_alpha/test_source_coverage.py` | 2991 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
 | `tests/test_indicators.py` | 1778 |
-| `tests/cli/test_make_targets.py` | 1093 |
+| `tests/cli/test_make_targets.py` | 1095 |
 | `tests/event_alpha/_legacy_helpers.py` | 825 |
 | `tests/event_alpha/test_artifact_schema.py` | 743 |
 | `tests/rsi/test_indicators_core.py` | 694 |
 | `tests/rsi/test_backtest.py` | 561 |
 | `tests/rsi/test_paper_risk.py` | 379 |
-| `tests/event_alpha/test_shim_registry.py` | 278 |
+| `tests/event_alpha/test_shim_registry.py` | 325 |
 | `tests/cli/test_parser.py` | 243 |
 | `tests/event_alpha/test_legacy_import_compatibility.py` | 170 |
 | `tests/cli/test_event_alpha_command_registry.py` | 163 |
@@ -328,9 +328,10 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 | phase | status | policy |
 |---|---|---|
-| `v1` | `current` | Old top-level Event Alpha imports remain active compatibility shims; new work imports new package paths. |
-| `v2` | `future` | Old imports may warn in development mode only after old/new import tests, Make targets, and operator docs prove compatibility. |
-| `v3` | `future` | Old imports can be removed only through an explicit compatibility-breaking migration with full verification and release notes. |
+| `v3_public_compatibility` | `current` | Only retained public Event Alpha compatibility entrypoints remain; new work imports canonical package paths. |
+| `deleted_import_tombstones` | `current` | Deleted old Event Alpha imports are allowed to fail; docs show canonical paths and compatibility tests cover retained public entrypoints only. |
+| `v4_dev_warning` | `future` | Retained public old imports may warn in development mode only after an accepted compatibility-breaking migration and release notes. |
+| `v4_removal` | `future` | Retained public old imports can be removed only through an explicit compatibility-breaking migration with full verification and release notes. |
 
 ## Safety Snapshot
 

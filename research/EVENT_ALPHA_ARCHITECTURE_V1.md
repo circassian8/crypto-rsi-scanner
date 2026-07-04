@@ -58,15 +58,19 @@ layout gives new code a home while old import paths continue to work.
   `crypto_rsi_scanner/backtest.py` remains the historical CLI/helper facade
   over the compatibility core.
 
-`crypto_rsi_scanner/event_alpha/MODULE_MAP.md` lists old top-level module paths
-and their intended package locations.
+`crypto_rsi_scanner/event_alpha/MODULE_MAP.md` lists retained public old
+top-level module paths and their intended package locations.
 
 ## V1 Boundary Rules
 
 These rules are the anti-sprawl contract for future Codex/Claude passes:
 
-- Old import shims remain during the v1 migration so historical imports,
-  tests, and Make targets keep working.
+- Only retained public old import shims remain. They are documented in
+  `research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json` with path,
+  reason, expected lifetime, and owner note.
+- Deleted old imports are tombstoned and are allowed to fail. Docs should show
+  canonical package paths, and compatibility tests cover retained public
+  entrypoints only.
 - New code should import the new package paths listed in the package map.
 - Old top-level `crypto_rsi_scanner/event_*.py` shim modules should not gain
   new implementation logic. They may re-export symbols, hold compatibility
@@ -78,6 +82,7 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
 - `crypto_rsi_scanner.event_alpha.shims` is the shim registry. It marks mapped
   modules as `active_shim`, `partial_shim`, or `not_migrated`; active shims are
   compatibility-only and `make event-alpha-shim-report` audits the boundary.
+  Artifact doctor warns if a deleted old shim path is reintroduced.
 - CLI parser construction belongs in `crypto_rsi_scanner/cli/parser.py`.
   `build_parser()` is an orchestrator over `parser_base.py`,
   `parser_event_alpha.py`, `parser_notifications.py`,
@@ -160,9 +165,10 @@ Artifact implementation code now lives in package modules:
 - `event_alpha.artifacts.locks` for profile/namespace run locks.
 - `event_alpha.namespace.status` for stale/deprecated namespace markers.
 
-The top-level imports remain compatibility shims with no runtime deprecation
-warnings. Artifact paths and output schemas must stay unchanged unless a
-separate migration explicitly updates schema v1 consumers.
+The retained top-level artifact imports remain public compatibility shims with
+no runtime deprecation warnings. Deleted old imports are allowed to fail.
+Artifact paths and output schemas must stay unchanged unless a separate
+migration explicitly updates schema v1 consumers.
 
 ## Internal Large-Module Split
 
@@ -236,9 +242,9 @@ Radar/core implementation code now lives in package modules:
   and artifact persistence.
 - `event_alpha.radar.incidents` for profile-scoped incident artifacts.
 
-The old top-level modules remain quiet compatibility shims. After the radar
-move, the size gate was `125` top-level `event_*.py` files, `18`
-compatibility shims, and `107` remaining top-level implementation files.
+The old radar top-level modules have been deleted after canonical imports,
+Makefile references, docs, and compatibility assumptions moved to package
+paths. Their deleted imports are tombstones and are allowed to fail.
 
 ## Provider Implementation Move
 
@@ -301,12 +307,11 @@ Telegram-formatting code now lives in package modules:
 - `event_alpha.notifications.recipient_check` for guarded Telegram recipient
   diagnostics.
 
-The old top-level modules remain quiet compatibility shims. No-send semantics,
-structured skip telemetry, delivery `status`/`status_detail` fields, and normal
-heartbeat wording (`Strict alerts`, `Research candidates`, `Raw source
-candidates`) remain behavior-freeze gates. Current size gate after this
-notification move: `125` top-level `event_*.py` files, `42` compatibility shims,
-and `83` remaining top-level implementation files.
+The old notification top-level modules have been deleted after canonical
+imports, Makefile references, docs, and compatibility assumptions moved to
+package paths. No-send semantics, structured skip telemetry, delivery
+`status`/`status_detail` fields, and normal heartbeat wording (`Strict alerts`,
+`Research candidates`, `Raw source candidates`) remain behavior-freeze gates.
 
 ## Outcomes Implementation Move
 
@@ -329,12 +334,11 @@ policy-simulation code now lives in package modules:
 - `event_alpha.outcomes.policy_simulator` for offline policy-threshold
   simulation over local artifacts.
 
-The old top-level modules remain quiet compatibility shims. Output artifact
-paths and schemas remain unchanged, and outcome terminology such as
-`validation_rate`, `validated`, `invalidated/noise`, and `inconclusive` remains
-research-only review language. Current size gate after this outcomes move:
-`125` top-level `event_*.py` files, `56` compatibility shims, and `69`
-remaining top-level implementation files.
+The old outcomes top-level modules have been deleted after canonical imports,
+Makefile references, docs, and compatibility assumptions moved to package
+paths. Output artifact paths and schemas remain unchanged, and outcome
+terminology such as `validation_rate`, `validated`, `invalidated/noise`, and
+`inconclusive` remains research-only review language.
 
 ## Future Code Placement
 
