@@ -17,6 +17,53 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split validation review and pipeline phases · Codex
+**Why:** The refactor goal still tracks advisory oversized-function debt after
+production and legacy file-size gates passed. `review_validation_sample()` and
+`run_event_alpha_pipeline()` had clear phase boundaries and strong Event Alpha
+fixture coverage, making them safe behavior-preserving burn-down targets.
+**Changes:**
+- Split `crypto_rsi_scanner/event_alpha/radar/validation/review.py` so
+  `review_validation_sample()` is now a 31-line orchestrator over private
+  threshold, grouping, metric, blocker, cohort, and result helpers. Review
+  blocker order, cohort fields, metric math, and result field mapping are
+  preserved.
+- Split `crypto_rsi_scanner/event_alpha/radar/pipeline.py` so
+  `run_event_alpha_pipeline()` is now a 149-line orchestrator over private
+  alert/relationship, hypothesis-search, near-miss, evidence-acquisition, and
+  watchlist/router phase helpers. Public arguments, warning ordering, result
+  fields, no-send/no-live behavior, and route gates are preserved.
+- Regenerated refactor class ownership, size-gate, final, completion-map,
+  release-candidate, and shim reports. Current advisory inventory is `14`
+  classes and `5` functions over limits, with
+  `production_files_over_1500_lines=0`, `production_files_over_2000_lines=0`,
+  `production_files_over_3000_lines=0`, `new_violation_count=0`, and no active
+  shim implementation leaks.
+- Updated `ROADMAP.md` to record the current ownership burn-down state and the
+  five remaining oversized production functions.
+**Verify:** Focused checks passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha/test_integrated_radar.py -q -k 'pipeline or
+validation_review'` reported `23 passed, 217 deselected`; validation-only
+review tests reported `17 passed, 223 deselected`; `python3 -m compileall -q`
+passed for the edited modules. Full safe harness passed: `python3
+tests/test_indicators.py`; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q`; `python3
+-m compileall -q crypto_rsi_scanner tests`; `make test-pytest-safe
+PYTHON=python3`; refactor size/class/final/completion reports; shim report;
+integrated radar smoke/doctor; notification format smoke; Telegram no-send
+final check; evidence acquisition smoke; catalyst-frame e2e; Coinalyze
+preflight smoke/preflight/no-send rehearsal; source coverage, daily brief, and
+notify preview from artifacts for `notify_llm_deep_cryptopanic_rehearsal`;
+strict CryptoPanic artifact doctor; `make backtest-costs PYTHON=python3`; and
+`make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. The latest attached prompt's large
+production-file list was stale relative to the checkout; those modules are
+already split into packages and current size reports show no production files
+over 1,500 lines. No live provider calls by default, live sends, trading,
+paper-trading behavior changes, execution/order logic, Event Alpha RSI writes,
+or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split integrated merge-family assembly · Codex
 **Why:** The refactor goal still tracks advisory oversized-function debt after
 production and legacy size gates passed. `_merge_family()` is the integrated

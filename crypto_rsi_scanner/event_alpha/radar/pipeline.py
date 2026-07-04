@@ -176,6 +176,42 @@ class _PipelineCryptoPanicFields:
     cryptopanic_skip_reason: str | None = None
 
 
+@dataclass(frozen=True)
+class _PipelineAlertPhase:
+    alerts: list[event_alerts.EventAlertCandidate]
+    relationship_rows: list[event_llm_analyzer.EventLLMReportRow]
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class _PipelineHypothesisPhase:
+    impact_hypotheses: tuple[event_impact_hypotheses.EventImpactHypothesis, ...]
+    hypothesis_search_result: event_catalyst_search.CatalystSearchRunResult | None
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class _PipelineNearMissPhase:
+    impact_hypotheses: tuple[event_impact_hypotheses.EventImpactHypothesis, ...]
+    near_miss_result: event_near_miss.EventNearMissRefreshResult | None = None
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class _PipelineEvidencePhase:
+    impact_hypotheses: tuple[event_impact_hypotheses.EventImpactHypothesis, ...]
+    evidence_acquisition_result: event_evidence_acquisition.EventEvidenceAcquisitionRunResult | None = None
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class _PipelineWatchlistRoutePhase:
+    watchlist_result: event_watchlist.EventWatchlistRefreshResult | None = None
+    watchlist_monitor_result: event_watchlist_monitor.EventWatchlistMonitorResult | None = None
+    router_result: event_alpha_router.EventAlphaRouterResult | None = None
+    warnings: tuple[str, ...] = ()
+
+
 class _PipelineDiscoveryProperties:
     @property
     def raw_events(self) -> int:
@@ -396,6 +432,117 @@ def run_event_alpha_pipeline(
     catalyst_frame_rows_list = list(catalyst_frame_rows)
     warnings.extend(_llm_budget_warnings(extraction_rows_list, label="extractor"))
     warnings.extend(_llm_budget_warnings(catalyst_frame_rows_list, label="catalyst_frame"))
+
+    alert_phase = _pipeline_alert_phase(
+        discovery_result,
+        alert_cfg=alert_cfg,
+        observed=observed,
+        relationship_provider=relationship_provider,
+        relationship_cfg=relationship_cfg,
+        priors_cfg=priors_cfg,
+    )
+    warnings.extend(alert_phase.warnings)
+
+    hypothesis_phase = _pipeline_hypothesis_phase(
+        discovery_result,
+        extraction_rows_list=extraction_rows_list,
+        raw_events=source_raw_events,
+        catalyst_search_result=catalyst_search_result,
+        hypothesis_search_provider=hypothesis_search_provider,
+        hypothesis_search_cfg=hypothesis_search_cfg,
+        observed=observed,
+    )
+    impact_hypotheses = hypothesis_phase.impact_hypotheses
+    warnings.extend(hypothesis_phase.warnings)
+
+    near_miss_phase = _pipeline_near_miss_phase(
+        impact_hypotheses,
+        near_miss_cfg=near_miss_cfg,
+        near_miss_market_rows=near_miss_market_rows or watchlist_monitor_market_rows,
+        near_miss_market_provider=near_miss_market_provider,
+        near_miss_derivatives_rows=near_miss_derivatives_rows or watchlist_monitor_derivatives_rows,
+        near_miss_supply_rows=near_miss_supply_rows or watchlist_monitor_supply_rows,
+        observed=observed,
+    )
+    impact_hypotheses = near_miss_phase.impact_hypotheses
+    warnings.extend(near_miss_phase.warnings)
+
+    evidence_phase = _pipeline_evidence_phase(
+        impact_hypotheses,
+        near_miss_result=near_miss_phase.near_miss_result,
+        evidence_acquisition_cfg=evidence_acquisition_cfg,
+        evidence_acquisition_provider=evidence_acquisition_provider,
+        evidence_acquisition_providers_by_hint=evidence_acquisition_providers_by_hint,
+        evidence_acquisition_context=evidence_acquisition_context,
+        observed=observed,
+    )
+    impact_hypotheses = evidence_phase.impact_hypotheses
+    warnings.extend(evidence_phase.warnings)
+
+    anomaly_lifecycle_result = (
+        event_anomaly_state.build_anomaly_lifecycle(
+            source_raw_events or discovery_result.raw_events,
+            catalyst_search_result,
+            alert_phase.alerts,
+            now=observed,
+        )
+        if catalyst_search_result is not None
+        else None
+    )
+    watchlist_phase = _pipeline_watchlist_route_phase(
+        discovery_result,
+        alerts=alert_phase.alerts,
+        impact_hypotheses=impact_hypotheses,
+        watchlist_cfg=watchlist_cfg,
+        router_cfg=router_cfg,
+        refresh_watchlist=refresh_watchlist,
+        route=route,
+        watchlist_monitor_enabled=watchlist_monitor_enabled,
+        watchlist_monitor_market_rows=watchlist_monitor_market_rows,
+        watchlist_monitor_market_source=watchlist_monitor_market_source,
+        watchlist_monitor_market_provider=watchlist_monitor_market_provider,
+        watchlist_monitor_targeted_lookup=watchlist_monitor_targeted_lookup,
+        watchlist_monitor_max_assets=watchlist_monitor_max_assets,
+        watchlist_monitor_market_cache_ttl_seconds=watchlist_monitor_market_cache_ttl_seconds,
+        watchlist_monitor_derivatives_source=watchlist_monitor_derivatives_source,
+        watchlist_monitor_supply_source=watchlist_monitor_supply_source,
+        watchlist_monitor_derivatives_rows=watchlist_monitor_derivatives_rows,
+        watchlist_monitor_supply_rows=watchlist_monitor_supply_rows,
+        watchlist_monitor_enrichment_max_assets=watchlist_monitor_enrichment_max_assets,
+        watchlist_monitor_route_updates=watchlist_monitor_route_updates,
+        observed=observed,
+    )
+    warnings.extend(watchlist_phase.warnings)
+
+    return EventAlphaPipelineResult(
+        discovery_result=discovery_result,
+        alerts=alert_phase.alerts,
+        catalyst_search_result=catalyst_search_result,
+        hypothesis_search_result=hypothesis_phase.hypothesis_search_result,
+        anomaly_lifecycle_result=anomaly_lifecycle_result,
+        extraction_rows=extraction_rows_list,
+        catalyst_frame_rows=catalyst_frame_rows_list,
+        relationship_rows=alert_phase.relationship_rows,
+        watchlist_result=watchlist_phase.watchlist_result,
+        watchlist_monitor_result=watchlist_phase.watchlist_monitor_result,
+        router_result=watchlist_phase.router_result,
+        near_miss_result=near_miss_phase.near_miss_result,
+        evidence_acquisition_result=evidence_phase.evidence_acquisition_result,
+        impact_hypotheses=impact_hypotheses,
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _pipeline_alert_phase(
+    discovery_result: EventDiscoveryResult,
+    *,
+    alert_cfg: event_alerts.EventAlertConfig,
+    observed: datetime,
+    relationship_provider: object | None,
+    relationship_cfg: event_llm_analyzer.EventLLMConfig | None,
+    priors_cfg: event_alpha_priors.EventAlphaPriorsConfig | None,
+) -> _PipelineAlertPhase:
+    warnings: list[str] = []
     alerts = event_alerts.build_event_alert_candidates(discovery_result, cfg=alert_cfg, now=observed)
     relationship_rows: list[event_llm_analyzer.EventLLMReportRow] = []
     if relationship_provider is not None and relationship_cfg is not None:
@@ -414,11 +561,28 @@ def run_event_alpha_pipeline(
         warnings.extend(_llm_budget_warnings(relationship_rows, label="relationship"))
     if priors_cfg is not None:
         alerts = event_alpha_priors.apply_priors_to_alerts(alerts, cfg=priors_cfg, alert_cfg=alert_cfg)
+    return _PipelineAlertPhase(
+        alerts=alerts,
+        relationship_rows=relationship_rows,
+        warnings=tuple(warnings),
+    )
 
+
+def _pipeline_hypothesis_phase(
+    discovery_result: EventDiscoveryResult,
+    *,
+    extraction_rows_list: list[event_llm_extractor.EventLLMExtractionReportRow],
+    raw_events: Iterable[RawDiscoveredEvent],
+    catalyst_search_result: event_catalyst_search.CatalystSearchRunResult | None,
+    hypothesis_search_provider: event_catalyst_search.CatalystSearchProvider | None,
+    hypothesis_search_cfg: event_catalyst_search.EventImpactHypothesisSearchConfig | None,
+    observed: datetime,
+) -> _PipelineHypothesisPhase:
+    warnings: list[str] = []
     clusters = event_graph.build_event_clusters(discovery_result)
     impact_hypotheses = event_impact_hypotheses.generate_impact_hypotheses(
         discovery_result,
-        raw_events=source_raw_events,
+        raw_events=raw_events,
         clusters=clusters,
         extraction_rows=extraction_rows_list,
         now=observed,
@@ -460,50 +624,98 @@ def run_event_alpha_pipeline(
                 impact_hypotheses,
                 validation_raw,
             )
+    return _PipelineHypothesisPhase(
+        impact_hypotheses=impact_hypotheses,
+        hypothesis_search_result=hypothesis_search_result,
+        warnings=tuple(warnings),
+    )
 
-    near_miss_result: event_near_miss.EventNearMissRefreshResult | None = None
-    if near_miss_cfg is not None and near_miss_cfg.enabled:
-        near_miss_result = event_near_miss.refresh_near_miss_hypotheses(
-            impact_hypotheses,
-            cfg=near_miss_cfg,
-            market_rows=near_miss_market_rows or watchlist_monitor_market_rows,
-            targeted_market_provider=near_miss_market_provider,
-            derivatives_rows=near_miss_derivatives_rows or watchlist_monitor_derivatives_rows,
-            supply_rows=near_miss_supply_rows or watchlist_monitor_supply_rows,
-            now=observed,
-        )
-        impact_hypotheses = near_miss_result.hypotheses
-        warnings.extend(f"near miss: {warning}" for warning in near_miss_result.warnings)
 
-    evidence_acquisition_result: event_evidence_acquisition.EventEvidenceAcquisitionRunResult | None = None
-    if evidence_acquisition_cfg is not None and evidence_acquisition_cfg.enabled:
-        evidence_acquisition_result = event_evidence_acquisition.run_evidence_acquisition(
-            impact_hypotheses,
-            near_misses=near_miss_result.near_misses if near_miss_result else (),
-            provider=evidence_acquisition_provider,
-            providers_by_hint=evidence_acquisition_providers_by_hint or {},
-            cfg=evidence_acquisition_cfg,
-            now=observed,
-            run_context=evidence_acquisition_context or {},
-        )
-        impact_hypotheses = tuple(
+def _pipeline_near_miss_phase(
+    impact_hypotheses: tuple[event_impact_hypotheses.EventImpactHypothesis, ...],
+    *,
+    near_miss_cfg: event_near_miss.EventNearMissConfig | None,
+    near_miss_market_rows: Iterable[dict[str, Any]],
+    near_miss_market_provider: event_watchlist_market.EventWatchlistMarketProvider | None,
+    near_miss_derivatives_rows: Iterable[dict[str, Any]],
+    near_miss_supply_rows: Iterable[dict[str, Any]],
+    observed: datetime,
+) -> _PipelineNearMissPhase:
+    if near_miss_cfg is None or not near_miss_cfg.enabled:
+        return _PipelineNearMissPhase(impact_hypotheses=impact_hypotheses)
+    near_miss_result = event_near_miss.refresh_near_miss_hypotheses(
+        impact_hypotheses,
+        cfg=near_miss_cfg,
+        market_rows=near_miss_market_rows,
+        targeted_market_provider=near_miss_market_provider,
+        derivatives_rows=near_miss_derivatives_rows,
+        supply_rows=near_miss_supply_rows,
+        now=observed,
+    )
+    return _PipelineNearMissPhase(
+        impact_hypotheses=near_miss_result.hypotheses,
+        near_miss_result=near_miss_result,
+        warnings=tuple(f"near miss: {warning}" for warning in near_miss_result.warnings),
+    )
+
+
+def _pipeline_evidence_phase(
+    impact_hypotheses: tuple[event_impact_hypotheses.EventImpactHypothesis, ...],
+    *,
+    near_miss_result: event_near_miss.EventNearMissRefreshResult | None,
+    evidence_acquisition_cfg: event_evidence_acquisition.EvidenceAcquisitionConfig | None,
+    evidence_acquisition_provider: event_evidence_acquisition.EvidenceSearchProvider | None,
+    evidence_acquisition_providers_by_hint: dict[str, event_evidence_acquisition.EvidenceSearchProvider | None] | None,
+    evidence_acquisition_context: dict[str, Any] | None,
+    observed: datetime,
+) -> _PipelineEvidencePhase:
+    if evidence_acquisition_cfg is None or not evidence_acquisition_cfg.enabled:
+        return _PipelineEvidencePhase(impact_hypotheses=impact_hypotheses)
+    evidence_acquisition_result = event_evidence_acquisition.run_evidence_acquisition(
+        impact_hypotheses,
+        near_misses=near_miss_result.near_misses if near_miss_result else (),
+        provider=evidence_acquisition_provider,
+        providers_by_hint=evidence_acquisition_providers_by_hint or {},
+        cfg=evidence_acquisition_cfg,
+        now=observed,
+        run_context=evidence_acquisition_context or {},
+    )
+    return _PipelineEvidencePhase(
+        impact_hypotheses=tuple(
             item
             for item in evidence_acquisition_result.hypotheses
             if isinstance(item, event_impact_hypotheses.EventImpactHypothesis)
-        )
-        warnings.extend(f"evidence acquisition: {warning}" for warning in evidence_acquisition_result.warnings)
-
-    anomaly_lifecycle_result = (
-        event_anomaly_state.build_anomaly_lifecycle(
-            source_raw_events or discovery_result.raw_events,
-            catalyst_search_result,
-            alerts,
-            now=observed,
-        )
-        if catalyst_search_result is not None
-        else None
+        ),
+        evidence_acquisition_result=evidence_acquisition_result,
+        warnings=tuple(f"evidence acquisition: {warning}" for warning in evidence_acquisition_result.warnings),
     )
 
+
+def _pipeline_watchlist_route_phase(
+    discovery_result: EventDiscoveryResult,
+    *,
+    alerts: list[event_alerts.EventAlertCandidate],
+    impact_hypotheses: tuple[event_impact_hypotheses.EventImpactHypothesis, ...],
+    watchlist_cfg: event_watchlist.EventWatchlistConfig | None,
+    router_cfg: event_alpha_router.EventAlphaRouterConfig | None,
+    refresh_watchlist: bool,
+    route: bool,
+    watchlist_monitor_enabled: bool,
+    watchlist_monitor_market_rows: Iterable[dict[str, Any]],
+    watchlist_monitor_market_source: str,
+    watchlist_monitor_market_provider: event_watchlist_market.EventWatchlistMarketProvider | None,
+    watchlist_monitor_targeted_lookup: bool,
+    watchlist_monitor_max_assets: int,
+    watchlist_monitor_market_cache_ttl_seconds: int,
+    watchlist_monitor_derivatives_source: str,
+    watchlist_monitor_supply_source: str,
+    watchlist_monitor_derivatives_rows: Iterable[dict[str, Any]],
+    watchlist_monitor_supply_rows: Iterable[dict[str, Any]],
+    watchlist_monitor_enrichment_max_assets: int,
+    watchlist_monitor_route_updates: bool,
+    observed: datetime,
+) -> _PipelineWatchlistRoutePhase:
+    warnings: list[str] = []
     watchlist_result: event_watchlist.EventWatchlistRefreshResult | None = None
     watchlist_read_result: event_watchlist.EventWatchlistReadResult | None = None
     if refresh_watchlist:
@@ -572,23 +784,11 @@ def run_event_alpha_pipeline(
                 watchlist_cfg.state_path or Path("event_watchlist_state.jsonl")
             )
             router_result = event_alpha_router.route_watchlist(read_result, cfg=router_cfg)
-
-    return EventAlphaPipelineResult(
-        discovery_result=discovery_result,
-        alerts=alerts,
-        catalyst_search_result=catalyst_search_result,
-        hypothesis_search_result=hypothesis_search_result,
-        anomaly_lifecycle_result=anomaly_lifecycle_result,
-        extraction_rows=extraction_rows_list,
-        catalyst_frame_rows=catalyst_frame_rows_list,
-        relationship_rows=relationship_rows,
+    return _PipelineWatchlistRoutePhase(
         watchlist_result=watchlist_result,
         watchlist_monitor_result=watchlist_monitor_result,
         router_result=router_result,
-        near_miss_result=near_miss_result,
-        evidence_acquisition_result=evidence_acquisition_result,
-        impact_hypotheses=impact_hypotheses,
-        warnings=tuple(dict.fromkeys(warnings)),
+        warnings=tuple(warnings),
     )
 
 
