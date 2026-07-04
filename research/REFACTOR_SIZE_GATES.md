@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T19:34:25.396744+00:00`
+- generated_at: `2026-07-04T20:30:59.274287+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -13,25 +13,25 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
-- production_classes_over_limit: `14`
-- production_functions_over_limit: `1`
+- production_classes_over_limit: `3`
+- production_functions_over_limit: `0`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
-- classes_over_limit_count: `14`
-- functions_over_limit_count: `1`
-- accepted_class_exceptions_count: `14`
+- classes_over_limit_count: `3`
+- functions_over_limit_count: `0`
+- accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
-- modules_with_multiple_public_classes_count: `82`
+- modules_with_multiple_public_classes_count: `80`
 - modules_with_multiple_public_classes_status: `documented_advisory`
 - new_violation_count: `0`
 - moved_existing_violation_count: `15`
 - legacy_decomposition_gate_status: `pass`
 - legacy_files_over_1500_lines: `0`
 - legacy_files_over_3000_lines: `0`
-- legacy_total_lines: `4721`
-- legacy_classes_over_limit: `3`
+- legacy_total_lines: `3553`
+- legacy_classes_over_limit: `0`
 - legacy_functions_over_limit: `0`
-- legacy_modules_with_multiple_public_classes: `2`
+- legacy_modules_with_multiple_public_classes: `1`
 
 ## Policy
 
@@ -64,9 +64,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `deleted_shims` | 115 | informational |
 | `production_files_over_1200_lines` | 15 | target_gap |
 | `production_files_over_1500_lines` | 0 | blocker |
-| `public_classes_not_in_own_module` | 82 | blocker |
-| `class_exceptions_remaining` | 14 | blocker_until_reaccepted_for_v3 |
-| `functions_over_150_lines` | 1 | blocker |
+| `public_classes_not_in_own_module` | 80 | blocker |
+| `class_exceptions_remaining` | 3 | blocker_until_reaccepted_for_v3 |
+| `functions_over_150_lines` | 0 | blocker |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 19 | informational |
 
@@ -95,13 +95,10 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py` | 933 |
-| `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` | 905 |
 | `crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py` | 779 |
 | `crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py` | 629 |
-| `crypto_rsi_scanner/event_providers/binance_announcements/legacy.py` | 192 |
 | `crypto_rsi_scanner/refactor_legacy_inventory.py` | 190 |
 | `crypto_rsi_scanner/cli/services/scanner_legacy.py` | 120 |
-| `crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py` | 111 |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py` | 104 |
 | `crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py` | 95 |
 | `crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py` | 88 |
@@ -114,6 +111,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py` | 50 |
 | `crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py` | 50 |
 | `crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py` | 48 |
+| `crypto_rsi_scanner/backtest_parts/legacy.py` | 44 |
+| `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` | 16 |
+| `crypto_rsi_scanner/event_providers/binance_announcements/legacy.py` | 12 |
 
 ## Largest Production Files
 
@@ -136,8 +136,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1223 |
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 1155 |
+| `crypto_rsi_scanner/refactor_final_report.py` | 1151 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py` | 1145 |
-| `crypto_rsi_scanner/refactor_final_report.py` | 1145 |
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 1135 |
 | `crypto_rsi_scanner/cli/services/legacy/rsi_scan.py` | 1103 |
 | `crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py` | 1078 |
@@ -174,7 +174,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/test_indicators.py` | 1778 |
 | `tests/cli/test_make_targets.py` | 1085 |
 | `tests/event_alpha/_legacy_helpers.py` | 825 |
-| `tests/event_alpha/test_artifact_schema.py` | 728 |
+| `tests/event_alpha/test_artifact_schema.py` | 743 |
 | `tests/rsi/test_indicators_core.py` | 694 |
 | `tests/rsi/test_backtest.py` | 561 |
 | `tests/rsi/test_paper_risk.py` | 379 |
@@ -216,21 +216,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `file_over_1500_lines` | `file:tests/event_alpha/test_provider_readiness.py` | 5357 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_source_coverage.py` | 2991 |
 | `file_over_1500_lines` | `file:tests/test_indicators.py` | 1778 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/client.py:CoinGeckoClient` | 115 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/radar/asset_registry.py:CanonicalAsset` | 96 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/radar/watchlist_market.py:CoinGeckoWatchlistMarketProvider` | 116 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_providers/binance_announcements/legacy.py:BinanceAnnouncementProvider` | 107 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py:BybitAnnouncementProvider` | 79 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_providers/cryptopanic/legacy.py:CryptoPanicProvider` | 340 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_providers/gdelt.py:GdeltProvider` | 82 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_providers/prediction_market_events.py:PredictionMarketEventsProvider` | 83 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_providers/project_blog_rss.py:ProjectBlogRssProvider` | 96 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/llm_providers/openai_provider.py:OpenAILLMRelationshipProvider` | 137 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/llm_providers/openai_provider.py:OpenAILLMExtractionProvider` | 78 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/migrations.py:MigrationsMixin` | 88 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/signals.py:SignalsMixin` | 129 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin` | 89 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/refactor_final_report.py:build_refactor_final_report` | 157 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.backups` | 3 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store.models` | 4 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.event_alpha.artifacts.alerts` | 3 |
@@ -306,10 +294,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.event_core.models` | 7 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.event_fade` | 11 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.event_providers.base` | 2 |
-| `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.event_providers.cryptopanic.legacy` | 5 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.llm_providers.base` | 5 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.llm_providers.fixture` | 4 |
-| `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.llm_providers.openai_provider` | 2 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.ops` | 5 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.refactor_class_ownership_report` | 2 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.signal_registry` | 2 |

@@ -72,24 +72,8 @@ class CoinGeckoWatchlistMarketProvider:
 
     name = "coingecko"
 
-    def __init__(
-        self,
-        fetcher: Callable[[tuple[str, ...]], Iterable[Mapping[str, Any]]] | None = None,
-        *,
-        live_enabled: bool = False,
-        cache_ttl_seconds: int = 900,
-        client_factory: Callable[[], Any] | None = None,
-        now_fn: Callable[[], datetime] | None = None,
-        provider_health_cfg: event_provider_health.EventProviderHealthConfig | None = None,
-    ) -> None:
-        self._fetcher = fetcher
-        self.live_enabled = live_enabled
-        self.cache_ttl_seconds = max(0, int(cache_ttl_seconds or 0))
-        self.client_factory = client_factory or CoinGeckoClient
-        self.now_fn = now_fn or (lambda: datetime.now(timezone.utc))
-        self.provider_health_cfg = provider_health_cfg
-        self._cache: dict[tuple[str, ...], tuple[datetime, list[dict[str, Any]]]] = {}
-        self.last_cache_status: str = "miss"
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        initialize_coingecko_watchlist_market_provider(self, *args, **kwargs)
 
     def fetch_market_rows(
         self,
@@ -97,87 +81,129 @@ class CoinGeckoWatchlistMarketProvider:
         *,
         max_assets: int = 50,
     ) -> tuple[list[dict[str, Any]], tuple[str, ...]]:
-        ids = tuple(dict.fromkeys(str(coin_id or "").strip() for coin_id in coin_ids if str(coin_id or "").strip()))
-        ids = ids[: max(1, int(max_assets or 1))]
-        if not ids:
-            return [], ()
-        cache_key = tuple(sorted(ids))
-        cached = self._cache.get(cache_key)
-        observed = self._as_utc(self.now_fn())
-        if cached is not None and self.cache_ttl_seconds > 0:
-            cached_at, rows = cached
-            if cached_at + timedelta(seconds=self.cache_ttl_seconds) >= observed:
-                self.last_cache_status = "hit"
-                return [dict(row) for row in rows], ()
+        return fetch_coingecko_watchlist_market_rows(self, coin_ids, max_assets=max_assets)
+
+    def _fetch_live_rows(self, ids: tuple[str, ...]) -> list[dict[str, Any]]:
+        return fetch_coingecko_watchlist_live_rows(self, ids)
+
+    async def _fetch_live_rows_async(self, ids: tuple[str, ...]) -> list[dict[str, Any]]:
+        return await fetch_coingecko_watchlist_live_rows_async(self, ids)
+
+    @staticmethod
+    def _as_utc(value: datetime) -> datetime:
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
+def initialize_coingecko_watchlist_market_provider(
+    self: Any,
+    fetcher: Callable[[tuple[str, ...]], Iterable[Mapping[str, Any]]] | None = None,
+    *,
+    live_enabled: bool = False,
+    cache_ttl_seconds: int = 900,
+    client_factory: Callable[[], Any] | None = None,
+    now_fn: Callable[[], datetime] | None = None,
+    provider_health_cfg: event_provider_health.EventProviderHealthConfig | None = None,
+) -> None:
+    self._fetcher = fetcher
+    self.live_enabled = live_enabled
+    self.cache_ttl_seconds = max(0, int(cache_ttl_seconds or 0))
+    self.client_factory = client_factory or CoinGeckoClient
+    self.now_fn = now_fn or (lambda: datetime.now(timezone.utc))
+    self.provider_health_cfg = provider_health_cfg
+    self._cache: dict[tuple[str, ...], tuple[datetime, list[dict[str, Any]]]] = {}
+    self.last_cache_status: str = "miss"
+
+
+def fetch_coingecko_watchlist_market_rows(
+    self: Any,
+    coin_ids: Iterable[str],
+    *,
+    max_assets: int = 50,
+) -> tuple[list[dict[str, Any]], tuple[str, ...]]:
+    ids = tuple(dict.fromkeys(str(coin_id or "").strip() for coin_id in coin_ids if str(coin_id or "").strip()))
+    ids = ids[: max(1, int(max_assets or 1))]
+    if not ids:
+        return [], ()
+    cache_key = tuple(sorted(ids))
+    cached = self._cache.get(cache_key)
+    observed = self._as_utc(self.now_fn())
+    if cached is not None and self.cache_ttl_seconds > 0:
+        cached_at, rows = cached
+        if cached_at + timedelta(seconds=self.cache_ttl_seconds) >= observed:
+            self.last_cache_status = "hit"
+            return [dict(row) for row in rows], ()
+    decision = None
+    if self.provider_health_cfg is not None:
+        decision = event_provider_health.provider_allowed(
+            "coingecko",
+            cfg=self.provider_health_cfg,
+            now=observed,
+            provider_service="coingecko",
+            provider_role="watchlist_market",
+        )
+        if not decision.allowed:
+            self.last_cache_status = "backoff"
+            return [], (decision.reason or "provider coingecko:watchlist_market in backoff",)
+    try:
+        if self._fetcher is not None:
+            rows = [dict(row) for row in self._fetcher(ids) if isinstance(row, Mapping)]
+        elif self.live_enabled:
+            rows = self._fetch_live_rows(ids)
+        else:
+            self.last_cache_status = "disabled"
+            return [], ("CoinGecko targeted watchlist lookup is not configured; using fallback rows",)
+    except Exception as exc:  # pragma: no cover - defensive fail-soft guard
         if self.provider_health_cfg is not None:
-            decision = event_provider_health.provider_allowed(
+            event_provider_health.record_provider_failure(
                 "coingecko",
-                cfg=self.provider_health_cfg,
-                now=observed,
-                provider_service="coingecko",
-                provider_role="watchlist_market",
-            )
-            if not decision.allowed:
-                self.last_cache_status = "backoff"
-                return [], (decision.reason or "provider coingecko:watchlist_market in backoff",)
-        try:
-            if self._fetcher is not None:
-                rows = [dict(row) for row in self._fetcher(ids) if isinstance(row, Mapping)]
-            elif self.live_enabled:
-                rows = self._fetch_live_rows(ids)
-            else:
-                self.last_cache_status = "disabled"
-                return [], ("CoinGecko targeted watchlist lookup is not configured; using fallback rows",)
-        except Exception as exc:  # pragma: no cover - defensive fail-soft guard
-            if self.provider_health_cfg is not None:
-                event_provider_health.record_provider_failure(
-                    "coingecko",
-                    exc,
-                    cfg=self.provider_health_cfg,
-                    now=observed,
-                    provider_kind="enrichment",
-                    provider_service="coingecko",
-                    provider_role="watchlist_market",
-                )
-            self.last_cache_status = "error"
-            return [], (f"CoinGecko targeted watchlist lookup failed: {type(exc).__name__}: {exc}",)
-        if self.provider_health_cfg is not None and decision.reason != "provider_backoff_ignored_for_run":
-            event_provider_health.record_provider_success(
-                "coingecko",
+                exc,
                 cfg=self.provider_health_cfg,
                 now=observed,
                 provider_kind="enrichment",
                 provider_service="coingecko",
                 provider_role="watchlist_market",
             )
-        self._cache[cache_key] = (observed, [dict(row) for row in rows])
-        self.last_cache_status = "miss"
-        return rows, ()
+        self.last_cache_status = "error"
+        return [], (f"CoinGecko targeted watchlist lookup failed: {type(exc).__name__}: {exc}",)
+    if (
+        self.provider_health_cfg is not None
+        and decision is not None
+        and decision.reason != "provider_backoff_ignored_for_run"
+    ):
+        event_provider_health.record_provider_success(
+            "coingecko",
+            cfg=self.provider_health_cfg,
+            now=observed,
+            provider_kind="enrichment",
+            provider_service="coingecko",
+            provider_role="watchlist_market",
+        )
+    self._cache[cache_key] = (observed, [dict(row) for row in rows])
+    self.last_cache_status = "miss"
+    return rows, ()
 
-    def _fetch_live_rows(self, ids: tuple[str, ...]) -> list[dict[str, Any]]:
-        return _run_async(self._fetch_live_rows_async(ids))
 
-    async def _fetch_live_rows_async(self, ids: tuple[str, ...]) -> list[dict[str, Any]]:
-        async with self.client_factory() as client:
-            rows = await client._get(  # noqa: SLF001 - no public targeted markets helper yet
-                "/coins/markets",
-                {
-                    "vs_currency": "usd",
-                    "ids": ",".join(ids),
-                    "order": "market_cap_desc",
-                    "per_page": min(250, max(1, len(ids))),
-                    "page": 1,
-                    "sparkline": "false",
-                    "price_change_percentage": "1h,24h,7d",
-                },
-            )
-        if not isinstance(rows, list):
-            return []
-        return [dict(row) for row in rows if isinstance(row, Mapping)]
+def fetch_coingecko_watchlist_live_rows(self: Any, ids: tuple[str, ...]) -> list[dict[str, Any]]:
+    return _run_async(self._fetch_live_rows_async(ids))
 
-    @staticmethod
-    def _as_utc(value: datetime) -> datetime:
-        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+async def fetch_coingecko_watchlist_live_rows_async(self: Any, ids: tuple[str, ...]) -> list[dict[str, Any]]:
+    async with self.client_factory() as client:
+        rows = await client._get(  # noqa: SLF001 - no public targeted markets helper yet
+            "/coins/markets",
+            {
+                "vs_currency": "usd",
+                "ids": ",".join(ids),
+                "order": "market_cap_desc",
+                "per_page": min(250, max(1, len(ids))),
+                "page": 1,
+                "sparkline": "false",
+                "price_change_percentage": "1h,24h,7d",
+            },
+        )
+    if not isinstance(rows, list):
+        return []
+    return [dict(row) for row in rows if isinstance(row, Mapping)]
 
 
 def market_rows_for_watchlist(

@@ -33,86 +33,102 @@ def _urlopen_with_timeout(request: Request, timeout: float) -> Any:
 class PredictionMarketEventsProvider:
     name = "prediction_market_events"
 
-    def __init__(
-        self,
-        path: str | Path | None,
-        *,
-        required: bool = False,
-        live_enabled: bool = False,
-        base_url: str = DEFAULT_POLYMARKET_GAMMA_EVENTS_URL,
-        limit: int = 100,
-        timeout: float = 10.0,
-        opener: UrlOpen | None = None,
-        fetched_at: datetime | None = None,
-    ) -> None:
-        self.path = path
-        self.required = required
-        self.live_enabled = live_enabled
-        self.base_url = base_url
-        self.limit = limit
-        self.timeout = timeout
-        self.opener = opener or _urlopen_with_timeout
-        self.fetched_at = fetched_at
-        self.last_warnings: tuple[str, ...] = ()
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        initialize_prediction_market_events_provider(self, *args, **kwargs)
 
     def fetch_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
-        self.last_warnings = ()
-        if self.path is None and self.live_enabled:
-            return self._fetch_live_events(start, end)
-        return fetch_external_events(
-            self.path,
-            provider=self.name,
-            default_event_type="external_proxy_event",
-            start=start,
-            end=end,
-            required=self.required,
-        )
+        return fetch_prediction_market_events(self, start, end)
 
     def _fetch_live_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
-        try:
-            request = Request(
-                self._request_url(),
-                headers={"Accept": "application/json", "User-Agent": "crypto-rsi-scanner/1.0"},
-            )
-            with self.opener(request, self.timeout) as response:
-                status = getattr(response, "status", getattr(response, "code", 200))
-                if int(status) >= 400:
-                    raise RuntimeError(f"HTTP {status}")
-                payload = json.loads(response.read().decode("utf-8"))
-        except Exception as exc:  # noqa: BLE001
-            warning = f"Prediction-market live event fetch failed: {exc}"
-            self.last_warnings = (warning,)
-            if self.required:
-                raise
-            log.warning(warning)
-            return []
-
-        self.last_warnings = ()
-        fetched_at = _as_utc(self.fetched_at or datetime.now(timezone.utc))
-        rows = _polymarket_event_rows(payload)
-        events: list[RawDiscoveredEvent] = []
-        start_utc = _as_utc(start)
-        end_utc = _as_utc(end)
-        for row in rows:
-            event = _raw_polymarket_event(row, fetched_at)
-            if event is None:
-                continue
-            event_time = _parse_time(event.raw_json.get("event", {}).get("event_time")) if event.raw_json else None
-            reference_time = event_time or event.published_at or event.fetched_at
-            if start_utc <= reference_time <= end_utc:
-                events.append(event)
-        return events
+        return fetch_prediction_market_live_events(self, start, end)
 
     def _request_url(self) -> str:
-        query = {
-            "active": "true",
-            "closed": "false",
-            "limit": str(max(1, min(500, int(self.limit or 100)))),
-            "order": "volume_24hr",
-            "ascending": "false",
-        }
-        separator = "&" if "?" in self.base_url else "?"
-        return self.base_url + separator + urlencode(query)
+        return build_prediction_market_request_url(self)
+
+
+def initialize_prediction_market_events_provider(
+    self: Any,
+    path: str | Path | None,
+    *,
+    required: bool = False,
+    live_enabled: bool = False,
+    base_url: str = DEFAULT_POLYMARKET_GAMMA_EVENTS_URL,
+    limit: int = 100,
+    timeout: float = 10.0,
+    opener: UrlOpen | None = None,
+    fetched_at: datetime | None = None,
+) -> None:
+    self.path = path
+    self.required = required
+    self.live_enabled = live_enabled
+    self.base_url = base_url
+    self.limit = limit
+    self.timeout = timeout
+    self.opener = opener or _urlopen_with_timeout
+    self.fetched_at = fetched_at
+    self.last_warnings: tuple[str, ...] = ()
+
+
+def fetch_prediction_market_events(self: Any, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
+    self.last_warnings = ()
+    if self.path is None and self.live_enabled:
+        return self._fetch_live_events(start, end)
+    return fetch_external_events(
+        self.path,
+        provider=self.name,
+        default_event_type="external_proxy_event",
+        start=start,
+        end=end,
+        required=self.required,
+    )
+
+
+def fetch_prediction_market_live_events(self: Any, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
+    try:
+        request = Request(
+            self._request_url(),
+            headers={"Accept": "application/json", "User-Agent": "crypto-rsi-scanner/1.0"},
+        )
+        with self.opener(request, self.timeout) as response:
+            status = getattr(response, "status", getattr(response, "code", 200))
+            if int(status) >= 400:
+                raise RuntimeError(f"HTTP {status}")
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        warning = f"Prediction-market live event fetch failed: {exc}"
+        self.last_warnings = (warning,)
+        if self.required:
+            raise
+        log.warning(warning)
+        return []
+
+    self.last_warnings = ()
+    fetched_at = _as_utc(self.fetched_at or datetime.now(timezone.utc))
+    rows = _polymarket_event_rows(payload)
+    events: list[RawDiscoveredEvent] = []
+    start_utc = _as_utc(start)
+    end_utc = _as_utc(end)
+    for row in rows:
+        event = _raw_polymarket_event(row, fetched_at)
+        if event is None:
+            continue
+        event_time = _parse_time(event.raw_json.get("event", {}).get("event_time")) if event.raw_json else None
+        reference_time = event_time or event.published_at or event.fetched_at
+        if start_utc <= reference_time <= end_utc:
+            events.append(event)
+    return events
+
+
+def build_prediction_market_request_url(self: Any) -> str:
+    query = {
+        "active": "true",
+        "closed": "false",
+        "limit": str(max(1, min(500, int(self.limit or 100)))),
+        "order": "volume_24hr",
+        "ascending": "false",
+    }
+    separator = "&" if "?" in self.base_url else "?"
+    return self.base_url + separator + urlencode(query)
 
 
 def _polymarket_event_rows(payload: object) -> list[Mapping[str, Any]]:

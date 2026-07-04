@@ -2,160 +2,6 @@
   "accepted_class_exceptions": [
     {
       "accepted_exception": true,
-      "class_name": "CoinGeckoClient",
-      "exception_category": "provider_client",
-      "exception_reason": "Reusable async market-data client keeps rate-limit, retry, pagination, session, and fixture behavior in one public import contract.",
-      "exception_status": "accepted_exception",
-      "line_count": 115,
-      "module": "crypto_rsi_scanner.client",
-      "owner_note": "Split only with dedicated CoinGecko client parity tests; this pass intentionally avoids provider behavior churn.",
-      "public": true,
-      "qualname": "CoinGeckoClient",
-      "revisit_condition": "Revisit when adding a new CoinGecko endpoint family or changing async session/retry ownership.",
-      "source_path": "crypto_rsi_scanner/client.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "CanonicalAsset",
-      "exception_category": "data_model",
-      "exception_reason": "Field-rich canonical identity value object; splitting fields from serialization would add indirection without reducing behavior risk.",
-      "exception_status": "accepted_exception",
-      "line_count": 96,
-      "module": "crypto_rsi_scanner.event_alpha.radar.asset_registry",
-      "owner_note": "Keep schema-adjacent identity fields together while canonical resolver contracts settle.",
-      "public": true,
-      "qualname": "CanonicalAsset",
-      "revisit_condition": "Revisit when schema v2 splits asset identity, venue symbols, and diagnostics into separate contracts.",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/asset_registry.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "CoinGeckoWatchlistMarketProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Fixture/live market enrichment adapter is below file-size gates and tightly coupled to request budgeting and no-live defaults.",
-      "exception_status": "accepted_exception",
-      "line_count": 116,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
-      "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
-      "public": true,
-      "qualname": "CoinGeckoWatchlistMarketProvider",
-      "revisit_condition": "Revisit when watchlist market enrichment gains another provider implementation.",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist_market.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "BinanceAnnouncementProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Signed/public announcement compatibility core preserves old imports and WebSocket/fixture behavior.",
-      "exception_status": "accepted_exception",
-      "line_count": 107,
-      "module": "crypto_rsi_scanner.event_providers.binance_announcements.legacy",
-      "owner_note": "Do not split further without signed-listener fixture parity and secret-redaction tests.",
-      "public": true,
-      "qualname": "BinanceAnnouncementProvider",
-      "revisit_condition": "Revisit when Binance public rehearsal becomes a first-class activated provider path.",
-      "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "BybitAnnouncementProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Small HTTP announcement adapter is only slightly over the advisory class limit and already package-scoped.",
-      "exception_status": "accepted_exception",
-      "line_count": 79,
-      "module": "crypto_rsi_scanner.event_providers.bybit_announcements.legacy",
-      "owner_note": "Avoid touching Bybit request/normalization behavior outside provider-activation work.",
-      "public": true,
-      "qualname": "BybitAnnouncementProvider",
-      "revisit_condition": "Revisit when adding another Bybit announcement endpoint or response shape.",
-      "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "CryptoPanicProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Compatibility class still owns request hygiene, token redaction, quota/ledger telemetry, parser normalization, and fixture/live no-call behavior.",
-      "exception_status": "accepted_exception",
-      "line_count": 340,
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-      "owner_note": "The package already has client/parser/request_ledger homes; moving the remaining class body should be its own provider parity pass.",
-      "public": true,
-      "qualname": "CryptoPanicProvider",
-      "revisit_condition": "Revisit when CryptoPanic live activation or request-ledger semantics change.",
-      "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "GdeltProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "No-key public provider is fail-soft and only slightly over the advisory limit.",
-      "exception_status": "accepted_exception",
-      "line_count": 82,
-      "module": "crypto_rsi_scanner.event_providers.gdelt",
-      "owner_note": "Keep current timeout/429 behavior stable; public-provider noise is expected.",
-      "public": true,
-      "qualname": "GdeltProvider",
-      "revisit_condition": "Revisit when adding a second GDELT mode or durable request ledger.",
-      "source_path": "crypto_rsi_scanner/event_providers/gdelt.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "PredictionMarketEventsProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Small no-key prediction-market provider keeps fixture/live parsing in one stable adapter.",
-      "exception_status": "accepted_exception",
-      "line_count": 83,
-      "module": "crypto_rsi_scanner.event_providers.prediction_market_events",
-      "owner_note": "Split only when another prediction-market provider is added.",
-      "public": true,
-      "qualname": "PredictionMarketEventsProvider",
-      "revisit_condition": "Revisit when Polymarket Gamma support grows beyond the current parser.",
-      "source_path": "crypto_rsi_scanner/event_providers/prediction_market_events.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "ProjectBlogRssProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "RSS/Atom adapter is tightly coupled to per-feed fail-soft behavior and source normalization.",
-      "exception_status": "accepted_exception",
-      "line_count": 96,
-      "module": "crypto_rsi_scanner.event_providers.project_blog_rss",
-      "owner_note": "Keep feed failure semantics stable unless adding a reusable RSS client layer.",
-      "public": true,
-      "qualname": "ProjectBlogRssProvider",
-      "revisit_condition": "Revisit when project-blog sources get persistent request ledgers or richer feed classes.",
-      "source_path": "crypto_rsi_scanner/event_providers/project_blog_rss.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "OpenAILLMRelationshipProvider",
-      "exception_category": "llm_provider",
-      "exception_reason": "OpenAI relationship provider keeps request assembly, timeout/error handling, and structured parsing together behind explicit opt-in gates.",
-      "exception_status": "accepted_exception",
-      "line_count": 137,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "owner_note": "Do not alter LLM provider behavior during a refactor-only pass.",
-      "public": true,
-      "qualname": "OpenAILLMRelationshipProvider",
-      "revisit_condition": "Revisit when adding a second live LLM backend or shared OpenAI transport abstraction.",
-      "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "OpenAILLMExtractionProvider",
-      "exception_category": "llm_provider",
-      "exception_reason": "Small extraction provider is barely over the advisory threshold and shares safety semantics with the relationship provider.",
-      "exception_status": "accepted_exception",
-      "line_count": 78,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "owner_note": "Keep quote-validation and no-live defaults stable.",
-      "public": true,
-      "qualname": "OpenAILLMExtractionProvider",
-      "revisit_condition": "Revisit with a broader OpenAI provider transport split.",
-      "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py"
-    },
-    {
-      "accepted_exception": true,
       "class_name": "MigrationsMixin",
       "exception_category": "storage_mixin",
       "exception_reason": "SQLite migration ownership is intentionally centralized to avoid untested schema drift.",
@@ -197,167 +43,13 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "accepted_class_exceptions_count": 14,
+  "accepted_class_exceptions_count": 3,
   "baseline_path": "research/REFACTOR_SIZE_BASELINE.json",
   "baseline_present": true,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
       "accepted_exception": true,
-      "class_name": "CoinGeckoClient",
-      "exception_category": "provider_client",
-      "exception_reason": "Reusable async market-data client keeps rate-limit, retry, pagination, session, and fixture behavior in one public import contract.",
-      "exception_status": "accepted_exception",
-      "line_count": 115,
-      "module": "crypto_rsi_scanner.client",
-      "owner_note": "Split only with dedicated CoinGecko client parity tests; this pass intentionally avoids provider behavior churn.",
-      "public": true,
-      "qualname": "CoinGeckoClient",
-      "revisit_condition": "Revisit when adding a new CoinGecko endpoint family or changing async session/retry ownership.",
-      "source_path": "crypto_rsi_scanner/client.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "CanonicalAsset",
-      "exception_category": "data_model",
-      "exception_reason": "Field-rich canonical identity value object; splitting fields from serialization would add indirection without reducing behavior risk.",
-      "exception_status": "accepted_exception",
-      "line_count": 96,
-      "module": "crypto_rsi_scanner.event_alpha.radar.asset_registry",
-      "owner_note": "Keep schema-adjacent identity fields together while canonical resolver contracts settle.",
-      "public": true,
-      "qualname": "CanonicalAsset",
-      "revisit_condition": "Revisit when schema v2 splits asset identity, venue symbols, and diagnostics into separate contracts.",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/asset_registry.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "CoinGeckoWatchlistMarketProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Fixture/live market enrichment adapter is below file-size gates and tightly coupled to request budgeting and no-live defaults.",
-      "exception_status": "accepted_exception",
-      "line_count": 116,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
-      "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
-      "public": true,
-      "qualname": "CoinGeckoWatchlistMarketProvider",
-      "revisit_condition": "Revisit when watchlist market enrichment gains another provider implementation.",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist_market.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "BinanceAnnouncementProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Signed/public announcement compatibility core preserves old imports and WebSocket/fixture behavior.",
-      "exception_status": "accepted_exception",
-      "line_count": 107,
-      "module": "crypto_rsi_scanner.event_providers.binance_announcements.legacy",
-      "owner_note": "Do not split further without signed-listener fixture parity and secret-redaction tests.",
-      "public": true,
-      "qualname": "BinanceAnnouncementProvider",
-      "revisit_condition": "Revisit when Binance public rehearsal becomes a first-class activated provider path.",
-      "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "BybitAnnouncementProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Small HTTP announcement adapter is only slightly over the advisory class limit and already package-scoped.",
-      "exception_status": "accepted_exception",
-      "line_count": 79,
-      "module": "crypto_rsi_scanner.event_providers.bybit_announcements.legacy",
-      "owner_note": "Avoid touching Bybit request/normalization behavior outside provider-activation work.",
-      "public": true,
-      "qualname": "BybitAnnouncementProvider",
-      "revisit_condition": "Revisit when adding another Bybit announcement endpoint or response shape.",
-      "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "CryptoPanicProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Compatibility class still owns request hygiene, token redaction, quota/ledger telemetry, parser normalization, and fixture/live no-call behavior.",
-      "exception_status": "accepted_exception",
-      "line_count": 340,
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-      "owner_note": "The package already has client/parser/request_ledger homes; moving the remaining class body should be its own provider parity pass.",
-      "public": true,
-      "qualname": "CryptoPanicProvider",
-      "revisit_condition": "Revisit when CryptoPanic live activation or request-ledger semantics change.",
-      "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "GdeltProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "No-key public provider is fail-soft and only slightly over the advisory limit.",
-      "exception_status": "accepted_exception",
-      "line_count": 82,
-      "module": "crypto_rsi_scanner.event_providers.gdelt",
-      "owner_note": "Keep current timeout/429 behavior stable; public-provider noise is expected.",
-      "public": true,
-      "qualname": "GdeltProvider",
-      "revisit_condition": "Revisit when adding a second GDELT mode or durable request ledger.",
-      "source_path": "crypto_rsi_scanner/event_providers/gdelt.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "PredictionMarketEventsProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Small no-key prediction-market provider keeps fixture/live parsing in one stable adapter.",
-      "exception_status": "accepted_exception",
-      "line_count": 83,
-      "module": "crypto_rsi_scanner.event_providers.prediction_market_events",
-      "owner_note": "Split only when another prediction-market provider is added.",
-      "public": true,
-      "qualname": "PredictionMarketEventsProvider",
-      "revisit_condition": "Revisit when Polymarket Gamma support grows beyond the current parser.",
-      "source_path": "crypto_rsi_scanner/event_providers/prediction_market_events.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "ProjectBlogRssProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "RSS/Atom adapter is tightly coupled to per-feed fail-soft behavior and source normalization.",
-      "exception_status": "accepted_exception",
-      "line_count": 96,
-      "module": "crypto_rsi_scanner.event_providers.project_blog_rss",
-      "owner_note": "Keep feed failure semantics stable unless adding a reusable RSS client layer.",
-      "public": true,
-      "qualname": "ProjectBlogRssProvider",
-      "revisit_condition": "Revisit when project-blog sources get persistent request ledgers or richer feed classes.",
-      "source_path": "crypto_rsi_scanner/event_providers/project_blog_rss.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "OpenAILLMRelationshipProvider",
-      "exception_category": "llm_provider",
-      "exception_reason": "OpenAI relationship provider keeps request assembly, timeout/error handling, and structured parsing together behind explicit opt-in gates.",
-      "exception_status": "accepted_exception",
-      "line_count": 137,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "owner_note": "Do not alter LLM provider behavior during a refactor-only pass.",
-      "public": true,
-      "qualname": "OpenAILLMRelationshipProvider",
-      "revisit_condition": "Revisit when adding a second live LLM backend or shared OpenAI transport abstraction.",
-      "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "OpenAILLMExtractionProvider",
-      "exception_category": "llm_provider",
-      "exception_reason": "Small extraction provider is barely over the advisory threshold and shares safety semantics with the relationship provider.",
-      "exception_status": "accepted_exception",
-      "line_count": 78,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "owner_note": "Keep quote-validation and no-live defaults stable.",
-      "public": true,
-      "qualname": "OpenAILLMExtractionProvider",
-      "revisit_condition": "Revisit with a broader OpenAI provider transport split.",
-      "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py"
-    },
-    {
-      "accepted_exception": true,
       "class_name": "MigrationsMixin",
       "exception_category": "storage_mixin",
       "exception_reason": "SQLite migration ownership is intentionally centralized to avoid untested schema drift.",
@@ -399,8 +91,8 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 14,
-  "existing_violation_count": 105,
+  "classes_over_limit_count": 3,
+  "existing_violation_count": 91,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -477,193 +169,6 @@
     {
       "accepted_exception": true,
       "category": "class_over_75_lines",
-      "class_name": "CoinGeckoClient",
-      "exception_category": "provider_client",
-      "exception_reason": "Reusable async market-data client keeps rate-limit, retry, pagination, session, and fixture behavior in one public import contract.",
-      "exception_status": "accepted_exception",
-      "line_count": 115,
-      "module": "crypto_rsi_scanner.client",
-      "owner_note": "Split only with dedicated CoinGecko client parity tests; this pass intentionally avoids provider behavior churn.",
-      "public": true,
-      "qualname": "CoinGeckoClient",
-      "revisit_condition": "Revisit when adding a new CoinGecko endpoint family or changing async session/retry ownership.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/client.py",
-      "violation_id": "class:crypto_rsi_scanner/client.py:CoinGeckoClient"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "CanonicalAsset",
-      "exception_category": "data_model",
-      "exception_reason": "Field-rich canonical identity value object; splitting fields from serialization would add indirection without reducing behavior risk.",
-      "exception_status": "accepted_exception",
-      "line_count": 96,
-      "module": "crypto_rsi_scanner.event_alpha.radar.asset_registry",
-      "owner_note": "Keep schema-adjacent identity fields together while canonical resolver contracts settle.",
-      "public": true,
-      "qualname": "CanonicalAsset",
-      "revisit_condition": "Revisit when schema v2 splits asset identity, venue symbols, and diagnostics into separate contracts.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/asset_registry.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/asset_registry.py:CanonicalAsset"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "CoinGeckoWatchlistMarketProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Fixture/live market enrichment adapter is below file-size gates and tightly coupled to request budgeting and no-live defaults.",
-      "exception_status": "accepted_exception",
-      "line_count": 116,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
-      "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
-      "public": true,
-      "qualname": "CoinGeckoWatchlistMarketProvider",
-      "revisit_condition": "Revisit when watchlist market enrichment gains another provider implementation.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist_market.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/watchlist_market.py:CoinGeckoWatchlistMarketProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "BinanceAnnouncementProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Signed/public announcement compatibility core preserves old imports and WebSocket/fixture behavior.",
-      "exception_status": "accepted_exception",
-      "line_count": 107,
-      "module": "crypto_rsi_scanner.event_providers.binance_announcements.legacy",
-      "owner_note": "Do not split further without signed-listener fixture parity and secret-redaction tests.",
-      "public": true,
-      "qualname": "BinanceAnnouncementProvider",
-      "revisit_condition": "Revisit when Binance public rehearsal becomes a first-class activated provider path.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py",
-      "violation_id": "class:crypto_rsi_scanner/event_providers/binance_announcements/legacy.py:BinanceAnnouncementProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "BybitAnnouncementProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Small HTTP announcement adapter is only slightly over the advisory class limit and already package-scoped.",
-      "exception_status": "accepted_exception",
-      "line_count": 79,
-      "module": "crypto_rsi_scanner.event_providers.bybit_announcements.legacy",
-      "owner_note": "Avoid touching Bybit request/normalization behavior outside provider-activation work.",
-      "public": true,
-      "qualname": "BybitAnnouncementProvider",
-      "revisit_condition": "Revisit when adding another Bybit announcement endpoint or response shape.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py",
-      "violation_id": "class:crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py:BybitAnnouncementProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "CryptoPanicProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Compatibility class still owns request hygiene, token redaction, quota/ledger telemetry, parser normalization, and fixture/live no-call behavior.",
-      "exception_status": "accepted_exception",
-      "line_count": 340,
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-      "owner_note": "The package already has client/parser/request_ledger homes; moving the remaining class body should be its own provider parity pass.",
-      "public": true,
-      "qualname": "CryptoPanicProvider",
-      "revisit_condition": "Revisit when CryptoPanic live activation or request-ledger semantics change.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py",
-      "violation_id": "class:crypto_rsi_scanner/event_providers/cryptopanic/legacy.py:CryptoPanicProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "GdeltProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "No-key public provider is fail-soft and only slightly over the advisory limit.",
-      "exception_status": "accepted_exception",
-      "line_count": 82,
-      "module": "crypto_rsi_scanner.event_providers.gdelt",
-      "owner_note": "Keep current timeout/429 behavior stable; public-provider noise is expected.",
-      "public": true,
-      "qualname": "GdeltProvider",
-      "revisit_condition": "Revisit when adding a second GDELT mode or durable request ledger.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_providers/gdelt.py",
-      "violation_id": "class:crypto_rsi_scanner/event_providers/gdelt.py:GdeltProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "PredictionMarketEventsProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Small no-key prediction-market provider keeps fixture/live parsing in one stable adapter.",
-      "exception_status": "accepted_exception",
-      "line_count": 83,
-      "module": "crypto_rsi_scanner.event_providers.prediction_market_events",
-      "owner_note": "Split only when another prediction-market provider is added.",
-      "public": true,
-      "qualname": "PredictionMarketEventsProvider",
-      "revisit_condition": "Revisit when Polymarket Gamma support grows beyond the current parser.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_providers/prediction_market_events.py",
-      "violation_id": "class:crypto_rsi_scanner/event_providers/prediction_market_events.py:PredictionMarketEventsProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "ProjectBlogRssProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "RSS/Atom adapter is tightly coupled to per-feed fail-soft behavior and source normalization.",
-      "exception_status": "accepted_exception",
-      "line_count": 96,
-      "module": "crypto_rsi_scanner.event_providers.project_blog_rss",
-      "owner_note": "Keep feed failure semantics stable unless adding a reusable RSS client layer.",
-      "public": true,
-      "qualname": "ProjectBlogRssProvider",
-      "revisit_condition": "Revisit when project-blog sources get persistent request ledgers or richer feed classes.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_providers/project_blog_rss.py",
-      "violation_id": "class:crypto_rsi_scanner/event_providers/project_blog_rss.py:ProjectBlogRssProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "OpenAILLMRelationshipProvider",
-      "exception_category": "llm_provider",
-      "exception_reason": "OpenAI relationship provider keeps request assembly, timeout/error handling, and structured parsing together behind explicit opt-in gates.",
-      "exception_status": "accepted_exception",
-      "line_count": 137,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "owner_note": "Do not alter LLM provider behavior during a refactor-only pass.",
-      "public": true,
-      "qualname": "OpenAILLMRelationshipProvider",
-      "revisit_condition": "Revisit when adding a second live LLM backend or shared OpenAI transport abstraction.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py",
-      "violation_id": "class:crypto_rsi_scanner/llm_providers/openai_provider.py:OpenAILLMRelationshipProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "OpenAILLMExtractionProvider",
-      "exception_category": "llm_provider",
-      "exception_reason": "Small extraction provider is barely over the advisory threshold and shares safety semantics with the relationship provider.",
-      "exception_status": "accepted_exception",
-      "line_count": 78,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "owner_note": "Keep quote-validation and no-live defaults stable.",
-      "public": true,
-      "qualname": "OpenAILLMExtractionProvider",
-      "revisit_condition": "Revisit with a broader OpenAI provider transport split.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py",
-      "violation_id": "class:crypto_rsi_scanner/llm_providers/openai_provider.py:OpenAILLMExtractionProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
       "class_name": "MigrationsMixin",
       "exception_category": "storage_mixin",
       "exception_reason": "SQLite migration ownership is intentionally centralized to avoid untested schema drift.",
@@ -711,17 +216,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py",
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "build_refactor_final_report",
-      "line_count": 157,
-      "module": "crypto_rsi_scanner.refactor_final_report",
-      "public": true,
-      "qualname": "build_refactor_final_report",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/refactor_final_report.py",
-      "violation_id": "function:crypto_rsi_scanner/refactor_final_report.py:build_refactor_final_report"
     },
     {
       "category": "public_classes_sharing_module",
@@ -1326,14 +820,6 @@
     {
       "category": "public_classes_sharing_module",
       "exception_reason": null,
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-      "public_class_count": 5,
-      "severity": "warning",
-      "violation_id": "public_classes:crypto_rsi_scanner.event_providers.cryptopanic.legacy"
-    },
-    {
-      "category": "public_classes_sharing_module",
-      "exception_reason": null,
       "module": "crypto_rsi_scanner.llm_providers.base",
       "public_class_count": 5,
       "severity": "warning",
@@ -1346,14 +832,6 @@
       "public_class_count": 4,
       "severity": "warning",
       "violation_id": "public_classes:crypto_rsi_scanner.llm_providers.fixture"
-    },
-    {
-      "category": "public_classes_sharing_module",
-      "exception_reason": null,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "public_class_count": 2,
-      "severity": "warning",
-      "violation_id": "public_classes:crypto_rsi_scanner.llm_providers.openai_provider"
     },
     {
       "category": "public_classes_sharing_module",
@@ -1380,7 +858,7 @@
       "violation_id": "public_classes:crypto_rsi_scanner.signal_registry"
     }
   ],
-  "file_count": 620,
+  "file_count": 631,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -1434,27 +912,14 @@
   ],
   "files_over_limit_count": 8,
   "function_line_limit": 150,
-  "functions_over_limit": [
-    {
-      "function_name": "build_refactor_final_report",
-      "line_count": 157,
-      "module": "crypto_rsi_scanner.refactor_final_report",
-      "public": true,
-      "qualname": "build_refactor_final_report",
-      "source_path": "crypto_rsi_scanner/refactor_final_report.py"
-    }
-  ],
-  "functions_over_limit_count": 1,
+  "functions_over_limit": [],
+  "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T19:34:25.396744+00:00",
+  "generated_at": "2026-07-04T20:30:59.274287+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py"
-    },
-    {
-      "line_count": 905,
-      "path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
     },
     {
       "line_count": 779,
@@ -1465,20 +930,12 @@
       "path": "crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py"
     },
     {
-      "line_count": 192,
-      "path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py"
-    },
-    {
       "line_count": 190,
       "path": "crypto_rsi_scanner/refactor_legacy_inventory.py"
     },
     {
       "line_count": 120,
       "path": "crypto_rsi_scanner/cli/services/scanner_legacy.py"
-    },
-    {
-      "line_count": 111,
-      "path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py"
     },
     {
       "line_count": 104,
@@ -1527,6 +984,18 @@
     {
       "line_count": 48,
       "path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
+    },
+    {
+      "line_count": 44,
+      "path": "crypto_rsi_scanner/backtest_parts/legacy.py"
+    },
+    {
+      "line_count": 16,
+      "path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
+    },
+    {
+      "line_count": 12,
+      "path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py"
     }
   ],
   "largest_production_files": [
@@ -1634,14 +1103,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1145,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py",
+      "line_count": 1151,
+      "path": "crypto_rsi_scanner/refactor_final_report.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
       "line_count": 1145,
-      "path": "crypto_rsi_scanner/refactor_final_report.py",
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py",
       "source_kind": "production"
     },
     {
@@ -1834,7 +1303,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 728,
+      "line_count": 743,
       "path": "tests/event_alpha/test_artifact_schema.py",
       "source_kind": "test"
     },
@@ -1929,33 +1398,8 @@
       "source_kind": "test"
     }
   ],
-  "legacy_classes_over_limit": 3,
-  "legacy_classes_over_limit_rows": [
-    {
-      "class_name": "BinanceAnnouncementProvider",
-      "line_count": 107,
-      "module": "crypto_rsi_scanner.event_providers.binance_announcements.legacy",
-      "public": true,
-      "qualname": "BinanceAnnouncementProvider",
-      "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py"
-    },
-    {
-      "class_name": "BybitAnnouncementProvider",
-      "line_count": 79,
-      "module": "crypto_rsi_scanner.event_providers.bybit_announcements.legacy",
-      "public": true,
-      "qualname": "BybitAnnouncementProvider",
-      "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py"
-    },
-    {
-      "class_name": "CryptoPanicProvider",
-      "line_count": 340,
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-      "public": true,
-      "qualname": "CryptoPanicProvider",
-      "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
-    }
-  ],
+  "legacy_classes_over_limit": 0,
+  "legacy_classes_over_limit_rows": [],
   "legacy_decomposition_blockers": [],
   "legacy_decomposition_gate_status": "pass",
   "legacy_file_count": 21,
@@ -1965,17 +1409,12 @@
   "legacy_functions_over_limit_rows": [],
   "legacy_line_blocking_limit": 3000,
   "legacy_line_warning_limit": 1500,
-  "legacy_modules_with_multiple_public_classes": 2,
+  "legacy_modules_with_multiple_public_classes": 1,
   "legacy_modules_with_multiple_public_classes_rows": [
     {
       "module": "crypto_rsi_scanner.event_alpha.providers.provider_health_legacy",
       "public_class_count": 7,
       "source_path": "crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py"
-    },
-    {
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-      "public_class_count": 5,
-      "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
     }
   ],
   "legacy_required_decomposition_blockers": [],
@@ -1984,7 +1423,7 @@
     "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py",
     "crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py"
   ],
-  "legacy_total_lines": 4721,
+  "legacy_total_lines": 3553,
   "modules_with_multiple_public_classes": [
     {
       "exception_reason": null,
@@ -2363,11 +1802,6 @@
     },
     {
       "exception_reason": null,
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-      "public_class_count": 5
-    },
-    {
-      "exception_reason": null,
       "module": "crypto_rsi_scanner.llm_providers.base",
       "public_class_count": 5
     },
@@ -2375,11 +1809,6 @@
       "exception_reason": null,
       "module": "crypto_rsi_scanner.llm_providers.fixture",
       "public_class_count": 4
-    },
-    {
-      "exception_reason": null,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "public_class_count": 2
     },
     {
       "exception_reason": null,
@@ -2397,7 +1826,7 @@
       "public_class_count": 2
     }
   ],
-  "modules_with_multiple_public_classes_count": 82,
+  "modules_with_multiple_public_classes_count": 80,
   "modules_with_multiple_public_classes_status": "documented_advisory",
   "moved_existing_violation_aliases": [
     {
@@ -2549,162 +1978,8 @@
     "v3_production_file_over_1500_lines": "blocker unless explicitly accepted",
     "v3_production_file_under_1200_lines": "target"
   },
-  "production_classes_over_limit": 14,
+  "production_classes_over_limit": 3,
   "production_classes_over_limit_rows": [
-    {
-      "accepted_exception": true,
-      "class_name": "CoinGeckoClient",
-      "exception_category": "provider_client",
-      "exception_reason": "Reusable async market-data client keeps rate-limit, retry, pagination, session, and fixture behavior in one public import contract.",
-      "exception_status": "accepted_exception",
-      "line_count": 115,
-      "module": "crypto_rsi_scanner.client",
-      "owner_note": "Split only with dedicated CoinGecko client parity tests; this pass intentionally avoids provider behavior churn.",
-      "public": true,
-      "qualname": "CoinGeckoClient",
-      "revisit_condition": "Revisit when adding a new CoinGecko endpoint family or changing async session/retry ownership.",
-      "source_path": "crypto_rsi_scanner/client.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "CanonicalAsset",
-      "exception_category": "data_model",
-      "exception_reason": "Field-rich canonical identity value object; splitting fields from serialization would add indirection without reducing behavior risk.",
-      "exception_status": "accepted_exception",
-      "line_count": 96,
-      "module": "crypto_rsi_scanner.event_alpha.radar.asset_registry",
-      "owner_note": "Keep schema-adjacent identity fields together while canonical resolver contracts settle.",
-      "public": true,
-      "qualname": "CanonicalAsset",
-      "revisit_condition": "Revisit when schema v2 splits asset identity, venue symbols, and diagnostics into separate contracts.",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/asset_registry.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "CoinGeckoWatchlistMarketProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Fixture/live market enrichment adapter is below file-size gates and tightly coupled to request budgeting and no-live defaults.",
-      "exception_status": "accepted_exception",
-      "line_count": 116,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
-      "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
-      "public": true,
-      "qualname": "CoinGeckoWatchlistMarketProvider",
-      "revisit_condition": "Revisit when watchlist market enrichment gains another provider implementation.",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist_market.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "BinanceAnnouncementProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Signed/public announcement compatibility core preserves old imports and WebSocket/fixture behavior.",
-      "exception_status": "accepted_exception",
-      "line_count": 107,
-      "module": "crypto_rsi_scanner.event_providers.binance_announcements.legacy",
-      "owner_note": "Do not split further without signed-listener fixture parity and secret-redaction tests.",
-      "public": true,
-      "qualname": "BinanceAnnouncementProvider",
-      "revisit_condition": "Revisit when Binance public rehearsal becomes a first-class activated provider path.",
-      "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "BybitAnnouncementProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Small HTTP announcement adapter is only slightly over the advisory class limit and already package-scoped.",
-      "exception_status": "accepted_exception",
-      "line_count": 79,
-      "module": "crypto_rsi_scanner.event_providers.bybit_announcements.legacy",
-      "owner_note": "Avoid touching Bybit request/normalization behavior outside provider-activation work.",
-      "public": true,
-      "qualname": "BybitAnnouncementProvider",
-      "revisit_condition": "Revisit when adding another Bybit announcement endpoint or response shape.",
-      "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "CryptoPanicProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Compatibility class still owns request hygiene, token redaction, quota/ledger telemetry, parser normalization, and fixture/live no-call behavior.",
-      "exception_status": "accepted_exception",
-      "line_count": 340,
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-      "owner_note": "The package already has client/parser/request_ledger homes; moving the remaining class body should be its own provider parity pass.",
-      "public": true,
-      "qualname": "CryptoPanicProvider",
-      "revisit_condition": "Revisit when CryptoPanic live activation or request-ledger semantics change.",
-      "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "GdeltProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "No-key public provider is fail-soft and only slightly over the advisory limit.",
-      "exception_status": "accepted_exception",
-      "line_count": 82,
-      "module": "crypto_rsi_scanner.event_providers.gdelt",
-      "owner_note": "Keep current timeout/429 behavior stable; public-provider noise is expected.",
-      "public": true,
-      "qualname": "GdeltProvider",
-      "revisit_condition": "Revisit when adding a second GDELT mode or durable request ledger.",
-      "source_path": "crypto_rsi_scanner/event_providers/gdelt.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "PredictionMarketEventsProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Small no-key prediction-market provider keeps fixture/live parsing in one stable adapter.",
-      "exception_status": "accepted_exception",
-      "line_count": 83,
-      "module": "crypto_rsi_scanner.event_providers.prediction_market_events",
-      "owner_note": "Split only when another prediction-market provider is added.",
-      "public": true,
-      "qualname": "PredictionMarketEventsProvider",
-      "revisit_condition": "Revisit when Polymarket Gamma support grows beyond the current parser.",
-      "source_path": "crypto_rsi_scanner/event_providers/prediction_market_events.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "ProjectBlogRssProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "RSS/Atom adapter is tightly coupled to per-feed fail-soft behavior and source normalization.",
-      "exception_status": "accepted_exception",
-      "line_count": 96,
-      "module": "crypto_rsi_scanner.event_providers.project_blog_rss",
-      "owner_note": "Keep feed failure semantics stable unless adding a reusable RSS client layer.",
-      "public": true,
-      "qualname": "ProjectBlogRssProvider",
-      "revisit_condition": "Revisit when project-blog sources get persistent request ledgers or richer feed classes.",
-      "source_path": "crypto_rsi_scanner/event_providers/project_blog_rss.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "OpenAILLMRelationshipProvider",
-      "exception_category": "llm_provider",
-      "exception_reason": "OpenAI relationship provider keeps request assembly, timeout/error handling, and structured parsing together behind explicit opt-in gates.",
-      "exception_status": "accepted_exception",
-      "line_count": 137,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "owner_note": "Do not alter LLM provider behavior during a refactor-only pass.",
-      "public": true,
-      "qualname": "OpenAILLMRelationshipProvider",
-      "revisit_condition": "Revisit when adding a second live LLM backend or shared OpenAI transport abstraction.",
-      "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py"
-    },
-    {
-      "accepted_exception": true,
-      "class_name": "OpenAILLMExtractionProvider",
-      "exception_category": "llm_provider",
-      "exception_reason": "Small extraction provider is barely over the advisory threshold and shares safety semantics with the relationship provider.",
-      "exception_status": "accepted_exception",
-      "line_count": 78,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "owner_note": "Keep quote-validation and no-live defaults stable.",
-      "public": true,
-      "qualname": "OpenAILLMExtractionProvider",
-      "revisit_condition": "Revisit with a broader OpenAI provider transport split.",
-      "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py"
-    },
     {
       "accepted_exception": true,
       "class_name": "MigrationsMixin",
@@ -2844,54 +2119,45 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 1,
-  "production_functions_over_limit_rows": [
-    {
-      "function_name": "build_refactor_final_report",
-      "line_count": 157,
-      "module": "crypto_rsi_scanner.refactor_final_report",
-      "public": true,
-      "qualname": "build_refactor_final_report",
-      "source_path": "crypto_rsi_scanner/refactor_final_report.py"
-    }
-  ],
+  "production_functions_over_limit": 0,
+  "production_functions_over_limit_rows": [],
   "production_size_gate_status": "pass",
   "provider_class_split_status": [
     {
-      "accepted_exception": true,
+      "accepted_exception": false,
       "class_name": "BinanceAnnouncementProvider",
-      "line_count": 107,
-      "module": "crypto_rsi_scanner.event_providers.binance_announcements.legacy",
-      "over_limit": true,
-      "owner_note": "Do not split further without signed-listener fixture parity and secret-redaction tests.",
-      "reason": "Signed/public announcement compatibility core preserves old imports and WebSocket/fixture behavior.",
-      "revisit_condition": "Revisit when Binance public rehearsal becomes a first-class activated provider path.",
-      "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py",
-      "split_status": "accepted_exception"
+      "line_count": 14,
+      "module": "crypto_rsi_scanner.event_providers.binance_announcements.provider",
+      "over_limit": false,
+      "owner_note": "",
+      "reason": "",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/provider.py",
+      "split_status": "below_threshold"
     },
     {
-      "accepted_exception": true,
+      "accepted_exception": false,
       "class_name": "BybitAnnouncementProvider",
-      "line_count": 79,
-      "module": "crypto_rsi_scanner.event_providers.bybit_announcements.legacy",
-      "over_limit": true,
-      "owner_note": "Avoid touching Bybit request/normalization behavior outside provider-activation work.",
-      "reason": "Small HTTP announcement adapter is only slightly over the advisory class limit and already package-scoped.",
-      "revisit_condition": "Revisit when adding another Bybit announcement endpoint or response shape.",
-      "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py",
-      "split_status": "accepted_exception"
+      "line_count": 14,
+      "module": "crypto_rsi_scanner.event_providers.bybit_announcements.provider",
+      "over_limit": false,
+      "owner_note": "",
+      "reason": "",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/provider.py",
+      "split_status": "below_threshold"
     },
     {
-      "accepted_exception": true,
+      "accepted_exception": false,
       "class_name": "CoinGeckoWatchlistMarketProvider",
-      "line_count": 116,
+      "line_count": 30,
       "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
-      "over_limit": true,
+      "over_limit": false,
       "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
       "reason": "Fixture/live market enrichment adapter is below file-size gates and tightly coupled to request budgeting and no-live defaults.",
       "revisit_condition": "Revisit when watchlist market enrichment gains another provider implementation.",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist_market.py",
-      "split_status": "accepted_exception"
+      "split_status": "below_threshold"
     },
     {
       "accepted_exception": false,
@@ -2906,83 +2172,84 @@
       "split_status": "below_threshold"
     },
     {
-      "accepted_exception": true,
+      "accepted_exception": false,
       "class_name": "CryptoPanicProvider",
-      "line_count": 340,
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-      "over_limit": true,
-      "owner_note": "The package already has client/parser/request_ledger homes; moving the remaining class body should be its own provider parity pass.",
-      "reason": "Compatibility class still owns request hygiene, token redaction, quota/ledger telemetry, parser normalization, and fixture/live no-call behavior.",
-      "revisit_condition": "Revisit when CryptoPanic live activation or request-ledger semantics change.",
-      "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py",
-      "split_status": "accepted_exception"
+      "line_count": 29,
+      "module": "crypto_rsi_scanner.event_providers.cryptopanic.provider",
+      "over_limit": false,
+      "owner_note": "",
+      "reason": "",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/provider.py",
+      "split_status": "below_threshold"
     },
     {
-      "accepted_exception": true,
+      "accepted_exception": false,
       "class_name": "GdeltProvider",
-      "line_count": 82,
+      "line_count": 14,
       "module": "crypto_rsi_scanner.event_providers.gdelt",
-      "over_limit": true,
+      "over_limit": false,
       "owner_note": "Keep current timeout/429 behavior stable; public-provider noise is expected.",
       "reason": "No-key public provider is fail-soft and only slightly over the advisory limit.",
       "revisit_condition": "Revisit when adding a second GDELT mode or durable request ledger.",
       "source_path": "crypto_rsi_scanner/event_providers/gdelt.py",
-      "split_status": "accepted_exception"
+      "split_status": "below_threshold"
     },
     {
-      "accepted_exception": true,
+      "accepted_exception": false,
       "class_name": "OpenAILLMExtractionProvider",
-      "line_count": 78,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "over_limit": true,
-      "owner_note": "Keep quote-validation and no-live defaults stable.",
-      "reason": "Small extraction provider is barely over the advisory threshold and shares safety semantics with the relationship provider.",
-      "revisit_condition": "Revisit with a broader OpenAI provider transport split.",
-      "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py",
-      "split_status": "accepted_exception"
+      "line_count": 28,
+      "module": "crypto_rsi_scanner.llm_providers.openai_extraction",
+      "over_limit": false,
+      "owner_note": "",
+      "reason": "",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/llm_providers/openai_extraction.py",
+      "split_status": "below_threshold"
     },
     {
-      "accepted_exception": true,
+      "accepted_exception": false,
       "class_name": "OpenAILLMRelationshipProvider",
-      "line_count": 137,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "over_limit": true,
-      "owner_note": "Do not alter LLM provider behavior during a refactor-only pass.",
-      "reason": "OpenAI relationship provider keeps request assembly, timeout/error handling, and structured parsing together behind explicit opt-in gates.",
-      "revisit_condition": "Revisit when adding a second live LLM backend or shared OpenAI transport abstraction.",
-      "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py",
-      "split_status": "accepted_exception"
+      "line_count": 34,
+      "module": "crypto_rsi_scanner.llm_providers.openai_relationship",
+      "over_limit": false,
+      "owner_note": "",
+      "reason": "",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/llm_providers/openai_relationship.py",
+      "split_status": "below_threshold"
     },
     {
-      "accepted_exception": true,
+      "accepted_exception": false,
       "class_name": "PredictionMarketEventsProvider",
-      "line_count": 83,
+      "line_count": 14,
       "module": "crypto_rsi_scanner.event_providers.prediction_market_events",
-      "over_limit": true,
+      "over_limit": false,
       "owner_note": "Split only when another prediction-market provider is added.",
       "reason": "Small no-key prediction-market provider keeps fixture/live parsing in one stable adapter.",
       "revisit_condition": "Revisit when Polymarket Gamma support grows beyond the current parser.",
       "source_path": "crypto_rsi_scanner/event_providers/prediction_market_events.py",
-      "split_status": "accepted_exception"
+      "split_status": "below_threshold"
     },
     {
-      "accepted_exception": true,
+      "accepted_exception": false,
       "class_name": "ProjectBlogRssProvider",
-      "line_count": 96,
+      "line_count": 11,
       "module": "crypto_rsi_scanner.event_providers.project_blog_rss",
-      "over_limit": true,
+      "over_limit": false,
       "owner_note": "Keep feed failure semantics stable unless adding a reusable RSS client layer.",
       "reason": "RSS/Atom adapter is tightly coupled to per-feed fail-soft behavior and source normalization.",
       "revisit_condition": "Revisit when project-blog sources get persistent request ledgers or richer feed classes.",
       "source_path": "crypto_rsi_scanner/event_providers/project_blog_rss.py",
-      "split_status": "accepted_exception"
+      "split_status": "below_threshold"
     }
   ],
   "remaining_class_ownership_debt": [],
   "remaining_class_ownership_debt_count": 0,
   "research_only": true,
-  "resolved_violation_count": 99,
+  "resolved_violation_count": 113,
   "resolved_violation_ids": [
+    "class:crypto_rsi_scanner/client.py:CoinGeckoClient",
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
     "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
     "class:crypto_rsi_scanner/event_alpha/notifications/delivery.py:NotificationDeliveryRecord",
@@ -2991,6 +2258,7 @@
     "class:crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py:CoinalyzeRehearsalReport",
     "class:crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py:LiveProviderReadinessProvider",
     "class:crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py:HealthCheckedEventProvider",
+    "class:crypto_rsi_scanner/event_alpha/radar/asset_registry.py:CanonicalAsset",
     "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search.py:EventProviderCatalystSearchProvider",
     "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search.py:FixtureCatalystSearchProvider",
     "class:crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py:EvidenceAcquisitionResult",
@@ -3000,6 +2268,15 @@
     "class:crypto_rsi_scanner/event_alpha/radar/pipeline.py:EventAlphaPipelineResult",
     "class:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:EventAlphaSourceCoverageReport",
     "class:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:EventWatchlistEntry",
+    "class:crypto_rsi_scanner/event_alpha/radar/watchlist_market.py:CoinGeckoWatchlistMarketProvider",
+    "class:crypto_rsi_scanner/event_providers/binance_announcements/legacy.py:BinanceAnnouncementProvider",
+    "class:crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py:BybitAnnouncementProvider",
+    "class:crypto_rsi_scanner/event_providers/cryptopanic/legacy.py:CryptoPanicProvider",
+    "class:crypto_rsi_scanner/event_providers/gdelt.py:GdeltProvider",
+    "class:crypto_rsi_scanner/event_providers/prediction_market_events.py:PredictionMarketEventsProvider",
+    "class:crypto_rsi_scanner/event_providers/project_blog_rss.py:ProjectBlogRssProvider",
+    "class:crypto_rsi_scanner/llm_providers/openai_provider.py:OpenAILLMExtractionProvider",
+    "class:crypto_rsi_scanner/llm_providers/openai_provider.py:OpenAILLMRelationshipProvider",
     "file:crypto_rsi_scanner/backtest_parts/legacy.py",
     "file:crypto_rsi_scanner/cli/services/event_alpha_notifications.py",
     "file:crypto_rsi_scanner/event_alpha/artifacts/alert_store.py",
@@ -3081,7 +2358,10 @@
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_alert",
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_hypothesis",
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_row",
-    "function:crypto_rsi_scanner/event_providers/cryptopanic/legacy.py:CryptoPanicProvider._fetch_live_events"
+    "function:crypto_rsi_scanner/event_providers/cryptopanic/legacy.py:CryptoPanicProvider._fetch_live_events",
+    "function:crypto_rsi_scanner/refactor_final_report.py:build_refactor_final_report",
+    "public_classes:crypto_rsi_scanner.event_providers.cryptopanic.legacy",
+    "public_classes:crypto_rsi_scanner.llm_providers.openai_provider"
   ],
   "row_type": "refactor_size_gate_report",
   "schema_version": "refactor_size_gate_report_v1",
@@ -3131,8 +2411,7 @@
     "auto_accept_blockers": [
       "production_files_over_1200_lines",
       "public_classes_not_in_own_module",
-      "class_exceptions_remaining",
-      "functions_over_150_lines"
+      "class_exceptions_remaining"
     ],
     "contract_path": "research/REFACTOR_V3_CONTRACT.md",
     "gate_severity": {
@@ -3151,9 +2430,9 @@
       "shim_removal_blockers": "blocker"
     },
     "gate_values": {
-      "class_exceptions_remaining": 14,
+      "class_exceptions_remaining": 3,
       "deleted_shims": 115,
-      "functions_over_150_lines": 1,
+      "functions_over_150_lines": 0,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 19,
@@ -3161,7 +2440,7 @@
       "old_path_test_imports": 0,
       "production_files_over_1200_lines": 15,
       "production_files_over_1500_lines": 0,
-      "public_classes_not_in_own_module": 82,
+      "public_classes_not_in_own_module": 80,
       "public_compatibility_shims": 9,
       "shim_removal_blockers": 0
     },
@@ -3773,13 +3052,6 @@
       {
         "documented_exception": false,
         "model_bundle_candidate": false,
-        "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-        "public_class_count": 5,
-        "v3_resolution": "split_public_classes"
-      },
-      {
-        "documented_exception": false,
-        "model_bundle_candidate": false,
         "module": "crypto_rsi_scanner.llm_providers.base",
         "public_class_count": 5,
         "v3_resolution": "split_public_classes"
@@ -3789,13 +3061,6 @@
         "model_bundle_candidate": false,
         "module": "crypto_rsi_scanner.llm_providers.fixture",
         "public_class_count": 4,
-        "v3_resolution": "split_public_classes"
-      },
-      {
-        "documented_exception": false,
-        "model_bundle_candidate": false,
-        "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-        "public_class_count": 2,
         "v3_resolution": "split_public_classes"
       },
       {
@@ -3828,9 +3093,9 @@
   },
   "v3_gate_status": "pending",
   "v3_gates": {
-    "class_exceptions_remaining": 14,
+    "class_exceptions_remaining": 3,
     "deleted_shims": 115,
-    "functions_over_150_lines": 1,
+    "functions_over_150_lines": 0,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 19,
@@ -3838,22 +3103,11 @@
     "old_path_test_imports": 0,
     "production_files_over_1200_lines": 15,
     "production_files_over_1500_lines": 0,
-    "public_classes_not_in_own_module": 82,
+    "public_classes_not_in_own_module": 80,
     "public_compatibility_shims": 9,
     "shim_removal_blockers": 0
   },
   "violation_ids": [
-    "class:crypto_rsi_scanner/client.py:CoinGeckoClient",
-    "class:crypto_rsi_scanner/event_alpha/radar/asset_registry.py:CanonicalAsset",
-    "class:crypto_rsi_scanner/event_alpha/radar/watchlist_market.py:CoinGeckoWatchlistMarketProvider",
-    "class:crypto_rsi_scanner/event_providers/binance_announcements/legacy.py:BinanceAnnouncementProvider",
-    "class:crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py:BybitAnnouncementProvider",
-    "class:crypto_rsi_scanner/event_providers/cryptopanic/legacy.py:CryptoPanicProvider",
-    "class:crypto_rsi_scanner/event_providers/gdelt.py:GdeltProvider",
-    "class:crypto_rsi_scanner/event_providers/prediction_market_events.py:PredictionMarketEventsProvider",
-    "class:crypto_rsi_scanner/event_providers/project_blog_rss.py:ProjectBlogRssProvider",
-    "class:crypto_rsi_scanner/llm_providers/openai_provider.py:OpenAILLMExtractionProvider",
-    "class:crypto_rsi_scanner/llm_providers/openai_provider.py:OpenAILLMRelationshipProvider",
     "class:crypto_rsi_scanner/storage_parts/migrations.py:MigrationsMixin",
     "class:crypto_rsi_scanner/storage_parts/signals.py:SignalsMixin",
     "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin",
@@ -3865,7 +3119,6 @@
     "file:tests/event_alpha/test_provider_readiness.py",
     "file:tests/event_alpha/test_source_coverage.py",
     "file:tests/test_indicators.py",
-    "function:crypto_rsi_scanner/refactor_final_report.py:build_refactor_final_report",
     "public_classes:crypto_rsi_scanner.backups",
     "public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store.models",
     "public_classes:crypto_rsi_scanner.event_alpha.artifacts.alerts",
@@ -3941,10 +3194,8 @@
     "public_classes:crypto_rsi_scanner.event_core.models",
     "public_classes:crypto_rsi_scanner.event_fade",
     "public_classes:crypto_rsi_scanner.event_providers.base",
-    "public_classes:crypto_rsi_scanner.event_providers.cryptopanic.legacy",
     "public_classes:crypto_rsi_scanner.llm_providers.base",
     "public_classes:crypto_rsi_scanner.llm_providers.fixture",
-    "public_classes:crypto_rsi_scanner.llm_providers.openai_provider",
     "public_classes:crypto_rsi_scanner.ops",
     "public_classes:crypto_rsi_scanner.refactor_class_ownership_report",
     "public_classes:crypto_rsi_scanner.signal_registry"
@@ -4025,193 +3276,6 @@
     {
       "accepted_exception": true,
       "category": "class_over_75_lines",
-      "class_name": "CoinGeckoClient",
-      "exception_category": "provider_client",
-      "exception_reason": "Reusable async market-data client keeps rate-limit, retry, pagination, session, and fixture behavior in one public import contract.",
-      "exception_status": "accepted_exception",
-      "line_count": 115,
-      "module": "crypto_rsi_scanner.client",
-      "owner_note": "Split only with dedicated CoinGecko client parity tests; this pass intentionally avoids provider behavior churn.",
-      "public": true,
-      "qualname": "CoinGeckoClient",
-      "revisit_condition": "Revisit when adding a new CoinGecko endpoint family or changing async session/retry ownership.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/client.py",
-      "violation_id": "class:crypto_rsi_scanner/client.py:CoinGeckoClient"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "CanonicalAsset",
-      "exception_category": "data_model",
-      "exception_reason": "Field-rich canonical identity value object; splitting fields from serialization would add indirection without reducing behavior risk.",
-      "exception_status": "accepted_exception",
-      "line_count": 96,
-      "module": "crypto_rsi_scanner.event_alpha.radar.asset_registry",
-      "owner_note": "Keep schema-adjacent identity fields together while canonical resolver contracts settle.",
-      "public": true,
-      "qualname": "CanonicalAsset",
-      "revisit_condition": "Revisit when schema v2 splits asset identity, venue symbols, and diagnostics into separate contracts.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/asset_registry.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/asset_registry.py:CanonicalAsset"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "CoinGeckoWatchlistMarketProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Fixture/live market enrichment adapter is below file-size gates and tightly coupled to request budgeting and no-live defaults.",
-      "exception_status": "accepted_exception",
-      "line_count": 116,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
-      "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
-      "public": true,
-      "qualname": "CoinGeckoWatchlistMarketProvider",
-      "revisit_condition": "Revisit when watchlist market enrichment gains another provider implementation.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist_market.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/watchlist_market.py:CoinGeckoWatchlistMarketProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "BinanceAnnouncementProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Signed/public announcement compatibility core preserves old imports and WebSocket/fixture behavior.",
-      "exception_status": "accepted_exception",
-      "line_count": 107,
-      "module": "crypto_rsi_scanner.event_providers.binance_announcements.legacy",
-      "owner_note": "Do not split further without signed-listener fixture parity and secret-redaction tests.",
-      "public": true,
-      "qualname": "BinanceAnnouncementProvider",
-      "revisit_condition": "Revisit when Binance public rehearsal becomes a first-class activated provider path.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py",
-      "violation_id": "class:crypto_rsi_scanner/event_providers/binance_announcements/legacy.py:BinanceAnnouncementProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "BybitAnnouncementProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Small HTTP announcement adapter is only slightly over the advisory class limit and already package-scoped.",
-      "exception_status": "accepted_exception",
-      "line_count": 79,
-      "module": "crypto_rsi_scanner.event_providers.bybit_announcements.legacy",
-      "owner_note": "Avoid touching Bybit request/normalization behavior outside provider-activation work.",
-      "public": true,
-      "qualname": "BybitAnnouncementProvider",
-      "revisit_condition": "Revisit when adding another Bybit announcement endpoint or response shape.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py",
-      "violation_id": "class:crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py:BybitAnnouncementProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "CryptoPanicProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Compatibility class still owns request hygiene, token redaction, quota/ledger telemetry, parser normalization, and fixture/live no-call behavior.",
-      "exception_status": "accepted_exception",
-      "line_count": 340,
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-      "owner_note": "The package already has client/parser/request_ledger homes; moving the remaining class body should be its own provider parity pass.",
-      "public": true,
-      "qualname": "CryptoPanicProvider",
-      "revisit_condition": "Revisit when CryptoPanic live activation or request-ledger semantics change.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py",
-      "violation_id": "class:crypto_rsi_scanner/event_providers/cryptopanic/legacy.py:CryptoPanicProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "GdeltProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "No-key public provider is fail-soft and only slightly over the advisory limit.",
-      "exception_status": "accepted_exception",
-      "line_count": 82,
-      "module": "crypto_rsi_scanner.event_providers.gdelt",
-      "owner_note": "Keep current timeout/429 behavior stable; public-provider noise is expected.",
-      "public": true,
-      "qualname": "GdeltProvider",
-      "revisit_condition": "Revisit when adding a second GDELT mode or durable request ledger.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_providers/gdelt.py",
-      "violation_id": "class:crypto_rsi_scanner/event_providers/gdelt.py:GdeltProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "PredictionMarketEventsProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "Small no-key prediction-market provider keeps fixture/live parsing in one stable adapter.",
-      "exception_status": "accepted_exception",
-      "line_count": 83,
-      "module": "crypto_rsi_scanner.event_providers.prediction_market_events",
-      "owner_note": "Split only when another prediction-market provider is added.",
-      "public": true,
-      "qualname": "PredictionMarketEventsProvider",
-      "revisit_condition": "Revisit when Polymarket Gamma support grows beyond the current parser.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_providers/prediction_market_events.py",
-      "violation_id": "class:crypto_rsi_scanner/event_providers/prediction_market_events.py:PredictionMarketEventsProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "ProjectBlogRssProvider",
-      "exception_category": "provider_adapter",
-      "exception_reason": "RSS/Atom adapter is tightly coupled to per-feed fail-soft behavior and source normalization.",
-      "exception_status": "accepted_exception",
-      "line_count": 96,
-      "module": "crypto_rsi_scanner.event_providers.project_blog_rss",
-      "owner_note": "Keep feed failure semantics stable unless adding a reusable RSS client layer.",
-      "public": true,
-      "qualname": "ProjectBlogRssProvider",
-      "revisit_condition": "Revisit when project-blog sources get persistent request ledgers or richer feed classes.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_providers/project_blog_rss.py",
-      "violation_id": "class:crypto_rsi_scanner/event_providers/project_blog_rss.py:ProjectBlogRssProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "OpenAILLMRelationshipProvider",
-      "exception_category": "llm_provider",
-      "exception_reason": "OpenAI relationship provider keeps request assembly, timeout/error handling, and structured parsing together behind explicit opt-in gates.",
-      "exception_status": "accepted_exception",
-      "line_count": 137,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "owner_note": "Do not alter LLM provider behavior during a refactor-only pass.",
-      "public": true,
-      "qualname": "OpenAILLMRelationshipProvider",
-      "revisit_condition": "Revisit when adding a second live LLM backend or shared OpenAI transport abstraction.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py",
-      "violation_id": "class:crypto_rsi_scanner/llm_providers/openai_provider.py:OpenAILLMRelationshipProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
-      "class_name": "OpenAILLMExtractionProvider",
-      "exception_category": "llm_provider",
-      "exception_reason": "Small extraction provider is barely over the advisory threshold and shares safety semantics with the relationship provider.",
-      "exception_status": "accepted_exception",
-      "line_count": 78,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "owner_note": "Keep quote-validation and no-live defaults stable.",
-      "public": true,
-      "qualname": "OpenAILLMExtractionProvider",
-      "revisit_condition": "Revisit with a broader OpenAI provider transport split.",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py",
-      "violation_id": "class:crypto_rsi_scanner/llm_providers/openai_provider.py:OpenAILLMExtractionProvider"
-    },
-    {
-      "accepted_exception": true,
-      "category": "class_over_75_lines",
       "class_name": "MigrationsMixin",
       "exception_category": "storage_mixin",
       "exception_reason": "SQLite migration ownership is intentionally centralized to avoid untested schema drift.",
@@ -4259,17 +3323,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py",
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "build_refactor_final_report",
-      "line_count": 157,
-      "module": "crypto_rsi_scanner.refactor_final_report",
-      "public": true,
-      "qualname": "build_refactor_final_report",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/refactor_final_report.py",
-      "violation_id": "function:crypto_rsi_scanner/refactor_final_report.py:build_refactor_final_report"
     },
     {
       "category": "public_classes_sharing_module",
@@ -4874,14 +3927,6 @@
     {
       "category": "public_classes_sharing_module",
       "exception_reason": null,
-      "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-      "public_class_count": 5,
-      "severity": "warning",
-      "violation_id": "public_classes:crypto_rsi_scanner.event_providers.cryptopanic.legacy"
-    },
-    {
-      "category": "public_classes_sharing_module",
-      "exception_reason": null,
       "module": "crypto_rsi_scanner.llm_providers.base",
       "public_class_count": 5,
       "severity": "warning",
@@ -4894,14 +3939,6 @@
       "public_class_count": 4,
       "severity": "warning",
       "violation_id": "public_classes:crypto_rsi_scanner.llm_providers.fixture"
-    },
-    {
-      "category": "public_classes_sharing_module",
-      "exception_reason": null,
-      "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-      "public_class_count": 2,
-      "severity": "warning",
-      "violation_id": "public_classes:crypto_rsi_scanner.llm_providers.openai_provider"
     },
     {
       "category": "public_classes_sharing_module",

@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Reduce class ownership debt to storage mixin exceptions · Codex
+**Why:** Refactor v3 still had advisory class ownership debt in provider
+adapters, OpenAI LLM providers, CoinGecko client paths, and canonical asset
+models. The goal was to move public production classes toward one-class module
+ownership without changing provider, storage, RSI, notification, or Event Alpha
+behavior.
+**Changes:**
+- Split provider shells away from request/fetch/parser/support code for
+  CryptoPanic, Binance announcements, Bybit announcements, GDELT,
+  prediction-market events, project-blog RSS, CoinGecko watchlist market
+  enrichment, CoinGecko client helpers, and OpenAI LLM relationship/extraction
+  providers while preserving public import paths.
+- Moved `CanonicalAsset` into its own canonical module and kept
+  `asset_registry` compatibility exports.
+- Split CryptoPanic model classes into one-class modules so the size gate does
+  not treat `models.py` as a new public-class bundle violation.
+- Regenerated `research/REFACTOR_CLASS_OWNERSHIP_REPORT.md/json`,
+  `research/REFACTOR_SIZE_GATES.md/json`, and
+  `research/REFACTOR_FINAL_REPORT.md/json`.
+- Kept `SignalsMixin`, `WatchlistMixin`, and `MigrationsMixin` as accepted DB
+  mixin exceptions with owner notes and migration-test revisit conditions.
+**Verify:** Passed `python3 tests/test_indicators.py` (`748/748 passed`);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (`759 passed`); `python3 -m compileall
+-q crypto_rsi_scanner tests`; `make refactor-size-gates PYTHON=python3`; `make
+refactor-class-ownership-report PYTHON=python3`; `make refactor-final-report
+PYTHON=python3`; `make event-alpha-cryptopanic-preflight PYTHON=python3`; `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`; `make
+event-alpha-official-exchange-smoke PYTHON=python3`; and `make verify
+PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. `classes_over_limit_count` is now
+`3`, `functions_over_limit_count=0`, `remaining_class_ownership_debt_count=0`,
+and the remaining oversized classes are the three storage mixins. No live
+provider calls, live Telegram sends, trading, paper-trading behavior changes,
+execution/order logic, Event Alpha RSI writes, or Event Alpha-created
+`TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Retire remaining nonessential Event Alpha shims · Codex
 **Why:** The second v3 shim retirement wave needed to remove old flat Event
 Alpha import surfaces that were no longer used by internal code, tests,

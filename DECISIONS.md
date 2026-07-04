@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-04 - Storage mixins remain the only oversized class exceptions
+**Status:** accepted
+**Decision:** After the provider, LLM, CoinGecko, and canonical asset class
+ownership cleanup, the only accepted classes over the 75-line advisory limit are
+`SignalsMixin`, `WatchlistMixin`, and `MigrationsMixin` under
+`crypto_rsi_scanner.storage_parts`. Provider shells, LLM providers, and
+`CanonicalAsset` should stay in their focused module homes, with compatibility
+exports preserved where public imports already exist.
+**Why:** The remaining oversized classes are DB persistence mixins where a split
+could affect SQLite schema, signal writes, watchlist behavior, or migration
+ordering. This pass is behavior-preserving, so the reports document those mixins
+as accepted exceptions instead of changing persistence internals.
+**Revisit when:** storage schema v2, a repository-layer split, or an explicit
+migration-tested DB refactor is planned with backup/restore and roundtrip
+coverage.
+
 ## 2026-07-04 - Second non-public Event Alpha shim wave retired
 **Status:** accepted
 **Decision:** Remaining non-public old flat Event Alpha shims may be deleted

@@ -442,6 +442,21 @@ def _class_ownership_final_fields(class_ownership: Mapping[str, Any]) -> dict[st
     }
 
 
+def _shim_final_fields(*, deleted_shims: int, final_shim_status: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "old_module_paths_removed": deleted_shims,
+        "removed_shims_count": int(final_shim_status.get("removed_shims_count") or 0),
+        "retained_public_shims_count": int(final_shim_status.get("retained_public_shims_count") or 0),
+        "retained_shims_with_reason": final_shim_status.get("retained_shims_with_reason", []),
+        "dead_duplicate_code_removed": False,
+        "dead_duplicate_code_removal_note": (
+            "Non-public top-level Event Alpha shims listed in "
+            "research/EVENT_ALPHA_DELETED_SHIMS.json were removed after shim "
+            "dependency and old-import reports proved they were unused internally."
+        ),
+    }
+
+
 def _line_gate_rows(
     *,
     root: Path,
@@ -667,16 +682,7 @@ def build_refactor_final_report(
         "normal_rsi_signal_rows_written": 0,
         "triggered_fade_created": 0,
         "compatibility_preserved": True,
-        "old_module_paths_removed": deleted_shims,
-        "removed_shims_count": int(final_shim_status.get("removed_shims_count") or 0),
-        "retained_public_shims_count": int(final_shim_status.get("retained_public_shims_count") or 0),
-        "retained_shims_with_reason": final_shim_status.get("retained_shims_with_reason", []),
-        "dead_duplicate_code_removed": False,
-        "dead_duplicate_code_removal_note": (
-            "Non-public top-level Event Alpha shims listed in "
-            "research/EVENT_ALPHA_DELETED_SHIMS.json were removed after shim "
-            "dependency and old-import reports proved they were unused internally."
-        ),
+        **_shim_final_fields(deleted_shims=deleted_shims, final_shim_status=final_shim_status),
         "line_counts": current_counts,
         "large_event_alpha_split_line_counts": large_event_alpha_split_line_counts,
         "baseline_line_counts": baseline_counts,

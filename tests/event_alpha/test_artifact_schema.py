@@ -626,6 +626,8 @@ def test_medium_event_alpha_and_provider_packages_preserve_imports_and_hygiene()
         _entry_from_row,
     )
     from crypto_rsi_scanner.event_alpha.radar.watchlist.models import EventWatchlistEntry
+    from crypto_rsi_scanner.event_alpha.radar.asset_registry import CanonicalAsset
+    from crypto_rsi_scanner.event_alpha.radar.canonical_asset import CanonicalAsset as NewCanonicalAsset
     from crypto_rsi_scanner.event_providers.binance_announcements import BinanceAnnouncementProvider
     from crypto_rsi_scanner.event_providers.binance_announcements.provider import (
         BinanceAnnouncementProvider as NewBinanceAnnouncementProvider,
@@ -655,6 +657,16 @@ def test_medium_event_alpha_and_provider_packages_preserve_imports_and_hygiene()
     )
     from crypto_rsi_scanner.event_alpha.providers.health.event_provider import HealthCheckedEventProvider
     from crypto_rsi_scanner.event_alpha.providers.health.universe_provider import HealthCheckedUniverseProvider
+    from crypto_rsi_scanner.llm_providers.openai_extraction import (
+        OpenAILLMExtractionProvider as NewOpenAILLMExtractionProvider,
+    )
+    from crypto_rsi_scanner.llm_providers.openai_provider import (
+        OpenAILLMExtractionProvider,
+        OpenAILLMRelationshipProvider,
+    )
+    from crypto_rsi_scanner.llm_providers.openai_relationship import (
+        OpenAILLMRelationshipProvider as NewOpenAILLMRelationshipProvider,
+    )
 
     assert validation.EventFadeValidationReview is EventFadeValidationReview
     assert callable(run_manual_discovery)
@@ -669,6 +681,9 @@ def test_medium_event_alpha_and_provider_packages_preserve_imports_and_hygiene()
     assert CoinalyzeDerivativesProvider is NewCoinalyzeDerivativesProvider
     assert BybitAnnouncementProvider is NewBybitAnnouncementProvider
     assert BinanceAnnouncementProvider is NewBinanceAnnouncementProvider
+    assert CanonicalAsset is NewCanonicalAsset
+    assert OpenAILLMRelationshipProvider is NewOpenAILLMRelationshipProvider
+    assert OpenAILLMExtractionProvider is NewOpenAILLMExtractionProvider
     assert provider_health.HealthCheckedEventProvider is HealthCheckedEventProvider
     assert provider_health.HealthCheckedUniverseProvider is HealthCheckedUniverseProvider
     assert provider_health.HealthCheckedDerivativesProvider is HealthCheckedDerivativesProvider

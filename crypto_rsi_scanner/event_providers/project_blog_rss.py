@@ -30,99 +30,111 @@ def _urlopen_with_timeout(request: Request, timeout: float) -> Any:
 class ProjectBlogRssProvider:
     name = "project_blog_rss"
 
-    def __init__(
-        self,
-        path: str | Path | None,
-        *,
-        required: bool = False,
-        live_enabled: bool = False,
-        feed_urls: Iterable[str] | None = None,
-        timeout: float = 10.0,
-        fail_fast_on_error: bool = False,
-        opener: UrlOpen | None = None,
-        fetched_at: datetime | None = None,
-    ) -> None:
-        self.path = path
-        self.required = required
-        self.live_enabled = live_enabled
-        self.feed_urls = tuple(url.strip() for url in (feed_urls or ()) if url.strip())
-        self.timeout = timeout
-        self.fail_fast_on_error = fail_fast_on_error
-        self.opener = opener or _urlopen_with_timeout
-        self.fetched_at = fetched_at
-        self.last_warnings: tuple[str, ...] = ()
-        self.last_feed_health: tuple[event_source_registry.FeedHealth, ...] = ()
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        initialize_project_blog_rss_provider(self, *args, **kwargs)
 
     def fetch_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
-        self.last_warnings = ()
-        self.last_feed_health = ()
-        if self.path is None and self.live_enabled:
-            return self._fetch_live_events(start, end)
-        return fetch_news_events(
-            self.path,
+        return fetch_project_blog_rss_events(self, start, end)
+
+    def _fetch_live_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
+        return fetch_project_blog_rss_live_events(self, start, end)
+
+
+def initialize_project_blog_rss_provider(
+    self: Any,
+    path: str | Path | None,
+    *,
+    required: bool = False,
+    live_enabled: bool = False,
+    feed_urls: Iterable[str] | None = None,
+    timeout: float = 10.0,
+    fail_fast_on_error: bool = False,
+    opener: UrlOpen | None = None,
+    fetched_at: datetime | None = None,
+) -> None:
+    self.path = path
+    self.required = required
+    self.live_enabled = live_enabled
+    self.feed_urls = tuple(url.strip() for url in (feed_urls or ()) if url.strip())
+    self.timeout = timeout
+    self.fail_fast_on_error = fail_fast_on_error
+    self.opener = opener or _urlopen_with_timeout
+    self.fetched_at = fetched_at
+    self.last_warnings: tuple[str, ...] = ()
+    self.last_feed_health: tuple[event_source_registry.FeedHealth, ...] = ()
+
+
+def fetch_project_blog_rss_events(self: Any, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
+    self.last_warnings = ()
+    self.last_feed_health = ()
+    if self.path is None and self.live_enabled:
+        return self._fetch_live_events(start, end)
+    return fetch_news_events(
+        self.path,
+        provider=self.name,
+        start=start,
+        end=end,
+        required=self.required,
+    )
+
+
+def fetch_project_blog_rss_live_events(self: Any, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
+    fetched_at = self.fetched_at or datetime.now(timezone.utc)
+    events: list[RawDiscoveredEvent] = []
+    warnings: list[str] = []
+    feed_health: list[event_source_registry.FeedHealth] = []
+    for feed_url in self.feed_urls:
+        try:
+            request = Request(
+                feed_url,
+                headers={"Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*"},
+            )
+            with self.opener(request, self.timeout) as response:
+                status = getattr(response, "status", getattr(response, "code", 200))
+                if int(status) >= 400:
+                    raise RuntimeError(f"HTTP {status}")
+                body = response.read()
+            rows = _feed_rows(body, feed_url=feed_url, fetched_at=fetched_at)
+        except Exception as exc:  # noqa: BLE001
+            failure_kind = _feed_failure_kind(exc)
+            warning = f"{failure_kind} project_blog_rss feed_url={feed_url}: {exc}"
+            warnings.append(warning)
+            feed_health.append(event_source_registry.feed_health_from_fetch(
+                feed_url=feed_url,
+                last_failure_at=fetched_at.isoformat(),
+                failure_type=_feed_health_failure_type(exc, failure_kind),
+                rows_fetched=0,
+                rows_kept=0,
+                rows_rejected=0,
+                failure_count=1,
+            ))
+            if self.required:
+                raise
+            log.warning(warning)
+            if self.fail_fast_on_error and failure_kind == "provider_failure":
+                warning = "provider_failure project_blog_rss fail-fast enabled; skipped remaining feeds after provider-level failure"
+                warnings.append(warning)
+                log.warning(warning)
+                break
+            continue
+        parsed_events = news_events_from_items(
+            rows,
             provider=self.name,
             start=start,
             end=end,
-            required=self.required,
+            fetched_at=fetched_at,
         )
-
-    def _fetch_live_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
-        fetched_at = self.fetched_at or datetime.now(timezone.utc)
-        events: list[RawDiscoveredEvent] = []
-        warnings: list[str] = []
-        feed_health: list[event_source_registry.FeedHealth] = []
-        for feed_url in self.feed_urls:
-            try:
-                request = Request(
-                    feed_url,
-                    headers={"Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*"},
-                )
-                with self.opener(request, self.timeout) as response:
-                    status = getattr(response, "status", getattr(response, "code", 200))
-                    if int(status) >= 400:
-                        raise RuntimeError(f"HTTP {status}")
-                    body = response.read()
-                rows = _feed_rows(body, feed_url=feed_url, fetched_at=fetched_at)
-            except Exception as exc:  # noqa: BLE001
-                failure_kind = _feed_failure_kind(exc)
-                warning = f"{failure_kind} project_blog_rss feed_url={feed_url}: {exc}"
-                warnings.append(warning)
-                feed_health.append(event_source_registry.feed_health_from_fetch(
-                    feed_url=feed_url,
-                    last_failure_at=fetched_at.isoformat(),
-                    failure_type=_feed_health_failure_type(exc, failure_kind),
-                    rows_fetched=0,
-                    rows_kept=0,
-                    rows_rejected=0,
-                    failure_count=1,
-                ))
-                if self.required:
-                    raise
-                log.warning(warning)
-                if self.fail_fast_on_error and failure_kind == "provider_failure":
-                    warning = "provider_failure project_blog_rss fail-fast enabled; skipped remaining feeds after provider-level failure"
-                    warnings.append(warning)
-                    log.warning(warning)
-                    break
-                continue
-            parsed_events = news_events_from_items(
-                rows,
-                provider=self.name,
-                start=start,
-                end=end,
-                fetched_at=fetched_at,
-            )
-            events.extend(parsed_events)
-            feed_health.append(event_source_registry.feed_health_from_fetch(
-                feed_url=feed_url,
-                last_success_at=fetched_at.isoformat(),
-                rows_fetched=len(rows),
-                rows_kept=len(parsed_events),
-                rows_rejected=max(0, len(rows) - len(parsed_events)),
-            ))
-        self.last_warnings = tuple(warnings)
-        self.last_feed_health = tuple(feed_health)
-        return events
+        events.extend(parsed_events)
+        feed_health.append(event_source_registry.feed_health_from_fetch(
+            feed_url=feed_url,
+            last_success_at=fetched_at.isoformat(),
+            rows_fetched=len(rows),
+            rows_kept=len(parsed_events),
+            rows_rejected=max(0, len(rows) - len(parsed_events)),
+        ))
+    self.last_warnings = tuple(warnings)
+    self.last_feed_health = tuple(feed_health)
+    return events
 
 
 def _feed_rows(body: bytes, *, feed_url: str, fetched_at: datetime) -> list[Mapping[str, Any]]:

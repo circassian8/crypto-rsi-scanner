@@ -39,117 +39,142 @@ def _base_url_and_headers() -> tuple[str, dict[str, str]]:
 
 
 class CoinGeckoClient:
-    def __init__(
-        self,
-        calls_per_minute: int | None = None,
-        *,
-        timeout_seconds: float | None = None,
-        max_retries: int | None = None,
-    ):
-        self.base_url, self.headers = _base_url_and_headers()
-        cpm = calls_per_minute or config.CALLS_PER_MINUTE
-        self._limiter = _RateLimiter(cpm)
-        self._session: aiohttp.ClientSession | None = None
-        self._fixture_dir: Path | None = config.FIXTURE_DIR
-        notification_mode = str(getattr(config, "EVENT_ALPHA_RUN_MODE", "") or "") == "notification_burn_in"
-        self.timeout_seconds = (
-            float(timeout_seconds)
-            if timeout_seconds is not None
-            else (
-                float(getattr(config, "EVENT_ALPHA_NOTIFY_PROVIDER_TIMEOUT_SECONDS", 5.0) or 5.0)
-                if notification_mode
-                else 30.0
-            )
-        )
-        self.max_retries = (
-            int(max_retries)
-            if max_retries is not None
-            else (
-                1
-                if notification_mode and bool(getattr(config, "EVENT_ALPHA_NOTIFY_FAST_FAIL_ON_DNS", True))
-                else config.MAX_RETRIES
-            )
-        )
+    def __init__(self, *args: object, **kwargs: object):
+        initialize_coingecko_client(self, *args, **kwargs)
 
     async def __aenter__(self) -> CoinGeckoClient:
-        if self._fixture_dir is None:
-            self._session = aiohttp.ClientSession(headers=self.headers)
-        return self
+        return await enter_coingecko_client(self)
 
     async def __aexit__(self, *exc: object) -> None:
-        if self._session:
-            await self._session.close()
+        await exit_coingecko_client(self, *exc)
 
     def _fixture_json(self, *parts: str) -> object:
-        if self._fixture_dir is None:
-            raise RuntimeError("fixture mode is not enabled")
-        path = self._fixture_dir.joinpath(*parts)
-        return json.loads(path.read_text(encoding="utf-8"))
+        return load_coingecko_fixture_json(self, *parts)
 
     async def _get(self, path: str, params: dict) -> dict:
-        url = f"{self.base_url}{path}"
-        max_retries = max(1, int(self.max_retries or 1))
-        for attempt in range(max_retries):
-            await self._limiter.acquire()
-            try:
-                timeout = aiohttp.ClientTimeout(total=max(0.1, float(self.timeout_seconds or 30.0)))
-                async with self._session.get(url, params=params, timeout=timeout) as resp:
-                    if resp.status == 200:
-                        return await resp.json()
-                    if resp.status == 429:
-                        retry_after = resp.headers.get("Retry-After")
-                        if retry_after and retry_after.isdigit():
-                            wait = float(retry_after)
-                        else:
-                            wait = 8.0 * (attempt + 1)
-                        log.warning("Rate limited on %s, backing off %.0fs", path, wait)
-                        await asyncio.sleep(wait)
-                        continue
-                    if 500 <= resp.status < 600:
-                        await asyncio.sleep(2.0 * (attempt + 1))
-                        continue
-                    text = await resp.text()
-                    raise RuntimeError(f"CoinGecko {resp.status}: {text[:200]}")
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-                if attempt == max_retries - 1:
-                    raise
-                log.warning("Request error on %s (attempt %d): %s", path, attempt + 1, e)
-                await asyncio.sleep(2.0 * (attempt + 1))
-        raise RuntimeError(f"CoinGecko request failed after {max_retries} retries: {path}")
+        return await get_coingecko_json(self, path, params)
 
     async def get_top_markets(self, n: int) -> list[dict]:
-        if self._fixture_dir is not None:
-            data = self._fixture_json("top_markets.json")
-            if not isinstance(data, list):
-                raise RuntimeError(f"fixture top_markets.json must contain a list: {self._fixture_dir}")
-            return data[:n]
-        return await self._get(
-            "/coins/markets",
-            {
-                "vs_currency": "usd",
-                "order": "market_cap_desc",
-                "per_page": min(n, 250),
-                "page": 1,
-                "sparkline": "true",
-                "price_change_percentage": "24h,7d",
-            },
-        )
+        return await get_top_markets(self, n)
 
     async def get_market_chart(self, coin_id: str, days: int) -> dict:
-        if self._fixture_dir is not None:
-            chart_dir = self._fixture_dir / "market_chart"
-            exact = chart_dir / f"{coin_id}-{days}.json"
-            fallback = chart_dir / f"{coin_id}.json"
-            path = exact if exact.exists() else fallback
-            if not path.exists():
-                raise FileNotFoundError(
-                    f"missing CoinGecko chart fixture for {coin_id} ({days}d) in {chart_dir}"
-                )
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if not isinstance(data, dict):
-                raise RuntimeError(f"fixture chart must contain an object: {path}")
-            return data
-        return await self._get(
-            f"/coins/{coin_id}/market_chart",
-            {"vs_currency": "usd", "days": days},
+        return await get_market_chart(self, coin_id, days)
+
+
+def initialize_coingecko_client(
+    self: CoinGeckoClient,
+    calls_per_minute: int | None = None,
+    *,
+    timeout_seconds: float | None = None,
+    max_retries: int | None = None,
+) -> None:
+    self.base_url, self.headers = _base_url_and_headers()
+    cpm = calls_per_minute or config.CALLS_PER_MINUTE
+    self._limiter = _RateLimiter(cpm)
+    self._session: aiohttp.ClientSession | None = None
+    self._fixture_dir: Path | None = config.FIXTURE_DIR
+    notification_mode = str(getattr(config, "EVENT_ALPHA_RUN_MODE", "") or "") == "notification_burn_in"
+    self.timeout_seconds = (
+        float(timeout_seconds)
+        if timeout_seconds is not None
+        else (
+            float(getattr(config, "EVENT_ALPHA_NOTIFY_PROVIDER_TIMEOUT_SECONDS", 5.0) or 5.0)
+            if notification_mode
+            else 30.0
         )
+    )
+    self.max_retries = (
+        int(max_retries)
+        if max_retries is not None
+        else (
+            1
+            if notification_mode and bool(getattr(config, "EVENT_ALPHA_NOTIFY_FAST_FAIL_ON_DNS", True))
+            else config.MAX_RETRIES
+        )
+    )
+
+
+async def enter_coingecko_client(self: CoinGeckoClient) -> CoinGeckoClient:
+    if self._fixture_dir is None:
+        self._session = aiohttp.ClientSession(headers=self.headers)
+    return self
+
+
+async def exit_coingecko_client(self: CoinGeckoClient, *exc: object) -> None:
+    if self._session:
+        await self._session.close()
+
+
+def load_coingecko_fixture_json(self: CoinGeckoClient, *parts: str) -> object:
+    if self._fixture_dir is None:
+        raise RuntimeError("fixture mode is not enabled")
+    path = self._fixture_dir.joinpath(*parts)
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+async def get_coingecko_json(self: CoinGeckoClient, path: str, params: dict) -> dict:
+    url = f"{self.base_url}{path}"
+    max_retries = max(1, int(self.max_retries or 1))
+    for attempt in range(max_retries):
+        await self._limiter.acquire()
+        try:
+            timeout = aiohttp.ClientTimeout(total=max(0.1, float(self.timeout_seconds or 30.0)))
+            async with self._session.get(url, params=params, timeout=timeout) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+                if resp.status == 429:
+                    retry_after = resp.headers.get("Retry-After")
+                    wait = float(retry_after) if retry_after and retry_after.isdigit() else 8.0 * (attempt + 1)
+                    log.warning("Rate limited on %s, backing off %.0fs", path, wait)
+                    await asyncio.sleep(wait)
+                    continue
+                if 500 <= resp.status < 600:
+                    await asyncio.sleep(2.0 * (attempt + 1))
+                    continue
+                text = await resp.text()
+                raise RuntimeError(f"CoinGecko {resp.status}: {text[:200]}")
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            if attempt == max_retries - 1:
+                raise
+            log.warning("Request error on %s (attempt %d): %s", path, attempt + 1, e)
+            await asyncio.sleep(2.0 * (attempt + 1))
+    raise RuntimeError(f"CoinGecko request failed after {max_retries} retries: {path}")
+
+
+async def get_top_markets(self: CoinGeckoClient, n: int) -> list[dict]:
+    if self._fixture_dir is not None:
+        data = self._fixture_json("top_markets.json")
+        if not isinstance(data, list):
+            raise RuntimeError(f"fixture top_markets.json must contain a list: {self._fixture_dir}")
+        return data[:n]
+    return await self._get(
+        "/coins/markets",
+        {
+            "vs_currency": "usd",
+            "order": "market_cap_desc",
+            "per_page": min(n, 250),
+            "page": 1,
+            "sparkline": "true",
+            "price_change_percentage": "24h,7d",
+        },
+    )
+
+
+async def get_market_chart(self: CoinGeckoClient, coin_id: str, days: int) -> dict:
+    if self._fixture_dir is not None:
+        chart_dir = self._fixture_dir / "market_chart"
+        exact = chart_dir / f"{coin_id}-{days}.json"
+        fallback = chart_dir / f"{coin_id}.json"
+        path = exact if exact.exists() else fallback
+        if not path.exists():
+            raise FileNotFoundError(
+                f"missing CoinGecko chart fixture for {coin_id} ({days}d) in {chart_dir}"
+            )
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise RuntimeError(f"fixture chart must contain an object: {path}")
+        return data
+    return await self._get(
+        f"/coins/{coin_id}/market_chart",
+        {"vs_currency": "usd", "days": days},
+    )

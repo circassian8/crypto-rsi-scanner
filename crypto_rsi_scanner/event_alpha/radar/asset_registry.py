@@ -9,116 +9,27 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from .canonical_asset import (
+    MAJOR_BASE_ASSETS,
+    QUOTE_ASSETS,
+    THEME_OR_SECTOR_SYMBOLS,
+    CanonicalAsset,
+    _bool,
+    _contracts,
+    _text,
+    _tuple,
+    is_quote_asset_symbol,
+    is_theme_or_sector_symbol,
+    normalize_symbol,
+    quote_asset_symbols,
+)
+
 
 ASSET_REGISTRY_JSON = "event_asset_registry.json"
-
-QUOTE_ASSETS = frozenset({"USD", "USDT", "USDC", "FDUSD", "TUSD", "BUSD", "DAI", "USDD", "PYUSD"})
-MAJOR_BASE_ASSETS = frozenset({"BTC", "ETH"})
-THEME_OR_SECTOR_SYMBOLS = frozenset({"SECTOR", "THEME", "NARRATIVE"})
-
-
-@dataclass(frozen=True)
-class CanonicalAsset:
-    canonical_asset_id: str
-    symbol: str
-    coin_id: str | None = None
-    name: str | None = None
-    aliases: tuple[str, ...] = ()
-    contracts_by_chain: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
-    is_quote_asset: bool = False
-    quote_asset_excluded: bool = False
-    base_asset_excluded: bool = False
-    major_base_asset: bool = False
-    liquidity_tier: str | None = None
-    venues: tuple[str, ...] = ()
-    spot_symbols: tuple[str, ...] = ()
-    perp_symbols: tuple[str, ...] = ()
-    coinalyze_symbols: tuple[str, ...] = ()
-    bybit_symbols: tuple[str, ...] = ()
-    binance_symbols: tuple[str, ...] = ()
-    dex_pool_ids: tuple[str, ...] = ()
-    eligible_lanes: tuple[str, ...] = ()
-    is_tradable_asset: bool = True
-    is_theme_or_sector: bool = False
-    diagnostics_reason: str | None = None
-    asset_role: str | None = None
-    source: str | None = None
-
-    @classmethod
-    def from_mapping(cls, row: Mapping[str, Any], *, source: str | None = None) -> "CanonicalAsset":
-        symbol = normalize_symbol(row.get("symbol") or row.get("base_symbol") or "")
-        coin_id = _text(row.get("coin_id"))
-        canonical_id = _text(row.get("canonical_asset_id")) or coin_id or symbol.casefold()
-        is_quote = _bool(row.get("is_quote_asset")) or symbol in QUOTE_ASSETS
-        is_theme = _bool(row.get("is_theme_or_sector")) or symbol in THEME_OR_SECTOR_SYMBOLS
-        diagnostics_reason = _text(row.get("diagnostics_reason"))
-        if is_quote and not diagnostics_reason:
-            diagnostics_reason = "quote_asset_excluded"
-        if is_theme and not diagnostics_reason:
-            diagnostics_reason = "theme_or_sector_diagnostic"
-        return cls(
-            canonical_asset_id=canonical_id,
-            symbol=symbol,
-            coin_id=coin_id,
-            name=_text(row.get("name")),
-            aliases=_tuple(row.get("aliases")),
-            contracts_by_chain=_contracts(row.get("contracts_by_chain") or row.get("contracts")),
-            is_quote_asset=is_quote,
-            quote_asset_excluded=_bool(row.get("quote_asset_excluded")) or is_quote,
-            base_asset_excluded=_bool(row.get("base_asset_excluded")),
-            major_base_asset=_bool(row.get("major_base_asset")) or symbol in MAJOR_BASE_ASSETS,
-            liquidity_tier=_text(row.get("liquidity_tier")),
-            venues=_tuple(row.get("venues")),
-            spot_symbols=_tuple(row.get("spot_symbols")),
-            perp_symbols=_tuple(row.get("perp_symbols")),
-            coinalyze_symbols=_tuple(row.get("coinalyze_symbols")),
-            bybit_symbols=_tuple(row.get("bybit_symbols")),
-            binance_symbols=_tuple(row.get("binance_symbols")),
-            dex_pool_ids=_tuple(row.get("dex_pool_ids")),
-            eligible_lanes=_tuple(row.get("eligible_lanes")),
-            is_tradable_asset=(
-                _bool(row.get("is_tradable_asset"))
-                if row.get("is_tradable_asset") is not None
-                else not (is_quote or is_theme)
-            ),
-            is_theme_or_sector=is_theme,
-            diagnostics_reason=diagnostics_reason,
-            asset_role=_text(row.get("asset_role") or row.get("role")),
-            source=source or _text(row.get("source")),
-        )
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "canonical_asset_id": self.canonical_asset_id,
-            "symbol": self.symbol,
-            "coin_id": self.coin_id,
-            "name": self.name,
-            "aliases": list(self.aliases),
-            "contracts_by_chain": {chain: list(values) for chain, values in self.contracts_by_chain.items()},
-            "is_quote_asset": self.is_quote_asset,
-            "quote_asset_excluded": self.quote_asset_excluded,
-            "base_asset_excluded": self.base_asset_excluded,
-            "major_base_asset": self.major_base_asset,
-            "liquidity_tier": self.liquidity_tier,
-            "venues": list(self.venues),
-            "spot_symbols": list(self.spot_symbols),
-            "perp_symbols": list(self.perp_symbols),
-            "coinalyze_symbols": list(self.coinalyze_symbols),
-            "bybit_symbols": list(self.bybit_symbols),
-            "binance_symbols": list(self.binance_symbols),
-            "dex_pool_ids": list(self.dex_pool_ids),
-            "eligible_lanes": list(self.eligible_lanes),
-            "is_tradable_asset": self.is_tradable_asset,
-            "is_theme_or_sector": self.is_theme_or_sector,
-            "diagnostics_reason": self.diagnostics_reason,
-            "asset_role": self.asset_role,
-            "source": self.source,
-        }
 
 
 def load_asset_registry(path: str | Path | None) -> tuple[CanonicalAsset, ...]:
@@ -375,22 +286,6 @@ def identifier_key_variants(value: Any) -> tuple[str, ...]:
     return tuple(dict.fromkeys(item for item in variants if item))
 
 
-def normalize_symbol(value: Any) -> str:
-    return _text(value).strip().upper()
-
-
-def quote_asset_symbols() -> tuple[str, ...]:
-    return tuple(sorted(QUOTE_ASSETS))
-
-
-def is_quote_asset_symbol(value: Any) -> bool:
-    return normalize_symbol(value) in QUOTE_ASSETS
-
-
-def is_theme_or_sector_symbol(value: Any) -> bool:
-    return normalize_symbol(value) in THEME_OR_SECTOR_SYMBOLS
-
-
 def _built_in_assets() -> tuple[CanonicalAsset, ...]:
     quote_assets = tuple(
         CanonicalAsset(
@@ -500,25 +395,6 @@ def _pair_base_symbol(pair: str) -> str:
     return _base_from_market_symbol(text)
 
 
-def _contracts(value: Any) -> dict[str, tuple[str, ...]]:
-    if not isinstance(value, Mapping):
-        return {}
-    out: dict[str, tuple[str, ...]] = {}
-    for chain, addresses in value.items():
-        chain_key = str(chain or "").strip().casefold()
-        if not chain_key:
-            continue
-        if isinstance(addresses, str):
-            values = (addresses,)
-        elif isinstance(addresses, Iterable):
-            values = tuple(str(item).strip() for item in addresses if str(item).strip())
-        else:
-            continue
-        if values:
-            out[chain_key] = tuple(dict.fromkeys(values))
-    return out
-
-
 def _merge_contracts(left: Any, right: Any) -> dict[str, list[str]]:
     merged: dict[str, list[str]] = {}
     for source in (_contracts(left), _contracts(right)):
@@ -541,36 +417,6 @@ def _liquidity_tier(row: Mapping[str, Any]) -> str | None:
     if volume > 0:
         return "thin"
     return None
-
-
-def _tuple(value: Any) -> tuple[str, ...]:
-    if value is None:
-        return ()
-    if isinstance(value, str):
-        values = (value,)
-    elif isinstance(value, Mapping):
-        values = tuple(str(key) for key in value)
-    elif isinstance(value, Iterable):
-        values = tuple(str(item) for item in value)
-    else:
-        values = (str(value),)
-    return tuple(dict.fromkeys(item.strip() for item in values if item and item.strip()))
-
-
-def _text(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
-
-
-def _bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return False
-    if isinstance(value, (int, float)):
-        return bool(value)
-    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
 
 
 def _int(value: Any) -> int:
