@@ -131,7 +131,7 @@
     }
   ],
   "classes_over_limit_count": 14,
-  "existing_violation_count": 118,
+  "existing_violation_count": 117,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -394,17 +394,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "_route_entry",
-      "line_count": 220,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.router",
-      "public": false,
-      "qualname": "_route_entry",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/router.py:_route_entry"
     },
     {
       "category": "function_over_150_lines",
@@ -1184,7 +1173,7 @@
       "violation_id": "public_classes:crypto_rsi_scanner.signal_registry"
     }
   ],
-  "file_count": 730,
+  "file_count": 731,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -1254,14 +1243,6 @@
       "public": true,
       "qualname": "send_notifications",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py"
-    },
-    {
-      "function_name": "_route_entry",
-      "line_count": 220,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.router",
-      "public": false,
-      "qualname": "_route_entry",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/router.py"
     },
     {
       "function_name": "_hypothesis_from_rule",
@@ -1352,9 +1333,9 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     }
   ],
-  "functions_over_limit_count": 14,
+  "functions_over_limit_count": 13,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T07:43:00.474909+00:00",
+  "generated_at": "2026-07-04T07:52:49.413493+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1458,12 +1439,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 1413,
-      "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1406,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
       "source_kind": "production"
@@ -1472,6 +1447,12 @@
       "limit": 1500,
       "line_count": 1392,
       "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1385,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
       "source_kind": "production"
     },
     {
@@ -2536,7 +2517,7 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 14,
+  "production_functions_over_limit": 13,
   "production_functions_over_limit_rows": [
     {
       "function_name": "diagnose_artifacts",
@@ -2553,14 +2534,6 @@
       "public": true,
       "qualname": "send_notifications",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py"
-    },
-    {
-      "function_name": "_route_entry",
-      "line_count": 220,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.router",
-      "public": false,
-      "qualname": "_route_entry",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/router.py"
     },
     {
       "function_name": "_hypothesis_from_rule",
@@ -2653,7 +2626,7 @@
   ],
   "production_size_gate_status": "pass",
   "research_only": true,
-  "resolved_violation_count": 86,
+  "resolved_violation_count": 87,
   "resolved_violation_ids": [
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
     "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
@@ -2718,6 +2691,7 @@
     "function:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:write_notification_plan_preview",
     "function:crypto_rsi_scanner/event_alpha/notifications/provider_status.py:build_event_discovery_provider_status",
     "function:crypto_rsi_scanner/event_alpha/notifications/readiness.py:build_send_readiness",
+    "function:crypto_rsi_scanner/event_alpha/notifications/router.py:_route_entry",
     "function:crypto_rsi_scanner/event_alpha/outcomes/quality.py:evaluate_signal_quality_case",
     "function:crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py:run_no_send_rehearsal",
     "function:crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py:run_no_send_rehearsal",
@@ -2772,7 +2746,6 @@
     "file:tests/test_indicators.py",
     "function:crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py:diagnose_artifacts",
     "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications",
-    "function:crypto_rsi_scanner/event_alpha/notifications/router.py:_route_entry",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/builder.py:_hypothesis_from_rule",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py:_classify_path",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py:validate_impact_path",
@@ -3129,17 +3102,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "_route_entry",
-      "line_count": 220,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.router",
-      "public": false,
-      "qualname": "_route_entry",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/router.py:_route_entry"
     },
     {
       "category": "function_over_150_lines",

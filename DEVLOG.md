@@ -17,6 +17,60 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split Event Alpha router decisions · Codex
+**Why:** The refactor goal still has advisory oversized-function debt after the
+production and legacy size gates passed. `_route_entry()` was a contained
+research-only route selector with broad fixture coverage, making it a safe
+behavior-preserving split.
+**Changes:**
+- Split `crypto_rsi_scanner/event_alpha/notifications/router.py` so
+  `_route_entry()` is now a 42-line ordered orchestrator over focused helpers
+  for disabled routing, quality-capped rows, raw/terminal rows,
+  `TRIGGERED_FADE` review routing, duplicate suppression, validated impact
+  hypotheses, playbook routing, and fallback local reports.
+- Moved router report and Telegram digest rendering into
+  `crypto_rsi_scanner/event_alpha/notifications/router_rendering.py` while
+  preserving the historical `event_alpha_router.format_router_report()` and
+  `format_routed_telegram_digest()` exports as wrappers.
+- Preserved route enum values, lane mapping, alertability, reason strings,
+  quality-gate metadata, no-send copy, and the invariant that
+  `TRIGGERED_FADE_RESEARCH` is only routed for proxy-fade rows produced by the
+  deterministic `event_fade` path.
+- Regenerated refactor class ownership, size-gate, final, completion-map,
+  release-candidate, and shim reports. Current advisory inventory is `14`
+  classes and `13` functions over limits, with production size gates passing and
+  no active shim implementation leaks.
+- Updated `ROADMAP.md` to include `_route_entry()` in the completed ownership
+  burn-down list.
+**Verify:** Focused router tests passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha/test_integrated_radar.py::test_event_alpha_router_routes_watchlist_escalations_safely
+tests/event_alpha/test_integrated_radar.py::test_event_alpha_router_daily_digest_for_validated_impact_hypotheses
+tests/event_alpha/test_integrated_radar.py::test_event_alpha_router_routes_material_changes_with_lanes
+tests/event_alpha/test_outcomes.py::test_event_alpha_quality_gate_dominates_router_and_artifacts -q`
+reported `4 passed`; the broader integrated/outcomes slice reported
+`290 passed`. Full safe checks passed: `python3 tests/test_indicators.py`
+reported `745/745 passed`; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q` reported
+`756 passed`; `python3 -m compileall -q crypto_rsi_scanner tests`; `make
+refactor-size-gates PYTHON=python3`; `make refactor-class-ownership-report
+PYTHON=python3`; `make refactor-final-report PYTHON=python3`; `make
+event-alpha-shim-report PYTHON=python3`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make
+event-alpha-notification-format-smoke PYTHON=python3`; `make
+event-alpha-telegram-no-send-final-check-fast PYTHON=python3`; `make
+event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`;
+and `make verify PYTHON=python3` passed.
+**Notes/risks:** Behavior-preserving only. The strict CryptoPanic rehearsal
+doctor remains `WARN` with known non-blocking quality/incident warnings and no
+blockers. No live provider calls by default, live sends, trading, paper-trading
+behavior changes, execution/order logic, Event Alpha RSI writes, or Event
+Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split signal quality case evaluator · Codex
 **Why:** The refactor goal still has advisory oversized-function debt after the
 production and legacy size gates passed. `evaluate_signal_quality_case()` was a

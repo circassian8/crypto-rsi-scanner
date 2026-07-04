@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T07:43:00.474909+00:00`
+- generated_at: `2026-07-04T07:52:49.413493+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -11,11 +11,11 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `14`
+- production_functions_over_limit: `13`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
 - classes_over_limit_count: `14`
-- functions_over_limit_count: `14`
+- functions_over_limit_count: `13`
 - modules_with_multiple_public_classes_count: `82`
 - new_violation_count: `0`
 - moved_existing_violation_count: `22`
@@ -103,9 +103,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1473 |
 | `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1451 |
 | `crypto_rsi_scanner/cli/services/legacy/utility_commands.py` | 1440 |
-| `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1413 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1406 |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 |
+| `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1385 |
 | `crypto_rsi_scanner/config.py` | 1319 |
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1298 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
@@ -212,7 +212,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin` | 89 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py:diagnose_artifacts` | 1048 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications` | 406 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/notifications/router.py:_route_entry` | 220 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/builder.py:_hypothesis_from_rule` | 199 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py:validate_impact_path` | 181 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py:_classify_path` | 271 |

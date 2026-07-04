@@ -17,7 +17,7 @@
   },
   "class_ownership_report": {
     "classes_over_limit_count": 14,
-    "functions_over_limit_count": 14,
+    "functions_over_limit_count": 13,
     "modules_with_multiple_public_classes_count": 82,
     "path": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
     "present": true,
@@ -85,7 +85,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-04T07:43:02+00:00",
+  "generated_at": "2026-07-04T07:52:51+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -209,12 +209,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 1413,
-      "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1406,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
       "source_kind": "production"
@@ -223,6 +217,12 @@
       "limit": 1500,
       "line_count": 1392,
       "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1385,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
       "source_kind": "production"
     },
     {
@@ -852,7 +852,7 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 14,
+  "production_functions_over_limit": 13,
   "production_size_gate_status": "pass",
   "pytest_runtime_seconds": 11.538,
   "remaining_implementation_modules_by_package_target": {},

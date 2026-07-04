@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import html
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
 from typing import Iterable, Mapping
 
 from ... import event_alpha_quality_fields, event_opportunity_verdict, event_playbooks, event_watchlist
+from . import router_rendering
 
 
 class EventAlphaRoute(str, Enum):
@@ -242,95 +242,7 @@ def route_watchlist(
 
 
 def format_router_report(result: EventAlphaRouterResult) -> str:
-    rows = [
-        "=" * 76,
-        "EVENT ALPHA ROUTER REPORT (research-only; no sends, trades, or paper rows)",
-        "=" * 76,
-        f"state_path: {result.state_path}",
-        f"router_enabled: {str(result.enabled).lower()}",
-        f"rows_read: {result.rows_read} · decisions: {len(result.decisions)} · alertable: {len(result.alertable_decisions)}",
-    ]
-    if not result.enabled:
-        rows.append("disabled: set RSI_EVENT_ALPHA_ROUTER_ENABLED=1 for route decisions.")
-    if not result.decisions:
-        rows.append("")
-        rows.append("No watchlist rows to route.")
-        return "\n".join(rows)
-    counts: dict[str, int] = {}
-    for decision in result.decisions:
-        counts[decision.route.value] = counts.get(decision.route.value, 0) + 1
-    rows.append("routes: " + ", ".join(f"{route}={count}" for route, count in sorted(counts.items())))
-    lane_counts: dict[str, int] = {}
-    for decision in result.decisions:
-        lane_counts[decision.lane.value] = lane_counts.get(decision.lane.value, 0) + 1
-    rows.append("lanes: " + ", ".join(f"{lane}={count}" for lane, count in sorted(lane_counts.items())))
-    rows.append("")
-    for decision in result.decisions:
-        entry = decision.entry
-        rows.append(
-            f"{decision.route.value:<24} score={entry.latest_score:>3} high={entry.highest_score:>3} "
-            f"{entry.symbol}/{entry.coin_id}"
-        )
-        rows.append(f"  alert_id: {decision.alert_id} · card_id: {decision.card_id}")
-        rows.append(f"  event: {entry.latest_event_name}")
-        rows.append(
-            f"  state: {entry.previous_state or 'new'} -> {event_watchlist.final_state_value(entry)} · "
-            f"watchlist_alertable={str(entry.should_alert).lower()}"
-        )
-        if entry.state_quality_capped:
-            rows.append(
-                "  state quality gate: "
-                f"requested={entry.requested_state_before_quality_gate or entry.state} "
-                f"final={event_watchlist.final_state_value(entry)} "
-                f"block={entry.quality_state_block_reason or 'quality_state_capped'}"
-            )
-        rows.append(
-            f"  playbook: {entry.latest_playbook_type or 'unknown'} "
-            f"action={entry.latest_playbook_action or 'store_only'}"
-        )
-        components = entry.latest_score_components or {}
-        if entry.relationship_type == "impact_hypothesis" and (
-            components.get("opportunity_level") or components.get("opportunity_score_final")
-        ):
-            rows.append(
-                "  opportunity: "
-                f"level={components.get('opportunity_level') or 'unknown'} "
-                f"score={components.get('opportunity_score_final') if components.get('opportunity_score_final') is not None else 'n/a'} "
-                f"market={components.get('market_confirmation_level') or 'unknown'} "
-                f"evidence={components.get('source_class') or 'unknown'}/{components.get('evidence_specificity') or 'unknown'}"
-            )
-        if decision.requested_route_before_quality_gate or decision.quality_gate_block_reason:
-            rows.append(
-                "  quality gate: "
-                f"requested={decision.requested_route_before_quality_gate or decision.route.value} "
-                f"final={decision.final_route_after_quality_gate or decision.route.value} "
-                f"level={decision.opportunity_level or components.get('opportunity_level') or 'unknown'} "
-                f"score={decision.opportunity_score_final if decision.opportunity_score_final is not None else components.get('opportunity_score_final', 'n/a')} "
-                f"block={decision.quality_gate_block_reason or 'none'}"
-            )
-        if decision.routing_score_source or decision.routing_verdict_used:
-            rows.append(
-                "  routing score: "
-                f"source={decision.routing_score_source or 'unknown'} "
-                f"value={decision.routing_score_used if decision.routing_score_used is not None else 'n/a'} "
-                f"verdict={decision.routing_verdict_used or 'unknown'}"
-            )
-        rows.append(f"  route reason: {decision.reason}")
-        rows.append(f"  lane: {decision.lane.value}")
-        rows.append(f"  card: {decision.card_id}.md")
-        rows.append(f"  feedback: make event-feedback-useful FEEDBACK_TARGET={decision.alert_id}")
-        if entry.latest_llm_asset_role:
-            rows.append(
-                f"  llm: role={entry.latest_llm_asset_role} "
-                f"conf={entry.latest_llm_confidence if entry.latest_llm_confidence is not None else 0.0:.2f}"
-            )
-        warnings = (*entry.warnings, *decision.warnings)
-        if warnings:
-            rows.append("  warnings: " + "; ".join(dict.fromkeys(warnings)))
-        if entry.suppressed_reason:
-            rows.append(f"  watchlist suppressed: {entry.suppressed_reason}")
-        rows.append("")
-    return "\n".join(rows).rstrip()
+    return router_rendering.format_router_report(result)
 
 
 def format_routed_telegram_digest(
@@ -339,67 +251,14 @@ def format_routed_telegram_digest(
     profile: str | None = None,
     card_path_by_alert_id: Mapping[str, object] | None = None,
 ) -> str:
-    """Render router-approved Event Alpha escalations for Telegram."""
-    keep = [decision for decision in decisions if alertable_after_quality_gate(decision)]
-    card_paths = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
-    lines = [
-        "<b>Event Alpha routed research alerts</b>",
-        "<i>Research-only / DAY-1 UNVALIDATED. Not a trade signal, paper trade, or execution.</i>",
-        "Validation status: DAY-1 UNVALIDATED",
-        "Trading action: NONE",
-        "Review before acting.",
-    ]
-    if profile:
-        lines.append(f"profile={_esc(profile)}")
-    if not keep:
-        lines.append("No router-approved escalations.")
-        return "\n".join(lines)
-    for decision in keep:
-        entry = decision.entry
-        is_validated_hypothesis = _is_validated_hypothesis_digest_entry(entry)
-        lines.append("")
-        lines.append(
-            f"<b>{_esc(final_route_value(decision))}</b> score={entry.latest_score} "
-            f"<b>{_esc(entry.symbol)}</b>"
-        )
-        if is_validated_hypothesis:
-            lines.append("<b>Validated impact hypothesis</b>")
-            lines.append("Catalyst link validated, but this is not a calibrated strategy.")
-        lines.append(_esc(entry.latest_event_name or "unknown event"))
-        lines.append(
-            f"tier={_esc(entry.latest_tier or 'unknown')} route={_esc(decision.route.value)} "
-            f"lane={_esc(decision.lane.value)}"
-        )
-        if profile:
-            lines.append(f"profile={_esc(profile)} notification_lane={_esc(decision.lane.value)}")
-        lines.append(
-            f"state={_esc(event_watchlist.final_state_value(entry))} playbook={_esc(entry.latest_playbook_type or 'unknown')} "
-            f"external_catalyst={_esc(entry.external_asset or 'unknown')}"
-        )
-        lines.append(_event_time_line(entry))
-        lines.append("market=" + _esc(_market_summary(entry.latest_market_snapshot)))
-        if entry.latest_rule_playbook_type and entry.latest_rule_playbook_type != entry.latest_playbook_type:
-            lines.append(f"rule_playbook={_esc(entry.latest_rule_playbook_type)}")
-        if entry.latest_llm_asset_role:
-            conf = entry.latest_llm_confidence if entry.latest_llm_confidence is not None else 0.0
-            lines.append(f"llm_role={_esc(entry.latest_llm_asset_role)} llm_confidence={conf:.2f}")
-        else:
-            lines.append("llm_role=none llm_confidence=n/a")
-        lines.append(f"route_reason={_esc(decision.reason)}")
-        if is_validated_hypothesis:
-            lines.append("operator_note=Research-only. Not a trade signal. Review the local card before acting.")
-        lines.append(f"alert_id={_esc(decision.alert_id)}")
-        lines.append(f"card_id={_esc(decision.card_id)}")
-        card_path = card_paths.get(decision.alert_id)
-        if card_path:
-            lines.append(f"research_card={_esc(card_path)}")
-        else:
-            lines.append("research_card=not_written")
-        lines.append(f"feedback=make event-feedback-useful FEEDBACK_TARGET={_esc(decision.alert_id)}")
-        warnings = tuple(dict.fromkeys((*entry.warnings, *decision.warnings)))
-        if warnings:
-            lines.append("warnings=" + _esc("; ".join(warnings[:3])))
-    return "\n".join(lines)
+    return router_rendering.format_routed_telegram_digest(
+        decisions,
+        profile=profile,
+        card_path_by_alert_id=card_path_by_alert_id,
+        alertable_after_quality_gate=alertable_after_quality_gate,
+        final_route_value=final_route_value,
+        is_validated_hypothesis_digest_entry=_is_validated_hypothesis_digest_entry,
+    )
 
 
 def _route_entry(
@@ -412,216 +271,359 @@ def _route_entry(
     warnings = list(entry.warnings)
 
     if not cfg.enabled:
-        return EventAlphaRouteDecision(
-            entry=entry,
-            route=EventAlphaRoute.STORE_ONLY,
-            alertable=False,
-            reason="Event Alpha router is disabled; retaining watchlist row as research evidence only.",
-            lane=EventAlphaRouteLane.LOCAL_ONLY,
-            warnings=tuple(warnings),
-        )
+        return _disabled_route_decision(entry, warnings)
 
-    if event_watchlist.state_is_quality_capped(entry):
-        requested_route = _route_value_for_requested_state(event_watchlist.requested_state_value(entry), playbook)
-        _, state_block = event_watchlist.quality_cap_watchlist_state(
-            event_watchlist.requested_state_value(entry),
-            _quality_for_entry(entry),
-        )
-        state_block = entry.quality_state_block_reason or state_block or "quality_state_capped"
-        if state != event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value:
-            warnings.append(f"quality_state_capped:{state_block}")
-        else:
-            route_block = _quality_gate_block_reason(_quality_for_entry(entry)) or state_block
-            return EventAlphaRouteDecision(
-                entry=entry,
-                route=EventAlphaRoute.STORE_ONLY,
-                alertable=False,
-                reason=(
-                    "Quality route gate kept lifecycle-blocked row local-only: "
-                    f"{route_block}."
-                ),
-                lane=EventAlphaRouteLane.LOCAL_ONLY,
-                warnings=tuple(dict.fromkeys((*warnings, f"quality_gate_blocked:{route_block}"))),
-                requested_route_before_quality_gate=requested_route,
-                final_route_after_quality_gate=EventAlphaRoute.STORE_ONLY.value,
-                quality_gate_block_reason=route_block,
-                opportunity_level=entry.opportunity_level,
-                opportunity_score_final=entry.opportunity_score_final,
-                routing_score_used=entry.opportunity_score_final,
-                routing_score_source="opportunity_score_final",
-                routing_verdict_used=entry.opportunity_level,
-            )
+    quality_capped = _quality_capped_route_decision(
+        entry,
+        playbook=playbook,
+        state=state,
+        warnings=warnings,
+    )
+    if quality_capped is not None:
+        return quality_capped
 
     if _is_raw_or_terminal(state):
-        return EventAlphaRouteDecision(
-            entry=entry,
-            route=EventAlphaRoute.STORE_ONLY,
-            alertable=False,
-            reason="Raw, expired, or invalidated watchlist state is stored only.",
-            lane=EventAlphaRouteLane.LOCAL_ONLY,
-            warnings=tuple(warnings),
-        )
+        return _raw_or_terminal_route_decision(entry, warnings)
 
     if state == event_watchlist.EventWatchlistState.TRIGGERED_FADE.value:
-        if playbook == event_playbooks.EventPlaybookType.PROXY_FADE.value:
-            return EventAlphaRouteDecision(
-                entry=entry,
-                route=EventAlphaRoute.TRIGGERED_FADE_RESEARCH,
-                alertable=True,
-                reason="Proxy-fade playbook reached TRIGGERED_FADE from the deterministic event_fade engine.",
-                lane=EventAlphaRouteLane.TRIGGERED_FADE,
-                warnings=tuple(warnings),
-            )
-        warnings.append("non-proxy playbook cannot route triggered fade")
-        return EventAlphaRouteDecision(
-            entry=entry,
-            route=EventAlphaRoute.LOCAL_REPORT,
-            alertable=False,
-            reason="Triggered state is retained for local review because the playbook is not proxy_fade.",
-            lane=EventAlphaRouteLane.LOCAL_ONLY,
-            warnings=tuple(warnings),
-        )
+        return _triggered_fade_route_decision(entry, playbook=playbook, warnings=warnings)
 
     material_allowed, material_reason = _material_change_allowed(entry, cfg)
     if not entry.should_alert or not material_allowed:
-        return EventAlphaRouteDecision(
-            entry=entry,
-            route=EventAlphaRoute.SUPPRESS_DUPLICATE,
-            alertable=False,
-            reason=material_reason or entry.suppressed_reason or "No meaningful state escalation since the previous observation.",
-            lane=EventAlphaRouteLane.LOCAL_ONLY,
-            warnings=tuple(warnings),
-        )
+        return _suppressed_route_decision(entry, warnings, material_reason=material_reason)
 
     if _looks_like_validated_hypothesis(entry):
-        quality_block = _validated_hypothesis_digest_block_reason(entry, cfg)
-        if quality_block:
-            warnings.append(f"validated_hypothesis_digest_blocked:{quality_block}")
-            return EventAlphaRouteDecision(
-                entry=entry,
-                route=EventAlphaRoute.STORE_ONLY,
-                alertable=False,
-                reason=f"Validated impact hypothesis kept local-only: {quality_block}.",
-                lane=EventAlphaRouteLane.LOCAL_ONLY,
-                warnings=tuple(warnings),
-            )
-        route = _validated_hypothesis_route(entry)
-        return EventAlphaRouteDecision(
-            entry=entry,
-            route=route,
-            alertable=(
-                cfg.instant_enabled
-                if route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH
-                else cfg.daily_digest_enabled and cfg.validated_hypothesis_digest_enabled
-            ),
-            reason=_validated_hypothesis_route_reason(entry),
-            lane=EventAlphaRouteLane.INSTANT_ESCALATION
-            if route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH
-            else EventAlphaRouteLane.DAILY_DIGEST,
-            warnings=tuple(warnings),
-        )
+        return _validated_hypothesis_route_decision(entry, cfg=cfg, warnings=warnings)
 
     if entry.relationship_type == "impact_hypothesis":
-        return EventAlphaRouteDecision(
-            entry=entry,
-            route=EventAlphaRoute.STORE_ONLY,
-            alertable=False,
-            reason="Impact hypothesis rows require catalyst-link validation and a validated token identity before digest routing.",
-            lane=EventAlphaRouteLane.LOCAL_ONLY,
-            warnings=tuple(warnings),
-        )
+        return _unvalidated_impact_hypothesis_route_decision(entry, warnings)
 
-    if playbook in {
+    playbook_decision = _playbook_route_decision(entry, cfg=cfg, playbook=playbook, state=state, warnings=warnings)
+    if playbook_decision is not None:
+        return playbook_decision
+
+    return _unrecognized_route_decision(entry, warnings)
+
+
+def _disabled_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    warnings: list[str],
+) -> EventAlphaRouteDecision:
+    return _decision(
+        entry,
+        EventAlphaRoute.STORE_ONLY,
+        False,
+        "Event Alpha router is disabled; retaining watchlist row as research evidence only.",
+        warnings=warnings,
+    )
+
+
+def _quality_capped_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    *,
+    playbook: str,
+    state: str,
+    warnings: list[str],
+) -> EventAlphaRouteDecision | None:
+    if not event_watchlist.state_is_quality_capped(entry):
+        return None
+    requested_state = event_watchlist.requested_state_value(entry)
+    requested_route = _route_value_for_requested_state(requested_state, playbook)
+    _, state_block = event_watchlist.quality_cap_watchlist_state(
+        requested_state,
+        _quality_for_entry(entry),
+    )
+    state_block = entry.quality_state_block_reason or state_block or "quality_state_capped"
+    if state != event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value:
+        warnings.append(f"quality_state_capped:{state_block}")
+        return None
+    route_block = _quality_gate_block_reason(_quality_for_entry(entry)) or state_block
+    return _decision(
+        entry,
+        EventAlphaRoute.STORE_ONLY,
+        False,
+        "Quality route gate kept lifecycle-blocked row local-only: "
+        f"{route_block}.",
+        warnings=tuple(dict.fromkeys((*warnings, f"quality_gate_blocked:{route_block}"))),
+        requested_route_before_quality_gate=requested_route,
+        final_route_after_quality_gate=EventAlphaRoute.STORE_ONLY.value,
+        quality_gate_block_reason=route_block,
+        opportunity_level=entry.opportunity_level,
+        opportunity_score_final=entry.opportunity_score_final,
+        routing_score_used=entry.opportunity_score_final,
+        routing_score_source="opportunity_score_final",
+        routing_verdict_used=entry.opportunity_level,
+    )
+
+
+def _raw_or_terminal_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    warnings: list[str],
+) -> EventAlphaRouteDecision:
+    return _decision(
+        entry,
+        EventAlphaRoute.STORE_ONLY,
+        False,
+        "Raw, expired, or invalidated watchlist state is stored only.",
+        warnings=warnings,
+    )
+
+
+def _triggered_fade_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    *,
+    playbook: str,
+    warnings: list[str],
+) -> EventAlphaRouteDecision:
+    if playbook == event_playbooks.EventPlaybookType.PROXY_FADE.value:
+        return _decision(
+            entry,
+            EventAlphaRoute.TRIGGERED_FADE_RESEARCH,
+            True,
+            "Proxy-fade playbook reached TRIGGERED_FADE from the deterministic event_fade engine.",
+            lane=EventAlphaRouteLane.TRIGGERED_FADE,
+            warnings=warnings,
+        )
+    warnings.append("non-proxy playbook cannot route triggered fade")
+    return _decision(
+        entry,
+        EventAlphaRoute.LOCAL_REPORT,
+        False,
+        "Triggered state is retained for local review because the playbook is not proxy_fade.",
+        warnings=warnings,
+    )
+
+
+def _suppressed_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    warnings: list[str],
+    *,
+    material_reason: str | None,
+) -> EventAlphaRouteDecision:
+    return _decision(
+        entry,
+        EventAlphaRoute.SUPPRESS_DUPLICATE,
+        False,
+        material_reason or entry.suppressed_reason or "No meaningful state escalation since the previous observation.",
+        warnings=warnings,
+    )
+
+
+def _validated_hypothesis_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    *,
+    cfg: EventAlphaRouterConfig,
+    warnings: list[str],
+) -> EventAlphaRouteDecision:
+    quality_block = _validated_hypothesis_digest_block_reason(entry, cfg)
+    if quality_block:
+        warnings.append(f"validated_hypothesis_digest_blocked:{quality_block}")
+        return _decision(
+            entry,
+            EventAlphaRoute.STORE_ONLY,
+            False,
+            f"Validated impact hypothesis kept local-only: {quality_block}.",
+            warnings=warnings,
+        )
+    route = _validated_hypothesis_route(entry)
+    high_priority = route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+    return _decision(
+        entry,
+        route,
+        (
+            cfg.instant_enabled
+            if high_priority
+            else cfg.daily_digest_enabled and cfg.validated_hypothesis_digest_enabled
+        ),
+        _validated_hypothesis_route_reason(entry),
+        lane=EventAlphaRouteLane.INSTANT_ESCALATION
+        if high_priority
+        else EventAlphaRouteLane.DAILY_DIGEST,
+        warnings=warnings,
+    )
+
+
+def _unvalidated_impact_hypothesis_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    warnings: list[str],
+) -> EventAlphaRouteDecision:
+    return _decision(
+        entry,
+        EventAlphaRoute.STORE_ONLY,
+        False,
+        "Impact hypothesis rows require catalyst-link validation and a validated token identity before digest routing.",
+        warnings=warnings,
+    )
+
+
+def _playbook_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    *,
+    cfg: EventAlphaRouterConfig,
+    playbook: str,
+    state: str,
+    warnings: list[str],
+) -> EventAlphaRouteDecision | None:
+    if _is_control_or_anomaly_playbook(playbook):
+        return _control_or_anomaly_route_decision(entry, warnings)
+    if playbook == event_playbooks.EventPlaybookType.INFRASTRUCTURE_MENTION.value:
+        return _infrastructure_route_decision(entry, warnings)
+    if playbook in _NON_FADE_RESEARCH_PLAYBOOKS:
+        return _non_fade_research_route_decision(entry, cfg=cfg, state=state, warnings=warnings)
+    if _is_higher_watchlist_state(state):
+        return _higher_proxy_state_route_decision(entry, cfg=cfg, playbook=playbook, warnings=warnings)
+    if _is_proxy_digest_state(state, playbook):
+        return _proxy_digest_route_decision(entry, cfg=cfg, warnings=warnings)
+    return None
+
+
+def _control_or_anomaly_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    warnings: list[str],
+) -> EventAlphaRouteDecision:
+    return _decision(
+        entry,
+        EventAlphaRoute.STORE_ONLY,
+        False,
+        "Control/anomaly playbooks are evidence only until catalyst and asset identity are validated.",
+        warnings=warnings,
+    )
+
+
+def _infrastructure_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    warnings: list[str],
+) -> EventAlphaRouteDecision:
+    return _decision(
+        entry,
+        EventAlphaRoute.LOCAL_REPORT,
+        False,
+        "Infrastructure playbooks may be reviewed locally but cannot enter research digest routing.",
+        warnings=warnings,
+    )
+
+
+def _non_fade_research_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    *,
+    cfg: EventAlphaRouterConfig,
+    state: str,
+    warnings: list[str],
+) -> EventAlphaRouteDecision:
+    route = (
+        EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+        if _is_higher_watchlist_state(state)
+        else EventAlphaRoute.RESEARCH_DIGEST
+    )
+    high_priority = route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+    return _decision(
+        entry,
+        route,
+        cfg.instant_enabled if high_priority else cfg.daily_digest_enabled,
+        "Non-fade event playbook produced a research-only state escalation.",
+        lane=EventAlphaRouteLane.INSTANT_ESCALATION if high_priority else EventAlphaRouteLane.DAILY_DIGEST,
+        warnings=warnings,
+    )
+
+
+def _higher_proxy_state_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    *,
+    cfg: EventAlphaRouterConfig,
+    playbook: str,
+    warnings: list[str],
+) -> EventAlphaRouteDecision:
+    route = (
+        EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+        if playbook == event_playbooks.EventPlaybookType.PROXY_FADE.value
+        else EventAlphaRoute.RESEARCH_DIGEST
+    )
+    high_priority = route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+    return _decision(
+        entry,
+        route,
+        cfg.instant_enabled if high_priority else cfg.daily_digest_enabled,
+        "Proxy candidate escalated to a higher watchlist state.",
+        lane=EventAlphaRouteLane.INSTANT_ESCALATION if high_priority else EventAlphaRouteLane.DAILY_DIGEST,
+        warnings=warnings,
+    )
+
+
+def _proxy_digest_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    *,
+    cfg: EventAlphaRouterConfig,
+    warnings: list[str],
+) -> EventAlphaRouteDecision:
+    return _decision(
+        entry,
+        EventAlphaRoute.RESEARCH_DIGEST,
+        cfg.daily_digest_enabled,
+        "Proxy candidate produced a meaningful radar/watchlist escalation.",
+        lane=EventAlphaRouteLane.DAILY_DIGEST,
+        warnings=warnings,
+    )
+
+
+def _unrecognized_route_decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    warnings: list[str],
+) -> EventAlphaRouteDecision:
+    return _decision(
+        entry,
+        EventAlphaRoute.LOCAL_REPORT,
+        False,
+        "Unrecognized playbook/state combination is kept in local research output only.",
+        warnings=warnings,
+    )
+
+
+def _decision(
+    entry: event_watchlist.EventWatchlistEntry,
+    route: EventAlphaRoute,
+    alertable: bool,
+    reason: str,
+    *,
+    lane: EventAlphaRouteLane = EventAlphaRouteLane.LOCAL_ONLY,
+    warnings: Iterable[str] = (),
+    **kwargs: object,
+) -> EventAlphaRouteDecision:
+    return EventAlphaRouteDecision(
+        entry=entry,
+        route=route,
+        alertable=alertable,
+        reason=reason,
+        lane=lane,
+        warnings=tuple(warnings),
+        **kwargs,
+    )
+
+
+def _is_control_or_anomaly_playbook(playbook: str) -> bool:
+    return playbook in {
         event_playbooks.EventPlaybookType.SOURCE_NOISE_CONTROL.value,
         event_playbooks.EventPlaybookType.AMBIGUOUS_CONTROL.value,
         event_playbooks.EventPlaybookType.MARKET_ANOMALY.value,
         event_playbooks.EventPlaybookType.MARKET_ANOMALY_UNKNOWN.value,
-    }:
-        return EventAlphaRouteDecision(
-            entry=entry,
-            route=EventAlphaRoute.STORE_ONLY,
-            alertable=False,
-            reason="Control/anomaly playbooks are evidence only until catalyst and asset identity are validated.",
-            lane=EventAlphaRouteLane.LOCAL_ONLY,
-            warnings=tuple(warnings),
-        )
+    }
 
-    if playbook == event_playbooks.EventPlaybookType.INFRASTRUCTURE_MENTION.value:
-        return EventAlphaRouteDecision(
-            entry=entry,
-            route=EventAlphaRoute.LOCAL_REPORT,
-            alertable=False,
-            reason="Infrastructure playbooks may be reviewed locally but cannot enter research digest routing.",
-            lane=EventAlphaRouteLane.LOCAL_ONLY,
-            warnings=tuple(warnings),
-        )
 
-    if playbook in _NON_FADE_RESEARCH_PLAYBOOKS:
-        route = (
-            EventAlphaRoute.HIGH_PRIORITY_RESEARCH
-            if state in {
-                event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
-                event_watchlist.EventWatchlistState.ARMED.value,
-                event_watchlist.EventWatchlistState.EVENT_PASSED.value,
-            }
-            else EventAlphaRoute.RESEARCH_DIGEST
-        )
-        return EventAlphaRouteDecision(
-            entry=entry,
-            route=route,
-            alertable=cfg.instant_enabled if route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH else cfg.daily_digest_enabled,
-            reason="Non-fade event playbook produced a research-only state escalation.",
-            lane=EventAlphaRouteLane.INSTANT_ESCALATION
-            if route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH
-            else EventAlphaRouteLane.DAILY_DIGEST,
-            warnings=tuple(warnings),
-        )
-
-    if state in {
+def _is_higher_watchlist_state(state: str) -> bool:
+    return state in {
         event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
         event_watchlist.EventWatchlistState.ARMED.value,
         event_watchlist.EventWatchlistState.EVENT_PASSED.value,
-    }:
-        route = (
-            EventAlphaRoute.HIGH_PRIORITY_RESEARCH
-            if playbook == event_playbooks.EventPlaybookType.PROXY_FADE.value
-            else EventAlphaRoute.RESEARCH_DIGEST
-        )
-        return EventAlphaRouteDecision(
-            entry=entry,
-            route=route,
-            alertable=cfg.instant_enabled if route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH else cfg.daily_digest_enabled,
-            reason="Proxy candidate escalated to a higher watchlist state.",
-            lane=EventAlphaRouteLane.INSTANT_ESCALATION
-            if route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH
-            else EventAlphaRouteLane.DAILY_DIGEST,
-            warnings=tuple(warnings),
-        )
+    }
 
-    if state in {
+
+def _is_proxy_digest_state(state: str, playbook: str) -> bool:
+    return state in {
         event_watchlist.EventWatchlistState.WATCHLIST.value,
         event_watchlist.EventWatchlistState.RADAR.value,
     } and playbook in {
         event_playbooks.EventPlaybookType.PROXY_FADE.value,
         event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
-    }:
-        return EventAlphaRouteDecision(
-            entry=entry,
-            route=EventAlphaRoute.RESEARCH_DIGEST,
-            alertable=cfg.daily_digest_enabled,
-            reason="Proxy candidate produced a meaningful radar/watchlist escalation.",
-            lane=EventAlphaRouteLane.DAILY_DIGEST,
-            warnings=tuple(warnings),
-        )
-
-    return EventAlphaRouteDecision(
-        entry=entry,
-        route=EventAlphaRoute.LOCAL_REPORT,
-        alertable=False,
-        reason="Unrecognized playbook/state combination is kept in local research output only.",
-        lane=EventAlphaRouteLane.LOCAL_ONLY,
-        warnings=tuple(warnings),
-    )
+    }
 
 
 def _apply_quality_gate(decision: EventAlphaRouteDecision) -> EventAlphaRouteDecision:
@@ -1380,34 +1382,3 @@ _NON_FADE_RESEARCH_PLAYBOOKS = {
     event_playbooks.EventPlaybookType.AI_IPO_PROXY.value,
     event_playbooks.EventPlaybookType.SECURITY_OR_REGULATORY_SHOCK.value,
 }
-
-
-def _esc(value: object) -> str:
-    return html.escape(str(value), quote=False)
-
-
-def _event_time_line(entry: event_watchlist.EventWatchlistEntry) -> str:
-    event_time = entry.event_time or "unknown"
-    parsed = _parse_iso(event_time)
-    if parsed is None:
-        return f"event_time={_esc(event_time)} countdown=unknown"
-    from datetime import datetime, timezone
-
-    now = datetime.now(timezone.utc)
-    hours = (parsed - now).total_seconds() / 3600.0
-    if hours >= 0:
-        countdown = f"T-{hours:.1f}h"
-    else:
-        countdown = f"T+{abs(hours):.1f}h"
-    return f"event_time={_esc(event_time)} countdown={_esc(countdown)}"
-
-
-def _market_summary(snapshot: Mapping[str, object] | None) -> str:
-    if not snapshot:
-        return "no market confirmation snapshot"
-    bits: list[str] = []
-    for key in ("price", "return_24h", "return_72h", "volume_zscore_24h", "rsi_1d", "rsi_4h"):
-        value = snapshot.get(key)
-        if value not in (None, ""):
-            bits.append(f"{key}={value}")
-    return ", ".join(bits[:5]) if bits else "market snapshot present"
