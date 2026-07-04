@@ -142,7 +142,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5211,
+  "function_count": 5222,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -490,30 +490,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     },
     {
-      "function_name": "_entry_from_alert",
-      "line_count": 199,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.entries",
-      "public": false,
-      "qualname": "_entry_from_alert",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
-    },
-    {
-      "function_name": "_entry_from_hypothesis",
-      "line_count": 352,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.entries",
-      "public": false,
-      "qualname": "_entry_from_hypothesis",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
-    },
-    {
-      "function_name": "_entry_from_row",
-      "line_count": 164,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.entries",
-      "public": false,
-      "qualname": "_entry_from_row",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
-    },
-    {
       "function_name": "_fetch_live_events",
       "line_count": 158,
       "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
@@ -530,8 +506,8 @@
       "source_path": "crypto_rsi_scanner/refactor_final_report.py"
     }
   ],
-  "functions_over_limit_count": 48,
-  "generated_at": "2026-07-04T04:33:15.562396+00:00",
+  "functions_over_limit_count": 45,
+  "generated_at": "2026-07-04T04:47:33.580042+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1218,7 +1194,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 48,
+  "production_functions_over_limit": 45,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_event_alpha_notify_cycle_body",
@@ -1563,30 +1539,6 @@
       "public": true,
       "qualname": "review_validation_sample",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
-    },
-    {
-      "function_name": "_entry_from_alert",
-      "line_count": 199,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.entries",
-      "public": false,
-      "qualname": "_entry_from_alert",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
-    },
-    {
-      "function_name": "_entry_from_hypothesis",
-      "line_count": 352,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.entries",
-      "public": false,
-      "qualname": "_entry_from_hypothesis",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
-    },
-    {
-      "function_name": "_entry_from_row",
-      "line_count": 164,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.entries",
-      "public": false,
-      "qualname": "_entry_from_row",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
     },
     {
       "function_name": "_fetch_live_events",

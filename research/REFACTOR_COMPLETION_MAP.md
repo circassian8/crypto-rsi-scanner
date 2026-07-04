@@ -2,7 +2,7 @@
 
 Static map of the behavior-preserving Event Alpha refactor. It records package ownership, compatibility cores, size gates, and safety boundaries.
 
-- generated_at: `2026-07-04T04:34:22+00:00`
+- generated_at: `2026-07-04T04:48:44+00:00`
 - status: `accepted`
 - scanner.py lines: `90`
 - scanner command bodies remaining: `0`

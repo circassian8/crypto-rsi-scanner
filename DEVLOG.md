@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split watchlist entry builder functions · Codex
+**Why:** The refactor completion goal still tracks oversized functions as
+advisory ownership debt after production and legacy file-size gates passed.
+This pass reduces the watchlist entry-construction functions that assemble
+operator-facing Event Alpha state rows without changing row fields or route
+gates.
+**Changes:**
+- Extracted alert incident fields, transition timestamps, shared quality fields,
+  hypothesis incident context, hypothesis score-component construction, warning
+  assembly, suppressed-reason copy, and row quality/state resolution from
+  `crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py`.
+- Kept `_entry_from_alert`, `_entry_from_hypothesis`, and `_entry_from_row`
+  public/legacy helper names intact while reducing each below the 150-line
+  function threshold.
+- Refreshed refactor size, class ownership, final, completion-map, and release
+  candidate reports. Current advisory inventory is `14` classes and `45`
+  functions over limits, with `production_files_over_1500_lines=0`,
+  `production_files_over_2000_lines=0`, `legacy_files_over_1500_lines=0`, and
+  `new_violation_count=0`.
+**Verify:** Focused integrated/source-coverage/notification/artifact-schema
+tests passed (`354 passed`), compileall passed for the touched watchlist
+package, and refactor report targets passed with `gate_status=pass` and
+completion map `accepted`. Full safe regression was run before commit; see the
+latest `research/REFACTOR_VERIFICATION_RESULTS.json`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Remaining advisory debt is concentrated in large
+notification, daily-brief, doctor-context, provider/model, and
+rendering/serialization functions plus 14 oversized classes.
+
 ## 2026-07-04 — Split remaining class ownership adapters · Codex
 **Why:** Production file-size gates now pass, but the refactor objective still
 tracks oversized field aggregates and provider adapter classes as advisory

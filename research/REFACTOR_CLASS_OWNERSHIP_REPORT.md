@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T04:33:15.562396+00:00`
+- generated_at: `2026-07-04T04:47:33.580042+00:00`
 - public_class_count: `407`
 - classes_over_limit_count: `14`
-- functions_over_limit_count: `48`
+- functions_over_limit_count: `45`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `48`
+- production_functions_over_limit: `45`
 - modules_with_multiple_public_classes_count: `82`
 - legacy_decomposition_gate_status: `pass`
 - legacy_classes_over_limit: `3`
@@ -202,8 +202,5 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.radar.source_coverage.builder` | `build_source_coverage_report` | 238 | true |
 | `crypto_rsi_scanner.event_alpha.radar.source_coverage.provider_status` | `format_source_coverage_report` | 200 | true |
 | `crypto_rsi_scanner.event_alpha.radar.validation.review` | `review_validation_sample` | 280 | true |
-| `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_entry_from_alert` | 199 | false |
-| `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_entry_from_hypothesis` | 352 | false |
-| `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_entry_from_row` | 164 | false |
 | `crypto_rsi_scanner.event_providers.cryptopanic.legacy` | `CryptoPanicProvider._fetch_live_events` | 158 | false |
 | `crypto_rsi_scanner.refactor_final_report` | `build_refactor_final_report` | 223 | true |

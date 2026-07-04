@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T04:33:16+00:00`
+- generated_at: `2026-07-04T04:47:34+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -44,13 +44,13 @@ Research-only refactor gate report. This report does not call providers, send Te
 - intentionally_outside_event_alpha_modules: `["crypto_rsi_scanner.event_fade"]`
 - class_ownership_report: `research/REFACTOR_CLASS_OWNERSHIP_REPORT.json`
 - class_ownership_classes_over_limit: `14`
-- class_ownership_functions_over_limit: `48`
+- class_ownership_functions_over_limit: `45`
 - production_size_gate_status: `pass`
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `48`
+- production_functions_over_limit: `45`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
 - legacy_decomposition_gate_status: `pass`
@@ -136,7 +136,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 924 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py` | 918 |
 | `crypto_rsi_scanner/event_alpha/providers/official_exchange.py` | 913 |
-| `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` | 888 |
+| `crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py` | 890 |
 
 ## Test Size Gate
 
