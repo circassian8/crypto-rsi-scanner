@@ -449,56 +449,8 @@ def _line_gate_rows(
     return rows
 
 
-def build_refactor_final_report(
-    *,
-    root: Path | None = None,
-    pytest_runtime_seconds: float | None = None,
-    standalone_runner_runtime_seconds: float | None = None,
-) -> dict[str, Any]:
-    root = (root or repo_root_from_module()).resolve()
-    runtime_report = _runtime_report(root)
-    if pytest_runtime_seconds is None and isinstance(runtime_report.get("pytest_runtime_seconds"), (int, float)):
-        pytest_runtime_seconds = float(runtime_report["pytest_runtime_seconds"])
-    if standalone_runner_runtime_seconds is None and isinstance(runtime_report.get("standalone_runner_runtime_seconds"), (int, float)):
-        standalone_runner_runtime_seconds = float(runtime_report["standalone_runner_runtime_seconds"])
-    current_counts = {
-        path: _line_count(root / path)
-        for path in TRACKED_LINE_COUNT_PATHS
-    }
-    large_event_alpha_split_line_counts = {
-        name: _line_count(root / path)
-        for name, path in LARGE_EVENT_ALPHA_SPLIT_PATHS.items()
-    }
-    baseline_counts = _baseline_line_counts(root)
-    event_modules = _top_level_event_modules(root)
-    shim_report = event_alpha_shims.audit_registry(root=root)
-    shim_counts = {
-        "active_shims": int(shim_report.get("shim_status_counts", {}).get("active_shim", 0)),
-        "partial_shims": int(shim_report.get("shim_status_counts", {}).get("partial_shim", 0)),
-    }
-    shim_counts["unmigrated_modules"] = max(0, len(event_modules) - shim_counts["active_shims"] - shim_counts["partial_shims"])
-    line_gates = _line_gate_rows(root=root, current_counts=current_counts, baseline_counts=baseline_counts)
-    blocked = [row for row in line_gates if row["gate_status"] != "pass"]
-    registry_summary = check_registry.registry_summary()
-    scanner_command_bodies = _scanner_command_body_functions(root)
-    namespace_inventory = _namespace_inventory(root)
-    ci_static_safety = _ci_static_safety(root)
-    classification = _remaining_module_classification(root)
-    class_ownership = _class_ownership_summary(root)
-    legacy_inventory = refactor_legacy_inventory.build_legacy_inventory(root=root)
-    size_gate_report = refactor_size_gates.build_gate_report(root=root)
-    cli_service_line_counts = _cli_service_line_counts(root)
-    cli_event_alpha_service_lines = cli_service_line_counts.get("crypto_rsi_scanner/cli/services/event_alpha.py")
-    cli_service_bind_calls = _cli_service_bind_scanner_globals_call_sites(root)
-    parser_build_parser_lines = _function_line_count(root, "crypto_rsi_scanner/cli/parser.py", "build_parser")
-    commands_event_alpha_handle_lines = _function_line_count(
-        root,
-        "crypto_rsi_scanner/cli/commands_event_alpha.py",
-        "handle",
-    )
-    legacy_doctor_core_lines = current_counts.get("crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py")
-    legacy_unregistered = int(registry_summary.get("legacy_unregistered") or 0)
-    doctor_plugin_migration = {
+def _doctor_plugin_migration_summary(*, legacy_unregistered: int, root: Path) -> dict[str, Any]:
+    return {
         "plugin_check_counts": _doctor_plugin_check_counts(root),
         "legacy_unregistered": legacy_unregistered,
         "legacy_unregistered_target": 5,
@@ -507,6 +459,16 @@ def build_refactor_final_report(
         "remaining_legacy_unregistered_details": _doctor_legacy_unregistered_details() if legacy_unregistered > 5 else [],
         "migrated_this_run": len(MIGRATED_MODULES_THIS_RUN),
     }
+
+
+def _refactor_extra_blockers(
+    *,
+    legacy_unregistered: int,
+    cli_event_alpha_service_lines: int | None,
+    cli_service_bind_calls: int,
+    legacy_inventory: Mapping[str, Any],
+    size_gate_report: Mapping[str, Any],
+) -> list[dict[str, str]]:
     extra_blockers: list[dict[str, str]] = []
     if legacy_unregistered > 5:
         extra_blockers.append(
@@ -563,6 +525,101 @@ def build_refactor_final_report(
                     "risk": "Moving production code without fixture-backed parity can change CLI, provider, notification, or artifact behavior.",
                 }
             )
+    return extra_blockers
+
+
+def _report_blocker_rows(
+    blocked: Iterable[Mapping[str, Any]],
+    extra_blockers: Iterable[Mapping[str, str]],
+) -> list[dict[str, str]]:
+    return [
+        {
+            "path": str(row["path"]),
+            "blocker_reason": str(row["blocker_reason"]),
+            "next_migration_module": str(row["next_migration_module"]),
+            "risk": str(row["risk"]),
+        }
+        for row in blocked
+    ] + [dict(row) for row in extra_blockers]
+
+
+def _old_import_deprecation_plan() -> list[dict[str, str]]:
+    return [
+        {
+            "phase": "v1",
+            "status": "current",
+            "policy": "Old top-level Event Alpha imports remain active compatibility shims; new work imports new package paths.",
+        },
+        {
+            "phase": "v2",
+            "status": "future",
+            "policy": "Old imports may warn in development mode only after old/new import tests, Make targets, and operator docs prove compatibility.",
+        },
+        {
+            "phase": "v3",
+            "status": "future",
+            "policy": "Old imports can be removed only through an explicit compatibility-breaking migration with full verification and release notes.",
+        },
+    ]
+
+
+def build_refactor_final_report(
+    *,
+    root: Path | None = None,
+    pytest_runtime_seconds: float | None = None,
+    standalone_runner_runtime_seconds: float | None = None,
+) -> dict[str, Any]:
+    root = (root or repo_root_from_module()).resolve()
+    runtime_report = _runtime_report(root)
+    if pytest_runtime_seconds is None and isinstance(runtime_report.get("pytest_runtime_seconds"), (int, float)):
+        pytest_runtime_seconds = float(runtime_report["pytest_runtime_seconds"])
+    if standalone_runner_runtime_seconds is None and isinstance(runtime_report.get("standalone_runner_runtime_seconds"), (int, float)):
+        standalone_runner_runtime_seconds = float(runtime_report["standalone_runner_runtime_seconds"])
+    current_counts = {
+        path: _line_count(root / path)
+        for path in TRACKED_LINE_COUNT_PATHS
+    }
+    large_event_alpha_split_line_counts = {
+        name: _line_count(root / path)
+        for name, path in LARGE_EVENT_ALPHA_SPLIT_PATHS.items()
+    }
+    baseline_counts = _baseline_line_counts(root)
+    event_modules = _top_level_event_modules(root)
+    shim_report = event_alpha_shims.audit_registry(root=root)
+    shim_counts = {
+        "active_shims": int(shim_report.get("shim_status_counts", {}).get("active_shim", 0)),
+        "partial_shims": int(shim_report.get("shim_status_counts", {}).get("partial_shim", 0)),
+    }
+    shim_counts["unmigrated_modules"] = max(0, len(event_modules) - shim_counts["active_shims"] - shim_counts["partial_shims"])
+    line_gates = _line_gate_rows(root=root, current_counts=current_counts, baseline_counts=baseline_counts)
+    blocked = [row for row in line_gates if row["gate_status"] != "pass"]
+    registry_summary = check_registry.registry_summary()
+    scanner_command_bodies = _scanner_command_body_functions(root)
+    namespace_inventory = _namespace_inventory(root)
+    ci_static_safety = _ci_static_safety(root)
+    classification = _remaining_module_classification(root)
+    class_ownership = _class_ownership_summary(root)
+    legacy_inventory = refactor_legacy_inventory.build_legacy_inventory(root=root)
+    size_gate_report = refactor_size_gates.build_gate_report(root=root)
+    cli_service_line_counts = _cli_service_line_counts(root)
+    cli_event_alpha_service_lines = cli_service_line_counts.get("crypto_rsi_scanner/cli/services/event_alpha.py")
+    cli_service_bind_calls = _cli_service_bind_scanner_globals_call_sites(root)
+    parser_build_parser_lines = _function_line_count(root, "crypto_rsi_scanner/cli/parser.py", "build_parser")
+    commands_event_alpha_handle_lines = _function_line_count(
+        root,
+        "crypto_rsi_scanner/cli/commands_event_alpha.py",
+        "handle",
+    )
+    legacy_doctor_core_lines = current_counts.get("crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py")
+    legacy_unregistered = int(registry_summary.get("legacy_unregistered") or 0)
+    doctor_plugin_migration = _doctor_plugin_migration_summary(legacy_unregistered=legacy_unregistered, root=root)
+    extra_blockers = _refactor_extra_blockers(
+        legacy_unregistered=legacy_unregistered,
+        cli_event_alpha_service_lines=cli_event_alpha_service_lines,
+        cli_service_bind_calls=cli_service_bind_calls,
+        legacy_inventory=legacy_inventory,
+        size_gate_report=size_gate_report,
+    )
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -645,32 +702,8 @@ def build_refactor_final_report(
         "pytest_runtime_seconds": pytest_runtime_seconds,
         "standalone_runner_runtime_seconds": standalone_runner_runtime_seconds,
         "runtime_note": "Runtimes are measured verification values supplied by the operator; null means not measured during report generation.",
-        "blockers": [
-            {
-                "path": row["path"],
-                "blocker_reason": row["blocker_reason"],
-                "next_migration_module": row["next_migration_module"],
-                "risk": row["risk"],
-            }
-            for row in blocked
-        ] + extra_blockers,
-        "deprecation_plan": [
-            {
-                "phase": "v1",
-                "status": "current",
-                "policy": "Old top-level Event Alpha imports remain active compatibility shims; new work imports new package paths.",
-            },
-            {
-                "phase": "v2",
-                "status": "future",
-                "policy": "Old imports may warn in development mode only after old/new import tests, Make targets, and operator docs prove compatibility.",
-            },
-            {
-                "phase": "v3",
-                "status": "future",
-                "policy": "Old imports can be removed only through an explicit compatibility-breaking migration with full verification and release notes.",
-            },
-        ],
+        "blockers": _report_blocker_rows(blocked, extra_blockers),
+        "deprecation_plan": _old_import_deprecation_plan(),
     }
 
 

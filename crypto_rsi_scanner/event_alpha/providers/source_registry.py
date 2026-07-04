@@ -168,6 +168,27 @@ class FeedHealth:
         }
 
 
+@dataclass(frozen=True)
+class _SourceDescriptorContext:
+    provider_text: str
+    url: str
+    domain: str
+    payload: Mapping[str, Any]
+    joined: str
+    source_class_hint: str
+    source_identity_joined: str
+
+
+@dataclass(frozen=True)
+class _SourceAssessmentInputs:
+    mapping: dict[str, Any]
+    payload: dict[str, Any]
+    provider_value: Any
+    source_url_value: Any
+    text_value: str
+    descriptor: SourceDescriptor
+
+
 _OFFICIAL_EXCHANGE_HINTS = ("binance", "bybit", "coinbase", "okx", "kucoin", "bitget", "kraken")
 _STRUCTURED_CALENDAR_HINTS = ("coinmarketcal", "coindar", "messari")
 _UNLOCK_HINTS = ("tokenomist", "unlock", "vesting")
@@ -235,6 +256,20 @@ def source_descriptor_for(
     text: str | None = None,
 ) -> SourceDescriptor:
     """Return the default source contract for a provider/domain."""
+    context = _source_descriptor_context(provider, source_url=source_url, raw_json=raw_json, text=text)
+    structured = _structured_source_descriptor(context)
+    if structured is not None:
+        return structured
+    return _news_or_fallback_source_descriptor(context)
+
+
+def _source_descriptor_context(
+    provider: str | None = None,
+    *,
+    source_url: str | None = None,
+    raw_json: Mapping[str, Any] | None = None,
+    text: str | None = None,
+) -> _SourceDescriptorContext:
     provider_text = clean_text(provider or "")
     url = str(source_url or "")
     parsed = urlparse(url)
@@ -247,14 +282,33 @@ def source_descriptor_for(
     source_identity_joined = " ".join(
         part for part in (provider_text, domain, origin, source_class_hint, source_kind_hint) if part
     )
-    reasons: list[str] = []
+    return _SourceDescriptorContext(
+        provider_text=provider_text,
+        url=url,
+        domain=domain,
+        payload=payload,
+        joined=joined,
+        source_class_hint=source_class_hint,
+        source_identity_joined=source_identity_joined,
+    )
 
+
+def _descriptor(context: _SourceDescriptorContext, reason: str, **kwargs: Any) -> SourceDescriptor:
+    return SourceDescriptor(
+        provider=context.provider_text or "unknown",
+        source_domain=context.domain,
+        source_url=context.url,
+        reason_codes=(reason,),
+        **kwargs,
+    )
+
+
+def _structured_source_descriptor(context: _SourceDescriptorContext) -> SourceDescriptor | None:
+    joined = context.joined
     if any(hint in joined for hint in _OFFICIAL_EXCHANGE_HINTS):
-        reasons.append("official_exchange_source")
-        return SourceDescriptor(
-            provider=provider_text or "unknown",
-            source_domain=domain,
-            source_url=url,
+        return _descriptor(
+            context,
+            "official_exchange_source",
             source_class=SourceClass.OFFICIAL_EXCHANGE.value,
             default_mission=SourceMission.OFFICIAL_CONFIRMATION.value,
             source_quality_prior=92.0,
@@ -263,14 +317,11 @@ def source_descriptor_for(
             can_validate_catalyst=True,
             can_validate_impact_path=True,
             can_validate_event_time=True,
-            reason_codes=tuple(reasons),
         )
     if any(hint in joined for hint in ("official", "project blog", "github.com", "medium.com")):
-        reasons.append("official_project_source")
-        return SourceDescriptor(
-            provider=provider_text or "unknown",
-            source_domain=domain,
-            source_url=url,
+        return _descriptor(
+            context,
+            "official_project_source",
             source_class=SourceClass.OFFICIAL_PROJECT.value,
             default_mission=SourceMission.OFFICIAL_CONFIRMATION.value,
             source_quality_prior=88.0,
@@ -279,14 +330,13 @@ def source_descriptor_for(
             can_validate_catalyst=True,
             can_validate_impact_path=True,
             can_validate_event_time=True,
-            reason_codes=tuple(reasons),
         )
-    if source_class_hint == SourceClass.STRUCTURED_UNLOCK.value or any(hint in source_identity_joined for hint in _UNLOCK_HINTS):
-        reasons.append("structured_unlock_source")
-        return SourceDescriptor(
-            provider=provider_text or "unknown",
-            source_domain=domain,
-            source_url=url,
+    if context.source_class_hint == SourceClass.STRUCTURED_UNLOCK.value or any(
+        hint in context.source_identity_joined for hint in _UNLOCK_HINTS
+    ):
+        return _descriptor(
+            context,
+            "structured_unlock_source",
             source_class=SourceClass.STRUCTURED_UNLOCK.value,
             default_mission=SourceMission.SUPPLY_CONFIRMATION.value,
             source_quality_prior=88.0,
@@ -306,14 +356,11 @@ def source_descriptor_for(
                 SourceMission.DERIVATIVE_CONFIRMATION.value,
             ),
             useful_playbooks=_PLAYBOOKS_BY_SOURCE_CLASS[SourceClass.STRUCTURED_UNLOCK.value],
-            reason_codes=tuple(reasons),
         )
     if any(hint in joined for hint in _STRUCTURED_CALENDAR_HINTS):
-        reasons.append("structured_calendar_source")
-        return SourceDescriptor(
-            provider=provider_text or "unknown",
-            source_domain=domain,
-            source_url=url,
+        return _descriptor(
+            context,
+            "structured_calendar_source",
             source_class=SourceClass.STRUCTURED_CALENDAR.value,
             default_mission=SourceMission.CATALYST_VALIDATION.value,
             source_quality_prior=84.0,
@@ -333,27 +380,21 @@ def source_descriptor_for(
                 SourceMission.SUPPLY_CONFIRMATION.value,
             ),
             useful_playbooks=_PLAYBOOKS_BY_SOURCE_CLASS[SourceClass.STRUCTURED_CALENDAR.value],
-            reason_codes=tuple(reasons),
         )
     if any(hint in joined for hint in _DERIVATIVES_HINTS):
-        reasons.append("derivatives_data_source")
-        return SourceDescriptor(
-            provider=provider_text or "unknown",
-            source_domain=domain,
-            source_url=url,
+        return _descriptor(
+            context,
+            "derivatives_data_source",
             source_class=SourceClass.DERIVATIVES_DATA.value,
             default_mission=SourceMission.DERIVATIVE_CONFIRMATION.value,
             source_quality_prior=80.0,
             confidence_cap=90.0,
             can_validate_catalyst=False,
-            reason_codes=tuple(reasons),
         )
     if any(hint in joined for hint in _SUPPLY_HINTS):
-        reasons.append("supply_data_source")
-        return SourceDescriptor(
-            provider=provider_text or "unknown",
-            source_domain=domain,
-            source_url=url,
+        return _descriptor(
+            context,
+            "supply_data_source",
             source_class=SourceClass.SUPPLY_DATA.value,
             default_mission=SourceMission.SUPPLY_CONFIRMATION.value,
             source_quality_prior=78.0,
@@ -361,14 +402,11 @@ def source_descriptor_for(
             can_validate_token_identity=True,
             can_validate_catalyst=True,
             can_validate_impact_path=True,
-            reason_codes=tuple(reasons),
         )
     if any(hint in joined for hint in _MARKET_DATA_HINTS):
-        reasons.append("market_data_source")
-        return SourceDescriptor(
-            provider=provider_text or "unknown",
-            source_domain=domain,
-            source_url=url,
+        return _descriptor(
+            context,
+            "market_data_source",
             source_class=SourceClass.MARKET_DATA.value,
             default_mission=SourceMission.MARKET_CONFIRMATION.value,
             source_quality_prior=80.0,
@@ -384,15 +422,12 @@ def source_descriptor_for(
                 SourceMission.OFFICIAL_CONFIRMATION.value,
             ),
             useful_playbooks=_PLAYBOOKS_BY_SOURCE_CLASS[SourceClass.MARKET_DATA.value],
-            reason_codes=tuple(reasons),
         )
     if "cryptopanic" in joined:
-        tags = _currency_tags(payload)
-        reasons.append("cryptopanic_tagged" if tags else "cryptopanic_untagged")
-        return SourceDescriptor(
-            provider=provider_text or "unknown",
-            source_domain=domain,
-            source_url=url,
+        tags = _currency_tags(context.payload)
+        return _descriptor(
+            context,
+            "cryptopanic_tagged" if tags else "cryptopanic_untagged",
             source_class=SourceClass.CRYPTOPANIC_TAGGED.value if tags else SourceClass.CRYPTO_NEWS.value,
             default_mission=SourceMission.CATALYST_VALIDATION.value,
             source_quality_prior=74.0 if tags else 62.0,
@@ -401,78 +436,62 @@ def source_descriptor_for(
             can_validate_catalyst=True,
             can_validate_impact_path=False,
             can_validate_event_time=False,
-            reason_codes=tuple(reasons),
         )
+    return None
+
+
+def _news_or_fallback_source_descriptor(context: _SourceDescriptorContext) -> SourceDescriptor:
+    joined = context.joined
     if any(hint in joined for hint in _SEO_HINTS):
-        reasons.append("seo_or_affiliate_source")
-        return SourceDescriptor(
-            provider=provider_text or "unknown",
-            source_domain=domain,
-            source_url=url,
+        return _descriptor(
+            context,
+            "seo_or_affiliate_source",
             source_class=SourceClass.SEO_OR_AFFILIATE.value,
             default_mission=SourceMission.SOURCE_NOISE_CONTROL.value,
             source_quality_prior=20.0,
             confidence_cap=30.0,
-            reason_codes=tuple(reasons),
         )
     if any(hint in joined for hint in _MARKET_RECAP_HINTS):
-        reasons.append("market_recap_source")
-        return SourceDescriptor(
-            provider=provider_text or "unknown",
-            source_domain=domain,
-            source_url=url,
+        return _descriptor(
+            context,
+            "market_recap_source",
             source_class=SourceClass.MARKET_RECAP.value,
             default_mission=SourceMission.SOURCE_NOISE_CONTROL.value,
             source_quality_prior=32.0,
             confidence_cap=40.0,
-            reason_codes=tuple(reasons),
         )
     if "polymarket" in joined or "prediction market" in joined:
-        reasons.append("prediction_market_context_source")
-        return SourceDescriptor(
-            provider=provider_text or "unknown",
-            source_domain=domain,
-            source_url=url,
+        return _descriptor(
+            context,
+            "prediction_market_context_source",
             source_class=SourceClass.PREDICTION_MARKET.value,
             default_mission=SourceMission.EXTERNAL_CONTEXT.value,
             source_quality_prior=52.0,
             confidence_cap=62.0,
             can_validate_catalyst=True,
             can_validate_event_time=True,
-            reason_codes=tuple(reasons),
         )
     if any(hint in joined for hint in _CRYPTO_NEWS_HINTS):
-        reasons.append("crypto_news_source")
-        return SourceDescriptor(
-            provider=provider_text or "unknown",
-            source_domain=domain,
-            source_url=url,
+        return _descriptor(
+            context,
+            "crypto_news_source",
             source_class=SourceClass.CRYPTO_NEWS.value,
             default_mission=SourceMission.CATALYST_VALIDATION.value,
             source_quality_prior=65.0,
             confidence_cap=80.0,
             can_validate_catalyst=True,
-            reason_codes=tuple(reasons),
         )
-    if "gdelt" in joined or domain:
-        reasons.append("broad_news_source")
-        return SourceDescriptor(
-            provider=provider_text or "unknown",
-            source_domain=domain,
-            source_url=url,
+    if "gdelt" in joined or context.domain:
+        return _descriptor(
+            context,
+            "broad_news_source",
             source_class=SourceClass.BROAD_NEWS.value,
             default_mission=SourceMission.EXTERNAL_CONTEXT.value,
             source_quality_prior=48.0,
             confidence_cap=58.0,
             can_validate_catalyst=True,
-            reason_codes=tuple(reasons),
         )
-    return SourceDescriptor(
-        provider=provider_text or "unknown",
-        source_domain=domain,
-        source_url=url,
-        reason_codes=("unknown_source",),
-    )
+    return _descriptor(context, "unknown_source")
 
 
 def assess_source(
@@ -489,47 +508,17 @@ def assess_source(
     provider_coverage_status: str | ProviderCoverageStatus | None = None,
 ) -> SourceRegistryAssessment:
     """Assess one evidence row under the source registry."""
-    mapping = dict(row or {})
-    payload = {
-        key: mapping.get(key)
-        for key in (
-            "currencies",
-            "currency_tags",
-            "currencyTags",
-            "tags",
-            "source_origin",
-            "source_class",
-            "kind",
-            "filter",
-            "status",
-            "vote",
-            "votes",
-        )
-        if mapping.get(key) not in (None, "", [], {}, ())
-    }
-    nested_payload = raw_json or mapping.get("raw_json") or mapping.get("score_components") or {}
-    if isinstance(nested_payload, Mapping):
-        payload.update(dict(nested_payload))
-    provider_value = provider or mapping.get("provider") or mapping.get("source_provider") or mapping.get("source")
-    source_url_value = source_url or mapping.get("source_url") or mapping.get("url")
-    text_value = " ".join(
-        str(value or "")
-        for value in (
-            text,
-            mapping.get("title"),
-            mapping.get("body"),
-            mapping.get("description"),
-            mapping.get("event_name"),
-            mapping.get("canonical_incident_name"),
-            mapping.get("evidence_quotes"),
-        )
+    inputs = _source_assessment_inputs(
+        row,
+        provider=provider,
+        source_url=source_url,
+        raw_json=raw_json,
+        text=text,
     )
-    descriptor = source_descriptor_for(
-        str(provider_value or ""),
-        source_url=str(source_url_value or ""),
-        raw_json=payload,
-        text=text_value,
-    )
+    mapping = inputs.mapping
+    payload = inputs.payload
+    text_value = inputs.text_value
+    descriptor = inputs.descriptor
     status = _coverage_status(provider_coverage_status or mapping.get("provider_coverage_status"))
     mission_value = str(mission.value if isinstance(mission, SourceMission) else mission or descriptor.default_mission)
     reasons = list(descriptor.reason_codes)
@@ -632,6 +621,65 @@ def assess_source(
         narrative_heat="narrative_heat" in reasons,
         reason_codes=tuple(dict.fromkeys(reasons)),
         warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _source_assessment_inputs(
+    row: Mapping[str, Any] | None = None,
+    *,
+    provider: str | None = None,
+    source_url: str | None = None,
+    raw_json: Mapping[str, Any] | None = None,
+    text: str | None = None,
+) -> _SourceAssessmentInputs:
+    mapping = dict(row or {})
+    payload = {
+        key: mapping.get(key)
+        for key in (
+            "currencies",
+            "currency_tags",
+            "currencyTags",
+            "tags",
+            "source_origin",
+            "source_class",
+            "kind",
+            "filter",
+            "status",
+            "vote",
+            "votes",
+        )
+        if mapping.get(key) not in (None, "", [], {}, ())
+    }
+    nested_payload = raw_json or mapping.get("raw_json") or mapping.get("score_components") or {}
+    if isinstance(nested_payload, Mapping):
+        payload.update(dict(nested_payload))
+    provider_value = provider or mapping.get("provider") or mapping.get("source_provider") or mapping.get("source")
+    source_url_value = source_url or mapping.get("source_url") or mapping.get("url")
+    text_value = " ".join(
+        str(value or "")
+        for value in (
+            text,
+            mapping.get("title"),
+            mapping.get("body"),
+            mapping.get("description"),
+            mapping.get("event_name"),
+            mapping.get("canonical_incident_name"),
+            mapping.get("evidence_quotes"),
+        )
+    )
+    descriptor = source_descriptor_for(
+        str(provider_value or ""),
+        source_url=str(source_url_value or ""),
+        raw_json=payload,
+        text=text_value,
+    )
+    return _SourceAssessmentInputs(
+        mapping=mapping,
+        payload=payload,
+        provider_value=provider_value,
+        source_url_value=source_url_value,
+        text_value=text_value,
+        descriptor=descriptor,
     )
 
 

@@ -131,7 +131,7 @@
     }
   ],
   "classes_over_limit_count": 14,
-  "existing_violation_count": 142,
+  "existing_violation_count": 138,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -562,28 +562,6 @@
     },
     {
       "category": "function_over_150_lines",
-      "function_name": "source_descriptor_for",
-      "line_count": 246,
-      "module": "crypto_rsi_scanner.event_alpha.providers.source_registry",
-      "public": true,
-      "qualname": "source_descriptor_for",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:source_descriptor_for"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "assess_source",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.providers.source_registry",
-      "public": true,
-      "qualname": "assess_source",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:assess_source"
-    },
-    {
-      "category": "function_over_150_lines",
       "function_name": "run_manual_discovery",
       "line_count": 244,
       "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
@@ -749,17 +727,6 @@
     },
     {
       "category": "function_over_150_lines",
-      "function_name": "format_source_coverage_report",
-      "line_count": 200,
-      "module": "crypto_rsi_scanner.event_alpha.radar.source_coverage.provider_status",
-      "public": true,
-      "qualname": "format_source_coverage_report",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py:format_source_coverage_report"
-    },
-    {
-      "category": "function_over_150_lines",
       "function_name": "review_validation_sample",
       "line_count": 280,
       "module": "crypto_rsi_scanner.event_alpha.radar.validation.review",
@@ -779,17 +746,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py",
       "violation_id": "function:crypto_rsi_scanner/event_providers/cryptopanic/legacy.py:CryptoPanicProvider._fetch_live_events"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "build_refactor_final_report",
-      "line_count": 223,
-      "module": "crypto_rsi_scanner.refactor_final_report",
-      "public": true,
-      "qualname": "build_refactor_final_report",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/refactor_final_report.py",
-      "violation_id": "function:crypto_rsi_scanner/refactor_final_report.py:build_refactor_final_report"
     },
     {
       "category": "public_classes_sharing_module",
@@ -1640,22 +1596,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py"
     },
     {
-      "function_name": "source_descriptor_for",
-      "line_count": 246,
-      "module": "crypto_rsi_scanner.event_alpha.providers.source_registry",
-      "public": true,
-      "qualname": "source_descriptor_for",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
-    },
-    {
-      "function_name": "assess_source",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.providers.source_registry",
-      "public": true,
-      "qualname": "assess_source",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
-    },
-    {
       "function_name": "run_manual_discovery",
       "line_count": 244,
       "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
@@ -1776,14 +1716,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/builder.py"
     },
     {
-      "function_name": "format_source_coverage_report",
-      "line_count": 200,
-      "module": "crypto_rsi_scanner.event_alpha.radar.source_coverage.provider_status",
-      "public": true,
-      "qualname": "format_source_coverage_report",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py"
-    },
-    {
       "function_name": "review_validation_sample",
       "line_count": 280,
       "module": "crypto_rsi_scanner.event_alpha.radar.validation.review",
@@ -1798,19 +1730,11 @@
       "public": false,
       "qualname": "CryptoPanicProvider._fetch_live_events",
       "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
-    },
-    {
-      "function_name": "build_refactor_final_report",
-      "line_count": 223,
-      "module": "crypto_rsi_scanner.refactor_final_report",
-      "public": true,
-      "qualname": "build_refactor_final_report",
-      "source_path": "crypto_rsi_scanner/refactor_final_report.py"
     }
   ],
-  "functions_over_limit_count": 38,
+  "functions_over_limit_count": 34,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T05:10:28.314141+00:00",
+  "generated_at": "2026-07-04T05:22:52.055793+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -2046,8 +1970,20 @@
     },
     {
       "limit": 1500,
+      "line_count": 989,
+      "path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 985,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/alerts.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 984,
+      "path": "crypto_rsi_scanner/refactor_final_report.py",
       "source_kind": "production"
     },
     {
@@ -2078,18 +2014,6 @@
       "limit": 1500,
       "line_count": 961,
       "path": "crypto_rsi_scanner/cli/services/legacy/reports.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 951,
-      "path": "crypto_rsi_scanner/refactor_final_report.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 941,
-      "path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
       "source_kind": "production"
     },
     {
@@ -2843,10 +2767,6 @@
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/source_coverage/builder.py:build_source_coverage_report"
     },
     {
-      "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:format_source_coverage_report",
-      "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py:format_source_coverage_report"
-    },
-    {
       "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/validation/legacy.py:review_validation_sample",
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/validation/review.py:review_validation_sample"
     },
@@ -2911,7 +2831,7 @@
       "current_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.models"
     }
   ],
-  "moved_existing_violation_count": 36,
+  "moved_existing_violation_count": 35,
   "new_violation_count": 0,
   "new_violations": [],
   "no_live_provider_calls": true,
@@ -3057,7 +2977,7 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 38,
+  "production_functions_over_limit": 34,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_event_alpha_notify_cycle_body",
@@ -3196,22 +3116,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py"
     },
     {
-      "function_name": "source_descriptor_for",
-      "line_count": 246,
-      "module": "crypto_rsi_scanner.event_alpha.providers.source_registry",
-      "public": true,
-      "qualname": "source_descriptor_for",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
-    },
-    {
-      "function_name": "assess_source",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.providers.source_registry",
-      "public": true,
-      "qualname": "assess_source",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
-    },
-    {
       "function_name": "run_manual_discovery",
       "line_count": 244,
       "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
@@ -3332,14 +3236,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/builder.py"
     },
     {
-      "function_name": "format_source_coverage_report",
-      "line_count": 200,
-      "module": "crypto_rsi_scanner.event_alpha.radar.source_coverage.provider_status",
-      "public": true,
-      "qualname": "format_source_coverage_report",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py"
-    },
-    {
       "function_name": "review_validation_sample",
       "line_count": 280,
       "module": "crypto_rsi_scanner.event_alpha.radar.validation.review",
@@ -3354,19 +3250,11 @@
       "public": false,
       "qualname": "CryptoPanicProvider._fetch_live_events",
       "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
-    },
-    {
-      "function_name": "build_refactor_final_report",
-      "line_count": 223,
-      "module": "crypto_rsi_scanner.refactor_final_report",
-      "public": true,
-      "qualname": "build_refactor_final_report",
-      "source_path": "crypto_rsi_scanner/refactor_final_report.py"
     }
   ],
   "production_size_gate_status": "pass",
   "research_only": true,
-  "resolved_violation_count": 62,
+  "resolved_violation_count": 66,
   "resolved_violation_ids": [
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
     "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
@@ -3421,15 +3309,19 @@
     "function:crypto_rsi_scanner/event_alpha/notifications/go_no_go.py:build_go_no_go",
     "function:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:select_research_review_candidates_with_diagnostics",
     "function:crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py:_provider_rows",
+    "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:assess_source",
+    "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:source_descriptor_for",
     "function:crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py:_row_from_core_opportunity",
     "function:crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py:normalize_derivatives_state",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:format_impact_hypothesis_report",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:validate_hypotheses_with_raw_events",
     "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:format_integrated_daily_brief",
     "function:crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py:_candidate_from_row",
+    "function:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:format_source_coverage_report",
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_alert",
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_hypothesis",
-    "function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_row"
+    "function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_row",
+    "function:crypto_rsi_scanner/refactor_final_report.py:build_refactor_final_report"
   ],
   "row_type": "refactor_size_gate_report",
   "schema_version": "refactor_size_gate_report_v1",
@@ -3476,8 +3368,6 @@
     "function:crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py:evaluate_signal_quality_case",
     "function:crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py:run_no_send_rehearsal",
     "function:crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py:run_no_send_rehearsal",
-    "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:assess_source",
-    "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:source_descriptor_for",
     "function:crypto_rsi_scanner/event_alpha/radar/discovery/manual.py:load_discovery_events",
     "function:crypto_rsi_scanner/event_alpha/radar/discovery/manual.py:run_manual_discovery",
     "function:crypto_rsi_scanner/event_alpha/radar/evidence/executor.py:_execute_request",
@@ -3493,10 +3383,8 @@
     "function:crypto_rsi_scanner/event_alpha/radar/pipeline.py:run_event_alpha_operating_cycle",
     "function:crypto_rsi_scanner/event_alpha/radar/pipeline.py:run_event_alpha_pipeline",
     "function:crypto_rsi_scanner/event_alpha/radar/source_coverage/builder.py:build_source_coverage_report",
-    "function:crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py:format_source_coverage_report",
     "function:crypto_rsi_scanner/event_alpha/radar/validation/review.py:review_validation_sample",
     "function:crypto_rsi_scanner/event_providers/cryptopanic/legacy.py:CryptoPanicProvider._fetch_live_events",
-    "function:crypto_rsi_scanner/refactor_final_report.py:build_refactor_final_report",
     "public_classes:crypto_rsi_scanner.backups",
     "public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store.models",
     "public_classes:crypto_rsi_scanner.event_alpha.artifacts.alerts",
@@ -4010,28 +3898,6 @@
     },
     {
       "category": "function_over_150_lines",
-      "function_name": "source_descriptor_for",
-      "line_count": 246,
-      "module": "crypto_rsi_scanner.event_alpha.providers.source_registry",
-      "public": true,
-      "qualname": "source_descriptor_for",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:source_descriptor_for"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "assess_source",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.providers.source_registry",
-      "public": true,
-      "qualname": "assess_source",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:assess_source"
-    },
-    {
-      "category": "function_over_150_lines",
       "function_name": "run_manual_discovery",
       "line_count": 244,
       "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
@@ -4197,17 +4063,6 @@
     },
     {
       "category": "function_over_150_lines",
-      "function_name": "format_source_coverage_report",
-      "line_count": 200,
-      "module": "crypto_rsi_scanner.event_alpha.radar.source_coverage.provider_status",
-      "public": true,
-      "qualname": "format_source_coverage_report",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py:format_source_coverage_report"
-    },
-    {
-      "category": "function_over_150_lines",
       "function_name": "review_validation_sample",
       "line_count": 280,
       "module": "crypto_rsi_scanner.event_alpha.radar.validation.review",
@@ -4227,17 +4082,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py",
       "violation_id": "function:crypto_rsi_scanner/event_providers/cryptopanic/legacy.py:CryptoPanicProvider._fetch_live_events"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "build_refactor_final_report",
-      "line_count": 223,
-      "module": "crypto_rsi_scanner.refactor_final_report",
-      "public": true,
-      "qualname": "build_refactor_final_report",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/refactor_final_report.py",
-      "violation_id": "function:crypto_rsi_scanner/refactor_final_report.py:build_refactor_final_report"
     },
     {
       "category": "public_classes_sharing_module",

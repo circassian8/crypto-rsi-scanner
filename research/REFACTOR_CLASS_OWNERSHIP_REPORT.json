@@ -1,5 +1,5 @@
 {
-  "class_count": 461,
+  "class_count": 463,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
@@ -142,7 +142,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5237,
+  "function_count": 5256,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -282,22 +282,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py"
     },
     {
-      "function_name": "source_descriptor_for",
-      "line_count": 246,
-      "module": "crypto_rsi_scanner.event_alpha.providers.source_registry",
-      "public": true,
-      "qualname": "source_descriptor_for",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
-    },
-    {
-      "function_name": "assess_source",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.providers.source_registry",
-      "public": true,
-      "qualname": "assess_source",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
-    },
-    {
       "function_name": "run_manual_discovery",
       "line_count": 244,
       "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
@@ -418,14 +402,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/builder.py"
     },
     {
-      "function_name": "format_source_coverage_report",
-      "line_count": 200,
-      "module": "crypto_rsi_scanner.event_alpha.radar.source_coverage.provider_status",
-      "public": true,
-      "qualname": "format_source_coverage_report",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py"
-    },
-    {
       "function_name": "review_validation_sample",
       "line_count": 280,
       "module": "crypto_rsi_scanner.event_alpha.radar.validation.review",
@@ -440,18 +416,10 @@
       "public": false,
       "qualname": "CryptoPanicProvider._fetch_live_events",
       "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
-    },
-    {
-      "function_name": "build_refactor_final_report",
-      "line_count": 223,
-      "module": "crypto_rsi_scanner.refactor_final_report",
-      "public": true,
-      "qualname": "build_refactor_final_report",
-      "source_path": "crypto_rsi_scanner/refactor_final_report.py"
     }
   ],
-  "functions_over_limit_count": 38,
-  "generated_at": "2026-07-04T05:10:29.320147+00:00",
+  "functions_over_limit_count": 34,
+  "generated_at": "2026-07-04T05:22:53.063681+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1138,7 +1106,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 38,
+  "production_functions_over_limit": 34,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_event_alpha_notify_cycle_body",
@@ -1277,22 +1245,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py"
     },
     {
-      "function_name": "source_descriptor_for",
-      "line_count": 246,
-      "module": "crypto_rsi_scanner.event_alpha.providers.source_registry",
-      "public": true,
-      "qualname": "source_descriptor_for",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
-    },
-    {
-      "function_name": "assess_source",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.providers.source_registry",
-      "public": true,
-      "qualname": "assess_source",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
-    },
-    {
       "function_name": "run_manual_discovery",
       "line_count": 244,
       "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
@@ -1413,14 +1365,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/builder.py"
     },
     {
-      "function_name": "format_source_coverage_report",
-      "line_count": 200,
-      "module": "crypto_rsi_scanner.event_alpha.radar.source_coverage.provider_status",
-      "public": true,
-      "qualname": "format_source_coverage_report",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py"
-    },
-    {
       "function_name": "review_validation_sample",
       "line_count": 280,
       "module": "crypto_rsi_scanner.event_alpha.radar.validation.review",
@@ -1435,14 +1379,6 @@
       "public": false,
       "qualname": "CryptoPanicProvider._fetch_live_events",
       "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
-    },
-    {
-      "function_name": "build_refactor_final_report",
-      "line_count": 223,
-      "module": "crypto_rsi_scanner.refactor_final_report",
-      "public": true,
-      "qualname": "build_refactor_final_report",
-      "source_path": "crypto_rsi_scanner/refactor_final_report.py"
     }
   ],
   "public_class_count": 407,

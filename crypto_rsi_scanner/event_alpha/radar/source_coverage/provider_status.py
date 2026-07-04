@@ -21,7 +21,20 @@ from ...providers import unlock_calendar_preflight as event_unlock_calendar_pref
 from .models import *  # noqa: F403
 
 def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str:
-    lines = [
+    lines = _source_coverage_header_lines(report)
+    lines.extend(_source_pack_coverage_lines(report.packs))
+    lines.extend(_category_priority_lines(report.category_priorities))
+    lines.extend(_live_provider_activation_lines(report))
+    recs = _recommendation_lines(report)
+    lines.extend(["", "Most useful next data source:"])
+    lines.extend(recs)
+    lines.append("")
+    lines.append("No alerts, sends, trades, paper rows, normal RSI rows, or triggers were changed.")
+    return "\n".join(lines)
+
+
+def _source_coverage_header_lines(report: EventAlphaSourceCoverageReport) -> list[str]:
+    return [
         "=" * 76,
         "EVENT ALPHA SOURCE COVERAGE (research-only)",
         "=" * 76,
@@ -53,7 +66,11 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         "",
         "Source-pack coverage:",
     ]
-    for pack in report.packs:
+
+
+def _source_pack_coverage_lines(packs: Iterable[EventAlphaSourcePackCoverage]) -> list[str]:
+    lines: list[str] = []
+    for pack in packs:
         lines.extend(
             [
                 f"- {pack.source_pack}",
@@ -80,17 +97,45 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
                 f"  recommended actions: {_join(pack.recommended_actions)}",
             ]
         )
-    lines.extend(["", "Most useful next data source categories:"])
-    for idx, category in enumerate(report.category_priorities, start=1):
+    return lines
+
+
+def _category_priority_lines(categories: Iterable[Mapping[str, Any]]) -> list[str]:
+    lines = ["", "Most useful next data source categories:"]
+    for idx, category in enumerate(categories, start=1):
         lines.extend([
             f"{idx}. {category.get('category')}",
             f"   providers: {_join(category.get('providers') or ())}",
             f"   enables: {_join(category.get('enabled_lanes') or ())}",
             f"   reason: {category.get('reason') or 'none'}",
         ])
-    lines.extend(["", "Live-provider activation readiness:"])
-    lines.append(f"- readiness report: {LIVE_PROVIDER_READINESS_MD}")
-    lines.append(f"- readiness JSON: {LIVE_PROVIDER_READINESS_JSON}")
+    return lines
+
+
+def _live_provider_activation_lines(report: EventAlphaSourceCoverageReport) -> list[str]:
+    lines = [
+        "",
+        "Live-provider activation readiness:",
+        f"- readiness report: {LIVE_PROVIDER_READINESS_MD}",
+        f"- readiness JSON: {LIVE_PROVIDER_READINESS_JSON}",
+    ]
+    lines.extend(_coinalyze_activation_lines(report))
+    lines.extend(_bybit_activation_lines(report))
+    lines.extend(_unlock_calendar_activation_lines(report))
+    lines.extend(_dex_onchain_activation_lines(report))
+    lines.extend(_official_exchange_activation_lines(report))
+    lines.extend(
+        [
+            "- command: make event-alpha-live-provider-readiness PROFILE="
+            f"{report.profile} ARTIFACT_NAMESPACE={report.artifact_namespace}",
+            "- next activation plan: use the ranked source categories above; rehearse no-send before enabling live calls.",
+        ]
+    )
+    return lines
+
+
+def _coinalyze_activation_lines(report: EventAlphaSourceCoverageReport) -> list[str]:
+    lines: list[str] = []
     if report.coinalyze_preflight_report_path and report.coinalyze_preflight_json_path:
         lines.append(f"- Coinalyze preflight: {report.coinalyze_preflight_status}")
         lines.append(f"- Coinalyze preflight report: {report.coinalyze_preflight_report_path}")
@@ -115,6 +160,11 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         )
     else:
         lines.append("- Coinalyze rehearsal: not generated")
+    return lines
+
+
+def _bybit_activation_lines(report: EventAlphaSourceCoverageReport) -> list[str]:
+    lines: list[str] = []
     if report.bybit_announcements_preflight_report_path and report.bybit_announcements_preflight_json_path:
         lines.append(f"- Bybit announcements preflight: {report.bybit_announcements_preflight_status}")
         lines.append(f"- Bybit announcements preflight report: {report.bybit_announcements_preflight_report_path}")
@@ -138,27 +188,29 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         )
     else:
         lines.append("- Bybit announcements rehearsal: not generated")
+    return lines
+
+
+def _unlock_calendar_activation_lines(report: EventAlphaSourceCoverageReport) -> list[str]:
+    lines: list[str] = []
     if report.unlock_calendar_preflight_report_path and report.unlock_calendar_preflight_json_path:
         lines.append(f"- Unlock/calendar preflight: {report.unlock_calendar_preflight_status}")
         lines.append(f"- Unlock/calendar preflight report: {report.unlock_calendar_preflight_report_path}")
         lines.append(f"- Unlock/calendar preflight JSON: {report.unlock_calendar_preflight_json_path}")
         if report.unlock_calendar_preflight_provider_rows:
             lines.append("- Unlock/calendar provider rows:")
-            for row in report.unlock_calendar_preflight_provider_rows:
-                lines.append(
-                    "  - "
-                    f"{row.get('provider') or 'unknown'} "
-                    f"configured={str(bool(row.get('configured'))).lower()} "
-                    f"fixture_parser_status={row.get('fixture_parser_status') or 'unknown'} "
-                    f"live_call_allowed={str(bool(row.get('live_call_allowed'))).lower()} "
-                    f"source_packs={_join(row.get('source_packs_enabled') or ())}"
-                )
+            lines.extend(_provider_row_lines(report.unlock_calendar_preflight_provider_rows))
     else:
         lines.append("- Unlock/calendar preflight: not generated")
         lines.append(
             "- command: make event-alpha-tokenomist-preflight ARTIFACT_NAMESPACE="
             f"{report.artifact_namespace} PROFILE={report.profile} PYTHON=python3"
         )
+    return lines
+
+
+def _dex_onchain_activation_lines(report: EventAlphaSourceCoverageReport) -> list[str]:
+    lines: list[str] = []
     if report.dex_onchain_readiness_report_path and report.dex_onchain_readiness_json_path:
         lines.append(f"- DEX/on-chain readiness: {report.dex_onchain_readiness_status}")
         lines.append(f"- DEX/on-chain readiness report: {report.dex_onchain_readiness_report_path}")
@@ -170,22 +222,30 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         )
         if report.dex_onchain_readiness_provider_rows:
             lines.append("- DEX/on-chain provider rows:")
-            for row in report.dex_onchain_readiness_provider_rows:
-                lines.append(
-                    "  - "
-                    f"{row.get('provider') or 'unknown'} "
-                    f"configured={str(bool(row.get('configured'))).lower()} "
-                    f"fixture_parser_status={row.get('fixture_parser_status') or 'unknown'} "
-                    f"live_call_allowed={str(bool(row.get('live_call_allowed'))).lower()} "
-                    f"source_packs={_join(row.get('source_packs_enabled') or ())}"
-                )
+            lines.extend(_provider_row_lines(report.dex_onchain_readiness_provider_rows))
     else:
         lines.append("- DEX/on-chain readiness: not generated")
         lines.append(
             "- command: make event-alpha-dex-onchain-readiness-smoke ARTIFACT_NAMESPACE="
             f"{report.artifact_namespace} PROFILE={report.profile} PYTHON=python3"
         )
-    lines.append(f"- Official exchange activation: {report.official_exchange_activation_status}")
+    return lines
+
+
+def _provider_row_lines(provider_rows: Iterable[Mapping[str, Any]]) -> list[str]:
+    return [
+        "  - "
+        f"{row.get('provider') or 'unknown'} "
+        f"configured={str(bool(row.get('configured'))).lower()} "
+        f"fixture_parser_status={row.get('fixture_parser_status') or 'unknown'} "
+        f"live_call_allowed={str(bool(row.get('live_call_allowed'))).lower()} "
+        f"source_packs={_join(row.get('source_packs_enabled') or ())}"
+        for row in provider_rows
+    ]
+
+
+def _official_exchange_activation_lines(report: EventAlphaSourceCoverageReport) -> list[str]:
+    lines = [f"- Official exchange activation: {report.official_exchange_activation_status}"]
     if report.official_exchange_activation_report_path:
         lines.append(f"- Official exchange activation report: {report.official_exchange_activation_report_path}")
     if report.official_exchange_activation_json_path:
@@ -207,19 +267,7 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
             )
     else:
         lines.append("- Official exchange activation provider rows: none")
-    lines.extend(
-        [
-            "- command: make event-alpha-live-provider-readiness PROFILE="
-            f"{report.profile} ARTIFACT_NAMESPACE={report.artifact_namespace}",
-            "- next activation plan: use the ranked source categories above; rehearse no-send before enabling live calls.",
-        ]
-    )
-    recs = _recommendation_lines(report)
-    lines.extend(["", "Most useful next data source:"])
-    lines.extend(recs)
-    lines.append("")
-    lines.append("No alerts, sends, trades, paper rows, normal RSI rows, or triggers were changed.")
-    return "\n".join(lines)
+    return lines
 def _health_by_provider(rows: Mapping[str, Mapping[str, Any]], *, now: datetime) -> dict[str, str]:
     out: dict[str, str] = {}
     for key, row in rows.items():

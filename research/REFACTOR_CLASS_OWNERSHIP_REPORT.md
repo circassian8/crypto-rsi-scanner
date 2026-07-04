@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T05:10:29.320147+00:00`
+- generated_at: `2026-07-04T05:22:53.063681+00:00`
 - public_class_count: `407`
 - classes_over_limit_count: `14`
-- functions_over_limit_count: `38`
+- functions_over_limit_count: `34`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `38`
+- production_functions_over_limit: `34`
 - modules_with_multiple_public_classes_count: `82`
 - legacy_decomposition_gate_status: `pass`
 - legacy_classes_over_limit: `3`
@@ -176,8 +176,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.outcomes.quality.case_eval` | `evaluate_signal_quality_case` | 211 | true |
 | `crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight` | `run_no_send_rehearsal` | 160 | true |
 | `crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight` | `run_no_send_rehearsal` | 194 | true |
-| `crypto_rsi_scanner.event_alpha.providers.source_registry` | `source_descriptor_for` | 246 | true |
-| `crypto_rsi_scanner.event_alpha.providers.source_registry` | `assess_source` | 158 | true |
 | `crypto_rsi_scanner.event_alpha.radar.discovery.manual` | `run_manual_discovery` | 244 | true |
 | `crypto_rsi_scanner.event_alpha.radar.discovery.manual` | `load_discovery_events` | 183 | true |
 | `crypto_rsi_scanner.event_alpha.radar.evidence.executor` | `_execute_request` | 167 | false |
@@ -193,7 +191,5 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.radar.pipeline` | `run_event_alpha_pipeline` | 244 | true |
 | `crypto_rsi_scanner.event_alpha.radar.pipeline` | `run_event_alpha_operating_cycle` | 347 | true |
 | `crypto_rsi_scanner.event_alpha.radar.source_coverage.builder` | `build_source_coverage_report` | 238 | true |
-| `crypto_rsi_scanner.event_alpha.radar.source_coverage.provider_status` | `format_source_coverage_report` | 200 | true |
 | `crypto_rsi_scanner.event_alpha.radar.validation.review` | `review_validation_sample` | 280 | true |
 | `crypto_rsi_scanner.event_providers.cryptopanic.legacy` | `CryptoPanicProvider._fetch_live_events` | 158 | false |
-| `crypto_rsi_scanner.refactor_final_report` | `build_refactor_final_report` | 223 | true |

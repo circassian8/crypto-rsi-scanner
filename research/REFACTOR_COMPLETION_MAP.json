@@ -65,7 +65,7 @@
     "top_level_event_module_count": 125,
     "unmigrated_modules": 1
   },
-  "generated_at": "2026-07-04T05:11:37+00:00",
+  "generated_at": "2026-07-04T05:24:04+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
   "known_remaining_blockers": [],
   "live_provider_calls_allowed": false,
@@ -116,7 +116,7 @@
   "size_gates": {
     "classes_over_limit_count": 14,
     "files_over_limit_count": 8,
-    "functions_over_limit_count": 38,
+    "functions_over_limit_count": 34,
     "gate_status": "pass",
     "largest_legacy_files": [
       {
@@ -353,8 +353,20 @@
       },
       {
         "limit": 1500,
+        "line_count": 989,
+        "path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
         "line_count": 985,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/alerts.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
+        "line_count": 984,
+        "path": "crypto_rsi_scanner/refactor_final_report.py",
         "source_kind": "production"
       },
       {
@@ -385,18 +397,6 @@
         "limit": 1500,
         "line_count": 961,
         "path": "crypto_rsi_scanner/cli/services/legacy/reports.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 951,
-        "path": "crypto_rsi_scanner/refactor_final_report.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 941,
-        "path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
         "source_kind": "production"
       },
       {
@@ -601,13 +601,13 @@
     "legacy_functions_over_limit": 1,
     "legacy_modules_with_multiple_public_classes": 2,
     "legacy_total_lines": 4704,
-    "moved_existing_violation_count": 36,
+    "moved_existing_violation_count": 35,
     "new_violation_count": 0,
     "production_classes_over_limit": 14,
     "production_files_over_1500_lines": 0,
     "production_files_over_2000_lines": 0,
     "production_files_over_3000_lines": 0,
-    "production_functions_over_limit": 38,
+    "production_functions_over_limit": 34,
     "production_size_gate_status": "pass",
     "test_files_over_1500_lines": 8,
     "test_size_gate_status": "warning"

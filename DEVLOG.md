@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split source registry and source coverage report helpers · Codex
+**Why:** The active refactor goal still has advisory oversized-function debt
+after the runtime and artifact-size gates passed. This pass removes four more
+pure/reporting functions from the over-limit inventory without changing source
+classification semantics, source-coverage Markdown content, or refactor gate
+rules.
+**Changes:**
+- Split `source_descriptor_for()` in
+  `crypto_rsi_scanner/event_alpha/providers/source_registry.py` into context,
+  structured-source, and news/fallback descriptor helpers.
+- Split `assess_source()` input assembly in the same module into a private
+  assessment-input helper while preserving source-quality scoring and warning
+  rules.
+- Split `format_source_coverage_report()` in
+  `crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py`
+  into header, source-pack, category, provider-activation, and recommendation
+  section renderers.
+- Split blocker/deprecation-plan assembly out of
+  `build_refactor_final_report()` in
+  `crypto_rsi_scanner/refactor_final_report.py`.
+- Refreshed refactor size, class ownership, and final reports. Current
+  advisory inventory is `14` classes and `34` functions over limits, with
+  `production_files_over_1500_lines=0`, `legacy_files_over_1500_lines=0`, and
+  `new_violation_count=0`.
+**Verify:** Source-coverage pytest passed (`35 passed`), source-registry/source
+pack focused tests passed, `make event-alpha-source-coverage-report` passed for
+`notify_llm_deep_cryptopanic_rehearsal`, refactor final-report focused tests
+passed, compileall passed for touched modules and the full
+`crypto_rsi_scanner tests` tree, and refactor reports passed with
+`gate_status=pass`.
+**Notes/risks:** Behavior-preserving only. No provider calls, live sends,
+trading, paper-trading behavior changes, execution/order logic, Event Alpha RSI
+writes, or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split near-threshold readiness and artifact normalizers · Codex
 **Why:** The refactor goal still has advisory oversized-function debt even
 after production and legacy file-size gates passed. This pass removes four
