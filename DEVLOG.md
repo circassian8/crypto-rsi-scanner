@@ -17,6 +17,49 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split artifact doctor diagnosis phases · Codex
+**Why:** The refactor burn-down still had one oversized production function:
+`diagnose_artifacts()` in the legacy artifact-doctor context loader. The
+function mixed namespace/schema setup, core/card context assembly, provider and
+integrated-artifact conflict collection, notification checks, outcome/incident
+checks, and the final 400-field result constructor.
+**Changes:**
+- Split `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` into
+  short context phases for loading, namespace/profile checks, core/card
+  context, artifact conflicts, notification context, and quality/incident
+  context. `diagnose_artifacts()` is now a 41-line public orchestrator.
+- Added
+  `crypto_rsi_scanner/event_alpha/doctor/legacy/result_fields.py`, a static
+  compatibility table for the legacy doctor result fields, preserving the old
+  counter expressions while keeping executable functions under the size gate.
+- Regenerated refactor class ownership, size-gate, final, completion-map,
+  release-candidate, and shim reports. Current advisory inventory is `14`
+  classes and `0` functions over limits, with
+  `production_files_over_1500_lines=0`, `production_files_over_2000_lines=0`,
+  `production_files_over_3000_lines=0`, `new_violation_count=0`,
+  `legacy_unregistered=0`, and no active shim implementation leaks.
+- Updated `ROADMAP.md` with the zero oversized-function state.
+**Verify:** Focused checks passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha/test_artifact_doctor.py tests/event_alpha/test_namespace_lifecycle.py
+-q` reported `75 passed`; shim/make-target focused tests reported `26 passed`;
+`python3 -m compileall -q crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py
+crypto_rsi_scanner/event_alpha/doctor/legacy/result_fields.py` passed. Full
+safe harness passed: `python3 tests/test_indicators.py`;
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q`; `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make test-pytest-safe PYTHON=python3`; refactor
+size/class/final/completion reports; shim report; integrated radar
+smoke/doctor; notification format smoke; Telegram no-send final check; evidence
+acquisition smoke; catalyst-frame e2e; Coinalyze preflight
+smoke/preflight/no-send rehearsal; source coverage, daily brief, and notify
+preview from artifacts for `notify_llm_deep_cryptopanic_rehearsal`; strict
+CryptoPanic artifact doctor; `make backtest-costs PYTHON=python3`; and `make
+verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+live sends, trading, paper-trading behavior changes, execution/order logic,
+Event Alpha RSI writes, or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split notification send plan phases · Codex
 **Why:** The refactor goal still tracks advisory oversized-function debt after
 production and legacy file-size gates passed. `send_notifications()` contained

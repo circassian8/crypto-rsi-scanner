@@ -1,6 +1,6 @@
 {
-  "commands_expected": 23,
-  "commands_run": 23,
+  "commands_expected": 24,
+  "commands_run": 24,
   "no_live_provider_calls_by_default": true,
   "no_live_telegram_sends": true,
   "no_trading_paper_execution_rsi_or_triggered_fade_changes": true,
@@ -11,9 +11,12 @@
         "python3",
         "tests/test_indicators.py"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/01_python3_tests_test_indicators.py.log",
+      "elapsed_seconds": null,
+      "index": 1,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/standalone.log",
       "returncode": 0,
-      "seconds": 25.364
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -28,9 +31,12 @@
         "tests/test_indicators.py",
         "-q"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/02_env_PYTEST_DISABLE_PLUGIN_AUTOLOAD-1_python3.log",
+      "elapsed_seconds": null,
+      "index": 2,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/pytest_safe.log",
       "returncode": 0,
-      "seconds": 25.968
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -41,9 +47,12 @@
         "crypto_rsi_scanner",
         "tests"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/03_python3_-m_compileall.log",
+      "elapsed_seconds": null,
+      "index": 3,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/compileall.log",
       "returncode": 0,
-      "seconds": 0.041
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -51,9 +60,12 @@
         "test-pytest-safe",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/04_make_test-pytest-safe_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 4,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/test_pytest_safe.log",
       "returncode": 0,
-      "seconds": 26.113
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -61,9 +73,12 @@
         "refactor-size-gates",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/05_make_refactor-size-gates_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 5,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/refactor_size.log",
       "returncode": 0,
-      "seconds": 1.085
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -71,9 +86,12 @@
         "refactor-class-ownership-report",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/06_make_refactor-class-ownership-report_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 6,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/refactor_class.log",
       "returncode": 0,
-      "seconds": 1.007
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -81,9 +99,25 @@
         "refactor-final-report",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/07_make_refactor-final-report_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 7,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/refactor_final.log",
       "returncode": 0,
-      "seconds": 1.195
+      "seconds": null,
+      "status": "pass"
+    },
+    {
+      "command": [
+        "make",
+        "refactor-completion-map",
+        "PYTHON=python3"
+      ],
+      "elapsed_seconds": null,
+      "index": 8,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/refactor_completion.log",
+      "returncode": 0,
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -91,9 +125,12 @@
         "event-alpha-shim-report",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/08_make_event-alpha-shim-report_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 9,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/shim_report.log",
       "returncode": 0,
-      "seconds": 0.056
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -101,9 +138,12 @@
         "event-alpha-integrated-radar-smoke",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/09_make_event-alpha-integrated-radar-smoke_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 10,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/integrated_smoke.log",
       "returncode": 0,
-      "seconds": 1.806
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -111,9 +151,12 @@
         "event-alpha-integrated-radar-doctor",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/10_make_event-alpha-integrated-radar-doctor_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 11,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/integrated_doctor.log",
       "returncode": 0,
-      "seconds": 0.793
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -121,9 +164,12 @@
         "event-alpha-notification-format-smoke",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/11_make_event-alpha-notification-format-smoke_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 12,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/notification_format.log",
       "returncode": 0,
-      "seconds": 2.089
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -131,9 +177,12 @@
         "event-alpha-telegram-no-send-final-check-fast",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/12_make_event-alpha-telegram-no-send-final-check-fast_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 13,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/telegram_final.log",
       "returncode": 0,
-      "seconds": 2.824
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -141,9 +190,12 @@
         "event-alpha-evidence-acquisition-smoke",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/13_make_event-alpha-evidence-acquisition-smoke_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 14,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/evidence_smoke.log",
       "returncode": 0,
-      "seconds": 4.426
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -151,9 +203,12 @@
         "event-alpha-catalyst-frame-e2e-cycle",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/14_make_event-alpha-catalyst-frame-e2e-cycle_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 15,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/catalyst_frame.log",
       "returncode": 0,
-      "seconds": 4.248
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -161,9 +216,12 @@
         "event-alpha-coinalyze-preflight-smoke",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/15_make_event-alpha-coinalyze-preflight-smoke_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 16,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/coinalyze_preflight_smoke.log",
       "returncode": 0,
-      "seconds": 0.656
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -171,9 +229,12 @@
         "event-alpha-coinalyze-preflight",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/16_make_event-alpha-coinalyze-preflight_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 17,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/coinalyze_preflight.log",
       "returncode": 0,
-      "seconds": 0.647
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -181,9 +242,12 @@
         "event-alpha-coinalyze-no-send-rehearsal",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/17_make_event-alpha-coinalyze-no-send-rehearsal_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 18,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/coinalyze_rehearsal.log",
       "returncode": 0,
-      "seconds": 0.646
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -193,9 +257,12 @@
         "ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/18_make_event-alpha-source-coverage-report_PROFILE-notify_llm_deep.log",
+      "elapsed_seconds": null,
+      "index": 19,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/source_coverage.log",
       "returncode": 0,
-      "seconds": 0.647
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -205,9 +272,12 @@
         "ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/19_make_event-alpha-daily-brief_PROFILE-notify_llm_deep.log",
+      "elapsed_seconds": null,
+      "index": 20,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/daily_brief.log",
       "returncode": 0,
-      "seconds": 4.471
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -217,9 +287,12 @@
         "ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/20_make_event-alpha-notify-preview-from-artifacts_PROFILE-notify_llm_deep.log",
+      "elapsed_seconds": null,
+      "index": 21,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/notify_preview.log",
       "returncode": 0,
-      "seconds": 1.063
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -230,9 +303,12 @@
         "STRICT=1",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/21_make_event-alpha-artifact-doctor_PROFILE-notify_llm_deep.log",
+      "elapsed_seconds": null,
+      "index": 22,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/artifact_doctor.log",
       "returncode": 0,
-      "seconds": 1.691
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -240,9 +316,12 @@
         "backtest-costs",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/22_make_backtest-costs_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 23,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/backtest_costs.log",
       "returncode": 0,
-      "seconds": 0.56
+      "seconds": null,
+      "status": "pass"
     },
     {
       "command": [
@@ -250,9 +329,12 @@
         "verify",
         "PYTHON=python3"
       ],
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/23_make_verify_PYTHON-python3.log",
+      "elapsed_seconds": null,
+      "index": 24,
+      "log_path": "/tmp/crypto_rsi_context_loading_refactor_verify/verify.log",
       "returncode": 0,
-      "seconds": 26.599
+      "seconds": null,
+      "status": "pass"
     }
   ],
   "safety_env": {
@@ -264,6 +346,7 @@
     "RSI_EVENT_ALPHA_TELEGRAM_ALLOW_SEND": "0"
   },
   "schema_version": "refactor_verification_results_v1",
-  "seconds": 134.0,
-  "status": "pass"
+  "seconds": null,
+  "status": "pass",
+  "total_elapsed_seconds": null
 }

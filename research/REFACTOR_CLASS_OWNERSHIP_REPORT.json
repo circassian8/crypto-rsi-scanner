@@ -142,20 +142,11 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5575,
+  "function_count": 5584,
   "function_line_limit": 150,
-  "functions_over_limit": [
-    {
-      "function_name": "diagnose_artifacts",
-      "line_count": 1048,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.context_loading",
-      "public": true,
-      "qualname": "diagnose_artifacts",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py"
-    }
-  ],
-  "functions_over_limit_count": 1,
-  "generated_at": "2026-07-04T09:44:13.416693+00:00",
+  "functions_over_limit": [],
+  "functions_over_limit_count": 0,
+  "generated_at": "2026-07-04T09:57:48.540903+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -833,17 +824,8 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 1,
-  "production_functions_over_limit_rows": [
-    {
-      "function_name": "diagnose_artifacts",
-      "line_count": 1048,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.context_loading",
-      "public": true,
-      "qualname": "diagnose_artifacts",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py"
-    }
-  ],
+  "production_functions_over_limit": 0,
+  "production_functions_over_limit_rows": [],
   "public_class_count": 407,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,

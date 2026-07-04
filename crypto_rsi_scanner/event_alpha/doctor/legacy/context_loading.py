@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .runtime import *
+from .result_fields import build_legacy_doctor_result
 
 def diagnose_artifacts(
     *,
@@ -40,110 +41,144 @@ def diagnose_artifacts(
     skip_legacy_checks: bool = False,
 ) -> EventAlphaArtifactDoctorResult:
     """Diagnose cross-artifact lineage, mode, and profile/namespace cleanliness."""
-    loaded = _load_and_filter_doctor_artifacts(locals())
-    runs = loaded.runs
-    alerts = loaded.alerts
-    feedback = loaded.feedback
-    outcomes = loaded.outcomes
-    hypotheses = loaded.hypotheses
-    core_rows = loaded.core_rows
-    watchlist = loaded.watchlist
-    incidents = loaded.incidents
-    acquisition_rows = loaded.acquisition_rows
-    market_anomalies = loaded.market_anomalies
-    official_exchange_candidates = loaded.official_exchange_candidates
-    scheduled_catalysts = loaded.scheduled_catalysts
-    unlock_candidates = loaded.unlock_candidates
-    derivatives_state = loaded.derivatives_state
-    fade_review_candidates = loaded.fade_review_candidates
-    dex_pool_state = loaded.dex_pool_state
-    dex_pool_anomalies = loaded.dex_pool_anomalies
-    protocol_fundamentals = loaded.protocol_fundamentals
-    integrated_candidates = loaded.integrated_candidates
-    raw_legacy = loaded.raw_legacy
-    integrated_manifest_path = loaded.integrated_manifest_path
-    integrated_source_coverage_json_path = loaded.integrated_source_coverage_json_path
-    integrated_delivery_path = loaded.integrated_delivery_path
-    integrated_outcomes_path = loaded.integrated_outcomes_path
-    namespace_dir = _artifact_namespace_dir(
-        inspected_alert_store_path,
-        source_coverage_report_path,
-        daily_brief_path,
-        integrated_outcomes_path,
+    ctx = _build_doctor_context(locals())
+    if ctx.short_circuit_result is not None:
+        return ctx.short_circuit_result
+    ctx.status = "BLOCKED" if ctx.blockers else ("WARN" if ctx.warnings else "OK")
+    return build_legacy_doctor_result(ctx)
+
+
+def _build_doctor_context(options: Mapping[str, Any]) -> SimpleNamespace:
+    ctx = _load_doctor_context_inputs(options)
+    if ctx.short_circuit_result is not None:
+        return ctx
+    _apply_namespace_profile_checks(ctx)
+    _attach_core_card_context(ctx)
+    _attach_artifact_conflict_context(ctx)
+    _attach_notification_context(ctx)
+    _attach_quality_incident_context(ctx)
+    return ctx
+
+
+def _merge_context(ctx: SimpleNamespace, values: Mapping[str, Any]) -> None:
+    for name, value in values.items():
+        if name in {"ctx", "values"}:
+            continue
+        setattr(ctx, name, value)
+
+
+def _load_doctor_context_inputs(options: Mapping[str, Any]) -> SimpleNamespace:
+    ctx = SimpleNamespace(**options)
+    ctx.short_circuit_result = None
+    loaded = _load_and_filter_doctor_artifacts(options)
+    ctx.loaded = loaded
+    ctx.runs = loaded.runs
+    ctx.alerts = loaded.alerts
+    ctx.feedback = loaded.feedback
+    ctx.outcomes = loaded.outcomes
+    ctx.hypotheses = loaded.hypotheses
+    ctx.core_rows = loaded.core_rows
+    ctx.watchlist = loaded.watchlist
+    ctx.incidents = loaded.incidents
+    ctx.acquisition_rows = loaded.acquisition_rows
+    ctx.market_anomalies = loaded.market_anomalies
+    ctx.official_exchange_candidates = loaded.official_exchange_candidates
+    ctx.scheduled_catalysts = loaded.scheduled_catalysts
+    ctx.unlock_candidates = loaded.unlock_candidates
+    ctx.derivatives_state = loaded.derivatives_state
+    ctx.fade_review_candidates = loaded.fade_review_candidates
+    ctx.dex_pool_state = loaded.dex_pool_state
+    ctx.dex_pool_anomalies = loaded.dex_pool_anomalies
+    ctx.protocol_fundamentals = loaded.protocol_fundamentals
+    ctx.integrated_candidates = loaded.integrated_candidates
+    ctx.raw_legacy = loaded.raw_legacy
+    ctx.integrated_manifest_path = loaded.integrated_manifest_path
+    ctx.integrated_source_coverage_json_path = loaded.integrated_source_coverage_json_path
+    ctx.integrated_delivery_path = loaded.integrated_delivery_path
+    ctx.integrated_outcomes_path = loaded.integrated_outcomes_path
+    ctx.namespace_dir = _artifact_namespace_dir(
+        ctx.inspected_alert_store_path,
+        ctx.source_coverage_report_path,
+        ctx.daily_brief_path,
+        ctx.integrated_outcomes_path,
     )
-    namespace_phase = namespace_doctor.inspect_namespace(
-        namespace_dir,
-        include_stale_artifacts=include_stale_artifacts,
+    ctx.namespace_phase = namespace_doctor.inspect_namespace(
+        ctx.namespace_dir,
+        include_stale_artifacts=ctx.include_stale_artifacts,
     )
-    if namespace_phase.short_circuit:
-        phase_status = "BLOCKED" if namespace_phase.blockers else "STALE"
-        return _phase_only_doctor_result(
+    if ctx.namespace_phase.short_circuit:
+        phase_status = "BLOCKED" if ctx.namespace_phase.blockers else "STALE"
+        ctx.short_circuit_result = _phase_only_doctor_result(
             status=phase_status,
-            profile=profile,
-            artifact_namespace=artifact_namespace,
-            runs=runs,
-            alerts=alerts,
-            feedback=feedback,
-            outcomes=outcomes,
-            card_paths=card_paths,
-            namespace_phase=namespace_phase,
+            profile=ctx.profile,
+            artifact_namespace=ctx.artifact_namespace,
+            runs=ctx.runs,
+            alerts=ctx.alerts,
+            feedback=ctx.feedback,
+            outcomes=ctx.outcomes,
+            card_paths=ctx.card_paths,
+            namespace_phase=ctx.namespace_phase,
             schema_result=schema_doctor.SchemaDoctorResult(),
-            strict=strict,
-            strict_legacy=strict_legacy,
-            schema_only=schema_only,
+            strict=ctx.strict,
+            strict_legacy=ctx.strict_legacy,
+            schema_only=ctx.schema_only,
             legacy_checks_skipped=True,
-            blockers=namespace_phase.blockers,
-            warnings=namespace_phase.warnings,
+            blockers=ctx.namespace_phase.blockers,
+            warnings=ctx.namespace_phase.warnings,
         )
-    schema_result = schema_doctor.validate_namespace_artifacts(namespace_phase.namespace_dir)
-    safety_result = safety_doctor.validate_schema_safety(
-        schema_result,
-        strict=strict,
-        schema_only=schema_only,
+        return ctx
+    ctx.schema_result = schema_doctor.validate_namespace_artifacts(ctx.namespace_phase.namespace_dir)
+    ctx.safety_result = safety_doctor.validate_schema_safety(
+        ctx.schema_result,
+        strict=ctx.strict,
+        schema_only=ctx.schema_only,
     )
-    if schema_only or skip_legacy_checks:
-        phase_blockers: list[str] = list(namespace_phase.blockers)
-        phase_blockers.extend(safety_result.blockers)
-        phase_warnings: list[str] = list(namespace_phase.warnings)
-        phase_warnings.extend(safety_result.warnings)
-        if schema_result.schema_validation_errors:
+    if ctx.schema_only or ctx.skip_legacy_checks:
+        phase_blockers = list(ctx.namespace_phase.blockers)
+        phase_blockers.extend(ctx.safety_result.blockers)
+        phase_warnings = list(ctx.namespace_phase.warnings)
+        phase_warnings.extend(ctx.safety_result.warnings)
+        if ctx.schema_result.schema_validation_errors:
             message = check_registry.format_check_message(
                 "schema.validation_errors",
-                f"schema_validation_errors={schema_result.schema_validation_errors}",
+                f"schema_validation_errors={ctx.schema_result.schema_validation_errors}",
             )
-            (phase_blockers if schema_only or strict else phase_warnings).append(message)
+            (phase_blockers if ctx.schema_only or ctx.strict else phase_warnings).append(message)
         consistency_phase = consistency_doctor.skipped_result()
         phase_blockers.extend(consistency_phase.blockers)
         phase_warnings.extend(consistency_phase.warnings)
         status = "BLOCKED" if phase_blockers else ("WARN" if phase_warnings else "OK")
-        return _phase_only_doctor_result(
+        ctx.short_circuit_result = _phase_only_doctor_result(
             status=status,
-            profile=profile,
-            artifact_namespace=artifact_namespace,
-            runs=runs,
-            alerts=alerts,
-            feedback=feedback,
-            outcomes=outcomes,
-            card_paths=card_paths,
-            namespace_phase=namespace_phase,
-            schema_result=schema_result,
-            strict=strict,
-            strict_legacy=strict_legacy,
-            schema_only=schema_only,
+            profile=ctx.profile,
+            artifact_namespace=ctx.artifact_namespace,
+            runs=ctx.runs,
+            alerts=ctx.alerts,
+            feedback=ctx.feedback,
+            outcomes=ctx.outcomes,
+            card_paths=ctx.card_paths,
+            namespace_phase=ctx.namespace_phase,
+            schema_result=ctx.schema_result,
+            strict=ctx.strict,
+            strict_legacy=ctx.strict_legacy,
+            schema_only=ctx.schema_only,
             legacy_checks_skipped=True,
             blockers=phase_blockers,
             warnings=phase_warnings,
         )
-    blockers: list[str] = []
-    warnings: list[str] = []
-    blockers.extend(namespace_phase.blockers)
-    warnings.extend(namespace_phase.warnings)
-    blockers.extend(safety_result.blockers)
-    warnings.extend(safety_result.warnings)
+        return ctx
+    ctx.blockers = []
+    ctx.warnings = []
+    ctx.blockers.extend(ctx.namespace_phase.blockers)
+    ctx.warnings.extend(ctx.namespace_phase.warnings)
+    ctx.blockers.extend(ctx.safety_result.blockers)
+    ctx.warnings.extend(ctx.safety_result.warnings)
     active_shim_logic_count, active_shim_logic_modules = event_alpha_shims.active_shim_violation_summary()
+    ctx.active_shim_logic_count = active_shim_logic_count
+    ctx.active_shim_logic_modules = active_shim_logic_modules
     if active_shim_logic_count:
         modules = ", ".join(active_shim_logic_modules[:5])
-        warnings.append(
+        ctx.warnings.append(
             check_registry.format_check_message(
                 "paths.active_shim_contains_logic",
                 "active_shim_modules_with_implementation_logic="
@@ -152,46 +187,56 @@ def diagnose_artifacts(
             )
         )
     run_snapshot_context = _inspect_run_snapshot_context(
-        runs=runs,
-        alerts=alerts,
-        feedback=feedback,
-        outcomes=outcomes,
-        inspected_alert_store_path=inspected_alert_store_path,
-        include_test_artifacts=include_test_artifacts,
-        delivery_strict_scope=delivery_strict_scope,
-        strict=strict,
+        runs=ctx.runs,
+        alerts=ctx.alerts,
+        feedback=ctx.feedback,
+        outcomes=ctx.outcomes,
+        inspected_alert_store_path=ctx.inspected_alert_store_path,
+        include_test_artifacts=ctx.include_test_artifacts,
+        delivery_strict_scope=ctx.delivery_strict_scope,
+        strict=ctx.strict,
     )
-    blockers.extend(run_snapshot_context.blockers)
-    warnings.extend(run_snapshot_context.warnings)
-    matching_snapshot_runs = run_snapshot_context.matching_snapshot_runs
-    missing_snapshot_runs = run_snapshot_context.missing_snapshot_runs
-    external_snapshot_runs = run_snapshot_context.external_snapshot_runs
-    latest_run_id = run_snapshot_context.latest_run_id
-    latest_run = run_snapshot_context.latest_run
-    effective_delivery_scope = run_snapshot_context.effective_delivery_scope
-    namespaces = {
-        event_alpha_artifacts.row_namespace(row)
-        for row in (*runs, *alerts, *feedback, *outcomes)
-    }
-    profiles = {
-        event_alpha_artifacts.row_profile(row)
-        for row in (*runs, *alerts, *feedback, *outcomes)
-    }
-    if artifact_namespace and any(ns not in {artifact_namespace, "legacy"} for ns in namespaces):
-        blockers.append("mixed artifact namespaces after filtering")
+    ctx.blockers.extend(run_snapshot_context.blockers)
+    ctx.warnings.extend(run_snapshot_context.warnings)
+    ctx.run_snapshot_context = run_snapshot_context
+    ctx.matching_snapshot_runs = run_snapshot_context.matching_snapshot_runs
+    ctx.missing_snapshot_runs = run_snapshot_context.missing_snapshot_runs
+    ctx.external_snapshot_runs = run_snapshot_context.external_snapshot_runs
+    ctx.latest_run_id = run_snapshot_context.latest_run_id
+    ctx.latest_run = run_snapshot_context.latest_run
+    ctx.effective_delivery_scope = run_snapshot_context.effective_delivery_scope
+    return ctx
+
+
+def _apply_namespace_profile_checks(ctx: SimpleNamespace) -> None:
+    runs, alerts, feedback, outcomes = ctx.runs, ctx.alerts, ctx.feedback, ctx.outcomes
+    namespaces = {event_alpha_artifacts.row_namespace(row) for row in (*runs, *alerts, *feedback, *outcomes)}
+    profiles = {event_alpha_artifacts.row_profile(row) for row in (*runs, *alerts, *feedback, *outcomes)}
+    if ctx.artifact_namespace and any(ns not in {ctx.artifact_namespace, "legacy"} for ns in namespaces):
+        ctx.blockers.append("mixed artifact namespaces after filtering")
     elif len(namespaces - {"legacy"}) > 1:
-        (blockers if strict else warnings).append("multiple artifact namespaces present")
-    if profile and any(item not in {profile, "default"} for item in profiles):
-        warnings.append("rows from multiple profiles are present")
-    if provider_health_rows is not None and profile in {"no_key_live", "api_live", "full_llm_live", "research_send"}:
-        if not provider_health_rows:
+        (ctx.blockers if ctx.strict else ctx.warnings).append("multiple artifact namespaces present")
+    if ctx.profile and any(item not in {ctx.profile, "default"} for item in profiles):
+        ctx.warnings.append("rows from multiple profiles are present")
+    if ctx.provider_health_rows is not None and ctx.profile in {"no_key_live", "api_live", "full_llm_live", "research_send"}:
+        if not ctx.provider_health_rows:
             message = "provider health rows missing for live/burn-in profile"
-            (blockers if strict else warnings).append(message)
-    if profile in {"full_llm_live", "no_key_llm"} and not list(llm_budget_rows):
-        warnings.append("LLM budget rows missing for LLM profile")
-    card_file_paths = [Path(path) for path in card_paths]
+            (ctx.blockers if ctx.strict else ctx.warnings).append(message)
+    if ctx.profile in {"full_llm_live", "no_key_llm"} and not list(ctx.llm_budget_rows):
+        ctx.warnings.append("LLM budget rows missing for LLM profile")
+    ctx.namespaces = namespaces
+    ctx.profiles = profiles
+
+
+def _attach_core_card_context(ctx: SimpleNamespace) -> None:
+    alerts = ctx.alerts
+    acquisition_rows = ctx.acquisition_rows
+    core_rows = ctx.core_rows
+    hypotheses = ctx.hypotheses
+    watchlist = ctx.watchlist
+    card_file_paths = [Path(path) for path in ctx.card_paths]
     research_card_paths = [path for path in card_file_paths if path.name != "index.md"]
-    daily_brief_card_names = _daily_brief_card_names(daily_brief_path)
+    daily_brief_card_names = _daily_brief_card_names(ctx.daily_brief_path)
     card_count = len(research_card_paths)
     index_present = any(path.name == "index.md" for path in card_file_paths)
     cards_missing_lineage = sum(1 for path in research_card_paths if not event_research_cards.card_has_current_lineage(path))
@@ -266,10 +311,7 @@ def diagnose_artifacts(
     diagnostic_fake_core = sum(
         1
         for row in alerts
-        if (
-            bool(row.get("is_diagnostic_snapshot"))
-            or event_core_opportunities.row_is_diagnostic(row)
-        )
+        if (bool(row.get("is_diagnostic_snapshot")) or event_core_opportunities.row_is_diagnostic(row))
         and str(row.get("core_opportunity_id") or "").strip()
         and str(row.get("core_opportunity_id_status") or "") not in {"diagnostic_support", "canonical"}
     )
@@ -288,40 +330,65 @@ def diagnose_artifacts(
         and str(row.get("core_opportunity_id_status") or "") not in {"diagnostic_support", "canonical"}
     )
     card_primary_mismatches = _card_primary_mismatches(research_card_paths, normalized_core_rows_by_id)
-    card_acquisition_mismatches = _card_acquisition_count_mismatches(
-        research_card_paths,
-        normalized_core_rows_by_id,
-        acquisition_rows,
-    )
-    card_source_pack_mismatches = _card_source_pack_mismatches(
-        research_card_paths,
-        normalized_core_rows_by_id,
-        acquisition_rows,
-    )
+    card_acquisition_mismatches = _card_acquisition_count_mismatches(research_card_paths, normalized_core_rows_by_id, acquisition_rows)
+    card_source_pack_mismatches = _card_source_pack_mismatches(research_card_paths, normalized_core_rows_by_id, acquisition_rows)
     card_support_blockers = _card_primary_section_contains_support_row_blockers(research_card_paths, normalized_core_rows_by_id)
     card_upgrade_inconsistent = _card_upgrade_text_inconsistent_with_final_level(research_card_paths, normalized_core_rows_by_id)
     card_market_missing = _card_market_confirmation_missing_but_core_has_market_confirmation(research_card_paths, normalized_core_rows_by_id)
-    card_source_unknown = _card_latest_source_unknown_but_accepted_evidence_exists(
-        research_card_paths,
-        normalized_core_rows_by_id,
-        acquisition_rows,
-    )
+    card_source_unknown = _card_latest_source_unknown_but_accepted_evidence_exists(research_card_paths, normalized_core_rows_by_id, acquisition_rows)
+    _merge_context(ctx, locals())
+
+
+def _attach_artifact_conflict_context(ctx: SimpleNamespace) -> None:
+    acquisition_rows = ctx.acquisition_rows
+    alerts = ctx.alerts
+    core_rows = ctx.core_rows
+    daily_brief_path = ctx.daily_brief_path
+    delivery_rows = ctx.delivery_rows
+    fade_review_candidates = ctx.fade_review_candidates
+    incidents = ctx.incidents
+    integrated_candidates = ctx.integrated_candidates
+    integrated_delivery_path = ctx.integrated_delivery_path
+    integrated_manifest_path = ctx.integrated_manifest_path
+    integrated_outcomes_path = ctx.integrated_outcomes_path
+    integrated_source_coverage_json_path = ctx.integrated_source_coverage_json_path
+    market_anomalies = ctx.market_anomalies
+    namespace_dir = ctx.namespace_dir
+    official_exchange_candidates = ctx.official_exchange_candidates
+    protocol_fundamentals = ctx.protocol_fundamentals
+    research_card_paths = ctx.research_card_paths
+    scheduled_catalysts = ctx.scheduled_catalysts
+    source_coverage_report_path = ctx.source_coverage_report_path
+    runs = ctx.runs
+    feedback = ctx.feedback
+    outcomes = ctx.outcomes
+    hypotheses = ctx.hypotheses
+    watchlist = ctx.watchlist
+    derivatives_state = ctx.derivatives_state
+    dex_pool_state = ctx.dex_pool_state
+    dex_pool_anomalies = ctx.dex_pool_anomalies
+    unlock_candidates = ctx.unlock_candidates
     audit_impact_mismatch = 0
     audit_source_pack_mismatch = 0
     market_freshness_contradictions = sum(1 for row in core_rows if _core_row_has_market_freshness_contradiction(row))
     promoted_core_in_weak = _promoted_core_rows_that_are_weak(core_rows)
     core_route_conflicts = _core_route_conflicts_with_opportunity_level(core_rows)
-    live_confirmation_conflicts = _live_confirmation_conflicts(core_rows, profile=profile, artifact_namespace=artifact_namespace)
-    raw_core_conflicts = _raw_core_live_confirmation_conflicts(
-        core_rows,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-    )
+    live_confirmation_conflicts = _live_confirmation_conflicts(core_rows, profile=ctx.profile, artifact_namespace=ctx.artifact_namespace)
+    raw_core_conflicts = _raw_core_live_confirmation_conflicts(core_rows, profile=ctx.profile, artifact_namespace=ctx.artifact_namespace)
     opportunity_lane_conflicts = _opportunity_lane_conflicts(core_rows)
     market_anomaly_conflicts = _market_anomaly_artifact_conflicts(market_anomalies)
     official_exchange_conflicts = _official_exchange_artifact_conflicts(official_exchange_candidates)
     scheduled_conflicts = _scheduled_catalyst_artifact_conflicts((*scheduled_catalysts, *unlock_candidates))
     derivatives_conflicts = _derivatives_crowding_artifact_conflicts((*derivatives_state, *fade_review_candidates))
+    preview_path = (
+        Path(ctx.inspected_alert_store_path).parent / "event_alpha_notification_preview.md"
+        if ctx.inspected_alert_store_path is not None
+        else (
+            Path(source_coverage_report_path).parent / "event_alpha_notification_preview.md"
+            if source_coverage_report_path is not None
+            else None
+        )
+    )
     integrated_conflicts = _integrated_radar_artifact_conflicts(
         integrated_candidates,
         core_rows=core_rows,
@@ -331,40 +398,14 @@ def diagnose_artifacts(
         source_coverage_json_path=integrated_source_coverage_json_path,
         delivery_path=integrated_delivery_path,
         outcome_path=integrated_outcomes_path,
-        preview_path=(
-            Path(inspected_alert_store_path).parent / "event_alpha_notification_preview.md"
-            if inspected_alert_store_path is not None
-            else (
-                Path(source_coverage_report_path).parent / "event_alpha_notification_preview.md"
-                if source_coverage_report_path is not None
-                else None
-            )
-        ),
+        preview_path=preview_path,
     )
     namespace_status = event_alpha_namespace_status.load_namespace_status(namespace_dir)
     structured_path_conflicts = _structured_operator_path_conflicts(
-        (
-            *runs,
-            *alerts,
-            *feedback,
-            *outcomes,
-            *hypotheses,
-            *core_rows,
-            *watchlist,
-            *incidents,
-            *acquisition_rows,
-            *market_anomalies,
-            *official_exchange_candidates,
-            *scheduled_catalysts,
-            *unlock_candidates,
-            *derivatives_state,
-            *fade_review_candidates,
-            *dex_pool_state,
-            *dex_pool_anomalies,
-            *protocol_fundamentals,
-            *integrated_candidates,
-            *delivery_rows,
-        )
+        (*runs, *alerts, *feedback, *outcomes, *hypotheses, *core_rows, *watchlist, *incidents, *acquisition_rows,
+         *market_anomalies, *official_exchange_candidates, *scheduled_catalysts, *unlock_candidates, *derivatives_state,
+         *fade_review_candidates, *dex_pool_state, *dex_pool_anomalies, *protocol_fundamentals, *integrated_candidates,
+         *delivery_rows)
     )
     if namespace_dir is not None:
         structured_path_conflicts += _structured_operator_path_file_conflicts(namespace_dir)
@@ -397,10 +438,29 @@ def diagnose_artifacts(
         core_rows=core_rows,
         delivery_rows=[row for row in delivery_rows if isinstance(row, Mapping)],
         source_coverage_report_path=source_coverage_report_path,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
+        profile=ctx.profile,
+        artifact_namespace=ctx.artifact_namespace,
     )
     upgrade_high_priority = 0
+    _merge_context(ctx, locals())
+
+
+def _attach_notification_context(ctx: SimpleNamespace) -> None:
+    alerts = ctx.alerts
+    card_file_paths = ctx.card_file_paths
+    card_core_ids = ctx.card_core_ids
+    card_feedback_targets = ctx.card_feedback_targets
+    core_rows = ctx.core_rows
+    core_rows_by_id = ctx.core_rows_by_id
+    delivery_rows = ctx.delivery_rows
+    feedback = ctx.feedback
+    hypotheses = ctx.hypotheses
+    latest_run = ctx.latest_run
+    latest_run_id = ctx.latest_run_id
+    normalized_core_rows_by_id = ctx.normalized_core_rows_by_id
+    store_core_ids = ctx.store_core_ids
+    visible_core = ctx.visible_core
+    watchlist = ctx.watchlist
     fresh_visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids and _core_has_fresh_rows(item))
     fresh_visible_missing_targets = sum(
         1
@@ -416,16 +476,13 @@ def diagnose_artifacts(
         and not _alert_snapshot_is_diagnostic(row)
         and not _alert_has_feedback_target(row)
     )
-    diagnostic_snapshots_missing_feedback = sum(
-        1 for row in alerts
-        if _alert_snapshot_is_diagnostic(row) and not _alert_has_feedback_target(row)
-    )
+    diagnostic_snapshots_missing_feedback = sum(1 for row in alerts if _alert_snapshot_is_diagnostic(row) and not _alert_has_feedback_target(row))
     review_cards_dir = card_file_paths[0].parent if card_file_paths else None
     review_items = event_alpha_notification_inbox.build_event_alpha_review_items(
-        profile,
-        artifact_namespace,
+        ctx.profile,
+        ctx.artifact_namespace,
         include_diagnostics=True,
-        notification_runs=runs,
+        notification_runs=ctx.runs,
         alert_rows=alerts,
         feedback_rows=feedback,
         research_cards_dir=review_cards_dir,
@@ -433,20 +490,17 @@ def diagnose_artifacts(
         core_opportunity_rows=core_rows,
     )
     default_review_items = event_alpha_notification_inbox.build_event_alpha_review_items(
-        profile,
-        artifact_namespace,
+        ctx.profile,
+        ctx.artifact_namespace,
         include_diagnostics=False,
-        notification_runs=runs,
+        notification_runs=ctx.runs,
         alert_rows=alerts,
         feedback_rows=feedback,
         research_cards_dir=review_cards_dir,
         notification_delivery_rows=delivery_rows,
         core_opportunity_rows=core_rows,
     )
-    inbox_core_missing_card = sum(
-        1 for item in review_items
-        if not item.is_diagnostic and item.core_opportunity_id and not item.card_path
-    )
+    inbox_core_missing_card = sum(1 for item in review_items if not item.is_diagnostic and item.core_opportunity_id and not item.card_path)
     inbox_core_alert_target = sum(
         1 for item in review_items
         if not item.is_diagnostic
@@ -457,14 +511,15 @@ def diagnose_artifacts(
     )
     inbox_diag_visible_default = sum(1 for item in default_review_items if item.is_diagnostic)
     audit_primary_not_canonical = _audit_primary_snapshot_not_canonical_when_canonical_exists(alerts, store_core_ids)
-    doctor_check_context = SimpleNamespace(**locals())
-    doctor_integrated_radar_checks.apply_core_card_checks(doctor_check_context, blockers, warnings)
-    doctor_provider_readiness_checks.apply_structured_artifact_checks(doctor_check_context, blockers, warnings)
-    doctor_integrated_radar_checks.apply_integrated_artifact_checks(doctor_check_context, blockers, warnings)
-    doctor_path_checks.apply_integrated_path_checks(doctor_check_context, blockers, warnings)
-    doctor_source_coverage_checks.apply_checks(doctor_check_context, blockers, warnings)
-    doctor_provider_readiness_checks.apply_preflight_checks(doctor_check_context, blockers, warnings)
-    doctor_integrated_radar_checks.apply_identity_checks(doctor_check_context, blockers, warnings)
+    _merge_context(ctx, locals())
+    doctor_check_context = SimpleNamespace(**vars(ctx))
+    doctor_integrated_radar_checks.apply_core_card_checks(doctor_check_context, ctx.blockers, ctx.warnings)
+    doctor_provider_readiness_checks.apply_structured_artifact_checks(doctor_check_context, ctx.blockers, ctx.warnings)
+    doctor_integrated_radar_checks.apply_integrated_artifact_checks(doctor_check_context, ctx.blockers, ctx.warnings)
+    doctor_path_checks.apply_integrated_path_checks(doctor_check_context, ctx.blockers, ctx.warnings)
+    doctor_source_coverage_checks.apply_checks(doctor_check_context, ctx.blockers, ctx.warnings)
+    doctor_provider_readiness_checks.apply_preflight_checks(doctor_check_context, ctx.blockers, ctx.warnings)
+    doctor_integrated_radar_checks.apply_identity_checks(doctor_check_context, ctx.blockers, ctx.warnings)
     research_review_enabled_but_lane_missing = 0
     research_review_candidates_without_delivery = 0
     if latest_run:
@@ -474,9 +529,7 @@ def diagnose_artifacts(
         latest_lanes = {
             str(row.get("lane") or "")
             for row in delivery_rows
-            if isinstance(row, Mapping)
-            and latest_run_id
-            and str(row.get("run_id") or "") == str(latest_run_id)
+            if isinstance(row, Mapping) and latest_run_id and str(row.get("run_id") or "") == str(latest_run_id)
         }
         if rr_enabled and (rr_candidates or rr_would_send) and "research_review_digest" not in latest_lanes:
             research_review_enabled_but_lane_missing = 1
@@ -487,7 +540,7 @@ def diagnose_artifacts(
         delivery_rows=[row for row in delivery_rows if isinstance(row, Mapping)],
         core_rows_by_id=core_rows_by_id,
         latest_run_id=latest_run_id,
-        strict_scope=effective_delivery_scope,
+        strict_scope=ctx.effective_delivery_scope,
     )
     preview_conflicts = _notification_preview_consistency_conflicts(
         delivery_rows=[row for row in delivery_rows if isinstance(row, Mapping)],
@@ -495,12 +548,18 @@ def diagnose_artifacts(
         core_rows=core_rows,
         latest_run_id=latest_run_id,
     )
-    doctor_notification_checks.apply_checks(SimpleNamespace(**locals()), blockers, warnings)
-    quality = _quality_missing_summary(
-        hypotheses=hypotheses,
-        watchlist=watchlist,
-        alerts=alerts,
-    )
+    _merge_context(ctx, locals())
+    doctor_notification_checks.apply_checks(SimpleNamespace(**vars(ctx)), ctx.blockers, ctx.warnings)
+
+
+def _attach_quality_incident_context(ctx: SimpleNamespace) -> None:
+    alerts = ctx.alerts
+    core_rows = ctx.core_rows
+    hypotheses = ctx.hypotheses
+    incidents = ctx.incidents
+    runs = ctx.runs
+    watchlist = ctx.watchlist
+    quality = _quality_missing_summary(hypotheses=hypotheses, watchlist=watchlist, alerts=alerts)
     fresh_missing = (
         quality["fresh_hypothesis_rows_missing_top_level_quality"]
         + quality["fresh_watchlist_rows_missing_top_level_quality"]
@@ -514,544 +573,23 @@ def diagnose_artifacts(
     missing_final_route = _missing_final_route_rows(route_conflict_alerts)
     fresh_missing_final_route = _missing_final_route_rows(route_conflict_alerts, legacy=False)
     watchlist_conflicts = _watchlist_quality_state_conflicts(watchlist)
-    incident_linkage = _incident_linkage_summary(
-        hypotheses=hypotheses,
-        watchlist=watchlist,
-        alerts=alerts,
-        incidents=incidents,
-    )
-    doctor_outcome_checks.apply_checks(SimpleNamespace(**locals()), blockers, warnings)
-    if schema_result.schema_validation_errors:
-        warnings.append(
+    incident_linkage = _incident_linkage_summary(hypotheses=hypotheses, watchlist=watchlist, alerts=alerts, incidents=incidents)
+    _merge_context(ctx, locals())
+    doctor_outcome_checks.apply_checks(SimpleNamespace(**vars(ctx)), ctx.blockers, ctx.warnings)
+    if ctx.schema_result.schema_validation_errors:
+        ctx.warnings.append(
             check_registry.format_check_message(
                 "schema.validation_errors",
-                f"schema_validation_errors={schema_result.schema_validation_errors}",
+                f"schema_validation_errors={ctx.schema_result.schema_validation_errors}",
             )
         )
     if incident_linkage["invalid_canonical_incident_rows"]:
         message = f"invalid_canonical_incident_rows={incident_linkage['invalid_canonical_incident_rows']}"
-        (blockers if strict else warnings).append(message)
+        (ctx.blockers if ctx.strict else ctx.warnings).append(message)
     consistency_phase = consistency_doctor.ConsistencyDoctorResult()
-    blockers.extend(consistency_phase.blockers)
-    warnings.extend(consistency_phase.warnings)
-    status = "BLOCKED" if blockers else ("WARN" if warnings else "OK")
-    return EventAlphaArtifactDoctorResult(
-        status=status,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        run_rows=len(runs),
-        alert_rows=len(alerts),
-        feedback_rows=len(feedback),
-        outcome_rows=len(outcomes),
-        card_files=card_count,
-        research_card_files=card_count,
-        research_card_index_present=index_present,
-        cards_missing_lineage=cards_missing_lineage,
-        cards_missing_feedback_target=cards_missing_feedback_target,
-        visible_core_opportunities=len(visible_core),
-        core_opportunity_store_rows=len(core_rows),
-        visible_core_opportunities_missing_store_rows=visible_missing_store_rows,
-        duplicate_core_opportunity_store_rows=duplicate_store_rows,
-        core_opportunity_store_rows_missing_card_path=store_rows_missing_card_path,
-        visible_core_opportunities_missing_cards=visible_missing_cards,
-        visible_core_opportunities_missing_feedback_targets=visible_missing_targets,
-        alert_snapshots_missing_core_opportunity_id=snapshots_missing_core,
-        alert_snapshots_missing_feedback_target=snapshots_missing_feedback,
-        core_cards_missing_store_row=core_cards_missing_store,
-        visible_core_cards_missing_store_row=visible_core_cards_missing_store,
-        orphan_core_opportunity_cards=orphan_core_cards,
-        diagnostic_snapshots_with_fake_core_id=diagnostic_fake_core,
-        alert_snapshots_core_id_missing_from_store=snapshot_core_missing_store,
-        evidence_acquisition_core_id_missing_from_store=acquisition_core_missing_store,
-        card_primary_fields_mismatch_core_store=card_primary_mismatches,
-        card_evidence_acquisition_count_mismatch=card_acquisition_mismatches,
-        evidence_acquisition_stale_validated_digest=acquisition_final_conflicts["evidence_acquisition_stale_validated_digest"],
-        card_source_pack_mismatch_core_acquisition=card_source_pack_mismatches,
-        card_primary_section_contains_support_row_blockers=card_support_blockers,
-        card_upgrade_text_inconsistent_with_final_level=card_upgrade_inconsistent,
-        audit_primary_impact_path_mismatch_core=audit_impact_mismatch,
-        audit_source_pack_mismatch_core=audit_source_pack_mismatch,
-        card_market_confirmation_missing_but_core_has_market_confirmation=card_market_missing,
-        card_latest_source_unknown_but_accepted_evidence_exists=card_source_unknown,
-        quality_review_promoted_core_in_weak_section=promoted_core_in_weak,
-        market_freshness_contradictory_summary=market_freshness_contradictions,
-        quality_review_market_freshness_contradiction=market_freshness_contradictions,
-        upgrade_candidates_include_high_priority=upgrade_high_priority,
-        daily_brief_card_group_mismatch_with_index=card_group_mismatches,
-        daily_brief_missing_selected_run=daily_brief_conflicts["daily_brief_missing_selected_run"],
-        daily_brief_selected_run_mismatch=daily_brief_conflicts["daily_brief_selected_run_mismatch"],
-        daily_brief_core_count_mismatch_store=daily_brief_conflicts["daily_brief_core_count_mismatch_store"],
-        daily_brief_research_review_lane_missing=daily_brief_conflicts["daily_brief_research_review_lane_missing"],
-        daily_brief_source_coverage_path_missing=daily_brief_conflicts["daily_brief_source_coverage_path_missing"],
-        daily_brief_coinalyze_source_coverage_mismatch=daily_brief_conflicts[
-            "daily_brief_coinalyze_source_coverage_mismatch"
-        ],
-        core_route_conflicts_with_opportunity_level=core_route_conflicts,
-        live_validated_without_confirmation=live_confirmation_conflicts["live_validated_without_confirmation"],
-        live_sector_digest_without_asset=live_confirmation_conflicts["live_sector_digest_without_asset"],
-        live_rejected_results_promoted=live_confirmation_conflicts["live_rejected_results_promoted"],
-        live_skipped_budget_promoted=live_confirmation_conflicts["live_skipped_budget_promoted"],
-        raw_core_validated_without_confirmation=raw_core_conflicts["raw_core_validated_without_confirmation"],
-        raw_core_source_only_narrative_validated=raw_core_conflicts["raw_core_source_only_narrative_validated"],
-        raw_core_cryptopanic_tag_only_direct_path_confirmed=raw_core_conflicts["raw_core_cryptopanic_tag_only_direct_path_confirmed"],
-        raw_core_suppressed_duplicate_validated_stale=raw_core_conflicts["raw_core_suppressed_duplicate_validated_stale"],
-        confirmed_long_without_source_market=opportunity_lane_conflicts["confirmed_long_without_source_market"],
-        fade_short_without_crowding_exhaustion=opportunity_lane_conflicts["fade_short_without_crowding_exhaustion"],
-        early_long_without_fresh_strong_source=opportunity_lane_conflicts["early_long_without_fresh_strong_source"],
-        risk_only_missing_evidence_only=opportunity_lane_conflicts["risk_only_missing_evidence_only"],
-        cryptopanic_only_narrative_confirmed_lane=opportunity_lane_conflicts["cryptopanic_only_narrative_confirmed_lane"],
-        diagnostic_visible_default_operator_lane=opportunity_lane_conflicts["diagnostic_visible_default_operator_lane"],
-        core_missing_market_state_snapshot=opportunity_lane_conflicts["core_missing_market_state_snapshot"],
-        market_state_return_unit_missing=opportunity_lane_conflicts["market_state_return_unit_missing"],
-        market_state_possible_double_scaled=opportunity_lane_conflicts["market_state_possible_double_scaled"],
-        market_state_lane_possible_double_scaled=opportunity_lane_conflicts["market_state_lane_possible_double_scaled"],
-        market_anomaly_rows=len(market_anomalies),
-        market_anomaly_missing_market_state_snapshot=market_anomaly_conflicts["market_anomaly_missing_market_state_snapshot"],
-        market_anomaly_missing_market_state_class=market_anomaly_conflicts["market_anomaly_missing_market_state_class"],
-        market_anomaly_confirmed_breakout_missing_evidence=market_anomaly_conflicts["market_anomaly_confirmed_breakout_missing_evidence"],
-        market_anomaly_suspicious_illiquid_promoted_confirmed=market_anomaly_conflicts["market_anomaly_suspicious_illiquid_promoted_confirmed"],
-        market_anomaly_created_alert_rows=market_anomaly_conflicts["market_anomaly_created_alert_rows"],
-        market_anomaly_missing_freshness_status=market_anomaly_conflicts["market_anomaly_missing_freshness_status"],
-        market_anomaly_needs_search_without_plan=market_anomaly_conflicts["market_anomaly_needs_search_without_plan"],
-        official_exchange_candidate_rows=len(official_exchange_candidates),
-        official_exchange_candidate_missing_source_fields=official_exchange_conflicts["official_exchange_candidate_missing_source_fields"],
-        official_exchange_listing_without_official_source=official_exchange_conflicts["official_exchange_listing_without_official_source"],
-        official_exchange_secret_leak=official_exchange_conflicts["official_exchange_secret_leak"],
-        official_exchange_delisting_long_research=official_exchange_conflicts["official_exchange_delisting_long_research"],
-        official_exchange_quote_asset_misclassified=official_exchange_conflicts["official_exchange_quote_asset_misclassified"],
-        official_exchange_major_pair_noise_promoted_early_long=official_exchange_conflicts[
-            "official_exchange_major_pair_noise_promoted_early_long"
-        ],
-        official_exchange_created_alert_rows=official_exchange_conflicts["official_exchange_created_alert_rows"],
-        official_exchange_activation_missing_shared_schema=official_exchange_activation_conflicts[
-            "official_exchange_activation_missing_shared_schema"
-        ],
-        official_exchange_activation_live_without_ledger=official_exchange_activation_conflicts[
-            "official_exchange_activation_live_without_ledger"
-        ],
-        official_exchange_activation_signed_listener_secret_leak=official_exchange_activation_conflicts[
-            "official_exchange_activation_signed_listener_secret_leak"
-        ],
-        official_exchange_activation_forbidden_side_effect_claim=official_exchange_activation_conflicts[
-            "official_exchange_activation_forbidden_side_effect_claim"
-        ],
-        instrument_resolution_missing_canonical_id_when_fixture_has_it=instrument_resolution_conflicts[
-            "instrument_resolution_missing_canonical_id_when_fixture_has_it"
-        ],
-        instrument_resolution_quote_asset_misclassified=instrument_resolution_conflicts[
-            "instrument_resolution_quote_asset_misclassified"
-        ],
-        instrument_resolution_sector_visible_as_tradable=instrument_resolution_conflicts[
-            "instrument_resolution_sector_visible_as_tradable"
-        ],
-        instrument_resolution_coinalyze_symbol_unlinked=instrument_resolution_conflicts[
-            "instrument_resolution_coinalyze_symbol_unlinked"
-        ],
-        scheduled_catalyst_rows=len(scheduled_catalysts),
-        unlock_candidate_rows=len(unlock_candidates),
-        derivatives_state_rows=len(derivatives_state),
-        fade_review_candidate_rows=len(fade_review_candidates),
-        dex_pool_state_rows=len(dex_pool_state),
-        dex_pool_anomaly_rows=len(dex_pool_anomalies),
-        protocol_fundamental_rows=len(protocol_fundamentals),
-        unlock_without_structured_evidence=scheduled_conflicts["unlock_without_structured_evidence"],
-        unlock_missing_event_time=scheduled_conflicts["unlock_missing_event_time"],
-        unlock_promoted_without_size_metrics=scheduled_conflicts["unlock_promoted_without_size_metrics"],
-        media_unlock_promoted_structured=scheduled_conflicts["media_unlock_promoted_structured"],
-        stale_completed_catalyst_upcoming=scheduled_conflicts["stale_completed_catalyst_upcoming"],
-        calendar_event_missing_source_url=scheduled_conflicts["calendar_event_missing_source_url"],
-        cryptopanic_unlock_proof=scheduled_conflicts["cryptopanic_unlock_proof"],
-        scheduled_catalyst_created_alert_rows=scheduled_conflicts["scheduled_catalyst_created_alert_rows"],
-        fade_review_without_completed_move=derivatives_conflicts["fade_review_without_completed_move"],
-        fade_review_without_crowding_exhaustion=derivatives_conflicts["fade_review_without_crowding_exhaustion"],
-        fade_review_created_triggered_fade=derivatives_conflicts["fade_review_created_triggered_fade"],
-        fade_review_created_normal_rsi_signal=derivatives_conflicts["fade_review_created_normal_rsi_signal"],
-        fade_review_notification_missing_disclaimer=derivatives_conflicts["fade_review_notification_missing_disclaimer"],
-        derivatives_artifact_secret_leak=derivatives_conflicts["derivatives_artifact_secret_leak"],
-        derivatives_state_missing_freshness_status=derivatives_conflicts["derivatives_state_missing_freshness_status"],
-        derivatives_metric_claim_implemented_missing=derivatives_conflicts["derivatives_metric_claim_implemented_missing"],
-        derivatives_unit_metadata_missing=derivatives_conflicts["derivatives_unit_metadata_missing"],
-        stale_derivatives_snapshot_promoted_fade_review=derivatives_conflicts["stale_derivatives_snapshot_promoted_fade_review"],
-        confirmed_long_crowded_without_warning=derivatives_conflicts["confirmed_long_crowded_without_warning"],
-        integrated_radar_candidate_rows=len(integrated_candidates),
-        integrated_candidate_missing_opportunity_type=integrated_conflicts["integrated_candidate_missing_opportunity_type"],
-        integrated_candidate_missing_market_state_snapshot=integrated_conflicts["integrated_candidate_missing_market_state_snapshot"],
-        integrated_confirmed_long_without_source_market=integrated_conflicts["integrated_confirmed_long_without_source_market"],
-        integrated_early_long_without_fresh_strong_source=integrated_conflicts["integrated_early_long_without_fresh_strong_source"],
-        integrated_fade_without_crowding_exhaustion=integrated_conflicts["integrated_fade_without_crowding_exhaustion"],
-        integrated_risk_without_evidence=integrated_conflicts["integrated_risk_without_evidence"],
-        integrated_market_anomaly_confirmed=integrated_conflicts["integrated_market_anomaly_confirmed"],
-        integrated_cryptopanic_confirmed=integrated_conflicts["integrated_cryptopanic_confirmed"],
-        integrated_major_pair_early_long=integrated_conflicts["integrated_major_pair_early_long"],
-        integrated_input_manifest_missing=integrated_conflicts["integrated_input_manifest_missing"],
-        integrated_source_coverage_json_missing=integrated_conflicts["integrated_source_coverage_json_missing"],
-        integrated_candidate_core_missing=integrated_conflicts["integrated_candidate_core_missing"],
-        integrated_candidate_core_opportunity_type_mismatch=integrated_conflicts["integrated_candidate_core_opportunity_type_mismatch"],
-        integrated_candidate_core_market_state_mismatch=integrated_conflicts["integrated_candidate_core_market_state_mismatch"],
-        integrated_candidate_core_route_level_mismatch=integrated_conflicts["integrated_candidate_core_route_level_mismatch"],
-        integrated_candidate_core_reason_code_loss=integrated_conflicts["integrated_candidate_core_reason_code_loss"],
-        integrated_candidate_core_source_url_loss=integrated_conflicts["integrated_candidate_core_source_url_loss"],
-        integrated_candidate_core_official_event_loss=integrated_conflicts["integrated_candidate_core_official_event_loss"],
-        integrated_candidate_core_scheduled_event_loss=integrated_conflicts["integrated_candidate_core_scheduled_event_loss"],
-        integrated_candidate_core_unlock_event_loss=integrated_conflicts["integrated_candidate_core_unlock_event_loss"],
-        integrated_candidate_core_derivatives_loss=integrated_conflicts["integrated_candidate_core_derivatives_loss"],
-        integrated_candidate_card_opportunity_type_mismatch=integrated_conflicts["integrated_candidate_card_opportunity_type_mismatch"],
-        integrated_candidate_card_why_now_mismatch=integrated_conflicts["integrated_candidate_card_why_now_mismatch"],
-        integrated_major_pair_card_early_long=integrated_conflicts["integrated_major_pair_card_early_long"],
-        integrated_card_generic_lane_override=integrated_conflicts["integrated_card_generic_lane_override"],
-        card_opportunity_lane_core_mismatch=integrated_conflicts["card_opportunity_lane_core_mismatch"],
-        integrated_candidate_card_official_event_missing=integrated_conflicts["integrated_candidate_card_official_event_missing"],
-        integrated_candidate_card_source_url_missing=integrated_conflicts["integrated_candidate_card_source_url_missing"],
-        integrated_candidate_core_crowding_metadata_loss=integrated_conflicts["integrated_candidate_core_crowding_metadata_loss"],
-        derivatives_card_metric_claim_without_data=integrated_conflicts["derivatives_card_metric_claim_without_data"],
-        integrated_coinalyze_crowding_card_missing=integrated_conflicts["integrated_coinalyze_crowding_card_missing"],
-        integrated_coinalyze_loaded_no_rows_attached=integrated_conflicts["integrated_coinalyze_loaded_no_rows_attached"],
-        integrated_coinalyze_missing_skip_reason=integrated_conflicts["integrated_coinalyze_missing_skip_reason"],
-        integrated_coinalyze_stale_loaded_without_warning=integrated_conflicts["integrated_coinalyze_stale_loaded_without_warning"],
-        integrated_coinalyze_loaded_from_stale_namespace=integrated_conflicts["integrated_coinalyze_loaded_from_stale_namespace"],
-        integrated_fade_card_crowding_unknown=integrated_conflicts["integrated_fade_card_crowding_unknown"],
-        integrated_fade_card_missing_disclaimer=integrated_conflicts["integrated_fade_card_missing_disclaimer"],
-        integrated_confirmed_long_crowding_warning_hidden=integrated_conflicts["integrated_confirmed_long_crowding_warning_hidden"],
-        integrated_dex_low_liquidity_promoted_confirmed=integrated_conflicts[
-            "integrated_dex_low_liquidity_promoted_confirmed"
-        ],
-        integrated_market_confirmation_display_contradiction=integrated_conflicts["integrated_market_confirmation_display_contradiction"],
-        integrated_derivatives_display_contradiction=integrated_conflicts["integrated_derivatives_display_contradiction"],
-        integrated_manifest_mixed_timestamp_pair=integrated_conflicts["integrated_manifest_mixed_timestamp_pair"],
-        integrated_core_silent_upgrade=integrated_conflicts["integrated_core_silent_upgrade"],
-        integrated_diagnostic_visible_in_default_operator_section=integrated_conflicts["integrated_diagnostic_visible_in_default_operator_section"],
-        integrated_preview_missing_disclaimer=integrated_conflicts["integrated_preview_missing_disclaimer"],
-        integrated_delivery_ledger_missing=integrated_conflicts["integrated_delivery_ledger_missing"],
-        integrated_preview_lane_mismatch=integrated_conflicts["integrated_preview_lane_mismatch"],
-        integrated_delivery_missing_disclaimer=integrated_conflicts["integrated_delivery_missing_disclaimer"],
-        integrated_delivery_sent_in_no_send=integrated_conflicts["integrated_delivery_sent_in_no_send"],
-        integrated_delivery_side_effect_flag=integrated_conflicts["integrated_delivery_side_effect_flag"],
-        integrated_delivery_missing_skip_reasons=integrated_conflicts["integrated_delivery_missing_skip_reasons"],
-        integrated_delivery_card_path_absolute=integrated_conflicts["integrated_delivery_card_path_absolute"],
-        integrated_delivery_card_path_not_rendered=integrated_conflicts["integrated_delivery_card_path_not_rendered"],
-        integrated_operator_markdown_absolute_path=integrated_conflicts["integrated_operator_markdown_absolute_path"],
-        operator_structured_path_absolute=integrated_conflicts["operator_structured_path_absolute"],
-        integrated_legacy_preview_alerts_wording=integrated_conflicts["integrated_legacy_preview_alerts_wording"],
-        integrated_manifest_daily_brief_unavailable=integrated_conflicts["integrated_manifest_daily_brief_unavailable"],
-        integrated_outcome_missing_for_candidate=integrated_conflicts["integrated_outcome_missing_for_candidate"],
-        integrated_outcome_side_effect_flag=integrated_conflicts["integrated_outcome_side_effect_flag"],
-        integrated_outcome_schema_missing=integrated_conflicts["integrated_outcome_schema_missing"],
-        integrated_outcome_missing_identity=integrated_conflicts["integrated_outcome_missing_identity"],
-        integrated_outcome_returns_without_price=integrated_conflicts["integrated_outcome_returns_without_price"],
-        integrated_outcome_diagnostic_in_performance=integrated_conflicts["integrated_outcome_diagnostic_in_performance"],
-        integrated_calibration_diagnostic_in_main_priors=integrated_conflicts["integrated_calibration_diagnostic_in_main_priors"],
-        integrated_calibration_prior_safety_missing=integrated_conflicts["integrated_calibration_prior_safety_missing"],
-        integrated_calibration_legacy_alias_top_level=integrated_conflicts["integrated_calibration_legacy_alias_top_level"],
-        integrated_outcome_return_double_scaled=integrated_conflicts["integrated_outcome_return_double_scaled"],
-        integrated_outcome_missing_data_unlabeled=integrated_conflicts["integrated_outcome_missing_data_unlabeled"],
-        integrated_outcome_thesis_move_missing=integrated_conflicts["integrated_outcome_thesis_move_missing"],
-        integrated_outcome_card_thesis_interpretation_missing=integrated_conflicts[
-            "integrated_outcome_card_thesis_interpretation_missing"
-        ],
-        integrated_outcome_card_trade_wording=integrated_conflicts["integrated_outcome_card_trade_wording"],
-        integrated_performance_diagnostic_in_main_aggregate=integrated_conflicts[
-            "integrated_performance_diagnostic_in_main_aggregate"
-        ],
-        integrated_performance_auto_apply_enabled=integrated_conflicts["integrated_performance_auto_apply_enabled"],
-        integrated_performance_low_sample_missing_warning=integrated_conflicts[
-            "integrated_performance_low_sample_missing_warning"
-        ],
-        integrated_performance_trade_pnl_wording=integrated_conflicts["integrated_performance_trade_pnl_wording"],
-        integrated_created_normal_rsi_signal=integrated_conflicts["integrated_created_normal_rsi_signal"],
-        integrated_created_triggered_fade=integrated_conflicts["integrated_created_triggered_fade"],
-        source_coverage_report_missing=source_coverage_report_conflicts["source_coverage_report_missing"],
-        source_coverage_provider_status_unknown=source_coverage_report_conflicts["source_coverage_provider_status_unknown"],
-        source_coverage_provider_marked_healthy_without_observation=source_coverage_report_conflicts["source_coverage_provider_marked_healthy_without_observation"],
-        source_coverage_category_priority_missing=source_coverage_report_conflicts[
-            "source_coverage_category_priority_missing"
-        ],
-        source_coverage_readiness_link_missing=source_coverage_report_conflicts[
-            "source_coverage_readiness_link_missing"
-        ],
-        source_coverage_context_provider_ranked_above_lane_critical=source_coverage_report_conflicts[
-            "source_coverage_context_provider_ranked_above_lane_critical"
-        ],
-        source_coverage_coinalyze_missing_linked_artifact=source_coverage_report_conflicts[
-            "source_coverage_coinalyze_missing_linked_artifact"
-        ],
-        source_coverage_bybit_announcements_missing_linked_artifact=source_coverage_report_conflicts[
-            "source_coverage_bybit_announcements_missing_linked_artifact"
-        ],
-        source_coverage_unlock_calendar_missing_linked_artifact=source_coverage_report_conflicts[
-            "source_coverage_unlock_calendar_missing_linked_artifact"
-        ],
-        source_coverage_dex_onchain_missing_linked_artifact=source_coverage_report_conflicts[
-            "source_coverage_dex_onchain_missing_linked_artifact"
-        ],
-        live_provider_readiness_missing=live_provider_readiness_conflicts["live_provider_readiness_missing"],
-        live_provider_readiness_secret_leak=live_provider_readiness_conflicts["live_provider_readiness_secret_leak"],
-        live_provider_readiness_live_calls_allowed_in_smoke=live_provider_readiness_conflicts[
-            "live_provider_readiness_live_calls_allowed_in_smoke"
-        ],
-        live_provider_readiness_configured_missing_env=live_provider_readiness_conflicts[
-            "live_provider_readiness_configured_missing_env"
-        ],
-        coinalyze_preflight_secret_leak=coinalyze_preflight_conflicts["coinalyze_preflight_secret_leak"],
-        coinalyze_preflight_live_call_allowed_in_smoke=coinalyze_preflight_conflicts[
-            "coinalyze_preflight_live_call_allowed_in_smoke"
-        ],
-        coinalyze_preflight_configured_missing_env=coinalyze_preflight_conflicts[
-            "coinalyze_preflight_configured_missing_env"
-        ],
-        coinalyze_preflight_ready_without_request_ledger=coinalyze_preflight_conflicts[
-            "coinalyze_preflight_ready_without_request_ledger"
-        ],
-        coinalyze_preflight_missing_fixture_parser_status=coinalyze_preflight_conflicts[
-            "coinalyze_preflight_missing_fixture_parser_status"
-        ],
-        coinalyze_preflight_forbidden_side_effect_claim=coinalyze_preflight_conflicts[
-            "coinalyze_preflight_forbidden_side_effect_claim"
-        ],
-        coinalyze_rehearsal_secret_leak=coinalyze_preflight_conflicts["coinalyze_rehearsal_secret_leak"],
-        coinalyze_rehearsal_live_without_ledger=coinalyze_preflight_conflicts[
-            "coinalyze_rehearsal_live_without_ledger"
-        ],
-        coinalyze_rehearsal_live_call_allowed_in_smoke=coinalyze_preflight_conflicts[
-            "coinalyze_rehearsal_live_call_allowed_in_smoke"
-        ],
-        coinalyze_rehearsal_live_without_explicit_allow=coinalyze_preflight_conflicts[
-            "coinalyze_rehearsal_live_without_explicit_allow"
-        ],
-        coinalyze_rehearsal_request_budget_exceeded=coinalyze_preflight_conflicts[
-            "coinalyze_rehearsal_request_budget_exceeded"
-        ],
-        coinalyze_rehearsal_success_without_derivatives_state=coinalyze_preflight_conflicts[
-            "coinalyze_rehearsal_success_without_derivatives_state"
-        ],
-        coinalyze_rehearsal_success_without_crowding_candidates=coinalyze_preflight_conflicts[
-            "coinalyze_rehearsal_success_without_crowding_candidates"
-        ],
-        coinalyze_provider_health_healthy_without_successful_ledger=coinalyze_preflight_conflicts[
-            "coinalyze_provider_health_healthy_without_successful_ledger"
-        ],
-        coinalyze_rehearsal_forbidden_side_effect_claim=coinalyze_preflight_conflicts[
-            "coinalyze_rehearsal_forbidden_side_effect_claim"
-        ],
-        coinalyze_supported_metric_implemented_missing_state=coinalyze_preflight_conflicts[
-            "coinalyze_supported_metric_implemented_missing_state"
-        ],
-        bybit_announcements_preflight_secret_leak=bybit_announcements_conflicts[
-            "bybit_announcements_preflight_secret_leak"
-        ],
-        bybit_announcements_preflight_live_call_allowed_in_smoke=bybit_announcements_conflicts[
-            "bybit_announcements_preflight_live_call_allowed_in_smoke"
-        ],
-        bybit_announcements_preflight_missing_fixture_parser_status=bybit_announcements_conflicts[
-            "bybit_announcements_preflight_missing_fixture_parser_status"
-        ],
-        bybit_announcements_rehearsal_secret_leak=bybit_announcements_conflicts[
-            "bybit_announcements_rehearsal_secret_leak"
-        ],
-        bybit_announcements_rehearsal_live_without_ledger=bybit_announcements_conflicts[
-            "bybit_announcements_rehearsal_live_without_ledger"
-        ],
-        bybit_announcements_rehearsal_live_without_explicit_allow=bybit_announcements_conflicts[
-            "bybit_announcements_rehearsal_live_without_explicit_allow"
-        ],
-        bybit_announcements_rehearsal_unsupported_params=bybit_announcements_conflicts[
-            "bybit_announcements_rehearsal_unsupported_params"
-        ],
-        bybit_announcements_rehearsal_forbidden_side_effect_claim=bybit_announcements_conflicts[
-            "bybit_announcements_rehearsal_forbidden_side_effect_claim"
-        ],
-        unlock_calendar_preflight_secret_leak=unlock_calendar_conflicts[
-            "unlock_calendar_preflight_secret_leak"
-        ],
-        unlock_calendar_preflight_live_without_ledger=unlock_calendar_conflicts[
-            "unlock_calendar_preflight_live_without_ledger"
-        ],
-        unlock_calendar_preflight_live_call_allowed_in_smoke=unlock_calendar_conflicts[
-            "unlock_calendar_preflight_live_call_allowed_in_smoke"
-        ],
-        unlock_calendar_preflight_missing_fixture_parser_status=unlock_calendar_conflicts[
-            "unlock_calendar_preflight_missing_fixture_parser_status"
-        ],
-        unlock_calendar_preflight_forbidden_side_effect_claim=unlock_calendar_conflicts[
-            "unlock_calendar_preflight_forbidden_side_effect_claim"
-        ],
-        dex_onchain_readiness_secret_leak=dex_onchain_conflicts["dex_onchain_readiness_secret_leak"],
-        dex_onchain_live_without_ledger=dex_onchain_conflicts["dex_onchain_live_without_ledger"],
-        dex_onchain_live_call_allowed_in_smoke=dex_onchain_conflicts["dex_onchain_live_call_allowed_in_smoke"],
-        dex_onchain_missing_fixture_parser_status=dex_onchain_conflicts["dex_onchain_missing_fixture_parser_status"],
-        dex_onchain_forbidden_side_effect_claim=dex_onchain_conflicts["dex_onchain_forbidden_side_effect_claim"],
-        dex_low_liquidity_promoted_confirmed=dex_onchain_conflicts["dex_low_liquidity_promoted_confirmed"],
-        protocol_metric_missing_source_time=dex_onchain_conflicts["protocol_metric_missing_source_time"],
-        source_pack_provider_status_missing=source_coverage_conflicts["source_pack_provider_status_missing"],
-        missing_provider_recommendations_missing=source_coverage_conflicts["missing_provider_recommendations_missing"],
-        degraded_provider_absence_marked_meaningful=source_coverage_conflicts["degraded_provider_absence_marked_meaningful"],
-        cryptopanic_configured_but_not_observed=cryptopanic_conflicts["cryptopanic_configured_but_not_observed"],
-        cryptopanic_used_but_no_source_coverage_entry=cryptopanic_conflicts["cryptopanic_used_but_no_source_coverage_entry"],
-        cryptopanic_accepted_evidence_missing_from_card=cryptopanic_conflicts["cryptopanic_accepted_evidence_missing_from_card"],
-        cryptopanic_rejected_only_promoted=cryptopanic_conflicts["cryptopanic_rejected_only_promoted"],
-        cryptopanic_token_printed_or_unredacted=cryptopanic_conflicts["cryptopanic_token_printed_or_unredacted"],
-        cryptopanic_growth_unsupported_param_used=cryptopanic_conflicts["cryptopanic_growth_unsupported_param_used"],
-        cryptopanic_duplicate_request_key=cryptopanic_conflicts["cryptopanic_duplicate_request_key"],
-        cryptopanic_invalid_currency_code=cryptopanic_conflicts["cryptopanic_invalid_currency_code"],
-        cryptopanic_empty_currency_request=cryptopanic_conflicts["cryptopanic_empty_currency_request"],
-        cryptopanic_coin_id_sent_as_currency=cryptopanic_conflicts["cryptopanic_coin_id_sent_as_currency"],
-        cryptopanic_all_requests_failed=cryptopanic_conflicts["cryptopanic_all_requests_failed"],
-        cryptopanic_json_parse_errors=cryptopanic_conflicts["cryptopanic_json_parse_errors"],
-        cryptopanic_configured_but_unusable=cryptopanic_conflicts["cryptopanic_configured_but_unusable"],
-        cryptopanic_status_code_missing_on_http_failure=cryptopanic_conflicts["cryptopanic_status_code_missing_on_http_failure"],
-        cryptopanic_body_excerpt_unredacted_token=cryptopanic_conflicts["cryptopanic_body_excerpt_unredacted_token"],
-        cryptopanic_quota_exceeded=cryptopanic_conflicts["cryptopanic_quota_exceeded"],
-        cryptopanic_request_ledger_missing_when_used=cryptopanic_conflicts["cryptopanic_request_ledger_missing_when_used"],
-        cryptopanic_success_with_backoff_status=cryptopanic_conflicts["cryptopanic_success_with_backoff_status"],
-        cryptopanic_restore_token_recommendation_when_configured=cryptopanic_conflicts[
-            "cryptopanic_restore_token_recommendation_when_configured"
-        ],
-        evidence_count_mismatch=evidence_count_mismatches,
-        unconfirmed_narrative_daily_digest=delivery_conflicts["unconfirmed_narrative_daily_digest"],
-        single_source_no_market_fan_token_digest=delivery_conflicts["single_source_no_market_fan_token_digest"],
-        visible_sector_core_without_config=visible_sector_cores,
-        duplicate_proxy_core_rows=duplicate_proxy_cores,
-        runs_with_matching_snapshots=matching_snapshot_runs,
-        runs_with_missing_snapshots=missing_snapshot_runs,
-        runs_with_external_snapshot_paths=external_snapshot_runs,
-        legacy_rows_skipped=0 if include_legacy_artifacts else raw_legacy,
-        legacy_rows_counted=sum(
-            1 for row in (*runs, *alerts, *feedback, *outcomes)
-            if event_alpha_artifacts.is_legacy_row(row)
-        ),
-        delivery_rows=delivery_summary.rows,
-        latest_run_id=latest_run_id,
-        latest_run_delivery_rows=delivery_conflicts["latest_run_delivery_rows"],
-        legacy_delivery_rows=delivery_conflicts["legacy_delivery_rows"],
-        stale_delivery_rows=delivery_conflicts["stale_delivery_rows"],
-        delivery_strict_scope=effective_delivery_scope,
-        deliveries_partial_delivered=delivery_summary.partial_delivered,
-        deliveries_failed=delivery_summary.failed,
-        delivery_status_missing=delivery_conflicts["delivery_status_missing"],
-        delivery_status_detail_missing=delivery_conflicts["delivery_status_detail_missing"],
-        delivery_mode_missing=delivery_conflicts["delivery_mode_missing"],
-        delivery_state_inconsistent=delivery_conflicts["delivery_state_inconsistent"],
-        delivery_would_send_sent_failed_inconsistent=delivery_conflicts["delivery_would_send_sent_failed_inconsistent"],
-        delivery_identity_mismatch_core_store=delivery_conflicts["delivery_identity_mismatch_core_store"],
-        delivery_core_id_missing=delivery_conflicts["delivery_core_id_missing"],
-        legacy_pre_core_delivery_identity=delivery_conflicts["legacy_pre_core_delivery_identity"],
-        stale_delivery_identity_missing_core=delivery_conflicts["stale_delivery_identity_missing_core"],
-        delivery_feedback_target_missing=delivery_conflicts["delivery_feedback_target_missing"],
-        delivery_card_path_missing=delivery_conflicts["delivery_card_path_missing"],
-        delivery_alert_id_not_canonical=delivery_conflicts["delivery_alert_id_not_canonical"],
-        telegram_message_contains_absolute_path=delivery_conflicts["telegram_message_contains_absolute_path"],
-        telegram_message_contains_raw_debug_dump=delivery_conflicts["telegram_message_contains_raw_debug_dump"],
-        research_review_digest_missing_confirmation_label=delivery_conflicts["research_review_digest_missing_confirmation_label"],
-        research_review_digest_contains_strict_alertable=delivery_conflicts["research_review_digest_contains_strict_alertable"],
-        research_review_digest_contains_hard_gated_candidate=delivery_conflicts["research_review_digest_contains_hard_gated_candidate"],
-        research_review_digest_too_many_items=delivery_conflicts["research_review_digest_too_many_items"],
-        research_review_digest_missing_feedback_target=delivery_conflicts["research_review_digest_missing_feedback_target"],
-        research_review_digest_skipped_without_reason=delivery_conflicts["research_review_digest_skipped_without_reason"],
-        research_review_digest_missing_family_summary=delivery_conflicts["research_review_digest_missing_family_summary"],
-        research_review_digest_duplicate_visible_family_summary=delivery_conflicts[
-            "research_review_digest_duplicate_visible_family_summary"
-        ],
-        research_review_digest_absolute_path=delivery_conflicts["research_review_digest_absolute_path"],
-        notification_body_card_mismatch_canonical=delivery_conflicts["notification_body_card_mismatch_canonical"],
-        notification_body_feedback_mismatch_canonical=delivery_conflicts["notification_body_feedback_mismatch_canonical"],
-        research_review_body_uses_hypothesis_target_when_core_exists=delivery_conflicts["research_review_body_uses_hypothesis_target_when_core_exists"],
-        research_review_digest_enabled_but_lane_missing=research_review_enabled_but_lane_missing,
-        research_review_digest_candidates_without_delivery=research_review_candidates_without_delivery,
-        digest_item_without_live_confirmation=delivery_conflicts["digest_item_without_live_confirmation"],
-        digest_item_rejected_results_only=delivery_conflicts["digest_item_rejected_results_only"],
-        strategic_broad_asset_digest_without_confirmation=delivery_conflicts["strategic_broad_asset_digest_without_confirmation"],
-        notification_preview_missing=delivery_conflicts["notification_preview_missing"],
-        notification_preview_relpath_missing=delivery_conflicts["notification_preview_relpath_missing"],
-        notification_preview_path_unresolvable=delivery_conflicts["notification_preview_path_unresolvable"],
-        notification_preview_run_summary_mismatch=preview_conflicts["notification_preview_run_summary_mismatch"],
-        notification_preview_llm_summary_mismatch=preview_conflicts["notification_preview_llm_summary_mismatch"],
-        notification_preview_lane_counts_mismatch=preview_conflicts["notification_preview_lane_counts_mismatch"],
-        notification_preview_core_count_mismatch=preview_conflicts["notification_preview_core_count_mismatch"],
-        notification_preview_alertable_count_mismatch=preview_conflicts["notification_preview_alertable_count_mismatch"],
-        notification_preview_missing_send_guard_status=preview_conflicts["notification_preview_missing_send_guard_status"],
-        notification_preview_send_guard_status_missing=preview_conflicts["notification_preview_send_guard_status_missing"],
-        notification_preview_no_send_status_unclear=preview_conflicts["notification_preview_no_send_status_unclear"],
-        notification_preview_legacy_alerts_wording=preview_conflicts["notification_preview_legacy_alerts_wording"],
-        quality_fields_missing_count=quality["quality_fields_missing_count"],
-        hypothesis_rows_missing_opportunity_verdict=quality["hypothesis_rows_missing_opportunity_verdict"],
-        watchlist_rows_missing_quality_fields=quality["watchlist_rows_missing_quality_fields"],
-        alert_rows_missing_quality_fields=quality["alert_rows_missing_quality_fields"],
-        fresh_hypothesis_rows_missing_top_level_quality=quality["fresh_hypothesis_rows_missing_top_level_quality"],
-        fresh_watchlist_rows_missing_top_level_quality=quality["fresh_watchlist_rows_missing_top_level_quality"],
-        fresh_alert_rows_missing_top_level_quality=quality["fresh_alert_rows_missing_top_level_quality"],
-        legacy_quality_missing_rows=quality["legacy_quality_missing_rows"],
-        alertable_route_conflicts_with_opportunity_level=route_conflicts,
-        alert_snapshot_route_mismatch_core_store=snapshot_core_conflicts["route_mismatch"],
-        alert_snapshot_level_mismatch_core_store=snapshot_core_conflicts["level_mismatch"],
-        alert_snapshot_live_confirmation_stale=snapshot_core_conflicts["live_confirmation_stale"],
-        alert_snapshot_core_resolution_missing=snapshot_core_conflicts["core_resolution_missing"],
-        alert_snapshot_pre_reconciliation_alertable=snapshot_core_conflicts["pre_reconciliation_alertable"],
-        diagnostic_support_snapshot_alertable=snapshot_core_conflicts["diagnostic_support_alertable"],
-        diagnostic_support_snapshot_inherits_core_route=snapshot_core_conflicts["diagnostic_support_inherits_core_route"],
-        duplicate_alertable_snapshot_for_core=snapshot_core_conflicts["duplicate_alertable_snapshot_for_core"],
-        canonical_snapshot_missing_for_visible_core=snapshot_core_conflicts["canonical_snapshot_missing_for_visible_core"],
-        inbox_core_item_missing_card=inbox_core_missing_card,
-        inbox_core_item_uses_alert_id_feedback_target_when_core_target_exists=inbox_core_alert_target,
-        inbox_diagnostic_snapshot_visible_by_default=inbox_diag_visible_default,
-        audit_primary_snapshot_not_canonical_when_canonical_exists=audit_primary_not_canonical,
-        feedback_readiness_counts_diagnostic_as_required=diagnostic_snapshots_missing_feedback,
-        fresh_quality_route_conflict_rows=fresh_route_conflicts,
-        legacy_quality_conflict_rows=legacy_route_conflicts,
-        alert_rows_missing_final_route=missing_final_route,
-        fresh_alert_rows_missing_final_route=fresh_missing_final_route,
-        watchlist_state_conflicts_with_quality=watchlist_conflicts["watchlist_state_conflicts_with_quality"],
-        universal_watchlist_state_conflicts=watchlist_conflicts["universal_watchlist_state_conflicts"],
-        non_hypothesis_watchlist_quality_conflicts=watchlist_conflicts["non_hypothesis_watchlist_quality_conflicts"],
-        hypothesis_watchlist_quality_conflicts=watchlist_conflicts["hypothesis_watchlist_quality_conflicts"],
-        quality_capped_watchlist_rows=watchlist_conflicts["quality_capped_watchlist_rows"],
-        active_watchlist_rows_quality_capped=watchlist_conflicts["active_watchlist_rows_quality_capped"],
-        fresh_watchlist_state_conflict_rows=watchlist_conflicts["fresh_uncapped"],
-        legacy_watchlist_conflicts=watchlist_conflicts["legacy"],
-        hypothesis_rows_missing_incident_id=incident_linkage["hypothesis_rows_missing_incident_id"],
-        watchlist_hypothesis_rows_missing_incident_id=incident_linkage["watchlist_hypothesis_rows_missing_incident_id"],
-        alert_hypothesis_rows_missing_incident_id=incident_linkage["alert_hypothesis_rows_missing_incident_id"],
-        incident_rows_without_linked_hypotheses=incident_linkage["incident_rows_without_linked_hypotheses"],
-        incident_rows_without_linked_watchlist=incident_linkage["incident_rows_without_linked_watchlist"],
-        canonical_unlinked_incidents=incident_linkage["canonical_unlinked_incidents"],
-        active_incident_without_qualified_link=incident_linkage["active_incident_without_qualified_link"],
-        linked_incident_without_qualified_link=incident_linkage["linked_incident_without_qualified_link"],
-        weak_unqualified_incident_links=incident_linkage["weak_unqualified_incident_links"],
-        quality_blocked_links_present=incident_linkage["quality_blocked_links_present"],
-        quality_blocked_links_promoting_incident=incident_linkage["quality_blocked_links_promoting_incident"],
-        diagnostic_incident_rows=incident_linkage["diagnostic_incident_rows"],
-        raw_observation_incident_rows=incident_linkage["raw_observation_incident_rows"],
-        external_context_incident_rows=incident_linkage["external_context_incident_rows"],
-        rejected_incident_rows=incident_linkage["rejected_incident_rows"],
-        incident_relevance_missing=incident_linkage["incident_relevance_missing"],
-        invalid_canonical_incident_rows=incident_linkage["invalid_canonical_incident_rows"],
-        garbage_primary_subject_incidents=incident_linkage["garbage_primary_subject_incidents"],
-        fresh_incident_linkage_blockers=(
-            incident_linkage["fresh_missing_hypotheses"]
-            + incident_linkage["fresh_missing_watchlist"]
-            + incident_linkage["fresh_missing_alerts"]
-        ),
-        legacy_incident_linkage_warnings=(
-            incident_linkage["legacy_missing_hypotheses"]
-            + incident_linkage["legacy_missing_watchlist"]
-            + incident_linkage["legacy_missing_alerts"]
-        ),
-        namespace_status=namespace_status.status if namespace_status else event_alpha_namespace_status.STATUS_ACTIVE,
-        namespace_stale_deprecated=1 if event_alpha_namespace_status.is_stale_deprecated(namespace_status) else 0,
-        namespace_superseded_by=namespace_status.superseded_by if namespace_status else None,
-        strict_legacy=bool(strict_legacy),
-        strict=bool(strict),
-        schema_only=False,
-        legacy_checks_skipped=False,
-        schema_rows_validated=schema_result.schema_rows_validated,
-        schema_validation_errors=schema_result.schema_validation_errors,
-        missing_required_fields=schema_result.missing_required_fields,
-        invalid_enum_fields=schema_result.invalid_enum_fields,
-        invalid_path_fields=schema_result.invalid_path_fields,
-        invalid_safety_fields=schema_result.invalid_safety_fields,
-        deprecated_field_usage=schema_result.deprecated_field_usage,
-        active_shim_modules_with_implementation_logic=active_shim_logic_count,
-        blockers=tuple(dict.fromkeys(blockers)),
-        warnings=tuple(dict.fromkeys(warnings)),
-    )
+    ctx.blockers.extend(consistency_phase.blockers)
+    ctx.warnings.extend(consistency_phase.warnings)
+    ctx.consistency_phase = consistency_phase
 
 
 def _load_and_filter_doctor_artifacts(options: Mapping[str, Any]) -> SimpleNamespace:
