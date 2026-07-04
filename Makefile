@@ -459,8 +459,10 @@ refactor-size-gates:
 refactor-final-report:
 	$(PYTHON) -m crypto_rsi_scanner.refactor_final_report $(if $(strip $(PYTEST_RUNTIME_SECONDS)),--pytest-runtime-seconds $(PYTEST_RUNTIME_SECONDS),) $(if $(strip $(STANDALONE_RUNTIME_SECONDS)),--standalone-runtime-seconds $(STANDALONE_RUNTIME_SECONDS),)
 
+REFACTOR_VERIFICATION_RESULTS ?= research/REFACTOR_VERIFICATION_RESULTS.json
+
 refactor-completion-map:
-	$(PYTHON) -m crypto_rsi_scanner.refactor_completion_map
+	$(PYTHON) -m crypto_rsi_scanner.refactor_completion_map $(if $(wildcard $(REFACTOR_VERIFICATION_RESULTS)),--verification-results $(REFACTOR_VERIFICATION_RESULTS),)
 
 smoke-alerts:
 	$(PYTHON) -m crypto_rsi_scanner.alert_smoke

@@ -2,8 +2,8 @@
 
 Static map of the behavior-preserving Event Alpha refactor. It records package ownership, compatibility cores, size gates, and safety boundaries.
 
-- generated_at: `2026-07-04T03:48:32+00:00`
-- status: `pending_with_blockers`
+- generated_at: `2026-07-04T04:02:11+00:00`
+- status: `accepted`
 - scanner.py lines: `90`
 - scanner command bodies remaining: `0`
 - cli service bind sites: `5`
@@ -16,7 +16,7 @@ Static map of the behavior-preserving Event Alpha refactor. It records package o
 - test size gate status: `warning`
 - legacy decomposition gate status: `pass`
 - legacy files over 3000 lines: `0`
-- verification status: `not_run`
+- verification status: `pass`
 
 ## Transitional Compatibility Cores
 
@@ -27,7 +27,7 @@ Static map of the behavior-preserving Event Alpha refactor. It records package o
 
 ## Known Remaining Blockers
 
-- `verification_not_recorded`: release-candidate verification results were not supplied
+- none
 
 ## Safety Invariants
 

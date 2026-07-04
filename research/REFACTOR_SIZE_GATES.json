@@ -13,15 +13,6 @@
       "source_path": "crypto_rsi_scanner/client.py"
     },
     {
-      "class_name": "EventAlphaArtifactDoctorResult",
-      "exception_reason": null,
-      "line_count": 402,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.result_models",
-      "public": true,
-      "qualname": "EventAlphaArtifactDoctorResult",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py"
-    },
-    {
       "class_name": "CanonicalAsset",
       "exception_reason": null,
       "line_count": 96,
@@ -202,8 +193,8 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 22,
-  "existing_violation_count": 160,
+  "classes_over_limit_count": 21,
+  "existing_violation_count": 159,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -288,18 +279,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/client.py",
       "violation_id": "class:crypto_rsi_scanner/client.py:CoinGeckoClient"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "EventAlphaArtifactDoctorResult",
-      "exception_reason": null,
-      "line_count": 402,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.result_models",
-      "public": true,
-      "qualname": "EventAlphaArtifactDoctorResult",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py:EventAlphaArtifactDoctorResult"
     },
     {
       "category": "class_over_75_lines",
@@ -2168,7 +2147,7 @@
   ],
   "functions_over_limit_count": 48,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T03:48:31.361265+00:00",
+  "generated_at": "2026-07-04T04:01:05.461165+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -3125,10 +3104,6 @@
   "modules_with_multiple_public_classes_count": 82,
   "moved_existing_violation_aliases": [
     {
-      "baseline_violation_id": "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
-      "current_violation_id": "class:crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py:EventAlphaArtifactDoctorResult"
-    },
-    {
       "baseline_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search.py:EventProviderCatalystSearchProvider",
       "current_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:EventProviderCatalystSearchProvider"
     },
@@ -3329,7 +3304,7 @@
       "current_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.models"
     }
   ],
-  "moved_existing_violation_count": 51,
+  "moved_existing_violation_count": 50,
   "new_violation_count": 0,
   "new_violations": [],
   "no_live_provider_calls": true,
@@ -3343,7 +3318,7 @@
     "production_file_over_3000_lines": "blocker",
     "test_file_size_debt": "tracked separately from production completion"
   },
-  "production_classes_over_limit": 22,
+  "production_classes_over_limit": 21,
   "production_classes_over_limit_rows": [
     {
       "class_name": "CoinGeckoClient",
@@ -3353,15 +3328,6 @@
       "public": true,
       "qualname": "CoinGeckoClient",
       "source_path": "crypto_rsi_scanner/client.py"
-    },
-    {
-      "class_name": "EventAlphaArtifactDoctorResult",
-      "exception_reason": null,
-      "line_count": 402,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.result_models",
-      "public": true,
-      "qualname": "EventAlphaArtifactDoctorResult",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py"
     },
     {
       "class_name": "CanonicalAsset",
@@ -3936,9 +3902,10 @@
   ],
   "production_size_gate_status": "pass",
   "research_only": true,
-  "resolved_violation_count": 44,
+  "resolved_violation_count": 45,
   "resolved_violation_ids": [
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
+    "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
     "class:crypto_rsi_scanner/event_alpha/notifications/delivery.py:NotificationDeliveryRecord",
     "class:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:_DeliveryWriter",
     "class:crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py:BybitAnnouncementsRehearsalReport",
@@ -3990,7 +3957,6 @@
   "test_size_gate_status": "warning",
   "violation_ids": [
     "class:crypto_rsi_scanner/client.py:CoinGeckoClient",
-    "class:crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py:EventAlphaArtifactDoctorResult",
     "class:crypto_rsi_scanner/event_alpha/radar/asset_registry.py:CanonicalAsset",
     "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:EventProviderCatalystSearchProvider",
     "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:FixtureCatalystSearchProvider",
@@ -4234,18 +4200,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/client.py",
       "violation_id": "class:crypto_rsi_scanner/client.py:CoinGeckoClient"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "EventAlphaArtifactDoctorResult",
-      "exception_reason": null,
-      "line_count": 402,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.result_models",
-      "public": true,
-      "qualname": "EventAlphaArtifactDoctorResult",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py:EventAlphaArtifactDoctorResult"
     },
     {
       "category": "class_over_75_lines",

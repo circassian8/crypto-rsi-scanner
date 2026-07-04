@@ -5,7 +5,7 @@ from __future__ import annotations
 from .runtime import *
 
 @dataclass(frozen=True)
-class EventAlphaArtifactDoctorResult:
+class _DoctorResultIdentityFields:
     status: str
     profile: str | None
     artifact_namespace: str | None
@@ -18,6 +18,10 @@ class EventAlphaArtifactDoctorResult:
     research_card_index_present: bool = False
     cards_missing_lineage: int = 0
     cards_missing_feedback_target: int = 0
+
+
+@dataclass(frozen=True)
+class _DoctorResultCoreCoverageFields:
     visible_core_opportunities: int = 0
     core_opportunity_store_rows: int = 0
     visible_core_opportunities_missing_store_rows: int = 0
@@ -73,6 +77,10 @@ class EventAlphaArtifactDoctorResult:
     market_state_return_unit_missing: int = 0
     market_state_possible_double_scaled: int = 0
     market_state_lane_possible_double_scaled: int = 0
+
+
+@dataclass(frozen=True)
+class _DoctorResultStructuredArtifactFields:
     market_anomaly_rows: int = 0
     market_anomaly_missing_market_state_snapshot: int = 0
     market_anomaly_missing_market_state_class: int = 0
@@ -123,6 +131,10 @@ class EventAlphaArtifactDoctorResult:
     derivatives_unit_metadata_missing: int = 0
     stale_derivatives_snapshot_promoted_fade_review: int = 0
     confirmed_long_crowded_without_warning: int = 0
+
+
+@dataclass(frozen=True)
+class _DoctorResultIntegratedRadarFields:
     integrated_radar_candidate_rows: int = 0
     integrated_candidate_missing_opportunity_type: int = 0
     integrated_candidate_missing_market_state_snapshot: int = 0
@@ -181,6 +193,10 @@ class EventAlphaArtifactDoctorResult:
     operator_structured_path_absolute: int = 0
     integrated_legacy_preview_alerts_wording: int = 0
     integrated_manifest_daily_brief_unavailable: int = 0
+
+
+@dataclass(frozen=True)
+class _DoctorResultIntegratedOutcomeFields:
     integrated_outcome_missing_for_candidate: int = 0
     integrated_outcome_side_effect_flag: int = 0
     integrated_outcome_schema_missing: int = 0
@@ -201,6 +217,10 @@ class EventAlphaArtifactDoctorResult:
     integrated_performance_trade_pnl_wording: int = 0
     integrated_created_normal_rsi_signal: int = 0
     integrated_created_triggered_fade: int = 0
+
+
+@dataclass(frozen=True)
+class _DoctorResultProviderReadinessFields:
     source_coverage_report_missing: int = 0
     source_coverage_provider_status_unknown: int = 0
     source_coverage_provider_marked_healthy_without_observation: int = 0
@@ -231,6 +251,10 @@ class EventAlphaArtifactDoctorResult:
     coinalyze_provider_health_healthy_without_successful_ledger: int = 0
     coinalyze_rehearsal_forbidden_side_effect_claim: int = 0
     coinalyze_supported_metric_implemented_missing_state: int = 0
+
+
+@dataclass(frozen=True)
+class _DoctorResultProviderEvidenceFields:
     bybit_announcements_preflight_secret_leak: int = 0
     bybit_announcements_preflight_live_call_allowed_in_smoke: int = 0
     bybit_announcements_preflight_missing_fixture_parser_status: int = 0
@@ -283,6 +307,10 @@ class EventAlphaArtifactDoctorResult:
     runs_with_external_snapshot_paths: int = 0
     legacy_rows_skipped: int = 0
     legacy_rows_counted: int = 0
+
+
+@dataclass(frozen=True)
+class _DoctorResultNotificationFields:
     delivery_rows: int = 0
     latest_run_id: str | None = None
     latest_run_delivery_rows: int = 0
@@ -335,6 +363,10 @@ class EventAlphaArtifactDoctorResult:
     notification_preview_send_guard_status_missing: int = 0
     notification_preview_no_send_status_unclear: int = 0
     notification_preview_legacy_alerts_wording: int = 0
+
+
+@dataclass(frozen=True)
+class _DoctorResultQualityIncidentFields:
     quality_fields_missing_count: int = 0
     hypothesis_rows_missing_opportunity_verdict: int = 0
     watchlist_rows_missing_quality_fields: int = 0
@@ -390,6 +422,10 @@ class EventAlphaArtifactDoctorResult:
     garbage_primary_subject_incidents: int = 0
     fresh_incident_linkage_blockers: int = 0
     legacy_incident_linkage_warnings: int = 0
+
+
+@dataclass(frozen=True)
+class _DoctorResultNamespaceSchemaFields:
     namespace_status: str | None = None
     namespace_stale_deprecated: int = 0
     namespace_superseded_by: str | None = None
@@ -407,6 +443,22 @@ class EventAlphaArtifactDoctorResult:
     active_shim_modules_with_implementation_logic: int = 0
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class EventAlphaArtifactDoctorResult(
+    _DoctorResultNamespaceSchemaFields,
+    _DoctorResultQualityIncidentFields,
+    _DoctorResultNotificationFields,
+    _DoctorResultProviderEvidenceFields,
+    _DoctorResultProviderReadinessFields,
+    _DoctorResultIntegratedOutcomeFields,
+    _DoctorResultIntegratedRadarFields,
+    _DoctorResultStructuredArtifactFields,
+    _DoctorResultCoreCoverageFields,
+    _DoctorResultIdentityFields,
+):
+    """Compatibility aggregate for artifact doctor counters."""
 
 __all__ = (
     'EventAlphaArtifactDoctorResult',

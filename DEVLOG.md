@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split artifact doctor result field ownership · Codex
+**Why:** The production-size gates pass, but the refactor objective still tracks
+field-heavy classes and large functions as advisory ownership debt. This pass
+removes the field-only artifact doctor result aggregate from the oversized class
+inventory without changing doctor counters, constructor compatibility, strict/WARN
+semantics, or artifact schemas.
+**Changes:**
+- Split `EventAlphaArtifactDoctorResult` in
+  `crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py` into focused
+  private dataclass field groups for identity, core/card coverage, structured
+  artifacts, integrated radar/outcomes, provider readiness/evidence,
+  notifications, quality/incidents, and namespace/schema counters.
+- Kept the public `EventAlphaArtifactDoctorResult` name as a compatibility
+  aggregate with the same field order, defaults, and attributes.
+- Updated `make refactor-completion-map` so it consumes
+  `research/REFACTOR_VERIFICATION_RESULTS.json` when present instead of
+  downgrading the release-candidate report to `verification_not_recorded`.
+- Refreshed refactor size, class ownership, final, completion-map, release
+  candidate, and verification-result reports. Current advisory inventory is
+  `21` classes and `48` functions over limits, with
+  `production_files_over_1500_lines=0`, `production_files_over_2000_lines=0`,
+  `legacy_files_over_1500_lines=0`, and `new_violation_count=0`.
+**Verify:** Focused artifact-doctor/notification/outcome/namespace tests passed
+(`192 passed`), then the full 23-command safe refactor regression stack passed,
+including standalone tests, safe pytest, compileall, refactor reports, shim
+report, integrated radar smoke/doctor, notification no-send checks,
+evidence-acquisition and catalyst-frame smokes, Coinalyze preflight/rehearsal,
+artifact-backed source coverage/brief/preview/doctor, `make backtest-costs`, and
+`make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Remaining advisory debt is concentrated in large
+notification, daily-brief, doctor-context, and rendering/serialization functions
+plus 21 oversized classes.
+
 ## 2026-07-04 — Split core opportunity row serialization · Codex
 **Why:** The long-running refactor objective still tracks oversized production
 functions after the production file-size gates passed. This pass reduces a

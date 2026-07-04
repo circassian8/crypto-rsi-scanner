@@ -1,5 +1,5 @@
 {
-  "class_count": 421,
+  "class_count": 431,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
@@ -10,15 +10,6 @@
       "public": true,
       "qualname": "CoinGeckoClient",
       "source_path": "crypto_rsi_scanner/client.py"
-    },
-    {
-      "class_name": "EventAlphaArtifactDoctorResult",
-      "exception_reason": null,
-      "line_count": 402,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.result_models",
-      "public": true,
-      "qualname": "EventAlphaArtifactDoctorResult",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py"
     },
     {
       "class_name": "CanonicalAsset",
@@ -201,7 +192,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 22,
+  "classes_over_limit_count": 21,
   "exceptions": [
     {
       "module": "crypto_rsi_scanner.event_core.models",
@@ -603,7 +594,7 @@
     }
   ],
   "functions_over_limit_count": 48,
-  "generated_at": "2026-07-04T03:48:31.215197+00:00",
+  "generated_at": "2026-07-04T04:01:06.462312+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1161,7 +1152,7 @@
     "multiple_public_classes": "allowed for small value objects/enums in documented models modules",
     "public_class_over_75_lines": "should live in its own module unless documented here"
   },
-  "production_classes_over_limit": 22,
+  "production_classes_over_limit": 21,
   "production_classes_over_limit_rows": [
     {
       "class_name": "CoinGeckoClient",
@@ -1171,15 +1162,6 @@
       "public": true,
       "qualname": "CoinGeckoClient",
       "source_path": "crypto_rsi_scanner/client.py"
-    },
-    {
-      "class_name": "EventAlphaArtifactDoctorResult",
-      "exception_reason": null,
-      "line_count": 402,
-      "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.result_models",
-      "public": true,
-      "qualname": "EventAlphaArtifactDoctorResult",
-      "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py"
     },
     {
       "class_name": "CanonicalAsset",
