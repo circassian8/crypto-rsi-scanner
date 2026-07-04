@@ -214,7 +214,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5176,
+  "function_count": 5197,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -248,22 +248,6 @@
       "public": true,
       "qualname": "format_opportunity_audit",
       "source_path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py"
-    },
-    {
-      "function_name": "_impact_hypothesis_lines",
-      "line_count": 223,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.outcomes",
-      "public": false,
-      "qualname": "_impact_hypothesis_lines",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/outcomes.py"
-    },
-    {
-      "function_name": "render_research_card",
-      "line_count": 220,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.renderer",
-      "public": true,
-      "qualname": "render_research_card",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/renderer.py"
     },
     {
       "function_name": "diagnose_artifacts",
@@ -384,14 +368,6 @@
       "public": true,
       "qualname": "run_no_send_rehearsal",
       "source_path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py"
-    },
-    {
-      "function_name": "_provider_rows",
-      "line_count": 429,
-      "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
-      "public": false,
-      "qualname": "_provider_rows",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py"
     },
     {
       "function_name": "source_descriptor_for",
@@ -634,8 +610,8 @@
       "source_path": "crypto_rsi_scanner/refactor_final_report.py"
     }
   ],
-  "functions_over_limit_count": 52,
-  "generated_at": "2026-07-04T03:14:57.438159+00:00",
+  "functions_over_limit_count": 49,
+  "generated_at": "2026-07-04T03:29:01.085584+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1394,7 +1370,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 52,
+  "production_functions_over_limit": 49,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_event_alpha_notify_cycle_body",
@@ -1427,22 +1403,6 @@
       "public": true,
       "qualname": "format_opportunity_audit",
       "source_path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py"
-    },
-    {
-      "function_name": "_impact_hypothesis_lines",
-      "line_count": 223,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.outcomes",
-      "public": false,
-      "qualname": "_impact_hypothesis_lines",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/outcomes.py"
-    },
-    {
-      "function_name": "render_research_card",
-      "line_count": 220,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.renderer",
-      "public": true,
-      "qualname": "render_research_card",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/renderer.py"
     },
     {
       "function_name": "diagnose_artifacts",
@@ -1563,14 +1523,6 @@
       "public": true,
       "qualname": "run_no_send_rehearsal",
       "source_path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py"
-    },
-    {
-      "function_name": "_provider_rows",
-      "line_count": 429,
-      "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
-      "public": false,
-      "qualname": "_provider_rows",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py"
     },
     {
       "function_name": "source_descriptor_for",

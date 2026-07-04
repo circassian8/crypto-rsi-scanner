@@ -203,7 +203,7 @@
     }
   ],
   "classes_over_limit_count": 22,
-  "existing_violation_count": 164,
+  "existing_violation_count": 161,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -587,28 +587,6 @@
     },
     {
       "category": "function_over_150_lines",
-      "function_name": "_impact_hypothesis_lines",
-      "line_count": 223,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.outcomes",
-      "public": false,
-      "qualname": "_impact_hypothesis_lines",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/outcomes.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/outcomes.py:_impact_hypothesis_lines"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "render_research_card",
-      "line_count": 220,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.renderer",
-      "public": true,
-      "qualname": "render_research_card",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/renderer.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/renderer.py:render_research_card"
-    },
-    {
-      "category": "function_over_150_lines",
       "function_name": "diagnose_artifacts",
       "line_count": 1335,
       "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.context_loading",
@@ -771,17 +749,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py:run_no_send_rehearsal"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "_provider_rows",
-      "line_count": 429,
-      "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
-      "public": false,
-      "qualname": "_provider_rows",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py:_provider_rows"
     },
     {
       "category": "function_over_150_lines",
@@ -1858,22 +1825,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py"
     },
     {
-      "function_name": "_impact_hypothesis_lines",
-      "line_count": 223,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.outcomes",
-      "public": false,
-      "qualname": "_impact_hypothesis_lines",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/outcomes.py"
-    },
-    {
-      "function_name": "render_research_card",
-      "line_count": 220,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.renderer",
-      "public": true,
-      "qualname": "render_research_card",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/renderer.py"
-    },
-    {
       "function_name": "diagnose_artifacts",
       "line_count": 1335,
       "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.context_loading",
@@ -1992,14 +1943,6 @@
       "public": true,
       "qualname": "run_no_send_rehearsal",
       "source_path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py"
-    },
-    {
-      "function_name": "_provider_rows",
-      "line_count": 429,
-      "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
-      "public": false,
-      "qualname": "_provider_rows",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py"
     },
     {
       "function_name": "source_descriptor_for",
@@ -2242,9 +2185,9 @@
       "source_path": "crypto_rsi_scanner/refactor_final_report.py"
     }
   ],
-  "functions_over_limit_count": 52,
+  "functions_over_limit_count": 49,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T03:14:57.487713+00:00",
+  "generated_at": "2026-07-04T03:29:01.048453+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -2450,6 +2393,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1033,
+      "path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1002,
       "path": "crypto_rsi_scanner/event_alpha/radar/llm/extractor.py",
       "source_kind": "production"
@@ -2470,12 +2419,6 @@
       "limit": 1500,
       "line_count": 994,
       "path": "crypto_rsi_scanner/cli/services/event_alpha_research.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 988,
-      "path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py",
       "source_kind": "production"
     },
     {
@@ -3237,14 +3180,6 @@
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py:build_daily_brief"
     },
     {
-      "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py:_impact_hypothesis_lines",
-      "current_violation_id": "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/outcomes.py:_impact_hypothesis_lines"
-    },
-    {
-      "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py:render_research_card",
-      "current_violation_id": "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/renderer.py:render_research_card"
-    },
-    {
       "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:diagnose_artifacts",
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py:diagnose_artifacts"
     },
@@ -3417,7 +3352,7 @@
       "current_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.models"
     }
   ],
-  "moved_existing_violation_count": 54,
+  "moved_existing_violation_count": 52,
   "new_violation_count": 0,
   "new_violations": [],
   "no_live_provider_calls": true,
@@ -3635,7 +3570,7 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 52,
+  "production_functions_over_limit": 49,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_event_alpha_notify_cycle_body",
@@ -3668,22 +3603,6 @@
       "public": true,
       "qualname": "format_opportunity_audit",
       "source_path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py"
-    },
-    {
-      "function_name": "_impact_hypothesis_lines",
-      "line_count": 223,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.outcomes",
-      "public": false,
-      "qualname": "_impact_hypothesis_lines",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/outcomes.py"
-    },
-    {
-      "function_name": "render_research_card",
-      "line_count": 220,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.renderer",
-      "public": true,
-      "qualname": "render_research_card",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/renderer.py"
     },
     {
       "function_name": "diagnose_artifacts",
@@ -3804,14 +3723,6 @@
       "public": true,
       "qualname": "run_no_send_rehearsal",
       "source_path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py"
-    },
-    {
-      "function_name": "_provider_rows",
-      "line_count": 429,
-      "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
-      "public": false,
-      "qualname": "_provider_rows",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py"
     },
     {
       "function_name": "source_descriptor_for",
@@ -4056,7 +3967,7 @@
   ],
   "production_size_gate_status": "pass",
   "research_only": true,
-  "resolved_violation_count": 40,
+  "resolved_violation_count": 43,
   "resolved_violation_ids": [
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
     "class:crypto_rsi_scanner/event_alpha/notifications/delivery.py:NotificationDeliveryRecord",
@@ -4096,8 +4007,11 @@
     "function:crypto_rsi_scanner/event_alpha/artifacts/alert_store.py:_snapshot_from_route_decision",
     "function:crypto_rsi_scanner/event_alpha/artifacts/locks.py:acquire_run_lock",
     "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py:_core_score_components",
+    "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py:_impact_hypothesis_lines",
+    "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py:render_research_card",
     "function:crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py:_run_record",
-    "function:crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py:format_run_ledger_report"
+    "function:crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py:format_run_ledger_report",
+    "function:crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py:_provider_rows"
   ],
   "row_type": "refactor_size_gate_report",
   "schema_version": "refactor_size_gate_report_v1",
@@ -4139,8 +4053,6 @@
     "function:crypto_rsi_scanner/cli/services/event_alpha_research.py:event_alpha_cycle",
     "function:crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py:build_daily_brief",
     "function:crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py:format_opportunity_audit",
-    "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/outcomes.py:_impact_hypothesis_lines",
-    "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/renderer.py:render_research_card",
     "function:crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py:diagnose_artifacts",
     "function:crypto_rsi_scanner/event_alpha/doctor/legacy/notification_delivery_checks.py:_notification_delivery_conflicts",
     "function:crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py:_integrated_radar_artifact_conflicts",
@@ -4156,7 +4068,6 @@
     "function:crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py:evaluate_signal_quality_case",
     "function:crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py:run_no_send_rehearsal",
     "function:crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py:run_no_send_rehearsal",
-    "function:crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py:_provider_rows",
     "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:assess_source",
     "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:source_descriptor_for",
     "function:crypto_rsi_scanner/event_alpha/radar/core/serialization.py:_row_from_core_opportunity",
@@ -4653,28 +4564,6 @@
     },
     {
       "category": "function_over_150_lines",
-      "function_name": "_impact_hypothesis_lines",
-      "line_count": 223,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.outcomes",
-      "public": false,
-      "qualname": "_impact_hypothesis_lines",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/outcomes.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/outcomes.py:_impact_hypothesis_lines"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "render_research_card",
-      "line_count": 220,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.renderer",
-      "public": true,
-      "qualname": "render_research_card",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/renderer.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/renderer.py:render_research_card"
-    },
-    {
-      "category": "function_over_150_lines",
       "function_name": "diagnose_artifacts",
       "line_count": 1335,
       "module": "crypto_rsi_scanner.event_alpha.doctor.legacy.context_loading",
@@ -4837,17 +4726,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py:run_no_send_rehearsal"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "_provider_rows",
-      "line_count": 429,
-      "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
-      "public": false,
-      "qualname": "_provider_rows",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py:_provider_rows"
     },
     {
       "category": "function_over_150_lines",

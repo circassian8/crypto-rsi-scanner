@@ -311,7 +311,21 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
     bybit_history = _bybit_announcements_history(artifact_namespace)
     unlock_history = _unlock_calendar_history(artifact_namespace)
     dex_onchain_history = _dex_onchain_history(artifact_namespace)
-    rows = (
+    return (
+        *_derivatives_provider_rows(smoke_mode=smoke_mode, coinalyze_history=coinalyze_history),
+        *_official_exchange_provider_rows(smoke_mode=smoke_mode, bybit_history=bybit_history),
+        *_unlock_calendar_provider_rows(smoke_mode=smoke_mode, unlock_history=unlock_history),
+        *_dex_onchain_provider_rows(smoke_mode=smoke_mode, dex_onchain_history=dex_onchain_history),
+        *_context_provider_rows(smoke_mode=smoke_mode),
+    )
+
+
+def _derivatives_provider_rows(
+    *,
+    smoke_mode: bool,
+    coinalyze_history: Mapping[str, Any],
+) -> tuple[LiveProviderReadinessProvider, ...]:
+    return (
         _row(
             "coinalyze",
             category="derivatives",
@@ -352,6 +366,15 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
             latest_budget_used=coinalyze_history["latest_budget_used"],
             activation_phase_override=coinalyze_history["activation_phase"],
         ),
+    )
+
+
+def _official_exchange_provider_rows(
+    *,
+    smoke_mode: bool,
+    bybit_history: Mapping[str, Any],
+) -> tuple[LiveProviderReadinessProvider, ...]:
+    return (
         _row(
             "bybit_announcements_public",
             category="official_exchange",
@@ -471,6 +494,15 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
             provider_health_key="binance_announcements_signed_listener",
             lanes_blocked_without_market=("CONFIRMED_LONG_RESEARCH",),
         ),
+    )
+
+
+def _unlock_calendar_provider_rows(
+    *,
+    smoke_mode: bool,
+    unlock_history: Mapping[str, Any],
+) -> tuple[LiveProviderReadinessProvider, ...]:
+    return (
         _row(
             "tokenomist",
             category="structured_unlock_calendar",
@@ -576,6 +608,15 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
             latest_budget_used=unlock_history["latest_budget_used"],
             activation_phase_override=unlock_history["activation_phase"],
         ),
+    )
+
+
+def _dex_onchain_provider_rows(
+    *,
+    smoke_mode: bool,
+    dex_onchain_history: Mapping[str, Any],
+) -> tuple[LiveProviderReadinessProvider, ...]:
+    return (
         _row(
             "geckoterminal",
             category="dex_onchain",
@@ -706,6 +747,11 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
             latest_budget_used=0,
             activation_phase_override=dex_onchain_history["activation_phase"],
         ),
+    )
+
+
+def _context_provider_rows(*, smoke_mode: bool) -> tuple[LiveProviderReadinessProvider, ...]:
+    return (
         _row(
             "cryptopanic_rss_gdelt_context",
             category="news_context",
@@ -734,7 +780,6 @@ def _provider_rows(*, smoke_mode: bool, artifact_namespace: str) -> Iterable[Liv
             lanes_blocked_without_market=("CONFIRMED_LONG_RESEARCH",),
         ),
     )
-    return rows
 
 
 def _row(

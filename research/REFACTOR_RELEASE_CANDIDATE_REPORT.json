@@ -29,9 +29,14 @@
     },
     "remaining_legacy_unregistered_details": []
   },
-  "generated_at": "2026-07-04T02:41:08+00:00",
+  "generated_at": "2026-07-04T03:30:02+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
-  "known_remaining_blockers": [],
+  "known_remaining_blockers": [
+    {
+      "id": "verification_not_recorded",
+      "reason": "release-candidate verification results were not supplied"
+    }
+  ],
   "line_counts": {
     "crypto_rsi_scanner/cli/commands_event_alpha.py": 14,
     "crypto_rsi_scanner/cli/parser.py": 225,
@@ -100,7 +105,7 @@
     "unknown_namespace_count": 0,
     "unknown_namespaces": []
   },
-  "rc_verdict": "Event Alpha refactor v2 accepted: critical behavior, safety, shim, size, scanner-facade, and regression checks passed.",
+  "rc_verdict": "Event Alpha refactor v2 pending: critical blockers remain documented below.",
   "safety_invariants": {
     "no_event_alpha_created_triggered_fade": true,
     "no_event_alpha_normal_rsi_signal_writes": true,
@@ -130,174 +135,11 @@
     "top_level_event_module_count": 125,
     "unmigrated_modules": 1
   },
-  "status": "accepted",
+  "status": "pending_with_documented_refactor_blockers",
   "verification": {
-    "commands": [
-      {
-        "command": "python3 tests/test_indicators.py",
-        "elapsed_seconds": null,
-        "index": 1,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "env PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q",
-        "elapsed_seconds": null,
-        "index": 2,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "python3 -m compileall -q crypto_rsi_scanner tests",
-        "elapsed_seconds": null,
-        "index": 3,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make test-pytest-safe PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 4,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make refactor-size-gates PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 5,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make refactor-class-ownership-report PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 6,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make refactor-final-report PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 7,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-shim-report PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 8,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-integrated-radar-smoke PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 9,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-integrated-radar-doctor PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 10,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-notification-format-smoke PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 11,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-telegram-no-send-final-check-fast PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 12,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-evidence-acquisition-smoke PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 13,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 14,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-coinalyze-preflight-smoke PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 15,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-coinalyze-preflight PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 16,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 17,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 18,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 19,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 20,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 21,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make backtest-costs PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 22,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make verify PYTHON=python3",
-        "elapsed_seconds": null,
-        "index": 23,
-        "returncode": 0,
-        "status": "pass"
-      }
-    ],
+    "commands": [],
     "failed_commands": 0,
-    "status": "pass",
-    "total_commands": 23,
-    "total_elapsed_seconds": null
+    "status": "not_run",
+    "total_commands": 0
   }
 }

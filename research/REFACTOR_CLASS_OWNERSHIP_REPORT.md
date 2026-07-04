@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T03:14:57.438159+00:00`
+- generated_at: `2026-07-04T03:29:01.085584+00:00`
 - public_class_count: `407`
 - classes_over_limit_count: `22`
-- functions_over_limit_count: `52`
+- functions_over_limit_count: `49`
 - production_classes_over_limit: `22`
-- production_functions_over_limit: `52`
+- production_functions_over_limit: `49`
 - modules_with_multiple_public_classes_count: `82`
 - legacy_decomposition_gate_status: `pass`
 - legacy_classes_over_limit: `3`
@@ -171,8 +171,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.cli.services.event_alpha_research` | `event_alpha_cycle` | 251 | true |
 | `crypto_rsi_scanner.event_alpha.artifacts.daily_brief.legacy_parts.builder` | `build_daily_brief` | 884 | true |
 | `crypto_rsi_scanner.event_alpha.artifacts.opportunity_audit` | `format_opportunity_audit` | 227 | true |
-| `crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.outcomes` | `_impact_hypothesis_lines` | 223 | false |
-| `crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.renderer` | `render_research_card` | 220 | true |
 | `crypto_rsi_scanner.event_alpha.doctor.legacy.context_loading` | `diagnose_artifacts` | 1335 | true |
 | `crypto_rsi_scanner.event_alpha.doctor.legacy.notification_delivery_checks` | `_notification_delivery_conflicts` | 251 | false |
 | `crypto_rsi_scanner.event_alpha.doctor.legacy.provider_readiness_checks` | `_integrated_radar_artifact_conflicts` | 218 | false |
@@ -188,7 +186,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.outcomes.quality.case_eval` | `evaluate_signal_quality_case` | 211 | true |
 | `crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight` | `run_no_send_rehearsal` | 160 | true |
 | `crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight` | `run_no_send_rehearsal` | 194 | true |
-| `crypto_rsi_scanner.event_alpha.providers.live_provider_readiness` | `_provider_rows` | 429 | false |
 | `crypto_rsi_scanner.event_alpha.providers.source_registry` | `source_descriptor_for` | 246 | true |
 | `crypto_rsi_scanner.event_alpha.providers.source_registry` | `assess_source` | 158 | true |
 | `crypto_rsi_scanner.event_alpha.radar.core.serialization` | `_row_from_core_opportunity` | 406 | false |

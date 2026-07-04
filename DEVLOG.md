@@ -17,6 +17,48 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split provider readiness and research-card render helpers · Codex
+**Why:** The production and legacy size gates now pass, but the refactor
+objective still tracks oversized production functions as advisory debt. This
+pass reduces another renderer/provider slice without changing CLI behavior,
+artifact schemas, provider readiness semantics, notification gates, scoring, or
+Event Alpha research-only safety boundaries.
+**Changes:**
+- Split `event_alpha/providers/live_provider_readiness.py::_provider_rows()`
+  into focused derivatives, official-exchange, unlock-calendar, DEX/on-chain,
+  and context provider row builders while preserving provider order and row
+  fields.
+- Split research-card impact-hypothesis Markdown rendering in
+  `event_alpha/artifacts/research_cards/legacy_parts/outcomes.py` into context,
+  incident, frame, candidate, market, and verdict helper functions without
+  changing section text or order.
+- Split `render_research_card()` in
+  `event_alpha/artifacts/research_cards/legacy_parts/renderer.py` into artifact
+  context resolution, summary/lineage rendering, evidence sections, and review
+  sections while preserving card output semantics.
+- Refreshed refactor size, class ownership, final, completion-map, and release
+  candidate reports. Current advisory inventory is `22` classes and `49`
+  functions over limits, with `production_files_over_1500_lines=0`,
+  `production_files_over_2000_lines=0`, `legacy_files_over_1500_lines=0`, and
+  `new_violation_count=0`.
+**Verify:** Passed focused card/provider tests, `python3 tests/test_indicators.py`,
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q`, `python3 -m compileall -q
+crypto_rsi_scanner tests`, `make test-pytest-safe PYTHON=python3`, `make
+event-alpha-live-provider-readiness-smoke PYTHON=python3`, `make
+event-alpha-integrated-radar-smoke PYTHON=python3`, `make
+event-alpha-integrated-radar-doctor PYTHON=python3`, `make
+event-alpha-notification-format-smoke PYTHON=python3`, `make
+event-alpha-telegram-no-send-final-check-fast PYTHON=python3`, `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`, and the refactor report
+targets. Final `make verify PYTHON=python3` was rerun before commit.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Remaining advisory debt is concentrated in large
+doctor/brief/notification/core serialization functions and field-heavy
+dataclasses.
+
 ## 2026-07-04 — Reduce Event Alpha model ownership debt · Codex
 **Why:** The production-size gates are passing, but the refactor objective still
 tracks oversized classes as remaining advisory ownership debt. This pass burns

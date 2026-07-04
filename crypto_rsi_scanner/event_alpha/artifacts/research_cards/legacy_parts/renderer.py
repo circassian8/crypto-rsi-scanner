@@ -20,24 +20,65 @@ def render_research_card(
 ) -> EventResearchCardResult:
     """Render one Markdown card from local research artifacts."""
     clean_key = str(key or "").strip()
+    context = _research_card_context(
+        clean_key,
+        watchlist_entries=watchlist_entries,
+        alert_rows=alert_rows,
+        route_decisions=route_decisions,
+        clusters=clusters,
+        monitor_rows=monitor_rows,
+        feedback_rows=feedback_rows,
+        outcome_rows=outcome_rows,
+        card_path=card_path,
+    )
+    if context["entry"] is None and context["alert"] is None:
+        return EventResearchCardResult(
+            key=clean_key,
+            markdown=f"# Event Research Card\n\nNo watchlist or alert snapshot matched `{clean_key}`.",
+            found=False,
+        )
+    context["generated_iso"] = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
+    context["lineage_context"] = lineage_context
+    context["card_path"] = card_path
+    lines = _research_card_summary_lines(context)
+    _append_research_card_evidence_sections(lines, context)
+    _append_research_card_review_sections(lines, context)
+    return EventResearchCardResult(key=clean_key, markdown="\n".join(lines).rstrip() + "\n", found=True)
+
+
+def _research_card_context(
+    clean_key: str,
+    *,
+    watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry],
+    alert_rows: Iterable[Mapping[str, Any]],
+    route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
+    clusters: Iterable[event_graph.EventCluster],
+    monitor_rows: Iterable[event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any]],
+    feedback_rows: Iterable[Mapping[str, Any]],
+    outcome_rows: Iterable[Mapping[str, Any]],
+    card_path: str | Path | None,
+) -> dict[str, Any]:
     entry_rows = list(watchlist_entries)
     alert_row_list = list(alert_rows)
     decision_rows = list(route_decisions)
-    monitor_row_list = list(monitor_rows)
     feedback_row_list = list(feedback_rows)
-    outcome_row_list = list(outcome_rows)
     entry = _find_entry(clean_key, entry_rows)
     alert = _find_alert(clean_key, alert_row_list)
     decision = _find_decision(clean_key, decision_rows)
-    core_rows = [row for row in alert_row_list if isinstance(row, Mapping) and row.get("row_type") == "event_core_opportunity"]
-    core_view = event_core_opportunity_store.canonical_core_opportunity_view_from_rows(
+    core_rows = [
+        row
+        for row in alert_row_list
+        if isinstance(row, Mapping) and row.get("row_type") == "event_core_opportunity"
+    ]
+    core_view = _research_card_core_view(
         clean_key,
         core_rows=core_rows,
-        supporting_rows=[*alert_row_list, *decision_rows, *entry_rows],
         alert_rows=alert_row_list,
+        decision_rows=decision_rows,
+        entry_rows=entry_rows,
         feedback_rows=feedback_row_list,
-        card_paths=[card_path] if card_path is not None else (),
-    ) if core_rows else None
+        card_path=card_path,
+    )
     core = (
         core_view.core_opportunity
         if core_view is not None and core_view.found
@@ -46,25 +87,56 @@ def render_research_card(
     if core is not None:
         if entry is None or (alert is not None and alert.get("row_type") == "event_core_opportunity"):
             entry = _entry_from_core_opportunity(core)
-        alert = _canonical_card_alert(core, core_view.canonical_core_row if core_view is not None and core_view.canonical_core_row else alert)
-    cluster = _find_cluster(clean_key, list(clusters), entry, alert)
-    monitor_row = _find_monitor_row(clean_key, monitor_row_list, entry, alert)
-    feedback = _matching_rows(clean_key, feedback_row_list, entry, alert)
-    outcome = _find_outcome(clean_key, outcome_row_list, entry, alert) or alert
-    if entry is None and alert is None:
-        return EventResearchCardResult(
-            key=clean_key,
-            markdown=f"# Event Research Card\n\nNo watchlist or alert snapshot matched `{clean_key}`.",
-            found=False,
-        )
+        canonical_row = core_view.canonical_core_row if core_view is not None and core_view.canonical_core_row else alert
+        alert = _canonical_card_alert(core, canonical_row)
+    return {
+        "clean_key": clean_key,
+        "entry": entry,
+        "alert": alert,
+        "decision": decision,
+        "core": core,
+        "cluster": _find_cluster(clean_key, list(clusters), entry, alert),
+        "monitor_row": _find_monitor_row(clean_key, list(monitor_rows), entry, alert),
+        "feedback": _matching_rows(clean_key, feedback_row_list, entry, alert),
+        "outcome": _find_outcome(clean_key, list(outcome_rows), entry, alert) or alert,
+    }
+
+
+def _research_card_core_view(
+    clean_key: str,
+    *,
+    core_rows: list[Mapping[str, Any]],
+    alert_rows: list[Mapping[str, Any]],
+    decision_rows: list[event_alpha_router.EventAlphaRouteDecision],
+    entry_rows: list[event_watchlist.EventWatchlistEntry],
+    feedback_rows: list[Mapping[str, Any]],
+    card_path: str | Path | None,
+) -> Any | None:
+    if not core_rows:
+        return None
+    return event_core_opportunity_store.canonical_core_opportunity_view_from_rows(
+        clean_key,
+        core_rows=core_rows,
+        supporting_rows=[*alert_rows, *decision_rows, *entry_rows],
+        alert_rows=alert_rows,
+        feedback_rows=feedback_rows,
+        card_paths=[card_path] if card_path is not None else (),
+    )
+
+
+def _research_card_summary_lines(context: Mapping[str, Any]) -> list[str]:
+    entry = context["entry"]
+    alert = context["alert"]
+    decision = context["decision"]
+    core = context["core"]
+    clean_key = context["clean_key"]
     playbook = _value(entry, alert, "latest_playbook_type", "playbook_type") or "unknown"
     symbol = _value(entry, alert, "symbol", "asset_symbol") or "UNKNOWN"
     coin_id = _value(entry, alert, "coin_id", "asset_coin_id") or "unknown"
     canonical_asset_id = _value(entry, alert, "canonical_asset_id", "canonical_asset_id")
     event_name = _value(entry, alert, "latest_event_name", "event_name") or "unknown event"
     tier = _value(entry, alert, "latest_tier", "tier") or "unknown"
-    state = event_watchlist.final_state_value(entry) if entry is not None else str(alert.get("final_state_after_quality_gate") or alert.get("state") or "snapshot")
-    generated_iso = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
+    state = _research_card_state(entry, alert)
     summary_identity_lines = [f"- Asset: {symbol}/{coin_id}"]
     if canonical_asset_id:
         summary_identity_lines.append(f"- Canonical asset: {canonical_asset_id}")
@@ -107,10 +179,27 @@ def render_research_card(
         alert=alert,
         decision=decision,
         core=core,
-        generated_iso=generated_iso,
-        lineage_context=lineage_context,
-        card_path=card_path,
+        generated_iso=context["generated_iso"],
+        lineage_context=context["lineage_context"],
+        card_path=context["card_path"],
     ))
+    return lines
+
+
+def _research_card_state(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> str:
+    if entry is not None:
+        return event_watchlist.final_state_value(entry)
+    return str(alert.get("final_state_after_quality_gate") or alert.get("state") or "snapshot")
+
+
+def _append_research_card_evidence_sections(lines: list[str], context: Mapping[str, Any]) -> None:
+    entry = context["entry"]
+    alert = context["alert"]
+    cluster = context["cluster"]
+    playbook = _value(entry, alert, "latest_playbook_type", "playbook_type") or "unknown"
     lines.extend([
         "",
         "## Cluster Context",
@@ -141,7 +230,12 @@ def render_research_card(
         lines.extend(["", "## Derivatives / Crowding"])
         lines.extend(derivatives_lines)
     lines.extend(["", "## Source Coverage / Evidence Acquisition"])
-    lines.extend(_source_acquisition_lines(entry, alert, card_path=card_path, lineage_context=lineage_context))
+    lines.extend(_source_acquisition_lines(
+        entry,
+        alert,
+        card_path=context["card_path"],
+        lineage_context=context["lineage_context"],
+    ))
     lines.extend([
         "",
         "## Accepted / Rejected Asset Links",
@@ -150,7 +244,7 @@ def render_research_card(
         f"- Effective playbook: {_value(entry, alert, 'latest_effective_playbook_type', 'playbook_type') or playbook}",
     ])
     lines.extend(["", "## Quality Gate Result"])
-    lines.extend(_quality_gate_lines(entry, alert, decision))
+    lines.extend(_quality_gate_lines(entry, alert, context["decision"]))
     if entry is not None and event_watchlist.state_is_quality_capped(entry):
         _, state_block_reason = event_watchlist.quality_cap_watchlist_state(
             event_watchlist.requested_state_value(entry),
@@ -174,6 +268,17 @@ def render_research_card(
     if hypothesis_lines:
         lines.extend(["", "## Impact Hypothesis Context"])
         lines.extend(hypothesis_lines)
+
+
+def _append_research_card_review_sections(lines: list[str], context: Mapping[str, Any]) -> None:
+    entry = context["entry"]
+    alert = context["alert"]
+    decision = context["decision"]
+    monitor_row = context["monitor_row"]
+    feedback = context["feedback"]
+    outcome = context["outcome"]
+    playbook = _value(entry, alert, "latest_playbook_type", "playbook_type") or "unknown"
+    state = _research_card_state(entry, alert)
     lines.extend([
         "",
         "## LLM Interpretation",
@@ -223,7 +328,6 @@ def render_research_card(
         lines.extend(f"- {warning}" for warning in warnings)
     lines.extend(["", "## Outcome Tracking"])
     lines.extend(_outcome_tracking_lines(outcome))
-    return EventResearchCardResult(key=clean_key, markdown="\n".join(lines).rstrip() + "\n", found=True)
 
 def render_selected_cards(
     *,

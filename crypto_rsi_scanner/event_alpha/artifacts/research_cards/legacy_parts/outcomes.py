@@ -8,7 +8,31 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     if entry is None:
         return []
     components = dict(entry.latest_score_components or {})
-    has_hypothesis_context = entry.relationship_type == "impact_hypothesis" or any(
+    if not _has_impact_hypothesis_context(entry, components):
+        return []
+    context = _impact_hypothesis_context(entry, components)
+    lines = (
+        _impact_hypothesis_incident_lines(components, context)
+        + _impact_hypothesis_frame_lines(components, context)
+        + _impact_hypothesis_candidate_lines(entry, components, context)
+        + _impact_hypothesis_market_lines(components, context)
+        + _impact_hypothesis_verdict_lines(entry, components, context)
+    )
+    if context["validation_reasons"]:
+        lines.append("- Validation evidence: " + "; ".join(str(item) for item in context["validation_reasons"][:4]))
+    if context["why_not_promoted"]:
+        lines.append(
+            "- Why not promoted diagnostics: "
+            + event_alpha_reason_text.humanize_event_alpha_reasons(context["why_not_promoted"], limit=4)
+        )
+    return lines
+
+
+def _has_impact_hypothesis_context(
+    entry: event_watchlist.EventWatchlistEntry,
+    components: Mapping[str, Any],
+) -> bool:
+    return entry.relationship_type == "impact_hypothesis" or any(
         components.get(key) not in (None, "", [], {}, ())
         for key in (
             "hypothesis_id",
@@ -19,82 +43,99 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
             "impact_path_reason",
         )
     )
-    if not has_hypothesis_context:
-        return []
+
+
+def _list_value(value: Any) -> list[Any]:
+    return [value] if isinstance(value, str) else list(value or [])
+
+
+def _impact_hypothesis_context(
+    entry: event_watchlist.EventWatchlistEntry,
+    components: Mapping[str, Any],
+) -> dict[str, Any]:
     validated_asset = components.get("validated_asset") if isinstance(components.get("validated_asset"), Mapping) else {}
-    validated_symbol = components.get("validated_symbol") or validated_asset.get("symbol") or entry.symbol
-    validated_coin_id = components.get("validated_coin_id") or validated_asset.get("coin_id") or entry.coin_id
-    candidate_symbols = components.get("candidate_symbols") or []
-    validation_reasons = components.get("validation_reasons") or components.get("validation_reason") or []
-    if isinstance(validation_reasons, str):
-        validation_reasons = [validation_reasons]
+    verdict_copy = event_opportunity_verdict.build_verdict_aware_upgrade_downgrade_text(components)
+    digest_eligible = components.get("digest_eligible_by_impact_path")
+    if digest_eligible is None and _is_promoted_components(components):
+        digest_eligible = True
     gate_line = _impact_hypothesis_quality_gate_line(entry, components)
-    impact_path_reason = components.get("impact_path_reason") or _canonical_reason_from_components(components) or "not available"
-    impact_path_type = components.get("impact_path_type") or components.get("primary_impact_path") or "not available"
-    candidate_role = components.get("candidate_role") or "not available"
-    asset_kind = components.get("asset_kind") or "unknown"
-    role_source = components.get("role_source") or components.get("asset_role_source") or "unknown"
-    identity_confidence = components.get("identity_confidence")
-    identity_evidence = components.get("identity_evidence") or []
-    collision_risk = components.get("collision_risk") or "none"
-    role_capabilities = components.get("role_capabilities") or {}
-    role_validation_failures = components.get("role_validation_failures") or []
-    incident_id = components.get("incident_id") or "unknown"
-    canonical_incident_name = components.get("canonical_incident_name") or "unknown"
-    event_archetype = components.get("event_archetype") or "unknown"
-    primary_subject = components.get("primary_subject") or "unknown"
-    affected_ecosystem = components.get("affected_ecosystem") or "unknown"
-    cause_status = components.get("cause_status") or "unknown"
-    main_frame_type = components.get("main_frame_type") or "unknown"
-    main_frame_role = components.get("main_frame_role") or "unknown"
-    main_frame_subject = components.get("main_frame_subject") or "unknown"
-    main_frame_actor = components.get("main_frame_actor") or "unknown"
-    main_frame_object = components.get("main_frame_object") or "unknown"
-    main_frame_quote = components.get("main_frame_evidence_quote") or "none"
-    frame_status = components.get("frame_status") or "unknown"
-    selected_main_reason = components.get("selected_main_catalyst_reason") or "unknown"
-    rule_predicted_path = components.get("rule_predicted_impact_path") or "unknown"
-    llm_predicted_path = components.get("llm_predicted_main_frame_type") or "unknown"
-    frame_disagreement = components.get("frame_rule_disagreement")
-    disagreement_resolution = components.get("disagreement_resolution") or "unknown"
-    background_context_summary = components.get("background_context_summary") or "none"
-    negated_frame_ids = components.get("negated_frame_ids") or []
-    corrective_frame_ids = components.get("corrective_frame_ids") or []
-    rejected_impact_paths = components.get("rejected_impact_paths") or []
-    frame_summary = components.get("frame_summary") or []
-    claim_polarities = components.get("claim_polarities") or []
-    claim_history = components.get("claim_history") or []
-    independent_source_domains = components.get("independent_source_domains") or components.get("source_domains") or []
-    conflicting_claims = components.get("conflicting_claims") or []
-    role_confidence = components.get("role_confidence")
-    role_evidence = components.get("role_evidence") or []
+    final_opportunity_level = components.get("final_opportunity_level") or components.get("opportunity_level") or "unknown"
+    why_digest_ineligible = components.get("why_digest_ineligible") or verdict_copy.missing_evidence_text
+    upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
+    if _is_promoted_components(components):
+        upgrade_text = verdict_copy.upgrade_text
+        downgrade_text = verdict_copy.downgrade_text
+    else:
+        upgrade_text = (
+            event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=6)
+            or verdict_copy.upgrade_text
+        )
+        downgrade_text = (
+            event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=6)
+            or verdict_copy.downgrade_text
+        )
+    market = _impact_hypothesis_market_context(components)
+    return {
+        **market,
+        "validated_symbol": components.get("validated_symbol") or validated_asset.get("symbol") or entry.symbol,
+        "validated_coin_id": components.get("validated_coin_id") or validated_asset.get("coin_id") or entry.coin_id,
+        "candidate_symbols": components.get("candidate_symbols") or [],
+        "validation_reasons": _list_value(
+            components.get("validation_reasons") or components.get("validation_reason") or []
+        ),
+        "gate_line": gate_line,
+        "impact_path_reason": (
+            components.get("impact_path_reason")
+            or _canonical_reason_from_components(components)
+            or "not available"
+        ),
+        "impact_path_type": components.get("impact_path_type") or components.get("primary_impact_path") or "not available",
+        "candidate_role": components.get("candidate_role") or "not available",
+        "asset_kind": components.get("asset_kind") or "unknown",
+        "role_source": components.get("role_source") or components.get("asset_role_source") or "unknown",
+        "impact_path_strength": (
+            components.get("impact_path_strength")
+            or _canonical_strength_from_components(components)
+            or "not available"
+        ),
+        "digest_eligible": digest_eligible,
+        "why_digest_ineligible": why_digest_ineligible,
+        "final_opportunity_level": final_opportunity_level,
+        "final_opportunity_score": components.get("final_opportunity_score") or components.get("opportunity_score_final"),
+        "verdict_reasons": _list_value(components.get("opportunity_verdict_reasons") or []),
+        "missing_requirements": _list_value(components.get("missing_requirements") or []),
+        "manual_verification_items": _list_value(components.get("manual_verification_items") or []),
+        "why_not_promoted": _list_value(components.get("why_not_promoted") or []),
+        "upgrade_text": upgrade_text,
+        "downgrade_text": downgrade_text,
+        "local_only_due_to_weak_cooccurrence": _local_only_due_to_weak_cooccurrence(
+            final_opportunity_level=final_opportunity_level,
+            gate_line=gate_line,
+            why_digest_ineligible=why_digest_ineligible,
+        ),
+    }
+
+
+def _impact_hypothesis_market_context(components: Mapping[str, Any]) -> dict[str, Any]:
     market_context_source = components.get("market_context_source") or "not available"
-    market_context_age = _format_market_context_age(components)
     market_context_quality = (
         components.get("market_context_freshness_status")
         or components.get("market_context_data_quality")
         or "unknown"
     )
-    freshness_cap = components.get("market_context_freshness_cap_applied")
-    market_reaction_confirmed = components.get("market_reaction_confirmed")
-    causal_mechanism_confirmed = components.get("causal_mechanism_confirmed")
-    incident_confidence = components.get("incident_confidence")
-    impact_path_strength = components.get("impact_path_strength") or _canonical_strength_from_components(components) or "not available"
-    opportunity_score_v2 = components.get("opportunity_score_v2")
-    evidence_specificity = components.get("evidence_specificity_score")
-    verdict_copy = event_opportunity_verdict.build_verdict_aware_upgrade_downgrade_text(components)
-    why_digest_ineligible = components.get("why_digest_ineligible") or verdict_copy.missing_evidence_text
-    digest_eligible = components.get("digest_eligible_by_impact_path")
-    if digest_eligible is None and _is_promoted_components(components):
-        digest_eligible = True
-    evidence_quality_score = components.get("evidence_quality_score")
-    source_class = components.get("source_class") or "unknown"
-    evidence_specificity_class = components.get("evidence_specificity") or "unknown"
     market_confirmation_score = components.get("market_confirmation_score")
     market_confirmation_level = components.get("market_confirmation_level") or "not available"
-    market_data_freshness = components.get("market_data_freshness") or components.get("market_context_freshness_status") or "not available"
+    market_data_freshness = (
+        components.get("market_data_freshness")
+        or components.get("market_context_freshness_status")
+        or "not available"
+    )
     market_reaction_confirmation = components.get("market_reaction_confirmation") or market_confirmation_level
-    market_confirmation_summary = components.get("market_confirmation_summary") or _canonical_market_summary_from_components(components) or "not available"
+    market_confirmation_summary = (
+        components.get("market_confirmation_summary")
+        or _canonical_market_summary_from_components(components)
+        or "not available"
+    )
     integrated_market_level = components.get("integrated_market_confirmation_level")
     if integrated_market_level:
         market_confirmation_level = integrated_market_level
@@ -108,30 +149,28 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
             f"{market_confirmation_score if market_confirmation_score is not None else 'n/a'}; "
             f"freshness={market_data_freshness} source={market_context_source}"
         )
-    opportunity_score_final = components.get("opportunity_score_final")
-    opportunity_level = components.get("opportunity_level") or "unknown"
-    final_opportunity_score = components.get("final_opportunity_score") or opportunity_score_final
-    final_opportunity_level = components.get("final_opportunity_level") or opportunity_level
-    verdict_reasons = components.get("opportunity_verdict_reasons") or []
-    missing_requirements = components.get("missing_requirements") or []
-    manual_verification_items = components.get("manual_verification_items") or []
-    if isinstance(verdict_reasons, str):
-        verdict_reasons = [verdict_reasons]
-    if isinstance(missing_requirements, str):
-        missing_requirements = [missing_requirements]
-    if isinstance(manual_verification_items, str):
-        manual_verification_items = [manual_verification_items]
-    why_not_promoted = components.get("why_not_promoted") or []
-    if isinstance(why_not_promoted, str):
-        why_not_promoted = [why_not_promoted]
-    upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
-    if _is_promoted_components(components):
-        upgrade_text = verdict_copy.upgrade_text
-        downgrade_text = verdict_copy.downgrade_text
-    else:
-        upgrade_text = event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=6) or verdict_copy.upgrade_text
-        downgrade_text = event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=6) or verdict_copy.downgrade_text
-    local_only_due_to_weak_cooccurrence = (
+    return {
+        "market_context_source": market_context_source,
+        "market_context_age": _format_market_context_age(components),
+        "market_context_quality": market_context_quality,
+        "freshness_cap": components.get("market_context_freshness_cap_applied"),
+        "market_reaction_confirmed": components.get("market_reaction_confirmed"),
+        "causal_mechanism_confirmed": components.get("causal_mechanism_confirmed"),
+        "market_confirmation_score": market_confirmation_score,
+        "market_confirmation_level": market_confirmation_level,
+        "market_data_freshness": market_data_freshness,
+        "market_reaction_confirmation": market_reaction_confirmation,
+        "market_confirmation_summary": market_confirmation_summary,
+    }
+
+
+def _local_only_due_to_weak_cooccurrence(
+    *,
+    final_opportunity_level: Any,
+    gate_line: str,
+    why_digest_ineligible: Any,
+) -> bool:
+    return (
         final_opportunity_level in {"local_only", "exploratory", "unknown", ""}
         and (
             "impact_path_not_validated" in gate_line
@@ -139,73 +178,119 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
             or str(why_digest_ineligible or "none").strip().casefold() not in {"", "none", "not available"}
         )
     )
-    lines = [
-        f"- Validated asset: {validated_symbol or 'unknown'}/{validated_coin_id or 'unknown'}",
-        f"- Incident: {canonical_incident_name} ({incident_id})",
+
+
+def _impact_hypothesis_incident_lines(
+    components: Mapping[str, Any],
+    context: Mapping[str, Any],
+) -> list[str]:
+    return [
+        f"- Validated asset: {context['validated_symbol'] or 'unknown'}/{context['validated_coin_id'] or 'unknown'}",
+        f"- Incident: {components.get('canonical_incident_name') or 'unknown'} ({components.get('incident_id') or 'unknown'})",
         f"- Incident relevance: {components.get('incident_relevance_status') or 'unknown'} "
         f"score={components.get('incident_relevance_score') if components.get('incident_relevance_score') is not None else 'n/a'}",
         f"- Canonical persistence reason: {components.get('canonical_persistence_reason') or 'unknown'}",
         f"- Incident relevance reasons: {'; '.join(str(item) for item in (components.get('incident_relevance_reasons') or [])[:4]) if components.get('incident_relevance_reasons') else 'none'}",
-        f"- Event archetype: {event_archetype}",
-        f"- Main catalyst: {main_frame_type} ({main_frame_role})",
-        f"- Frame status: {frame_status}",
-        f"- Main catalyst subject/actor/object: {main_frame_subject} / {main_frame_actor} / {main_frame_object}",
-        f"- Main catalyst evidence: {main_frame_quote}",
-        f"- Main catalyst selected because: {selected_main_reason}",
-        f"- Rule vs LLM frame: rule={rule_predicted_path} llm={llm_predicted_path} "
+    ]
+
+
+def _impact_hypothesis_frame_lines(
+    components: Mapping[str, Any],
+    context: Mapping[str, Any],
+) -> list[str]:
+    negated_frame_ids = components.get("negated_frame_ids") or []
+    corrective_frame_ids = components.get("corrective_frame_ids") or []
+    rejected_impact_paths = components.get("rejected_impact_paths") or []
+    frame_disagreement = components.get("frame_rule_disagreement")
+    return [
+        f"- Event archetype: {components.get('event_archetype') or 'unknown'}",
+        f"- Main catalyst: {components.get('main_frame_type') or 'unknown'} ({components.get('main_frame_role') or 'unknown'})",
+        f"- Frame status: {components.get('frame_status') or 'unknown'}",
+        f"- Main catalyst subject/actor/object: {components.get('main_frame_subject') or 'unknown'} / {components.get('main_frame_actor') or 'unknown'} / {components.get('main_frame_object') or 'unknown'}",
+        f"- Main catalyst evidence: {components.get('main_frame_evidence_quote') or 'none'}",
+        f"- Main catalyst selected because: {components.get('selected_main_catalyst_reason') or 'unknown'}",
+        f"- Rule vs LLM frame: rule={components.get('rule_predicted_impact_path') or 'unknown'} "
+        f"llm={components.get('llm_predicted_main_frame_type') or 'unknown'} "
         f"disagreement={str(bool(frame_disagreement)).lower() if frame_disagreement is not None else 'unknown'} "
-        f"resolution={disagreement_resolution}",
-        f"- Background context: {background_context_summary}",
+        f"resolution={components.get('disagreement_resolution') or 'unknown'}",
+        f"- Background context: {components.get('background_context_summary') or 'none'}",
         f"- Negated/corrective frames: {len(negated_frame_ids) + len(corrective_frame_ids)}",
         f"- Rejected/background impact paths: {'; '.join(str(item) for item in rejected_impact_paths[:4]) if rejected_impact_paths else 'none'}",
-        f"- Catalyst frame evidence: {_frame_summary_value(frame_summary)}",
-        f"- Primary subject: {primary_subject}",
-        f"- Affected ecosystem: {affected_ecosystem}",
-        f"- Cause status: {cause_status}",
-        f"- Incident confidence: {incident_confidence if incident_confidence is not None else 'n/a'}",
-        f"- Claim polarity: {', '.join(str(item) for item in claim_polarities[:6]) if claim_polarities else 'unknown'}",
-        f"- Claim history: {_claim_history_summary(claim_history)}",
-        f"- Independent source domains: {', '.join(str(item) for item in independent_source_domains[:6]) if independent_source_domains else 'none'}",
-        f"- Conflicting claims: {'; '.join(str(item) for item in conflicting_claims[:4]) if conflicting_claims else 'none'}",
+        f"- Catalyst frame evidence: {_frame_summary_value(components.get('frame_summary') or [])}",
+        f"- Primary subject: {components.get('primary_subject') or 'unknown'}",
+        f"- Affected ecosystem: {components.get('affected_ecosystem') or 'unknown'}",
+        f"- Cause status: {components.get('cause_status') or 'unknown'}",
+        f"- Incident confidence: {components.get('incident_confidence') if components.get('incident_confidence') is not None else 'n/a'}",
+        f"- Claim polarity: {', '.join(str(item) for item in (components.get('claim_polarities') or [])[:6]) if components.get('claim_polarities') else 'unknown'}",
+        f"- Claim history: {_claim_history_summary(components.get('claim_history') or [])}",
+        f"- Independent source domains: {', '.join(str(item) for item in (components.get('independent_source_domains') or components.get('source_domains') or [])[:6]) if (components.get('independent_source_domains') or components.get('source_domains')) else 'none'}",
+        f"- Conflicting claims: {'; '.join(str(item) for item in (components.get('conflicting_claims') or [])[:4]) if components.get('conflicting_claims') else 'none'}",
+    ]
+
+
+def _impact_hypothesis_candidate_lines(
+    entry: event_watchlist.EventWatchlistEntry,
+    components: Mapping[str, Any],
+    context: Mapping[str, Any],
+) -> list[str]:
+    role_evidence = components.get("role_evidence") or []
+    return [
         f"- Original sector hypothesis: {', '.join(str(item) for item in (components.get('candidate_sectors') or [])[:6]) or components.get('hypothesis_scope') or 'unknown'}",
         f"- Candidate source: {entry.latest_source or 'impact_hypothesis'}",
         f"- Candidate Discovery Origin: {components.get('candidate_source') or components.get('source') or entry.latest_source or 'impact_hypothesis'}",
-        f"- Candidate symbols considered: {', '.join(str(item) for item in candidate_symbols[:8]) if candidate_symbols else 'none'}",
+        f"- Candidate symbols considered: {', '.join(str(item) for item in context['candidate_symbols'][:8]) if context['candidate_symbols'] else 'none'}",
         f"- Playbook: {entry.latest_playbook_type or 'impact_hypothesis'}",
-        f"- Impact path type: {impact_path_type}",
-        f"- Candidate role: {candidate_role}",
-        f"- Asset kind: {asset_kind}",
-        f"- Role source: {role_source}",
-        f"- Identity confidence: {identity_confidence if identity_confidence is not None else 'n/a'}",
-        f"- Identity evidence: {_display_list_value(identity_evidence)}",
-        f"- Collision risk: {collision_risk}",
-        f"- Role capabilities: {_role_capabilities_line(role_capabilities)}",
-        f"- Role validation failures: {_display_list_value(role_validation_failures)}",
-        f"- Candidate role confidence: {role_confidence if role_confidence is not None else 'n/a'}",
+        f"- Impact path type: {context['impact_path_type']}",
+        f"- Candidate role: {context['candidate_role']}",
+        f"- Asset kind: {context['asset_kind']}",
+        f"- Role source: {context['role_source']}",
+        f"- Identity confidence: {components.get('identity_confidence') if components.get('identity_confidence') is not None else 'n/a'}",
+        f"- Identity evidence: {_display_list_value(components.get('identity_evidence') or [])}",
+        f"- Collision risk: {components.get('collision_risk') or 'none'}",
+        f"- Role capabilities: {_role_capabilities_line(components.get('role_capabilities') or {})}",
+        f"- Role validation failures: {_display_list_value(components.get('role_validation_failures') or [])}",
+        f"- Candidate role confidence: {components.get('role_confidence') if components.get('role_confidence') is not None else 'n/a'}",
         f"- Candidate role evidence: {'; '.join(str(item) for item in role_evidence[:4]) if role_evidence else 'none'}",
-        f"- Impact path strength: {impact_path_strength}",
-        f"- Impact path reason: {impact_path_reason}",
-        f"- Opportunity score v2: {opportunity_score_v2 if opportunity_score_v2 is not None else 'n/a'}",
-        f"- Final opportunity verdict: {final_opportunity_level} / {final_opportunity_score if final_opportunity_score is not None else 'n/a'}",
+        f"- Impact path strength: {context['impact_path_strength']}",
+        f"- Impact path reason: {context['impact_path_reason']}",
+    ]
+
+
+def _impact_hypothesis_market_lines(
+    components: Mapping[str, Any],
+    context: Mapping[str, Any],
+) -> list[str]:
+    return [
+        f"- Opportunity score v2: {components.get('opportunity_score_v2') if components.get('opportunity_score_v2') is not None else 'n/a'}",
+        f"- Final opportunity verdict: {context['final_opportunity_level']} / {context['final_opportunity_score'] if context['final_opportunity_score'] is not None else 'n/a'}",
         f"- Final verdict source: {components.get('final_verdict_source') or 'initial'} ({components.get('final_verdict_reason') or 'no refresh override'})",
-        f"- Source/evidence specificity: {evidence_specificity if evidence_specificity is not None else 'n/a'}",
-        f"- Evidence quality: {source_class}/{evidence_specificity_class} / {evidence_quality_score if evidence_quality_score is not None else 'n/a'}",
-        f"- Market confirmation: {market_confirmation_level} / {market_confirmation_score if market_confirmation_score is not None else 'n/a'}",
-        f"- Market freshness: {market_data_freshness}",
-        f"- Market reaction confirmation: {market_reaction_confirmation}",
-        f"- Market context source: {market_context_source} ({market_context_quality}; age={market_context_age}; cap_applied={str(bool(freshness_cap)).lower()})",
-        "- Targeted market refresh: "
-        + _targeted_market_refresh_line(components),
-        f"- Market reaction confirmed: {str(bool(market_reaction_confirmed)).lower() if market_reaction_confirmed is not None else 'unknown'}",
-        f"- Causal mechanism confirmed: {str(bool(causal_mechanism_confirmed)).lower() if causal_mechanism_confirmed is not None else 'unknown'}",
-        f"- Market summary: {market_confirmation_summary}",
-        f"- Impact path digest eligible: {str(bool(digest_eligible)).lower() if digest_eligible is not None else 'unknown'}",
-        f"- Missing evidence / gate failure: {why_digest_ineligible}",
-        f"- Opportunity verdict reasons: {'; '.join(str(item) for item in verdict_reasons[:4]) if verdict_reasons else 'none'}",
-        f"- Missing requirements: {'; '.join(str(item) for item in missing_requirements[:4]) if missing_requirements else 'none'}",
-        f"- Quality gate: {gate_line}",
-        f"- Local-only due to weak co-occurrence: {str(local_only_due_to_weak_cooccurrence).lower()}",
-        f"- Why promoted/local-only: {_impact_hypothesis_promotion_line(entry, components, gate_line)}",
+        f"- Source/evidence specificity: {components.get('evidence_specificity_score') if components.get('evidence_specificity_score') is not None else 'n/a'}",
+        f"- Evidence quality: {components.get('source_class') or 'unknown'}/{components.get('evidence_specificity') or 'unknown'} / {components.get('evidence_quality_score') if components.get('evidence_quality_score') is not None else 'n/a'}",
+        f"- Market confirmation: {context['market_confirmation_level']} / {context['market_confirmation_score'] if context['market_confirmation_score'] is not None else 'n/a'}",
+        f"- Market freshness: {context['market_data_freshness']}",
+        f"- Market reaction confirmation: {context['market_reaction_confirmation']}",
+        f"- Market context source: {context['market_context_source']} ({context['market_context_quality']}; age={context['market_context_age']}; cap_applied={str(bool(context['freshness_cap'])).lower()})",
+        "- Targeted market refresh: " + _targeted_market_refresh_line(components),
+        f"- Market reaction confirmed: {str(bool(context['market_reaction_confirmed'])).lower() if context['market_reaction_confirmed'] is not None else 'unknown'}",
+        f"- Causal mechanism confirmed: {str(bool(context['causal_mechanism_confirmed'])).lower() if context['causal_mechanism_confirmed'] is not None else 'unknown'}",
+        f"- Market summary: {context['market_confirmation_summary']}",
+    ]
+
+
+def _impact_hypothesis_verdict_lines(
+    entry: event_watchlist.EventWatchlistEntry,
+    components: Mapping[str, Any],
+    context: Mapping[str, Any],
+) -> list[str]:
+    manual_verification_items = context["manual_verification_items"]
+    return [
+        f"- Impact path digest eligible: {str(bool(context['digest_eligible'])).lower() if context['digest_eligible'] is not None else 'unknown'}",
+        f"- Missing evidence / gate failure: {context['why_digest_ineligible']}",
+        f"- Opportunity verdict reasons: {'; '.join(str(item) for item in context['verdict_reasons'][:4]) if context['verdict_reasons'] else 'none'}",
+        f"- Missing requirements: {'; '.join(str(item) for item in context['missing_requirements'][:4]) if context['missing_requirements'] else 'none'}",
+        f"- Quality gate: {context['gate_line']}",
+        f"- Local-only due to weak co-occurrence: {str(context['local_only_due_to_weak_cooccurrence']).lower()}",
+        f"- Why promoted/local-only: {_impact_hypothesis_promotion_line(entry, components, context['gate_line'])}",
         "- Safety label: catalyst link validated, but this is not a calibrated strategy or trade signal.",
         "- Why it may be wrong: " + _impact_hypothesis_wrong_line(components),
         "- What to verify manually: "
@@ -214,19 +299,9 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
             if manual_verification_items
             else "independent catalyst source, asset identity, liquidity/organic volume, and whether the catalyst actually affects this token."
         ),
-        "- What would upgrade this candidate: "
-        + upgrade_text,
-        "- What would invalidate this candidate: "
-        + downgrade_text,
+        "- What would upgrade this candidate: " + context["upgrade_text"],
+        "- What would invalidate this candidate: " + context["downgrade_text"],
     ]
-    if validation_reasons:
-        lines.append("- Validation evidence: " + "; ".join(str(item) for item in validation_reasons[:4]))
-    if why_not_promoted:
-        lines.append(
-            "- Why not promoted diagnostics: "
-            + event_alpha_reason_text.humanize_event_alpha_reasons(why_not_promoted, limit=4)
-        )
-    return lines
 
 def _impact_hypothesis_quality_gate_line(
     entry: event_watchlist.EventWatchlistEntry,
