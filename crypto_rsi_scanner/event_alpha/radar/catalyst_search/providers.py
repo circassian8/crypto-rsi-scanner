@@ -77,39 +77,12 @@ class FixtureCatalystSearchProvider:
     def _load_rows(self) -> dict[str, tuple[RawDiscoveredEvent, ...]]:
         if self._loaded_rows is not None:
             return self._loaded_rows
-        if self.rows_by_query:
-            self._loaded_rows = dict(self.rows_by_query)
-            return self._loaded_rows
-        if self.path is None:
-            self._loaded_rows = {}
-            return self._loaded_rows
-        if not self.path.exists():
-            if self.required:
-                raise FileNotFoundError(f"fixture catalyst-search rows not found: {self.path}")
-            log.warning("Fixture catalyst-search rows missing: %s", self.path)
-            self._loaded_rows = {}
-            return self._loaded_rows
-        try:
-            raw = json.loads(self.path.read_text(encoding="utf-8"))
-            rows = raw.get("search_results", raw) if isinstance(raw, Mapping) else raw
-            if not isinstance(rows, list):
-                raise ValueError("fixture catalyst-search file must be a list or {'search_results': [...]}")
-            loaded: dict[str, list[RawDiscoveredEvent]] = {}
-            for item in rows:
-                if not isinstance(item, Mapping):
-                    raise ValueError("fixture catalyst-search rows must be objects")
-                query = str(item.get("query") or item.get("query_contains") or "").strip()
-                event_obj = item.get("raw_event") if isinstance(item.get("raw_event"), Mapping) else item
-                raw_event = _raw_event_from_fixture(event_obj)
-                loaded.setdefault(query, []).append(raw_event)
-            self._loaded_rows = {key: tuple(value) for key, value in loaded.items()}
-            return self._loaded_rows
-        except Exception as exc:  # noqa: BLE001
-            if self.required:
-                raise
-            log.warning("Fixture catalyst-search rows failed to load: %s", exc)
-            self._loaded_rows = {}
-            return self._loaded_rows
+        self._loaded_rows = _load_fixture_search_rows(
+            self.rows_by_query,
+            self.path,
+            required=self.required,
+        )
+        return self._loaded_rows
 class CompositeCatalystSearchProvider:
     """Fan out catalyst-search queries to multiple evidence providers."""
 
@@ -185,65 +158,142 @@ class EventProviderCatalystSearchProvider:
         max_results_per_query: int,
         now: datetime | None = None,
     ) -> CatalystSearchRunResult:
-        observed = _as_utc(now or datetime.now(timezone.utc))
-        start = observed - timedelta(hours=max(0.0, self.lookback_hours))
-        end = observed + timedelta(days=max(0.0, self.horizon_days))
-        query_rows = tuple(queries)
-        result_events: list[SearchResultEvent] = []
-        warnings: list[str] = []
-        cache: dict[tuple[str, ...], tuple[RawDiscoveredEvent, ...]] = {}
-        fetch_count = 0
-        cache_hits = 0
-        cache_misses = 0
-        for query in query_rows:
-            cache_key = self.cache_key_for_query(query)
-            if cache_key in cache:
-                events = cache[cache_key]
-                cache_hits += 1
-            else:
-                if self.max_fetches_per_search is not None and fetch_count >= self.max_fetches_per_search:
-                    warnings.append(
-                        f"{self.name} search fetch cap reached after {fetch_count} fetch(es)"
-                    )
-                    break
-                cache_misses += 1
-                fetch_count += 1
-                events = ()
-                try:
-                    provider = self.event_provider_factory(query)
-                    events = tuple(provider.fetch_events(start, end))  # type: ignore[attr-defined]
-                    provider_warnings = tuple(str(item) for item in getattr(provider, "last_warnings", ()) if str(item))
-                    warnings.extend(provider_warnings)
-                except Exception as exc:  # noqa: BLE001
-                    warnings.append(f"{self.name} search failed for {query.query!r}: {exc}")
-                cache[cache_key] = events
-            try:
-                matched = [
-                    raw for raw in events
-                    if not self.filter_by_query or _raw_event_matches_query(raw, query)
-                ][: max(0, max_results_per_query)]
-            except Exception as exc:  # noqa: BLE001
-                warnings.append(f"{self.name} filter failed for {query.query!r}: {exc}")
-                matched = []
-            for raw in matched:
-                result_events.append(SearchResultEvent(
-                    query=query,
-                    raw_event=_annotate_search_source(raw, self.name, query),
-                ))
-        return CatalystSearchRunResult(
-            provider=self.name,
-            queries=query_rows,
-            result_events=tuple(result_events),
-            warnings=tuple(dict.fromkeys(warnings)),
-            provider_fetch_count=fetch_count,
-            provider_cache_hits=cache_hits,
-            provider_cache_misses=cache_misses,
-            query_count=len(query_rows),
-            result_count=len(result_events),
+        return _search_event_provider_queries(
+            self,
+            queries,
+            max_results_per_query=max_results_per_query,
+            now=now,
         )
 
     def cache_key_for_query(self, query: SearchQuery) -> tuple[str, ...]:
         return (self.name, query.query)
+
+
+def _load_fixture_search_rows(
+    rows_by_query: Mapping[str, tuple[RawDiscoveredEvent, ...]],
+    path: Path | None,
+    *,
+    required: bool,
+) -> dict[str, tuple[RawDiscoveredEvent, ...]]:
+    if rows_by_query:
+        return dict(rows_by_query)
+    if path is None:
+        return {}
+    if not path.exists():
+        if required:
+            raise FileNotFoundError(f"fixture catalyst-search rows not found: {path}")
+        log.warning("Fixture catalyst-search rows missing: %s", path)
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        rows = raw.get("search_results", raw) if isinstance(raw, Mapping) else raw
+        if not isinstance(rows, list):
+            raise ValueError("fixture catalyst-search file must be a list or {'search_results': [...]}")
+        loaded: dict[str, list[RawDiscoveredEvent]] = {}
+        for item in rows:
+            if not isinstance(item, Mapping):
+                raise ValueError("fixture catalyst-search rows must be objects")
+            query = str(item.get("query") or item.get("query_contains") or "").strip()
+            event_obj = item.get("raw_event") if isinstance(item.get("raw_event"), Mapping) else item
+            loaded.setdefault(query, []).append(_raw_event_from_fixture(event_obj))
+        return {key: tuple(value) for key, value in loaded.items()}
+    except Exception as exc:  # noqa: BLE001
+        if required:
+            raise
+        log.warning("Fixture catalyst-search rows failed to load: %s", exc)
+        return {}
+
+
+def _search_event_provider_queries(
+    provider_adapter: EventProviderCatalystSearchProvider,
+    queries: Iterable[SearchQuery],
+    *,
+    max_results_per_query: int,
+    now: datetime | None = None,
+) -> CatalystSearchRunResult:
+    observed = _as_utc(now or datetime.now(timezone.utc))
+    start = observed - timedelta(hours=max(0.0, provider_adapter.lookback_hours))
+    end = observed + timedelta(days=max(0.0, provider_adapter.horizon_days))
+    query_rows = tuple(queries)
+    result_events: list[SearchResultEvent] = []
+    warnings: list[str] = []
+    cache: dict[tuple[str, ...], tuple[RawDiscoveredEvent, ...]] = {}
+    fetch_count = 0
+    cache_hits = 0
+    cache_misses = 0
+    for query in query_rows:
+        cache_key = provider_adapter.cache_key_for_query(query)
+        if cache_key in cache:
+            events = cache[cache_key]
+            cache_hits += 1
+        else:
+            if provider_adapter.max_fetches_per_search is not None and fetch_count >= provider_adapter.max_fetches_per_search:
+                warnings.append(f"{provider_adapter.name} search fetch cap reached after {fetch_count} fetch(es)")
+                break
+            cache_misses += 1
+            fetch_count += 1
+            events = _fetch_provider_search_events(provider_adapter, query, start=start, end=end, warnings=warnings)
+            cache[cache_key] = events
+        matched = _filter_provider_search_events(
+            provider_adapter,
+            query,
+            events,
+            max_results_per_query=max_results_per_query,
+            warnings=warnings,
+        )
+        for raw in matched:
+            result_events.append(SearchResultEvent(
+                query=query,
+                raw_event=_annotate_search_source(raw, provider_adapter.name, query),
+            ))
+    return CatalystSearchRunResult(
+        provider=provider_adapter.name,
+        queries=query_rows,
+        result_events=tuple(result_events),
+        warnings=tuple(dict.fromkeys(warnings)),
+        provider_fetch_count=fetch_count,
+        provider_cache_hits=cache_hits,
+        provider_cache_misses=cache_misses,
+        query_count=len(query_rows),
+        result_count=len(result_events),
+    )
+
+
+def _fetch_provider_search_events(
+    provider_adapter: EventProviderCatalystSearchProvider,
+    query: SearchQuery,
+    *,
+    start: datetime,
+    end: datetime,
+    warnings: list[str],
+) -> tuple[RawDiscoveredEvent, ...]:
+    try:
+        provider = provider_adapter.event_provider_factory(query)
+        events = tuple(provider.fetch_events(start, end))  # type: ignore[attr-defined]
+        provider_warnings = tuple(str(item) for item in getattr(provider, "last_warnings", ()) if str(item))
+        warnings.extend(provider_warnings)
+        return events
+    except Exception as exc:  # noqa: BLE001
+        warnings.append(f"{provider_adapter.name} search failed for {query.query!r}: {exc}")
+        return ()
+
+
+def _filter_provider_search_events(
+    provider_adapter: EventProviderCatalystSearchProvider,
+    query: SearchQuery,
+    events: tuple[RawDiscoveredEvent, ...],
+    *,
+    max_results_per_query: int,
+    warnings: list[str],
+) -> list[RawDiscoveredEvent]:
+    try:
+        return [
+            raw for raw in events
+            if not provider_adapter.filter_by_query or _raw_event_matches_query(raw, query)
+        ][: max(0, max_results_per_query)]
+    except Exception as exc:  # noqa: BLE001
+        warnings.append(f"{provider_adapter.name} filter failed for {query.query!r}: {exc}")
+        return []
 class GdeltCatalystSearchProvider(EventProviderCatalystSearchProvider):
     name = "gdelt"
 

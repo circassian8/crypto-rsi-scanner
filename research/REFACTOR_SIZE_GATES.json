@@ -22,42 +22,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/asset_registry.py"
     },
     {
-      "class_name": "FixtureCatalystSearchProvider",
-      "exception_reason": null,
-      "line_count": 79,
-      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
-      "public": true,
-      "qualname": "FixtureCatalystSearchProvider",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py"
-    },
-    {
-      "class_name": "EventProviderCatalystSearchProvider",
-      "exception_reason": null,
-      "line_count": 88,
-      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
-      "public": true,
-      "qualname": "EventProviderCatalystSearchProvider",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py"
-    },
-    {
-      "class_name": "EventIntegratedRadarResult",
-      "exception_reason": null,
-      "line_count": 88,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.models",
-      "public": true,
-      "qualname": "EventIntegratedRadarResult",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py"
-    },
-    {
-      "class_name": "EventWatchlistEntry",
-      "exception_reason": null,
-      "line_count": 85,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.models",
-      "public": true,
-      "qualname": "EventWatchlistEntry",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/models.py"
-    },
-    {
       "class_name": "CoinGeckoWatchlistMarketProvider",
       "exception_reason": null,
       "line_count": 116,
@@ -166,8 +130,8 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 18,
-  "existing_violation_count": 156,
+  "classes_over_limit_count": 14,
+  "existing_violation_count": 152,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -264,54 +228,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/asset_registry.py",
       "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/asset_registry.py:CanonicalAsset"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "FixtureCatalystSearchProvider",
-      "exception_reason": null,
-      "line_count": 79,
-      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
-      "public": true,
-      "qualname": "FixtureCatalystSearchProvider",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:FixtureCatalystSearchProvider"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "EventProviderCatalystSearchProvider",
-      "exception_reason": null,
-      "line_count": 88,
-      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
-      "public": true,
-      "qualname": "EventProviderCatalystSearchProvider",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:EventProviderCatalystSearchProvider"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "EventIntegratedRadarResult",
-      "exception_reason": null,
-      "line_count": 88,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.models",
-      "public": true,
-      "qualname": "EventIntegratedRadarResult",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py:EventIntegratedRadarResult"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "EventWatchlistEntry",
-      "exception_reason": null,
-      "line_count": 85,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.models",
-      "public": true,
-      "qualname": "EventWatchlistEntry",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/models.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/watchlist/models.py:EventWatchlistEntry"
     },
     {
       "category": "class_over_75_lines",
@@ -2084,7 +2000,7 @@
   ],
   "functions_over_limit_count": 48,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T04:22:37.524454+00:00",
+  "generated_at": "2026-07-04T04:33:14.564608+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -3041,22 +2957,6 @@
   "modules_with_multiple_public_classes_count": 82,
   "moved_existing_violation_aliases": [
     {
-      "baseline_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search.py:EventProviderCatalystSearchProvider",
-      "current_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:EventProviderCatalystSearchProvider"
-    },
-    {
-      "baseline_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search.py:FixtureCatalystSearchProvider",
-      "current_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:FixtureCatalystSearchProvider"
-    },
-    {
-      "baseline_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:EventIntegratedRadarResult",
-      "current_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py:EventIntegratedRadarResult"
-    },
-    {
-      "baseline_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:EventWatchlistEntry",
-      "current_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/watchlist/models.py:EventWatchlistEntry"
-    },
-    {
       "baseline_violation_id": "function:crypto_rsi_scanner/cli/services/event_alpha_notifications.py:_event_alpha_notify_cycle_body",
       "current_violation_id": "function:crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py:_event_alpha_notify_cycle_body"
     },
@@ -3233,7 +3133,7 @@
       "current_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.models"
     }
   ],
-  "moved_existing_violation_count": 48,
+  "moved_existing_violation_count": 44,
   "new_violation_count": 0,
   "new_violations": [],
   "no_live_provider_calls": true,
@@ -3247,7 +3147,7 @@
     "production_file_over_3000_lines": "blocker",
     "test_file_size_debt": "tracked separately from production completion"
   },
-  "production_classes_over_limit": 18,
+  "production_classes_over_limit": 14,
   "production_classes_over_limit_rows": [
     {
       "class_name": "CoinGeckoClient",
@@ -3266,42 +3166,6 @@
       "public": true,
       "qualname": "CanonicalAsset",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/asset_registry.py"
-    },
-    {
-      "class_name": "FixtureCatalystSearchProvider",
-      "exception_reason": null,
-      "line_count": 79,
-      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
-      "public": true,
-      "qualname": "FixtureCatalystSearchProvider",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py"
-    },
-    {
-      "class_name": "EventProviderCatalystSearchProvider",
-      "exception_reason": null,
-      "line_count": 88,
-      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
-      "public": true,
-      "qualname": "EventProviderCatalystSearchProvider",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py"
-    },
-    {
-      "class_name": "EventIntegratedRadarResult",
-      "exception_reason": null,
-      "line_count": 88,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.models",
-      "public": true,
-      "qualname": "EventIntegratedRadarResult",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py"
-    },
-    {
-      "class_name": "EventWatchlistEntry",
-      "exception_reason": null,
-      "line_count": 85,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.models",
-      "public": true,
-      "qualname": "EventWatchlistEntry",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/models.py"
     },
     {
       "class_name": "CoinGeckoWatchlistMarketProvider",
@@ -3804,7 +3668,7 @@
   ],
   "production_size_gate_status": "pass",
   "research_only": true,
-  "resolved_violation_count": 48,
+  "resolved_violation_count": 52,
   "resolved_violation_ids": [
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
     "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
@@ -3814,11 +3678,15 @@
     "class:crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py:CoinalyzeRehearsalReport",
     "class:crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py:LiveProviderReadinessProvider",
     "class:crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py:HealthCheckedEventProvider",
+    "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search.py:EventProviderCatalystSearchProvider",
+    "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search.py:FixtureCatalystSearchProvider",
     "class:crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py:EvidenceAcquisitionResult",
     "class:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:EventImpactHypothesis",
+    "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:EventIntegratedRadarResult",
     "class:crypto_rsi_scanner/event_alpha/radar/llm/budget.py:EventLLMBudgetRunTracker",
     "class:crypto_rsi_scanner/event_alpha/radar/pipeline.py:EventAlphaPipelineResult",
     "class:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:EventAlphaSourceCoverageReport",
+    "class:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:EventWatchlistEntry",
     "file:crypto_rsi_scanner/backtest_parts/legacy.py",
     "file:crypto_rsi_scanner/cli/services/event_alpha_notifications.py",
     "file:crypto_rsi_scanner/event_alpha/artifacts/alert_store.py",
@@ -3863,10 +3731,6 @@
   "violation_ids": [
     "class:crypto_rsi_scanner/client.py:CoinGeckoClient",
     "class:crypto_rsi_scanner/event_alpha/radar/asset_registry.py:CanonicalAsset",
-    "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:EventProviderCatalystSearchProvider",
-    "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:FixtureCatalystSearchProvider",
-    "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py:EventIntegratedRadarResult",
-    "class:crypto_rsi_scanner/event_alpha/radar/watchlist/models.py:EventWatchlistEntry",
     "class:crypto_rsi_scanner/event_alpha/radar/watchlist_market.py:CoinGeckoWatchlistMarketProvider",
     "class:crypto_rsi_scanner/event_providers/binance_announcements/legacy.py:BinanceAnnouncementProvider",
     "class:crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py:BybitAnnouncementProvider",
@@ -4114,54 +3978,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/asset_registry.py",
       "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/asset_registry.py:CanonicalAsset"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "FixtureCatalystSearchProvider",
-      "exception_reason": null,
-      "line_count": 79,
-      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
-      "public": true,
-      "qualname": "FixtureCatalystSearchProvider",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:FixtureCatalystSearchProvider"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "EventProviderCatalystSearchProvider",
-      "exception_reason": null,
-      "line_count": 88,
-      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
-      "public": true,
-      "qualname": "EventProviderCatalystSearchProvider",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:EventProviderCatalystSearchProvider"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "EventIntegratedRadarResult",
-      "exception_reason": null,
-      "line_count": 88,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.models",
-      "public": true,
-      "qualname": "EventIntegratedRadarResult",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py:EventIntegratedRadarResult"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "EventWatchlistEntry",
-      "exception_reason": null,
-      "line_count": 85,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.models",
-      "public": true,
-      "qualname": "EventWatchlistEntry",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/models.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/watchlist/models.py:EventWatchlistEntry"
     },
     {
       "category": "class_over_75_lines",

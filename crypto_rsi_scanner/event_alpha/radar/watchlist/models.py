@@ -53,7 +53,7 @@ class EventWatchlistConfig:
 
 
 @dataclass(frozen=True)
-class EventWatchlistEntry:
+class _EventWatchlistIdentityFields:
     schema_version: str
     row_type: str
     key: str
@@ -68,6 +68,10 @@ class EventWatchlistEntry:
     previous_state: str | None
     first_seen_at: str
     last_seen_at: str
+
+
+@dataclass(frozen=True)
+class _EventWatchlistIncidentFields:
     incident_id: str | None = None
     hypothesis_id: str | None = None
     incident_canonical_name: str | None = None
@@ -90,6 +94,10 @@ class EventWatchlistEntry:
     first_triggered_at: str | None = None
     first_invalidated_at: str | None = None
     first_expired_at: str | None = None
+
+
+@dataclass(frozen=True)
+class _EventWatchlistLatestFields:
     source_count: int = 0
     highest_score: int = 0
     latest_score: int = 0
@@ -106,6 +114,10 @@ class EventWatchlistEntry:
     latest_llm_confidence: float | None = None
     latest_market_snapshot: dict[str, Any] = field(default_factory=dict)
     latest_score_components: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class _EventWatchlistOpportunityFields:
     impact_path_type: str | None = None
     impact_path_strength: str | None = None
     candidate_role: str | None = None
@@ -126,6 +138,10 @@ class EventWatchlistEntry:
     manual_verification_items: list[str] = field(default_factory=list)
     upgrade_requirements: list[str] = field(default_factory=list)
     downgrade_warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class _EventWatchlistChangeFields:
     alert_history: list[dict[str, Any]] = field(default_factory=list)
     state_changed: bool = False
     escalation: bool = False
@@ -138,6 +154,17 @@ class EventWatchlistEntry:
     should_alert: bool = False
     suppressed_reason: str | None = None
     warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class EventWatchlistEntry(
+    _EventWatchlistChangeFields,
+    _EventWatchlistOpportunityFields,
+    _EventWatchlistLatestFields,
+    _EventWatchlistIncidentFields,
+    _EventWatchlistIdentityFields,
+):
+    pass
 
 
 @dataclass(frozen=True)

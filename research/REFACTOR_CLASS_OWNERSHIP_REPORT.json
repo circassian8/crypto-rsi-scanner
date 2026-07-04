@@ -1,5 +1,5 @@
 {
-  "class_count": 448,
+  "class_count": 457,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
@@ -19,42 +19,6 @@
       "public": true,
       "qualname": "CanonicalAsset",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/asset_registry.py"
-    },
-    {
-      "class_name": "FixtureCatalystSearchProvider",
-      "exception_reason": null,
-      "line_count": 79,
-      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
-      "public": true,
-      "qualname": "FixtureCatalystSearchProvider",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py"
-    },
-    {
-      "class_name": "EventProviderCatalystSearchProvider",
-      "exception_reason": null,
-      "line_count": 88,
-      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
-      "public": true,
-      "qualname": "EventProviderCatalystSearchProvider",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py"
-    },
-    {
-      "class_name": "EventIntegratedRadarResult",
-      "exception_reason": null,
-      "line_count": 88,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.models",
-      "public": true,
-      "qualname": "EventIntegratedRadarResult",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py"
-    },
-    {
-      "class_name": "EventWatchlistEntry",
-      "exception_reason": null,
-      "line_count": 85,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.models",
-      "public": true,
-      "qualname": "EventWatchlistEntry",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/models.py"
     },
     {
       "class_name": "CoinGeckoWatchlistMarketProvider",
@@ -165,7 +129,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 18,
+  "classes_over_limit_count": 14,
   "exceptions": [
     {
       "module": "crypto_rsi_scanner.event_core.models",
@@ -178,7 +142,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5207,
+  "function_count": 5211,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -567,7 +531,7 @@
     }
   ],
   "functions_over_limit_count": 48,
-  "generated_at": "2026-07-04T04:22:38.527393+00:00",
+  "generated_at": "2026-07-04T04:33:15.562396+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1125,7 +1089,7 @@
     "multiple_public_classes": "allowed for small value objects/enums in documented models modules",
     "public_class_over_75_lines": "should live in its own module unless documented here"
   },
-  "production_classes_over_limit": 18,
+  "production_classes_over_limit": 14,
   "production_classes_over_limit_rows": [
     {
       "class_name": "CoinGeckoClient",
@@ -1144,42 +1108,6 @@
       "public": true,
       "qualname": "CanonicalAsset",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/asset_registry.py"
-    },
-    {
-      "class_name": "FixtureCatalystSearchProvider",
-      "exception_reason": null,
-      "line_count": 79,
-      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
-      "public": true,
-      "qualname": "FixtureCatalystSearchProvider",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py"
-    },
-    {
-      "class_name": "EventProviderCatalystSearchProvider",
-      "exception_reason": null,
-      "line_count": 88,
-      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
-      "public": true,
-      "qualname": "EventProviderCatalystSearchProvider",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py"
-    },
-    {
-      "class_name": "EventIntegratedRadarResult",
-      "exception_reason": null,
-      "line_count": 88,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.models",
-      "public": true,
-      "qualname": "EventIntegratedRadarResult",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py"
-    },
-    {
-      "class_name": "EventWatchlistEntry",
-      "exception_reason": null,
-      "line_count": 85,
-      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.models",
-      "public": true,
-      "qualname": "EventWatchlistEntry",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/models.py"
     },
     {
       "class_name": "CoinGeckoWatchlistMarketProvider",

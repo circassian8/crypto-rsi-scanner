@@ -5,7 +5,7 @@ from __future__ import annotations
 from .runtime import *
 
 @dataclass(frozen=True)
-class EventIntegratedRadarResult:
+class _IntegratedRadarRequiredFields:
     namespace_dir: Path
     run_id: str
     profile: str
@@ -28,6 +28,10 @@ class EventIntegratedRadarResult:
     integrated_delivery_path: Path | None
     run_ledger_path: str
     core_opportunity_store_path: str
+
+
+@dataclass(frozen=True)
+class _IntegratedRadarOptionalArtifactFields:
     input_manifest_path: Path | None = None
     source_coverage_json_path: Path | None = None
     source_coverage_path: Path | None = None
@@ -55,6 +59,10 @@ class EventIntegratedRadarResult:
     alerts: tuple[Mapping[str, Any], ...] = ()
     routed: int = 0
     alertable: int = 0
+
+
+@dataclass(frozen=True)
+class _IntegratedRadarSendFields:
     send_requested: bool = False
     send_attempted: bool = False
     send_success: bool = False
@@ -71,6 +79,10 @@ class EventIntegratedRadarResult:
     research_review_digest_would_send: int = 0
     research_review_digest_sent: int = 0
     research_review_digest_block_reason: str | None = "no_send_guard_enabled"
+
+
+@dataclass(frozen=True)
+class _IntegratedRadarSnapshotFields:
     snapshot_write_attempted: bool = True
     snapshot_write_success: bool = True
     snapshot_rows_written: int = 0
@@ -93,6 +105,16 @@ class EventIntegratedRadarResult:
     source_coverage_md_path_rel: str | None = None
     warnings: tuple[str, ...] = ()
     cycle_completed: bool = True
+
+
+@dataclass(frozen=True)
+class EventIntegratedRadarResult(
+    _IntegratedRadarSnapshotFields,
+    _IntegratedRadarSendFields,
+    _IntegratedRadarOptionalArtifactFields,
+    _IntegratedRadarRequiredFields,
+):
+    pass
 
 __all__ = (
     'EventIntegratedRadarResult',

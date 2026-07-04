@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split remaining class ownership adapters · Codex
+**Why:** Production file-size gates now pass, but the refactor objective still
+tracks oversized field aggregates and provider adapter classes as advisory
+ownership debt. This pass reduces low-risk model/provider class debt while
+leaving CLI behavior, artifact schemas, provider request contracts, and no-send
+guards unchanged.
+**Changes:**
+- Split `EventIntegratedRadarResult` in
+  `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py` into
+  private dataclass field groups while preserving the public class name,
+  constructor field order, defaults, and frozen behavior.
+- Split `EventWatchlistEntry` in
+  `crypto_rsi_scanner/event_alpha/radar/watchlist/models.py` into private
+  identity, incident, latest-state, opportunity, and change-tracking field
+  groups with the same public aggregate API.
+- Moved fixture row loading and event-provider search loops out of
+  `FixtureCatalystSearchProvider` and `EventProviderCatalystSearchProvider`
+  into private helper functions, keeping provider names, search results, cache
+  accounting, warnings, and fetch-cap behavior compatible.
+- Refreshed refactor size, class ownership, final, completion-map, and release
+  candidate reports. Current advisory inventory is `14` classes and `48`
+  functions over limits, with `production_files_over_1500_lines=0`,
+  `production_files_over_2000_lines=0`, `legacy_files_over_1500_lines=0`, and
+  `new_violation_count=0`.
+**Verify:** Focused integrated/source-coverage/notification tests passed
+(`342 passed`), focused integrated/source-coverage/outcomes tests passed
+(`325 passed`), compileall passed for touched Event Alpha packages, and
+refactor report targets passed with `gate_status=pass` and completion map
+`accepted`. Full safe regression was run before commit; see the latest
+`research/REFACTOR_VERIFICATION_RESULTS.json`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Remaining advisory debt is concentrated in large
+notification, daily-brief, doctor-context, provider/model, and
+rendering/serialization functions plus 14 oversized classes.
+
 ## 2026-07-04 — Split source coverage report ownership · Codex
 **Why:** The refactor objective still tracks oversized report/data aggregates
 after production file-size gates passed. This pass reduces the source-coverage
