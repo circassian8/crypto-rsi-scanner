@@ -15,6 +15,7 @@ from typing import Any
 
 from . import refactor_class_ownership_report as ownership
 from . import refactor_legacy_inventory
+from . import refactor_v3_contract
 
 
 BASELINE_SCHEMA_VERSION = "refactor_size_baseline_v1"
@@ -122,6 +123,9 @@ def build_inventory(
     long_files = [row for row in file_rows if row["line_count"] > file_line_limit]
     production_file_rows = [row for row in file_rows if row.get("source_kind") == "production"]
     test_file_rows = [row for row in file_rows if row.get("source_kind") == "test"]
+    production_files_over_1200 = [
+        row for row in production_file_rows if row["line_count"] > refactor_v3_contract.PRODUCTION_TARGET_LINE_LIMIT
+    ]
     production_files_over_1500 = [
         row for row in production_file_rows if row["line_count"] > PRODUCTION_WARNING_LINE_LIMIT
     ]
@@ -200,6 +204,11 @@ def build_inventory(
         "function_line_limit": function_line_limit,
         "file_count": len(file_rows),
         "files_over_limit_count": len(long_files),
+        "production_files_over_1200_lines": len(production_files_over_1200),
+        "production_files_over_1200_line_rows": sorted(
+            production_files_over_1200,
+            key=lambda row: (-int(row.get("line_count") or 0), str(row.get("path") or "")),
+        ),
         "production_files_over_1500_lines": len(production_files_over_1500),
         "production_files_over_2000_lines": len(production_files_over_2000),
         "production_files_over_3000_lines": len(production_files_over_3000),
@@ -260,6 +269,11 @@ def build_baseline(*, root: str | Path | None = None) -> dict[str, Any]:
 def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
     repo_root = Path(root).expanduser() if root is not None else repo_root_from_module()
     inventory = build_inventory(root=repo_root)
+    v3_gate_snapshot = refactor_v3_contract.build_v3_gate_snapshot(
+        root=repo_root,
+        size_gate_report=inventory,
+        class_ownership_report=inventory,
+    )
     baseline_path = repo_root / "research" / BASELINE_JSON
     baseline = _read_json(baseline_path)
     baseline_ids = set(baseline.get("violation_ids", [])) if isinstance(baseline, dict) else set()
@@ -296,6 +310,8 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
         "policy": {
             "existing_violations": "warning",
             "new_violations_compared_to_baseline": "blocker",
+            "v3_production_file_under_1200_lines": "target",
+            "v3_production_file_over_1500_lines": "blocker unless explicitly accepted",
             "production_file_over_1500_lines": "warning",
             "production_file_over_2000_lines": "refactor-complete blocker unless explicitly exempted",
             "production_file_over_3000_lines": "blocker",
@@ -303,6 +319,10 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
             "baseline_update": "explicit make refactor-size-baseline-update only",
         },
         "new_violation_count": len(new_rows),
+        "v3_gate_status": v3_gate_snapshot["status"],
+        "v3_auto_accept_ready": v3_gate_snapshot["v3_auto_accept_ready"],
+        "v3_gates": v3_gate_snapshot["gate_values"],
+        "v3_gate_snapshot": v3_gate_snapshot,
         "existing_violation_count": len(existing_rows),
         "resolved_violation_count": len(resolved_ids),
         "moved_existing_violation_count": len(moved_existing),
@@ -350,6 +370,9 @@ def format_gate_report(report: dict[str, Any]) -> str:
         f"- gate_status: `{report.get('gate_status')}`",
         f"- baseline_present: `{str(bool(report.get('baseline_present'))).lower()}`",
         f"- files_over_limit_count: `{report.get('files_over_limit_count', 0)}`",
+        f"- v3_gate_status: `{report.get('v3_gate_status')}`",
+        f"- v3_auto_accept_ready: `{report.get('v3_auto_accept_ready')}`",
+        f"- production_files_over_1200_lines: `{report.get('production_files_over_1200_lines', 0)}`",
         f"- production_size_gate_status: `{report.get('production_size_gate_status')}`",
         f"- production_files_over_1500_lines: `{report.get('production_files_over_1500_lines', 0)}`",
         f"- production_files_over_2000_lines: `{report.get('production_files_over_2000_lines', 0)}`",
@@ -378,6 +401,8 @@ def format_gate_report(report: dict[str, Any]) -> str:
         "",
         "- Existing violations from `research/REFACTOR_SIZE_BASELINE.json` are warnings.",
         "- New file/function/class/module ownership violations are blockers.",
+        "- Refactor v3 targets production files below 1,200 lines.",
+        "- Refactor v3 treats production files over 1,500 lines as blockers unless explicitly accepted.",
         "- Production files over 1,500 lines are warnings.",
         "- Production files over 2,000 lines block refactor-complete status unless explicitly exempted.",
         "- Production files over 3,000 lines are blockers.",
@@ -393,6 +418,18 @@ def format_gate_report(report: dict[str, Any]) -> str:
     ]
     for row in _limit_rows(report.get("new_violations"), 120):
         lines.append(_violation_row(row))
+    lines.extend([
+        "",
+        "## Refactor V3 Gates",
+        "",
+        "| gate | value | severity |",
+        "|---|---:|---|",
+    ])
+    v3_snapshot = report.get("v3_gate_snapshot") if isinstance(report.get("v3_gate_snapshot"), dict) else {}
+    v3_values = v3_snapshot.get("gate_values") if isinstance(v3_snapshot.get("gate_values"), dict) else {}
+    v3_severity = v3_snapshot.get("gate_severity") if isinstance(v3_snapshot.get("gate_severity"), dict) else {}
+    for name in refactor_v3_contract.V3_GATE_NAMES:
+        lines.append(f"| `{name}` | {v3_values.get(name, 0)} | {v3_severity.get(name, '')} |")
     lines.extend([
         "",
         "## Moved Existing Violations",

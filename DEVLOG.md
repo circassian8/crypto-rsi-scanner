@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Define Event Alpha refactor v3 finalization contract · Codex
+**Why:** Refactor v2 accepted the compatibility-shim state, but the final
+refactor phase needs a stricter, measurable contract before old Event Alpha
+shim paths are retired or explicitly kept as public entrypoints.
+**Changes:**
+- Added `crypto_rsi_scanner/refactor_v3_contract.py` plus
+  `research/REFACTOR_V3_CONTRACT.md/json`.
+- Threaded v3 gate snapshots through `research/REFACTOR_FINAL_REPORT.md/json`,
+  `research/REFACTOR_SIZE_GATES.md/json`,
+  `research/REFACTOR_CLASS_OWNERSHIP_REPORT.md/json`, and
+  `research/EVENT_ALPHA_SHIM_DEPENDENCY_REPORT.md/json`.
+- Added v3 tests covering contract generation, `scanner.py` as the public CLI
+  entrypoint, `event_fade.py` as the intentional Event Alpha boundary
+  exception, all requested gate names, and auto-accept staying false while
+  nonessential shims remain.
+- Updated `DECISIONS.md` and `ROADMAP.md` with the v3 finalization contract and
+  current pending counts. Current v3 state is pending:
+  `nonessential_shims_remaining=111`, `old_path_internal_imports=0`,
+  `public_compatibility_shims=13`, `shim_removal_blockers=109`,
+  `production_files_over_1200_lines=14`,
+  `production_files_over_1500_lines=0`,
+  `public_classes_not_in_own_module=82`,
+  `class_exceptions_remaining=14`, `functions_over_150_lines=0`, and
+  `old_path_docs_references=215`.
+**Verify:** Passed `python3 tests/test_indicators.py` (`750/750 passed`);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (`761 passed`);
+`python3 -m compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-shim-dependency-report PYTHON=python3`; `make refactor-size-gates
+PYTHON=python3`; `make refactor-class-ownership-report PYTHON=python3`; `make
+refactor-final-report PYTHON=python3`; and `make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No shims were deleted. V2-compatible
+reports still pass, while v3 is deliberately pending until old shims,
+class/module ownership debt, and near-threshold files are removed or explicitly
+accepted for v3. No live provider calls, live Telegram sends, trading,
+paper-trading behavior changes, execution/order logic, Event Alpha RSI writes,
+or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Add Event Alpha shim dependency proof · Codex
 **Why:** Event Alpha implementation code has mostly moved under
 `crypto_rsi_scanner/event_alpha/`, but old top-level `event_*.py` shims must not

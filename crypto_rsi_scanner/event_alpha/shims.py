@@ -352,6 +352,18 @@ def build_shim_dependency_report(
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
     internal_import_count = sum(len(row["internal_import_references"]) for row in rows)
     safe_to_remove_count = sum(1 for row in rows if row["safe_to_remove"])
+    nonessential_rows = [
+        row for row in rows if row.get("recommended_action") != "keep_public_entrypoint"
+    ]
+    nonessential_blocker_rows = [
+        row for row in nonessential_rows if row.get("removal_blockers")
+    ]
+    public_compatibility_count = sum(
+        1 for row in rows if row.get("recommended_action") == "keep_public_entrypoint"
+    )
+    old_path_docs_references = sum(len(row["docs_references"]) for row in rows) + sum(
+        len(row["artifact_doc_references"]) for row in rows
+    )
     docs_deprecated_warnings = [
         {
             "old_module": row["old_module"],
@@ -383,6 +395,17 @@ def build_shim_dependency_report(
         "dynamic_import_reference_count": sum(len(row["dynamic_import_references"]) for row in rows),
         "artifact_doc_reference_count": sum(len(row["artifact_doc_references"]) for row in rows),
         "safe_to_remove_count": safe_to_remove_count,
+        "v3_gate_status": "pending" if nonessential_rows or internal_import_count or docs_deprecated_warnings else "pass",
+        "v3_auto_accept_ready": not (nonessential_rows or internal_import_count or docs_deprecated_warnings),
+        "v3_gates": {
+            "nonessential_shims_remaining": len(nonessential_rows),
+            "old_path_internal_imports": internal_import_count,
+            "public_compatibility_shims": public_compatibility_count,
+            "shim_removal_blockers": len(nonessential_blocker_rows),
+            "old_path_docs_references": old_path_docs_references,
+        },
+        "nonessential_shim_rows": [_candidate_row(row) for row in nonessential_rows],
+        "shim_removal_blocker_rows": [_candidate_row(row) for row in nonessential_blocker_rows],
         "docs_deprecated_reference_warnings": docs_deprecated_warnings,
         "active_shim_modules_with_implementation_logic": audit.get(
             "active_shim_modules_with_implementation_logic", 0
@@ -463,6 +486,8 @@ def format_shim_dependency_report(report: dict[str, object]) -> str:
         f"- dynamic_import_reference_count: {report.get('dynamic_import_reference_count', 0)}",
         f"- safe_to_remove_count: {report.get('safe_to_remove_count', 0)}",
         f"- active_shim_modules_with_implementation_logic: {report.get('active_shim_modules_with_implementation_logic', 0)}",
+        f"- v3_gate_status: {report.get('v3_gate_status')}",
+        f"- v3_auto_accept_ready: {report.get('v3_auto_accept_ready')}",
         "",
         "## Policy",
         "",
@@ -471,11 +496,29 @@ def format_shim_dependency_report(report: dict[str, object]) -> str:
         "- `scanner.py` may remain a compatibility CLI entrypoint.",
         "- `event_fade.py` remains intentionally outside Event Alpha; Event Alpha may write `FADE_SHORT_REVIEW` research but must not create `TRIGGERED_FADE`.",
         "",
+        "## Refactor V3 Shim Gates",
+        "",
+        "| gate | value |",
+        "|---|---:|",
+    ]
+    v3_gates = report.get("v3_gates") if isinstance(report.get("v3_gates"), dict) else {}
+    for gate in (
+        "nonessential_shims_remaining",
+        "old_path_internal_imports",
+        "public_compatibility_shims",
+        "shim_removal_blockers",
+        "old_path_docs_references",
+    ):
+        lines.append(f"| `{gate}` | {v3_gates.get(gate, 0)} |")
+    lines.extend(
+        [
+            "",
         "## Registry Dependencies",
         "",
         "| old module | new module | status | internal | tests | make | docs | dynamic | safe | action |",
         "|---|---|---:|---:|---:|---:|---:|---:|---:|---|",
-    ]
+        ]
+    )
     for row in report.get("entries", []):
         if not isinstance(row, dict):
             continue

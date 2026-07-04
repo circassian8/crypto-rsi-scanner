@@ -19,6 +19,7 @@ from typing import Any
 from . import refactor_baseline
 from . import refactor_legacy_inventory
 from . import refactor_size_gates
+from . import refactor_v3_contract
 from .event_alpha import shims as event_alpha_shims
 from .event_alpha.doctor import check_registry
 from .event_alpha.namespace import lifecycle as namespace_lifecycle
@@ -628,6 +629,7 @@ def build_refactor_final_report(
     class_ownership = _class_ownership_summary(root)
     legacy_inventory = refactor_legacy_inventory.build_legacy_inventory(root=root)
     size_gate_report = refactor_size_gates.build_gate_report(root=root)
+    v3_gate_snapshot = _build_v3_gate_snapshot(root=root, size_gate_report=size_gate_report)
     cli_service_line_counts = _cli_service_line_counts(root)
     cli_event_alpha_service_lines = cli_service_line_counts.get("crypto_rsi_scanner/cli/services/event_alpha.py")
     cli_service_bind_calls = _cli_service_bind_scanner_globals_call_sites(root)
@@ -713,6 +715,7 @@ def build_refactor_final_report(
         "test_size_gate_status": size_gate_report.get("test_size_gate_status"),
         "test_files_over_1500_lines": size_gate_report.get("test_files_over_1500_lines"),
         "largest_test_files": size_gate_report.get("largest_test_files", []),
+        **_v3_final_fields(v3_gate_snapshot),
         "legacy_classes_over_limit": legacy_inventory["legacy_classes_over_limit"],
         "legacy_functions_over_limit": legacy_inventory["legacy_functions_over_limit"],
         "legacy_modules_with_multiple_public_classes": legacy_inventory[
@@ -744,8 +747,10 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
         f"- generated_at: `{data['generated_at']}`",
         f"- gate_status: `{data['gate_summary']['status']}`",
         f"- compatibility_preserved: `{data['compatibility_preserved']}`",
-        f"- old_module_paths_removed: `{data['old_module_paths_removed']}`",
-        "",
+            f"- old_module_paths_removed: `{data['old_module_paths_removed']}`",
+            f"- v3_gate_status: `{data.get('v3_gate_status')}`",
+            f"- v3_auto_accept_ready: `{data.get('v3_auto_accept_ready')}`",
+            "",
         "## Runtime Measurements",
         "",
         f"- standalone_runner_runtime_seconds: `{data.get('standalone_runner_runtime_seconds')}`",
@@ -768,51 +773,10 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             f"<{row['target_lines_lt']} | "
             f"`{row['gate_status']}` |"
         )
+    _append_organization_counts_section(lines, data)
+    _append_v3_finalization_section(lines, data)
     lines.extend(
         [
-            "",
-            "## Organization Counts",
-            "",
-            f"- top_level_event_module_count: `{data['top_level_event_module_count']}`",
-            f"- active_shims: `{data['active_shims']}`",
-            f"- partial_shims: `{data['partial_shims']}`",
-            f"- unmigrated_modules: `{data['unmigrated_modules']}`",
-            f"- active_shim_modules_with_implementation_logic: `{data['active_shim_modules_with_implementation_logic']}`",
-            f"- migrated_modules_this_run_count: `{data['migrated_modules_this_run_count']}`",
-            f"- scanner_bind_scanner_globals_call_sites: `{data['scanner_bind_scanner_globals_call_sites']}`",
-            f"- cli_service_bind_scanner_globals_call_sites: `{data['cli_service_bind_scanner_globals_call_sites']}`",
-            f"- cli_event_alpha_service_lines: `{data['cli_event_alpha_service_lines']}`",
-            f"- scanner_legacy_service_lines: `{data.get('line_counts', {}).get('crypto_rsi_scanner/cli/services/scanner_legacy.py')}`",
-            f"- parser_build_parser_lines: `{data.get('parser_build_parser_lines')}`",
-            f"- commands_event_alpha_handle_lines: `{data.get('commands_event_alpha_handle_lines')}`",
-            f"- legacy_artifact_doctor_core_lines: `{data.get('legacy_artifact_doctor_core_lines')}`",
-            f"- legacy_artifact_doctor_core_note: {data.get('legacy_artifact_doctor_core_note')}",
-            f"- large_event_alpha_split_line_counts: `{json.dumps(data.get('large_event_alpha_split_line_counts', {}), sort_keys=True)}`",
-            f"- cli_flag_snapshot_path: `{data.get('cli_flag_snapshot_path')}`",
-            f"- scanner_command_body_functions_remaining: `{data['scanner_command_body_functions_remaining']}`",
-            f"- remaining_implementation_modules_by_package_target: `{json.dumps(data.get('remaining_implementation_modules_by_package_target', {}), sort_keys=True)}`",
-            f"- intentionally_outside_event_alpha_modules: `{json.dumps(data.get('intentionally_outside_event_alpha_modules', []), sort_keys=True)}`",
-            f"- class_ownership_report: `{data.get('class_ownership_report', {}).get('path')}`",
-            f"- class_ownership_classes_over_limit: `{data.get('class_ownership_report', {}).get('classes_over_limit_count')}`",
-            f"- class_ownership_functions_over_limit: `{data.get('class_ownership_report', {}).get('functions_over_limit_count')}`",
-            f"- accepted_class_exceptions_count: `{data.get('accepted_class_exceptions_count')}`",
-            f"- remaining_class_ownership_debt_count: `{data.get('remaining_class_ownership_debt_count')}`",
-            f"- modules_with_multiple_public_classes_status: `{data.get('modules_with_multiple_public_classes_status')}`",
-            f"- production_size_gate_status: `{data.get('production_size_gate_status')}`",
-            f"- production_files_over_1500_lines: `{data.get('production_files_over_1500_lines')}`",
-            f"- production_files_over_2000_lines: `{data.get('production_files_over_2000_lines')}`",
-            f"- production_files_over_3000_lines: `{data.get('production_files_over_3000_lines')}`",
-            f"- production_classes_over_limit: `{data.get('production_classes_over_limit')}`",
-            f"- production_functions_over_limit: `{data.get('production_functions_over_limit')}`",
-            f"- test_size_gate_status: `{data.get('test_size_gate_status')}`",
-            f"- test_files_over_1500_lines: `{data.get('test_files_over_1500_lines')}`",
-            f"- legacy_decomposition_gate_status: `{data.get('legacy_decomposition_gate_status')}`",
-            f"- legacy_files_over_1500_lines: `{data.get('legacy_files_over_1500_lines')}`",
-            f"- legacy_files_over_3000_lines: `{data.get('legacy_files_over_3000_lines')}`",
-            f"- legacy_total_lines: `{data.get('legacy_total_lines')}`",
-            f"- legacy_classes_over_limit: `{data.get('legacy_classes_over_limit')}`",
-            f"- legacy_functions_over_limit: `{data.get('legacy_functions_over_limit')}`",
-            f"- legacy_modules_with_multiple_public_classes: `{data.get('legacy_modules_with_multiple_public_classes')}`",
             "",
             "## Newly Migrated Modules",
             "",
@@ -877,6 +841,31 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _build_v3_gate_snapshot(*, root: Path, size_gate_report: Mapping[str, Any]) -> dict[str, Any]:
+    existing = size_gate_report.get("v3_gate_snapshot")
+    if isinstance(existing, dict):
+        return dict(existing)
+    return refactor_v3_contract.build_v3_gate_snapshot(
+        root=root,
+        shim_dependency_report=event_alpha_shims.build_shim_dependency_report(root=root),
+        size_gate_report=size_gate_report,
+        class_ownership_report=size_gate_report,
+    )
+
+
+def _v3_final_fields(v3_gate_snapshot: Mapping[str, Any]) -> dict[str, Any]:
+    gate_values = dict(v3_gate_snapshot["gate_values"])
+    return {
+        "v3_contract_path": "research/REFACTOR_V3_CONTRACT.md",
+        "v3_gate_status": v3_gate_snapshot["status"],
+        "v3_auto_accept_ready": v3_gate_snapshot["v3_auto_accept_ready"],
+        "v3_auto_accept_blockers": v3_gate_snapshot["auto_accept_blockers"],
+        "v3_gates": gate_values,
+        "v3_gate_snapshot": v3_gate_snapshot,
+        **gate_values,
+    }
+
+
 def _append_legacy_decomposition_section(lines: list[str], data: dict[str, Any]) -> None:
     lines.extend(
         [
@@ -890,6 +879,75 @@ def _append_legacy_decomposition_section(lines: list[str], data: dict[str, Any])
     for row in data.get("largest_legacy_files", []):
         if isinstance(row, dict):
             lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
+
+
+def _append_organization_counts_section(lines: list[str], data: dict[str, Any]) -> None:
+    rows = [
+        ("top_level_event_module_count", data["top_level_event_module_count"]),
+        ("active_shims", data["active_shims"]),
+        ("partial_shims", data["partial_shims"]),
+        ("unmigrated_modules", data["unmigrated_modules"]),
+        ("active_shim_modules_with_implementation_logic", data["active_shim_modules_with_implementation_logic"]),
+        ("migrated_modules_this_run_count", data["migrated_modules_this_run_count"]),
+        ("scanner_bind_scanner_globals_call_sites", data["scanner_bind_scanner_globals_call_sites"]),
+        ("cli_service_bind_scanner_globals_call_sites", data["cli_service_bind_scanner_globals_call_sites"]),
+        ("cli_event_alpha_service_lines", data["cli_event_alpha_service_lines"]),
+        ("scanner_legacy_service_lines", data.get("line_counts", {}).get("crypto_rsi_scanner/cli/services/scanner_legacy.py")),
+        ("parser_build_parser_lines", data.get("parser_build_parser_lines")),
+        ("commands_event_alpha_handle_lines", data.get("commands_event_alpha_handle_lines")),
+        ("legacy_artifact_doctor_core_lines", data.get("legacy_artifact_doctor_core_lines")),
+        ("legacy_artifact_doctor_core_note", data.get("legacy_artifact_doctor_core_note")),
+        ("large_event_alpha_split_line_counts", json.dumps(data.get("large_event_alpha_split_line_counts", {}), sort_keys=True)),
+        ("cli_flag_snapshot_path", data.get("cli_flag_snapshot_path")),
+        ("scanner_command_body_functions_remaining", data["scanner_command_body_functions_remaining"]),
+        ("remaining_implementation_modules_by_package_target", json.dumps(data.get("remaining_implementation_modules_by_package_target", {}), sort_keys=True)),
+        ("intentionally_outside_event_alpha_modules", json.dumps(data.get("intentionally_outside_event_alpha_modules", []), sort_keys=True)),
+        ("class_ownership_report", data.get("class_ownership_report", {}).get("path")),
+        ("class_ownership_classes_over_limit", data.get("class_ownership_report", {}).get("classes_over_limit_count")),
+        ("class_ownership_functions_over_limit", data.get("class_ownership_report", {}).get("functions_over_limit_count")),
+        ("accepted_class_exceptions_count", data.get("accepted_class_exceptions_count")),
+        ("remaining_class_ownership_debt_count", data.get("remaining_class_ownership_debt_count")),
+        ("modules_with_multiple_public_classes_status", data.get("modules_with_multiple_public_classes_status")),
+        ("production_size_gate_status", data.get("production_size_gate_status")),
+        ("production_files_over_1500_lines", data.get("production_files_over_1500_lines")),
+        ("production_files_over_2000_lines", data.get("production_files_over_2000_lines")),
+        ("production_files_over_3000_lines", data.get("production_files_over_3000_lines")),
+        ("production_classes_over_limit", data.get("production_classes_over_limit")),
+        ("production_functions_over_limit", data.get("production_functions_over_limit")),
+        ("test_size_gate_status", data.get("test_size_gate_status")),
+        ("test_files_over_1500_lines", data.get("test_files_over_1500_lines")),
+        ("legacy_decomposition_gate_status", data.get("legacy_decomposition_gate_status")),
+        ("legacy_files_over_1500_lines", data.get("legacy_files_over_1500_lines")),
+        ("legacy_files_over_3000_lines", data.get("legacy_files_over_3000_lines")),
+        ("legacy_total_lines", data.get("legacy_total_lines")),
+        ("legacy_classes_over_limit", data.get("legacy_classes_over_limit")),
+        ("legacy_functions_over_limit", data.get("legacy_functions_over_limit")),
+        ("legacy_modules_with_multiple_public_classes", data.get("legacy_modules_with_multiple_public_classes")),
+    ]
+    lines.extend(["", "## Organization Counts", ""])
+    lines.extend(f"- {key}: `{value}`" for key, value in rows)
+
+
+def _append_v3_finalization_section(lines: list[str], data: dict[str, Any]) -> None:
+    lines.extend(
+        [
+            "",
+            "## Refactor V3 Finalization Gates",
+            "",
+            f"- v3_contract_path: `{data.get('v3_contract_path')}`",
+            f"- v3_gate_status: `{data.get('v3_gate_status')}`",
+            f"- v3_auto_accept_ready: `{data.get('v3_auto_accept_ready')}`",
+            f"- v3_auto_accept_blockers: `{json.dumps(data.get('v3_auto_accept_blockers', []), sort_keys=True)}`",
+            "",
+            "| gate | value | severity |",
+            "|---|---:|---|",
+        ]
+    )
+    v3_snapshot = data.get("v3_gate_snapshot") if isinstance(data.get("v3_gate_snapshot"), dict) else {}
+    v3_values = v3_snapshot.get("gate_values") if isinstance(v3_snapshot.get("gate_values"), dict) else {}
+    v3_severity = v3_snapshot.get("gate_severity") if isinstance(v3_snapshot.get("gate_severity"), dict) else {}
+    for name in refactor_v3_contract.V3_GATE_NAMES:
+        lines.append(f"| `{name}` | {v3_values.get(name, 0)} | {v3_severity.get(name, '')} |")
 
 
 def _append_class_ownership_section(lines: list[str], data: dict[str, Any]) -> None:
@@ -1033,6 +1091,7 @@ def write_refactor_final_report(
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / REPORT_JSON
     md_path = output_dir / REPORT_MD
+    refactor_v3_contract.write_refactor_v3_contract(out_dir=output_dir, root=root)
     json_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(format_refactor_final_markdown(data), encoding="utf-8")
     if out_dir is None:

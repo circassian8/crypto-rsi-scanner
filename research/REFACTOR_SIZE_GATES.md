@@ -2,10 +2,13 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T17:06:50.283930+00:00`
+- generated_at: `2026-07-04T17:55:03.992976+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
+- v3_gate_status: `pending`
+- v3_auto_accept_ready: `False`
+- production_files_over_1200_lines: `14`
 - production_size_gate_status: `pass`
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
@@ -34,6 +37,8 @@ Static source inventory only. This report does not call providers, send Telegram
 
 - Existing violations from `research/REFACTOR_SIZE_BASELINE.json` are warnings.
 - New file/function/class/module ownership violations are blockers.
+- Refactor v3 targets production files below 1,200 lines.
+- Refactor v3 treats production files over 1,500 lines as blockers unless explicitly accepted.
 - Production files over 1,500 lines are warnings.
 - Production files over 2,000 lines block refactor-complete status unless explicitly exempted.
 - Production files over 3,000 lines are blockers.
@@ -46,6 +51,21 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | category | id | lines/count |
 |---|---|---:|
+
+## Refactor V3 Gates
+
+| gate | value | severity |
+|---|---:|---|
+| `nonessential_shims_remaining` | 111 | blocker |
+| `old_path_internal_imports` | 0 | blocker |
+| `public_compatibility_shims` | 13 | informational |
+| `shim_removal_blockers` | 109 | blocker |
+| `production_files_over_1200_lines` | 14 | target_gap |
+| `production_files_over_1500_lines` | 0 | blocker |
+| `public_classes_not_in_own_module` | 82 | blocker |
+| `class_exceptions_remaining` | 14 | blocker_until_reaccepted_for_v3 |
+| `functions_over_150_lines` | 0 | blocker |
+| `old_path_docs_references` | 215 | blocker_unless_policy_scoped |
 
 ## Moved Existing Violations
 
@@ -114,17 +134,17 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 1155 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py` | 1145 |
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 1135 |
+| `crypto_rsi_scanner/refactor_final_report.py` | 1131 |
 | `crypto_rsi_scanner/cli/services/legacy/rsi_scan.py` | 1103 |
 | `crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py` | 1078 |
-| `crypto_rsi_scanner/refactor_final_report.py` | 1072 |
 | `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1069 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1059 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1047 |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1046 |
 | `crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py` | 1044 |
 | `crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py` | 1035 |
 | `crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py` | 1033 |
 | `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1012 |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1003 |
 | `crypto_rsi_scanner/event_alpha/radar/llm/extractor.py` | 1002 |
 | `crypto_rsi_scanner/event_alpha/radar/scheduled_catalysts.py` | 995 |
 | `crypto_rsi_scanner/event_alpha/providers/source_registry.py` | 989 |
@@ -149,13 +169,13 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_source_coverage.py` | 2988 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1813 |
 | `tests/test_indicators.py` | 1771 |
-| `tests/cli/test_make_targets.py` | 1029 |
+| `tests/cli/test_make_targets.py` | 1079 |
 | `tests/event_alpha/_legacy_helpers.py` | 819 |
 | `tests/event_alpha/test_artifact_schema.py` | 734 |
 | `tests/rsi/test_indicators_core.py` | 694 |
 | `tests/rsi/test_backtest.py` | 561 |
 | `tests/rsi/test_paper_risk.py` | 379 |
-| `tests/event_alpha/test_shim_registry.py` | 272 |
+| `tests/event_alpha/test_shim_registry.py` | 279 |
 | `tests/cli/test_parser.py` | 243 |
 | `tests/cli/test_event_alpha_command_registry.py` | 163 |
 | `tests/cli/test_dispatch.py` | 129 |

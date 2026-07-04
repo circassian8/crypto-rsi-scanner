@@ -85,6 +85,12 @@ def test_shim_dependency_report_writer_outputs_references_and_candidates():
         assert report["registry_entry_count"] >= 50
         assert "internal_import_reference_count" in report
         assert "safe_to_remove_count" in report
+        assert report["v3_gate_status"] == "pending"
+        assert report["v3_auto_accept_ready"] is False
+        assert report["v3_gates"]["nonessential_shims_remaining"] > 0
+        assert report["v3_gates"]["public_compatibility_shims"] >= 1
+        assert report["v3_gates"]["old_path_internal_imports"] == report["internal_import_reference_count"]
+        assert report["v3_gates"]["shim_removal_blockers"] >= 1
         assert "removal_candidates" in report
         assert dep_json.exists()
         assert dep_md.exists()
@@ -93,6 +99,7 @@ def test_shim_dependency_report_writer_outputs_references_and_candidates():
         text = dep_md.read_text(encoding="utf-8")
         removal_text = removal_md.read_text(encoding="utf-8")
         assert "Event Alpha Shim Dependency Report" in text
+        assert "Refactor V3 Shim Gates" in text
         assert "Event Alpha Shim Removal Candidates" in removal_text
         assert "FADE_SHORT_REVIEW" in removal_text
         assert "must not create `TRIGGERED_FADE`" in removal_text

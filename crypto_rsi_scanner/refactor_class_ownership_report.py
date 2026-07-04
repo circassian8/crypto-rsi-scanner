@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from . import refactor_legacy_inventory
+from . import refactor_v3_contract
 
 
 REPORT_SCHEMA_VERSION = "refactor_class_ownership_report_v1"
@@ -272,6 +273,15 @@ def build_report(
         class_line_limit=class_line_limit,
         function_line_limit=function_line_limit,
     )
+    v3_gate_snapshot = refactor_v3_contract.build_v3_gate_snapshot(
+        root=repo_root,
+        shim_dependency_report=_shim_dependency_report_snapshot(repo_root),
+        class_ownership_report={
+            "modules_with_multiple_public_classes": modules_with_multiple_public_classes,
+            "accepted_class_exceptions_count": len(accepted_class_exceptions),
+            "functions_over_limit_count": len(long_functions),
+        },
+    )
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
@@ -295,6 +305,13 @@ def build_report(
         "accepted_class_exceptions_count": len(accepted_class_exceptions),
         "remaining_class_ownership_debt": remaining_class_debt,
         "remaining_class_ownership_debt_count": len(remaining_class_debt),
+        "v3_gate_status": v3_gate_snapshot["status"],
+        "v3_auto_accept_ready": v3_gate_snapshot["v3_auto_accept_ready"],
+        "v3_gates": v3_gate_snapshot["gate_values"],
+        "v3_gate_snapshot": v3_gate_snapshot,
+        "public_classes_not_in_own_module": v3_gate_snapshot["gate_values"]["public_classes_not_in_own_module"],
+        "class_exceptions_remaining": v3_gate_snapshot["gate_values"]["class_exceptions_remaining"],
+        "functions_over_150_lines": v3_gate_snapshot["gate_values"]["functions_over_150_lines"],
         "provider_class_split_status": _provider_class_split_status(classes, long_classes),
         "storage_mixin_exception_status": _storage_mixin_exception_status(classes, long_classes),
         "near_threshold_file_status": _near_threshold_file_status(package_root, repo_root=repo_root),
@@ -366,6 +383,24 @@ def _provider_class_split_status(
             }
         )
     return sorted(rows, key=lambda item: (str(item["class_name"]), str(item["module"])))
+
+
+def _shim_dependency_report_snapshot(repo_root: Path) -> dict[str, Any]:
+    path = repo_root / "research" / "EVENT_ALPHA_SHIM_DEPENDENCY_REPORT.json"
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            data = {}
+        if isinstance(data, dict):
+            return data
+    return {
+        "entries": [],
+        "internal_import_reference_count": 0,
+        "docs_reference_count": 0,
+        "artifact_doc_reference_count": 0,
+        "removal_candidate_counts": {},
+    }
 
 
 def _storage_mixin_exception_status(
@@ -451,6 +486,11 @@ def format_report(report: dict[str, Any]) -> str:
         f"- production_functions_over_limit: `{report.get('production_functions_over_limit', 0)}`",
         f"- accepted_class_exceptions_count: `{report.get('accepted_class_exceptions_count', 0)}`",
         f"- remaining_class_ownership_debt_count: `{report.get('remaining_class_ownership_debt_count', 0)}`",
+        f"- v3_gate_status: `{report.get('v3_gate_status')}`",
+        f"- v3_auto_accept_ready: `{report.get('v3_auto_accept_ready')}`",
+        f"- public_classes_not_in_own_module: `{report.get('public_classes_not_in_own_module', 0)}`",
+        f"- class_exceptions_remaining: `{report.get('class_exceptions_remaining', 0)}`",
+        f"- functions_over_150_lines: `{report.get('functions_over_150_lines', 0)}`",
         f"- modules_with_multiple_public_classes_count: `{report.get('modules_with_multiple_public_classes_count', 0)}`",
         f"- modules_with_multiple_public_classes_status: `{report.get('modules_with_multiple_public_classes_status')}`",
         f"- legacy_decomposition_gate_status: `{report.get('legacy_decomposition_gate_status')}`",
@@ -463,11 +503,18 @@ def format_report(report: dict[str, Any]) -> str:
         "- Every public class over 75 lines should live in its own module unless documented as an exception.",
         "- Multiple tiny value objects/enums may live in `models.py` only when documented.",
         "- Internal helper classes over 75 lines should also be split or documented.",
+        "- Refactor v3 expects public classes to live in their own modules unless the module is a documented model bundle.",
+        "- Refactor v3 keeps accepted class exceptions pending until each exception is reaccepted for the v3 removal phase.",
         "- `event_fade.py` remains outside Event Alpha; Event Alpha may produce `FADE_SHORT_REVIEW` research artifacts but must not create `TRIGGERED_FADE`.",
         "",
+    ]
+    _append_v3_class_gate_section(lines, report)
+    lines.extend(
+        [
         "## Exceptions",
         "",
-    ]
+        ]
+    )
     for row in report.get("exceptions", []):
         if isinstance(row, dict):
             lines.append(f"- `{row.get('module')}`: {row.get('reason')}")
@@ -570,8 +617,25 @@ def format_report(report: dict[str, Any]) -> str:
         lines.append(
             f"| `{row.get('module')}` | `{row.get('qualname')}` | {row.get('line_count', 0)} | "
             f"{str(bool(row.get('public'))).lower()} |"
-        )
+    )
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _append_v3_class_gate_section(lines: list[str], report: dict[str, Any]) -> None:
+    lines.extend(
+        [
+            "## Refactor V3 Gates",
+            "",
+            "| gate | value | severity |",
+            "|---|---:|---|",
+        ]
+    )
+    v3_snapshot = report.get("v3_gate_snapshot") if isinstance(report.get("v3_gate_snapshot"), dict) else {}
+    v3_values = v3_snapshot.get("gate_values") if isinstance(v3_snapshot.get("gate_values"), dict) else {}
+    v3_severity = v3_snapshot.get("gate_severity") if isinstance(v3_snapshot.get("gate_severity"), dict) else {}
+    for name in refactor_v3_contract.V3_GATE_NAMES:
+        lines.append(f"| `{name}` | {v3_values.get(name, 0)} | {v3_severity.get(name, '')} |")
+    lines.append("")
 
 
 def _collect_source_rows(package_root: Path, *, repo_root: Path) -> tuple[list[ClassOwnershipRow], list[FunctionOwnershipRow]]:

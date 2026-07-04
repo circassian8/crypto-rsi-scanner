@@ -611,6 +611,7 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     from tempfile import TemporaryDirectory
 
     from crypto_rsi_scanner import refactor_final_report
+    from crypto_rsi_scanner import refactor_v3_contract
 
     root = REPO_ROOT
     with TemporaryDirectory() as tmp:
@@ -623,7 +624,10 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
         )
         assert paths["json"].exists()
         assert paths["markdown"].exists()
+        assert (out_dir / refactor_v3_contract.CONTRACT_JSON).exists()
+        assert (out_dir / refactor_v3_contract.CONTRACT_MD).exists()
         payload = json.loads(paths["json"].read_text(encoding="utf-8"))
+        contract = json.loads((out_dir / refactor_v3_contract.CONTRACT_JSON).read_text(encoding="utf-8"))
         markdown = paths["markdown"].read_text(encoding="utf-8")
 
     assert payload["schema_version"] == "refactor_final_report_v1"
@@ -654,6 +658,24 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["cli_event_alpha_service_lines"] == payload["line_counts"]["crypto_rsi_scanner/cli/services/event_alpha.py"]
     assert payload["cli_service_bind_scanner_globals_call_sites"] >= 1
     assert "crypto_rsi_scanner.event_fade" in payload["intentionally_outside_event_alpha_modules"]
+    assert contract["schema_version"] == "refactor_v3_contract_v1"
+    assert any(
+        row["path"] == "crypto_rsi_scanner/event_fade.py"
+        for row in contract["intentional_exceptions"]
+    )
+    assert any(
+        row["path"] == "crypto_rsi_scanner/scanner.py"
+        for row in contract["public_compatibility_entrypoints"]
+    )
+    assert payload["v3_contract_path"] == "research/REFACTOR_V3_CONTRACT.md"
+    assert payload["v3_gate_status"] == "pending"
+    assert payload["v3_auto_accept_ready"] is False
+    for gate_name in refactor_v3_contract.V3_GATE_NAMES:
+        assert gate_name in payload["v3_gates"]
+    assert payload["nonessential_shims_remaining"] == payload["v3_gates"]["nonessential_shims_remaining"]
+    assert payload["public_compatibility_shims"] == payload["v3_gates"]["public_compatibility_shims"]
+    assert payload["nonessential_shims_remaining"] > 0
+    assert "nonessential_shims_remaining" in payload["v3_auto_accept_blockers"]
     assert payload["remaining_implementation_modules_by_package_target"] == {}
     assert payload["remaining_module_classification"]["path"] == "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json"
     assert payload["class_ownership_report"]["path"] == "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json"
@@ -684,9 +706,33 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert "v2" in phases and "warn in development mode only" in phases["v2"]
     assert "v3" in phases and "removed" in phases["v3"]
     assert "Refactor Final Report" in markdown
+    assert "Refactor V3 Finalization Gates" in markdown
     assert "Newly Migrated Modules" in markdown
     assert "Blockers" in markdown
     assert "Deprecation Plan" in markdown
+
+
+def test_refactor_v3_contract_generation_lists_final_exceptions():
+    import json
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from crypto_rsi_scanner import refactor_v3_contract
+
+    with TemporaryDirectory() as tmp:
+        json_path, md_path, contract = refactor_v3_contract.write_refactor_v3_contract(out_dir=tmp)
+        payload = json.loads(Path(json_path).read_text(encoding="utf-8"))
+        markdown = Path(md_path).read_text(encoding="utf-8")
+
+    assert payload == contract
+    assert payload["schema_version"] == refactor_v3_contract.CONTRACT_SCHEMA_VERSION
+    assert payload["research_only"] is True
+    assert payload["no_live_provider_calls"] is True
+    assert payload["no_sends_trades_paper_rsi_or_triggered_fade"] is True
+    assert set(refactor_v3_contract.V3_GATE_NAMES).issubset(set(payload["v3_gate_names"]))
+    assert any(row["path"] == "crypto_rsi_scanner/event_fade.py" for row in payload["intentional_exceptions"])
+    assert any(row["path"] == "crypto_rsi_scanner/scanner.py" for row in payload["public_compatibility_entrypoints"])
+    assert "old Event Alpha shim paths are temporary" in markdown or "Temporary compatibility paths" in markdown
 
 
 def test_refactor_final_report_make_target_is_available():
@@ -819,6 +865,10 @@ def test_refactor_size_gates_static_baseline_and_new_violation_detection():
         assert blocked["gate_status"] == "blocked"
         assert any(row["category"] == "file_over_1500_lines" for row in blocked["new_violations"])
         assert blocked["production_size_gate_status"] == "warning"
+        assert blocked["production_files_over_1200_lines"] == 1
+        assert blocked["v3_gates"]["production_files_over_1200_lines"] == 1
+        assert blocked["v3_gates"]["production_files_over_1500_lines"] == 1
+        assert blocked["v3_auto_accept_ready"] is False
         assert json.loads(baseline_path.read_text(encoding="utf-8"))["violation_ids"] == []
 
         (package / "giant_production.py").write_text("\n".join(["VALUE = 1"] * 2002) + "\n", encoding="utf-8")

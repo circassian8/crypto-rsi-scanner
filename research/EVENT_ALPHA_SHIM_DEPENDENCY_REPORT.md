@@ -2,7 +2,7 @@
 
 Research artifact only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: 2026-07-04T17:06:49.096644+00:00
+- generated_at: 2026-07-04T17:55:01.743461+00:00
 - status: OK
 - registry_entry_count: 124
 - internal_import_reference_count: 0
@@ -12,6 +12,8 @@ Research artifact only. This report does not call providers, send Telegram messa
 - dynamic_import_reference_count: 0
 - safe_to_remove_count: 0
 - active_shim_modules_with_implementation_logic: 0
+- v3_gate_status: pending
+- v3_auto_accept_ready: False
 
 ## Policy
 
@@ -19,6 +21,16 @@ Research artifact only. This report does not call providers, send Telegram messa
 - Old shims stay available during v1/v2 compatibility and may be removed only after zero internal references and an accepted removal release.
 - `scanner.py` may remain a compatibility CLI entrypoint.
 - `event_fade.py` remains intentionally outside Event Alpha; Event Alpha may write `FADE_SHORT_REVIEW` research but must not create `TRIGGERED_FADE`.
+
+## Refactor V3 Shim Gates
+
+| gate | value |
+|---|---:|
+| `nonessential_shims_remaining` | 111 |
+| `old_path_internal_imports` | 0 |
+| `public_compatibility_shims` | 13 |
+| `shim_removal_blockers` | 109 |
+| `old_path_docs_references` | 215 |
 
 ## Registry Dependencies
 

@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-04 - Event Alpha refactor v3 finalization contract
+**Status:** accepted
+**Decision:** Refactor v3 is the finalization phase after accepted v2
+compatibility. Old top-level Event Alpha shim paths are temporary and should be
+removed unless explicitly retained as public compatibility entrypoints.
+`scanner.py` remains a public CLI entrypoint compatibility wrapper, and
+`event_fade.py` remains intentionally outside Event Alpha because
+`TRIGGERED_FADE` ownership belongs only to `event_fade.py` plus `proxy_fade`.
+New code must import new package paths only. V3 reports must expose stricter
+gates for nonessential shims, old-path internal imports, public compatibility
+shims, shim removal blockers, production files over 1,200 and 1,500 lines,
+public classes not in their own modules, accepted class exceptions, functions
+over 150 lines, and old-path documentation references.
+**Why:** Refactor v2 accepted the compatibility shim state, but fully finishing
+the refactor requires a measurable removal contract before deleting old paths or
+relitigating safety-sensitive boundaries. Keeping v3 as a pending gate report
+lets future passes remove or explicitly retain shims without changing runtime
+behavior in this setup pass.
+**Revisit when:** `research/REFACTOR_FINAL_REPORT.md/json` reports
+`v3_auto_accept_ready=true`, especially `nonessential_shims_remaining=0`,
+`old_path_internal_imports=0`, and no unaccepted v3 size/class ownership gaps.
+
 ## 2026-07-04 - Event Alpha shim retirement requires dependency proof
 **Status:** accepted
 **Decision:** Old Event Alpha top-level shims remain available until the shim

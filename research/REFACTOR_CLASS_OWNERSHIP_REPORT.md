@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T17:06:51.363916+00:00`
+- generated_at: `2026-07-04T17:54:31.539417+00:00`
 - public_class_count: `408`
 - classes_over_limit_count: `14`
 - functions_over_limit_count: `0`
@@ -10,6 +10,11 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_functions_over_limit: `0`
 - accepted_class_exceptions_count: `14`
 - remaining_class_ownership_debt_count: `0`
+- v3_gate_status: `pending`
+- v3_auto_accept_ready: `False`
+- public_classes_not_in_own_module: `82`
+- class_exceptions_remaining: `14`
+- functions_over_150_lines: `0`
 - modules_with_multiple_public_classes_count: `82`
 - modules_with_multiple_public_classes_status: `documented_advisory`
 - legacy_decomposition_gate_status: `pass`
@@ -22,7 +27,24 @@ Static source inventory only. This report does not call providers, send Telegram
 - Every public class over 75 lines should live in its own module unless documented as an exception.
 - Multiple tiny value objects/enums may live in `models.py` only when documented.
 - Internal helper classes over 75 lines should also be split or documented.
+- Refactor v3 expects public classes to live in their own modules unless the module is a documented model bundle.
+- Refactor v3 keeps accepted class exceptions pending until each exception is reaccepted for the v3 removal phase.
 - `event_fade.py` remains outside Event Alpha; Event Alpha may produce `FADE_SHORT_REVIEW` research artifacts but must not create `TRIGGERED_FADE`.
+
+## Refactor V3 Gates
+
+| gate | value | severity |
+|---|---:|---|
+| `nonessential_shims_remaining` | 111 | blocker |
+| `old_path_internal_imports` | 0 | blocker |
+| `public_compatibility_shims` | 13 | informational |
+| `shim_removal_blockers` | 109 | blocker |
+| `production_files_over_1200_lines` | 14 | target_gap |
+| `production_files_over_1500_lines` | 0 | blocker |
+| `public_classes_not_in_own_module` | 82 | blocker |
+| `class_exceptions_remaining` | 14 | blocker_until_reaccepted_for_v3 |
+| `functions_over_150_lines` | 0 | blocker |
+| `old_path_docs_references` | 215 | blocker_unless_policy_scoped |
 
 ## Exceptions
 
