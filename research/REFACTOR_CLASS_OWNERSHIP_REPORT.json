@@ -1,5 +1,5 @@
 {
-  "class_count": 445,
+  "class_count": 448,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
@@ -46,15 +46,6 @@
       "public": true,
       "qualname": "EventIntegratedRadarResult",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py"
-    },
-    {
-      "class_name": "EventAlphaSourceCoverageReport",
-      "exception_reason": null,
-      "line_count": 143,
-      "module": "crypto_rsi_scanner.event_alpha.radar.source_coverage.models",
-      "public": true,
-      "qualname": "EventAlphaSourceCoverageReport",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py"
     },
     {
       "class_name": "EventWatchlistEntry",
@@ -174,7 +165,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 19,
+  "classes_over_limit_count": 18,
   "exceptions": [
     {
       "module": "crypto_rsi_scanner.event_core.models",
@@ -187,7 +178,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5206,
+  "function_count": 5207,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -576,7 +567,7 @@
     }
   ],
   "functions_over_limit_count": 48,
-  "generated_at": "2026-07-04T04:15:47.788411+00:00",
+  "generated_at": "2026-07-04T04:22:38.527393+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1134,7 +1125,7 @@
     "multiple_public_classes": "allowed for small value objects/enums in documented models modules",
     "public_class_over_75_lines": "should live in its own module unless documented here"
   },
-  "production_classes_over_limit": 19,
+  "production_classes_over_limit": 18,
   "production_classes_over_limit_rows": [
     {
       "class_name": "CoinGeckoClient",
@@ -1180,15 +1171,6 @@
       "public": true,
       "qualname": "EventIntegratedRadarResult",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py"
-    },
-    {
-      "class_name": "EventAlphaSourceCoverageReport",
-      "exception_reason": null,
-      "line_count": 143,
-      "module": "crypto_rsi_scanner.event_alpha.radar.source_coverage.models",
-      "public": true,
-      "qualname": "EventAlphaSourceCoverageReport",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py"
     },
     {
       "class_name": "EventWatchlistEntry",

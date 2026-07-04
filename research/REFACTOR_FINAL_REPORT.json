@@ -16,7 +16,7 @@
     ]
   },
   "class_ownership_report": {
-    "classes_over_limit_count": 19,
+    "classes_over_limit_count": 18,
     "functions_over_limit_count": 48,
     "modules_with_multiple_public_classes_count": 82,
     "path": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
@@ -85,7 +85,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-04T04:15:48+00:00",
+  "generated_at": "2026-07-04T04:22:39+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -857,7 +857,7 @@
     "source_coverage": 1,
     "stale_artifacts": 1
   },
-  "production_classes_over_limit": 19,
+  "production_classes_over_limit": 18,
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,

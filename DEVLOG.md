@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split source coverage report ownership · Codex
+**Why:** The refactor objective still tracks oversized report/data aggregates
+after production file-size gates passed. This pass reduces the source-coverage
+report class while preserving source coverage payloads, provider artifact links,
+Coinalyze/Bybit/readiness metadata, and report rendering.
+**Changes:**
+- Split `EventAlphaSourceCoverageReport` in
+  `crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py` into focused
+  private dataclass field groups for core/CryptoPanic fields and provider
+  artifact/readiness fields.
+- Moved source-coverage report serialization into a module helper while keeping
+  the public `to_dict()` API and output keys compatible.
+- Refreshed refactor size, class ownership, final, completion-map, and release
+  candidate reports. Current advisory inventory is `18` classes and `48`
+  functions over limits, with `production_files_over_1500_lines=0`,
+  `production_files_over_2000_lines=0`, `legacy_files_over_1500_lines=0`, and
+  `new_violation_count=0`.
+**Verify:** Focused source-coverage/provider/artifact-doctor tests passed
+(`169 passed`), compileall passed for touched source/test modules, and refactor
+report targets passed with `gate_status=pass` and completion map `accepted`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Remaining advisory debt is concentrated in large
+notification, daily-brief, doctor-context, provider/model, and
+rendering/serialization functions plus 18 oversized classes.
+
 ## 2026-07-04 — Split Event Alpha pipeline result ownership · Codex
 **Why:** The refactor goal still tracks oversized result/data aggregates after
 production file-size gates passed. This pass reduces the Event Alpha pipeline

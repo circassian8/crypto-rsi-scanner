@@ -209,7 +209,7 @@ class EventAlphaSourceCoveragePack:
             "recommended_actions": list(self.recommended_actions),
         }
 @dataclass(frozen=True)
-class EventAlphaSourceCoverageReport:
+class _SourceCoverageReportCoreFields:
     profile: str
     artifact_namespace: str
     packs: tuple[EventAlphaSourceCoveragePack, ...]
@@ -233,6 +233,10 @@ class EventAlphaSourceCoverageReport:
     cryptopanic_not_used_reason: str | None = None
     cryptopanic_coverage_status: str = "not_configured"
     cryptopanic_recommendation: str | None = None
+
+
+@dataclass(frozen=True)
+class _SourceCoverageReportProviderArtifactFields:
     coinalyze_preflight_status: str = "not_generated"
     coinalyze_preflight_json_path: str | None = None
     coinalyze_preflight_report_path: str | None = None
@@ -270,85 +274,102 @@ class EventAlphaSourceCoverageReport:
     official_exchange_activation_provider_rows: tuple[Mapping[str, Any], ...] = ()
     category_priorities: tuple[Mapping[str, Any], ...] = SOURCE_COVERAGE_CATEGORY_PRIORITIES
 
+
+class _SourceCoverageReportSerializationMixin:
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "profile": self.profile,
-            "artifact_namespace": self.artifact_namespace,
-            "provider_health_rows": self.provider_health_rows,
-            "acquisition_rows": self.acquisition_rows,
-            "core_rows": self.core_rows,
-            "cryptopanic_configured": self.cryptopanic_configured,
-            "cryptopanic_health_status": self.cryptopanic_health_status,
-            "cryptopanic_observed": self.cryptopanic_observed,
-            "cryptopanic_requests_used": self.cryptopanic_requests_used,
-            "cryptopanic_rolling_7d_requests": self.cryptopanic_rolling_7d_requests,
-            "cryptopanic_remaining_weekly": self.cryptopanic_remaining_weekly,
-            "cryptopanic_accepted_evidence": self.cryptopanic_accepted_evidence,
-            "cryptopanic_rejected_evidence": self.cryptopanic_rejected_evidence,
-            "cryptopanic_successful_requests": self.cryptopanic_successful_requests,
-            "cryptopanic_failed_requests": self.cryptopanic_failed_requests,
-            "cryptopanic_partial_success": self.cryptopanic_partial_success,
-            "cryptopanic_backoff_reconciled_after_success": self.cryptopanic_backoff_reconciled_after_success,
-            "cryptopanic_health_reason": self.cryptopanic_health_reason,
-            "cryptopanic_source_packs": list(self.cryptopanic_source_packs),
-            "cryptopanic_not_used_reason": self.cryptopanic_not_used_reason,
-            "cryptopanic_coverage_status": self.cryptopanic_coverage_status,
-            "cryptopanic_recommendation": self.cryptopanic_recommendation,
-            "coinalyze_preflight_status": self.coinalyze_preflight_status,
-            "coinalyze_preflight_json_path": self.coinalyze_preflight_json_path,
-            "coinalyze_preflight_report_path": self.coinalyze_preflight_report_path,
-            "coinalyze_rehearsal_status": self.coinalyze_rehearsal_status,
-            "coinalyze_rehearsal_report_path": self.coinalyze_rehearsal_report_path,
-            "coinalyze_request_ledger_path": self.coinalyze_request_ledger_path,
-            "coinalyze_provider_health_status": self.coinalyze_provider_health_status,
-            "coinalyze_requests_used": self.coinalyze_requests_used,
-            "coinalyze_snapshots_written": self.coinalyze_snapshots_written,
-            "coinalyze_supported_metric_status": dict(self.coinalyze_supported_metric_status or {}),
-            "bybit_announcements_preflight_status": self.bybit_announcements_preflight_status,
-            "bybit_announcements_preflight_json_path": self.bybit_announcements_preflight_json_path,
-            "bybit_announcements_preflight_report_path": self.bybit_announcements_preflight_report_path,
-            "bybit_announcements_rehearsal_status": self.bybit_announcements_rehearsal_status,
-            "bybit_announcements_rehearsal_report_path": self.bybit_announcements_rehearsal_report_path,
-            "bybit_announcements_request_ledger_path": self.bybit_announcements_request_ledger_path,
-            "bybit_announcements_provider_health_status": self.bybit_announcements_provider_health_status,
-            "bybit_announcements_requests_used": self.bybit_announcements_requests_used,
-            "bybit_announcements_official_events_written": self.bybit_announcements_official_events_written,
-            "bybit_announcements_official_listing_candidates_written": self.bybit_announcements_official_listing_candidates_written,
-            "unlock_calendar_preflight_status": self.unlock_calendar_preflight_status,
-            "unlock_calendar_preflight_json_path": self.unlock_calendar_preflight_json_path,
-            "unlock_calendar_preflight_report_path": self.unlock_calendar_preflight_report_path,
-            "unlock_calendar_preflight_provider_rows": [
-                dict(row) for row in self.unlock_calendar_preflight_provider_rows
-            ],
-            "dex_onchain_readiness_status": self.dex_onchain_readiness_status,
-            "dex_onchain_readiness_json_path": self.dex_onchain_readiness_json_path,
-            "dex_onchain_readiness_report_path": self.dex_onchain_readiness_report_path,
-            "dex_onchain_readiness_provider_rows": [
-                dict(row) for row in self.dex_onchain_readiness_provider_rows
-            ],
-            "dex_pool_state_rows": self.dex_pool_state_rows,
-            "dex_pool_anomaly_rows": self.dex_pool_anomaly_rows,
-            "protocol_fundamental_rows": self.protocol_fundamental_rows,
-            "official_exchange_activation_status": self.official_exchange_activation_status,
-            "official_exchange_activation_json_path": self.official_exchange_activation_json_path,
-            "official_exchange_activation_report_path": self.official_exchange_activation_report_path,
-            "official_exchange_activation_provider_rows": [
-                dict(row) for row in self.official_exchange_activation_provider_rows
-            ],
-            "category_priorities": [
-                {
-                    "category_priority_rank": idx + 1,
-                    "category": str(item.get("category") or ""),
-                    "providers": list(item.get("providers") or ()),
-                    "enabled_lanes": list(item.get("enabled_lanes") or ()),
-                    "reason": str(item.get("reason") or ""),
-                }
-                for idx, item in enumerate(self.category_priorities)
-            ],
-            "live_provider_activation_readiness_artifacts": {
-                "json": LIVE_PROVIDER_READINESS_JSON,
-                "markdown": LIVE_PROVIDER_READINESS_MD,
-                "note": "write with make event-alpha-live-provider-readiness before enabling live providers",
-            },
-            "packs": [pack.to_dict() for pack in self.packs],
-        }
+        return _source_coverage_report_to_dict(self)
+
+
+@dataclass(frozen=True)
+class EventAlphaSourceCoverageReport(
+    _SourceCoverageReportSerializationMixin,
+    _SourceCoverageReportProviderArtifactFields,
+    _SourceCoverageReportCoreFields,
+):
+    """Compatibility aggregate for source-coverage report fields."""
+
+
+def _source_coverage_report_to_dict(report: EventAlphaSourceCoverageReport) -> dict[str, Any]:
+    return {
+        "profile": report.profile,
+        "artifact_namespace": report.artifact_namespace,
+        "provider_health_rows": report.provider_health_rows,
+        "acquisition_rows": report.acquisition_rows,
+        "core_rows": report.core_rows,
+        "cryptopanic_configured": report.cryptopanic_configured,
+        "cryptopanic_health_status": report.cryptopanic_health_status,
+        "cryptopanic_observed": report.cryptopanic_observed,
+        "cryptopanic_requests_used": report.cryptopanic_requests_used,
+        "cryptopanic_rolling_7d_requests": report.cryptopanic_rolling_7d_requests,
+        "cryptopanic_remaining_weekly": report.cryptopanic_remaining_weekly,
+        "cryptopanic_accepted_evidence": report.cryptopanic_accepted_evidence,
+        "cryptopanic_rejected_evidence": report.cryptopanic_rejected_evidence,
+        "cryptopanic_successful_requests": report.cryptopanic_successful_requests,
+        "cryptopanic_failed_requests": report.cryptopanic_failed_requests,
+        "cryptopanic_partial_success": report.cryptopanic_partial_success,
+        "cryptopanic_backoff_reconciled_after_success": report.cryptopanic_backoff_reconciled_after_success,
+        "cryptopanic_health_reason": report.cryptopanic_health_reason,
+        "cryptopanic_source_packs": list(report.cryptopanic_source_packs),
+        "cryptopanic_not_used_reason": report.cryptopanic_not_used_reason,
+        "cryptopanic_coverage_status": report.cryptopanic_coverage_status,
+        "cryptopanic_recommendation": report.cryptopanic_recommendation,
+        "coinalyze_preflight_status": report.coinalyze_preflight_status,
+        "coinalyze_preflight_json_path": report.coinalyze_preflight_json_path,
+        "coinalyze_preflight_report_path": report.coinalyze_preflight_report_path,
+        "coinalyze_rehearsal_status": report.coinalyze_rehearsal_status,
+        "coinalyze_rehearsal_report_path": report.coinalyze_rehearsal_report_path,
+        "coinalyze_request_ledger_path": report.coinalyze_request_ledger_path,
+        "coinalyze_provider_health_status": report.coinalyze_provider_health_status,
+        "coinalyze_requests_used": report.coinalyze_requests_used,
+        "coinalyze_snapshots_written": report.coinalyze_snapshots_written,
+        "coinalyze_supported_metric_status": dict(report.coinalyze_supported_metric_status or {}),
+        "bybit_announcements_preflight_status": report.bybit_announcements_preflight_status,
+        "bybit_announcements_preflight_json_path": report.bybit_announcements_preflight_json_path,
+        "bybit_announcements_preflight_report_path": report.bybit_announcements_preflight_report_path,
+        "bybit_announcements_rehearsal_status": report.bybit_announcements_rehearsal_status,
+        "bybit_announcements_rehearsal_report_path": report.bybit_announcements_rehearsal_report_path,
+        "bybit_announcements_request_ledger_path": report.bybit_announcements_request_ledger_path,
+        "bybit_announcements_provider_health_status": report.bybit_announcements_provider_health_status,
+        "bybit_announcements_requests_used": report.bybit_announcements_requests_used,
+        "bybit_announcements_official_events_written": report.bybit_announcements_official_events_written,
+        "bybit_announcements_official_listing_candidates_written": (
+            report.bybit_announcements_official_listing_candidates_written
+        ),
+        "unlock_calendar_preflight_status": report.unlock_calendar_preflight_status,
+        "unlock_calendar_preflight_json_path": report.unlock_calendar_preflight_json_path,
+        "unlock_calendar_preflight_report_path": report.unlock_calendar_preflight_report_path,
+        "unlock_calendar_preflight_provider_rows": [
+            dict(row) for row in report.unlock_calendar_preflight_provider_rows
+        ],
+        "dex_onchain_readiness_status": report.dex_onchain_readiness_status,
+        "dex_onchain_readiness_json_path": report.dex_onchain_readiness_json_path,
+        "dex_onchain_readiness_report_path": report.dex_onchain_readiness_report_path,
+        "dex_onchain_readiness_provider_rows": [
+            dict(row) for row in report.dex_onchain_readiness_provider_rows
+        ],
+        "dex_pool_state_rows": report.dex_pool_state_rows,
+        "dex_pool_anomaly_rows": report.dex_pool_anomaly_rows,
+        "protocol_fundamental_rows": report.protocol_fundamental_rows,
+        "official_exchange_activation_status": report.official_exchange_activation_status,
+        "official_exchange_activation_json_path": report.official_exchange_activation_json_path,
+        "official_exchange_activation_report_path": report.official_exchange_activation_report_path,
+        "official_exchange_activation_provider_rows": [
+            dict(row) for row in report.official_exchange_activation_provider_rows
+        ],
+        "category_priorities": [
+            {
+                "category_priority_rank": idx + 1,
+                "category": str(item.get("category") or ""),
+                "providers": list(item.get("providers") or ()),
+                "enabled_lanes": list(item.get("enabled_lanes") or ()),
+                "reason": str(item.get("reason") or ""),
+            }
+            for idx, item in enumerate(report.category_priorities)
+        ],
+        "live_provider_activation_readiness_artifacts": {
+            "json": LIVE_PROVIDER_READINESS_JSON,
+            "markdown": LIVE_PROVIDER_READINESS_MD,
+            "note": "write with make event-alpha-live-provider-readiness before enabling live providers",
+        },
+        "packs": [pack.to_dict() for pack in report.packs],
+    }

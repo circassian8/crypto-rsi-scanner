@@ -49,15 +49,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py"
     },
     {
-      "class_name": "EventAlphaSourceCoverageReport",
-      "exception_reason": null,
-      "line_count": 143,
-      "module": "crypto_rsi_scanner.event_alpha.radar.source_coverage.models",
-      "public": true,
-      "qualname": "EventAlphaSourceCoverageReport",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py"
-    },
-    {
       "class_name": "EventWatchlistEntry",
       "exception_reason": null,
       "line_count": 85,
@@ -175,8 +166,8 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 19,
-  "existing_violation_count": 157,
+  "classes_over_limit_count": 18,
+  "existing_violation_count": 156,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -309,18 +300,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py",
       "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py:EventIntegratedRadarResult"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "EventAlphaSourceCoverageReport",
-      "exception_reason": null,
-      "line_count": 143,
-      "module": "crypto_rsi_scanner.event_alpha.radar.source_coverage.models",
-      "public": true,
-      "qualname": "EventAlphaSourceCoverageReport",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py:EventAlphaSourceCoverageReport"
     },
     {
       "category": "class_over_75_lines",
@@ -2105,7 +2084,7 @@
   ],
   "functions_over_limit_count": 48,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T04:15:46.776123+00:00",
+  "generated_at": "2026-07-04T04:22:37.524454+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -3074,10 +3053,6 @@
       "current_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py:EventIntegratedRadarResult"
     },
     {
-      "baseline_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:EventAlphaSourceCoverageReport",
-      "current_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py:EventAlphaSourceCoverageReport"
-    },
-    {
       "baseline_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:EventWatchlistEntry",
       "current_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/watchlist/models.py:EventWatchlistEntry"
     },
@@ -3258,7 +3233,7 @@
       "current_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.models"
     }
   ],
-  "moved_existing_violation_count": 49,
+  "moved_existing_violation_count": 48,
   "new_violation_count": 0,
   "new_violations": [],
   "no_live_provider_calls": true,
@@ -3272,7 +3247,7 @@
     "production_file_over_3000_lines": "blocker",
     "test_file_size_debt": "tracked separately from production completion"
   },
-  "production_classes_over_limit": 19,
+  "production_classes_over_limit": 18,
   "production_classes_over_limit_rows": [
     {
       "class_name": "CoinGeckoClient",
@@ -3318,15 +3293,6 @@
       "public": true,
       "qualname": "EventIntegratedRadarResult",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py"
-    },
-    {
-      "class_name": "EventAlphaSourceCoverageReport",
-      "exception_reason": null,
-      "line_count": 143,
-      "module": "crypto_rsi_scanner.event_alpha.radar.source_coverage.models",
-      "public": true,
-      "qualname": "EventAlphaSourceCoverageReport",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py"
     },
     {
       "class_name": "EventWatchlistEntry",
@@ -3838,7 +3804,7 @@
   ],
   "production_size_gate_status": "pass",
   "research_only": true,
-  "resolved_violation_count": 47,
+  "resolved_violation_count": 48,
   "resolved_violation_ids": [
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
     "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
@@ -3852,6 +3818,7 @@
     "class:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:EventImpactHypothesis",
     "class:crypto_rsi_scanner/event_alpha/radar/llm/budget.py:EventLLMBudgetRunTracker",
     "class:crypto_rsi_scanner/event_alpha/radar/pipeline.py:EventAlphaPipelineResult",
+    "class:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:EventAlphaSourceCoverageReport",
     "file:crypto_rsi_scanner/backtest_parts/legacy.py",
     "file:crypto_rsi_scanner/cli/services/event_alpha_notifications.py",
     "file:crypto_rsi_scanner/event_alpha/artifacts/alert_store.py",
@@ -3899,7 +3866,6 @@
     "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:EventProviderCatalystSearchProvider",
     "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:FixtureCatalystSearchProvider",
     "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py:EventIntegratedRadarResult",
-    "class:crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py:EventAlphaSourceCoverageReport",
     "class:crypto_rsi_scanner/event_alpha/radar/watchlist/models.py:EventWatchlistEntry",
     "class:crypto_rsi_scanner/event_alpha/radar/watchlist_market.py:CoinGeckoWatchlistMarketProvider",
     "class:crypto_rsi_scanner/event_providers/binance_announcements/legacy.py:BinanceAnnouncementProvider",
@@ -4184,18 +4150,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py",
       "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py:EventIntegratedRadarResult"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "EventAlphaSourceCoverageReport",
-      "exception_reason": null,
-      "line_count": 143,
-      "module": "crypto_rsi_scanner.event_alpha.radar.source_coverage.models",
-      "public": true,
-      "qualname": "EventAlphaSourceCoverageReport",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py:EventAlphaSourceCoverageReport"
     },
     {
       "category": "class_over_75_lines",
