@@ -139,89 +139,176 @@ def run_manual_discovery(
     raw_event_transform: Callable[[tuple[RawDiscoveredEvent]], Iterable[RawDiscoveredEvent]] | None = None,
     provider_health_cfg: event_provider_health.EventProviderHealthConfig | None = None,
 ) -> EventDiscoveryResult:
-    cfg = cfg or EventDiscoveryConfig()
-    now = _as_utc(now or datetime.now(timezone.utc))
+    return _run_manual_discovery_from_options(locals())
+
+
+def _run_manual_discovery_from_options(options: Mapping[str, Any]) -> EventDiscoveryResult:
+    cfg = options["cfg"] or EventDiscoveryConfig()
+    now = _as_utc(options["now"] or datetime.now(timezone.utc))
     start = now - timedelta(hours=cfg.lookback_hours)
     end = now + timedelta(days=cfg.horizon_days)
     provider_warnings: list[str] = []
-    raw_events = load_discovery_events(
+    raw_events = _load_manual_discovery_raw_events(
+        options["event_path"],
+        start,
+        end,
+        provider_health_cfg=options["provider_health_cfg"],
+        provider_warnings=provider_warnings,
+        local_options=options,
+    )
+    market_rows = _load_manual_discovery_market_rows(
+        now=now,
+        market_enrichment_enabled=options["market_enrichment_enabled"],
+        anomaly_scanner_enabled=options["anomaly_scanner_enabled"],
+        market_enrichment_path=options["market_enrichment_path"],
+        market_enrichment_live=options["market_enrichment_live"],
+        market_enrichment_fetch_limit=options["market_enrichment_fetch_limit"],
+        market_enrichment_fail_soft=options["market_enrichment_fail_soft"],
+        universe_path=options["universe_path"],
+        universe_fetch_limit=options["universe_fetch_limit"],
+        universe_limit=options["universe_limit"],
+        provider_health_cfg=options["provider_health_cfg"],
+        provider_warnings=provider_warnings,
+    )
+    raw_events = _apply_manual_discovery_market_and_transform(
+        raw_events,
+        market_rows,
+        now=now,
+        anomaly_scanner_enabled=options["anomaly_scanner_enabled"],
+        anomaly_min_return_24h=options["anomaly_min_return_24h"],
+        anomaly_min_volume_mcap=options["anomaly_min_volume_mcap"],
+        anomaly_min_volume_zscore=options["anomaly_min_volume_zscore"],
+        anomaly_max_assets=options["anomaly_max_assets"],
+        raw_event_transform=options["raw_event_transform"],
+    )
+    assets = _load_manual_discovery_assets(
+        options["alias_path"],
+        universe_path=options["universe_path"],
+        universe_limit=options["universe_limit"],
+        universe_live=options["universe_live"],
+        universe_fetch_limit=options["universe_fetch_limit"],
+        provider_health_cfg=options["provider_health_cfg"],
+        provider_warnings=provider_warnings,
+    )
+    derivatives = _load_manual_discovery_derivatives(
+        assets,
+        coinalyze_derivatives_path=options["coinalyze_derivatives_path"],
+        coinalyze_live=options["coinalyze_live"],
+        coinalyze_api_key=options["coinalyze_api_key"],
+        coinalyze_symbols=options["coinalyze_symbols"],
+        coinalyze_auto_symbols=options["coinalyze_auto_symbols"],
+        coinalyze_base_url=options["coinalyze_base_url"],
+        coinalyze_timeout=options["coinalyze_timeout"],
+        coinalyze_history_interval=options["coinalyze_history_interval"],
+        coinalyze_lookback_hours=options["coinalyze_lookback_hours"],
+        coinalyze_convert_to_usd=options["coinalyze_convert_to_usd"],
+        provider_health_cfg=options["provider_health_cfg"],
+        provider_warnings=provider_warnings,
+    )
+    supply = _load_manual_discovery_supply(
+        tokenomist_supply_path=options["tokenomist_supply_path"],
+        etherscan_supply_path=options["etherscan_supply_path"],
+        arkham_supply_path=options["arkham_supply_path"],
+        dune_supply_path=options["dune_supply_path"],
+    )
+    return _run_manual_discovery_core(
+        raw_events,
+        assets,
+        cfg=cfg,
+        fade_cfg=options["fade_cfg"],
+        now=now,
+        market_rows=market_rows,
+        market_enrichment_enabled=options["market_enrichment_enabled"],
+        derivatives_by_asset=derivatives,
+        supply_by_asset=supply,
+        warnings=provider_warnings,
+    )
+
+
+def _load_manual_discovery_raw_events(
+    event_path: str | Path | None,
+    start: datetime,
+    end: datetime,
+    *,
+    provider_health_cfg: event_provider_health.EventProviderHealthConfig | None,
+    provider_warnings: list[str],
+    local_options: Mapping[str, Any],
+) -> list[RawDiscoveredEvent]:
+    option_keys = (
+        "binance_announcements_path", "binance_announcements_live", "binance_announcements_api_key",
+        "binance_announcements_api_secret", "binance_announcements_ws_url", "binance_announcements_topic",
+        "binance_announcements_recv_window_ms", "binance_announcements_listen_seconds",
+        "binance_announcements_max_messages", "bybit_announcements_path", "bybit_announcements_live",
+        "bybit_announcements_base_url", "bybit_announcements_locale", "bybit_announcements_type",
+        "bybit_announcements_limit", "bybit_announcements_timeout", "coinmarketcal_path", "tokenomist_path",
+        "cryptopanic_path", "cryptopanic_live", "cryptopanic_api_token", "cryptopanic_base_url",
+        "cryptopanic_plan", "cryptopanic_public", "cryptopanic_following", "cryptopanic_filter",
+        "cryptopanic_currencies", "cryptopanic_regions", "cryptopanic_kind", "cryptopanic_search",
+        "cryptopanic_timeout", "cryptopanic_request_ledger_path", "cryptopanic_profile",
+        "cryptopanic_artifact_namespace", "cryptopanic_weekly_request_limit",
+        "cryptopanic_requests_per_run_limit", "cryptopanic_requests_per_day_soft_limit",
+        "cryptopanic_min_seconds_between_requests", "cryptopanic_max_pages_per_query",
+        "cryptopanic_max_currencies_per_request", "gdelt_path", "gdelt_live", "gdelt_base_url",
+        "gdelt_query", "gdelt_max_records", "gdelt_timeout", "project_blog_rss_path",
+        "project_blog_rss_live", "project_blog_rss_urls", "project_blog_rss_timeout",
+        "project_blog_rss_fail_fast_on_error", "external_ipo_path", "sports_fixtures_path",
+        "prediction_market_events_path", "prediction_market_events_live",
+        "prediction_market_events_base_url", "prediction_market_events_limit",
+        "prediction_market_events_timeout",
+    )
+    options = {key: local_options[key] for key in option_keys}
+    return load_discovery_events(
         event_path,
         start,
         end,
-        binance_announcements_path=binance_announcements_path,
-        binance_announcements_live=binance_announcements_live,
-        binance_announcements_api_key=binance_announcements_api_key,
-        binance_announcements_api_secret=binance_announcements_api_secret,
-        binance_announcements_ws_url=binance_announcements_ws_url,
-        binance_announcements_topic=binance_announcements_topic,
-        binance_announcements_recv_window_ms=binance_announcements_recv_window_ms,
-        binance_announcements_listen_seconds=binance_announcements_listen_seconds,
-        binance_announcements_max_messages=binance_announcements_max_messages,
-        bybit_announcements_path=bybit_announcements_path,
-        bybit_announcements_live=bybit_announcements_live,
-        bybit_announcements_base_url=bybit_announcements_base_url,
-        bybit_announcements_locale=bybit_announcements_locale,
-        bybit_announcements_type=bybit_announcements_type,
-        bybit_announcements_limit=bybit_announcements_limit,
-        bybit_announcements_timeout=bybit_announcements_timeout,
-        coinmarketcal_path=coinmarketcal_path,
-        tokenomist_path=tokenomist_path,
-        cryptopanic_path=cryptopanic_path,
-        cryptopanic_live=cryptopanic_live,
-        cryptopanic_api_token=cryptopanic_api_token,
-        cryptopanic_base_url=cryptopanic_base_url,
-        cryptopanic_plan=cryptopanic_plan,
-        cryptopanic_public=cryptopanic_public,
-        cryptopanic_following=cryptopanic_following,
-        cryptopanic_filter=cryptopanic_filter,
-        cryptopanic_currencies=cryptopanic_currencies,
-        cryptopanic_regions=cryptopanic_regions,
-        cryptopanic_kind=cryptopanic_kind,
-        cryptopanic_search=cryptopanic_search,
-        cryptopanic_timeout=cryptopanic_timeout,
-        cryptopanic_request_ledger_path=cryptopanic_request_ledger_path,
-        cryptopanic_profile=cryptopanic_profile,
-        cryptopanic_artifact_namespace=cryptopanic_artifact_namespace,
-        cryptopanic_weekly_request_limit=cryptopanic_weekly_request_limit,
-        cryptopanic_requests_per_run_limit=cryptopanic_requests_per_run_limit,
-        cryptopanic_requests_per_day_soft_limit=cryptopanic_requests_per_day_soft_limit,
-        cryptopanic_min_seconds_between_requests=cryptopanic_min_seconds_between_requests,
-        cryptopanic_max_pages_per_query=cryptopanic_max_pages_per_query,
-        cryptopanic_max_currencies_per_request=cryptopanic_max_currencies_per_request,
-        gdelt_path=gdelt_path,
-        gdelt_live=gdelt_live,
-        gdelt_base_url=gdelt_base_url,
-        gdelt_query=gdelt_query,
-        gdelt_max_records=gdelt_max_records,
-        gdelt_timeout=gdelt_timeout,
-        project_blog_rss_path=project_blog_rss_path,
-        project_blog_rss_live=project_blog_rss_live,
-        project_blog_rss_urls=project_blog_rss_urls,
-        project_blog_rss_timeout=project_blog_rss_timeout,
-        project_blog_rss_fail_fast_on_error=project_blog_rss_fail_fast_on_error,
-        external_ipo_path=external_ipo_path,
-        sports_fixtures_path=sports_fixtures_path,
-        prediction_market_events_path=prediction_market_events_path,
-        prediction_market_events_live=prediction_market_events_live,
-        prediction_market_events_base_url=prediction_market_events_base_url,
-        prediction_market_events_limit=prediction_market_events_limit,
-        prediction_market_events_timeout=prediction_market_events_timeout,
         provider_health_cfg=provider_health_cfg,
         provider_warnings=provider_warnings,
+        **options,
     )
-    if market_enrichment_enabled or anomaly_scanner_enabled:
-        market_rows, market_warnings = event_market_enrichment.load_market_enrichment_rows_safe(
-            market_enrichment_path if market_enrichment_path is not None else universe_path,
-            live=market_enrichment_live,
-            fetch_limit=market_enrichment_fetch_limit or universe_fetch_limit or 0,
-            limit=universe_limit,
-            fail_soft=market_enrichment_fail_soft,
-            provider_health_cfg=provider_health_cfg if market_enrichment_fail_soft else None,
-            now=now,
-        )
-        provider_warnings.extend(market_warnings)
-    else:
-        market_rows = []
+
+
+def _load_manual_discovery_market_rows(
+    *,
+    now: datetime,
+    market_enrichment_enabled: bool,
+    anomaly_scanner_enabled: bool,
+    market_enrichment_path: str | Path | None,
+    market_enrichment_live: bool,
+    market_enrichment_fetch_limit: int,
+    market_enrichment_fail_soft: bool,
+    universe_path: str | Path | None,
+    universe_fetch_limit: int | None,
+    universe_limit: int | None,
+    provider_health_cfg: event_provider_health.EventProviderHealthConfig | None,
+    provider_warnings: list[str],
+) -> list[Mapping[str, Any]]:
+    if not (market_enrichment_enabled or anomaly_scanner_enabled):
+        return []
+    market_rows, market_warnings = event_market_enrichment.load_market_enrichment_rows_safe(
+        market_enrichment_path if market_enrichment_path is not None else universe_path,
+        live=market_enrichment_live,
+        fetch_limit=market_enrichment_fetch_limit or universe_fetch_limit or 0,
+        limit=universe_limit,
+        fail_soft=market_enrichment_fail_soft,
+        provider_health_cfg=provider_health_cfg if market_enrichment_fail_soft else None,
+        now=now,
+    )
+    provider_warnings.extend(market_warnings)
+    return market_rows
+
+
+def _apply_manual_discovery_market_and_transform(
+    raw_events: list[RawDiscoveredEvent],
+    market_rows: list[Mapping[str, Any]],
+    *,
+    now: datetime,
+    anomaly_scanner_enabled: bool,
+    anomaly_min_return_24h: float,
+    anomaly_min_volume_mcap: float,
+    anomaly_min_volume_zscore: float,
+    anomaly_max_assets: int,
+    raw_event_transform: Callable[[tuple[RawDiscoveredEvent]], Iterable[RawDiscoveredEvent]] | None,
+) -> list[RawDiscoveredEvent]:
     if anomaly_scanner_enabled:
         raw_events.extend(event_anomaly_scanner.discover_market_anomalies(
             market_rows,
@@ -234,14 +321,27 @@ def run_manual_discovery(
             ),
             now=now,
         ))
-    if raw_event_transform is not None:
-        original_raw_events = tuple(raw_events)
-        try:
-            raw_events = list(raw_event_transform(original_raw_events))
-        except Exception as exc:  # noqa: BLE001
-            log.warning("Event raw evidence transform failed; continuing without transformed hints: %s", exc)
-            raw_events = list(original_raw_events)
-    assets = load_discovery_assets(
+    if raw_event_transform is None:
+        return raw_events
+    original_raw_events = tuple(raw_events)
+    try:
+        return list(raw_event_transform(original_raw_events))
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Event raw evidence transform failed; continuing without transformed hints: %s", exc)
+        return list(original_raw_events)
+
+
+def _load_manual_discovery_assets(
+    alias_path: str | Path | None,
+    *,
+    universe_path: str | Path | None,
+    universe_limit: int | None,
+    universe_live: bool,
+    universe_fetch_limit: int | None,
+    provider_health_cfg: event_provider_health.EventProviderHealthConfig | None,
+    provider_warnings: list[str],
+) -> list[DiscoveredAsset]:
+    return load_discovery_assets(
         alias_path,
         universe_path=universe_path,
         universe_limit=universe_limit,
@@ -250,7 +350,25 @@ def run_manual_discovery(
         provider_health_cfg=provider_health_cfg,
         provider_warnings=provider_warnings,
     )
-    derivatives = load_derivatives_snapshots(
+
+
+def _load_manual_discovery_derivatives(
+    assets: list[DiscoveredAsset],
+    *,
+    coinalyze_derivatives_path: str | Path | None,
+    coinalyze_live: bool,
+    coinalyze_api_key: str,
+    coinalyze_symbols: Iterable[str],
+    coinalyze_auto_symbols: bool,
+    coinalyze_base_url: str,
+    coinalyze_timeout: float,
+    coinalyze_history_interval: str,
+    coinalyze_lookback_hours: int,
+    coinalyze_convert_to_usd: bool,
+    provider_health_cfg: event_provider_health.EventProviderHealthConfig | None,
+    provider_warnings: list[str],
+) -> dict[str, Mapping[str, Any]]:
+    return load_derivatives_snapshots(
         coinalyze_derivatives_path,
         coinalyze_live=coinalyze_live,
         coinalyze_api_key=coinalyze_api_key,
@@ -265,12 +383,36 @@ def run_manual_discovery(
         provider_health_cfg=provider_health_cfg,
         provider_warnings=provider_warnings,
     )
-    supply = load_supply_snapshots(
+
+
+def _load_manual_discovery_supply(
+    *,
+    tokenomist_supply_path: str | Path | None,
+    etherscan_supply_path: str | Path | None,
+    arkham_supply_path: str | Path | None,
+    dune_supply_path: str | Path | None,
+) -> dict[str, Mapping[str, Any]]:
+    return load_supply_snapshots(
         tokenomist_supply_path=tokenomist_supply_path,
         etherscan_supply_path=etherscan_supply_path,
         arkham_supply_path=arkham_supply_path,
         dune_supply_path=dune_supply_path,
     )
+
+
+def _run_manual_discovery_core(
+    raw_events: list[RawDiscoveredEvent],
+    assets: list[DiscoveredAsset],
+    *,
+    cfg: EventDiscoveryConfig,
+    fade_cfg: event_fade.EventFadeConfig | None,
+    now: datetime,
+    market_rows: list[Mapping[str, Any]],
+    market_enrichment_enabled: bool,
+    derivatives_by_asset: Mapping[str, Mapping[str, Any]],
+    supply_by_asset: Mapping[str, Mapping[str, Any]],
+    warnings: list[str],
+) -> EventDiscoveryResult:
     market = (
         event_market_enrichment.market_snapshots_from_rows(market_rows, now=now)
         if market_enrichment_enabled and market_rows
@@ -283,9 +425,9 @@ def run_manual_discovery(
         fade_cfg=fade_cfg,
         now=now,
         market_by_asset=market,
-        derivatives_by_asset=derivatives,
-        supply_by_asset=supply,
-        warnings=provider_warnings,
+        derivatives_by_asset=derivatives_by_asset,
+        supply_by_asset=supply_by_asset,
+        warnings=warnings,
     )
 
 

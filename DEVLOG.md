@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split manual discovery orchestration debt · Codex
+**Why:** The refactor still has advisory oversized-function debt even though
+production and legacy file-size gates pass. `run_manual_discovery()` kept
+tripping the ownership report because its compatibility signature and command
+orchestration lived in one body.
+**Changes:**
+- Kept the public `run_manual_discovery()` signature in
+  `crypto_rsi_scanner/event_alpha/radar/discovery/manual.py` and moved its
+  behavior-preserving orchestration into private helper functions for raw
+  event loading, market/anomaly transformation, asset loading, derivatives
+  loading, supply loading, and final `run_discovery()` invocation.
+- Refreshed refactor class ownership, size-gate, and final reports. Current
+  advisory inventory is `14` classes and `21` functions over limits, with
+  `gate_status=pass` and `new_violation_count=0`.
+**Verify:** Focused discovery/provider tests passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha/test_provider_readiness.py -q -k "run_manual_discovery or event_discovery_report or market_enrichment or supply or derivatives"`
+reported `8 passed, 81 deselected`; artifact schema smoke reported
+`12 passed`; `python3 -m compileall -q crypto_rsi_scanner/event_alpha/radar/discovery/manual.py`
+passed; refactor class ownership, size-gate, and final reports passed. Full
+safe verification for the committed tree: `python3 tests/test_indicators.py`,
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q`,
+`python3 -m compileall -q crypto_rsi_scanner tests`, and
+`make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+live sends, trading, paper-trading behavior changes, execution/order logic,
+Event Alpha RSI writes, or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split notification cycle and discovery loader functions · Codex
 **Why:** The long-running refactor still tracks advisory oversized-function
 debt after production and legacy size gates passed. This pass reduces three

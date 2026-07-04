@@ -142,7 +142,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5346,
+  "function_count": 5354,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -208,14 +208,6 @@
       "public": true,
       "qualname": "evaluate_signal_quality_case",
       "source_path": "crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py"
-    },
-    {
-      "function_name": "run_manual_discovery",
-      "line_count": 244,
-      "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
-      "public": true,
-      "qualname": "run_manual_discovery",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/discovery/manual.py"
     },
     {
       "function_name": "_execute_request",
@@ -322,8 +314,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     }
   ],
-  "functions_over_limit_count": 22,
-  "generated_at": "2026-07-04T06:13:52.068669+00:00",
+  "functions_over_limit_count": 21,
+  "generated_at": "2026-07-04T06:23:54.831189+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1001,7 +993,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 22,
+  "production_functions_over_limit": 21,
   "production_functions_over_limit_rows": [
     {
       "function_name": "build_daily_brief",
@@ -1066,14 +1058,6 @@
       "public": true,
       "qualname": "evaluate_signal_quality_case",
       "source_path": "crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py"
-    },
-    {
-      "function_name": "run_manual_discovery",
-      "line_count": 244,
-      "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
-      "public": true,
-      "qualname": "run_manual_discovery",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/discovery/manual.py"
     },
     {
       "function_name": "_execute_request",
