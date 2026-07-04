@@ -17,6 +17,63 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Finish production-size refactor burn-down · Codex
+**Why:** The previous refactor passes left several production modules over the
+new size-gate thresholds and still hid meaningful implementation bodies behind
+large same-path files. This pass needed to split those files conservatively
+without changing CLI behavior, artifact schemas, route gates, scoring,
+provider-readiness behavior, notification no-send semantics, or research-only
+safety boundaries.
+**Changes:**
+- Split remaining large production files into same-name packages with focused
+  modules and compatibility exports: Event Alpha quality, catalyst search,
+  incidents, alert store, source coverage, notification inbox, CLI
+  notification services, Event Alpha parser args, Event Alpha command registry,
+  and the backtest legacy compatibility core.
+- Preserved old imports and monkeypatch-heavy compatibility by keeping package
+  aggregators and binder wrappers, including scanner-global binding across the
+  split Event Alpha command registry and notification service modules.
+- Strengthened refactor reports so production and test size debt are tracked
+  separately. `make refactor-size-gates` now reports production/test counters;
+  no production Python file is over 1,500 lines, and the production size gate
+  is passing.
+- Refreshed refactor size, class ownership, final, completion-map,
+  release-candidate, shim, and verification artifacts. The completion map and
+  release-candidate reports are accepted from the 23-command safe regression
+  stack.
+**Verify:** `python3 tests/test_indicators.py`; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py
+-q`; `python3 -m compileall -q crypto_rsi_scanner tests`; `make
+test-pytest-safe PYTHON=python3`; `make refactor-size-gates PYTHON=python3`;
+`make refactor-class-ownership-report PYTHON=python3`; `make
+refactor-final-report PYTHON=python3`; `make event-alpha-shim-report
+PYTHON=python3`; `make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`; `make
+event-alpha-notification-format-smoke PYTHON=python3`; `make
+event-alpha-telegram-no-send-final-check-fast PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-preflight PYTHON=python3`; `make
+event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`; `make
+event-alpha-source-coverage-report PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1
+PYTHON=python3`; `make backtest-costs PYTHON=python3`; `make verify
+PYTHON=python3`. All 23 verification commands passed and
+`research/REFACTOR_VERIFICATION_RESULTS.json` records `failed=0`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Remaining debt is class/function ownership
+(`31` classes and `62` functions over the current advisory limits), not
+production file size.
+
 ## 2026-07-03 — Decompose Event Alpha legacy radar cores · Codex
 **Why:** The refactor gates were still measuring real implementation sprawl in
 large internal `legacy.py`/`legacy_*` cores. This pass needed to split those

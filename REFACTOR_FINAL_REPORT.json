@@ -17,22 +17,21 @@
   },
   "class_ownership_report": {
     "classes_over_limit_count": 31,
-    "functions_over_limit_count": 64,
-    "modules_with_multiple_public_classes_count": 81,
+    "functions_over_limit_count": 62,
+    "modules_with_multiple_public_classes_count": 82,
     "path": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
     "present": true,
     "public_class_count": 407
   },
   "cli_event_alpha_service_lines": 46,
   "cli_flag_snapshot_path": "research/CLI_FLAG_SNAPSHOT.json",
-  "cli_service_bind_scanner_globals_call_sites": 6,
+  "cli_service_bind_scanner_globals_call_sites": 5,
   "cli_service_line_counts": {
     "crypto_rsi_scanner/cli/services/__init__.py": 8,
     "crypto_rsi_scanner/cli/services/event_alpha.py": 46,
     "crypto_rsi_scanner/cli/services/event_alpha_fade_review.py": 493,
     "crypto_rsi_scanner/cli/services/event_alpha_integrated.py": 479,
     "crypto_rsi_scanner/cli/services/event_alpha_namespace.py": 50,
-    "crypto_rsi_scanner/cli/services/event_alpha_notifications.py": 1711,
     "crypto_rsi_scanner/cli/services/event_alpha_outcomes.py": 365,
     "crypto_rsi_scanner/cli/services/event_alpha_provider_preflights.py": 71,
     "crypto_rsi_scanner/cli/services/event_alpha_reports.py": 296,
@@ -86,7 +85,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-03T15:38:59+00:00",
+  "generated_at": "2026-07-04T02:17:33+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -108,10 +107,6 @@
     "research_cards_wrapper": 14
   },
   "largest_legacy_files": [
-    {
-      "line_count": 2174,
-      "path": "crypto_rsi_scanner/backtest_parts/legacy.py"
-    },
     {
       "line_count": 933,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py"
@@ -187,6 +182,404 @@
     {
       "line_count": 50,
       "path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
+    },
+    {
+      "line_count": 48,
+      "path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
+    }
+  ],
+  "largest_production_files": [
+    {
+      "limit": 1500,
+      "line_count": 1440,
+      "path": "crypto_rsi_scanner/cli/services/legacy/utility_commands.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1428,
+      "path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1413,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1392,
+      "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1392,
+      "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1319,
+      "path": "crypto_rsi_scanner/config.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1275,
+      "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1267,
+      "path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1261,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1249,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1247,
+      "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1233,
+      "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1222,
+      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1203,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1181,
+      "path": "crypto_rsi_scanner/event_fade.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1171,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1103,
+      "path": "crypto_rsi_scanner/cli/services/legacy/rsi_scan.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1078,
+      "path": "crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1061,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/delivery.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1059,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1002,
+      "path": "crypto_rsi_scanner/event_alpha/radar/llm/extractor.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 995,
+      "path": "crypto_rsi_scanner/event_alpha/radar/scheduled_catalysts.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 994,
+      "path": "crypto_rsi_scanner/cli/services/event_alpha_research.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 993,
+      "path": "crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 985,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/alerts.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 984,
+      "path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 980,
+      "path": "crypto_rsi_scanner/event_alpha/radar/impact_hypothesis_store.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 975,
+      "path": "crypto_rsi_scanner/event_alpha/radar/incident_graph.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 970,
+      "path": "crypto_rsi_scanner/event_alpha/radar/core_opportunities.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 961,
+      "path": "crypto_rsi_scanner/cli/services/legacy/reports.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 951,
+      "path": "crypto_rsi_scanner/refactor_final_report.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 941,
+      "path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 941,
+      "path": "crypto_rsi_scanner/event_alpha/radar/identity.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 935,
+      "path": "crypto_rsi_scanner/event_alpha/config/profiles.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 933,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 924,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_confirmation.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 918,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 913,
+      "path": "crypto_rsi_scanner/event_alpha/providers/official_exchange.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 888,
+      "path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 879,
+      "path": "crypto_rsi_scanner/event_alpha/outcomes/quality/reports.py",
+      "source_kind": "production"
+    }
+  ],
+  "largest_test_files": [
+    {
+      "limit": 1500,
+      "line_count": 16084,
+      "path": "tests/event_alpha/test_integrated_radar.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 5373,
+      "path": "tests/event_alpha/test_provider_readiness.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 5037,
+      "path": "tests/event_alpha/test_notifications.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 4041,
+      "path": "tests/event_alpha/test_outcomes.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 3981,
+      "path": "tests/event_alpha/test_artifact_doctor.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 2988,
+      "path": "tests/event_alpha/test_source_coverage.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1813,
+      "path": "tests/event_alpha/test_namespace_lifecycle.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1771,
+      "path": "tests/test_indicators.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1014,
+      "path": "tests/cli/test_make_targets.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 819,
+      "path": "tests/event_alpha/_legacy_helpers.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 734,
+      "path": "tests/event_alpha/test_artifact_schema.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 694,
+      "path": "tests/rsi/test_indicators_core.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 561,
+      "path": "tests/rsi/test_backtest.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 379,
+      "path": "tests/rsi/test_paper_risk.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 243,
+      "path": "tests/cli/test_parser.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 204,
+      "path": "tests/event_alpha/test_shim_registry.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 163,
+      "path": "tests/cli/test_event_alpha_command_registry.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 129,
+      "path": "tests/cli/test_dispatch.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 67,
+      "path": "tests/rsi/_legacy_helpers.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 30,
+      "path": "tests/event_alpha/conftest.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 13,
+      "path": "tests/conftest.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1,
+      "path": "tests/__init__.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1,
+      "path": "tests/cli/__init__.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1,
+      "path": "tests/event_alpha/__init__.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1,
+      "path": "tests/rsi/__init__.py",
+      "source_kind": "test"
     }
   ],
   "legacy_artifact_doctor_core_lines": 95,
@@ -194,10 +587,6 @@
   "legacy_classes_over_limit": 5,
   "legacy_decomposition": {
     "largest_legacy_files": [
-      {
-        "line_count": 2174,
-        "path": "crypto_rsi_scanner/backtest_parts/legacy.py"
-      },
       {
         "line_count": 933,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py"
@@ -273,6 +662,10 @@
       {
         "line_count": 50,
         "path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
+      },
+      {
+        "line_count": 48,
+        "path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
       }
     ],
     "legacy_classes_over_limit": 5,
@@ -319,28 +712,12 @@
       }
     ],
     "legacy_decomposition_blockers": [],
-    "legacy_decomposition_gate_status": "warning",
+    "legacy_decomposition_gate_status": "pass",
     "legacy_file_count": 21,
-    "legacy_files_over_1500_lines": 1,
+    "legacy_files_over_1500_lines": 0,
     "legacy_files_over_3000_lines": 0,
-    "legacy_functions_over_limit": 3,
+    "legacy_functions_over_limit": 1,
     "legacy_functions_over_limit_rows": [
-      {
-        "function_name": "walk_coin",
-        "line_count": 153,
-        "module": "crypto_rsi_scanner.backtest_parts.legacy",
-        "public": true,
-        "qualname": "walk_coin",
-        "source_path": "crypto_rsi_scanner/backtest_parts/legacy.py"
-      },
-      {
-        "function_name": "main",
-        "line_count": 227,
-        "module": "crypto_rsi_scanner.backtest_parts.legacy",
-        "public": true,
-        "qualname": "main",
-        "source_path": "crypto_rsi_scanner/backtest_parts/legacy.py"
-      },
       {
         "function_name": "_fetch_live_events",
         "line_count": 158,
@@ -371,14 +748,14 @@
       "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py",
       "crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py"
     ],
-    "legacy_total_lines": 6728
+    "legacy_total_lines": 4598
   },
-  "legacy_decomposition_gate_status": "warning",
-  "legacy_files_over_1500_lines": 1,
+  "legacy_decomposition_gate_status": "pass",
+  "legacy_files_over_1500_lines": 0,
   "legacy_files_over_3000_lines": 0,
-  "legacy_functions_over_limit": 3,
+  "legacy_functions_over_limit": 1,
   "legacy_modules_with_multiple_public_classes": 2,
-  "legacy_total_lines": 6728,
+  "legacy_total_lines": 4598,
   "legacy_unregistered": 0,
   "line_counts": {
     "crypto_rsi_scanner/cli/commands_event_alpha.py": 14,
@@ -496,6 +873,12 @@
     "source_coverage": 1,
     "stale_artifacts": 1
   },
+  "production_classes_over_limit": 31,
+  "production_files_over_1500_lines": 0,
+  "production_files_over_2000_lines": 0,
+  "production_files_over_3000_lines": 0,
+  "production_functions_over_limit": 62,
+  "production_size_gate_status": "pass",
   "pytest_runtime_seconds": 11.538,
   "remaining_implementation_modules_by_package_target": {},
   "remaining_module_classification": {
@@ -514,7 +897,7 @@
   },
   "research_only": true,
   "runtime_note": "Runtimes are measured verification values supplied by the operator; null means not measured during report generation.",
-  "scanner_bind_scanner_globals_call_sites": 7,
+  "scanner_bind_scanner_globals_call_sites": 6,
   "scanner_command_body_function_names": [],
   "scanner_command_body_functions_remaining": 0,
   "schema_version": "refactor_final_report_v1",
@@ -523,7 +906,9 @@
   },
   "standalone_runner_runtime_seconds": 11.191,
   "telegram_sends": 0,
+  "test_files_over_1500_lines": 8,
   "test_runtime_report_path": "research/test_runtime_report.json",
+  "test_size_gate_status": "warning",
   "top_level_event_module_count": 125,
   "trades_created": 0,
   "triggered_fade_created": 0,

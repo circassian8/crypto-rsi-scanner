@@ -1,4 +1,4 @@
-"""Operator inbox for Event Alpha day-1 notification review."""
+"""Split implementation for `crypto_rsi_scanner/event_alpha/notifications/inbox.py` (builder)."""
 
 from __future__ import annotations
 
@@ -7,105 +7,18 @@ import re
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping
-
-from ... import (
+from .... import (
     event_alpha_alert_store,
     event_alpha_quality_fields,
     event_alpha_router,
     event_core_opportunities,
     event_watchlist,
 )
-from ..artifacts import research_cards as event_research_cards
-from ..radar import core_opportunity_store as event_core_opportunity_store
-from . import delivery
-from . import pipeline as event_alpha_notifications
-
-_INBOX_LEGACY_CONFLICT_CLASSIFICATIONS = {
-    event_alpha_alert_store.SNAPSHOT_LEGACY_CONFLICT,
-    event_alpha_alert_store.SNAPSHOT_STALE_PRE_QUALITY_GATE,
-}
-
-
-@dataclass(frozen=True)
-class EventAlphaNotificationInboxItem:
-    alert_id: str
-    alert_key: str
-    symbol: str
-    coin_id: str
-    run_id: str
-    tier: str
-    playbook: str
-    card_path: str
-    sent: bool
-    would_send: bool
-    blocked_by_guard: bool
-    delivery_state: str
-    reviewed: bool
-    reason: str
-    final_route_after_quality_gate: str = ""
-    final_tier_after_quality_gate: str = ""
-    quality_gate_block_reason: str = ""
-    alertable_after_quality_gate: bool = True
-    snapshot_quality_classification: str = ""
-    item_type: str = "core_opportunity"
-    is_diagnostic: bool = False
-    core_opportunity_id: str = ""
-    feedback_target: str = ""
-    feedback_target_type: str = ""
-    final_state_after_quality_gate: str = ""
-    opportunity_level: str = ""
-
-
-@dataclass(frozen=True)
-class EventAlphaReviewQueueItem:
-    category: str
-    rank_score: float
-    symbol: str
-    coin_id: str
-    tier: str
-    route: str
-    reason: str
-    card_basename: str
-    feedback_target: str
-    source_item: EventAlphaNotificationInboxItem
-
-
-@dataclass(frozen=True)
-class EventAlphaNotificationInboxResult:
-    profile: str
-    artifact_namespace: str
-    notification_runs_path: Path
-    alert_store_path: Path
-    feedback_path: Path
-    research_cards_dir: Path
-    outcomes_path: Path | None
-    notification_runs_read: int
-    alert_rows_read: int
-    feedback_rows_read: int
-    research_cards_read: int
-    outcome_rows_read: int
-    sent_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
-    partial_delivered_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
-    would_send_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
-    would_send_blocked_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
-    weak_validated_local_only: tuple[EventAlphaNotificationInboxItem, ...]
-    quality_gated_local_only: tuple[EventAlphaNotificationInboxItem, ...]
-    legacy_quality_conflicts: tuple[EventAlphaNotificationInboxItem, ...]
-    research_review_without_feedback: tuple[EventAlphaNotificationInboxItem, ...] = ()
-    exploratory_without_feedback: tuple[EventAlphaNotificationInboxItem, ...] = ()
-    high_priority_unreviewed: tuple[EventAlphaNotificationInboxItem, ...] = ()
-    triggered_fade_unreviewed: tuple[EventAlphaNotificationInboxItem, ...] = ()
-    heartbeat_only_runs: tuple[dict[str, Any], ...] = ()
-    duplicate_or_in_flight_runs: tuple[dict[str, Any], ...] = ()
-    provider_degraded_runs: tuple[dict[str, Any], ...] = ()
-    canonical_review_items: tuple[EventAlphaNotificationInboxItem, ...] = ()
-    diagnostic_review_items_hidden: tuple[EventAlphaNotificationInboxItem, ...] = ()
-    diagnostic_review_items: tuple[EventAlphaNotificationInboxItem, ...] = ()
-    canonical_review_items_with_cards: int = 0
-    canonical_review_items_with_feedback_targets: int = 0
-    diagnostic_review_items_with_feedback_targets: int = 0
-    include_diagnostics: bool = False
-
+from ...artifacts import research_cards as event_research_cards
+from ...radar import core_opportunity_store as event_core_opportunity_store
+from .. import delivery
+from .. import pipeline as event_alpha_notifications
+from .models import *  # noqa: F403
 
 REVIEW_QUEUE_STRICT_ALERTABLE = "strict_alertable"
 REVIEW_QUEUE_HIGH_PRIORITY_WOULD_SEND = "high_priority_would_send"
@@ -114,7 +27,6 @@ REVIEW_QUEUE_RESEARCH_REVIEW_NEAR_MISS = "research_review_near_miss"
 REVIEW_QUEUE_UPGRADE_CANDIDATE = "upgrade_candidate"
 REVIEW_QUEUE_LOCAL_ONLY_LEARNING_ROW = "local_only_learning_row"
 REVIEW_QUEUE_DIAGNOSTIC_ONLY = "diagnostic_only"
-
 _REVIEW_QUEUE_WEIGHTS = {
     REVIEW_QUEUE_STRICT_ALERTABLE: 700.0,
     REVIEW_QUEUE_HIGH_PRIORITY_WOULD_SEND: 650.0,
@@ -124,8 +36,6 @@ _REVIEW_QUEUE_WEIGHTS = {
     REVIEW_QUEUE_LOCAL_ONLY_LEARNING_ROW: 250.0,
     REVIEW_QUEUE_DIAGNOSTIC_ONLY: 50.0,
 }
-
-
 def build_notification_inbox(
     *,
     notification_runs: Iterable[Mapping[str, Any]],
@@ -312,8 +222,6 @@ def build_notification_inbox(
         diagnostic_review_items_with_feedback_targets=sum(1 for item in diagnostic_review_items if item.feedback_target),
         include_diagnostics=include_diagnostics,
     )
-
-
 def build_event_alpha_review_items(
     profile: str | None,
     namespace: str | None,
@@ -344,412 +252,6 @@ def build_event_alpha_review_items(
         watchlist_entries=watchlist_entries,
         core_opportunity_rows=core_opportunity_rows,
     )
-
-
-def build_ranked_review_queue(
-    result: EventAlphaNotificationInboxResult,
-    *,
-    include_diagnostics: bool = False,
-    limit: int | None = None,
-) -> tuple[EventAlphaReviewQueueItem, ...]:
-    """Return a compact operator queue ranked for burn-in review.
-
-    The queue is a presentation layer only. It does not alter route decisions,
-    delivery state, feedback rows, or Event Alpha scoring.
-    """
-    queue: list[EventAlphaReviewQueueItem] = []
-
-    def add(items: Iterable[EventAlphaNotificationInboxItem], category: str) -> None:
-        for item in items:
-            if item.is_diagnostic and not include_diagnostics:
-                continue
-            queue.append(_review_queue_item(item, category))
-
-    strict = tuple(
-        item for item in (
-            *result.sent_without_feedback,
-            *result.partial_delivered_without_feedback,
-            *result.would_send_without_feedback,
-            *result.would_send_blocked_without_feedback,
-            *result.high_priority_unreviewed,
-            *result.triggered_fade_unreviewed,
-        )
-        if _item_alertable(item)
-    )
-    high = tuple(item for item in strict if _item_high_priority(item))
-    digest = tuple(item for item in strict if item not in high)
-    add(high, REVIEW_QUEUE_HIGH_PRIORITY_WOULD_SEND)
-    add(digest, REVIEW_QUEUE_DIGEST_WOULD_SEND)
-    add(result.research_review_without_feedback, REVIEW_QUEUE_RESEARCH_REVIEW_NEAR_MISS)
-    add(result.exploratory_without_feedback, REVIEW_QUEUE_UPGRADE_CANDIDATE)
-    local_learning = (*result.quality_gated_local_only, *result.weak_validated_local_only)
-    if not include_diagnostics:
-        local_learning = tuple(item for item in local_learning if not _item_is_diagnostic_control(item))
-    add(local_learning, REVIEW_QUEUE_LOCAL_ONLY_LEARNING_ROW)
-    if include_diagnostics:
-        add(result.diagnostic_review_items, REVIEW_QUEUE_DIAGNOSTIC_ONLY)
-    else:
-        add(result.diagnostic_review_items_hidden, REVIEW_QUEUE_DIAGNOSTIC_ONLY)
-        queue = [item for item in queue if item.category != REVIEW_QUEUE_DIAGNOSTIC_ONLY]
-
-    deduped: dict[str, EventAlphaReviewQueueItem] = {}
-    for item in queue:
-        key = item.feedback_target or item.source_item.core_opportunity_id or item.source_item.alert_id
-        prior = deduped.get(key)
-        if prior is None or item.rank_score > prior.rank_score:
-            deduped[key] = item
-    ranked = sorted(
-        deduped.values(),
-        key=lambda item: (
-            item.rank_score,
-            _category_weight(item.category),
-            item.symbol,
-            item.coin_id,
-        ),
-        reverse=True,
-    )
-    if limit is not None:
-        ranked = ranked[: max(0, int(limit))]
-    return tuple(ranked)
-
-
-def format_notification_inbox(result: EventAlphaNotificationInboxResult, *, burn_in_review: bool = False) -> str:
-    if burn_in_review:
-        return _format_notification_inbox_burn_in_review(result)
-    lines = [
-        "=" * 76,
-        "EVENT ALPHA NOTIFICATION INBOX (research-only / review queue)",
-        "=" * 76,
-        f"profile: {result.profile}",
-        f"artifact_namespace: {result.artifact_namespace}",
-        f"notification_runs_path: {result.notification_runs_path}",
-        f"alert_store_path: {result.alert_store_path}",
-        f"feedback_path: {result.feedback_path}",
-        f"research_cards_dir: {result.research_cards_dir}",
-        f"outcomes_path: {result.outcomes_path or 'not loaded'}",
-        (
-            "rows: "
-            f"notification_runs={result.notification_runs_read} "
-            f"alerts={result.alert_rows_read} "
-            f"feedback={result.feedback_rows_read} "
-            f"cards={result.research_cards_read} "
-            f"outcomes={result.outcome_rows_read}"
-        ),
-        (
-            "review_items: "
-            f"canonical={len(result.canonical_review_items)} "
-            f"canonical_cards={result.canonical_review_items_with_cards} "
-            f"canonical_feedback_targets={result.canonical_review_items_with_feedback_targets} "
-            f"diagnostics_hidden={len(result.diagnostic_review_items_hidden)} "
-            f"diagnostics_visible={len(result.diagnostic_review_items)}"
-        ),
-        "",
-    ]
-    _append_item_section(
-        lines,
-        "delivered core opportunities needing feedback",
-        result.sent_without_feedback,
-        profile=result.profile,
-    )
-    _append_item_section(
-        lines,
-        "partial-delivered core opportunities needing delivery review",
-        result.partial_delivered_without_feedback,
-        profile=result.profile,
-    )
-    _append_item_section(lines, "would-send core opportunities blocked by preview mode", result.would_send_without_feedback, profile=result.profile)
-    _append_item_section(lines, "would-send core opportunities blocked by guard without feedback", result.would_send_blocked_without_feedback, profile=result.profile)
-    _append_item_section(lines, "research-review candidates needing feedback", result.research_review_without_feedback, profile=result.profile)
-    _append_item_section(lines, "near-misses for optional review", result.exploratory_without_feedback, profile=result.profile)
-    _append_item_section(lines, "local-only learning rows for optional review", (*result.quality_gated_local_only, *result.weak_validated_local_only), profile=result.profile)
-    _append_item_section(lines, "legacy quality conflicts for migration review", result.legacy_quality_conflicts, profile=result.profile)
-    _append_item_section(lines, "high-priority/watchlist/digest core opportunities not reviewed", result.high_priority_unreviewed, profile=result.profile)
-    _append_item_section(lines, "triggered-fade cards not reviewed", result.triggered_fade_unreviewed, profile=result.profile)
-    if result.diagnostic_review_items:
-        _append_item_section(lines, "diagnostic/support snapshots", result.diagnostic_review_items, profile=result.profile)
-    elif result.diagnostic_review_items_hidden:
-        lines.append(f"diagnostic/support snapshots hidden by default: {len(result.diagnostic_review_items_hidden)}")
-        lines.append("- pass the diagnostics flag in local tooling to inspect source-noise/control snapshots")
-        lines.append("")
-    _append_run_section(lines, "heartbeat-only runs", result.heartbeat_only_runs)
-    _append_run_section(lines, "duplicate/in-flight suppressed runs", result.duplicate_or_in_flight_runs)
-    _append_run_section(lines, "provider-degraded notification runs", result.provider_degraded_runs)
-    lines.append("Review queue is artifact-only; it does not send, trade, paper trade, or alter Event Alpha tiers.")
-    return "\n".join(lines).rstrip()
-
-
-def _format_notification_inbox_burn_in_review(result: EventAlphaNotificationInboxResult) -> str:
-    sent_or_partial = (*result.sent_without_feedback, *result.partial_delivered_without_feedback)
-    would_send = (*result.would_send_without_feedback, *result.would_send_blocked_without_feedback)
-    active = (*sent_or_partial, *would_send, *result.high_priority_unreviewed, *result.triggered_fade_unreviewed)
-    local_count = len(result.quality_gated_local_only) + len(result.weak_validated_local_only)
-    queue = build_ranked_review_queue(result, limit=12)
-    lines = [
-        "=" * 76,
-        "EVENT ALPHA BURN-IN REVIEW INBOX (research-only)",
-        "=" * 76,
-        f"profile: {result.profile}",
-        f"artifact_namespace: {result.artifact_namespace}",
-        (
-            "summary: "
-            f"sent_or_partial={len(sent_or_partial)} "
-            f"would_send={len(would_send)} "
-            f"active_unreviewed={len(active)} "
-            f"research_review={len(result.research_review_without_feedback)} "
-            f"near_miss={len(result.exploratory_without_feedback)} "
-            f"local_or_quality_capped={local_count} "
-            f"provider_degraded_runs={len(result.provider_degraded_runs)} "
-            f"diagnostics_hidden={len(result.diagnostic_review_items_hidden)}"
-        ),
-        "",
-    ]
-    _append_review_queue_section(lines, "Ranked review queue", queue, profile=result.profile, limit=12)
-    _append_compact_item_section(lines, "Would-send / sent core opportunities", active, profile=result.profile, limit=12)
-    _append_compact_item_section(lines, "Research-review candidates", result.research_review_without_feedback, profile=result.profile, limit=8)
-    _append_compact_item_section(lines, "Near-miss candidates", result.exploratory_without_feedback, profile=result.profile, limit=8)
-    if local_count:
-        lines.append(f"Local-only / quality-capped rows: {local_count}")
-        lines.append("- collapsed in burn-in review; use the full inbox or quality review for row-level diagnostics")
-        lines.append("")
-    else:
-        lines.append("Local-only / quality-capped rows: 0")
-        lines.append("- none")
-        lines.append("")
-    _append_run_section(lines, "provider-degraded notification runs", result.provider_degraded_runs)
-    if result.diagnostic_review_items_hidden:
-        lines.append(f"Diagnostic/support rows hidden: {len(result.diagnostic_review_items_hidden)}")
-        lines.append("- rerun with diagnostics enabled for source-noise/control row details")
-        lines.append("")
-    lines.append("Burn-in review is artifact-only; it does not send, trade, paper trade, or alter Event Alpha tiers.")
-    return "\n".join(lines).rstrip()
-
-
-def _append_review_queue_section(
-    lines: list[str],
-    title: str,
-    items: Iterable[EventAlphaReviewQueueItem],
-    *,
-    profile: str,
-    limit: int,
-) -> None:
-    rows = list(items)
-    lines.append(f"{title}: {len(rows)}")
-    if not rows:
-        lines.append("- none")
-        lines.append("")
-        return
-    for idx, item in enumerate(rows[: max(0, limit)], start=1):
-        lines.append(
-            f"{idx}. [{_human_queue_category(item.category)}] {item.symbol or 'UNKNOWN'}/{item.coin_id or 'unknown'} "
-            f"score={item.rank_score:g} tier={item.tier or 'unknown'} route={item.route or 'unknown'}"
-        )
-        lines.append(
-            f"   why: {item.reason or 'selected for operator review'} · "
-            f"card={item.card_basename or 'not_written'} · feedback={item.feedback_target or item.source_item.alert_id}"
-        )
-        lines.append(
-            f"   command: make event-feedback-watch PROFILE={profile} FEEDBACK_TARGET='{item.feedback_target or item.source_item.alert_id}'"
-        )
-    if len(rows) > limit:
-        lines.append(f"- +{len(rows) - limit} more in the full notification inbox")
-    lines.append("")
-
-
-def _review_queue_item(item: EventAlphaNotificationInboxItem, category: str) -> EventAlphaReviewQueueItem:
-    score = _category_weight(category) + _item_score_hint(item) + _freshness_bonus(item) - _missing_evidence_penalty(item)
-    return EventAlphaReviewQueueItem(
-        category=category,
-        rank_score=round(score, 2),
-        symbol=item.symbol,
-        coin_id=item.coin_id,
-        tier=item.tier,
-        route=item.final_route_after_quality_gate,
-        reason=item.reason,
-        card_basename=_card_label(item.card_path),
-        feedback_target=item.feedback_target or item.alert_id,
-        source_item=item,
-    )
-
-
-def _category_weight(category: str) -> float:
-    return _REVIEW_QUEUE_WEIGHTS.get(category, 0.0)
-
-
-def _item_alertable(item: EventAlphaNotificationInboxItem) -> bool:
-    return bool(item.alertable_after_quality_gate) or event_alpha_router.route_value_is_alertable(item.final_route_after_quality_gate)
-
-
-def _item_high_priority(item: EventAlphaNotificationInboxItem) -> bool:
-    text = " ".join(str(part or "") for part in (
-        item.tier,
-        item.final_route_after_quality_gate,
-        item.final_state_after_quality_gate,
-        item.opportunity_level,
-        item.reason,
-    )).casefold()
-    return "high_priority" in text or "triggered_fade" in text
-
-
-def _item_is_diagnostic_control(item: EventAlphaNotificationInboxItem) -> bool:
-    text = " ".join(str(part or "") for part in (
-        item.playbook,
-        item.item_type,
-        item.reason,
-        item.quality_gate_block_reason,
-        item.opportunity_level,
-    )).casefold()
-    return bool(item.is_diagnostic) or any(token in text for token in (
-        "source_noise",
-        "ticker_collision",
-        "word_collision",
-        "diagnostic",
-        "control",
-    ))
-
-
-def _item_score_hint(item: EventAlphaNotificationInboxItem) -> float:
-    text = " ".join(str(part or "") for part in (
-        item.reason,
-        item.tier,
-        item.opportunity_level,
-        item.final_route_after_quality_gate,
-    ))
-    scores = [float(match.group(1)) for match in re.finditer(r"(?:score|rank|level)[=: ]+([0-9]+(?:\.[0-9]+)?)", text, flags=re.IGNORECASE)]
-    if scores:
-        return max(scores)
-    if _item_high_priority(item):
-        return 90.0
-    if "watchlist" in text.casefold():
-        return 75.0
-    if "digest" in text.casefold():
-        return 65.0
-    if item.item_type == "near_miss_core":
-        return 60.0
-    if item.opportunity_level == "local_only":
-        return 30.0
-    return 45.0
-
-
-def _freshness_bonus(item: EventAlphaNotificationInboxItem) -> float:
-    text = item.reason.casefold()
-    if "fresh" in text or "novel" in text:
-        return 8.0
-    if "stale" in text or "legacy" in text:
-        return -8.0
-    return 0.0
-
-
-def _missing_evidence_penalty(item: EventAlphaNotificationInboxItem) -> float:
-    text = " ".join(str(part or "") for part in (
-        item.reason,
-        item.quality_gate_block_reason,
-    )).casefold()
-    penalty = 0.0
-    for token in ("missing", "unconfirmed", "no_results", "rejected", "source_noise", "generic"):
-        if token in text:
-            penalty += 4.0
-    return min(20.0, penalty)
-
-
-def _human_queue_category(category: str) -> str:
-    return {
-        REVIEW_QUEUE_STRICT_ALERTABLE: "strict alert",
-        REVIEW_QUEUE_HIGH_PRIORITY_WOULD_SEND: "high-priority would-send",
-        REVIEW_QUEUE_DIGEST_WOULD_SEND: "digest would-send",
-        REVIEW_QUEUE_RESEARCH_REVIEW_NEAR_MISS: "research-review near-miss",
-        REVIEW_QUEUE_UPGRADE_CANDIDATE: "upgrade candidate",
-        REVIEW_QUEUE_LOCAL_ONLY_LEARNING_ROW: "local-only learning",
-        REVIEW_QUEUE_DIAGNOSTIC_ONLY: "diagnostic only",
-    }.get(category, category.replace("_", " "))
-
-
-def _card_label(path: str) -> str:
-    text = str(path or "").strip()
-    if not text:
-        return ""
-    return Path(text).name or text
-
-
-def _append_item_section(
-    lines: list[str],
-    title: str,
-    items: Iterable[EventAlphaNotificationInboxItem],
-    *,
-    profile: str,
-) -> None:
-    rows = list(items)
-    lines.append(f"{title}: {len(rows)}")
-    if not rows:
-        lines.append("- none")
-        lines.append("")
-        return
-    for item in rows[:20]:
-        item_id_label = "core_id" if item.core_opportunity_id and item.alert_id == item.core_opportunity_id else "alert_id"
-        lines.append(
-            f"- {item.symbol or 'UNKNOWN'}/{item.coin_id or 'unknown'} {item_id_label}={item.alert_id} "
-            f"tier={item.tier} playbook={item.playbook} "
-            f"sent={_yes_no(item.sent)} would_send={_yes_no(item.would_send)} "
-            f"delivery_state={item.delivery_state or 'none'}"
-        )
-        if item.alert_key and item.alert_key != item.alert_id:
-            lines.append(f"  source_alert_id: {item.alert_key}")
-        if item.core_opportunity_id and item.alert_id != item.core_opportunity_id:
-            lines.append(f"  core_opportunity_id: {item.core_opportunity_id}")
-        lines.append(f"  card: {item.card_path or 'not_written'}")
-        lines.append(f"  run_id: {item.run_id or 'unknown'}")
-        if item.quality_gate_block_reason:
-            lines.append(
-                f"  quality_gate: final={item.final_route_after_quality_gate or 'unknown'} "
-                f"tier={item.final_tier_after_quality_gate or item.tier or 'unknown'} "
-                f"block={item.quality_gate_block_reason}"
-            )
-        if item.snapshot_quality_classification:
-            lines.append(f"  snapshot_classification: {item.snapshot_quality_classification}")
-        lines.append(f"  reason: {item.reason}")
-        target = item.feedback_target or item.alert_id
-        lines.append(f"  feedback_target: {target}")
-        lines.append(f"  feedback_useful: make event-feedback-useful PROFILE={profile} FEEDBACK_TARGET='{target}'")
-        lines.append(f"  feedback_junk: make event-feedback-junk PROFILE={profile} FEEDBACK_TARGET='{target}'")
-    lines.append("")
-
-
-def _append_compact_item_section(
-    lines: list[str],
-    title: str,
-    items: Iterable[EventAlphaNotificationInboxItem],
-    *,
-    profile: str,
-    limit: int,
-) -> None:
-    rows = list(dict.fromkeys(items))
-    lines.append(f"{title}: {len(rows)}")
-    if not rows:
-        lines.append("- none")
-        lines.append("")
-        return
-    for idx, item in enumerate(rows[: max(0, limit)], start=1):
-        target = item.feedback_target or item.alert_id
-        lane_status = "sent" if item.sent else ("would-send" if item.would_send or item.blocked_by_guard else "review")
-        lines.append(
-            f"{idx}. {item.symbol or 'UNKNOWN'}/{item.coin_id or 'unknown'} "
-            f"{lane_status} tier={item.tier or 'unknown'} playbook={item.playbook or 'unknown'}"
-        )
-        lines.append(
-            f"   core_id: {item.core_opportunity_id or item.alert_id} · "
-            f"state={item.final_state_after_quality_gate or item.delivery_state or 'unknown'} "
-            f"route={item.final_route_after_quality_gate or 'unknown'}"
-        )
-        if item.card_path:
-            lines.append(f"   card: {_card_label(item.card_path)}")
-        lines.append(f"   feedback: make event-feedback-useful PROFILE={profile} FEEDBACK_TARGET='{target}'")
-        if item.quality_gate_block_reason:
-            lines.append(f"   gate: {item.quality_gate_block_reason}")
-        lines.append(f"   why: {item.reason}")
-    if len(rows) > limit:
-        lines.append(f"- +{len(rows) - limit} more in the full notification inbox")
-    lines.append("")
-
-
 def _build_event_alpha_review_items_from_rows(
     *,
     profile: str | None,
@@ -819,8 +321,6 @@ def _build_event_alpha_review_items_from_rows(
                 core_opportunity_id=str(alert.get("core_opportunity_id") or ""),
             ))
     return tuple(_dedupe_review_items(items))
-
-
 def _inbox_item_from_core(
     core: event_core_opportunities.CoreOpportunity,
     *,
@@ -886,8 +386,6 @@ def _inbox_item_from_core(
         final_state_after_quality_gate=final_state,
         opportunity_level=opportunity_level,
     )
-
-
 def _diagnostic_item_from_alert(
     alert: Mapping[str, Any],
     runs_by_id: Mapping[str, Mapping[str, Any]],
@@ -899,20 +397,6 @@ def _diagnostic_item_from_alert(
         _inbox_item(alert, runs_by_id.get(str(alert.get("run_id") or "")), card_paths, reviewed_ids, delivery_state_by_run),
         alert,
     )
-
-
-def alert_snapshot_is_diagnostic(row: Mapping[str, Any]) -> bool:
-    """Return true for support/control snapshots that should be hidden by default."""
-    return (
-        bool(row.get("is_diagnostic_snapshot"))
-        or str(row.get("snapshot_class") or "") == event_alpha_alert_store.SNAPSHOT_CLASS_DIAGNOSTIC_SUPPORT
-        or str(row.get("core_resolution_status") or "") == "diagnostic_support"
-        or str(row.get("snapshot_core_resolution_status") or "") == "diagnostic_support"
-        or str(row.get("core_opportunity_id_status") or "") == "diagnostic_support"
-        or event_core_opportunities.row_is_diagnostic(row)
-    )
-
-
 def _alerts_by_core_id(alerts: Iterable[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     out: dict[str, list[dict[str, Any]]] = {}
     for row in alerts:
@@ -921,8 +405,6 @@ def _alerts_by_core_id(alerts: Iterable[Mapping[str, Any]]) -> dict[str, list[di
             continue
         out.setdefault(core_id, []).append(dict(row))
     return out
-
-
 def _best_snapshot_for_core(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any] | None:
     candidates = [dict(row) for row in rows if isinstance(row, Mapping)]
     if not candidates:
@@ -952,33 +434,6 @@ def _best_snapshot_for_core(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]
         )
 
     return max(candidates, key=rank)
-
-
-def _card_paths_by_core_id(cards_dir: Path) -> dict[str, Path]:
-    if not cards_dir or not cards_dir.exists():
-        return {}
-    out: dict[str, Path] = {}
-    for path in cards_dir.glob("*.md"):
-        if path.name == "index.md":
-            continue
-        core_id = event_research_cards.card_core_opportunity_id(path)
-        if core_id:
-            out.setdefault(core_id, path)
-    return out
-
-
-def _card_path_for_core(
-    core_id: str,
-    row: Mapping[str, Any],
-    paths_by_core: Mapping[str, Path],
-) -> Path | None:
-    for key in ("research_card_path", "card_path"):
-        value = str(row.get(key) or "").strip()
-        if value:
-            return Path(value)
-    return paths_by_core.get(core_id)
-
-
 def _core_review_ids(
     core: event_core_opportunities.CoreOpportunity,
     row: Mapping[str, Any],
@@ -1006,8 +461,6 @@ def _core_review_ids(
     ids.update(f"ea:{item}" for item in list(ids) if item and not item.startswith("ea:"))
     ids.update(item[3:] for item in list(ids) if item.startswith("ea:"))
     return ids
-
-
 def _core_item_type(core: event_core_opportunities.CoreOpportunity) -> str:
     if core.is_high_priority or core.is_watchlist or core.is_validated_digest or core.alertable:
         return "core_opportunity"
@@ -1015,8 +468,6 @@ def _core_item_type(core: event_core_opportunities.CoreOpportunity) -> str:
     if level == "exploratory" or core.opportunity_score_final >= 50:
         return "near_miss_core"
     return "local_core_learning"
-
-
 def _core_item_type_from_alert_stub(alert: Mapping[str, Any], alertable_after_quality_gate: bool) -> str:
     if alertable_after_quality_gate:
         return "core_opportunity"
@@ -1025,8 +476,6 @@ def _core_item_type_from_alert_stub(alert: Mapping[str, Any], alertable_after_qu
     if level == "exploratory" or score >= 50:
         return "near_miss_core"
     return "local_core_learning"
-
-
 def _tier_for_core(core: event_core_opportunities.CoreOpportunity, final_route: str) -> str:
     route = str(final_route or "").upper()
     if "TRIGGERED_FADE" in route:
@@ -1036,8 +485,6 @@ def _tier_for_core(core: event_core_opportunities.CoreOpportunity, final_route: 
     if "RESEARCH_DIGEST" in route or "WATCHLIST" in route or core.is_watchlist or core.is_validated_digest:
         return "RADAR_DIGEST"
     return "STORE_ONLY"
-
-
 def _as_diagnostic_item(
     item: EventAlphaNotificationInboxItem,
     alert: Mapping[str, Any],
@@ -1056,8 +503,6 @@ def _as_diagnostic_item(
         feedback_target=target,
         feedback_target_type=str(alert.get("feedback_target_type") or item_type),
     )
-
-
 def _diagnostic_item_type(alert: Mapping[str, Any]) -> str:
     classification = str(alert.get("snapshot_quality_classification") or event_alpha_alert_store.classify_alert_snapshot(alert))
     snapshot_class = str(alert.get("snapshot_class") or "")
@@ -1074,8 +519,6 @@ def _diagnostic_item_type(alert: Mapping[str, Any]) -> str:
     if snapshot_class == event_alpha_alert_store.SNAPSHOT_CLASS_ORPHAN:
         return "orphan_snapshot"
     return "diagnostic_support_snapshot"
-
-
 def _dedupe_review_items(items: Iterable[EventAlphaNotificationInboxItem]) -> list[EventAlphaNotificationInboxItem]:
     out: list[EventAlphaNotificationInboxItem] = []
     seen: set[tuple[str, str]] = set()
@@ -1089,8 +532,6 @@ def _dedupe_review_items(items: Iterable[EventAlphaNotificationInboxItem]) -> li
         seen.add(key)
         out.append(item)
     return out
-
-
 def _delivery_item_duplicates_core(
     item: EventAlphaNotificationInboxItem,
     core_items: Iterable[EventAlphaNotificationInboxItem],
@@ -1103,31 +544,6 @@ def _delivery_item_duplicates_core(
         if identifiers.intersection(value for value in core_ids if value):
             return True
     return False
-
-
-def _append_run_section(lines: list[str], title: str, rows: Iterable[Mapping[str, Any]]) -> None:
-    items = list(rows)
-    lines.append(f"{title}: {len(items)}")
-    if not items:
-        lines.append("- none")
-        lines.append("")
-        return
-    for row in items[:20]:
-        lines.append(
-            f"- run_id={row.get('run_id') or 'unknown'} "
-            f"started_at={row.get('started_at') or 'unknown'} "
-            f"profile={row.get('notification_profile') or row.get('profile') or 'default'} "
-            f"scope={row.get('scope') or 'unknown'}:{row.get('scope_value') or 'unknown'}"
-        )
-        warnings = [str(item) for item in row.get("warnings") or [] if str(item)]
-        if warnings:
-            lines.append("  warnings: " + "; ".join(warnings[:5]))
-        provider = row.get("provider_fail_fast_blocks") or []
-        if provider:
-            lines.append("  provider_fail_fast_blocks: " + "; ".join(str(item) for item in provider[:5]))
-    lines.append("")
-
-
 def _inbox_item(
     alert: Mapping[str, Any],
     run: Mapping[str, Any] | None,
@@ -1196,8 +612,6 @@ def _inbox_item(
         final_state_after_quality_gate=str(alert.get("final_state_after_quality_gate") or alert.get("state") or ""),
         opportunity_level=str(alert.get("final_opportunity_level") or alert.get("opportunity_level") or ""),
     )
-
-
 def _digest_delivery_items(
     deliveries: Iterable[Mapping[str, Any]],
     watch_by_alert: Mapping[str, event_watchlist.EventWatchlistEntry],
@@ -1256,8 +670,6 @@ def _digest_delivery_items(
                 feedback_target_type=str(row.get("feedback_target_type") or ("core_opportunity_id" if core_id else "alert_id")),
             ))
     return items
-
-
 def _latest_delivery_state_by_run(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
     by_run: dict[str, str] = {}
     priority = {
@@ -1277,13 +689,9 @@ def _latest_delivery_state_by_run(rows: Iterable[Mapping[str, Any]]) -> dict[str
         if current is None or priority.get(state, 0) >= priority.get(current, 0):
             by_run[run_id] = state
     return by_run
-
-
 def _delivery_suppressed_run(row: Mapping[str, Any], state_by_run: Mapping[str, str]) -> bool:
     state = state_by_run.get(str(row.get("run_id") or ""))
     return state in (delivery.STATE_SKIPPED_DUPLICATE, delivery.STATE_SKIPPED_IN_FLIGHT)
-
-
 def _guard_blocked(row: Mapping[str, Any] | None) -> bool:
     if not row:
         return False
@@ -1291,8 +699,6 @@ def _guard_blocked(row: Mapping[str, Any] | None) -> bool:
         return True
     reason = str(row.get("block_reason") or "").casefold()
     return "disabled" in reason or "guard" in reason or "research_only" in reason
-
-
 def _quality_gate_for_alert(alert: Mapping[str, Any]) -> tuple[str, str | None, bool]:
     components = alert.get("score_components") if isinstance(alert.get("score_components"), Mapping) else {}
     has_quality = event_alpha_quality_fields.has_any_quality_field(alert, components_key="score_components")
@@ -1310,18 +716,6 @@ def _quality_gate_for_alert(alert: Mapping[str, Any]) -> tuple[str, str | None, 
     else:
         alertable = bool(route_alertable_raw) and event_alpha_router.route_value_is_alertable(route)
     return route, block, alertable
-
-
-def _countable_alertable(
-    item: EventAlphaNotificationInboxItem,
-    *,
-    include_legacy_conflicts: bool,
-) -> bool:
-    if item.snapshot_quality_classification in _INBOX_LEGACY_CONFLICT_CLASSIFICATIONS:
-        return bool(include_legacy_conflicts and item.alertable_after_quality_gate)
-    return bool(item.alertable_after_quality_gate)
-
-
 def _lane_for_alert(alert: Mapping[str, Any], *, final_route: str | None = None) -> str:
     route = str(final_route or alert.get("final_route_after_quality_gate") or alert.get("route") or "").upper()
     tier = str(alert.get("tier") or "").upper()
@@ -1331,109 +725,6 @@ def _lane_for_alert(alert: Mapping[str, Any], *, final_route: str | None = None)
     if "HIGH_PRIORITY" in route or tier == "HIGH_PRIORITY_WATCH":
         return "instant_escalation"
     return "daily_digest"
-
-
-def _is_high_priority(item: EventAlphaNotificationInboxItem) -> bool:
-    return item.tier == "HIGH_PRIORITY_WATCH" or "HIGH_PRIORITY" in item.reason.upper()
-
-
-def _is_triggered_fade(item: EventAlphaNotificationInboxItem) -> bool:
-    return item.tier == "TRIGGERED_FADE" or item.playbook == "proxy_fade" or "TRIGGERED_FADE" in item.reason.upper()
-
-
-def _is_weak_validated_local_only(
-    item: EventAlphaNotificationInboxItem,
-    alerts: Iterable[Mapping[str, Any]],
-) -> bool:
-    for alert in alerts:
-        alert_key = str(alert.get("alert_key") or "")
-        alert_id = str(alert.get("alert_id") or (f"ea:{alert_key}" if alert_key else ""))
-        if item.alert_id not in {alert_id, f"ea:{alert_key}"} and item.alert_key != alert_key:
-            continue
-        if str(alert.get("relationship_type") or "") != "impact_hypothesis":
-            return False
-        if bool(alert.get("route_alertable")):
-            return False
-        components = alert.get("score_components") if isinstance(alert.get("score_components"), Mapping) else {}
-        stage = str(alert.get("validation_stage") or components.get("validation_stage") or "")
-        impact_path_strength = str(alert.get("impact_path_strength") or components.get("impact_path_strength") or "")
-        impact_path_type = str(alert.get("impact_path_type") or components.get("impact_path_type") or "")
-        opportunity_level = str(alert.get("opportunity_level") or components.get("opportunity_level") or "")
-        why_digest_ineligible = str(alert.get("why_digest_ineligible") or components.get("why_digest_ineligible") or "")
-        reason_text = " ".join(str(value or "") for value in (
-            alert.get("route_reason"),
-            alert.get("reason"),
-            *((alert.get("quality_warnings") or []) if isinstance(alert.get("quality_warnings"), list) else []),
-        )).casefold()
-        return (
-            stage == "catalyst_link_validated"
-            or impact_path_strength in {"weak", "none"}
-            or impact_path_type == "generic_cooccurrence_only"
-            or opportunity_level in {"local_only", "exploratory"}
-            or bool(why_digest_ineligible)
-            or "impact_path_not_validated" in reason_text
-            or "weak_validated" in reason_text
-            or "generic_cooccurrence" in reason_text
-        )
-    return False
-
-
-def _reviewed_ids(rows: Iterable[Mapping[str, Any]]) -> set[str]:
-    ids: set[str] = set()
-    for row in rows:
-        for field in ("target", "key", "event_id", "coin_id", "symbol", "card_id", "alert_id"):
-            value = str(row.get(field) or "").strip()
-            if value:
-                ids.add(value)
-                if value.startswith("ea:"):
-                    ids.add(value[3:])
-                else:
-                    ids.add(f"ea:{value}")
-    return ids
-
-
-def _alert_ids(alert: Mapping[str, Any], alert_id: str, alert_key: str, card_id: str) -> set[str]:
-    ids = {value for value in (alert_id, alert_key, card_id) if value}
-    for field in ("event_id", "coin_id", "symbol", "asset_coin_id", "asset_symbol", "validated_coin_id", "validated_symbol", "snapshot_id"):
-        value = str(alert.get(field) or "").strip()
-        if value:
-            ids.add(value)
-    ids.update(f"ea:{value}" for value in list(ids) if value and not value.startswith("ea:"))
-    ids.update(value[3:] for value in list(ids) if value.startswith("ea:"))
-    return ids
-
-
-def _card_paths(cards_dir: Path) -> dict[str, Path]:
-    if not cards_dir.exists():
-        return {}
-    paths = {
-        path.stem: path
-        for path in cards_dir.glob("*.md")
-        if path.name != "index.md"
-    }
-    return paths
-
-
-def _path_for_card(
-    alert_id: str,
-    alert_key: str,
-    card_id: str,
-    paths: Mapping[str, Path],
-) -> Path | None:
-    for key in (card_id, alert_id.replace("ea:", "card_"), f"card_{alert_key}"):
-        clean = _card_key(key)
-        if clean in paths:
-            return paths[clean]
-    return None
-
-
-def _card_key(value: str) -> str:
-    text = str(value or "").strip()
-    if text.endswith(".md"):
-        text = text[:-3]
-    return text
-
-
 def _lane_count(row: Mapping[str, Any] | None, field: str, lane: str) -> int:
     if not row:
         return 0
@@ -1441,60 +732,3 @@ def _lane_count(row: Mapping[str, Any] | None, field: str, lane: str) -> int:
     if not isinstance(counts, Mapping):
         return 0
     return _int(counts.get(lane))
-
-
-def _heartbeat_only(row: Mapping[str, Any]) -> bool:
-    due = row.get("lane_counts_due") or {}
-    sent = row.get("lane_counts_sent") or {}
-    non_heartbeat_due = sum(_int(value) for key, value in dict(due).items() if key != "health_heartbeat")
-    non_heartbeat_sent = sum(_int(value) for key, value in dict(sent).items() if key != "health_heartbeat")
-    return bool(row.get("heartbeat_due") or row.get("heartbeat_sent")) and non_heartbeat_due == 0 and non_heartbeat_sent == 0
-
-
-def _provider_degraded(row: Mapping[str, Any]) -> bool:
-    return bool(
-        row.get("partial_results")
-        or _int(row.get("provider_failure_count")) > 0
-        or row.get("provider_fail_fast_blocks")
-        or row.get("runtime_budget_exhausted")
-        or _degraded_warning(row.get("warnings") or ())
-    )
-
-
-def _degraded_warning(warnings: Iterable[Any]) -> bool:
-    tokens = ("failed", "failure", "timeout", "dns", "429", "backoff", "runtime_budget")
-    return any(any(token in str(warning).casefold() for token in tokens) for warning in warnings)
-
-
-def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
-        return []
-    rows: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(row, dict):
-            rows.append(row)
-    return rows
-
-
-def _int(value: object) -> int:
-    try:
-        return int(value or 0)
-    except (TypeError, ValueError):
-        return 0
-
-
-def _float(value: object) -> float:
-    try:
-        return float(value or 0)
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def _yes_no(value: bool) -> str:
-    return "yes" if value else "no"

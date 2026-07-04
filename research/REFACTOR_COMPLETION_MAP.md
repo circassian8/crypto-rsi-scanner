@@ -2,15 +2,19 @@
 
 Static map of the behavior-preserving Event Alpha refactor. It records package ownership, compatibility cores, size gates, and safety boundaries.
 
-- generated_at: `2026-07-03T15:40:38+00:00`
+- generated_at: `2026-07-04T02:18:33+00:00`
 - status: `accepted`
 - scanner.py lines: `90`
 - scanner command bodies remaining: `0`
-- cli service bind sites: `6`
+- cli service bind sites: `5`
 - active shims: `124`
 - active shim logic violations: `0`
 - size gate status: `pass`
-- legacy decomposition gate status: `warning`
+- production size gate status: `pass`
+- production files over 2000 lines: `0`
+- production files over 3000 lines: `0`
+- test size gate status: `warning`
+- legacy decomposition gate status: `pass`
 - legacy files over 3000 lines: `0`
 - verification status: `pass`
 

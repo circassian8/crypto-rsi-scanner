@@ -18,6 +18,7 @@ from typing import Any
 
 from . import refactor_baseline
 from . import refactor_legacy_inventory
+from . import refactor_size_gates
 from .event_alpha import shims as event_alpha_shims
 from .event_alpha.doctor import check_registry
 from .event_alpha.namespace import lifecycle as namespace_lifecycle
@@ -485,6 +486,7 @@ def build_refactor_final_report(
     classification = _remaining_module_classification(root)
     class_ownership = _class_ownership_summary(root)
     legacy_inventory = refactor_legacy_inventory.build_legacy_inventory(root=root)
+    size_gate_report = refactor_size_gates.build_gate_report(root=root)
     cli_service_line_counts = _cli_service_line_counts(root)
     cli_event_alpha_service_lines = cli_service_line_counts.get("crypto_rsi_scanner/cli/services/event_alpha.py")
     cli_service_bind_calls = _cli_service_bind_scanner_globals_call_sites(root)
@@ -546,6 +548,21 @@ def build_refactor_final_report(
                     "risk": "Moving too much at once can change CLI, doctor, notification, card, brief, or radar semantics.",
                 }
             )
+    if size_gate_report.get("production_size_gate_status") == "blocked":
+        for row in size_gate_report.get("largest_production_files", []):
+            if int(row.get("line_count") or 0) <= refactor_size_gates.PRODUCTION_BLOCKER_LINE_LIMIT:
+                continue
+            extra_blockers.append(
+                {
+                    "path": str(row.get("path")),
+                    "blocker_reason": (
+                        "Production module remains over 2,000 lines; refactor completion must "
+                        "document an explicit exception or split the file."
+                    ),
+                    "next_migration_module": "focused production split modules for this file",
+                    "risk": "Moving production code without fixture-backed parity can change CLI, provider, notification, or artifact behavior.",
+                }
+            )
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -601,6 +618,16 @@ def build_refactor_final_report(
         "legacy_files_over_3000_lines": legacy_inventory["legacy_files_over_3000_lines"],
         "legacy_total_lines": legacy_inventory["legacy_total_lines"],
         "largest_legacy_files": legacy_inventory["largest_legacy_files"],
+        "production_size_gate_status": size_gate_report.get("production_size_gate_status"),
+        "production_files_over_1500_lines": size_gate_report.get("production_files_over_1500_lines"),
+        "production_files_over_2000_lines": size_gate_report.get("production_files_over_2000_lines"),
+        "production_files_over_3000_lines": size_gate_report.get("production_files_over_3000_lines"),
+        "largest_production_files": size_gate_report.get("largest_production_files", []),
+        "production_classes_over_limit": size_gate_report.get("production_classes_over_limit"),
+        "production_functions_over_limit": size_gate_report.get("production_functions_over_limit"),
+        "test_size_gate_status": size_gate_report.get("test_size_gate_status"),
+        "test_files_over_1500_lines": size_gate_report.get("test_files_over_1500_lines"),
+        "largest_test_files": size_gate_report.get("largest_test_files", []),
         "legacy_classes_over_limit": legacy_inventory["legacy_classes_over_limit"],
         "legacy_functions_over_limit": legacy_inventory["legacy_functions_over_limit"],
         "legacy_modules_with_multiple_public_classes": legacy_inventory[
@@ -707,6 +734,14 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             f"- class_ownership_report: `{data.get('class_ownership_report', {}).get('path')}`",
             f"- class_ownership_classes_over_limit: `{data.get('class_ownership_report', {}).get('classes_over_limit_count')}`",
             f"- class_ownership_functions_over_limit: `{data.get('class_ownership_report', {}).get('functions_over_limit_count')}`",
+            f"- production_size_gate_status: `{data.get('production_size_gate_status')}`",
+            f"- production_files_over_1500_lines: `{data.get('production_files_over_1500_lines')}`",
+            f"- production_files_over_2000_lines: `{data.get('production_files_over_2000_lines')}`",
+            f"- production_files_over_3000_lines: `{data.get('production_files_over_3000_lines')}`",
+            f"- production_classes_over_limit: `{data.get('production_classes_over_limit')}`",
+            f"- production_functions_over_limit: `{data.get('production_functions_over_limit')}`",
+            f"- test_size_gate_status: `{data.get('test_size_gate_status')}`",
+            f"- test_files_over_1500_lines: `{data.get('test_files_over_1500_lines')}`",
             f"- legacy_decomposition_gate_status: `{data.get('legacy_decomposition_gate_status')}`",
             f"- legacy_files_over_1500_lines: `{data.get('legacy_files_over_1500_lines')}`",
             f"- legacy_files_over_3000_lines: `{data.get('legacy_files_over_3000_lines')}`",
@@ -720,6 +755,7 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
         ]
     )
     _append_migrated_modules_section(lines, data)
+    _append_production_size_section(lines, data)
     _append_legacy_decomposition_section(lines, data)
     lines.extend(
         [
@@ -772,22 +808,7 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
     )
     for row in data["deprecation_plan"]:
         lines.append(f"| `{row['phase']}` | `{row['status']}` | {row['policy']} |")
-    lines.extend(
-        [
-            "",
-            "## Safety Snapshot",
-            "",
-            f"- research_only: `{data['research_only']}`",
-            f"- no_send_rehearsal: `{data['no_send_rehearsal']}`",
-            f"- live_provider_calls_allowed: `{data['live_provider_calls_allowed']}`",
-            f"- telegram_sends: `{data['telegram_sends']}`",
-            f"- trades_created: `{data['trades_created']}`",
-            f"- paper_trades_created: `{data['paper_trades_created']}`",
-            f"- normal_rsi_signal_rows_written: `{data['normal_rsi_signal_rows_written']}`",
-            f"- triggered_fade_created: `{data['triggered_fade_created']}`",
-            "",
-        ]
-    )
+    _append_safety_snapshot_section(lines, data)
     return "\n".join(lines)
 
 
@@ -804,6 +825,52 @@ def _append_legacy_decomposition_section(lines: list[str], data: dict[str, Any])
     for row in data.get("largest_legacy_files", []):
         if isinstance(row, dict):
             lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
+
+
+def _append_production_size_section(lines: list[str], data: dict[str, Any]) -> None:
+    lines.extend(
+        [
+            "",
+            "## Production Size Gate",
+            "",
+            "| path | lines |",
+            "|---|---:|",
+        ]
+    )
+    for row in data.get("largest_production_files", []):
+        if isinstance(row, dict):
+            lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
+    lines.extend(
+        [
+            "",
+            "## Test Size Gate",
+            "",
+            "| path | lines |",
+            "|---|---:|",
+        ]
+    )
+    for row in data.get("largest_test_files", []):
+        if isinstance(row, dict):
+            lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
+
+
+def _append_safety_snapshot_section(lines: list[str], data: dict[str, Any]) -> None:
+    lines.extend(
+        [
+            "",
+            "## Safety Snapshot",
+            "",
+            f"- research_only: `{data['research_only']}`",
+            f"- no_send_rehearsal: `{data['no_send_rehearsal']}`",
+            f"- live_provider_calls_allowed: `{data['live_provider_calls_allowed']}`",
+            f"- telegram_sends: `{data['telegram_sends']}`",
+            f"- trades_created: `{data['trades_created']}`",
+            f"- paper_trades_created: `{data['paper_trades_created']}`",
+            f"- normal_rsi_signal_rows_written: `{data['normal_rsi_signal_rows_written']}`",
+            f"- triggered_fade_created: `{data['triggered_fade_created']}`",
+            "",
+        ]
+    )
 
 
 def _append_migrated_modules_section(lines: list[str], data: dict[str, Any]) -> None:

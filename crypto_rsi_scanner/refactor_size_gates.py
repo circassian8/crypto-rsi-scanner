@@ -23,6 +23,10 @@ BASELINE_JSON = "REFACTOR_SIZE_BASELINE.json"
 REPORT_JSON = "REFACTOR_SIZE_GATES.json"
 REPORT_MD = "REFACTOR_SIZE_GATES.md"
 DEFAULT_FILE_LINE_LIMIT = 1500
+PRODUCTION_WARNING_LINE_LIMIT = 1500
+PRODUCTION_BLOCKER_LINE_LIMIT = 2000
+PRODUCTION_HARD_BLOCKER_LINE_LIMIT = 3000
+TEST_WARNING_LINE_LIMIT = 1500
 DEFAULT_CLASS_LINE_LIMIT = ownership.DEFAULT_CLASS_LINE_LIMIT
 DEFAULT_FUNCTION_LINE_LIMIT = ownership.DEFAULT_FUNCTION_LINE_LIMIT
 MOVED_VIOLATION_ALIASES = {
@@ -61,8 +65,28 @@ MOVED_VIOLATION_ALIASES = {
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_alert": "function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_alert",
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_hypothesis": "function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_hypothesis",
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_row": "function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_row",
+    "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:FixtureCatalystSearchProvider": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search.py:FixtureCatalystSearchProvider",
+    "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:EventProviderCatalystSearchProvider": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search.py:EventProviderCatalystSearchProvider",
+    "class:crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py:EventAlphaSourceCoverageReport": "class:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:EventAlphaSourceCoverageReport",
+    "function:crypto_rsi_scanner/backtest_parts/legacy_parts/cli.py:main": "function:crypto_rsi_scanner/backtest_parts/legacy.py:main",
+    "function:crypto_rsi_scanner/backtest_parts/legacy_parts/walk.py:walk_coin": "function:crypto_rsi_scanner/backtest_parts/legacy.py:walk_coin",
+    "function:crypto_rsi_scanner/cli/services/event_alpha_notifications/fixture_smoke.py:event_alpha_notify_fixture_smoke": "function:crypto_rsi_scanner/cli/services/event_alpha_notifications.py:event_alpha_notify_fixture_smoke",
+    "function:crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py:_event_alpha_notify_cycle_body": "function:crypto_rsi_scanner/cli/services/event_alpha_notifications.py:_event_alpha_notify_cycle_body",
+    "function:crypto_rsi_scanner/event_alpha/artifacts/alert_store/reconciliation.py:_snapshot_from_route_decision": "function:crypto_rsi_scanner/event_alpha/artifacts/alert_store.py:_snapshot_from_route_decision",
+    "function:crypto_rsi_scanner/event_alpha/notifications/inbox/builder.py:build_notification_inbox": "function:crypto_rsi_scanner/event_alpha/notifications/inbox.py:build_notification_inbox",
+    "function:crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py:evaluate_signal_quality_case": "function:crypto_rsi_scanner/event_alpha/outcomes/quality.py:evaluate_signal_quality_case",
+    "function:crypto_rsi_scanner/event_alpha/radar/source_coverage/builder.py:build_source_coverage_report": "function:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:build_source_coverage_report",
+    "function:crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py:format_source_coverage_report": "function:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:format_source_coverage_report",
+    "function:crypto_rsi_scanner/refactor_final_report.py:format_refactor_final_markdown": "function:crypto_rsi_scanner/refactor_final_report.py:format_refactor_final_markdown",
     "public_classes:crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.models": "public_classes:crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy",
     "public_classes:crypto_rsi_scanner.event_alpha.notifications.legacy.delivery_models": "public_classes:crypto_rsi_scanner.event_alpha.notifications.pipeline_legacy",
+    "public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store.models": "public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store",
+    "public_classes:crypto_rsi_scanner.event_alpha.notifications.inbox.models": "public_classes:crypto_rsi_scanner.event_alpha.notifications.inbox",
+    "public_classes:crypto_rsi_scanner.event_alpha.outcomes.quality.models": "public_classes:crypto_rsi_scanner.event_alpha.outcomes.quality",
+    "public_classes:crypto_rsi_scanner.event_alpha.radar.catalyst_search.models": "public_classes:crypto_rsi_scanner.event_alpha.radar.catalyst_search",
+    "public_classes:crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers": "public_classes:crypto_rsi_scanner.event_alpha.radar.catalyst_search",
+    "public_classes:crypto_rsi_scanner.event_alpha.radar.incidents.models": "public_classes:crypto_rsi_scanner.event_alpha.radar.incidents",
+    "public_classes:crypto_rsi_scanner.event_alpha.radar.source_coverage.models": "public_classes:crypto_rsi_scanner.event_alpha.radar.source_coverage",
     "public_classes:crypto_rsi_scanner.event_alpha.radar.core.models": "public_classes:crypto_rsi_scanner.event_alpha.radar.core.legacy_store",
     "public_classes:crypto_rsi_scanner.event_alpha.radar.evidence.models": "public_classes:crypto_rsi_scanner.event_alpha.radar.evidence.legacy_acquisition",
     "public_classes:crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.models": "public_classes:crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.legacy",
@@ -96,6 +120,39 @@ def build_inventory(
     )
     file_rows = _file_line_rows(repo_root, file_line_limit=file_line_limit)
     long_files = [row for row in file_rows if row["line_count"] > file_line_limit]
+    production_file_rows = [row for row in file_rows if row.get("source_kind") == "production"]
+    test_file_rows = [row for row in file_rows if row.get("source_kind") == "test"]
+    production_files_over_1500 = [
+        row for row in production_file_rows if row["line_count"] > PRODUCTION_WARNING_LINE_LIMIT
+    ]
+    production_files_over_2000 = [
+        row for row in production_file_rows if row["line_count"] > PRODUCTION_BLOCKER_LINE_LIMIT
+    ]
+    production_files_over_3000 = [
+        row for row in production_file_rows if row["line_count"] > PRODUCTION_HARD_BLOCKER_LINE_LIMIT
+    ]
+    test_files_over_1500 = [
+        row for row in test_file_rows if row["line_count"] > TEST_WARNING_LINE_LIMIT
+    ]
+    test_files_over_2000 = [
+        row for row in test_file_rows if row["line_count"] > PRODUCTION_BLOCKER_LINE_LIMIT
+    ]
+    production_classes_over_limit = [
+        row
+        for row in class_report.get("classes_over_limit", [])
+        if isinstance(row, dict) and str(row.get("source_path") or "").startswith("crypto_rsi_scanner/")
+    ]
+    production_functions_over_limit = [
+        row
+        for row in class_report.get("functions_over_limit", [])
+        if isinstance(row, dict) and str(row.get("source_path") or "").startswith("crypto_rsi_scanner/")
+    ]
+    production_size_gate_status = (
+        "blocked"
+        if production_files_over_2000 or production_files_over_3000
+        else ("warning" if production_files_over_1500 else "pass")
+    )
+    test_size_gate_status = "warning" if test_files_over_1500 else "pass"
     violations = []
     violations.extend(
         {
@@ -143,6 +200,25 @@ def build_inventory(
         "function_line_limit": function_line_limit,
         "file_count": len(file_rows),
         "files_over_limit_count": len(long_files),
+        "production_files_over_1500_lines": len(production_files_over_1500),
+        "production_files_over_2000_lines": len(production_files_over_2000),
+        "production_files_over_3000_lines": len(production_files_over_3000),
+        "largest_production_files": sorted(
+            production_file_rows,
+            key=lambda row: (-int(row.get("line_count") or 0), str(row.get("path") or "")),
+        )[:40],
+        "production_classes_over_limit": len(production_classes_over_limit),
+        "production_functions_over_limit": len(production_functions_over_limit),
+        "production_classes_over_limit_rows": production_classes_over_limit,
+        "production_functions_over_limit_rows": production_functions_over_limit,
+        "production_size_gate_status": production_size_gate_status,
+        "test_files_over_1500_lines": len(test_files_over_1500),
+        "test_files_over_2000_lines": len(test_files_over_2000),
+        "largest_test_files": sorted(
+            test_file_rows,
+            key=lambda row: (-int(row.get("line_count") or 0), str(row.get("path") or "")),
+        )[:40],
+        "test_size_gate_status": test_size_gate_status,
         "classes_over_limit_count": int(class_report.get("classes_over_limit_count", 0)),
         "functions_over_limit_count": int(class_report.get("functions_over_limit_count", 0)),
         "modules_with_multiple_public_classes_count": int(
@@ -210,6 +286,10 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
         "policy": {
             "existing_violations": "warning",
             "new_violations_compared_to_baseline": "blocker",
+            "production_file_over_1500_lines": "warning",
+            "production_file_over_2000_lines": "refactor-complete blocker unless explicitly exempted",
+            "production_file_over_3000_lines": "blocker",
+            "test_file_size_debt": "tracked separately from production completion",
             "baseline_update": "explicit make refactor-size-baseline-update only",
         },
         "new_violation_count": len(new_rows),
@@ -260,6 +340,14 @@ def format_gate_report(report: dict[str, Any]) -> str:
         f"- gate_status: `{report.get('gate_status')}`",
         f"- baseline_present: `{str(bool(report.get('baseline_present'))).lower()}`",
         f"- files_over_limit_count: `{report.get('files_over_limit_count', 0)}`",
+        f"- production_size_gate_status: `{report.get('production_size_gate_status')}`",
+        f"- production_files_over_1500_lines: `{report.get('production_files_over_1500_lines', 0)}`",
+        f"- production_files_over_2000_lines: `{report.get('production_files_over_2000_lines', 0)}`",
+        f"- production_files_over_3000_lines: `{report.get('production_files_over_3000_lines', 0)}`",
+        f"- production_classes_over_limit: `{report.get('production_classes_over_limit', 0)}`",
+        f"- production_functions_over_limit: `{report.get('production_functions_over_limit', 0)}`",
+        f"- test_size_gate_status: `{report.get('test_size_gate_status')}`",
+        f"- test_files_over_1500_lines: `{report.get('test_files_over_1500_lines', 0)}`",
         f"- classes_over_limit_count: `{report.get('classes_over_limit_count', 0)}`",
         f"- functions_over_limit_count: `{report.get('functions_over_limit_count', 0)}`",
         f"- modules_with_multiple_public_classes_count: `{report.get('modules_with_multiple_public_classes_count', 0)}`",
@@ -277,6 +365,10 @@ def format_gate_report(report: dict[str, Any]) -> str:
         "",
         "- Existing violations from `research/REFACTOR_SIZE_BASELINE.json` are warnings.",
         "- New file/function/class/module ownership violations are blockers.",
+        "- Production files over 1,500 lines are warnings.",
+        "- Production files over 2,000 lines block refactor-complete status unless explicitly exempted.",
+        "- Production files over 3,000 lines are blockers.",
+        "- Test file size debt is tracked separately and does not block production refactor completion.",
         "- Legacy implementation files over 1,500 lines are warnings.",
         "- Legacy implementation files over 3,000 lines block refactor-complete status.",
         "- Baseline updates require the explicit `make refactor-size-baseline-update` target.",
@@ -305,6 +397,24 @@ def format_gate_report(report: dict[str, Any]) -> str:
         "|---|---:|",
     ])
     for row in _limit_rows(report.get("largest_legacy_files"), 40):
+        lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
+    lines.extend([
+        "",
+        "## Largest Production Files",
+        "",
+        "| path | lines |",
+        "|---|---:|",
+    ])
+    for row in _limit_rows(report.get("largest_production_files"), 40):
+        lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
+    lines.extend([
+        "",
+        "## Largest Test Files",
+        "",
+        "| path | lines |",
+        "|---|---:|",
+    ])
+    for row in _limit_rows(report.get("largest_test_files"), 40):
         lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
     lines.extend([
         "",
@@ -343,6 +453,7 @@ def _file_line_rows(repo_root: Path, *, file_line_limit: int) -> list[dict[str, 
                     "path": rel,
                     "line_count": line_count,
                     "limit": file_line_limit,
+                    "source_kind": "production" if root.name == "crypto_rsi_scanner" else "test",
                 }
             )
     return rows

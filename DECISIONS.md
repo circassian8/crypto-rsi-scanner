@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-04 - Production size gates are separate from test and ownership debt
+**Status:** accepted
+**Decision:** Refactor acceptance distinguishes production file-size gates from
+test-file size and advisory class/function ownership. A production Python file
+over 1,500 lines is a warning, over 2,000 lines is a blocker, and over 3,000
+lines is a hard blocker. Test file size remains tracked separately, and
+classes/functions over the advisory limits are reported as the next ownership
+burn-down target rather than blocking the accepted production-size milestone.
+**Why:** The remaining large production files were split into focused packages
+with old import compatibility preserved, and the safe 23-command regression
+stack passed. Keeping production/test/ownership counters separate prevents
+test-suite compatibility debt or known large functions from masking the fact
+that production file-size blockers are now gone.
+**Revisit when:** the class/function ownership inventory has been reduced
+enough to make those advisory thresholds blocking, or when a future v2/v3
+compatibility break retires old import paths and compatibility binders.
+
 ## 2026-07-03 - Split binders accepted for Event Alpha legacy cores
 **Status:** accepted
 **Decision:** Large Event Alpha radar legacy cores may be decomposed into

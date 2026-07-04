@@ -1,17 +1,11 @@
-"""Registry-backed Event Alpha command dispatch.
-
-The dispatch chain is intentionally behavior-preserving: it was moved out of
-``commands_event_alpha.handle`` so the command module can stay small while later
-passes migrate individual handlers to explicit service imports.
-"""
+"""Split implementation for `crypto_rsi_scanner/cli/event_alpha_command_registry.py` (dispatch)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Callable
-
-from ._scanner_bindings import bind_scanner_globals
-from .services import (
+from .._scanner_bindings import bind_scanner_globals
+from ..services import (
     event_alpha_integrated as _service_integrated,
     event_alpha_namespace as _service_namespace,
     event_alpha_notifications as _service_notifications,
@@ -20,297 +14,10 @@ from .services import (
     event_alpha_reports as _service_reports,
     event_alpha_research as _service_research,
 )
+from .models import *  # noqa: F403
+from .metadata import *  # noqa: F403
 
-
-@dataclass(frozen=True)
-class EventAlphaCommandRegistration:
-    command_flag: str
-    parsed_attr: str
-    handler_module: str
-    handler_name: str
-    command_group: str
-    requires_no_send: bool = True
-    allows_live_provider_call: bool = False
-    test_fixture_command: bool = False
-    safety_notes: str = "research-only; no live calls or Telegram sends by default"
-
-
-def _flag_from_attr(attr: str) -> str:
-    return "--" + attr.replace("_", "-")
-
-
-_EVENT_ALPHA_DISPATCH_ATTRS = (
-    "all",
-    "all_history",
-    "confirm",
-    "event_alert_report",
-    "event_alert_send",
-    "event_alpha_alert_store_path",
-    "event_alpha_alerts_report",
-    "event_alpha_archive_stale_namespaces",
-    "event_alpha_artifact_doctor",
-    "event_alpha_artifact_doctor_delivery_scope",
-    "event_alpha_artifact_doctor_strict",
-    "event_alpha_artifact_doctor_strict_legacy",
-    "event_alpha_artifact_namespace",
-    "event_alpha_burn_in_checklist",
-    "event_alpha_burn_in_days",
-    "event_alpha_burn_in_readiness",
-    "event_alpha_burn_in_review",
-    "event_alpha_burn_in_scorecard",
-    "event_alpha_calibration_export_priors",
-    "event_alpha_calibration_report",
-    "event_alpha_cycle",
-    "event_alpha_daily_brief",
-    "event_alpha_derivatives_crowding_path",
-    "event_alpha_derivatives_report",
-    "event_alpha_doctor_schema_only",
-    "event_alpha_doctor_skip_legacy_checks",
-    "event_alpha_environment_doctor",
-    "event_alpha_explain_last_run",
-    "event_alpha_export_burn_in_pack",
-    "event_alpha_export_eval_cases_from_feedback",
-    "event_alpha_export_eval_cases_from_missed",
-    "event_alpha_export_notification_pack",
-    "event_alpha_export_signal_quality_cases",
-    "event_alpha_feedback_readiness",
-    "event_alpha_fill_outcomes",
-    "event_alpha_generate_launchd",
-    "event_alpha_health_guard",
-    "event_alpha_include_legacy_artifacts",
-    "event_alpha_include_stale_artifacts",
-    "event_alpha_include_test_artifacts",
-    "event_alpha_integrated_radar_auto",
-    "event_alpha_integrated_radar_calibration_export_priors",
-    "event_alpha_integrated_radar_calibration_report",
-    "event_alpha_integrated_radar_coinalyze_namespace",
-    "event_alpha_integrated_radar_cycle",
-    "event_alpha_integrated_radar_fill_outcomes",
-    "event_alpha_integrated_radar_fixture",
-    "event_alpha_integrated_radar_load_existing",
-    "event_alpha_integrated_radar_outcome_report",
-    "event_alpha_integrated_radar_run_sidecars",
-    "event_alpha_list_active_namespaces",
-    "event_alpha_mark_known_stale_namespaces",
-    "event_alpha_mark_namespace_stale",
-    "event_alpha_market_anomaly_asset_registry",
-    "event_alpha_market_anomaly_rows",
-    "event_alpha_market_anomaly_scan",
-    "event_alpha_market_anomaly_universe",
-    "event_alpha_missed_report",
-    "event_alpha_namespace_lifecycle_report",
-    "event_alpha_near_miss_report",
-    "event_alpha_notification_checklist",
-    "event_alpha_notification_deliveries_report",
-    "event_alpha_notification_inbox",
-    "event_alpha_notification_retry_failed",
-    "event_alpha_notification_runs_path",
-    "event_alpha_notification_runs_report",
-    "event_alpha_notification_slo_report",
-    "event_alpha_notify_cycle",
-    "event_alpha_notify_fixture_smoke",
-    "event_alpha_notify_go_no_go",
-    "event_alpha_notify_preview",
-    "event_alpha_notify_preview_from_artifacts",
-    "event_alpha_official_exchange_binance",
-    "event_alpha_official_exchange_bybit",
-    "event_alpha_official_exchange_report",
-    "event_alpha_pause_notifications",
-    "event_alpha_policy_simulate",
-    "event_alpha_preflight",
-    "event_alpha_priors_shadow_report",
-    "event_alpha_profile",
-    "event_alpha_profile_report",
-    "event_alpha_provider_health_reset",
-    "event_alpha_prune_artifacts",
-    "event_alpha_prune_or_archive_stale_namespace",
-    "event_alpha_quality_coverage_report",
-    "event_alpha_quality_review",
-    "event_alpha_radar_report",
-    "event_alpha_replay",
-    "event_alpha_replay_compare",
-    "event_alpha_replay_llm_advisory",
-    "event_alpha_replay_market_rows",
-    "event_alpha_replay_priors",
-    "event_alpha_replay_profile",
-    "event_alpha_replay_profile_alt",
-    "event_alpha_replay_raw_events",
-    "event_alpha_resume_notifications",
-    "event_alpha_router_report",
-    "event_alpha_run_ledger_path",
-    "event_alpha_run_limit",
-    "event_alpha_runs_report",
-    "event_alpha_scheduled_catalyst_coinmarketcal",
-    "event_alpha_scheduled_catalyst_messari",
-    "event_alpha_scheduled_catalyst_report",
-    "event_alpha_scheduled_catalyst_tokenomist",
-    "event_alpha_scheduler_status",
-    "event_alpha_send_readiness",
-    "event_alpha_send_test",
-    "event_alpha_signal_quality_cases_path",
-    "event_alpha_signal_quality_eval",
-    "event_alpha_signal_quality_export_path",
-    "event_alpha_stale_archive",
-    "event_alpha_stale_superseded_by",
-    "event_alpha_status",
-    "event_alpha_telegram_final_check",
-    "event_alpha_telegram_recipient_check",
-    "event_alpha_tuning_worksheet",
-    "event_alpha_v1_readiness",
-    "event_catalyst_search_report",
-    "event_discovery_binance_listen",
-    "event_discovery_refresh",
-    "event_discovery_report",
-    "event_discovery_run_limit",
-    "event_discovery_runs",
-    "event_discovery_status",
-    "event_fade_apply_review_template",
-    "event_fade_auto_report",
-    "event_fade_cache_review_bundle",
-    "event_fade_check_review_template",
-    "event_fade_export_cache_sample",
-    "event_fade_export_outcome_prices",
-    "event_fade_export_review_template",
-    "event_fade_export_sample",
-    "event_fade_fill_outcomes",
-    "event_fade_labeling_queue",
-    "event_fade_merge_sample",
-    "event_fade_overwrite_outcomes",
-    "event_fade_price_days",
-    "event_fade_price_fixture_dir",
-    "event_fade_price_interval",
-    "event_fade_queue_limit",
-    "event_fade_refresh_price_cache",
-    "event_fade_report",
-    "event_fade_review_bundle",
-    "event_fade_review_bundle_export_prices",
-    "event_fade_review_bundle_prices",
-    "event_fade_review_bundle_reviewed",
-    "event_fade_review_packet",
-    "event_fade_review_sample",
-    "event_feedback_by",
-    "event_feedback_ignore",
-    "event_feedback_junk",
-    "event_feedback_label",
-    "event_feedback_mark",
-    "event_feedback_missed",
-    "event_feedback_notes",
-    "event_feedback_path",
-    "event_feedback_report",
-    "event_feedback_traded",
-    "event_feedback_useful",
-    "event_feedback_watch",
-    "event_impact_hypotheses_inbox",
-    "event_impact_hypotheses_report",
-    "event_impact_hypothesis_smoke",
-    "event_impact_hypothesis_store_path",
-    "event_incident_store_path",
-    "event_incidents_report",
-    "event_llm_extract_report",
-    "event_llm_shadow_report",
-    "event_now",
-    "event_opportunity_audit",
-    "event_opportunity_audit_include_diagnostics",
-    "event_research_card",
-    "event_research_cards_write",
-    "event_source_reliability_report",
-    "event_watchlist_monitor",
-    "event_watchlist_refresh",
-    "event_watchlist_report",
-    "ignore_notification_pause",
-    "ignore_provider_backoff",
-    "include_diagnostic_incidents",
-    "include_external_context_incidents",
-    "include_legacy",
-    "include_raw_incidents",
-    "json",
-    "latest_run",
-    "out",
-    "provider_key",
-    "reason",
-    "role",
-    "run_id",
-    "service",
-    "since",
-    "verbose",
-    "with_llm",
-)
-
-
-def _command_group(attr: str) -> str:
-    if "coinalyze" in attr:
-        return "event_alpha_coinalyze"
-    if "bybit" in attr or "official_exchange" in attr:
-        return "event_alpha_official_exchange"
-    if "notify" in attr or "notification" in attr or "telegram" in attr or "send" in attr:
-        return "event_alpha_notification"
-    if "provider" in attr or "preflight" in attr or "readiness" in attr or "dex_onchain" in attr:
-        return "event_alpha_provider_readiness"
-    if "integrated_radar" in attr or "market_anomaly" in attr or "derivatives" in attr:
-        return "event_alpha_integrated_radar"
-    if "namespace" in attr:
-        return "event_alpha_namespace"
-    return "event_alpha"
-
-
-def _is_fixture_command(attr: str) -> bool:
-    return "smoke" in attr or "fixture" in attr
-
-
-_LOCAL_EVENT_ALPHA_COMMANDS = tuple(
-    EventAlphaCommandRegistration(
-        command_flag=_flag_from_attr(attr),
-        parsed_attr=attr,
-        handler_module="crypto_rsi_scanner.cli.event_alpha_command_registry",
-        handler_name="dispatch_event_alpha_command",
-        command_group=_command_group(attr),
-        test_fixture_command=_is_fixture_command(attr),
-    )
-    for attr in _EVENT_ALPHA_DISPATCH_ATTRS
-)
-
-_PROVIDER_READINESS_ATTRS = (
-    "event_alpha_bybit_announcements_no_send_rehearsal",
-    "event_alpha_bybit_announcements_preflight",
-    "event_alpha_bybit_announcements_preflight_smoke",
-    "event_alpha_coinalyze_no_send_rehearsal",
-    "event_alpha_coinalyze_preflight",
-    "event_alpha_coinalyze_preflight_smoke",
-    "event_alpha_coinmarketcal_preflight",
-    "event_alpha_cryptopanic_preflight",
-    "event_alpha_dex_onchain_readiness",
-    "event_alpha_dex_onchain_readiness_smoke",
-    "event_alpha_live_provider_readiness",
-    "event_alpha_live_provider_readiness_smoke",
-    "event_alpha_messari_unlocks_preflight",
-    "event_alpha_provider_health_report",
-    "event_alpha_source_coverage_report",
-    "event_alpha_tokenomist_preflight",
-    "event_alpha_unlock_calendar_preflight",
-)
-
-_PROVIDER_READINESS_COMMANDS = tuple(
-    EventAlphaCommandRegistration(
-        command_flag=_flag_from_attr(attr),
-        parsed_attr=attr,
-        handler_module="crypto_rsi_scanner.cli.commands_provider_readiness",
-        handler_name="handle",
-        command_group=_command_group(attr),
-        test_fixture_command=_is_fixture_command(attr),
-    )
-    for attr in _PROVIDER_READINESS_ATTRS
-)
-
-EVENT_ALPHA_COMMANDS = _LOCAL_EVENT_ALPHA_COMMANDS + _PROVIDER_READINESS_COMMANDS
-
-
-def _bind_legacy_scanner_globals() -> None:
-    bind_scanner_globals(globals())
-
-
-def dispatch_event_alpha_command(args) -> bool:
-    """Dispatch one Event Alpha command using the preserved branch order."""
-    _bind_legacy_scanner_globals()
+def _dispatch_event_alpha_command_section_1(args) -> bool:
     if args.event_fade_report:
         event_fade_report(verbose=args.verbose, event_now=args.event_now)
         return True
@@ -449,6 +156,9 @@ def dispatch_event_alpha_command(args) -> bool:
             profile_name=args.event_alpha_profile,
         )
         return True
+    return False
+
+def _dispatch_event_alpha_command_section_2(args) -> bool:
     if args.event_alpha_notification_runs_report:
         event_alpha_notification_runs_report(
             path=args.event_alpha_notification_runs_path,
@@ -588,6 +298,9 @@ def dispatch_event_alpha_command(args) -> bool:
             verbose=args.verbose,
         )
         return True
+    return False
+
+def _dispatch_event_alpha_command_section_3(args) -> bool:
     if args.event_alpha_feedback_readiness:
         event_alpha_feedback_readiness_report(
             profile_name=args.event_alpha_profile,
@@ -726,6 +439,9 @@ def dispatch_event_alpha_command(args) -> bool:
             include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
         )
         return True
+    return False
+
+def _dispatch_event_alpha_command_section_4(args) -> bool:
     if args.event_alpha_health_guard:
         _service_reports.event_alpha_health_guard_report(
             verbose=args.verbose,
@@ -869,6 +585,9 @@ def dispatch_event_alpha_command(args) -> bool:
             include_test_artifacts=args.event_alpha_include_test_artifacts,
         )
         return True
+    return False
+
+def _dispatch_event_alpha_command_section_5(args) -> bool:
     if args.event_alpha_official_exchange_report:
         _service_integrated.event_alpha_official_exchange_report(
             verbose=args.verbose,
@@ -1014,6 +733,9 @@ def dispatch_event_alpha_command(args) -> bool:
     if args.event_fade_review_sample:
         event_fade_review_sample(args.event_fade_review_sample, verbose=args.verbose)
         return True
+    return False
+
+def _dispatch_event_alpha_command_section_6(args) -> bool:
     if args.event_fade_labeling_queue:
         event_fade_labeling_queue(
             args.event_fade_labeling_queue,
@@ -1118,9 +840,19 @@ def dispatch_event_alpha_command(args) -> bool:
         return True
     return False
 
-
-__all__ = (
-    "EVENT_ALPHA_COMMANDS",
-    "EventAlphaCommandRegistration",
-    "dispatch_event_alpha_command",
-)
+def dispatch_event_alpha_command(args) -> bool:
+    """Dispatch one Event Alpha command using the preserved branch order."""
+    _bind_legacy_scanner_globals()
+    if _dispatch_event_alpha_command_section_1(args):
+        return True
+    if _dispatch_event_alpha_command_section_2(args):
+        return True
+    if _dispatch_event_alpha_command_section_3(args):
+        return True
+    if _dispatch_event_alpha_command_section_4(args):
+        return True
+    if _dispatch_event_alpha_command_section_5(args):
+        return True
+    if _dispatch_event_alpha_command_section_6(args):
+        return True
+    return False

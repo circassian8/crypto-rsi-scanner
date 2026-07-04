@@ -803,7 +803,20 @@ def test_refactor_size_gates_static_baseline_and_new_violation_detection():
         blocked = refactor_size_gates.build_gate_report(root=root)
         assert blocked["gate_status"] == "blocked"
         assert any(row["category"] == "file_over_1500_lines" for row in blocked["new_violations"])
+        assert blocked["production_size_gate_status"] == "warning"
         assert json.loads(baseline_path.read_text(encoding="utf-8"))["violation_ids"] == []
+
+        (package / "giant_production.py").write_text("\n".join(["VALUE = 1"] * 2002) + "\n", encoding="utf-8")
+        production_blocked = refactor_size_gates.build_gate_report(root=root)
+        assert production_blocked["production_size_gate_status"] == "blocked"
+        assert production_blocked["production_files_over_2000_lines"] == 1
+        assert any(row["path"] == "crypto_rsi_scanner/giant_production.py" for row in production_blocked["largest_production_files"])
+
+        (tests_dir / "test_giant.py").write_text("\n".join(["VALUE = 1"] * 2002) + "\n", encoding="utf-8")
+        test_tracked = refactor_size_gates.build_gate_report(root=root)
+        assert test_tracked["test_size_gate_status"] == "warning"
+        assert test_tracked["test_files_over_1500_lines"] == 1
+        assert any(row["path"] == "tests/test_giant.py" for row in test_tracked["largest_test_files"])
 
         (package / "feature_legacy.py").write_text("\n".join(["VALUE = 1"] * 3001) + "\n", encoding="utf-8")
         legacy_blocked = refactor_size_gates.build_gate_report(root=root)
@@ -838,12 +851,13 @@ def test_refactor_reports_list_large_legacy_implementation_cores():
 
     size_report = refactor_size_gates.build_gate_report(root=REPO_ROOT)
     final_report = refactor_final_report.build_refactor_final_report(root=REPO_ROOT)
-    legacy_paths = {row["path"] for row in size_report["largest_legacy_files"]}
-    assert "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py" in legacy_paths
-    assert "crypto_rsi_scanner/event_alpha/radar/validation/legacy.py" in legacy_paths
-    assert "crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py" in legacy_paths
-    assert size_report["legacy_decomposition_gate_status"] in {"warning", "pass"}
-    assert final_report["legacy_decomposition_gate_status"] in {"warning", "pass"}
+    assert size_report["legacy_decomposition_gate_status"] == "pass"
+    assert final_report["legacy_decomposition_gate_status"] == "pass"
+    assert size_report["legacy_files_over_1500_lines"] == 0
+    assert final_report["legacy_files_over_1500_lines"] == 0
+    assert size_report["production_size_gate_status"] == "pass"
+    assert final_report["production_size_gate_status"] == "pass"
+    assert size_report["production_files_over_2000_lines"] == 0
     assert not any(
         blocker["path"] == "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
         for blocker in final_report["blockers"]

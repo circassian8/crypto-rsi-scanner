@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-03T15:38:59+00:00`
+- generated_at: `2026-07-04T02:17:33+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -29,8 +29,8 @@ Research-only refactor gate report. This report does not call providers, send Te
 - unmigrated_modules: `1`
 - active_shim_modules_with_implementation_logic: `0`
 - migrated_modules_this_run_count: `29`
-- scanner_bind_scanner_globals_call_sites: `7`
-- cli_service_bind_scanner_globals_call_sites: `6`
+- scanner_bind_scanner_globals_call_sites: `6`
+- cli_service_bind_scanner_globals_call_sites: `5`
 - cli_event_alpha_service_lines: `46`
 - scanner_legacy_service_lines: `120`
 - parser_build_parser_lines: `25`
@@ -44,13 +44,21 @@ Research-only refactor gate report. This report does not call providers, send Te
 - intentionally_outside_event_alpha_modules: `["crypto_rsi_scanner.event_fade"]`
 - class_ownership_report: `research/REFACTOR_CLASS_OWNERSHIP_REPORT.json`
 - class_ownership_classes_over_limit: `31`
-- class_ownership_functions_over_limit: `64`
-- legacy_decomposition_gate_status: `warning`
-- legacy_files_over_1500_lines: `1`
+- class_ownership_functions_over_limit: `62`
+- production_size_gate_status: `pass`
+- production_files_over_1500_lines: `0`
+- production_files_over_2000_lines: `0`
+- production_files_over_3000_lines: `0`
+- production_classes_over_limit: `31`
+- production_functions_over_limit: `62`
+- test_size_gate_status: `warning`
+- test_files_over_1500_lines: `8`
+- legacy_decomposition_gate_status: `pass`
+- legacy_files_over_1500_lines: `0`
 - legacy_files_over_3000_lines: `0`
-- legacy_total_lines: `6728`
+- legacy_total_lines: `4598`
 - legacy_classes_over_limit: `5`
-- legacy_functions_over_limit: `3`
+- legacy_functions_over_limit: `1`
 - legacy_modules_with_multiple_public_classes: `2`
 
 ## Newly Migrated Modules
@@ -85,11 +93,85 @@ Research-only refactor gate report. This report does not call providers, send Te
 - `crypto_rsi_scanner.event_clock`
 - `crypto_rsi_scanner.event_models`
 
+## Production Size Gate
+
+| path | lines |
+|---|---:|
+| `crypto_rsi_scanner/cli/services/legacy/utility_commands.py` | 1440 |
+| `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1428 |
+| `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1413 |
+| `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 |
+| `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1392 |
+| `crypto_rsi_scanner/config.py` | 1319 |
+| `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
+| `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1267 |
+| `crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py` | 1261 |
+| `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1249 |
+| `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1247 |
+| `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 |
+| `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1222 |
+| `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py` | 1203 |
+| `crypto_rsi_scanner/event_fade.py` | 1181 |
+| `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1171 |
+| `crypto_rsi_scanner/cli/services/legacy/rsi_scan.py` | 1103 |
+| `crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py` | 1078 |
+| `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1061 |
+| `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1059 |
+| `crypto_rsi_scanner/event_alpha/radar/llm/extractor.py` | 1002 |
+| `crypto_rsi_scanner/event_alpha/radar/scheduled_catalysts.py` | 995 |
+| `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 994 |
+| `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 993 |
+| `crypto_rsi_scanner/event_alpha/artifacts/alerts.py` | 985 |
+| `crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py` | 984 |
+| `crypto_rsi_scanner/event_alpha/radar/impact_hypothesis_store.py` | 980 |
+| `crypto_rsi_scanner/event_alpha/radar/incident_graph.py` | 975 |
+| `crypto_rsi_scanner/event_alpha/radar/core_opportunities.py` | 970 |
+| `crypto_rsi_scanner/cli/services/legacy/reports.py` | 961 |
+| `crypto_rsi_scanner/refactor_final_report.py` | 951 |
+| `crypto_rsi_scanner/event_alpha/providers/source_registry.py` | 941 |
+| `crypto_rsi_scanner/event_alpha/radar/identity.py` | 941 |
+| `crypto_rsi_scanner/event_alpha/config/profiles.py` | 935 |
+| `crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py` | 933 |
+| `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 924 |
+| `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py` | 918 |
+| `crypto_rsi_scanner/event_alpha/providers/official_exchange.py` | 913 |
+| `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` | 888 |
+| `crypto_rsi_scanner/event_alpha/outcomes/quality/reports.py` | 879 |
+
+## Test Size Gate
+
+| path | lines |
+|---|---:|
+| `tests/event_alpha/test_integrated_radar.py` | 16084 |
+| `tests/event_alpha/test_provider_readiness.py` | 5373 |
+| `tests/event_alpha/test_notifications.py` | 5037 |
+| `tests/event_alpha/test_outcomes.py` | 4041 |
+| `tests/event_alpha/test_artifact_doctor.py` | 3981 |
+| `tests/event_alpha/test_source_coverage.py` | 2988 |
+| `tests/event_alpha/test_namespace_lifecycle.py` | 1813 |
+| `tests/test_indicators.py` | 1771 |
+| `tests/cli/test_make_targets.py` | 1014 |
+| `tests/event_alpha/_legacy_helpers.py` | 819 |
+| `tests/event_alpha/test_artifact_schema.py` | 734 |
+| `tests/rsi/test_indicators_core.py` | 694 |
+| `tests/rsi/test_backtest.py` | 561 |
+| `tests/rsi/test_paper_risk.py` | 379 |
+| `tests/cli/test_parser.py` | 243 |
+| `tests/event_alpha/test_shim_registry.py` | 204 |
+| `tests/cli/test_event_alpha_command_registry.py` | 163 |
+| `tests/cli/test_dispatch.py` | 129 |
+| `tests/rsi/_legacy_helpers.py` | 67 |
+| `tests/event_alpha/conftest.py` | 30 |
+| `tests/conftest.py` | 13 |
+| `tests/__init__.py` | 1 |
+| `tests/cli/__init__.py` | 1 |
+| `tests/event_alpha/__init__.py` | 1 |
+| `tests/rsi/__init__.py` | 1 |
+
 ## Legacy Decomposition Gate
 
 | path | lines |
 |---|---:|
-| `crypto_rsi_scanner/backtest_parts/legacy.py` | 2174 |
 | `crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py` | 933 |
 | `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` | 888 |
 | `crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py` | 769 |
@@ -109,6 +191,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py` | 50 |
 | `crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py` | 50 |
 | `crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py` | 50 |
+| `crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py` | 48 |
 
 ## Doctor Plugin Migration
 

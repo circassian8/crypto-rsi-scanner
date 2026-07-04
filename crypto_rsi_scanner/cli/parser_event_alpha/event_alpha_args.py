@@ -1,20 +1,10 @@
-"""Compatibility Event Alpha parser arguments.
-
-This module currently owns the full historical flag surface while the parser
-split stabilizes. The category-specific parser modules are called by
-``build_parser`` and can take ownership of narrower flag groups in later passes
-without changing defaults.
-"""
+"""Split implementation for `crypto_rsi_scanner/cli/parser_event_alpha.py` (event_alpha_args)."""
 
 from __future__ import annotations
 
 import argparse
 
-
-def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
-    """Add the historical scanner CLI flags without executing commands."""
-    from .. import event_alpha_profiles, event_feedback
-
+def _add_event_alpha_args_section_1(parser: argparse.ArgumentParser, event_alpha_profiles, event_feedback) -> None:
     parser.add_argument("--top-n", type=int, default=None, help="Number of coins to scan.")
     parser.add_argument(
         "--dry-run",
@@ -156,6 +146,8 @@ def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Print Event Alpha notification SLO/freshness status.",
     )
+
+def _add_event_alpha_args_section_2(parser: argparse.ArgumentParser, event_alpha_profiles, event_feedback) -> None:
     parser.add_argument(
         "--event-alpha-export-notification-pack",
         action="store_true",
@@ -301,6 +293,8 @@ def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Write and print the Event Alpha namespace lifecycle inventory report.",
     )
+
+def _add_event_alpha_args_section_3(parser: argparse.ArgumentParser, event_alpha_profiles, event_feedback) -> None:
     parser.add_argument(
         "--event-alpha-list-active-namespaces",
         action="store_true",
@@ -442,6 +436,8 @@ def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Refresh research-only event alpha watchlist state from current alert candidates.",
     )
+
+def _add_event_alpha_args_section_4(parser: argparse.ArgumentParser, event_alpha_profiles, event_feedback) -> None:
     parser.add_argument(
         "--event-watchlist-report",
         action="store_true",
@@ -587,6 +583,8 @@ def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
         metavar="OUT",
         help="Export reviewable Event Alpha calibration priors JSON; defaults to RSI_EVENT_ALPHA_PRIORS_PATH.",
     )
+
+def _add_event_alpha_args_section_5(parser: argparse.ArgumentParser, event_alpha_profiles, event_feedback) -> None:
     parser.add_argument(
         "--event-alpha-export-eval-cases-from-feedback",
         nargs="?",
@@ -732,6 +730,8 @@ def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
         default=None,
         help="Optional raw event JSONL/cache path for true local Event Alpha replay.",
     )
+
+def _add_event_alpha_args_section_6(parser: argparse.ArgumentParser, event_alpha_profiles, event_feedback) -> None:
     parser.add_argument(
         "--event-alpha-replay-market-rows",
         default=None,
@@ -877,6 +877,8 @@ def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
         default=None,
         help="Provider health key selector for --event-alpha-provider-health-reset, such as gdelt:event_source.",
     )
+
+def _add_event_alpha_args_section_7(parser: argparse.ArgumentParser, event_alpha_profiles, event_feedback) -> None:
     parser.add_argument(
         "--service",
         default=None,
@@ -1020,6 +1022,8 @@ def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
         metavar=("SAMPLE", "OUT"),
         help="Write compact editable review sidecar rows for prioritized validation rows.",
     )
+
+def _add_event_alpha_args_section_8(parser: argparse.ArgumentParser, event_alpha_profiles, event_feedback) -> None:
     parser.add_argument(
         "--event-fade-apply-review-template",
         nargs=3,
@@ -1163,6 +1167,8 @@ def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Install/load the daily launchd maintenance agent for this checkout.",
     )
+
+def _add_event_alpha_args_section_9(parser: argparse.ArgumentParser, event_alpha_profiles, event_feedback) -> None:
     parser.add_argument(
         "--restart-listener",
         action="store_true",
@@ -1190,7 +1196,6 @@ def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Confirm commands that are dry-run by default, such as --event-alpha-prune-artifacts.",
     )
-
     parser.add_argument(
         "--export-src",
         action="store_true",
@@ -1201,3 +1206,17 @@ def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Overwrite crypto_rsi_scanner_source_with_artifacts.zip with source plus local research artifacts.",
     )
+
+def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
+    """Add the historical scanner CLI flags without executing commands."""
+    from ... import event_alpha_profiles, event_feedback
+
+    _add_event_alpha_args_section_1(parser, event_alpha_profiles, event_feedback)
+    _add_event_alpha_args_section_2(parser, event_alpha_profiles, event_feedback)
+    _add_event_alpha_args_section_3(parser, event_alpha_profiles, event_feedback)
+    _add_event_alpha_args_section_4(parser, event_alpha_profiles, event_feedback)
+    _add_event_alpha_args_section_5(parser, event_alpha_profiles, event_feedback)
+    _add_event_alpha_args_section_6(parser, event_alpha_profiles, event_feedback)
+    _add_event_alpha_args_section_7(parser, event_alpha_profiles, event_feedback)
+    _add_event_alpha_args_section_8(parser, event_alpha_profiles, event_feedback)
+    _add_event_alpha_args_section_9(parser, event_alpha_profiles, event_feedback)

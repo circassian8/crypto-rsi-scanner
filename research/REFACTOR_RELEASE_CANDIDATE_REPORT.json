@@ -29,7 +29,7 @@
     },
     "remaining_legacy_unregistered_details": []
   },
-  "generated_at": "2026-07-03T15:40:39+00:00",
+  "generated_at": "2026-07-04T02:18:36+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
   "known_remaining_blockers": [],
   "line_counts": {
@@ -135,162 +135,162 @@
     "commands": [
       {
         "command": "python3 tests/test_indicators.py",
-        "elapsed_seconds": 19.677,
-        "index": 1,
+        "elapsed_seconds": 26.107,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
-        "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q",
-        "elapsed_seconds": 20.528,
-        "index": 2,
+        "command": "env PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q",
+        "elapsed_seconds": 26.726,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "python3 -m compileall -q crypto_rsi_scanner tests",
-        "elapsed_seconds": 0.042,
-        "index": 3,
+        "elapsed_seconds": 0.057,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make test-pytest-safe PYTHON=python3",
-        "elapsed_seconds": 20.582,
-        "index": 4,
+        "elapsed_seconds": 26.837,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make refactor-size-gates PYTHON=python3",
-        "elapsed_seconds": 1.132,
-        "index": 5,
+        "elapsed_seconds": 1.133,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make refactor-class-ownership-report PYTHON=python3",
-        "elapsed_seconds": 1.04,
-        "index": 6,
+        "elapsed_seconds": 1.03,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make refactor-final-report PYTHON=python3",
-        "elapsed_seconds": 0.168,
-        "index": 7,
+        "elapsed_seconds": 1.221,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-shim-report PYTHON=python3",
-        "elapsed_seconds": 0.056,
-        "index": 8,
+        "elapsed_seconds": 0.054,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-integrated-radar-smoke PYTHON=python3",
-        "elapsed_seconds": 1.848,
-        "index": 9,
+        "elapsed_seconds": 1.819,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-integrated-radar-doctor PYTHON=python3",
-        "elapsed_seconds": 0.777,
-        "index": 10,
+        "elapsed_seconds": 0.804,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-notification-format-smoke PYTHON=python3",
-        "elapsed_seconds": 2.032,
-        "index": 11,
+        "elapsed_seconds": 2.116,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-telegram-no-send-final-check-fast PYTHON=python3",
-        "elapsed_seconds": 2.762,
-        "index": 12,
+        "elapsed_seconds": 2.848,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-evidence-acquisition-smoke PYTHON=python3",
-        "elapsed_seconds": 4.337,
-        "index": 13,
+        "elapsed_seconds": 4.481,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3",
-        "elapsed_seconds": 4.123,
-        "index": 14,
+        "elapsed_seconds": 4.411,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-coinalyze-preflight-smoke PYTHON=python3",
-        "elapsed_seconds": 0.652,
-        "index": 15,
+        "elapsed_seconds": 0.666,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-coinalyze-preflight PYTHON=python3",
-        "elapsed_seconds": 0.631,
-        "index": 16,
+        "elapsed_seconds": 0.649,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3",
-        "elapsed_seconds": 0.633,
-        "index": 17,
+        "elapsed_seconds": 0.652,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
-        "elapsed_seconds": 0.644,
-        "index": 18,
+        "elapsed_seconds": 0.659,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
-        "elapsed_seconds": 4.426,
-        "index": 19,
+        "elapsed_seconds": 4.474,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
-        "elapsed_seconds": 0.919,
-        "index": 20,
+        "elapsed_seconds": 0.96,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3",
-        "elapsed_seconds": 1.455,
-        "index": 21,
+        "elapsed_seconds": 1.504,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make backtest-costs PYTHON=python3",
-        "elapsed_seconds": 0.587,
-        "index": 22,
+        "elapsed_seconds": 0.59,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make verify PYTHON=python3",
-        "elapsed_seconds": 21.319,
-        "index": 23,
+        "elapsed_seconds": 27.988,
+        "index": null,
         "returncode": 0,
         "status": "pass"
       }
@@ -298,6 +298,6 @@
     "failed_commands": 0,
     "status": "pass",
     "total_commands": 23,
-    "total_elapsed_seconds": 110.37
+    "total_elapsed_seconds": null
   }
 }
