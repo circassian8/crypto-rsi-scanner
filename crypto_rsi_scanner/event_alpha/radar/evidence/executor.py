@@ -228,108 +228,22 @@ def _execute_request(
     failures: list[str] = []
     providers_used: list[str] = []
     for rank, plan_query in enumerate(query_plan, start=1):
-        search_query = event_catalyst_search.SearchQuery(
-            anomaly_raw_id=request.hypothesis_id or request.opportunity_id,
-            query=plan_query.query,
-            symbol=request.symbol,
+        query_result, query_accepted, query_rejected, query_raw, provider_used = _execute_plan_query(
+            request,
+            plan_query=plan_query,
             rank=rank,
-            query_type=plan_query.purpose,
-            coin_id=request.coin_id,
-            project_name=request.coin_id.replace("-", " ") if request.coin_id else None,
-            aliases=tuple(dict.fromkeys(value for value in (request.coin_id, request.coin_id.replace("-", " ") if request.coin_id else "", request.symbol) if value)),
+            provider=provider,
+            providers_by_hint=providers_by_hint,
+            cfg=cfg,
+            now=now,
+            failures=failures,
         )
-        selected_provider = _provider_for_hint(plan_query.provider_hint, providers_by_hint, provider)
-        provider_name = getattr(selected_provider, "name", None) if selected_provider is not None else None
-        if selected_provider is None:
-            status = EvidenceAcquisitionStatus.PROVIDER_UNAVAILABLE.value
-            failure = f"{plan_query.provider_hint}:not_configured"
-            failures.append(failure)
-            query_results.append(EvidenceAcquisitionQueryResult(
-                query=plan_query.query,
-                provider_hint=plan_query.provider_hint,
-                provider_used=None,
-                purpose=plan_query.purpose,
-                status=status,
-                provider_failures=(failure,),
-                evidence_absence_is_meaningful=_absence_meaningful_for_hint(plan_query.provider_hint, request.provider_coverage_status),
-            ))
-            continue
-        if cfg.fixture_only and "fixture" not in str(provider_name or "").casefold():
-            failure = f"{plan_query.provider_hint}:fixture_only_provider_skipped"
-            failures.append(failure)
-            query_results.append(EvidenceAcquisitionQueryResult(
-                query=plan_query.query,
-                provider_hint=plan_query.provider_hint,
-                provider_used=provider_name,
-                purpose=plan_query.purpose,
-                status=EvidenceAcquisitionStatus.SKIPPED_CONFIG.value,
-                provider_failures=(failure,),
-            ))
-            continue
-        providers_used.append(str(provider_name or plan_query.provider_hint))
-        try:
-            search_result = selected_provider.search(
-                (search_query,),
-                max_results_per_query=cfg.max_results_per_query,
-                now=now,
-            )
-        except Exception as exc:  # noqa: BLE001 - acquisition must fail soft.
-            status = EvidenceAcquisitionStatus.PROVIDER_BACKOFF.value if "backoff" in str(exc).casefold() else EvidenceAcquisitionStatus.FAILED_SOFT.value
-            failure = f"{plan_query.provider_hint}:{type(exc).__name__}"
-            failures.append(failure)
-            query_results.append(EvidenceAcquisitionQueryResult(
-                query=plan_query.query,
-                provider_hint=plan_query.provider_hint,
-                provider_used=provider_name,
-                purpose=plan_query.purpose,
-                status=status,
-                provider_failures=(failure,),
-                warnings=(str(exc),),
-            ))
-            continue
-        query_accepted: list[Mapping[str, Any]] = []
-        query_rejected: list[Mapping[str, Any]] = []
-        warnings = tuple(str(item) for item in getattr(search_result, "warnings", ()) or () if str(item))
-        result_events = tuple(getattr(search_result, "result_events", ()) or ())
-        if _provider_unavailable_from_warnings(warnings):
-            status = EvidenceAcquisitionStatus.PROVIDER_UNAVAILABLE.value
-            failures.extend(f"{plan_query.provider_hint}:{warning}" for warning in warnings[:3])
-        elif _provider_backoff_from_warnings(warnings):
-            status = EvidenceAcquisitionStatus.PROVIDER_BACKOFF.value
-            failures.extend(f"{plan_query.provider_hint}:{warning}" for warning in warnings[:3])
-        elif not result_events:
-            status = EvidenceAcquisitionStatus.NO_RESULTS.value
-        else:
-            status = EvidenceAcquisitionStatus.EXECUTED.value
-        for result_event in result_events:
-            raw = getattr(result_event, "raw_event", None)
-            if raw is None:
-                continue
-            accepted, sample = _validate_raw_result(raw, search_query, request, plan_query)
-            if accepted:
-                query_accepted.append(sample)
-                accepted_evidence.append(sample)
-                accepted_raw.append(_annotate_accepted_raw(raw, request, sample))
-            else:
-                query_rejected.append(sample)
-                rejected_evidence.append(sample)
-        if query_accepted:
-            status = EvidenceAcquisitionStatus.ACCEPTED_EVIDENCE_FOUND.value
-        elif query_rejected:
-            status = EvidenceAcquisitionStatus.REJECTED_RESULTS_ONLY.value
-        query_results.append(EvidenceAcquisitionQueryResult(
-            query=plan_query.query,
-            provider_hint=plan_query.provider_hint,
-            provider_used=provider_name,
-            purpose=plan_query.purpose,
-            status=status,
-            results_seen=len(result_events),
-            accepted_evidence=tuple(query_accepted),
-            rejected_evidence=tuple(query_rejected[:5]),
-            provider_failures=tuple(failures[-3:]),
-            warnings=warnings,
-            evidence_absence_is_meaningful=_absence_meaningful_for_hint(plan_query.provider_hint, request.provider_coverage_status),
-        ))
+        query_results.append(query_result)
+        accepted_evidence.extend(query_accepted)
+        rejected_evidence.extend(query_rejected)
+        accepted_raw.extend(query_raw)
+        if provider_used:
+            providers_used.append(provider_used)
     final_status = _aggregate_status(query_results)
     result = EvidenceAcquisitionResult(
         acquisition_id=request.acquisition_id,
@@ -381,6 +295,169 @@ def _execute_request(
     return result, tuple(accepted_raw)
 
 
+def _execute_plan_query(
+    request: EvidenceAcquisitionRequest,
+    *,
+    plan_query: event_llm_evidence_planner.EvidencePlanQuery,
+    rank: int,
+    provider: EvidenceSearchProvider | None,
+    providers_by_hint: Mapping[str, EvidenceSearchProvider | None],
+    cfg: EvidenceAcquisitionConfig,
+    now: datetime,
+    failures: list[str],
+) -> tuple[EvidenceAcquisitionQueryResult, tuple[Mapping[str, Any], ...], tuple[Mapping[str, Any], ...], tuple[RawDiscoveredEvent, ...], str | None]:
+    search_query = event_catalyst_search.SearchQuery(
+        anomaly_raw_id=request.hypothesis_id or request.opportunity_id,
+        query=plan_query.query,
+        symbol=request.symbol,
+        rank=rank,
+        query_type=plan_query.purpose,
+        coin_id=request.coin_id,
+        project_name=request.coin_id.replace("-", " ") if request.coin_id else None,
+        aliases=tuple(dict.fromkeys(
+            value
+            for value in (request.coin_id, request.coin_id.replace("-", " ") if request.coin_id else "", request.symbol)
+            if value
+        )),
+    )
+    selected_provider = _provider_for_hint(plan_query.provider_hint, providers_by_hint, provider)
+    provider_name = getattr(selected_provider, "name", None) if selected_provider is not None else None
+    if selected_provider is None:
+        failure = f"{plan_query.provider_hint}:not_configured"
+        failures.append(failure)
+        return (
+            EvidenceAcquisitionQueryResult(
+                query=plan_query.query,
+                provider_hint=plan_query.provider_hint,
+                provider_used=None,
+                purpose=plan_query.purpose,
+                status=EvidenceAcquisitionStatus.PROVIDER_UNAVAILABLE.value,
+                provider_failures=(failure,),
+                evidence_absence_is_meaningful=_absence_meaningful_for_hint(plan_query.provider_hint, request.provider_coverage_status),
+            ),
+            (),
+            (),
+            (),
+            None,
+        )
+    if cfg.fixture_only and "fixture" not in str(provider_name or "").casefold():
+        failure = f"{plan_query.provider_hint}:fixture_only_provider_skipped"
+        failures.append(failure)
+        return (
+            EvidenceAcquisitionQueryResult(
+                query=plan_query.query,
+                provider_hint=plan_query.provider_hint,
+                provider_used=provider_name,
+                purpose=plan_query.purpose,
+                status=EvidenceAcquisitionStatus.SKIPPED_CONFIG.value,
+                provider_failures=(failure,),
+            ),
+            (),
+            (),
+            (),
+            None,
+        )
+    try:
+        search_result = selected_provider.search(
+            (search_query,),
+            max_results_per_query=cfg.max_results_per_query,
+            now=now,
+        )
+    except Exception as exc:  # noqa: BLE001 - acquisition must fail soft.
+        status = EvidenceAcquisitionStatus.PROVIDER_BACKOFF.value if "backoff" in str(exc).casefold() else EvidenceAcquisitionStatus.FAILED_SOFT.value
+        failure = f"{plan_query.provider_hint}:{type(exc).__name__}"
+        failures.append(failure)
+        return (
+            EvidenceAcquisitionQueryResult(
+                query=plan_query.query,
+                provider_hint=plan_query.provider_hint,
+                provider_used=provider_name,
+                purpose=plan_query.purpose,
+                status=status,
+                provider_failures=(failure,),
+                warnings=(str(exc),),
+            ),
+            (),
+            (),
+            (),
+            str(provider_name or plan_query.provider_hint),
+        )
+    return _query_result_from_search_result(
+        request,
+        plan_query=plan_query,
+        search_query=search_query,
+        search_result=search_result,
+        provider_name=provider_name,
+        failures=failures,
+    ) + (str(provider_name or plan_query.provider_hint),)
+
+
+def _query_result_from_search_result(
+    request: EvidenceAcquisitionRequest,
+    *,
+    plan_query: event_llm_evidence_planner.EvidencePlanQuery,
+    search_query: event_catalyst_search.SearchQuery,
+    search_result: object,
+    provider_name: str | None,
+    failures: list[str],
+) -> tuple[EvidenceAcquisitionQueryResult, tuple[Mapping[str, Any], ...], tuple[Mapping[str, Any], ...], tuple[RawDiscoveredEvent, ...]]:
+    query_accepted: list[Mapping[str, Any]] = []
+    query_rejected: list[Mapping[str, Any]] = []
+    accepted_raw: list[RawDiscoveredEvent] = []
+    warnings = tuple(str(item) for item in getattr(search_result, "warnings", ()) or () if str(item))
+    result_events = tuple(getattr(search_result, "result_events", ()) or ())
+    status = _query_status_from_search_warnings(plan_query, warnings, result_events, failures)
+    for result_event in result_events:
+        raw = getattr(result_event, "raw_event", None)
+        if raw is None:
+            continue
+        accepted, sample = _validate_raw_result(raw, search_query, request, plan_query)
+        if accepted:
+            query_accepted.append(sample)
+            accepted_raw.append(_annotate_accepted_raw(raw, request, sample))
+        else:
+            query_rejected.append(sample)
+    if query_accepted:
+        status = EvidenceAcquisitionStatus.ACCEPTED_EVIDENCE_FOUND.value
+    elif query_rejected:
+        status = EvidenceAcquisitionStatus.REJECTED_RESULTS_ONLY.value
+    return (
+        EvidenceAcquisitionQueryResult(
+            query=plan_query.query,
+            provider_hint=plan_query.provider_hint,
+            provider_used=provider_name,
+            purpose=plan_query.purpose,
+            status=status,
+            results_seen=len(result_events),
+            accepted_evidence=tuple(query_accepted),
+            rejected_evidence=tuple(query_rejected[:5]),
+            provider_failures=tuple(failures[-3:]),
+            warnings=warnings,
+            evidence_absence_is_meaningful=_absence_meaningful_for_hint(plan_query.provider_hint, request.provider_coverage_status),
+        ),
+        tuple(query_accepted),
+        tuple(query_rejected),
+        tuple(accepted_raw),
+    )
+
+
+def _query_status_from_search_warnings(
+    plan_query: event_llm_evidence_planner.EvidencePlanQuery,
+    warnings: tuple[str, ...],
+    result_events: tuple[object, ...],
+    failures: list[str],
+) -> str:
+    if _provider_unavailable_from_warnings(warnings):
+        failures.extend(f"{plan_query.provider_hint}:{warning}" for warning in warnings[:3])
+        return EvidenceAcquisitionStatus.PROVIDER_UNAVAILABLE.value
+    if _provider_backoff_from_warnings(warnings):
+        failures.extend(f"{plan_query.provider_hint}:{warning}" for warning in warnings[:3])
+        return EvidenceAcquisitionStatus.PROVIDER_BACKOFF.value
+    if not result_events:
+        return EvidenceAcquisitionStatus.NO_RESULTS.value
+    return EvidenceAcquisitionStatus.EXECUTED.value
+
+
 def _validate_raw_result(
     raw: RawDiscoveredEvent,
     query: event_catalyst_search.SearchQuery,
@@ -426,92 +503,27 @@ def _validate_raw_result(
         symbol=request.symbol,
         coin_id=request.coin_id,
     )
-    reason_codes: list[str] = []
-    reject_reasons: list[str] = []
-    official_exchange_identity_ok = _official_exchange_identity_match(raw_map, request)
-    if assessment.source_class == event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value:
-        identity_ok = official_exchange_identity_ok
-    else:
-        identity_ok = event_catalyst_search.result_mentions_anomaly_identity(raw, query, None)
-    if not identity_ok and plan_query.must_validate_asset:
-        reject_reasons.append("token_identity_rejected")
-    if not _catalyst_link_ok(text, request, plan_query):
-        reject_reasons.append("catalyst_missing")
-    if assessment.source_class in pack.context_only_sources:
-        reject_reasons.append("source_context_only")
-    currency_tags = _currency_tags_from_raw_map(raw_map)
-    if (
-        assessment.source_class == event_source_registry.SourceClass.CRYPTOPANIC_TAGGED.value
-        and plan_query.must_validate_asset
-        and currency_tags
-        and not assessment.cryptopanic_currency_tag_match
-    ):
-        reject_reasons.append("cryptopanic_currency_tag_mismatch")
-    if plan_query.must_validate_asset and not bool(pack_eval.get("source_pack_impact_path_validating_source")):
-        reject_reasons.append("source_pack_missing_impact_path_validator")
-    if pack.name == "unlock_supply_pack":
-        missing = set(str(item) for item in pack_eval.get("source_pack_missing_evidence") or ())
-        for reason in ("needs_supply_materiality", "unlock_not_material", "stale_unlock_data"):
-            if reason in missing:
-                reject_reasons.append(reason)
-    if pack.name == "project_event_pack":
-        missing = set(str(item) for item in pack_eval.get("source_pack_missing_evidence") or ())
-        if "low_authority_calendar_event" in missing:
-            reject_reasons.append("low_authority_calendar_event")
-    if quality.evidence_specificity in {
-        event_evidence_quality.EvidenceSpecificity.GENERIC_CONTEXT.value,
-        event_evidence_quality.EvidenceSpecificity.CATALYST_ONLY.value,
-        event_evidence_quality.EvidenceSpecificity.TOKEN_ONLY.value,
-    } and not (
-        official_exchange_identity_ok
-        and assessment.source_class == event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value
-        and bool(pack_eval.get("source_pack_impact_path_validating_source"))
-    ):
-        reject_reasons.append("impact_path_missing")
-    if assessment.confidence_cap < 45 or quality.evidence_quality_score < 45:
-        reject_reasons.append("source_quality_too_low")
-    if quality.evidence_specificity == event_evidence_quality.EvidenceSpecificity.SOURCE_NOISE.value:
-        reject_reasons.append("source_noise")
-    if (
-        assessment.narrative_heat
-        and not assessment.cryptopanic_currency_tag_match
-        and quality.evidence_specificity != event_evidence_quality.EvidenceSpecificity.DIRECT_TOKEN_MECHANISM.value
-    ):
-        reject_reasons.append("cryptopanic_narrative_heat_only")
-    if query.symbol.upper() in event_catalyst_search.COMMON_WORD_SYMBOLS and not _case_sensitive_symbol(raw, query.symbol):
-        reject_reasons.append("ticker_collision")
-    if _generic_cooccurrence(text, request):
-        reject_reasons.append("generic_cooccurrence_only")
-
-    if assessment.source_class == event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value:
-        reason_codes.append("official_exchange_listing")
-        if official_exchange_identity_ok:
-            reason_codes.append("official_exchange_identity_match")
-    if assessment.source_class == event_source_registry.SourceClass.OFFICIAL_PROJECT.value:
-        reason_codes.append("official_project_confirmation")
-    if assessment.source_class == event_source_registry.SourceClass.STRUCTURED_CALENDAR.value:
-        reason_codes.append("structured_calendar_source")
-        if assessment.can_validate_event_time:
-            reason_codes.append("event_time_confirmation")
-    if assessment.source_class == event_source_registry.SourceClass.STRUCTURED_UNLOCK.value:
-        reason_codes.append("structured_unlock_source")
-        if assessment.can_validate_event_time:
-            reason_codes.append("event_time_confirmation")
-        unlock_materiality = _structured_metadata_from_raw_map(raw_map).get("unlock_materiality")
-        if unlock_materiality in {"material", "large"}:
-            reason_codes.append("material_unlock")
-        if unlock_materiality == "large":
-            reason_codes.append("large_unlock")
-    if assessment.cryptopanic_currency_tag_match:
-        reason_codes.append("cryptopanic_currency_tag_match")
-    if quality.evidence_specificity == event_evidence_quality.EvidenceSpecificity.DIRECT_TOKEN_MECHANISM.value:
-        reason_codes.append("direct_token_mechanism")
-    if plan_query.purpose == "second_source_confirmation":
-        reason_codes.append("second_source_confirmation")
-    if plan_query.purpose == "denial_search" and _denial_or_correction(text):
-        reason_codes.append("denial_or_correction_found")
-    if not reason_codes and not reject_reasons:
-        reason_codes.append("second_source_confirmation")
+    reject_reasons, official_exchange_identity_ok, currency_tags = _raw_result_reject_reasons(
+        raw,
+        raw_map=raw_map,
+        text=text,
+        query=query,
+        request=request,
+        plan_query=plan_query,
+        pack=pack,
+        assessment=assessment,
+        pack_eval=pack_eval,
+        quality=quality,
+    )
+    reason_codes = _raw_result_reason_codes(
+        raw_map=raw_map,
+        text=text,
+        plan_query=plan_query,
+        assessment=assessment,
+        quality=quality,
+        official_exchange_identity_ok=official_exchange_identity_ok,
+        reject_reasons=reject_reasons,
+    )
 
     accepted = not reject_reasons
     exchange_metadata = _exchange_metadata_from_raw_map(raw_map)
@@ -551,6 +563,145 @@ def _validate_raw_result(
         "purpose": plan_query.purpose,
     }
     return accepted, sample
+
+
+def _raw_result_reject_reasons(
+    raw: RawDiscoveredEvent,
+    *,
+    raw_map: Mapping[str, Any],
+    text: str,
+    query: event_catalyst_search.SearchQuery,
+    request: EvidenceAcquisitionRequest,
+    plan_query: event_llm_evidence_planner.EvidencePlanQuery,
+    pack: event_source_packs.SourcePack,
+    assessment: event_source_registry.SourceAssessment,
+    pack_eval: Mapping[str, Any],
+    quality: event_evidence_quality.EvidenceQualityAssessment,
+) -> tuple[list[str], bool, tuple[str, ...]]:
+    reject_reasons: list[str] = []
+    official_exchange_identity_ok = _official_exchange_identity_match(raw_map, request)
+    if assessment.source_class == event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value:
+        identity_ok = official_exchange_identity_ok
+    else:
+        identity_ok = event_catalyst_search.result_mentions_anomaly_identity(raw, query, None)
+    if not identity_ok and plan_query.must_validate_asset:
+        reject_reasons.append("token_identity_rejected")
+    if not _catalyst_link_ok(text, request, plan_query):
+        reject_reasons.append("catalyst_missing")
+    if assessment.source_class in pack.context_only_sources:
+        reject_reasons.append("source_context_only")
+    currency_tags = _currency_tags_from_raw_map(raw_map)
+    if (
+        assessment.source_class == event_source_registry.SourceClass.CRYPTOPANIC_TAGGED.value
+        and plan_query.must_validate_asset
+        and currency_tags
+        and not assessment.cryptopanic_currency_tag_match
+    ):
+        reject_reasons.append("cryptopanic_currency_tag_mismatch")
+    if plan_query.must_validate_asset and not bool(pack_eval.get("source_pack_impact_path_validating_source")):
+        reject_reasons.append("source_pack_missing_impact_path_validator")
+    _append_pack_specific_reject_reasons(pack, pack_eval, reject_reasons)
+    if _quality_blocks_impact_path(quality, official_exchange_identity_ok, assessment, pack_eval):
+        reject_reasons.append("impact_path_missing")
+    if assessment.confidence_cap < 45 or quality.evidence_quality_score < 45:
+        reject_reasons.append("source_quality_too_low")
+    if quality.evidence_specificity == event_evidence_quality.EvidenceSpecificity.SOURCE_NOISE.value:
+        reject_reasons.append("source_noise")
+    if (
+        assessment.narrative_heat
+        and not assessment.cryptopanic_currency_tag_match
+        and quality.evidence_specificity != event_evidence_quality.EvidenceSpecificity.DIRECT_TOKEN_MECHANISM.value
+    ):
+        reject_reasons.append("cryptopanic_narrative_heat_only")
+    if query.symbol.upper() in event_catalyst_search.COMMON_WORD_SYMBOLS and not _case_sensitive_symbol(raw, query.symbol):
+        reject_reasons.append("ticker_collision")
+    if _generic_cooccurrence(text, request):
+        reject_reasons.append("generic_cooccurrence_only")
+    return reject_reasons, official_exchange_identity_ok, currency_tags
+
+
+def _append_pack_specific_reject_reasons(
+    pack: event_source_packs.SourcePack,
+    pack_eval: Mapping[str, Any],
+    reject_reasons: list[str],
+) -> None:
+    missing = set(str(item) for item in pack_eval.get("source_pack_missing_evidence") or ())
+    if pack.name == "unlock_supply_pack":
+        for reason in ("needs_supply_materiality", "unlock_not_material", "stale_unlock_data"):
+            if reason in missing:
+                reject_reasons.append(reason)
+    if pack.name == "project_event_pack" and "low_authority_calendar_event" in missing:
+        reject_reasons.append("low_authority_calendar_event")
+
+
+def _quality_blocks_impact_path(
+    quality: event_evidence_quality.EvidenceQualityAssessment,
+    official_exchange_identity_ok: bool,
+    assessment: event_source_registry.SourceAssessment,
+    pack_eval: Mapping[str, Any],
+) -> bool:
+    if quality.evidence_specificity not in {
+        event_evidence_quality.EvidenceSpecificity.GENERIC_CONTEXT.value,
+        event_evidence_quality.EvidenceSpecificity.CATALYST_ONLY.value,
+        event_evidence_quality.EvidenceSpecificity.TOKEN_ONLY.value,
+    }:
+        return False
+    return not (
+        official_exchange_identity_ok
+        and assessment.source_class == event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value
+        and bool(pack_eval.get("source_pack_impact_path_validating_source"))
+    )
+
+
+def _raw_result_reason_codes(
+    *,
+    raw_map: Mapping[str, Any],
+    text: str,
+    plan_query: event_llm_evidence_planner.EvidencePlanQuery,
+    assessment: event_source_registry.SourceAssessment,
+    quality: event_evidence_quality.EvidenceQualityAssessment,
+    official_exchange_identity_ok: bool,
+    reject_reasons: list[str],
+) -> list[str]:
+    reason_codes: list[str] = []
+    if assessment.source_class == event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value:
+        reason_codes.append("official_exchange_listing")
+        if official_exchange_identity_ok:
+            reason_codes.append("official_exchange_identity_match")
+    if assessment.source_class == event_source_registry.SourceClass.OFFICIAL_PROJECT.value:
+        reason_codes.append("official_project_confirmation")
+    if assessment.source_class == event_source_registry.SourceClass.STRUCTURED_CALENDAR.value:
+        reason_codes.append("structured_calendar_source")
+        if assessment.can_validate_event_time:
+            reason_codes.append("event_time_confirmation")
+    if assessment.source_class == event_source_registry.SourceClass.STRUCTURED_UNLOCK.value:
+        _append_structured_unlock_reason_codes(raw_map, assessment, reason_codes)
+    if assessment.cryptopanic_currency_tag_match:
+        reason_codes.append("cryptopanic_currency_tag_match")
+    if quality.evidence_specificity == event_evidence_quality.EvidenceSpecificity.DIRECT_TOKEN_MECHANISM.value:
+        reason_codes.append("direct_token_mechanism")
+    if plan_query.purpose == "second_source_confirmation":
+        reason_codes.append("second_source_confirmation")
+    if plan_query.purpose == "denial_search" and _denial_or_correction(text):
+        reason_codes.append("denial_or_correction_found")
+    if not reason_codes and not reject_reasons:
+        reason_codes.append("second_source_confirmation")
+    return reason_codes
+
+
+def _append_structured_unlock_reason_codes(
+    raw_map: Mapping[str, Any],
+    assessment: event_source_registry.SourceAssessment,
+    reason_codes: list[str],
+) -> None:
+    reason_codes.append("structured_unlock_source")
+    if assessment.can_validate_event_time:
+        reason_codes.append("event_time_confirmation")
+    unlock_materiality = _structured_metadata_from_raw_map(raw_map).get("unlock_materiality")
+    if unlock_materiality in {"material", "large"}:
+        reason_codes.append("material_unlock")
+    if unlock_materiality == "large":
+        reason_codes.append("large_unlock")
 
 
 def _annotate_accepted_raw(

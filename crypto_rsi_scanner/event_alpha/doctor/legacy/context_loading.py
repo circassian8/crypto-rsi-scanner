@@ -40,243 +40,31 @@ def diagnose_artifacts(
     skip_legacy_checks: bool = False,
 ) -> EventAlphaArtifactDoctorResult:
     """Diagnose cross-artifact lineage, mode, and profile/namespace cleanliness."""
-    raw_runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
-    raw_alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
-    raw_feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
-    raw_outcomes = [dict(row) for row in outcome_rows if isinstance(row, Mapping)]
-    raw_hypotheses = [_row(row) for row in hypothesis_rows]
-    raw_core_rows = [_row(row) for row in core_opportunity_rows]
-    raw_watchlist = [_row(row) for row in watchlist_rows]
-    raw_incidents = [_row(row) for row in incident_rows]
-    raw_acquisition_rows = [dict(row) for row in evidence_acquisition_rows if isinstance(row, Mapping)]
-    if market_anomaly_rows is None:
-        default_market_anomaly_path = None
-        if inspected_alert_store_path is not None:
-            default_market_anomaly_path = Path(inspected_alert_store_path).parent
-        elif source_coverage_report_path is not None:
-            default_market_anomaly_path = Path(source_coverage_report_path).parent
-        raw_market_anomalies = list(event_market_anomaly_scanner.load_market_anomaly_rows(default_market_anomaly_path))
-    else:
-        raw_market_anomalies = [dict(row) for row in market_anomaly_rows if isinstance(row, Mapping)]
-    if official_exchange_candidate_rows is None:
-        default_official_exchange_path = None
-        if inspected_alert_store_path is not None:
-            default_official_exchange_path = Path(inspected_alert_store_path).parent
-        elif source_coverage_report_path is not None:
-            default_official_exchange_path = Path(source_coverage_report_path).parent
-        raw_official_exchange_candidates = list(event_official_exchange.load_official_listing_candidates(default_official_exchange_path))
-    else:
-        raw_official_exchange_candidates = [dict(row) for row in official_exchange_candidate_rows if isinstance(row, Mapping)]
-    if scheduled_catalyst_rows is None:
-        default_scheduled_path = None
-        if inspected_alert_store_path is not None:
-            default_scheduled_path = Path(inspected_alert_store_path).parent
-        elif source_coverage_report_path is not None:
-            default_scheduled_path = Path(source_coverage_report_path).parent
-        raw_scheduled_catalysts = list(event_scheduled_catalysts.load_scheduled_catalysts(default_scheduled_path))
-    else:
-        raw_scheduled_catalysts = [dict(row) for row in scheduled_catalyst_rows if isinstance(row, Mapping)]
-    if unlock_candidate_rows is None:
-        default_unlock_path = None
-        if inspected_alert_store_path is not None:
-            default_unlock_path = Path(inspected_alert_store_path).parent
-        elif source_coverage_report_path is not None:
-            default_unlock_path = Path(source_coverage_report_path).parent
-        raw_unlock_candidates = list(event_scheduled_catalysts.load_unlock_candidates(default_unlock_path))
-    else:
-        raw_unlock_candidates = [dict(row) for row in unlock_candidate_rows if isinstance(row, Mapping)]
-    if derivatives_state_rows is None:
-        default_derivatives_path = None
-        if inspected_alert_store_path is not None:
-            default_derivatives_path = Path(inspected_alert_store_path).parent
-        elif source_coverage_report_path is not None:
-            default_derivatives_path = Path(source_coverage_report_path).parent
-        raw_derivatives_state = list(event_derivatives_crowding.load_derivatives_state(default_derivatives_path))
-    else:
-        raw_derivatives_state = [dict(row) for row in derivatives_state_rows if isinstance(row, Mapping)]
-    if fade_review_candidate_rows is None:
-        default_fade_review_path = None
-        if inspected_alert_store_path is not None:
-            default_fade_review_path = Path(inspected_alert_store_path).parent
-        elif source_coverage_report_path is not None:
-            default_fade_review_path = Path(source_coverage_report_path).parent
-        raw_fade_review_candidates = list(event_derivatives_crowding.load_derivatives_candidates(default_fade_review_path))
-        if not raw_fade_review_candidates:
-            raw_fade_review_candidates = list(event_derivatives_crowding.load_fade_review_candidates(default_fade_review_path))
-    else:
-        raw_fade_review_candidates = [dict(row) for row in fade_review_candidate_rows if isinstance(row, Mapping)]
-    default_dex_onchain_path = None
-    if inspected_alert_store_path is not None:
-        default_dex_onchain_path = Path(inspected_alert_store_path).parent
-    elif source_coverage_report_path is not None:
-        default_dex_onchain_path = Path(source_coverage_report_path).parent
-    raw_dex_pool_state = list(event_dex_onchain_readiness.load_dex_pool_state(default_dex_onchain_path))
-    raw_dex_pool_anomalies = list(event_dex_onchain_readiness.load_dex_pool_anomalies(default_dex_onchain_path))
-    raw_protocol_fundamentals = list(event_dex_onchain_readiness.load_protocol_fundamentals(default_dex_onchain_path))
-    default_integrated_path = None
-    if inspected_alert_store_path is not None:
-        default_integrated_path = Path(inspected_alert_store_path).parent / "event_integrated_radar_candidates.jsonl"
-    elif source_coverage_report_path is not None:
-        default_integrated_path = Path(source_coverage_report_path).parent / "event_integrated_radar_candidates.jsonl"
-    raw_integrated_candidates = _read_jsonl(default_integrated_path) if default_integrated_path is not None else []
-    default_integrated_dir = default_integrated_path.parent if default_integrated_path is not None else None
-    integrated_manifest_path = (
-        default_integrated_dir / "event_integrated_radar_input_manifest.json"
-        if default_integrated_dir is not None
-        else None
-    )
-    integrated_source_coverage_json_path = (
-        default_integrated_dir / "event_alpha_source_coverage.json"
-        if default_integrated_dir is not None
-        else None
-    )
-    integrated_delivery_path = (
-        default_integrated_dir / event_integrated_radar.INTEGRATED_DELIVERIES_FILENAME
-        if default_integrated_dir is not None
-        else None
-    )
-    integrated_outcomes_path = (
-        default_integrated_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
-        if default_integrated_dir is not None
-        else None
-    )
-    raw_legacy = sum(
-        1 for row in (*raw_runs, *raw_alerts, *raw_feedback, *raw_outcomes)
-        if event_alpha_artifacts.is_legacy_row(row)
-    )
-    runs = event_alpha_artifacts.filter_artifact_rows(
-        raw_runs,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    alerts = event_alpha_artifacts.filter_artifact_rows(
-        raw_alerts,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    feedback = event_alpha_artifacts.filter_artifact_rows(
-        raw_feedback,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    outcomes = event_alpha_artifacts.filter_artifact_rows(
-        raw_outcomes,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    hypotheses = event_alpha_artifacts.filter_artifact_rows(
-        raw_hypotheses,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    core_rows = event_alpha_artifacts.filter_artifact_rows(
-        raw_core_rows,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    watchlist = _filter_watchlist_rows_for_doctor(
-        raw_watchlist,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    incidents = event_alpha_artifacts.filter_artifact_rows(
-        raw_incidents,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    acquisition_rows = event_alpha_artifacts.filter_artifact_rows(
-        raw_acquisition_rows,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    market_anomalies = event_alpha_artifacts.filter_artifact_rows(
-        raw_market_anomalies,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    official_exchange_candidates = event_alpha_artifacts.filter_artifact_rows(
-        raw_official_exchange_candidates,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    scheduled_catalysts = event_alpha_artifacts.filter_artifact_rows(
-        raw_scheduled_catalysts,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    unlock_candidates = event_alpha_artifacts.filter_artifact_rows(
-        raw_unlock_candidates,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    derivatives_state = event_alpha_artifacts.filter_artifact_rows(
-        raw_derivatives_state,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    fade_review_candidates = event_alpha_artifacts.filter_artifact_rows(
-        raw_fade_review_candidates,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    dex_pool_state = event_alpha_artifacts.filter_artifact_rows(
-        raw_dex_pool_state,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    dex_pool_anomalies = event_alpha_artifacts.filter_artifact_rows(
-        raw_dex_pool_anomalies,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    protocol_fundamentals = event_alpha_artifacts.filter_artifact_rows(
-        raw_protocol_fundamentals,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    integrated_candidates = event_alpha_artifacts.filter_artifact_rows(
-        raw_integrated_candidates,
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
+    loaded = _load_and_filter_doctor_artifacts(locals())
+    runs = loaded.runs
+    alerts = loaded.alerts
+    feedback = loaded.feedback
+    outcomes = loaded.outcomes
+    hypotheses = loaded.hypotheses
+    core_rows = loaded.core_rows
+    watchlist = loaded.watchlist
+    incidents = loaded.incidents
+    acquisition_rows = loaded.acquisition_rows
+    market_anomalies = loaded.market_anomalies
+    official_exchange_candidates = loaded.official_exchange_candidates
+    scheduled_catalysts = loaded.scheduled_catalysts
+    unlock_candidates = loaded.unlock_candidates
+    derivatives_state = loaded.derivatives_state
+    fade_review_candidates = loaded.fade_review_candidates
+    dex_pool_state = loaded.dex_pool_state
+    dex_pool_anomalies = loaded.dex_pool_anomalies
+    protocol_fundamentals = loaded.protocol_fundamentals
+    integrated_candidates = loaded.integrated_candidates
+    raw_legacy = loaded.raw_legacy
+    integrated_manifest_path = loaded.integrated_manifest_path
+    integrated_source_coverage_json_path = loaded.integrated_source_coverage_json_path
+    integrated_delivery_path = loaded.integrated_delivery_path
+    integrated_outcomes_path = loaded.integrated_outcomes_path
     namespace_dir = _artifact_namespace_dir(
         inspected_alert_store_path,
         source_coverage_report_path,
@@ -363,99 +151,24 @@ def diagnose_artifacts(
                 + (f" modules={modules}" if modules else ""),
             )
         )
-    matching_snapshot_runs = 0
-    missing_snapshot_runs = 0
-    external_snapshot_runs = 0
-    if not runs:
-        blockers.append("no matching operational/burn-in run rows found")
-    latest_run_id = _latest_run_id(runs)
-    latest_run = next((row for row in runs if str(row.get("run_id") or "") == str(latest_run_id or "")), None)
-    effective_delivery_scope = _normalize_delivery_strict_scope(
-        delivery_strict_scope,
-        latest_run_id=latest_run_id,
+    run_snapshot_context = _inspect_run_snapshot_context(
+        runs=runs,
+        alerts=alerts,
+        feedback=feedback,
+        outcomes=outcomes,
+        inspected_alert_store_path=inspected_alert_store_path,
+        include_test_artifacts=include_test_artifacts,
+        delivery_strict_scope=delivery_strict_scope,
         strict=strict,
     )
-    run_ids = {str(row.get("run_id") or "") for row in runs if row.get("run_id")}
-    alert_run_ids = {str(row.get("run_id") or "") for row in alerts if row.get("run_id")}
-    alert_counts_by_run_id: dict[str, int] = {}
-    for row in alerts:
-        run_id = str(row.get("run_id") or "").strip()
-        if run_id:
-            alert_counts_by_run_id[run_id] = alert_counts_by_run_id.get(run_id, 0) + 1
-    for row in runs:
-        if event_alpha_artifacts.is_non_operational_row(row) and not include_test_artifacts:
-            continue
-        alertable = int(row.get("alertable") or 0) > 0
-        if not alertable:
-            continue
-        run_id = str(row.get("run_id") or "").strip()
-        stale_for_latest_scope = (
-            effective_delivery_scope == "latest_run"
-            and bool(latest_run_id)
-            and bool(run_id)
-            and run_id != latest_run_id
-        )
-        matching = alert_counts_by_run_id.get(run_id, 0)
-        availability = event_alpha_artifacts.classify_snapshot_availability(
-            row,
-            inspected_alert_store_path,
-            matching,
-        )
-        if availability == event_alpha_artifacts.SNAPSHOT_AVAILABLE:
-            matching_snapshot_runs += 1
-        elif availability in {
-            event_alpha_artifacts.SNAPSHOT_EXTERNAL_PATH,
-            event_alpha_artifacts.SNAPSHOT_TEST_OR_FIXTURE_EXTERNAL,
-        }:
-            external_snapshot_runs += 1
-        else:
-            missing_snapshot_runs += 1
-        if not bool(row.get("snapshot_write_success")):
-            if str(row.get("snapshot_write_block_reason") or "") == "test_or_fixture_run":
-                warnings.append(f"run {row.get('run_id') or 'unknown'} is test/fixture and skipped snapshots")
-                if availability == event_alpha_artifacts.SNAPSHOT_TEST_OR_FIXTURE_EXTERNAL:
-                    _record_snapshot_availability_issue(
-                        row,
-                        availability,
-                        blockers=blockers,
-                        warnings=warnings,
-                        strict=strict,
-                    )
-            else:
-                message = f"alertable run {row.get('run_id') or 'unknown'} has no successful snapshot write"
-                (warnings if stale_for_latest_scope else blockers).append(message)
-        elif int(row.get("alertable") or 0) > 0 and int(row.get("snapshot_rows_written") or 0) <= 0:
-            message = f"alertable run {row.get('run_id') or 'unknown'} wrote zero alert snapshots"
-            (warnings if stale_for_latest_scope else blockers).append(message)
-        elif availability != event_alpha_artifacts.SNAPSHOT_AVAILABLE:
-            if stale_for_latest_scope:
-                warnings.append(
-                    f"stale alertable run {row.get('run_id') or 'unknown'} has snapshot availability={availability}"
-                )
-            else:
-                _record_snapshot_availability_issue(
-                    row,
-                    availability,
-                    blockers=blockers,
-                    warnings=warnings,
-                    strict=strict,
-                )
-    orphan_alerts = sorted(alert_run_ids - run_ids)
-    if orphan_alerts:
-        warnings.append(f"alert snapshots reference unknown run_id(s): {', '.join(orphan_alerts[:5])}")
-    if any(row.get("run_id") in (None, "") for row in alerts):
-        warnings.append("legacy alert snapshots without run_id lineage are present")
-    alert_keys = {str(row.get("alert_key") or "") for row in alerts if row.get("alert_key")}
-    feedback_keys = {str(row.get("key") or row.get("alert_key") or "") for row in feedback}
-    outcome_keys = {str(row.get("alert_key") or "") for row in outcomes}
-    unknown_feedback = sorted(key for key in feedback_keys if key and key not in alert_keys)
-    unknown_outcomes = sorted(key for key in outcome_keys if key and key not in alert_keys)
-    if unknown_feedback:
-        message = f"feedback without matching alert snapshot: {', '.join(unknown_feedback[:5])}"
-        (blockers if strict else warnings).append(message)
-    if unknown_outcomes:
-        message = f"outcomes without matching alert snapshot: {', '.join(unknown_outcomes[:5])}"
-        (blockers if strict else warnings).append(message)
+    blockers.extend(run_snapshot_context.blockers)
+    warnings.extend(run_snapshot_context.warnings)
+    matching_snapshot_runs = run_snapshot_context.matching_snapshot_runs
+    missing_snapshot_runs = run_snapshot_context.missing_snapshot_runs
+    external_snapshot_runs = run_snapshot_context.external_snapshot_runs
+    latest_run_id = run_snapshot_context.latest_run_id
+    latest_run = run_snapshot_context.latest_run
+    effective_delivery_scope = run_snapshot_context.effective_delivery_scope
     namespaces = {
         event_alpha_artifacts.row_namespace(row)
         for row in (*runs, *alerts, *feedback, *outcomes)
@@ -1339,6 +1052,316 @@ def diagnose_artifacts(
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
     )
+
+
+def _load_and_filter_doctor_artifacts(options: Mapping[str, Any]) -> SimpleNamespace:
+    raw = _load_raw_doctor_artifacts(options)
+    filtered = _filter_doctor_artifacts(raw, options)
+    filtered.raw_legacy = sum(
+        1
+        for row in (*raw.raw_runs, *raw.raw_alerts, *raw.raw_feedback, *raw.raw_outcomes)
+        if event_alpha_artifacts.is_legacy_row(row)
+    )
+    filtered.integrated_manifest_path = raw.integrated_manifest_path
+    filtered.integrated_source_coverage_json_path = raw.integrated_source_coverage_json_path
+    filtered.integrated_delivery_path = raw.integrated_delivery_path
+    filtered.integrated_outcomes_path = raw.integrated_outcomes_path
+    return filtered
+
+
+def _default_doctor_artifact_dir(options: Mapping[str, Any]) -> Path | None:
+    if options["inspected_alert_store_path"] is not None:
+        return Path(options["inspected_alert_store_path"]).parent
+    if options["source_coverage_report_path"] is not None:
+        return Path(options["source_coverage_report_path"]).parent
+    return None
+
+
+def _load_raw_doctor_artifacts(options: Mapping[str, Any]) -> SimpleNamespace:
+    default_dir = _default_doctor_artifact_dir(options)
+    raw_fade_review_candidates = _load_raw_fade_review_candidates(options, default_dir)
+    integrated_path = (
+        default_dir / "event_integrated_radar_candidates.jsonl"
+        if default_dir is not None
+        else None
+    )
+    integrated_dir = integrated_path.parent if integrated_path is not None else None
+    return SimpleNamespace(
+        raw_runs=[dict(row) for row in options["run_rows"] if isinstance(row, Mapping)],
+        raw_alerts=[dict(row) for row in options["alert_rows"] if isinstance(row, Mapping)],
+        raw_feedback=[dict(row) for row in options["feedback_rows"] if isinstance(row, Mapping)],
+        raw_outcomes=[dict(row) for row in options["outcome_rows"] if isinstance(row, Mapping)],
+        raw_hypotheses=[_row(row) for row in options["hypothesis_rows"]],
+        raw_core_rows=[_row(row) for row in options["core_opportunity_rows"]],
+        raw_watchlist=[_row(row) for row in options["watchlist_rows"]],
+        raw_incidents=[_row(row) for row in options["incident_rows"]],
+        raw_acquisition_rows=[
+            dict(row) for row in options["evidence_acquisition_rows"] if isinstance(row, Mapping)
+        ],
+        raw_market_anomalies=_load_optional_rows(
+            options["market_anomaly_rows"],
+            lambda: event_market_anomaly_scanner.load_market_anomaly_rows(default_dir),
+        ),
+        raw_official_exchange_candidates=_load_optional_rows(
+            options["official_exchange_candidate_rows"],
+            lambda: event_official_exchange.load_official_listing_candidates(default_dir),
+        ),
+        raw_scheduled_catalysts=_load_optional_rows(
+            options["scheduled_catalyst_rows"],
+            lambda: event_scheduled_catalysts.load_scheduled_catalysts(default_dir),
+        ),
+        raw_unlock_candidates=_load_optional_rows(
+            options["unlock_candidate_rows"],
+            lambda: event_scheduled_catalysts.load_unlock_candidates(default_dir),
+        ),
+        raw_derivatives_state=_load_optional_rows(
+            options["derivatives_state_rows"],
+            lambda: event_derivatives_crowding.load_derivatives_state(default_dir),
+        ),
+        raw_fade_review_candidates=raw_fade_review_candidates,
+        raw_dex_pool_state=list(event_dex_onchain_readiness.load_dex_pool_state(default_dir)),
+        raw_dex_pool_anomalies=list(event_dex_onchain_readiness.load_dex_pool_anomalies(default_dir)),
+        raw_protocol_fundamentals=list(event_dex_onchain_readiness.load_protocol_fundamentals(default_dir)),
+        raw_integrated_candidates=_read_jsonl(integrated_path) if integrated_path is not None else [],
+        integrated_manifest_path=(
+            integrated_dir / "event_integrated_radar_input_manifest.json"
+            if integrated_dir is not None
+            else None
+        ),
+        integrated_source_coverage_json_path=(
+            integrated_dir / "event_alpha_source_coverage.json"
+            if integrated_dir is not None
+            else None
+        ),
+        integrated_delivery_path=(
+            integrated_dir / event_integrated_radar.INTEGRATED_DELIVERIES_FILENAME
+            if integrated_dir is not None
+            else None
+        ),
+        integrated_outcomes_path=(
+            integrated_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
+            if integrated_dir is not None
+            else None
+        ),
+    )
+
+
+def _load_optional_rows(rows: Iterable[Mapping[str, Any]] | None, loader: Callable[[], Iterable[Mapping[str, Any]]]) -> list[dict[str, Any]]:
+    if rows is None:
+        return [dict(row) for row in loader() if isinstance(row, Mapping)]
+    return [dict(row) for row in rows if isinstance(row, Mapping)]
+
+
+def _load_raw_fade_review_candidates(options: Mapping[str, Any], default_dir: Path | None) -> list[dict[str, Any]]:
+    rows = options["fade_review_candidate_rows"]
+    if rows is not None:
+        return [dict(row) for row in rows if isinstance(row, Mapping)]
+    candidates = list(event_derivatives_crowding.load_derivatives_candidates(default_dir))
+    if not candidates:
+        candidates = list(event_derivatives_crowding.load_fade_review_candidates(default_dir))
+    return [dict(row) for row in candidates if isinstance(row, Mapping)]
+
+
+def _filter_doctor_artifacts(raw: SimpleNamespace, options: Mapping[str, Any]) -> SimpleNamespace:
+    return SimpleNamespace(
+        runs=_filter_doctor_rows(raw.raw_runs, options),
+        alerts=_filter_doctor_rows(raw.raw_alerts, options),
+        feedback=_filter_doctor_rows(raw.raw_feedback, options),
+        outcomes=_filter_doctor_rows(raw.raw_outcomes, options),
+        hypotheses=_filter_doctor_rows(raw.raw_hypotheses, options),
+        core_rows=_filter_doctor_rows(raw.raw_core_rows, options),
+        watchlist=_filter_watchlist_rows_for_doctor(raw.raw_watchlist, **_doctor_filter_options(options)),
+        incidents=_filter_doctor_rows(raw.raw_incidents, options),
+        acquisition_rows=_filter_doctor_rows(raw.raw_acquisition_rows, options),
+        market_anomalies=_filter_doctor_rows(raw.raw_market_anomalies, options),
+        official_exchange_candidates=_filter_doctor_rows(raw.raw_official_exchange_candidates, options),
+        scheduled_catalysts=_filter_doctor_rows(raw.raw_scheduled_catalysts, options),
+        unlock_candidates=_filter_doctor_rows(raw.raw_unlock_candidates, options),
+        derivatives_state=_filter_doctor_rows(raw.raw_derivatives_state, options),
+        fade_review_candidates=_filter_doctor_rows(raw.raw_fade_review_candidates, options),
+        dex_pool_state=_filter_doctor_rows(raw.raw_dex_pool_state, options),
+        dex_pool_anomalies=_filter_doctor_rows(raw.raw_dex_pool_anomalies, options),
+        protocol_fundamentals=_filter_doctor_rows(raw.raw_protocol_fundamentals, options),
+        integrated_candidates=_filter_doctor_rows(raw.raw_integrated_candidates, options),
+    )
+
+
+def _filter_doctor_rows(rows: Iterable[Mapping[str, Any]], options: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    return event_alpha_artifacts.filter_artifact_rows(rows, **_doctor_filter_options(options))
+
+
+def _doctor_filter_options(options: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "profile": options["profile"],
+        "artifact_namespace": options["artifact_namespace"],
+        "include_test_artifacts": options["include_test_artifacts"],
+        "include_legacy_artifacts": options["include_legacy_artifacts"],
+    }
+
+
+def _inspect_run_snapshot_context(
+    *,
+    runs: list[Mapping[str, Any]],
+    alerts: list[Mapping[str, Any]],
+    feedback: list[Mapping[str, Any]],
+    outcomes: list[Mapping[str, Any]],
+    inspected_alert_store_path: str | Path | None,
+    include_test_artifacts: bool,
+    delivery_strict_scope: str | None,
+    strict: bool,
+) -> SimpleNamespace:
+    blockers: list[str] = []
+    warnings: list[str] = []
+    matching_snapshot_runs = 0
+    missing_snapshot_runs = 0
+    external_snapshot_runs = 0
+    if not runs:
+        blockers.append("no matching operational/burn-in run rows found")
+    latest_run_id = _latest_run_id(runs)
+    latest_run = next((row for row in runs if str(row.get("run_id") or "") == str(latest_run_id or "")), None)
+    effective_delivery_scope = _normalize_delivery_strict_scope(
+        delivery_strict_scope,
+        latest_run_id=latest_run_id,
+        strict=strict,
+    )
+    run_ids = {str(row.get("run_id") or "") for row in runs if row.get("run_id")}
+    alert_run_ids = {str(row.get("run_id") or "") for row in alerts if row.get("run_id")}
+    alert_counts_by_run_id = _alert_counts_by_run_id(alerts)
+    for row in runs:
+        if event_alpha_artifacts.is_non_operational_row(row) and not include_test_artifacts:
+            continue
+        if int(row.get("alertable") or 0) <= 0:
+            continue
+        availability = event_alpha_artifacts.classify_snapshot_availability(
+            row,
+            inspected_alert_store_path,
+            alert_counts_by_run_id.get(str(row.get("run_id") or "").strip(), 0),
+        )
+        matching_snapshot_runs += int(availability == event_alpha_artifacts.SNAPSHOT_AVAILABLE)
+        external_snapshot_runs += int(availability in {
+            event_alpha_artifacts.SNAPSHOT_EXTERNAL_PATH,
+            event_alpha_artifacts.SNAPSHOT_TEST_OR_FIXTURE_EXTERNAL,
+        })
+        missing_snapshot_runs += int(availability not in {
+            event_alpha_artifacts.SNAPSHOT_AVAILABLE,
+            event_alpha_artifacts.SNAPSHOT_EXTERNAL_PATH,
+            event_alpha_artifacts.SNAPSHOT_TEST_OR_FIXTURE_EXTERNAL,
+        })
+        _append_snapshot_availability_messages(
+            row,
+            availability,
+            latest_run_id=latest_run_id,
+            effective_delivery_scope=effective_delivery_scope,
+            strict=strict,
+            blockers=blockers,
+            warnings=warnings,
+        )
+    _append_lineage_match_messages(
+        alerts=alerts,
+        feedback=feedback,
+        outcomes=outcomes,
+        run_ids=run_ids,
+        alert_run_ids=alert_run_ids,
+        strict=strict,
+        blockers=blockers,
+        warnings=warnings,
+    )
+    return SimpleNamespace(
+        blockers=blockers,
+        warnings=warnings,
+        matching_snapshot_runs=matching_snapshot_runs,
+        missing_snapshot_runs=missing_snapshot_runs,
+        external_snapshot_runs=external_snapshot_runs,
+        latest_run_id=latest_run_id,
+        latest_run=latest_run,
+        effective_delivery_scope=effective_delivery_scope,
+    )
+
+
+def _alert_counts_by_run_id(alerts: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in alerts:
+        run_id = str(row.get("run_id") or "").strip()
+        if run_id:
+            counts[run_id] = counts.get(run_id, 0) + 1
+    return counts
+
+
+def _append_snapshot_availability_messages(
+    row: Mapping[str, Any],
+    availability: str,
+    *,
+    latest_run_id: str | None,
+    effective_delivery_scope: str,
+    strict: bool,
+    blockers: list[str],
+    warnings: list[str],
+) -> None:
+    run_id = str(row.get("run_id") or "").strip()
+    stale_for_latest_scope = (
+        effective_delivery_scope == "latest_run"
+        and bool(latest_run_id)
+        and bool(run_id)
+        and run_id != latest_run_id
+    )
+    if not bool(row.get("snapshot_write_success")):
+        if str(row.get("snapshot_write_block_reason") or "") == "test_or_fixture_run":
+            warnings.append(f"run {row.get('run_id') or 'unknown'} is test/fixture and skipped snapshots")
+            if availability == event_alpha_artifacts.SNAPSHOT_TEST_OR_FIXTURE_EXTERNAL:
+                _record_snapshot_availability_issue(
+                    row,
+                    availability,
+                    blockers=blockers,
+                    warnings=warnings,
+                    strict=strict,
+                )
+        else:
+            message = f"alertable run {row.get('run_id') or 'unknown'} has no successful snapshot write"
+            (warnings if stale_for_latest_scope else blockers).append(message)
+    elif int(row.get("alertable") or 0) > 0 and int(row.get("snapshot_rows_written") or 0) <= 0:
+        message = f"alertable run {row.get('run_id') or 'unknown'} wrote zero alert snapshots"
+        (warnings if stale_for_latest_scope else blockers).append(message)
+    elif availability != event_alpha_artifacts.SNAPSHOT_AVAILABLE:
+        if stale_for_latest_scope:
+            warnings.append(f"stale alertable run {row.get('run_id') or 'unknown'} has snapshot availability={availability}")
+        else:
+            _record_snapshot_availability_issue(
+                row,
+                availability,
+                blockers=blockers,
+                warnings=warnings,
+                strict=strict,
+            )
+
+
+def _append_lineage_match_messages(
+    *,
+    alerts: list[Mapping[str, Any]],
+    feedback: list[Mapping[str, Any]],
+    outcomes: list[Mapping[str, Any]],
+    run_ids: set[str],
+    alert_run_ids: set[str],
+    strict: bool,
+    blockers: list[str],
+    warnings: list[str],
+) -> None:
+    orphan_alerts = sorted(alert_run_ids - run_ids)
+    if orphan_alerts:
+        warnings.append(f"alert snapshots reference unknown run_id(s): {', '.join(orphan_alerts[:5])}")
+    if any(row.get("run_id") in (None, "") for row in alerts):
+        warnings.append("legacy alert snapshots without run_id lineage are present")
+    alert_keys = {str(row.get("alert_key") or "") for row in alerts if row.get("alert_key")}
+    feedback_keys = {str(row.get("key") or row.get("alert_key") or "") for row in feedback}
+    outcome_keys = {str(row.get("alert_key") or "") for row in outcomes}
+    unknown_feedback = sorted(key for key in feedback_keys if key and key not in alert_keys)
+    unknown_outcomes = sorted(key for key in outcome_keys if key and key not in alert_keys)
+    if unknown_feedback:
+        message = f"feedback without matching alert snapshot: {', '.join(unknown_feedback[:5])}"
+        (blockers if strict else warnings).append(message)
+    if unknown_outcomes:
+        message = f"outcomes without matching alert snapshot: {', '.join(unknown_outcomes[:5])}"
+        (blockers if strict else warnings).append(message)
+
 
 def _phase_only_doctor_result(
     *,

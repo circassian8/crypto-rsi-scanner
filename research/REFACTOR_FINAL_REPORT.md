@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T06:24:27+00:00`
+- generated_at: `2026-07-04T06:35:17+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -44,13 +44,13 @@ Research-only refactor gate report. This report does not call providers, send Te
 - intentionally_outside_event_alpha_modules: `["crypto_rsi_scanner.event_fade"]`
 - class_ownership_report: `research/REFACTOR_CLASS_OWNERSHIP_REPORT.json`
 - class_ownership_classes_over_limit: `14`
-- class_ownership_functions_over_limit: `21`
+- class_ownership_functions_over_limit: `19`
 - production_size_gate_status: `pass`
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `21`
+- production_functions_over_limit: `19`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
 - legacy_decomposition_gate_status: `pass`
@@ -98,8 +98,8 @@ Research-only refactor gate report. This report does not call providers, send Te
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1473 |
+| `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1451 |
 | `crypto_rsi_scanner/cli/services/legacy/utility_commands.py` | 1440 |
-| `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1428 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1413 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1406 |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 |
@@ -130,13 +130,13 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/radar/impact_hypothesis_store.py` | 980 |
 | `crypto_rsi_scanner/event_alpha/radar/incident_graph.py` | 975 |
 | `crypto_rsi_scanner/event_alpha/radar/core_opportunities.py` | 970 |
+| `crypto_rsi_scanner/event_alpha/radar/evidence/executor.py` | 968 |
 | `crypto_rsi_scanner/cli/services/legacy/reports.py` | 961 |
 | `crypto_rsi_scanner/event_alpha/radar/identity.py` | 941 |
 | `crypto_rsi_scanner/event_alpha/config/profiles.py` | 935 |
 | `crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py` | 933 |
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 924 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py` | 918 |
-| `crypto_rsi_scanner/event_alpha/providers/official_exchange.py` | 913 |
 
 ## Test Size Gate
 

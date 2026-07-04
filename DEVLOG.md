@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split doctor context and evidence executor function debt · Codex
+**Why:** Refactor ownership debt remained after the production and legacy
+file-size gates passed. This pass reduces the largest doctor context function
+and removes two evidence-acquisition executor functions from the over-limit
+inventory without changing artifact schemas, doctor counters, source-pack
+validation, or no-send/no-live safety behavior.
+**Changes:**
+- Split the initial artifact loading/filtering and run/snapshot lineage checks
+  out of `diagnose_artifacts()` in
+  `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py`, reducing
+  that function from `1,335` to `1,048` lines while keeping helper functions
+  under the 150-line threshold.
+- Split `_execute_request()` and `_validate_raw_result()` in
+  `crypto_rsi_scanner/event_alpha/radar/evidence/executor.py` into focused
+  per-query execution, search-result handling, query-status, reject-reason,
+  and reason-code helpers.
+- Refreshed refactor class ownership, size-gate, completion-map, release
+  candidate, and final reports. Current advisory inventory is `14` classes
+  and `19` functions over limits, with `gate_status=pass` and
+  `new_violation_count=0`.
+**Verify:** Focused tests passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha/test_artifact_doctor.py -q`
+reported `45 passed`; evidence-acquisition source-coverage slice reported
+`12 passed, 23 deselected`; compileall passed for the touched modules; refactor
+class ownership, size-gate, completion-map, and final reports passed. Full
+safe verification for the committed tree: `python3 tests/test_indicators.py`,
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q`,
+`python3 -m compileall -q crypto_rsi_scanner tests`, and
+`make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+live sends, trading, paper-trading behavior changes, execution/order logic,
+Event Alpha RSI writes, or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split manual discovery orchestration debt · Codex
 **Why:** The refactor still has advisory oversized-function debt even though
 production and legacy file-size gates pass. `run_manual_discovery()` kept
