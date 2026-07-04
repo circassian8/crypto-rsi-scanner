@@ -4,17 +4,8 @@
       "allowed_exports": [
         "*"
       ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.source_coverage",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_alpha_source_coverage",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
       "new_module": "crypto_rsi_scanner.event_alpha.artifacts.context",
-      "notes": "",
+      "notes": "public compatibility entrypoint retained after v3 shim retirement",
       "old_module": "crypto_rsi_scanner.event_alpha_artifacts",
       "shim_status": "active_shim"
     },
@@ -23,7 +14,7 @@
         "*"
       ],
       "new_module": "crypto_rsi_scanner.event_alpha.artifacts.paths",
-      "notes": "",
+      "notes": "public compatibility entrypoint retained after v3 shim retirement",
       "old_module": "crypto_rsi_scanner.event_artifact_paths",
       "shim_status": "active_shim"
     },
@@ -32,7 +23,7 @@
         "*"
       ],
       "new_module": "crypto_rsi_scanner.event_alpha.artifacts.run_ledger",
-      "notes": "",
+      "notes": "public compatibility entrypoint retained after v3 shim retirement",
       "old_module": "crypto_rsi_scanner.event_alpha_run_ledger",
       "shim_status": "active_shim"
     },
@@ -41,7 +32,7 @@
         "*"
       ],
       "new_module": "crypto_rsi_scanner.event_alpha.artifacts.retention",
-      "notes": "",
+      "notes": "public compatibility entrypoint retained after v3 shim retirement",
       "old_module": "crypto_rsi_scanner.event_alpha_retention",
       "shim_status": "active_shim"
     },
@@ -50,7 +41,7 @@
         "*"
       ],
       "new_module": "crypto_rsi_scanner.event_alpha.artifacts.locks",
-      "notes": "",
+      "notes": "public compatibility entrypoint retained after v3 shim retirement",
       "old_module": "crypto_rsi_scanner.event_alpha_run_lock",
       "shim_status": "active_shim"
     },
@@ -59,7 +50,7 @@
         "*"
       ],
       "new_module": "crypto_rsi_scanner.event_alpha.doctor.artifact_doctor",
-      "notes": "",
+      "notes": "public compatibility entrypoint retained after v3 shim retirement",
       "old_module": "crypto_rsi_scanner.event_alpha_artifact_doctor",
       "shim_status": "active_shim"
     },
@@ -67,197 +58,8 @@
       "allowed_exports": [
         "*"
       ],
-      "new_module": "crypto_rsi_scanner.event_alpha.namespace.status",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_alpha_namespace_status",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.llm.extract_eval",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_llm_extract_eval",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.llm.eval",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_llm_eval",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.incident_graph",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_incident_graph",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.identity",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_identity",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.graph",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_graph",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.resolver",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_resolver",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.price_history",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_price_history",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.catalyst_frame_validator",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_catalyst_frame_validator",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.anomaly_state",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_anomaly_state",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.anomaly_scanner",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_anomaly_scanner",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.market_units",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_market_units",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.llm.budget",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_llm_budget",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames_eval",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.providers.source_reliability",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_source_reliability",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.cache",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_cache",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.explain",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_alpha_explain",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.outcomes.quality_fields",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_alpha_quality_fields",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.outcomes.outcome_artifacts",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_alpha_outcomes",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.outcomes.eval",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_alpha_eval",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
       "new_module": "crypto_rsi_scanner.event_alpha.config.profiles",
-      "notes": "",
+      "notes": "public compatibility entrypoint retained after v3 shim retirement",
       "old_module": "crypto_rsi_scanner.event_alpha_profiles",
       "shim_status": "active_shim"
     },
@@ -266,7 +68,7 @@
         "*"
       ],
       "new_module": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
-      "notes": "",
+      "notes": "public compatibility entrypoint retained after v3 shim retirement",
       "old_module": "crypto_rsi_scanner.event_alpha_v1_readiness",
       "shim_status": "active_shim"
     },
@@ -275,90 +77,12 @@
         "*"
       ],
       "new_module": "crypto_rsi_scanner.event_alpha.config.preflight",
-      "notes": "",
+      "notes": "public compatibility entrypoint retained after v3 shim retirement",
       "old_module": "crypto_rsi_scanner.event_alpha_preflight",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.config.health_guard",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_alpha_health_guard",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.config.scheduler",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_alpha_scheduler",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.doctor.environment",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_alpha_environment_doctor",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.notifications.provider_status",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_provider_status",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.radar.missed",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_alpha_missed",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.reason_text",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_alpha_reason_text",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_core.clock",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_clock",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_core.models",
-      "notes": "",
-      "old_module": "crypto_rsi_scanner.event_models",
       "shim_status": "active_shim"
     }
   ],
-  "entry_count": 39,
-  "generated_at": "2026-07-04T18:50:14+00:00",
-  "schema_version": "event_alpha_shim_registry_v1",
-  "source_of_truth": "crypto_rsi_scanner.event_alpha.MODULE_MAP.md",
-  "status_policy": [
-    "active_shim",
-    "not_migrated",
-    "partial_shim"
-  ]
+  "entry_count": 9,
+  "generated_at": "2026-07-04T19:22:48+00:00",
+  "schema_version": "event_alpha_shim_registry_v1"
 }

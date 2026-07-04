@@ -1251,7 +1251,7 @@ def test_makefile_has_event_llm_eval_target():
 
     text = Path("Makefile").read_text(encoding="utf-8")
     assert "event-llm-eval:" in text
-    assert "python -m crypto_rsi_scanner.event_llm_eval" in text or "$(PYTHON) -m crypto_rsi_scanner.event_llm_eval" in text
+    assert "$(PYTHON) -m crypto_rsi_scanner.event_alpha.radar.llm.eval" in text
     assert "event-alert-no-key-llm-report:" in text
 
 
@@ -1606,7 +1606,7 @@ def test_makefile_has_event_llm_extract_eval_target():
 
     text = Path("Makefile").read_text(encoding="utf-8")
     assert "event-llm-extract-eval:" in text
-    assert "crypto_rsi_scanner.event_llm_extract_eval" in text
+    assert "crypto_rsi_scanner.event_alpha.radar.llm.extract_eval" in text
 
 
 def test_event_llm_extract_scanner_report_uses_runtime_config():
@@ -6336,7 +6336,7 @@ def test_makefile_has_event_alpha_no_key_target():
 
     text = Path("Makefile").read_text(encoding="utf-8")
     assert "event-alpha-eval:" in text
-    assert "event_alpha_eval" in text
+    assert "crypto_rsi_scanner.event_alpha.outcomes.eval" in text
     assert "event-alpha-no-key-report:" in text
     assert "--event-alpha-radar-report" in text
     assert "event-alpha-cycle:" in text

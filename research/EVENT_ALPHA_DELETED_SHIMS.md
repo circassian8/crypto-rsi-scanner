@@ -1,24 +1,17 @@
 # Event Alpha Deleted Shims
 
-Research artifact only. This manifest records old top-level shim paths intentionally removed after canonical imports were verified.
+Research artifact only. Deleted shims were old flat compatibility modules with no internal imports at the time of removal. This manifest does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T18:50:14+00:00`
-- deleted_shim_count: `85`
-- research_only: `true`
-- no_send_rehearsal: `true`
-- telegram_sends: `0`
-- trades_created: `0`
-- paper_trades_created: `0`
-- normal_rsi_signal_rows_written: `0`
-- triggered_fade_created: `0`
+- generated_at: 2026-07-04T19:22:48+00:00
+- deleted_shim_count: 115
 
 ## Selection Policy
 
-Removed shims were non-public active shims with zero internal, Makefile, script, dynamic, and artifact-doc references. They were referenced only by the dedicated legacy compatibility test before this pass and were not listed in the remaining module classification report.
+Wave 1 removed unused non-public shims referenced only by compatibility tests. Wave 2 removed remaining non-public shims after Makefile entrypoints, docs, and compatibility tests moved to canonical package paths. Public compatibility wrappers remain in MODULE_MAP and SHIM_REGISTRY.
 
 ## Deleted Shims
 
-| old path | new path | reason |
+| Old path | New path | Removal reason |
 |---|---|---|
 | `crypto_rsi_scanner.event_integrated_radar` | `crypto_rsi_scanner.event_alpha.radar.integrated_radar` | Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass. |
 | `crypto_rsi_scanner.event_market_anomaly_scanner` | `crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner` | Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass. |
@@ -105,14 +98,33 @@ Removed shims were non-public active shims with zero internal, Makefile, script,
 | `crypto_rsi_scanner.event_watchlist_market` | `crypto_rsi_scanner.event_alpha.radar.watchlist_market` | Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass. |
 | `crypto_rsi_scanner.event_alpha_replay` | `crypto_rsi_scanner.event_alpha.artifacts.replay` | Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass. |
 | `crypto_rsi_scanner.event_feedback` | `crypto_rsi_scanner.event_alpha.outcomes.feedback_labels` | Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass. |
-
-## Verification Commands
-
-- `make event-alpha-shim-dependency-report PYTHON=python3`
-- `make event-alpha-old-import-check PYTHON=python3`
-- `python3 tests/test_indicators.py`
-- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q`
-- `python3 -m compileall -q crypto_rsi_scanner tests`
-- `make event-alpha-integrated-radar-smoke PYTHON=python3`
-- `make event-alpha-integrated-radar-doctor PYTHON=python3`
-- `make verify PYTHON=python3`
+| `crypto_rsi_scanner.event_alpha_source_coverage` | `crypto_rsi_scanner.event_alpha.radar.source_coverage` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_alpha_namespace_status` | `crypto_rsi_scanner.event_alpha.namespace.status` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_llm_extract_eval` | `crypto_rsi_scanner.event_alpha.radar.llm.extract_eval` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_llm_eval` | `crypto_rsi_scanner.event_alpha.radar.llm.eval` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_incident_graph` | `crypto_rsi_scanner.event_alpha.radar.incident_graph` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_identity` | `crypto_rsi_scanner.event_alpha.radar.identity` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_graph` | `crypto_rsi_scanner.event_alpha.radar.graph` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_resolver` | `crypto_rsi_scanner.event_alpha.radar.resolver` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_price_history` | `crypto_rsi_scanner.event_alpha.radar.price_history` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_catalyst_frame_validator` | `crypto_rsi_scanner.event_alpha.radar.catalyst_frame_validator` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_anomaly_state` | `crypto_rsi_scanner.event_alpha.radar.anomaly_state` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_anomaly_scanner` | `crypto_rsi_scanner.event_alpha.radar.anomaly_scanner` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_market_units` | `crypto_rsi_scanner.event_alpha.radar.market_units` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_llm_budget` | `crypto_rsi_scanner.event_alpha.radar.llm.budget` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_llm_catalyst_frames_eval` | `crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames_eval` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_source_reliability` | `crypto_rsi_scanner.event_alpha.providers.source_reliability` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_cache` | `crypto_rsi_scanner.event_alpha.artifacts.cache` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_alpha_explain` | `crypto_rsi_scanner.event_alpha.artifacts.explain` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_alpha_quality_fields` | `crypto_rsi_scanner.event_alpha.outcomes.quality_fields` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_alpha_outcomes` | `crypto_rsi_scanner.event_alpha.outcomes.outcome_artifacts` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_alpha_eval` | `crypto_rsi_scanner.event_alpha.outcomes.eval` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_alpha_burn_in_checklist` | `crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_alpha_health_guard` | `crypto_rsi_scanner.event_alpha.config.health_guard` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_alpha_scheduler` | `crypto_rsi_scanner.event_alpha.config.scheduler` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_alpha_environment_doctor` | `crypto_rsi_scanner.event_alpha.doctor.environment` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_provider_status` | `crypto_rsi_scanner.event_alpha.notifications.provider_status` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_alpha_missed` | `crypto_rsi_scanner.event_alpha.radar.missed` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_alpha_reason_text` | `crypto_rsi_scanner.event_alpha.artifacts.reason_text` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_clock` | `crypto_rsi_scanner.event_core.clock` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_models` | `crypto_rsi_scanner.event_core.models` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |

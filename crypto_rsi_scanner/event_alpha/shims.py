@@ -31,6 +31,8 @@ OLD_IMPORT_CHECK_JSON = "EVENT_ALPHA_OLD_IMPORT_CHECK.json"
 OLD_IMPORT_CHECK_MD = "EVENT_ALPHA_OLD_IMPORT_CHECK.md"
 DELETED_SHIMS_JSON = "EVENT_ALPHA_DELETED_SHIMS.json"
 DELETED_SHIMS_MD = "EVENT_ALPHA_DELETED_SHIMS.md"
+FINAL_SHIM_STATUS_JSON = "EVENT_ALPHA_FINAL_SHIM_STATUS.json"
+FINAL_SHIM_STATUS_MD = "EVENT_ALPHA_FINAL_SHIM_STATUS.md"
 SHIM_SCHEMA_VERSION = "event_alpha_shim_registry_v1"
 SHIM_DEPENDENCY_SCHEMA_VERSION = "event_alpha_shim_dependency_report_v1"
 OLD_IMPORT_CHECK_SCHEMA_VERSION = "event_alpha_old_import_check_v1"
@@ -470,7 +472,51 @@ def write_shim_dependency_report(
     }
     removal_json_path.write_text(json.dumps(removal_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     removal_md_path.write_text(format_shim_removal_candidates(report), encoding="utf-8")
+    final_json_path = target / FINAL_SHIM_STATUS_JSON
+    final_md_path = target / FINAL_SHIM_STATUS_MD
+    final_status = build_final_shim_status_report(root=repo_root, dependency_report=report)
+    final_json_path.write_text(json.dumps(final_status, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    final_md_path.write_text(format_final_shim_status_report(final_status), encoding="utf-8")
     return dep_json_path, dep_md_path, removal_json_path, removal_md_path, report
+
+
+def build_final_shim_status_report(
+    *, root: str | Path | None = None, dependency_report: dict[str, object] | None = None, generated_at: datetime | None = None
+) -> dict[str, object]:
+    """Return the final retained/deleted old-shim inventory."""
+    repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
+    report = dependency_report or build_shim_dependency_report(root=repo_root, generated_at=generated_at)
+    retained_rows = [row for row in report.get("entries", []) if isinstance(row, dict) and row.get("recommended_action") == "keep_public_entrypoint"]
+    deleted_rows = deleted_shim_manifest(root=repo_root).get("deleted_shims")
+    deleted_rows = deleted_rows if isinstance(deleted_rows, list) else []
+    old_import_check = build_old_import_check_report(root=repo_root, generated_at=generated_at)
+    gates = report.get("v3_gates") if isinstance(report.get("v3_gates"), dict) else {}
+    return {
+        "schema_version": "event_alpha_final_shim_status_v1",
+        "row_type": "event_alpha_final_shim_status",
+        "generated_at": report.get("generated_at") or (generated_at or datetime.now(timezone.utc)).isoformat(),
+        "research_only": True,
+        "no_send_rehearsal": True,
+        "strict_alerts_created": 0,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "paper_trades_created": 0,
+        "normal_rsi_signal_rows_written": 0,
+        "triggered_fade_created": 0,
+        "removed_shims_count": len(deleted_rows),
+        "retained_public_shims_count": len(retained_rows),
+        "retained_shims_with_reason": [
+            {"old_module": row.get("old_module"), "new_module": row.get("new_module"), "reason": row.get("retention_reason") or "public compatibility entrypoint"}
+            for row in retained_rows
+        ],
+        "old_path_internal_imports": old_import_check.get("old_path_internal_imports", 0),
+        "old_path_test_imports": old_import_check.get("old_path_test_imports", 0),
+        "old_path_docs_references": old_import_check.get("old_path_docs_references", 0),
+        "old_path_import_allowed_exceptions": old_import_check.get("old_path_import_allowed_exceptions", 0),
+        "deleted_path_import_failure_checks": old_import_check.get("deleted_path_import_failure_checks", 0),
+        "nonessential_shims_remaining": gates.get("nonessential_shims_remaining", 0),
+        "public_compatibility_policy": "Only explicitly retained public compatibility entrypoints remain. Non-public old Event Alpha shim paths are expected to fail import after deletion.",
+    }
 
 
 def build_old_import_check_report(
@@ -763,6 +809,38 @@ def format_old_import_check_report(report: dict[str, object]) -> str:
             lines.append(f"- `{row.get('old_module')}` -> `{row.get('new_module')}` ({blockers})")
         lines.append("")
     if not any_blockers:
+        lines.append("- none")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def format_final_shim_status_report(report: dict[str, object]) -> str:
+    lines = [
+        "# Event Alpha Final Shim Status",
+        "",
+        "Research artifact only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.",
+        "",
+    ]
+    for key in (
+        "generated_at",
+        "removed_shims_count",
+        "retained_public_shims_count",
+        "nonessential_shims_remaining",
+        "old_path_internal_imports",
+        "old_path_test_imports",
+        "old_path_docs_references",
+        "old_path_import_allowed_exceptions",
+    ):
+        lines.append(f"- {key}: {report.get(key, 0)}")
+    lines.extend(["", "## Policy", "", str(report.get("public_compatibility_policy") or ""), "", "## Retained Public Shims", ""])
+    retained = report.get("retained_shims_with_reason")
+    if isinstance(retained, list) and retained:
+        for row in retained:
+            if not isinstance(row, dict):
+                continue
+            lines.append(
+                f"- `{row.get('old_module')}` -> `{row.get('new_module')}`: {row.get('reason')}"
+            )
+    else:
         lines.append("- none")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -1387,6 +1465,8 @@ def main(argv: list[str] | None = None) -> int:
         print(dep_md)
         print(removal_json)
         print(removal_md)
+        print(Path(args.out_dir) / FINAL_SHIM_STATUS_JSON)
+        print(Path(args.out_dir) / FINAL_SHIM_STATUS_MD)
         print(f"status={report.get('status')}")
         print(f"registry_entry_count={report.get('registry_entry_count', 0)}")
         print(f"internal_import_reference_count={report.get('internal_import_reference_count', 0)}")

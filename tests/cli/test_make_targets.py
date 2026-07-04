@@ -640,6 +640,9 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["triggered_fade_created"] == 0
     assert payload["old_module_paths_removed"] == payload["deleted_shims"]
     assert payload["deleted_shims"] >= 1
+    assert payload["removed_shims_count"] == payload["deleted_shims"]
+    assert payload["retained_public_shims_count"] >= 9
+    assert payload["retained_shims_with_reason"]
     assert payload["dead_duplicate_code_removed"] is False
     assert payload["pytest_runtime_seconds"] == 12.34
     assert payload["standalone_runner_runtime_seconds"] == 56.78
@@ -651,7 +654,7 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"] < 3000
     assert payload["legacy_artifact_doctor_core_lines"] == payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"]
     assert payload["line_counts"]["crypto_rsi_scanner/cli/services/event_alpha.py"] < 1500
-    assert payload["active_shims"] >= 30
+    assert payload["active_shims"] >= 9
     assert payload["partial_shims"] == 0
     assert payload["unmigrated_modules"] >= 1
     assert payload["unmigrated_modules"] <= 15
@@ -675,8 +678,8 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
         assert gate_name in payload["v3_gates"]
     assert payload["nonessential_shims_remaining"] == payload["v3_gates"]["nonessential_shims_remaining"]
     assert payload["public_compatibility_shims"] == payload["v3_gates"]["public_compatibility_shims"]
-    assert payload["nonessential_shims_remaining"] > 0
-    assert "nonessential_shims_remaining" in payload["v3_auto_accept_blockers"]
+    assert payload["nonessential_shims_remaining"] == 0
+    assert "nonessential_shims_remaining" not in payload["v3_auto_accept_blockers"]
     assert payload["remaining_implementation_modules_by_package_target"] == {}
     assert payload["remaining_module_classification"]["path"] == "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json"
     assert payload["class_ownership_report"]["path"] == "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json"

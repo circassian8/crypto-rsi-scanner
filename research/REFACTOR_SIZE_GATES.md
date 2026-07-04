@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T18:58:20.194139+00:00`
+- generated_at: `2026-07-04T19:34:25.396744+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -14,11 +14,11 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `0`
+- production_functions_over_limit: `1`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
 - classes_over_limit_count: `14`
-- functions_over_limit_count: `0`
+- functions_over_limit_count: `1`
 - accepted_class_exceptions_count: `14`
 - remaining_class_ownership_debt_count: `0`
 - modules_with_multiple_public_classes_count: `82`
@@ -56,19 +56,19 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | gate | value | severity |
 |---|---:|---|
-| `nonessential_shims_remaining` | 26 | blocker |
+| `nonessential_shims_remaining` | 0 | blocker |
 | `old_path_internal_imports` | 0 | blocker |
 | `old_path_test_imports` | 0 | blocker |
-| `public_compatibility_shims` | 13 | informational |
-| `shim_removal_blockers` | 26 | blocker |
-| `deleted_shims` | 85 | informational |
+| `public_compatibility_shims` | 9 | informational |
+| `shim_removal_blockers` | 0 | blocker |
+| `deleted_shims` | 115 | informational |
 | `production_files_over_1200_lines` | 15 | target_gap |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 82 | blocker |
 | `class_exceptions_remaining` | 14 | blocker_until_reaccepted_for_v3 |
-| `functions_over_150_lines` | 0 | blocker |
+| `functions_over_150_lines` | 1 | blocker |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
-| `old_path_import_allowed_exceptions` | 49 | informational |
+| `old_path_import_allowed_exceptions` | 19 | informational |
 
 ## Moved Existing Violations
 
@@ -120,10 +120,10 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py` | 1498 |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1498 |
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1487 |
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1473 |
 | `crypto_rsi_scanner/cli/services/legacy/utility_commands.py` | 1440 |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1418 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 |
@@ -137,8 +137,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 1155 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py` | 1145 |
+| `crypto_rsi_scanner/refactor_final_report.py` | 1145 |
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 1135 |
-| `crypto_rsi_scanner/refactor_final_report.py` | 1131 |
 | `crypto_rsi_scanner/cli/services/legacy/rsi_scan.py` | 1103 |
 | `crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py` | 1078 |
 | `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1069 |
@@ -172,14 +172,14 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_source_coverage.py` | 2991 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
 | `tests/test_indicators.py` | 1778 |
-| `tests/cli/test_make_targets.py` | 1081 |
+| `tests/cli/test_make_targets.py` | 1085 |
 | `tests/event_alpha/_legacy_helpers.py` | 825 |
 | `tests/event_alpha/test_artifact_schema.py` | 728 |
 | `tests/rsi/test_indicators_core.py` | 694 |
 | `tests/rsi/test_backtest.py` | 561 |
 | `tests/rsi/test_paper_risk.py` | 379 |
+| `tests/event_alpha/test_shim_registry.py` | 245 |
 | `tests/cli/test_parser.py` | 243 |
-| `tests/event_alpha/test_shim_registry.py` | 239 |
 | `tests/event_alpha/test_legacy_import_compatibility.py` | 170 |
 | `tests/cli/test_event_alpha_command_registry.py` | 163 |
 | `tests/cli/test_dispatch.py` | 129 |
@@ -230,6 +230,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/migrations.py:MigrationsMixin` | 88 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/signals.py:SignalsMixin` | 129 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin` | 89 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/refactor_final_report.py:build_refactor_final_report` | 157 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.backups` | 3 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store.models` | 4 |
 | `public_classes_sharing_module` | `public_classes:crypto_rsi_scanner.event_alpha.artifacts.alerts` | 3 |

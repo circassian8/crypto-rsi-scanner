@@ -631,6 +631,10 @@ def build_refactor_final_report(
     size_gate_report = refactor_size_gates.build_gate_report(root=root)
     v3_gate_snapshot = _build_v3_gate_snapshot(root=root, size_gate_report=size_gate_report)
     deleted_shims = event_alpha_shims.deleted_shim_count(root=root)
+    final_shim_status = event_alpha_shims.build_final_shim_status_report(
+        root=root,
+        dependency_report=event_alpha_shims.build_shim_dependency_report(root=root),
+    )
     cli_service_line_counts = _cli_service_line_counts(root)
     cli_event_alpha_service_lines = cli_service_line_counts.get("crypto_rsi_scanner/cli/services/event_alpha.py")
     cli_service_bind_calls = _cli_service_bind_scanner_globals_call_sites(root)
@@ -664,6 +668,9 @@ def build_refactor_final_report(
         "triggered_fade_created": 0,
         "compatibility_preserved": True,
         "old_module_paths_removed": deleted_shims,
+        "removed_shims_count": int(final_shim_status.get("removed_shims_count") or 0),
+        "retained_public_shims_count": int(final_shim_status.get("retained_public_shims_count") or 0),
+        "retained_shims_with_reason": final_shim_status.get("retained_shims_with_reason", []),
         "dead_duplicate_code_removed": False,
         "dead_duplicate_code_removal_note": (
             "Non-public top-level Event Alpha shims listed in "
@@ -753,6 +760,8 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
         f"- gate_status: `{data['gate_summary']['status']}`",
         f"- compatibility_preserved: `{data['compatibility_preserved']}`",
             f"- old_module_paths_removed: `{data['old_module_paths_removed']}`",
+            f"- removed_shims_count: `{data.get('removed_shims_count', 0)}`",
+            f"- retained_public_shims_count: `{data.get('retained_public_shims_count', 0)}`",
             f"- v3_gate_status: `{data.get('v3_gate_status')}`",
             f"- v3_auto_accept_ready: `{data.get('v3_auto_accept_ready')}`",
             "",

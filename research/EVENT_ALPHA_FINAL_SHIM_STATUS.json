@@ -1,0 +1,69 @@
+{
+  "deleted_path_import_failure_checks": 115,
+  "generated_at": "2026-07-04T19:54:58.468970+00:00",
+  "no_send_rehearsal": true,
+  "nonessential_shims_remaining": 0,
+  "normal_rsi_signal_rows_written": 0,
+  "old_path_docs_references": 0,
+  "old_path_import_allowed_exceptions": 19,
+  "old_path_internal_imports": 0,
+  "old_path_test_imports": 0,
+  "paper_trades_created": 0,
+  "public_compatibility_policy": "Only explicitly retained public compatibility entrypoints remain. Non-public old Event Alpha shim paths are expected to fail import after deletion.",
+  "removed_shims_count": 115,
+  "research_only": true,
+  "retained_public_shims_count": 9,
+  "retained_shims_with_reason": [
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.context",
+      "old_module": "crypto_rsi_scanner.event_alpha_artifacts",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.paths",
+      "old_module": "crypto_rsi_scanner.event_artifact_paths",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.run_ledger",
+      "old_module": "crypto_rsi_scanner.event_alpha_run_ledger",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.retention",
+      "old_module": "crypto_rsi_scanner.event_alpha_retention",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.locks",
+      "old_module": "crypto_rsi_scanner.event_alpha_run_lock",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.doctor.artifact_doctor",
+      "old_module": "crypto_rsi_scanner.event_alpha_artifact_doctor",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.config.profiles",
+      "old_module": "crypto_rsi_scanner.event_alpha_profiles",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
+      "old_module": "crypto_rsi_scanner.event_alpha_v1_readiness",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.config.preflight",
+      "old_module": "crypto_rsi_scanner.event_alpha_preflight",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    }
+  ],
+  "row_type": "event_alpha_final_shim_status",
+  "schema_version": "event_alpha_final_shim_status_v1",
+  "strict_alerts_created": 0,
+  "telegram_sends": 0,
+  "trades_created": 0,
+  "triggered_fade_created": 0
+}

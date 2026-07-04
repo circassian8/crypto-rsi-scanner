@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-04 - Second non-public Event Alpha shim wave retired
+**Status:** accepted
+**Decision:** Remaining non-public old flat Event Alpha shims may be deleted
+after Makefile module entrypoints, docs, and compatibility tests are moved to
+canonical package paths. The only retained old shim modules are explicitly
+public compatibility wrappers listed in
+`crypto_rsi_scanner/event_alpha/MODULE_MAP.md`; `scanner.py` remains the CLI
+entrypoint wrapper, and `event_fade.py` remains the safety boundary outside
+Event Alpha. Deleted old paths are tracked in
+`research/EVENT_ALPHA_DELETED_SHIMS.md/json` and final retained/deleted status
+is tracked in `research/EVENT_ALPHA_FINAL_SHIM_STATUS.md/json`.
+**Why:** The old import check reports zero internal old-path imports, so
+retaining non-public shims only preserves obsolete surfaces. Moving Makefile
+targets to canonical packages preserves target names while allowing the old
+module files to fail import intentionally.
+**Revisit when:** a retained public compatibility wrapper has an accepted
+deprecation/removal plan or a third-party/public entrypoint requirement is
+identified.
+
 ## 2026-07-04 - First non-public Event Alpha shims retired
 **Status:** accepted
 **Decision:** The first refactor v3 deletion batch may remove old flat Event
@@ -260,9 +279,10 @@ have package homes with active shims. Shared event infrastructure now lives in
 `crypto_rsi_scanner.event_core`: `event_core.clock` for deterministic research
 clock helpers and `event_core.models` for shared event dataclasses. The old
 `crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import
-paths remain active shims. `event_fade.py` stays intentionally outside Event
-Alpha and remains the only top-level `event_*.py` implementation excluded from
-shim ownership.
+paths were later retired by the second v3 shim deletion pass after internal
+imports moved to canonical `crypto_rsi_scanner.event_core.*` paths.
+`event_fade.py` stays intentionally outside Event Alpha and remains the only
+top-level `event_*.py` implementation excluded from shim ownership.
 **Why:** This clears the Event Alpha module-migration backlog without burying
 shared provider/radar infrastructure under Event Alpha, preserves old imports,
 and keeps the `TRIGGERED_FADE` safety boundary unchanged: Event Alpha may write
@@ -297,8 +317,8 @@ dispatch tests proving behavior parity.
 aggregator over focused Event Alpha service modules, 25 additional top-level
 Event Alpha modules have package homes with active shims, and
 `event_fade.py` remains explicitly outside Event Alpha. `event_clock.py` and
-`event_models.py` remain shared event infrastructure until a neutral package
-decision is made.
+`event_models.py` were later moved to neutral `event_core` package paths and
+their old flat shims were retired in the second v3 shim deletion pass.
 **Why:** The split reduces the Event Alpha CLI service file to 46 lines and
 raises the active-shim count to 120 with zero active-shim implementation
 violations, while preserving old import paths and research-only/no-send/no-live

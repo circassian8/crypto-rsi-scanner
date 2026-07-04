@@ -11,8 +11,8 @@ from crypto_rsi_scanner.event_alpha import shims
 def test_known_active_shims_are_minimal_compatibility_modules():
     report = shims.audit_registry()
 
-    assert report["registry_entry_count"] >= 30
-    assert report["shim_status_counts"][shims.STATUS_ACTIVE_SHIM] >= 30
+    assert report["registry_entry_count"] >= 9
+    assert report["shim_status_counts"][shims.STATUS_ACTIVE_SHIM] >= 9
     assert report["active_shim_modules_with_implementation_logic"] == 0
     assert not report["active_shim_violations"]
     assert any(
@@ -80,14 +80,16 @@ def test_shim_dependency_report_writer_outputs_references_and_candidates():
         assert dep_md == Path(tmp) / shims.DEPENDENCY_REPORT_MD
         assert removal_json == Path(tmp) / shims.REMOVAL_CANDIDATES_JSON
         assert removal_md == Path(tmp) / shims.REMOVAL_CANDIDATES_MD
+        assert (Path(tmp) / shims.FINAL_SHIM_STATUS_JSON).exists()
+        assert (Path(tmp) / shims.FINAL_SHIM_STATUS_MD).exists()
         assert report["schema_version"] == shims.SHIM_DEPENDENCY_SCHEMA_VERSION
-        assert report["registry_entry_count"] >= 30
+        assert report["registry_entry_count"] >= 9
         assert report["deleted_shims"] >= 1
         assert "internal_import_reference_count" in report
         assert "safe_to_remove_count" in report
-        assert report["v3_gate_status"] == "pending"
-        assert report["v3_auto_accept_ready"] is False
-        assert report["v3_gates"]["nonessential_shims_remaining"] > 0
+        assert report["v3_gate_status"] == "pass"
+        assert report["v3_auto_accept_ready"] is True
+        assert report["v3_gates"]["nonessential_shims_remaining"] == 0
         assert report["v3_gates"]["public_compatibility_shims"] >= 1
         assert report["v3_gates"]["deleted_shims"] == report["deleted_shims"]
         assert report["old_path_internal_imports"] == 0
@@ -96,7 +98,7 @@ def test_shim_dependency_report_writer_outputs_references_and_candidates():
         assert report["old_path_import_allowed_exceptions"] >= 1
         assert report["v3_gates"]["old_path_internal_imports"] == report["old_path_internal_imports"]
         assert report["v3_gates"]["old_path_test_imports"] == report["old_path_test_imports"]
-        assert report["v3_gates"]["shim_removal_blockers"] >= 1
+        assert report["v3_gates"]["shim_removal_blockers"] == 0
         assert report["v3_gates"]["old_path_import_allowed_exceptions"] == report["old_path_import_allowed_exceptions"]
         assert "removal_candidates" in report
         assert dep_json.exists()
@@ -211,18 +213,20 @@ def test_remaining_event_module_classification_documents_fade_boundary():
     rows = {row["module_name"]: row for row in report["modules"]}
 
     assert report["not_every_event_module_belongs_under_event_alpha"] is True
+    assert report["recommended_status_counts"]["active_shim"] == 9
     assert report["recommended_status_counts"]["intentionally_outside_event_alpha"] == 1
     assert report["recommended_status_counts"]["not_migrated"] == 0
     assert rows["crypto_rsi_scanner.event_fade"]["recommended_status"] == "intentionally_outside_event_alpha"
     assert rows["crypto_rsi_scanner.event_fade"]["must_remain_outside_event_alpha_for_safety"] is True
-    assert rows["crypto_rsi_scanner.event_incident_graph"]["recommended_status"] == "active_shim"
-    assert rows["crypto_rsi_scanner.event_llm_budget"]["new_proposed_package_path"] == "crypto_rsi_scanner.event_alpha.radar.llm.budget"
-    assert rows["crypto_rsi_scanner.event_alpha_missed"]["recommended_status"] == "active_shim"
-    assert rows["crypto_rsi_scanner.event_alpha_reason_text"]["recommended_status"] == "active_shim"
-    assert rows["crypto_rsi_scanner.event_clock"]["recommended_status"] == "active_shim"
-    assert rows["crypto_rsi_scanner.event_models"]["recommended_status"] == "active_shim"
-    assert rows["crypto_rsi_scanner.event_clock"]["shared_rsi_event_alpha_infrastructure"] is True
-    assert rows["crypto_rsi_scanner.event_models"]["shared_rsi_event_alpha_infrastructure"] is True
+    assert rows["crypto_rsi_scanner.event_alpha_artifacts"]["recommended_status"] == "active_shim"
+    assert rows["crypto_rsi_scanner.event_artifact_paths"]["recommended_status"] == "active_shim"
+    assert rows["crypto_rsi_scanner.event_alpha_run_ledger"]["recommended_status"] == "active_shim"
+    assert rows["crypto_rsi_scanner.event_alpha_retention"]["recommended_status"] == "active_shim"
+    assert rows["crypto_rsi_scanner.event_alpha_run_lock"]["recommended_status"] == "active_shim"
+    assert rows["crypto_rsi_scanner.event_alpha_artifact_doctor"]["recommended_status"] == "active_shim"
+    assert rows["crypto_rsi_scanner.event_alpha_profiles"]["recommended_status"] == "active_shim"
+    assert rows["crypto_rsi_scanner.event_alpha_v1_readiness"]["recommended_status"] == "active_shim"
+    assert rows["crypto_rsi_scanner.event_alpha_preflight"]["recommended_status"] == "active_shim"
     text = markdown_path.read_text(encoding="utf-8")
     assert "Event Alpha may produce `FADE_SHORT_REVIEW` research artifacts" in text
     assert "must not create `TRIGGERED_FADE`" in text

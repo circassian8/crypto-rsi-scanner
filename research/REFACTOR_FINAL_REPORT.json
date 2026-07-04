@@ -199,7 +199,7 @@
   ],
   "accepted_class_exceptions_count": 14,
   "active_shim_modules_with_implementation_logic": 0,
-  "active_shims": 39,
+  "active_shims": 9,
   "baseline_line_counts": {
     "crypto_rsi_scanner/event_alpha_artifact_doctor.py": 7145,
     "crypto_rsi_scanner/scanner.py": 13373,
@@ -678,7 +678,7 @@
   "compatibility_preserved": true,
   "dead_duplicate_code_removal_note": "Non-public top-level Event Alpha shims listed in research/EVENT_ALPHA_DELETED_SHIMS.json were removed after shim dependency and old-import reports proved they were unused internally.",
   "dead_duplicate_code_removed": false,
-  "deleted_shims": 85,
+  "deleted_shims": 115,
   "deprecation_plan": [
     {
       "phase": "v1",
@@ -716,13 +716,13 @@
     },
     "remaining_legacy_unregistered_details": []
   },
-  "functions_over_150_lines": 0,
+  "functions_over_150_lines": 1,
   "gate_summary": {
     "blocked": 0,
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-04T19:07:37+00:00",
+  "generated_at": "2026-07-04T19:55:54+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -834,6 +834,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1487,
       "path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
       "source_kind": "production"
@@ -848,12 +854,6 @@
       "limit": 1500,
       "line_count": 1440,
       "path": "crypto_rsi_scanner/cli/services/legacy/utility_commands.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1418,
-      "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "source_kind": "production"
     },
     {
@@ -936,7 +936,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1136,
+      "line_count": 1145,
       "path": "crypto_rsi_scanner/refactor_final_report.py",
       "source_kind": "production"
     },
@@ -1118,7 +1118,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1082,
+      "line_count": 1085,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
@@ -1154,14 +1154,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 243,
-      "path": "tests/cli/test_parser.py",
+      "line_count": 245,
+      "path": "tests/event_alpha/test_shim_registry.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 239,
-      "path": "tests/event_alpha/test_shim_registry.py",
+      "line_count": 243,
+      "path": "tests/cli/test_parser.py",
       "source_kind": "test"
     },
     {
@@ -1460,9 +1460,10 @@
   "modules_with_multiple_public_classes_revisit_condition": "Reduce package model/helper modules opportunistically when changing them; do not churn stable compatibility modules solely to reduce this advisory count.",
   "modules_with_multiple_public_classes_status": "documented_advisory",
   "namespace_lifecycle_inventory": {
-    "namespace_count": 45,
+    "namespace_count": 46,
     "status_counts": {
       "active_fixture_smoke": 18,
+      "active_integrated_smoke": 1,
       "active_live_rehearsal": 9,
       "active_provider_preflight": 5,
       "active_provider_rehearsal": 5,
@@ -1547,11 +1548,11 @@
     }
   ],
   "no_send_rehearsal": true,
-  "nonessential_shims_remaining": 26,
+  "nonessential_shims_remaining": 0,
   "normal_rsi_signal_rows_written": 0,
-  "old_module_paths_removed": 85,
+  "old_module_paths_removed": 115,
   "old_path_docs_references": 0,
-  "old_path_import_allowed_exceptions": 49,
+  "old_path_import_allowed_exceptions": 19,
   "old_path_internal_imports": 0,
   "old_path_test_imports": 0,
   "paper_trades_created": 0,
@@ -1574,7 +1575,7 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 0,
+  "production_functions_over_limit": 1,
   "production_size_gate_status": "pass",
   "provider_class_split_status": [
     {
@@ -1699,7 +1700,7 @@
     }
   ],
   "public_classes_not_in_own_module": 82,
-  "public_compatibility_shims": 13,
+  "public_compatibility_shims": 9,
   "pytest_runtime_seconds": 11.538,
   "remaining_class_ownership_debt": [],
   "remaining_class_ownership_debt_count": 0,
@@ -1708,25 +1709,74 @@
     "intentionally_outside_event_alpha_modules": [
       "crypto_rsi_scanner.event_fade"
     ],
-    "module_count": 30,
+    "module_count": 10,
     "path": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
     "recommended_status_counts": {
-      "active_shim": 29,
+      "active_shim": 9,
       "intentionally_outside_event_alpha": 1,
       "not_migrated": 0,
       "partial_shim": 0
     },
     "remaining_implementation_modules_by_package_target": {}
   },
+  "removed_shims_count": 115,
   "research_only": true,
+  "retained_public_shims_count": 9,
+  "retained_shims_with_reason": [
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.context",
+      "old_module": "crypto_rsi_scanner.event_alpha_artifacts",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.paths",
+      "old_module": "crypto_rsi_scanner.event_artifact_paths",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.run_ledger",
+      "old_module": "crypto_rsi_scanner.event_alpha_run_ledger",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.retention",
+      "old_module": "crypto_rsi_scanner.event_alpha_retention",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.locks",
+      "old_module": "crypto_rsi_scanner.event_alpha_run_lock",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.doctor.artifact_doctor",
+      "old_module": "crypto_rsi_scanner.event_alpha_artifact_doctor",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.config.profiles",
+      "old_module": "crypto_rsi_scanner.event_alpha_profiles",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
+      "old_module": "crypto_rsi_scanner.event_alpha_v1_readiness",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    },
+    {
+      "new_module": "crypto_rsi_scanner.event_alpha.config.preflight",
+      "old_module": "crypto_rsi_scanner.event_alpha_preflight",
+      "reason": "public CLI/Make/import compatibility retained during v1/v2."
+    }
+  ],
   "runtime_note": "Runtimes are measured verification values supplied by the operator; null means not measured during report generation.",
   "scanner_bind_scanner_globals_call_sites": 6,
   "scanner_command_body_function_names": [],
   "scanner_command_body_functions_remaining": 0,
   "schema_version": "refactor_final_report_v1",
-  "shim_removal_blockers": 26,
+  "shim_removal_blockers": 0,
   "shim_status_counts": {
-    "active_shim": 39
+    "active_shim": 9
   },
   "standalone_runner_runtime_seconds": 11.191,
   "storage_mixin_exception_status": [
@@ -1771,27 +1821,25 @@
   "test_files_over_1500_lines": 8,
   "test_runtime_report_path": "research/test_runtime_report.json",
   "test_size_gate_status": "warning",
-  "top_level_event_module_count": 40,
+  "top_level_event_module_count": 10,
   "trades_created": 0,
   "triggered_fade_created": 0,
   "unknown_namespace_count": 0,
   "unmigrated_modules": 1,
   "v3_auto_accept_blockers": [
-    "nonessential_shims_remaining",
-    "shim_removal_blockers",
     "production_files_over_1200_lines",
     "public_classes_not_in_own_module",
-    "class_exceptions_remaining"
+    "class_exceptions_remaining",
+    "functions_over_150_lines"
   ],
   "v3_auto_accept_ready": false,
   "v3_contract_path": "research/REFACTOR_V3_CONTRACT.md",
   "v3_gate_snapshot": {
     "auto_accept_blockers": [
-      "nonessential_shims_remaining",
-      "shim_removal_blockers",
       "production_files_over_1200_lines",
       "public_classes_not_in_own_module",
-      "class_exceptions_remaining"
+      "class_exceptions_remaining",
+      "functions_over_150_lines"
     ],
     "contract_path": "research/REFACTOR_V3_CONTRACT.md",
     "gate_severity": {
@@ -1811,259 +1859,29 @@
     },
     "gate_values": {
       "class_exceptions_remaining": 14,
-      "deleted_shims": 85,
-      "functions_over_150_lines": 0,
-      "nonessential_shims_remaining": 26,
+      "deleted_shims": 115,
+      "functions_over_150_lines": 1,
+      "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
-      "old_path_import_allowed_exceptions": 49,
+      "old_path_import_allowed_exceptions": 19,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
       "production_files_over_1200_lines": 15,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 82,
-      "public_compatibility_shims": 13,
-      "shim_removal_blockers": 26
+      "public_compatibility_shims": 9,
+      "shim_removal_blockers": 0
     },
-    "nonessential_shim_rows": [
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.source_coverage",
-        "old_module": "crypto_rsi_scanner.event_alpha_source_coverage",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.namespace.status",
-        "old_module": "crypto_rsi_scanner.event_alpha_namespace_status",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.incident_graph",
-        "old_module": "crypto_rsi_scanner.event_incident_graph",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.identity",
-        "old_module": "crypto_rsi_scanner.event_identity",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.graph",
-        "old_module": "crypto_rsi_scanner.event_graph",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.resolver",
-        "old_module": "crypto_rsi_scanner.event_resolver",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.price_history",
-        "old_module": "crypto_rsi_scanner.event_price_history",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.catalyst_frame_validator",
-        "old_module": "crypto_rsi_scanner.event_catalyst_frame_validator",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.anomaly_state",
-        "old_module": "crypto_rsi_scanner.event_anomaly_state",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.anomaly_scanner",
-        "old_module": "crypto_rsi_scanner.event_anomaly_scanner",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.market_units",
-        "old_module": "crypto_rsi_scanner.event_market_units",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.llm.budget",
-        "old_module": "crypto_rsi_scanner.event_llm_budget",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.providers.source_reliability",
-        "old_module": "crypto_rsi_scanner.event_source_reliability",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.cache",
-        "old_module": "crypto_rsi_scanner.event_cache",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.explain",
-        "old_module": "crypto_rsi_scanner.event_alpha_explain",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.outcomes.quality_fields",
-        "old_module": "crypto_rsi_scanner.event_alpha_quality_fields",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.outcomes.outcome_artifacts",
-        "old_module": "crypto_rsi_scanner.event_alpha_outcomes",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist",
-        "old_module": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.config.health_guard",
-        "old_module": "crypto_rsi_scanner.event_alpha_health_guard",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.config.scheduler",
-        "old_module": "crypto_rsi_scanner.event_alpha_scheduler",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.doctor.environment",
-        "old_module": "crypto_rsi_scanner.event_alpha_environment_doctor",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.notifications.provider_status",
-        "old_module": "crypto_rsi_scanner.event_provider_status",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.missed",
-        "old_module": "crypto_rsi_scanner.event_alpha_missed",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.reason_text",
-        "old_module": "crypto_rsi_scanner.event_alpha_reason_text",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_core.clock",
-        "old_module": "crypto_rsi_scanner.event_clock",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_core.models",
-        "old_module": "crypto_rsi_scanner.event_models",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      }
-    ],
+    "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
         "line_count": 1498,
         "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "threshold": 1200
       },
       {
@@ -2079,11 +1897,6 @@
       {
         "line_count": 1440,
         "path": "crypto_rsi_scanner/cli/services/legacy/utility_commands.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1418,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "threshold": 1200
       },
       {
@@ -2716,259 +2529,24 @@
     ],
     "row_type": "refactor_v3_gate_snapshot",
     "schema_version": "refactor_v3_gate_snapshot_v1",
-    "shim_removal_blocker_rows": [
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.source_coverage",
-        "old_module": "crypto_rsi_scanner.event_alpha_source_coverage",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.namespace.status",
-        "old_module": "crypto_rsi_scanner.event_alpha_namespace_status",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.incident_graph",
-        "old_module": "crypto_rsi_scanner.event_incident_graph",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.identity",
-        "old_module": "crypto_rsi_scanner.event_identity",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.graph",
-        "old_module": "crypto_rsi_scanner.event_graph",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.resolver",
-        "old_module": "crypto_rsi_scanner.event_resolver",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.price_history",
-        "old_module": "crypto_rsi_scanner.event_price_history",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.catalyst_frame_validator",
-        "old_module": "crypto_rsi_scanner.event_catalyst_frame_validator",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.anomaly_state",
-        "old_module": "crypto_rsi_scanner.event_anomaly_state",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.anomaly_scanner",
-        "old_module": "crypto_rsi_scanner.event_anomaly_scanner",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.market_units",
-        "old_module": "crypto_rsi_scanner.event_market_units",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.llm.budget",
-        "old_module": "crypto_rsi_scanner.event_llm_budget",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.providers.source_reliability",
-        "old_module": "crypto_rsi_scanner.event_source_reliability",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.cache",
-        "old_module": "crypto_rsi_scanner.event_cache",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.explain",
-        "old_module": "crypto_rsi_scanner.event_alpha_explain",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.outcomes.quality_fields",
-        "old_module": "crypto_rsi_scanner.event_alpha_quality_fields",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.outcomes.outcome_artifacts",
-        "old_module": "crypto_rsi_scanner.event_alpha_outcomes",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist",
-        "old_module": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.config.health_guard",
-        "old_module": "crypto_rsi_scanner.event_alpha_health_guard",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.config.scheduler",
-        "old_module": "crypto_rsi_scanner.event_alpha_scheduler",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.doctor.environment",
-        "old_module": "crypto_rsi_scanner.event_alpha_environment_doctor",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.notifications.provider_status",
-        "old_module": "crypto_rsi_scanner.event_provider_status",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.radar.missed",
-        "old_module": "crypto_rsi_scanner.event_alpha_missed",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.reason_text",
-        "old_module": "crypto_rsi_scanner.event_alpha_reason_text",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_core.clock",
-        "old_module": "crypto_rsi_scanner.event_clock",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_core.models",
-        "old_module": "crypto_rsi_scanner.event_models",
-        "recommended_action": "keep_until_v3",
-        "removal_blockers": [
-          "test_import_references"
-        ],
-        "safe_to_remove": false
-      }
-    ],
+    "shim_removal_blocker_rows": [],
     "status": "pending",
     "v3_auto_accept_ready": false
   },
   "v3_gate_status": "pending",
   "v3_gates": {
     "class_exceptions_remaining": 14,
-    "deleted_shims": 85,
-    "functions_over_150_lines": 0,
-    "nonessential_shims_remaining": 26,
+    "deleted_shims": 115,
+    "functions_over_150_lines": 1,
+    "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
-    "old_path_import_allowed_exceptions": 49,
+    "old_path_import_allowed_exceptions": 19,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
     "production_files_over_1200_lines": 15,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 82,
-    "public_compatibility_shims": 13,
-    "shim_removal_blockers": 26
+    "public_compatibility_shims": 9,
+    "shim_removal_blockers": 0
   }
 }

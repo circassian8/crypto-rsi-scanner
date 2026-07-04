@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Retire remaining nonessential Event Alpha shims · Codex
+**Why:** The second v3 shim retirement wave needed to remove old flat Event
+Alpha import surfaces that were no longer used by internal code, tests,
+Makefile targets, or docs, while keeping only documented public compatibility
+wrappers.
+**Changes:**
+- Removed 30 additional non-public top-level Event Alpha shim modules and kept
+  only the 9 public compatibility wrappers plus the intentional `event_fade.py`
+  boundary.
+- Updated Makefile module entrypoints to canonical package paths without
+  changing target names.
+- Regenerated `crypto_rsi_scanner/event_alpha/SHIM_REGISTRY.json`,
+  `research/EVENT_ALPHA_DELETED_SHIMS.md/json`,
+  `research/EVENT_ALPHA_FINAL_SHIM_STATUS.md/json`, old-import reports, shim
+  dependency reports, and refactor reports.
+- Updated legacy import tests, shim registry tests, Makefile path assertions,
+  `AGENTS.md`, `DECISIONS.md`, `ROADMAP.md`, and `MODULE_MAP.md` for the final
+  retained-shim policy.
+**Verify:** Passed `python3 tests/test_indicators.py` (`748/748 passed`);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (`759 passed`);
+`python3 -m compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-old-import-check PYTHON=python3`; `make
+event-alpha-shim-dependency-report PYTHON=python3`; `make event-alpha-shim-report
+PYTHON=python3`; `make refactor-final-report PYTHON=python3`; and `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. Current shim counters are
+`deleted_shims=115`, `active_shims=9`, `retained_public_shims_count=9`,
+`nonessential_shims_remaining=0`, and `old_path_internal_imports=0`. No live
+provider calls, live Telegram sends, trading, paper-trading behavior changes,
+execution/order logic, Event Alpha RSI writes, or Event Alpha-created
+`TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Retire first non-public Event Alpha shim batch · Codex
 **Why:** Refactor v3 can now start removing old flat Event Alpha shim paths
 that are proven unused internally and are not public compatibility entrypoints.

@@ -583,18 +583,18 @@ event-discovery-binance-listen:
 	$(PYTHON) main.py --event-discovery-binance-listen
 
 event-llm-eval:
-	$(PYTHON) -m crypto_rsi_scanner.event_llm_eval fixtures/event_discovery/llm_golden_cases.json
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.radar.llm.eval fixtures/event_discovery/llm_golden_cases.json
 
 event-llm-extract-eval:
-	$(PYTHON) -m crypto_rsi_scanner.event_llm_extract_eval fixtures/event_discovery/llm_extraction_golden_cases.json
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.radar.llm.extract_eval fixtures/event_discovery/llm_extraction_golden_cases.json
 
 event-alpha-eval:
-	$(PYTHON) -m crypto_rsi_scanner.event_alpha_eval fixtures/event_discovery/event_alpha_golden_cases.json
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.outcomes.eval fixtures/event_discovery/event_alpha_golden_cases.json
 
 event-alpha-catalyst-frame-validation-cycle: PROFILE = catalyst_frame_validation
 event-alpha-catalyst-frame-validation-cycle:
 	rm -rf event_fade_cache/$(PROFILE)
-	$(PYTHON) -m crypto_rsi_scanner.event_llm_catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json
 	$(EVENT_FIXTURE_NOW_ENV) $(PYTHON) main.py --event-alpha-cycle --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE)
 	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	$(PYTHON) main.py --event-alpha-quality-review --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE)
@@ -604,7 +604,7 @@ event-alpha-catalyst-frame-validation-cycle:
 event-alpha-catalyst-frame-e2e-cycle: PROFILE = catalyst_frame_e2e
 event-alpha-catalyst-frame-e2e-cycle:
 	rm -rf event_fade_cache/$(PROFILE)
-	$(PYTHON) -m crypto_rsi_scanner.event_llm_catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json
 	$(EVENT_FIXTURE_NOW_ENV) $(PYTHON) main.py --event-alpha-cycle --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE)
 	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	$(PYTHON) main.py --event-impact-hypotheses-report --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE)
@@ -616,7 +616,7 @@ event-alpha-catalyst-frame-e2e-cycle:
 event-alpha-notify-llm-quality-frame-smoke: PROFILE = notify_llm_quality_frame
 event-alpha-notify-llm-quality-frame-smoke:
 	rm -rf event_fade_cache/$(PROFILE)
-	$(PYTHON) -m crypto_rsi_scanner.event_llm_catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json
 	$(EVENT_FIXTURE_NOW_ENV) $(PYTHON) main.py --event-alpha-cycle --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE)
 	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	$(PYTHON) main.py --event-impact-hypotheses-report --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE)
@@ -629,7 +629,7 @@ event-alpha-market-refresh-smoke: PROFILE = market_refresh_smoke
 event-alpha-market-refresh-smoke: TARGET = VELVET
 event-alpha-market-refresh-smoke:
 	rm -rf event_fade_cache/$(PROFILE)
-	$(PYTHON) -m crypto_rsi_scanner.event_llm_catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json
 	$(EVENT_FIXTURE_NOW_ENV) $(PYTHON) main.py --event-alpha-cycle --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE)
 	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	$(PYTHON) main.py --event-alpha-near-miss-report --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE)
@@ -872,7 +872,7 @@ event-alpha-evidence-acquisition-smoke: PROFILE = evidence_acquisition_smoke
 event-alpha-evidence-acquisition-smoke: TARGET = VELVET
 event-alpha-evidence-acquisition-smoke:
 	rm -rf event_fade_cache/$(PROFILE)
-	$(PYTHON) -m crypto_rsi_scanner.event_llm_catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames_eval fixtures/event_discovery/llm_catalyst_frame_cases.json
 	$(EVENT_FIXTURE_NOW_ENV) $(PYTHON) main.py --event-alpha-cycle --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE)
 	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	$(PYTHON) main.py --event-alpha-near-miss-report --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE)

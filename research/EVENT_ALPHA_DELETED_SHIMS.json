@@ -1,5 +1,5 @@
 {
-  "deleted_shim_count": 85,
+  "deleted_shim_count": 115,
   "deleted_shims": [
     {
       "date": "2026-07-04T18:50:14+00:00",
@@ -595,15 +595,225 @@
       "old_path": "crypto_rsi_scanner.event_feedback",
       "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
       "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.source_coverage",
+      "old_path": "crypto_rsi_scanner.event_alpha_source_coverage",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.namespace.status",
+      "old_path": "crypto_rsi_scanner.event_alpha_namespace_status",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.llm.extract_eval",
+      "old_path": "crypto_rsi_scanner.event_llm_extract_eval",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.llm.eval",
+      "old_path": "crypto_rsi_scanner.event_llm_eval",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.incident_graph",
+      "old_path": "crypto_rsi_scanner.event_incident_graph",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.identity",
+      "old_path": "crypto_rsi_scanner.event_identity",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.graph",
+      "old_path": "crypto_rsi_scanner.event_graph",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.resolver",
+      "old_path": "crypto_rsi_scanner.event_resolver",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.price_history",
+      "old_path": "crypto_rsi_scanner.event_price_history",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.catalyst_frame_validator",
+      "old_path": "crypto_rsi_scanner.event_catalyst_frame_validator",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.anomaly_state",
+      "old_path": "crypto_rsi_scanner.event_anomaly_state",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.anomaly_scanner",
+      "old_path": "crypto_rsi_scanner.event_anomaly_scanner",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.market_units",
+      "old_path": "crypto_rsi_scanner.event_market_units",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.llm.budget",
+      "old_path": "crypto_rsi_scanner.event_llm_budget",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames_eval",
+      "old_path": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.providers.source_reliability",
+      "old_path": "crypto_rsi_scanner.event_source_reliability",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.cache",
+      "old_path": "crypto_rsi_scanner.event_cache",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.explain",
+      "old_path": "crypto_rsi_scanner.event_alpha_explain",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.quality_fields",
+      "old_path": "crypto_rsi_scanner.event_alpha_quality_fields",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.outcome_artifacts",
+      "old_path": "crypto_rsi_scanner.event_alpha_outcomes",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.eval",
+      "old_path": "crypto_rsi_scanner.event_alpha_eval",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist",
+      "old_path": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.config.health_guard",
+      "old_path": "crypto_rsi_scanner.event_alpha_health_guard",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.config.scheduler",
+      "old_path": "crypto_rsi_scanner.event_alpha_scheduler",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.doctor.environment",
+      "old_path": "crypto_rsi_scanner.event_alpha_environment_doctor",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.provider_status",
+      "old_path": "crypto_rsi_scanner.event_provider_status",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.missed",
+      "old_path": "crypto_rsi_scanner.event_alpha_missed",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.reason_text",
+      "old_path": "crypto_rsi_scanner.event_alpha_reason_text",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_core.clock",
+      "old_path": "crypto_rsi_scanner.event_clock",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04",
+      "new_path": "crypto_rsi_scanner.event_core.models",
+      "old_path": "crypto_rsi_scanner.event_models",
+      "removal_reason": "Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports.",
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3 && make event-alpha-shim-dependency-report PYTHON=python3"
     }
   ],
-  "generated_at": "2026-07-04T18:50:14+00:00",
+  "generated_at": "2026-07-04T19:22:48+00:00",
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "paper_trades_created": 0,
   "research_only": true,
   "schema_version": "event_alpha_deleted_shims_v1",
-  "selection_policy": "First deletion batch removes non-public active shims that had no dependencies except the dedicated legacy compatibility import test and were not listed in the remaining module classification report.",
+  "selection_policy": "Wave 1 removed unused non-public shims referenced only by compatibility tests. Wave 2 removed remaining non-public shims after Makefile entrypoints, docs, and compatibility tests moved to canonical package paths. Public compatibility wrappers remain in MODULE_MAP and SHIM_REGISTRY.",
   "strict_alerts_created": 0,
   "telegram_sends": 0,
   "trades_created": 0,
