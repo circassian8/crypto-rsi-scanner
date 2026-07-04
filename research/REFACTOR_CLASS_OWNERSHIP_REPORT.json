@@ -1443,12 +1443,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5704,
+  "function_count": 5706,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-04T21:15:14.079645+00:00",
+  "generated_at": "2026-07-04T22:43:07.703397+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -2921,15 +2921,15 @@
   "multi_public_class_modules_count": 80,
   "near_threshold_file_status": [
     {
-      "line_count": 1498,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+      "line_count": 1499,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
     },
     {
       "line_count": 1498,
-      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3400,13 +3400,13 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "line_count": 1499,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "threshold": 1200
       },
       {
         "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
         "threshold": 1200
       },
       {

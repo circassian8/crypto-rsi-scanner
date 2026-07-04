@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-05 - Event Alpha refactor v3 accepted
+**Status:** accepted
+**Decision:** Event Alpha refactor v3 is accepted as the current package,
+shim, doctor, namespace, size, and test baseline. The only top-level
+implementation event module is `event_fade.py`, which remains intentionally
+outside Event Alpha. The remaining old Event Alpha paths are retained public
+compatibility entrypoints only, deleted old imports are tombstoned, and new
+code must use canonical package paths.
+**Why:** The full v3 release-candidate gauntlet passed (`26/26` commands), the
+critical RC gates passed, and `research/REFACTOR_V3_RELEASE_CANDIDATE_REPORT.md`
+records zero nonessential shims, zero old-path internal/test/docs references,
+zero production files over 1,500 lines, zero functions over 150 lines, zero
+unresolved over-1,200-line production files, zero unresolved multi-class
+modules, zero unknown namespaces, and zero doctor registry legacy-unregistered
+checks. Remaining over-1,200 files and storage mixin classes are accepted
+warnings with owner notes and revisit conditions.
+**Revisit when:** a retained public shim is proposed for removal, a production
+file crosses a blocker threshold, a new class/model-bundle exception is needed,
+or a future provider activation pass changes Event Alpha package boundaries.
+
 ## 2026-07-05 - Retained Event Alpha shims are public entrypoints only
 **Status:** accepted
 **Decision:** The remaining old flat Event Alpha modules are retained only as

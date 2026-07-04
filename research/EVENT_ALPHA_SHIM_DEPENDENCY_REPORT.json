@@ -336,7 +336,7 @@
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 2405,
+          "line": 2440,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -579,7 +579,7 @@
       ]
     }
   ],
-  "generated_at": "2026-07-04T22:22:31.973035+00:00",
+  "generated_at": "2026-07-04T22:45:15.034950+00:00",
   "internal_import_reference_count": 0,
   "makefile_reference_count": 0,
   "no_send_rehearsal": true,

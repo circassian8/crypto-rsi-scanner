@@ -13,15 +13,15 @@
     "modules_with_multiple_public_classes_status": "pass",
     "near_threshold_file_status": [
       {
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "line_count": 1499,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
       },
       {
         "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
@@ -281,7 +281,7 @@
     "top_level_event_module_count": 10,
     "unmigrated_modules": 1
   },
-  "generated_at": "2026-07-04T21:42:02+00:00",
+  "generated_at": "2026-07-04T22:43:40+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
   "known_remaining_blockers": [],
   "live_provider_calls_allowed": false,
@@ -335,19 +335,19 @@
       {
         "accepted": true,
         "limit": 1500,
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
-        "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
-        "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
+        "line_count": 1499,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "reason": "Static shim registry/data table; large by design and non-behavioral.",
+        "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
         "source_kind": "production"
       },
       {
         "accepted": true,
         "limit": 1500,
         "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
-        "reason": "Static shim registry/data table; large by design and non-behavioral.",
-        "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
+        "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
         "source_kind": "production"
       },
       {
@@ -531,14 +531,14 @@
     "largest_production_files": [
       {
         "limit": 1500,
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "line_count": 1499,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "source_kind": "production"
       },
       {
         "limit": 1500,
         "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
         "source_kind": "production"
       },
       {
@@ -603,7 +603,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 1188,
+        "line_count": 1193,
         "path": "crypto_rsi_scanner/refactor_final_report.py",
         "source_kind": "production"
       },
@@ -675,6 +675,12 @@
       },
       {
         "limit": 1500,
+        "line_count": 1052,
+        "path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
         "line_count": 1047,
         "path": "crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py",
         "source_kind": "production"
@@ -695,12 +701,6 @@
         "limit": 1500,
         "line_count": 1033,
         "path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 1032,
-        "path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py",
         "source_kind": "production"
       },
       {
@@ -821,7 +821,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 1093,
+        "line_count": 1095,
         "path": "tests/cli/test_make_targets.py",
         "source_kind": "test"
       },
@@ -857,7 +857,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 278,
+        "line_count": 325,
         "path": "tests/event_alpha/test_shim_registry.py",
         "source_kind": "test"
       },
@@ -939,15 +939,15 @@
     "moved_existing_violation_count": 0,
     "near_threshold_file_status": [
       {
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "line_count": 1499,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
       },
       {
         "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"

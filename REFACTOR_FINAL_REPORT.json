@@ -4281,15 +4281,15 @@
     "multi_public_class_modules_count": 80,
     "near_threshold_file_status": [
       {
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "line_count": 1499,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
       },
       {
         "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
@@ -4567,7 +4567,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-04T22:23:28+00:00",
+  "generated_at": "2026-07-04T22:45:12+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -6660,15 +6660,15 @@
   },
   "near_threshold_file_status": [
     {
-      "line_count": 1498,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+      "line_count": 1499,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
     },
     {
       "line_count": 1498,
-      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"

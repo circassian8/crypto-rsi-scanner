@@ -2,7 +2,7 @@
 
 Research artifact only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: 2026-07-04T22:22:31.973035+00:00
+- generated_at: 2026-07-04T22:45:15.034950+00:00
 - status: OK
 - registry_entry_count: 9
 - internal_import_reference_count: 0

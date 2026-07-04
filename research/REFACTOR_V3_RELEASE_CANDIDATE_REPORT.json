@@ -1,0 +1,1963 @@
+{
+  "acceptance_status": "accepted",
+  "accepted_class_exceptions": [
+    {
+      "accepted_exception": true,
+      "class_name": "MigrationsMixin",
+      "exception_category": "storage_mixin",
+      "exception_reason": "SQLite migration ownership is intentionally centralized to avoid untested schema drift.",
+      "exception_status": "accepted_exception",
+      "line_count": 88,
+      "module": "crypto_rsi_scanner.storage_parts.migrations",
+      "owner_note": "DB schema behavior must not change in this cleanup pass.",
+      "public": true,
+      "qualname": "MigrationsMixin",
+      "revisit_condition": "Revisit only with explicit migration tests and backup/restore verification.",
+      "source_path": "crypto_rsi_scanner/storage_parts/migrations.py"
+    },
+    {
+      "accepted_exception": true,
+      "class_name": "SignalsMixin",
+      "exception_category": "storage_mixin",
+      "exception_reason": "Signal persistence methods share schema assumptions, row serialization, and outcome lookup behavior.",
+      "exception_status": "accepted_exception",
+      "line_count": 129,
+      "module": "crypto_rsi_scanner.storage_parts.signals",
+      "owner_note": "Avoid splitting storage write paths without SQLite roundtrip parity tests.",
+      "public": true,
+      "qualname": "SignalsMixin",
+      "revisit_condition": "Revisit when storage schema v2 or a repository layer is introduced.",
+      "source_path": "crypto_rsi_scanner/storage_parts/signals.py"
+    },
+    {
+      "accepted_exception": true,
+      "class_name": "WatchlistMixin",
+      "exception_category": "storage_mixin",
+      "exception_reason": "Watchlist persistence methods are stable DB helpers and only slightly exceed the advisory limit.",
+      "exception_status": "accepted_exception",
+      "line_count": 89,
+      "module": "crypto_rsi_scanner.storage_parts.watchlist",
+      "owner_note": "No DB schema or paper/watchlist behavior changes in this refactor pass.",
+      "public": true,
+      "qualname": "WatchlistMixin",
+      "revisit_condition": "Revisit when watchlist storage grows new tables or migrations.",
+      "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
+    }
+  ],
+  "accepted_class_exceptions_count": 3,
+  "accepted_production_files_over_1200_line_rows": [
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1499,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "reason": "Static shim registry/data table; large by design and non-behavioral.",
+      "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+      "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
+      "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1404,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+      "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
+      "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1395,
+      "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
+      "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
+      "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1392,
+      "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+      "reason": "Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
+      "revisit_condition": "When config/report command bodies move to canonical non-legacy service modules.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1387,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
+      "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
+      "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1319,
+      "path": "crypto_rsi_scanner/config.py",
+      "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
+      "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1275,
+      "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
+      "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
+      "revisit_condition": "When adding a new enrichment source or cache policy.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1261,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py",
+      "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
+      "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1239,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+      "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1233,
+      "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+      "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
+      "revisit_condition": "When outcome performance views gain new sections.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1223,
+      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+      "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+      "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+      "source_kind": "production"
+    }
+  ],
+  "accepted_warning_gates": {
+    "accepted_class_exceptions_count": 3,
+    "accepted_production_files_over_1200_lines": 12,
+    "classes_over_75_lines": 3,
+    "production_files_over_1200_lines": 12,
+    "refactor_final_v3_auto_accept_blockers": [
+      "production_files_over_1200_lines",
+      "class_exceptions_remaining"
+    ],
+    "refactor_final_v3_gate_status": "pending"
+  },
+  "classes_over_75_lines": 3,
+  "critical_gate_failures": [],
+  "critical_gate_status": "pass",
+  "critical_gates": {
+    "all_commands_passed": true,
+    "doctor_registry_legacy_unregistered_zero": true,
+    "functions_over_150_zero": true,
+    "namespace_unknown_zero": true,
+    "nonessential_shims_remaining_zero": true,
+    "old_import_check_status_ok": true,
+    "old_path_docs_references_zero": true,
+    "old_path_internal_imports_zero": true,
+    "old_path_test_imports_zero": true,
+    "only_event_fade_top_level_implementation": true,
+    "oversized_classes_are_accepted": true,
+    "production_files_over_1500_zero": true,
+    "refactor_completion_map_accepted": true,
+    "refactor_final_has_no_blockers": true,
+    "shim_dependency_status_ok": true,
+    "unresolved_multi_class_modules_zero": true,
+    "unresolved_production_files_over_1200_zero": true
+  },
+  "deleted_shims_count": 115,
+  "deleted_shims_manifest": "research/EVENT_ALPHA_DELETED_SHIMS.json",
+  "deleted_shims_sample": [
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.integrated_radar",
+      "old_path": "crypto_rsi_scanner.event_integrated_radar",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner",
+      "old_path": "crypto_rsi_scanner.event_market_anomaly_scanner",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.market_state",
+      "old_path": "crypto_rsi_scanner.event_market_state",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.market_reaction",
+      "old_path": "crypto_rsi_scanner.event_market_reaction",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.core_opportunities",
+      "old_path": "crypto_rsi_scanner.event_core_opportunities",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.core_opportunity_store",
+      "old_path": "crypto_rsi_scanner.event_core_opportunity_store",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.evidence_acquisition",
+      "old_path": "crypto_rsi_scanner.event_evidence_acquisition",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.opportunity_verdict",
+      "old_path": "crypto_rsi_scanner.event_opportunity_verdict",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses",
+      "old_path": "crypto_rsi_scanner.event_impact_hypotheses",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store",
+      "old_path": "crypto_rsi_scanner.event_impact_hypothesis_store",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    }
+  ],
+  "doctor_registry_status": {
+    "legacy_unregistered": 0,
+    "legacy_unregistered_status": "pass",
+    "plugin_check_counts": {
+      "integrated_radar": 3,
+      "namespace": 1,
+      "notifications": 1,
+      "outcomes": 1,
+      "paths": 1,
+      "provider_readiness": 2,
+      "safety": 1,
+      "secrets": 0,
+      "source_coverage": 1,
+      "stale_artifacts": 1
+    }
+  },
+  "functions_over_150_lines": 0,
+  "generated_at": "2026-07-04T22:57:29+00:00",
+  "model_bundles": [
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "BackupResult",
+        "BackupStatus",
+        "RestoreCheckResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 25,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.backups",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaAlertStoreConfig",
+        "EventAlphaAlertStoreReadResult",
+        "EventAlphaAlertStoreWriteResult",
+        "EventAlphaOutcomeFillResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 10,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.artifacts.alert_store.models",
+      "public_class_count": 4,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlertCandidate",
+        "EventAlertConfig",
+        "EventAlertTier"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 59,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.artifacts.alerts",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventDiscoveryCacheReadResult",
+        "EventDiscoveryCacheWriteResult",
+        "EventDiscoveryRunsReadResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 11,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.artifacts.cache",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaRunLock",
+        "EventAlphaRunLockConfig",
+        "RunLockStatus"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 24,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.artifacts.locks",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaReplayCandidateDiff",
+        "EventAlphaReplayComparisonResult",
+        "EventAlphaReplayPolicyRow",
+        "EventAlphaReplayResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 16,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.artifacts.replay",
+      "public_class_count": 4,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventResearchCardResult",
+        "EventResearchCardWriteResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 5,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.models",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaRetentionConfig",
+        "EventAlphaRetentionResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 8,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.artifacts.retention",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaRunLedgerConfig",
+        "EventAlphaRunLedgerReadResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 4,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.artifacts.run_ledger",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaHealthGuardConfig",
+        "EventAlphaHealthGuardResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 10,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.config.health_guard",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaV1ProfileReadiness",
+        "EventAlphaV1ReadinessResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 11,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EnvironmentCheck",
+        "EventAlphaEnvironmentDoctorResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 10,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.doctor.environment",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "DeliverySummary",
+        "NotificationDeliveryConfig",
+        "NotificationDeliveryRecord"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 50,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.notifications.delivery",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaNotificationInboxItem",
+        "EventAlphaNotificationInboxResult",
+        "EventAlphaReviewQueueItem"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 34,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.notifications.inbox.models",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "DeliveryIdentity",
+        "EventAlphaExploratoryDigestItem",
+        "EventAlphaNotificationConfig",
+        "EventAlphaNotificationPlan",
+        "EventAlphaResearchReviewDigestItem",
+        "EventAlphaResearchReviewSkippedItem"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 37,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.notifications.legacy.delivery_models",
+      "public_class_count": 6,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventDiscoveryProviderStatus",
+        "ProviderStatus"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 21,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.notifications.provider_status",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "TelegramRecipientCheckResult",
+        "TelegramRecipientCheckRow"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 9,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.notifications.recipient_check",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaRoute",
+        "EventAlphaRouteDecision",
+        "EventAlphaRouteLane",
+        "EventAlphaRouterConfig",
+        "EventAlphaRouterResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 24,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.notifications.router",
+      "public_class_count": 5,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaNotificationRunsConfig",
+        "EventAlphaNotificationRunsReadResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 4,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.notifications.runs",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventWatchlistMonitorResult",
+        "EventWatchlistMonitorRow"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 21,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaBurnInPackResult",
+        "EventAlphaBurnInReadinessResult",
+        "EventAlphaBurnInScorecard"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 24,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.outcomes.burn_in",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaEvalExportResult",
+        "EventAlphaFeedbackReadinessResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 33,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.outcomes.feedback",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventFeedbackConfig",
+        "EventFeedbackLabel",
+        "EventFeedbackReadResult",
+        "EventFeedbackRecord"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 50,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.outcomes.feedback_labels",
+      "public_class_count": 4,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaPolicyScenario",
+        "EventAlphaPolicySimulationResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 7,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.outcomes.policy_simulator",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaPriors",
+        "EventAlphaPriorsConfig",
+        "EventAlphaPriorsShadowResult",
+        "EventAlphaPriorsShadowRow"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 11,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.outcomes.priors",
+      "public_class_count": 4,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaQualityCoverageBucket",
+        "EventAlphaQualityCoverageMissingRow",
+        "EventAlphaQualityCoverageResult",
+        "EventAlphaQualityReviewResult",
+        "EventAlphaSignalQualityExportResult",
+        "EventAlphaTuningSuggestion",
+        "EventAlphaTuningWorksheet",
+        "SignalQualityCaseResult",
+        "SignalQualityEvalResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 8,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.outcomes.quality.models",
+      "public_class_count": 9,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "BybitAnnouncementsPreflightReport",
+        "BybitAnnouncementsRehearsalReport",
+        "RequestBudgetExceeded"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 53,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "CoinalyzePreflightReport",
+        "CoinalyzeRehearsalReport"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 74,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "DexOnchainProviderReadinessRow",
+        "DexOnchainReadinessReport",
+        "DexOnchainReadinessResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 61,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "LiveProviderReadinessProvider",
+        "LiveProviderReadinessReport"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 51,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "OfficialExchangeActivationProviderRow",
+        "OfficialExchangeActivationReport"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 45,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.providers.official_exchange_activation",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventProviderHealthConfig",
+        "HealthCheckedDerivativesProvider",
+        "HealthCheckedEventProvider",
+        "HealthCheckedProvider",
+        "HealthCheckedUniverseProvider",
+        "ProviderHealthDecision",
+        "ProviderHealthResetResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 75,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.providers.provider_health_legacy",
+      "public_class_count": 7,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "FeedHealth",
+        "ProviderCoverageStatus",
+        "SourceClass",
+        "SourceDescriptor",
+        "SourceMission",
+        "SourceRegistryAssessment"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 47,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.providers.source_registry",
+      "public_class_count": 6,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "UnlockCalendarPreflightReport",
+        "UnlockCalendarProviderPreflightRow"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 49,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAnomalyLifecycleState",
+        "EventAnomalyStateEntry",
+        "EventAnomalyStateResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 15,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.anomaly_state",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "CatalystSearchRunResult",
+        "CatalystSearchScore",
+        "EventCatalystSearchConfig",
+        "EventImpactHypothesisSearchConfig",
+        "HypothesisSearchQuerySpec",
+        "SearchQuery",
+        "SearchResultEvent"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 22,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.models",
+      "public_class_count": 7,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "CatalystSearchProvider",
+        "CompositeCatalystSearchProvider",
+        "CryptoPanicCatalystSearchProvider",
+        "EventProviderCatalystSearchProvider",
+        "FixtureCatalystSearchProvider",
+        "GdeltCatalystSearchProvider",
+        "PolymarketCatalystSearchProvider",
+        "ProjectRssCatalystSearchProvider"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 52,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers",
+      "public_class_count": 8,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "CauseStatus",
+        "ClaimPolarity",
+        "EventClaim"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 12,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.claim_semantics",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "CanonicalCoreOpportunityView",
+        "CoreEvidenceAcquisitionView",
+        "EventCoreOpportunityCardLinkUpdateResult",
+        "EventCoreOpportunityStoreConfig",
+        "EventCoreOpportunityStoreNormalizeResult",
+        "EventCoreOpportunityStoreReadResult",
+        "EventCoreOpportunityStoreWriteResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 48,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.core.models",
+      "public_class_count": 7,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "CanonicalCoreResolution",
+        "CoreOpportunity"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 57,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.core_opportunities",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventEvidenceAcquisitionRunResult",
+        "EvidenceAcquisitionConfig",
+        "EvidenceAcquisitionQueryResult",
+        "EvidenceAcquisitionRequest",
+        "EvidenceAcquisitionResult",
+        "EvidenceAcquisitionStatus",
+        "EvidenceSearchProvider"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 54,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.evidence.models",
+      "public_class_count": 7,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EvidenceQualityResult",
+        "EvidenceSpecificity",
+        "SourceClass"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 10,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.evidence_quality",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "ClusterEvidence",
+        "EventCluster",
+        "EventClusterAssetLink"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 21,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.graph",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "AssetIdentity",
+        "AssetKnowledge",
+        "AssetRoleCapabilities",
+        "AssetRoleValidation",
+        "IdentityEvidence",
+        "IdentityMatchResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 29,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.identity",
+      "public_class_count": 6,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventImpactHypothesis",
+        "HypothesisScope",
+        "HypothesisStatus",
+        "ImpactCategory",
+        "ImpactPathReason",
+        "ValidationStage"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 14,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.models",
+      "public_class_count": 6,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventImpactHypothesisStoreConfig",
+        "EventImpactHypothesisStoreReadResult",
+        "EventImpactHypothesisStoreWriteResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 10,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "CandidateRole",
+        "ImpactPathStrength",
+        "ImpactPathType",
+        "ImpactPathValidation"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 27,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.impact_path_validator",
+      "public_class_count": 4,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "CanonicalIncident",
+        "IncidentAssetRole",
+        "IncidentSubjectValidation"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 38,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.incident_graph",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventIncidentStoreConfig",
+        "EventIncidentStoreReadResult",
+        "EventIncidentStoreWriteResult",
+        "IncidentLinkQuality"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 26,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.incidents.models",
+      "public_class_count": 4,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventLLMConfig",
+        "EventLLMReportRow",
+        "EventLLMValidationError"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 18,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.llm.analyzer",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventLLMBudgetConfig",
+        "EventLLMBudgetRunTracker",
+        "EventLLMBudgetSnapshot"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 59,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.llm.budget",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventLLMCatalystFrame",
+        "EventLLMCatalystFrameAnalysis",
+        "EventLLMCatalystFrameConfig",
+        "EventLLMCatalystFrameReportRow",
+        "EventLLMCatalystFrameValidationError"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 25,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames",
+      "public_class_count": 5,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAnalystSummary",
+        "EvidenceContradictionStatus",
+        "EvidencePlanQuery",
+        "EvidencePlannerRequest",
+        "EvidencePlannerResult",
+        "LLMAnalystToolBudgetConfig",
+        "LLMAnalystToolBudgetResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 44,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.llm.evidence_planner",
+      "public_class_count": 7,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventLLMAssetMentionType",
+        "EventLLMCatalystType",
+        "EventLLMCryptoAssetMention",
+        "EventLLMEventDateHint",
+        "EventLLMExternalCatalystCandidate",
+        "EventLLMExtractionQuote",
+        "EventLLMFalsePositiveTerm",
+        "EventLLMRawEventExtraction"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 13,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.llm.extraction_models",
+      "public_class_count": 8,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventLLMExtractionReportRow",
+        "EventLLMExtractionValidationError",
+        "EventLLMExtractorConfig",
+        "RawEventExtractionPriority"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 17,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.llm.extractor",
+      "public_class_count": 4,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventLLMAnalysis",
+        "EventLLMAssetRelationship",
+        "EventLLMAssetRole",
+        "EventLLMEvidenceQuote",
+        "EventLLMExternalCatalyst",
+        "EventLLMRecommendedAlertAction",
+        "EventLLMRelationshipType",
+        "EventLLMSourceQuality"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 24,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.llm.models",
+      "public_class_count": 8,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "MarketAnomalyScanResult",
+        "MarketAnomalyScannerConfig"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 20,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventMarketConfirmationInput",
+        "EventMarketConfirmationResult",
+        "MarketConfirmationLevel",
+        "MarketConfirmationReason"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 31,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.market_confirmation",
+      "public_class_count": 4,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventMarketState",
+        "EventOpportunityType",
+        "MarketReactionInput",
+        "MarketReactionResult",
+        "MarketStateSnapshot"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 30,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.market_reaction",
+      "public_class_count": 5,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "MissedOpportunity",
+        "MissedOpportunityResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 21,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.missed",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventNearMissCandidate",
+        "EventNearMissConfig",
+        "EventNearMissRefreshResult",
+        "EventTargetedMarketRefreshQueueItem"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 53,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.near_miss.models",
+      "public_class_count": 4,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "AcquisitionConfirmation",
+        "LiveConfirmationVerdict",
+        "OpportunityLevel",
+        "OpportunityUpgradePath",
+        "OpportunityVerdict",
+        "VerdictAwareUpgradeDowngradeText"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 12,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.opportunity_verdict",
+      "public_class_count": 6,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaPipelineResult",
+        "EventAlphaSendResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 27,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.pipeline_models",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventPlaybookAction",
+        "EventPlaybookAssessment",
+        "EventPlaybookType"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 18,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.playbooks",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventFadeOutcomePriceExportResult",
+        "EventFadePriceAsset"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 9,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.price_history",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventAlphaSourceCoveragePack",
+        "EventAlphaSourceCoverageReport"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 45,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.source_coverage.models",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventArticleExtraction",
+        "EventLLMSourceTriage",
+        "EventSourceEnrichmentConfig",
+        "EventSourceEnrichmentResult",
+        "EventSourceFetchResult",
+        "EventSourceQualityJudgeConfig",
+        "EventSourceQualityJudgment",
+        "EventSourceTriageResult",
+        "LLMSourceQualityJudgeProvider"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 37,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.source_enrichment",
+      "public_class_count": 9,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventFadeValidationReview",
+        "ValidationCohort",
+        "ValidationLabelingQueue",
+        "ValidationLabelingQueueItem",
+        "ValidationOutcomeCandle",
+        "ValidationOutcomeFillResult",
+        "ValidationReviewTemplateCheck",
+        "ValidationReviewTemplateIssue",
+        "ValidationSampleEvidenceChange",
+        "ValidationSampleMergeResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 60,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.validation.models",
+      "public_class_count": 10,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventWatchlistConfig",
+        "EventWatchlistEntry",
+        "EventWatchlistReadResult",
+        "EventWatchlistRefreshResult",
+        "EventWatchlistState"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 12,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.models",
+      "public_class_count": 5,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "EventWatchlistEnrichmentResult",
+        "FixtureWatchlistDerivativesProvider",
+        "FixtureWatchlistDexLiquidityProvider",
+        "FixtureWatchlistProtocolMetricsProvider",
+        "FixtureWatchlistSupplyProvider",
+        "WatchlistDerivativesProvider",
+        "WatchlistDexLiquidityProvider",
+        "WatchlistProtocolMetricsProvider",
+        "WatchlistSupplyProvider"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 13,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_enrichment",
+      "public_class_count": 9,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "CoinGeckoWatchlistMarketProvider",
+        "EventWatchlistMarketProvider",
+        "EventWatchlistMarketResult",
+        "FixtureWatchlistMarketProvider"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 30,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
+      "public_class_count": 4,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "ShimAuditRow",
+        "ShimReference",
+        "ShimRegistryEntry"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 17,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.shims",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "DiscoveredAsset",
+        "DiscoveredEventFadeCandidate",
+        "EventAssetLink",
+        "EventClassification",
+        "EventDiscoveryResult",
+        "NormalizedEvent",
+        "RawDiscoveredEvent"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 17,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_core.models",
+      "public_class_count": 7,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "AssetUniverseProvider",
+        "EventProvider"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 5,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_providers.base",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "LLMCatalystFrameProvider",
+        "LLMExtractionProvider",
+        "LLMProviderResult",
+        "LLMRelationshipProvider",
+        "LLMSourceQualityProvider"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 5,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.llm_providers.base",
+      "public_class_count": 5,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "FixtureLLMCatalystFrameProvider",
+        "FixtureLLMExtractionProvider",
+        "FixtureLLMRelationshipProvider",
+        "FixtureLLMSourceQualityProvider"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 54,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.llm_providers.fixture",
+      "public_class_count": 4,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "LaunchdCommandResult",
+        "LaunchdServiceStatus",
+        "LogFileStatus",
+        "LogRotationResult",
+        "MaintenanceAgentInstallResult"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 12,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.ops",
+      "public_class_count": 5,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "ClassOwnershipRow",
+        "FunctionOwnershipRow"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 10,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.refactor_class_ownership_report",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "SetupDefinition",
+        "SignalDefinition"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 7,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.signal_registry",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    }
+  ],
+  "model_bundles_count": 79,
+  "namespace_lifecycle_status": {
+    "namespace_count": 46,
+    "status_counts": {
+      "active_fixture_smoke": 18,
+      "active_integrated_smoke": 1,
+      "active_live_rehearsal": 9,
+      "active_provider_preflight": 5,
+      "active_provider_rehearsal": 5,
+      "active_refactor_report": 1,
+      "manual_review": 5,
+      "quarantine": 1,
+      "stale_deprecated": 1
+    },
+    "unknown_namespace_count": 0,
+    "unknown_namespaces": []
+  },
+  "old_path_docs_references": 0,
+  "old_path_import_allowed_exceptions": 19,
+  "old_path_internal_imports": 0,
+  "old_path_test_imports": 0,
+  "production_files_over_1200_lines": 12,
+  "production_files_over_1500_lines": 0,
+  "retained_public_shims": [
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.context",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.artifacts.context. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_artifacts",
+      "reason": "Historical artifact-context helper import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.paths",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.artifacts.paths. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_artifact_paths",
+      "reason": "Historical artifact-path helper import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.run_ledger",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.artifacts.run_ledger. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_run_ledger",
+      "reason": "Historical run-ledger helper import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.retention",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.artifacts.retention. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_retention",
+      "reason": "Historical artifact-retention helper import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.locks",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.artifacts.locks. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_run_lock",
+      "reason": "Historical run-lock helper import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.doctor.artifact_doctor",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_artifact_doctor",
+      "reason": "Historical artifact-doctor import and entrypoint path retained for public compatibility while the implementation lives under event_alpha/doctor."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.config.profiles",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.config.profiles. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_profiles",
+      "reason": "Historical Event Alpha profile import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.config.v1_readiness. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_v1_readiness",
+      "reason": "Historical Event Alpha v1-readiness import path retained for external scripts, older operator snippets, and public import compatibility."
+    },
+    {
+      "expected_lifetime": "Retain through the v3 public compatibility period; revisit only in a documented v4/deprecation release.",
+      "new_path": "crypto_rsi_scanner.event_alpha.config.preflight",
+      "owner_note": "New code must import crypto_rsi_scanner.event_alpha.config.preflight. Keep the old module as an active shim only; deletion requires an accepted compatibility-breaking decision and updated compatibility tests.",
+      "path": "crypto_rsi_scanner.event_alpha_preflight",
+      "reason": "Historical Event Alpha preflight import path retained for external scripts, older operator snippets, and public import compatibility."
+    }
+  ],
+  "retained_public_shims_count": 9,
+  "row_type": "refactor_v3_release_candidate_report",
+  "safety_invariant_confirmation": {
+    "event_fade_remains_outside_event_alpha": true,
+    "no_event_alpha_rsi_signal_writes": true,
+    "no_event_alpha_triggered_fade": true,
+    "no_execution_or_order_logic_changes": true,
+    "no_live_provider_calls_by_default": true,
+    "no_live_telegram_sends": true,
+    "no_live_trading_added": true,
+    "no_paper_trading_behavior_changes": true,
+    "no_secrets_committed": true,
+    "research_only": true
+  },
+  "schema_version": "refactor_v3_release_candidate_report_v1",
+  "source_reports": {
+    "old_import_check": "research/EVENT_ALPHA_OLD_IMPORT_CHECK.json",
+    "refactor_class_ownership_report": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
+    "refactor_completion_map": "research/REFACTOR_COMPLETION_MAP.json",
+    "refactor_final_report": "research/REFACTOR_FINAL_REPORT.json",
+    "refactor_size_gates": "research/REFACTOR_SIZE_GATES.json",
+    "shim_dependency_report": "research/EVENT_ALPHA_SHIM_DEPENDENCY_REPORT.json"
+  },
+  "test_results": {
+    "commands": [
+      {
+        "command": "python3 tests/test_indicators.py",
+        "duration_seconds": 249.4,
+        "failure_output_tail": null,
+        "index": 1,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q",
+        "duration_seconds": 252.71,
+        "failure_output_tail": null,
+        "index": 2,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "python3 -m compileall -q crypto_rsi_scanner tests",
+        "duration_seconds": 0.06,
+        "failure_output_tail": null,
+        "index": 3,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make test-pytest-safe PYTHON=python3",
+        "duration_seconds": 266.8,
+        "failure_output_tail": null,
+        "index": 4,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-size-gates PYTHON=python3",
+        "duration_seconds": 4.08,
+        "failure_output_tail": null,
+        "index": 5,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-class-ownership-report PYTHON=python3",
+        "duration_seconds": 1.14,
+        "failure_output_tail": null,
+        "index": 6,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-completion-map PYTHON=python3",
+        "duration_seconds": 94.98,
+        "failure_output_tail": null,
+        "index": 7,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-final-report PYTHON=python3",
+        "duration_seconds": 29.38,
+        "failure_output_tail": null,
+        "index": 8,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-shim-report PYTHON=python3",
+        "duration_seconds": 0.04,
+        "failure_output_tail": null,
+        "index": 9,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-shim-dependency-report PYTHON=python3",
+        "duration_seconds": 24.93,
+        "failure_output_tail": null,
+        "index": 10,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-old-import-check PYTHON=python3",
+        "duration_seconds": 22.21,
+        "failure_output_tail": null,
+        "index": 11,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-integrated-radar-smoke PYTHON=python3",
+        "duration_seconds": 26.64,
+        "failure_output_tail": null,
+        "index": 12,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-integrated-radar-doctor PYTHON=python3",
+        "duration_seconds": 25.66,
+        "failure_output_tail": null,
+        "index": 13,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-notification-format-smoke PYTHON=python3",
+        "duration_seconds": 27.45,
+        "failure_output_tail": null,
+        "index": 14,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-telegram-no-send-final-check-fast PYTHON=python3",
+        "duration_seconds": 28.12,
+        "failure_output_tail": null,
+        "index": 15,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-evidence-acquisition-smoke PYTHON=python3",
+        "duration_seconds": 29.4,
+        "failure_output_tail": null,
+        "index": 16,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3",
+        "duration_seconds": 29.77,
+        "failure_output_tail": null,
+        "index": 17,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-preflight-smoke PYTHON=python3",
+        "duration_seconds": 0.71,
+        "failure_output_tail": null,
+        "index": 18,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-preflight PYTHON=python3",
+        "duration_seconds": 0.7,
+        "failure_output_tail": null,
+        "index": 19,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3",
+        "duration_seconds": 0.68,
+        "failure_output_tail": null,
+        "index": 20,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+        "duration_seconds": 0.69,
+        "failure_output_tail": null,
+        "index": 21,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+        "duration_seconds": 4.59,
+        "failure_output_tail": null,
+        "index": 22,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+        "duration_seconds": 1.27,
+        "failure_output_tail": null,
+        "index": 23,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3",
+        "duration_seconds": 27.65,
+        "failure_output_tail": null,
+        "index": 24,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make backtest-costs PYTHON=python3",
+        "duration_seconds": 0.58,
+        "failure_output_tail": null,
+        "index": 25,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make verify PYTHON=python3",
+        "duration_seconds": 250.72,
+        "failure_output_tail": null,
+        "index": 26,
+        "returncode": 0,
+        "status": "pass"
+      }
+    ],
+    "commands_failed": 0,
+    "commands_passed": 26,
+    "commands_run": 26,
+    "duration_seconds_total": 1400.36
+  },
+  "top_level_event_module_count": 10,
+  "top_level_implementation_event_modules": [
+    {
+      "module": "crypto_rsi_scanner.event_fade",
+      "path": "crypto_rsi_scanner/event_fade.py",
+      "reason": "Intentional safety boundary outside Event Alpha; owns TRIGGERED_FADE with proxy_fade."
+    }
+  ],
+  "unresolved_multi_class_modules_count": 0,
+  "unresolved_production_files_over_1200_lines": 0
+}

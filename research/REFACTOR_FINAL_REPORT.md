@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T22:23:28+00:00`
+- generated_at: `2026-07-04T22:45:12+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `115`
@@ -262,8 +262,8 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 | path | lines | status | revisit condition |
 |---|---:|---|---|
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1499 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py` | 1498 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1498 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |

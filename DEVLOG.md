@@ -17,6 +17,55 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Accept Event Alpha refactor v3 release candidate · Codex
+**Why:** The final v3 pass needed a complete safe verification gauntlet and a
+checked-in release-candidate report before accepting the refactor as the
+current baseline.
+**Changes:**
+- Ran the full 26-command safe verification set requested for the v3 RC; every
+  command returned `0`.
+- Added `research/REFACTOR_V3_RELEASE_CANDIDATE_REPORT.md/json` with command
+  results, top-level implementation modules, retained public shims, deleted
+  shims, old-path import counters, size/class/model-bundle status, doctor
+  registry status, namespace lifecycle status, and safety invariant
+  confirmation.
+- Added the accepted decision “Event Alpha refactor v3 accepted” and updated
+  `ROADMAP.md` with the accepted RC status.
+**Verify:** Passed `python3 tests/test_indicators.py`; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py
+-q`; `python3 -m compileall -q crypto_rsi_scanner tests`; `make
+test-pytest-safe PYTHON=python3`; `make refactor-size-gates PYTHON=python3`;
+`make refactor-class-ownership-report PYTHON=python3`; `make
+refactor-completion-map PYTHON=python3`; `make refactor-final-report
+PYTHON=python3`; `make event-alpha-shim-report PYTHON=python3`; `make
+event-alpha-shim-dependency-report PYTHON=python3`; `make
+event-alpha-old-import-check PYTHON=python3`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make
+event-alpha-notification-format-smoke PYTHON=python3`; `make
+event-alpha-telegram-no-send-final-check-fast PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-preflight PYTHON=python3`; `make
+event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`; `make
+event-alpha-source-coverage-report PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1
+PYTHON=python3`; `make backtest-costs PYTHON=python3`; and `make verify
+PYTHON=python3`.
+**Notes/risks:** The RC accepts only blocker-level gates. The broader
+`refactor-final-report` still shows accepted warning debt for production files
+over 1,200 lines and the three storage mixin class exceptions, all documented
+with owner notes. No live provider calls, live Telegram sends, trading,
+paper-trading behavior changes, execution/order logic, Event Alpha RSI writes,
+or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-05 — Finalize Event Alpha public shim surface · Codex
 **Why:** The v3 shim deletion pass needed to prove no nonessential old Event
 Alpha shims remain while preserving the few intentional public entrypoints and

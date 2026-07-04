@@ -425,7 +425,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 2405,
+          "line": 2440,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -4362,7 +4362,7 @@
       ]
     }
   ],
-  "generated_at": "2026-07-04T22:22:51.829334+00:00",
+  "generated_at": "2026-07-04T22:45:59.274002+00:00",
   "legacy_import_compatibility_test": "tests/event_alpha/test_legacy_import_compatibility.py",
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
