@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split near-threshold report and selection functions · Codex
+**Why:** The refactor goal still has oversized function debt after production
+and legacy file gates passed. This pass removes three near-threshold functions
+from the over-limit inventory without changing alertability, notification
+selection, artifact fields, or integrated radar report semantics.
+**Changes:**
+- Split the radar learning snapshot and outcome tracker Markdown sections out
+  of `format_integrated_daily_brief()` in
+  `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/report.py`.
+- Extracted deterministic research-review skipped-item assembly from
+  `select_research_review_candidates_with_diagnostics()` in
+  `crypto_rsi_scanner/event_alpha/notifications/legacy/research_review_selection.py`.
+- Extracted raw-event validation scanning from
+  `validate_hypotheses_with_raw_events()` in
+  `crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/generation.py`.
+- Refreshed refactor size, class ownership, final, completion-map, and release
+  candidate reports. Current advisory inventory is `14` classes and `42`
+  functions over limits, with `production_files_over_1500_lines=0`,
+  `production_files_over_2000_lines=0`, `legacy_files_over_1500_lines=0`, and
+  `new_violation_count=0`.
+**Verify:** Focused integrated/notification/source-coverage/artifact-schema
+tests passed (`354 passed`), compileall passed for touched Event Alpha
+packages, and refactor report targets passed with `gate_status=pass` and
+completion map `accepted`. Full safe regression was run before commit; see the
+latest `research/REFACTOR_VERIFICATION_RESULTS.json`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Remaining advisory debt is concentrated in large
+notification, daily-brief, doctor-context, provider/model, and
+rendering/serialization functions plus 14 oversized classes.
+
 ## 2026-07-04 — Split watchlist entry builder functions · Codex
 **Why:** The refactor completion goal still tracks oversized functions as
 advisory ownership debt after production and legacy file-size gates passed.

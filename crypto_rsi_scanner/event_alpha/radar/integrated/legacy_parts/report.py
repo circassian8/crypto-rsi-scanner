@@ -131,58 +131,9 @@ def format_integrated_daily_brief(
     lines.extend(["", "## Source Coverage"])
     lines.extend(_source_coverage_lines(rows))
     lines.extend(["", "## Radar Learning Snapshot"])
-    if isinstance(performance_snapshot, Mapping):
-        maturation = performance_snapshot.get("maturation_counts") if isinstance(performance_snapshot.get("maturation_counts"), Mapping) else {}
-        views = performance_snapshot.get("performance_views") if isinstance(performance_snapshot.get("performance_views"), Mapping) else {}
-        early = views.get("early_long_conversion_rate") if isinstance(views, Mapping) else {}
-        fade = views.get("fade_review_exhaustion_rate") if isinstance(views, Mapping) else {}
-        lines.append(f"- Dashboard: {RADAR_PERFORMANCE_DASHBOARD_FILENAME}")
-        lines.append(f"- Evaluated rows: {_int(performance_snapshot.get('rows_evaluated'))}")
-        lines.append(f"- Maturation: {_format_counts(Counter({str(k): _int(v) for k, v in dict(maturation).items()}))}")
-        if isinstance(early, Mapping):
-            lines.append(f"- Early-long conversion rate: {_rate_text(early.get('rate'))}")
-        if isinstance(fade, Mapping):
-            lines.append(f"- Fade-review exhaustion rate: {_rate_text(fade.get('rate'))}")
-        lines.append("- Recommendations only; no automatic threshold changes were applied.")
-    else:
-        lines.append("- Dashboard not available yet.")
+    _append_radar_learning_snapshot(lines, performance_snapshot)
     lines.extend(["", "## Outcome Tracker Status"])
-    if outcomes:
-        matured = sum(1 for row in outcomes if str(row.get("outcome_status") or "") == "filled")
-        partial = sum(1 for row in outcomes if str(row.get("outcome_status") or "") != "filled")
-        performance_rows = [row for row in outcomes if _truthy(row.get("include_in_performance"))]
-        diagnostics = [row for row in outcomes if not _truthy(row.get("include_in_performance"))]
-        lines.append(f"- Outcome rows: {len(outcomes)}")
-        lines.append(f"- Filled: {matured}")
-        lines.append(f"- Partial/missing data: {partial}")
-        lines.append(f"- Performance rows: {len(performance_rows)}")
-        lines.append(f"- Diagnostics excluded: {len(diagnostics)}")
-        for lane, count in Counter(str(row.get("opportunity_type") or "unknown") for row in performance_rows).most_common():
-            lines.append(f"- {lane}: {count}")
-        lines.extend(["", "## Recently Matured Integrated Radar Outcomes"])
-        for row in sorted(performance_rows, key=lambda item: str(item.get("preview_time") or item.get("observed_at") or ""), reverse=True)[:10]:
-            lines.append(
-                f"- {row.get('symbol')}/{row.get('coin_id')} {row.get('opportunity_type')} "
-                f"label={row.get('outcome_label')} primary={_pct(row.get('primary_horizon_return'))} "
-                f"vs BTC={_pct(_by_horizon(row.get('relative_return_vs_btc_by_horizon'), row.get('primary_horizon')))} "
-                f"status={row.get('outcome_status')}"
-            )
-        if diagnostics:
-            lines.append(f"- Diagnostics excluded from performance: {len(diagnostics)}")
-        lines.extend(["", "## Calibration Snapshot"])
-        for lane, lane_rows in sorted(_group_by(performance_rows, "opportunity_type").items()):
-            validated = sum(1 for row in lane_rows if _outcome_truth(row) == "validated")
-            invalidated = sum(1 for row in lane_rows if _outcome_truth(row) == "invalidated/noise")
-            inconclusive = sum(1 for row in lane_rows if _outcome_truth(row) == "inconclusive")
-            rate = validated / max(1, validated + invalidated)
-            lines.append(
-                f"- {lane}: rows={len(lane_rows)} validated={validated} "
-                f"invalidated/noise={invalidated} inconclusive={inconclusive} "
-                f"validation_rate={rate:.2f}"
-            )
-        lines.append("- Small-sample warning: recommendations only; no automatic threshold or routing changes were applied.")
-    else:
-        lines.append("- No integrated radar outcomes filled yet.")
+    _append_outcome_tracker_status(lines, outcomes)
     lines.extend(["", "## Diagnostics Appendix"])
     diagnostics = [row for row in rows if row.get("opportunity_type") == event_market_reaction.EventOpportunityType.DIAGNOSTIC.value]
     if not diagnostics:
@@ -190,6 +141,61 @@ def format_integrated_daily_brief(
     for row in diagnostics[:10]:
         lines.extend(_candidate_summary_lines(row, compact=True))
     return "\n".join(lines).rstrip() + "\n"
+
+def _append_radar_learning_snapshot(lines: list[str], performance_snapshot: Mapping[str, Any] | None) -> None:
+    if not isinstance(performance_snapshot, Mapping):
+        lines.append("- Dashboard not available yet.")
+        return
+    maturation = performance_snapshot.get("maturation_counts") if isinstance(performance_snapshot.get("maturation_counts"), Mapping) else {}
+    views = performance_snapshot.get("performance_views") if isinstance(performance_snapshot.get("performance_views"), Mapping) else {}
+    early = views.get("early_long_conversion_rate") if isinstance(views, Mapping) else {}
+    fade = views.get("fade_review_exhaustion_rate") if isinstance(views, Mapping) else {}
+    lines.append(f"- Dashboard: {RADAR_PERFORMANCE_DASHBOARD_FILENAME}")
+    lines.append(f"- Evaluated rows: {_int(performance_snapshot.get('rows_evaluated'))}")
+    lines.append(f"- Maturation: {_format_counts(Counter({str(k): _int(v) for k, v in dict(maturation).items()}))}")
+    if isinstance(early, Mapping):
+        lines.append(f"- Early-long conversion rate: {_rate_text(early.get('rate'))}")
+    if isinstance(fade, Mapping):
+        lines.append(f"- Fade-review exhaustion rate: {_rate_text(fade.get('rate'))}")
+    lines.append("- Recommendations only; no automatic threshold changes were applied.")
+
+def _append_outcome_tracker_status(lines: list[str], outcomes: list[dict[str, Any]]) -> None:
+    if not outcomes:
+        lines.append("- No integrated radar outcomes filled yet.")
+        return
+    matured = sum(1 for row in outcomes if str(row.get("outcome_status") or "") == "filled")
+    partial = sum(1 for row in outcomes if str(row.get("outcome_status") or "") != "filled")
+    performance_rows = [row for row in outcomes if _truthy(row.get("include_in_performance"))]
+    diagnostics = [row for row in outcomes if not _truthy(row.get("include_in_performance"))]
+    lines.append(f"- Outcome rows: {len(outcomes)}")
+    lines.append(f"- Filled: {matured}")
+    lines.append(f"- Partial/missing data: {partial}")
+    lines.append(f"- Performance rows: {len(performance_rows)}")
+    lines.append(f"- Diagnostics excluded: {len(diagnostics)}")
+    for lane, count in Counter(str(row.get("opportunity_type") or "unknown") for row in performance_rows).most_common():
+        lines.append(f"- {lane}: {count}")
+    lines.extend(["", "## Recently Matured Integrated Radar Outcomes"])
+    for row in sorted(performance_rows, key=lambda item: str(item.get("preview_time") or item.get("observed_at") or ""), reverse=True)[:10]:
+        lines.append(
+            f"- {row.get('symbol')}/{row.get('coin_id')} {row.get('opportunity_type')} "
+            f"label={row.get('outcome_label')} primary={_pct(row.get('primary_horizon_return'))} "
+            f"vs BTC={_pct(_by_horizon(row.get('relative_return_vs_btc_by_horizon'), row.get('primary_horizon')))} "
+            f"status={row.get('outcome_status')}"
+        )
+    if diagnostics:
+        lines.append(f"- Diagnostics excluded from performance: {len(diagnostics)}")
+    lines.extend(["", "## Calibration Snapshot"])
+    for lane, lane_rows in sorted(_group_by(performance_rows, "opportunity_type").items()):
+        validated = sum(1 for row in lane_rows if _outcome_truth(row) == "validated")
+        invalidated = sum(1 for row in lane_rows if _outcome_truth(row) == "invalidated/noise")
+        inconclusive = sum(1 for row in lane_rows if _outcome_truth(row) == "inconclusive")
+        rate = validated / max(1, validated + invalidated)
+        lines.append(
+            f"- {lane}: rows={len(lane_rows)} validated={validated} "
+            f"invalidated/noise={invalidated} inconclusive={inconclusive} "
+            f"validation_rate={rate:.2f}"
+        )
+    lines.append("- Small-sample warning: recommendations only; no automatic threshold or routing changes were applied.")
 
 def build_integrated_notification_delivery_rows(
     candidates: Iterable[Mapping[str, Any]],

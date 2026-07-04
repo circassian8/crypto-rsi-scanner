@@ -22,6 +22,46 @@ def select_research_review_candidates(
     )
     return selected
 
+def _research_review_skipped_item(
+    decision: event_alpha_router.EventAlphaRouteDecision,
+    reason: str,
+    *,
+    core_index: Mapping[str, Mapping[str, Any]],
+    detail: str | None = None,
+    rank_score: float | None = None,
+) -> EventAlphaResearchReviewSkippedItem:
+    entry = decision.entry
+    core = _core_row_for_decision(decision, core_index) or {}
+    components = dict(getattr(entry, "latest_score_components", {}) or {})
+    symbol = str(core.get("symbol") or core.get("validated_symbol") or entry.symbol or components.get("validated_symbol") or "UNKNOWN")
+    coin_id = str(core.get("coin_id") or core.get("validated_coin_id") or entry.coin_id or components.get("validated_coin_id") or "unknown")
+    core_id = _core_id_for_decision(decision, core_index)
+    card_path = str(core.get("research_card_path") or core.get("card_path") or components.get("research_card_path") or "") or None
+    return EventAlphaResearchReviewSkippedItem(
+        symbol=symbol,
+        coin_id=coin_id,
+        core_opportunity_id=core_id,
+        score=_research_review_score(decision),
+        rank_score=float(rank_score if rank_score is not None else _research_review_score(decision)),
+        skip_reason=reason,
+        candidate_family_id=_research_review_family_id(
+            symbol=symbol,
+            coin_id=coin_id,
+            core_opportunity_id=core_id,
+            decision=decision,
+            core=core,
+        ),
+        opportunity_type=str(core.get("opportunity_type") or components.get("opportunity_type") or "").strip() or None,
+        final_opportunity_level=str(
+            core.get("final_opportunity_level")
+            or components.get("opportunity_level")
+            or getattr(decision, "opportunity_level", "")
+            or ""
+        ).strip() or None,
+        card_path=event_artifact_paths.artifact_display_path(card_path) if card_path else None,
+        detail=detail,
+    )
+
 def select_research_review_candidates_with_diagnostics(
     decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
     *,
@@ -52,36 +92,12 @@ def select_research_review_candidates_with_diagnostics(
         detail: str | None = None,
         rank_score: float | None = None,
     ) -> None:
-        entry = decision.entry
-        core = _core_row_for_decision(decision, core_index) or {}
-        components = dict(getattr(entry, "latest_score_components", {}) or {})
-        symbol = str(core.get("symbol") or core.get("validated_symbol") or entry.symbol or components.get("validated_symbol") or "UNKNOWN")
-        coin_id = str(core.get("coin_id") or core.get("validated_coin_id") or entry.coin_id or components.get("validated_coin_id") or "unknown")
-        core_id = _core_id_for_decision(decision, core_index)
-        card_path = str(core.get("research_card_path") or core.get("card_path") or components.get("research_card_path") or "") or None
-        skipped.append(EventAlphaResearchReviewSkippedItem(
-            symbol=symbol,
-            coin_id=coin_id,
-            core_opportunity_id=core_id,
-            score=_research_review_score(decision),
-            rank_score=float(rank_score if rank_score is not None else _research_review_score(decision)),
-            skip_reason=reason,
-            candidate_family_id=_research_review_family_id(
-                symbol=symbol,
-                coin_id=coin_id,
-                core_opportunity_id=core_id,
-                decision=decision,
-                core=core,
-            ),
-            opportunity_type=str(core.get("opportunity_type") or components.get("opportunity_type") or "").strip() or None,
-            final_opportunity_level=str(
-                core.get("final_opportunity_level")
-                or components.get("opportunity_level")
-                or getattr(decision, "opportunity_level", "")
-                or ""
-            ).strip() or None,
-            card_path=event_artifact_paths.artifact_display_path(card_path) if card_path else None,
+        skipped.append(_research_review_skipped_item(
+            decision,
+            reason,
+            core_index=core_index,
             detail=detail,
+            rank_score=rank_score,
         ))
 
     for decision in decisions:
@@ -146,35 +162,11 @@ def select_research_review_candidates_with_diagnostics(
     max_items = max(0, int(cfg.research_review_digest_max_items or 0))
     selected = tuple(items[:max_items])
     for item in items[max_items:]:
-        skipped.append(EventAlphaResearchReviewSkippedItem(
-            symbol=str(item.decision.entry.symbol or "UNKNOWN"),
-            coin_id=str(item.decision.entry.coin_id or "unknown"),
-            core_opportunity_id=_core_id_for_decision(item.decision, core_index),
-            score=_research_review_score(item.decision),
+        skipped.append(_research_review_skipped_item(
+            item.decision,
+            "max_items",
+            core_index=core_index,
             rank_score=item.rank_score,
-            skip_reason="max_items",
-            candidate_family_id=_research_review_family_id(
-                symbol=str(item.decision.entry.symbol or "UNKNOWN"),
-                coin_id=str(item.decision.entry.coin_id or "unknown"),
-                core_opportunity_id=_core_id_for_decision(item.decision, core_index),
-                decision=item.decision,
-                core=_core_row_for_decision(item.decision, core_index) or {},
-            ),
-            opportunity_type=str(
-                (_core_row_for_decision(item.decision, core_index) or {}).get("opportunity_type")
-                or item.decision.entry.latest_score_components.get("opportunity_type")
-                or ""
-            ).strip() or None,
-            final_opportunity_level=str(
-                (_core_row_for_decision(item.decision, core_index) or {}).get("final_opportunity_level")
-                or item.decision.entry.latest_score_components.get("opportunity_level")
-                or ""
-            ).strip() or None,
-            card_path=event_artifact_paths.artifact_display_path(
-                (_core_row_for_decision(item.decision, core_index) or {}).get("research_card_path")
-                or (_core_row_for_decision(item.decision, core_index) or {}).get("card_path")
-                or ""
-            ) or None,
             detail=f"ranked below top {max_items}",
         ))
     return selected, len(items), tuple(skipped)

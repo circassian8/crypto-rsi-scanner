@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T04:47:32.583092+00:00`
+- generated_at: `2026-07-04T04:56:58.284222+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -11,14 +11,14 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `45`
+- production_functions_over_limit: `42`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
 - classes_over_limit_count: `14`
-- functions_over_limit_count: `45`
+- functions_over_limit_count: `42`
 - modules_with_multiple_public_classes_count: `82`
 - new_violation_count: `0`
-- moved_existing_violation_count: `41`
+- moved_existing_violation_count: `38`
 - legacy_decomposition_gate_status: `pass`
 - legacy_files_over_1500_lines: `0`
 - legacy_files_over_3000_lines: `0`
@@ -56,7 +56,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function:crypto_rsi_scanner/event_alpha/doctor/legacy/reporting.py:format_artifact_doctor_report` | `function:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:format_artifact_doctor_report` |
 | `function:crypto_rsi_scanner/event_alpha/notifications/inbox/builder.py:build_notification_inbox` | `function:crypto_rsi_scanner/event_alpha/notifications/inbox.py:build_notification_inbox` |
 | `function:crypto_rsi_scanner/event_alpha/notifications/legacy/preview_writer.py:write_notification_plan_preview` | `function:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:write_notification_plan_preview` |
-| `function:crypto_rsi_scanner/event_alpha/notifications/legacy/research_review_selection.py:select_research_review_candidates_with_diagnostics` | `function:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:select_research_review_candidates_with_diagnostics` |
 | `function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications` | `function:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:send_notifications` |
 | `function:crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py:evaluate_signal_quality_case` | `function:crypto_rsi_scanner/event_alpha/outcomes/quality.py:evaluate_signal_quality_case` |
 | `function:crypto_rsi_scanner/event_alpha/radar/discovery/manual.py:load_discovery_events` | `function:crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py:load_discovery_events` |
@@ -64,11 +63,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function:crypto_rsi_scanner/event_alpha/radar/evidence/executor.py:_execute_request` | `function:crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py:_execute_request` |
 | `function:crypto_rsi_scanner/event_alpha/radar/evidence/executor.py:_validate_raw_result` | `function:crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py:_validate_raw_result` |
 | `function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/builder.py:_hypothesis_from_rule` | `function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:_hypothesis_from_rule` |
-| `function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/generation.py:validate_hypotheses_with_raw_events` | `function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:validate_hypotheses_with_raw_events` |
 | `function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/report.py:format_impact_hypothesis_report` | `function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:format_impact_hypothesis_report` |
 | `function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py:run_integrated_radar_cycle` | `function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:run_integrated_radar_cycle` |
 | `function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py:_merge_family` | `function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:_merge_family` |
-| `function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/report.py:format_integrated_daily_brief` | `function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:format_integrated_daily_brief` |
 | `function:crypto_rsi_scanner/event_alpha/radar/near_miss/candidates.py:_candidate_from_row` | `function:crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py:_candidate_from_row` |
 | `function:crypto_rsi_scanner/event_alpha/radar/near_miss/refresh.py:_refresh_one_hypothesis` | `function:crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py:_refresh_one_hypothesis` |
 | `function:crypto_rsi_scanner/event_alpha/radar/source_coverage/builder.py:build_source_coverage_report` | `function:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:build_source_coverage_report` |
@@ -88,6 +85,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_classes:crypto_rsi_scanner.event_alpha.radar.near_miss.models` | `public_classes:crypto_rsi_scanner.event_alpha.radar.near_miss.legacy` |
 | `public_classes:crypto_rsi_scanner.event_alpha.radar.source_coverage.models` | `public_classes:crypto_rsi_scanner.event_alpha.radar.source_coverage` |
 | `public_classes:crypto_rsi_scanner.event_alpha.radar.validation.models` | `public_classes:crypto_rsi_scanner.event_alpha.radar.validation.legacy` |
+| `public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.models` | `public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.legacy` |
 
 ## Legacy Decomposition Gate
 
@@ -239,7 +237,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/notifications/go_no_go.py:build_go_no_go` | 159 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/notifications/inbox/builder.py:build_notification_inbox` | 186 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/notifications/legacy/preview_writer.py:write_notification_plan_preview` | 190 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/notifications/legacy/research_review_selection.py:select_research_review_candidates_with_diagnostics` | 156 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications` | 406 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/notifications/provider_status.py:build_event_discovery_provider_status` | 229 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/notifications/readiness.py:build_send_readiness` | 193 |
@@ -255,13 +252,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/evidence/executor.py:_execute_request` | 167 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/evidence/executor.py:_validate_raw_result` | 170 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/builder.py:_hypothesis_from_rule` | 199 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/generation.py:validate_hypotheses_with_raw_events` | 152 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/report.py:format_impact_hypothesis_report` | 158 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py:validate_impact_path` | 181 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py:_classify_path` | 271 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py:run_integrated_radar_cycle` | 288 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py:_merge_family` | 245 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/report.py:format_integrated_daily_brief` | 154 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/market_confirmation.py:evaluate_market_confirmation` | 281 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/near_miss/candidates.py:_candidate_from_row` | 158 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/near_miss/refresh.py:_refresh_one_hypothesis` | 276 |

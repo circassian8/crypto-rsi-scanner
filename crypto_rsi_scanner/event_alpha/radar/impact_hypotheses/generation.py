@@ -117,6 +117,74 @@ def generate_impact_hypotheses(
     return tuple(_dedupe_hypotheses(out))
 
 
+@dataclass(frozen=True)
+class _HypothesisValidationMatches:
+    reasons: list[str]
+    rejections: list[str]
+    matched_symbols: list[str]
+    matched_coin_ids: list[str]
+    best_stage: str
+    impact_path_reason: str | None
+    impact_validation: event_impact_path_validator.ImpactPathValidation | None
+    impact_context: tuple[RawDiscoveredEvent, str | None, str | None] | None
+
+
+def _collect_hypothesis_validation_matches(
+    hypothesis: EventImpactHypothesis,
+    rows: tuple[RawDiscoveredEvent, ...],
+) -> _HypothesisValidationMatches:
+    reasons: list[str] = []
+    rejections: list[str] = []
+    matched_symbols: list[str] = []
+    matched_coin_ids: list[str] = []
+    best_stage = hypothesis.validation_stage
+    impact_path_reason: str | None = hypothesis.impact_path_reason
+    impact_validation: event_impact_path_validator.ImpactPathValidation | None = None
+    impact_context: tuple[RawDiscoveredEvent, str | None, str | None] | None = None
+    for raw in rows:
+        detail = _validation_detail(raw, hypothesis)
+        status = str(detail.get("status") or "none")
+        reason = str(detail.get("reason") or "")
+        symbol = str(detail.get("symbol") or "") or None
+        coin_id = str(detail.get("coin_id") or "") or None
+        stage = str(detail.get("validation_stage") or "")
+        if stage:
+            best_stage = _max_validation_stage(best_stage, stage)
+        if status == "accepted" and reason:
+            reasons.append(reason)
+            if symbol:
+                matched_symbols.append(symbol)
+            matched_coin_ids.append(coin_id or "")
+            path_validation = event_impact_path_validator.validate_impact_path(
+                raw,
+                hypothesis,
+                symbol=symbol,
+                coin_id=coin_id,
+                score_components=hypothesis.score_components,
+            )
+            path_reason = path_validation.impact_path_reason
+            preferred = _prefer_impact_validation(impact_validation, path_validation)
+            if preferred is path_validation:
+                impact_context = (raw, symbol, coin_id)
+            impact_validation = preferred
+            if path_reason:
+                impact_path_reason = _prefer_impact_path_reason(impact_path_reason, path_reason)
+                if path_validation.required_evidence_met:
+                    best_stage = _max_validation_stage(best_stage, ValidationStage.IMPACT_PATH_VALIDATED.value)
+        elif reason:
+            rejections.append(reason)
+    return _HypothesisValidationMatches(
+        reasons=reasons,
+        rejections=rejections,
+        matched_symbols=matched_symbols,
+        matched_coin_ids=matched_coin_ids,
+        best_stage=best_stage,
+        impact_path_reason=impact_path_reason,
+        impact_validation=impact_validation,
+        impact_context=impact_context,
+    )
+
+
 def validate_hypotheses_with_raw_events(
     hypotheses: Iterable[EventImpactHypothesis],
     raw_events: Iterable[RawDiscoveredEvent],
@@ -125,46 +193,15 @@ def validate_hypotheses_with_raw_events(
     rows = tuple(raw_events)
     out: list[EventImpactHypothesis] = []
     for hypothesis in hypotheses:
-        reasons: list[str] = []
-        rejections: list[str] = []
-        matched_symbols: list[str] = []
-        matched_coin_ids: list[str] = []
-        best_stage = hypothesis.validation_stage
-        impact_path_reason: str | None = hypothesis.impact_path_reason
-        impact_validation: event_impact_path_validator.ImpactPathValidation | None = None
-        impact_context: tuple[RawDiscoveredEvent, str | None, str | None] | None = None
-        for raw in rows:
-            detail = _validation_detail(raw, hypothesis)
-            status = str(detail.get("status") or "none")
-            reason = str(detail.get("reason") or "")
-            symbol = str(detail.get("symbol") or "") or None
-            coin_id = str(detail.get("coin_id") or "") or None
-            stage = str(detail.get("validation_stage") or "")
-            if stage:
-                best_stage = _max_validation_stage(best_stage, stage)
-            if status == "accepted" and reason:
-                reasons.append(reason)
-                if symbol:
-                    matched_symbols.append(symbol)
-                matched_coin_ids.append(coin_id or "")
-                path_validation = event_impact_path_validator.validate_impact_path(
-                    raw,
-                    hypothesis,
-                    symbol=symbol,
-                    coin_id=coin_id,
-                    score_components=hypothesis.score_components,
-                )
-                path_reason = path_validation.impact_path_reason
-                preferred = _prefer_impact_validation(impact_validation, path_validation)
-                if preferred is path_validation:
-                    impact_context = (raw, symbol, coin_id)
-                impact_validation = preferred
-                if path_reason:
-                    impact_path_reason = _prefer_impact_path_reason(impact_path_reason, path_reason)
-                    if path_validation.required_evidence_met:
-                        best_stage = _max_validation_stage(best_stage, ValidationStage.IMPACT_PATH_VALIDATED.value)
-            elif reason:
-                rejections.append(reason)
+        matches = _collect_hypothesis_validation_matches(hypothesis, rows)
+        reasons = matches.reasons
+        rejections = matches.rejections
+        matched_symbols = matches.matched_symbols
+        matched_coin_ids = matches.matched_coin_ids
+        best_stage = matches.best_stage
+        impact_path_reason = matches.impact_path_reason
+        impact_validation = matches.impact_validation
+        impact_context = matches.impact_context
         if reasons and best_stage in _PROMOTABLE_VALIDATION_STAGES:
             if (
                 _market_confirmation_score(rows) >= 70
