@@ -68,7 +68,7 @@ class EventAlphaSendResult:
 
 
 @dataclass(frozen=True)
-class EventAlphaPipelineResult:
+class _PipelineCoreFields:
     discovery_result: EventDiscoveryResult
     alerts: list[event_alerts.EventAlertCandidate]
     catalyst_search_result: event_catalyst_search.CatalystSearchRunResult | None
@@ -87,6 +87,10 @@ class EventAlphaPipelineResult:
     clock_status: dict[str, Any] = field(default_factory=dict)
     cycle_completed: bool = True
     partial_results: bool = False
+
+
+@dataclass(frozen=True)
+class _PipelineSendFields:
     send_requested: bool = False
     send_attempted: bool = False
     send_success: bool = False
@@ -117,6 +121,10 @@ class EventAlphaPipelineResult:
     research_review_digest_sent: int = 0
     research_review_digest_block_reason: str | None = None
     notification_burn_in: bool = False
+
+
+@dataclass(frozen=True)
+class _PipelineArtifactWriteFields:
     research_card_paths: tuple[Path, ...] = ()
     run_id: str | None = None
     profile: str | None = None
@@ -145,6 +153,10 @@ class EventAlphaPipelineResult:
     core_opportunity_write_success: bool = False
     core_opportunity_rows_written: int = 0
     core_opportunity_write_block_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class _PipelineCryptoPanicFields:
     cryptopanic_configured: bool = False
     cryptopanic_attempted: bool = False
     cryptopanic_requests_used: int = 0
@@ -163,6 +175,8 @@ class EventAlphaPipelineResult:
     cryptopanic_stale_backoff_reconciled_after_success: bool = False
     cryptopanic_skip_reason: str | None = None
 
+
+class _PipelineDiscoveryProperties:
     @property
     def raw_events(self) -> int:
         return len(self.discovery_result.raw_events)
@@ -229,6 +243,8 @@ class EventAlphaPipelineResult:
     def clusters(self) -> int:
         return len(event_graph.build_event_clusters(self.discovery_result))
 
+
+class _PipelineHypothesisWatchlistProperties:
     @property
     def hypotheses_validated(self) -> int:
         return len([
@@ -282,6 +298,8 @@ class EventAlphaPipelineResult:
     def watchlist_monitor_active_entries(self) -> int:
         return self.watchlist_monitor_result.active_entries if self.watchlist_monitor_result else 0
 
+
+class _PipelineRoutingEvidenceProperties:
     @property
     def routed(self) -> int:
         return len(self.router_result.decisions) if self.router_result else 0
@@ -313,6 +331,19 @@ class EventAlphaPipelineResult:
     @property
     def evidence_acquisition_upgraded(self) -> int:
         return self.evidence_acquisition_result.upgraded if self.evidence_acquisition_result else 0
+
+
+@dataclass(frozen=True)
+class EventAlphaPipelineResult(
+    _PipelineRoutingEvidenceProperties,
+    _PipelineHypothesisWatchlistProperties,
+    _PipelineDiscoveryProperties,
+    _PipelineCryptoPanicFields,
+    _PipelineArtifactWriteFields,
+    _PipelineSendFields,
+    _PipelineCoreFields,
+):
+    """Compatibility aggregate for Event Alpha pipeline outputs."""
 
 
 def run_event_alpha_pipeline(

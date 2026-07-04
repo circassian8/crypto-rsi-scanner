@@ -1,6 +1,6 @@
 # Refactor Release-Candidate Report
 
-- generated_at: `2026-07-04T04:10:23+00:00`
+- generated_at: `2026-07-04T04:16:56+00:00`
 - status: `accepted`
 - verdict: Event Alpha refactor v2 accepted: critical behavior, safety, shim, size, scanner-facade, and regression checks passed.
 - verification_failed_commands: `0`
@@ -10,29 +10,29 @@
 
 | status | command | seconds |
 |---|---|---:|
-| `pass` | `python3 tests/test_indicators.py` | 25.145 |
-| `pass` | `env PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q` | 25.858 |
-| `pass` | `python3 -m compileall -q crypto_rsi_scanner tests` | 0.051 |
-| `pass` | `make test-pytest-safe PYTHON=python3` | 26.092 |
-| `pass` | `make refactor-size-gates PYTHON=python3` | 1.089 |
-| `pass` | `make refactor-class-ownership-report PYTHON=python3` | 1.003 |
-| `pass` | `make refactor-final-report PYTHON=python3` | 1.196 |
+| `pass` | `python3 tests/test_indicators.py` | 25.226 |
+| `pass` | `env PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q` | 25.986 |
+| `pass` | `python3 -m compileall -q crypto_rsi_scanner tests` | 0.053 |
+| `pass` | `make test-pytest-safe PYTHON=python3` | 26.903 |
+| `pass` | `make refactor-size-gates PYTHON=python3` | 1.099 |
+| `pass` | `make refactor-class-ownership-report PYTHON=python3` | 1.012 |
+| `pass` | `make refactor-final-report PYTHON=python3` | 1.19 |
 | `pass` | `make event-alpha-shim-report PYTHON=python3` | 0.059 |
-| `pass` | `make event-alpha-integrated-radar-smoke PYTHON=python3` | 1.796 |
-| `pass` | `make event-alpha-integrated-radar-doctor PYTHON=python3` | 0.779 |
-| `pass` | `make event-alpha-notification-format-smoke PYTHON=python3` | 2.055 |
-| `pass` | `make event-alpha-telegram-no-send-final-check-fast PYTHON=python3` | 2.791 |
-| `pass` | `make event-alpha-evidence-acquisition-smoke PYTHON=python3` | 4.36 |
-| `pass` | `make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` | 4.182 |
-| `pass` | `make event-alpha-coinalyze-preflight-smoke PYTHON=python3` | 0.655 |
-| `pass` | `make event-alpha-coinalyze-preflight PYTHON=python3` | 0.635 |
-| `pass` | `make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3` | 0.63 |
-| `pass` | `make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | 0.641 |
-| `pass` | `make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | 4.443 |
-| `pass` | `make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | 0.991 |
-| `pass` | `make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3` | 1.56 |
-| `pass` | `make backtest-costs PYTHON=python3` | 0.557 |
-| `pass` | `make verify PYTHON=python3` | 26.568 |
+| `pass` | `make event-alpha-integrated-radar-smoke PYTHON=python3` | 1.813 |
+| `pass` | `make event-alpha-integrated-radar-doctor PYTHON=python3` | 0.797 |
+| `pass` | `make event-alpha-notification-format-smoke PYTHON=python3` | 2.095 |
+| `pass` | `make event-alpha-telegram-no-send-final-check-fast PYTHON=python3` | 2.908 |
+| `pass` | `make event-alpha-evidence-acquisition-smoke PYTHON=python3` | 4.547 |
+| `pass` | `make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` | 4.39 |
+| `pass` | `make event-alpha-coinalyze-preflight-smoke PYTHON=python3` | 0.696 |
+| `pass` | `make event-alpha-coinalyze-preflight PYTHON=python3` | 0.653 |
+| `pass` | `make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3` | 0.653 |
+| `pass` | `make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | 0.664 |
+| `pass` | `make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | 4.546 |
+| `pass` | `make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | 1.025 |
+| `pass` | `make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3` | 1.588 |
+| `pass` | `make backtest-costs PYTHON=python3` | 0.568 |
+| `pass` | `make verify PYTHON=python3` | 26.935 |
 
 ## Known Remaining Blockers
 

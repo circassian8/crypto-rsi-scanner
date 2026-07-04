@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split Event Alpha pipeline result ownership · Codex
+**Why:** The refactor goal still tracks oversized result/data aggregates after
+production file-size gates passed. This pass reduces the Event Alpha pipeline
+result class while preserving pipeline outputs, derived counters, notification
+telemetry, artifact write metadata, and CryptoPanic provider status fields.
+**Changes:**
+- Split `EventAlphaPipelineResult` in
+  `crypto_rsi_scanner/event_alpha/radar/pipeline.py` into focused private
+  dataclass field groups for core pipeline outputs, send/notification state,
+  artifact-write metadata, and CryptoPanic counters.
+- Moved derived counter properties into small private mixins and kept the public
+  `EventAlphaPipelineResult` name as a compatibility aggregate with the same
+  constructor field order, defaults, and property names.
+- Refreshed refactor size, class ownership, final, completion-map, and release
+  candidate reports. Current advisory inventory is `19` classes and `48`
+  functions over limits, with `production_files_over_1500_lines=0`,
+  `production_files_over_2000_lines=0`, `legacy_files_over_1500_lines=0`, and
+  `new_violation_count=0`.
+**Verify:** Focused pipeline/integrated Event Alpha tests passed (`342 passed`),
+compileall passed for the touched module/test set, and refactor report targets
+passed with `gate_status=pass` and completion map `accepted`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Remaining advisory debt is concentrated in large
+notification, daily-brief, doctor-context, provider/model, and
+rendering/serialization functions plus 19 oversized classes.
+
 ## 2026-07-04 — Split impact hypothesis field ownership · Codex
 **Why:** The refactor objective still tracks field-heavy Event Alpha models as
 advisory ownership debt after production file-size gates passed. This pass

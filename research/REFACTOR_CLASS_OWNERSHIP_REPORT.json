@@ -1,5 +1,5 @@
 {
-  "class_count": 438,
+  "class_count": 445,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
@@ -46,15 +46,6 @@
       "public": true,
       "qualname": "EventIntegratedRadarResult",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py"
-    },
-    {
-      "class_name": "EventAlphaPipelineResult",
-      "exception_reason": null,
-      "line_count": 245,
-      "module": "crypto_rsi_scanner.event_alpha.radar.pipeline",
-      "public": true,
-      "qualname": "EventAlphaPipelineResult",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py"
     },
     {
       "class_name": "EventAlphaSourceCoverageReport",
@@ -183,7 +174,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 20,
+  "classes_over_limit_count": 19,
   "exceptions": [
     {
       "module": "crypto_rsi_scanner.event_core.models",
@@ -585,7 +576,7 @@
     }
   ],
   "functions_over_limit_count": 48,
-  "generated_at": "2026-07-04T04:09:15.296545+00:00",
+  "generated_at": "2026-07-04T04:15:47.788411+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1143,7 +1134,7 @@
     "multiple_public_classes": "allowed for small value objects/enums in documented models modules",
     "public_class_over_75_lines": "should live in its own module unless documented here"
   },
-  "production_classes_over_limit": 20,
+  "production_classes_over_limit": 19,
   "production_classes_over_limit_rows": [
     {
       "class_name": "CoinGeckoClient",
@@ -1189,15 +1180,6 @@
       "public": true,
       "qualname": "EventIntegratedRadarResult",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py"
-    },
-    {
-      "class_name": "EventAlphaPipelineResult",
-      "exception_reason": null,
-      "line_count": 245,
-      "module": "crypto_rsi_scanner.event_alpha.radar.pipeline",
-      "public": true,
-      "qualname": "EventAlphaPipelineResult",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py"
     },
     {
       "class_name": "EventAlphaSourceCoverageReport",

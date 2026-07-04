@@ -2,11 +2,11 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T04:09:15.296545+00:00`
+- generated_at: `2026-07-04T04:15:47.788411+00:00`
 - public_class_count: `407`
-- classes_over_limit_count: `20`
+- classes_over_limit_count: `19`
 - functions_over_limit_count: `48`
-- production_classes_over_limit: `20`
+- production_classes_over_limit: `19`
 - production_functions_over_limit: `48`
 - modules_with_multiple_public_classes_count: `82`
 - legacy_decomposition_gate_status: `pass`
@@ -145,7 +145,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers` | `FixtureCatalystSearchProvider` | 79 | true |  |
 | `crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers` | `EventProviderCatalystSearchProvider` | 88 | true |  |
 | `crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.models` | `EventIntegratedRadarResult` | 88 | true |  |
-| `crypto_rsi_scanner.event_alpha.radar.pipeline` | `EventAlphaPipelineResult` | 245 | true |  |
 | `crypto_rsi_scanner.event_alpha.radar.source_coverage.models` | `EventAlphaSourceCoverageReport` | 143 | true |  |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.models` | `EventWatchlistEntry` | 85 | true |  |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist_market` | `CoinGeckoWatchlistMarketProvider` | 116 | true |  |
