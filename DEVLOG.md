@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split notification cycle and discovery loader functions · Codex
+**Why:** The long-running refactor still tracks advisory oversized-function
+debt after production and legacy size gates passed. This pass reduces three
+remaining command/loader functions without changing CLI flags, Make targets,
+provider guards, notification send gates, or artifact schemas.
+**Changes:**
+- Split `_event_alpha_notify_cycle_body()` in
+  `crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py` into
+  helpers for runtime setup, LLM/provider setup, pipeline execution, support
+  artifact writes, research card writes, notification planning, send/no-send
+  handling, alert snapshots, and ledger summaries.
+- Split `event_alpha_cycle()` in
+  `crypto_rsi_scanner/cli/services/event_alpha_research.py` into helpers for
+  cycle runtime setup, LLM/provider inputs, pipeline invocation, support
+  artifacts, optional cards, alert snapshots, CryptoPanic stats, and run-ledger
+  append.
+- Split `load_discovery_events()` in
+  `crypto_rsi_scanner/event_alpha/radar/discovery/manual.py` into core
+  fixture/exchange/calendar, news/blog, and external/prediction provider loader
+  helpers while preserving the public signature and old imports.
+- Refreshed refactor size, class ownership, and final reports. Current
+  advisory inventory is `14` classes and `22` functions over limits, with
+  `production_files_over_1500_lines=0`, `legacy_files_over_1500_lines=0`, and
+  `new_violation_count=0`.
+**Verify:** Compileall passed for the touched modules. Focused tests passed:
+notification cycle/final-check slice (`3 passed`), notification namespace lock
+slice (`1 passed`), Event Alpha cycle/catalyst-frame slice (`5 passed`), CLI
+command registry/dispatch (`11 passed`), provider discovery loader slice
+(`16 passed`), and artifact-schema smoke (`12 passed`). Refactor class, size,
+and final reports passed with `gate_status=pass`. Full safe verification for
+the committed tree: `python3 tests/test_indicators.py`,
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q`,
+`python3 -m compileall -q crypto_rsi_scanner tests`, and
+`make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No provider calls by default, live
+sends, trading, paper-trading behavior changes, execution/order logic, Event
+Alpha RSI writes, or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Reduce provider and source-coverage function debt · Codex
 **Why:** The production and legacy file-size gates already pass, but the
 refactor goal still tracks advisory oversized-function debt. This pass removes

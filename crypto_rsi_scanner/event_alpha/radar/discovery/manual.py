@@ -357,6 +357,109 @@ def load_discovery_events(
 ) -> list[RawDiscoveredEvent]:
     """Load local event fixtures from every configured research source."""
     events: list[RawDiscoveredEvent] = []
+    events.extend(_load_core_discovery_events(
+        event_path,
+        start,
+        end,
+        binance_announcements_path=binance_announcements_path,
+        binance_announcements_live=binance_announcements_live,
+        binance_announcements_api_key=binance_announcements_api_key,
+        binance_announcements_api_secret=binance_announcements_api_secret,
+        binance_announcements_ws_url=binance_announcements_ws_url,
+        binance_announcements_topic=binance_announcements_topic,
+        binance_announcements_recv_window_ms=binance_announcements_recv_window_ms,
+        binance_announcements_listen_seconds=binance_announcements_listen_seconds,
+        binance_announcements_max_messages=binance_announcements_max_messages,
+        bybit_announcements_path=bybit_announcements_path,
+        bybit_announcements_live=bybit_announcements_live,
+        bybit_announcements_base_url=bybit_announcements_base_url,
+        bybit_announcements_locale=bybit_announcements_locale,
+        bybit_announcements_type=bybit_announcements_type,
+        bybit_announcements_limit=bybit_announcements_limit,
+        bybit_announcements_timeout=bybit_announcements_timeout,
+        coinmarketcal_path=coinmarketcal_path,
+        tokenomist_path=tokenomist_path,
+    ))
+    events.extend(_load_news_discovery_events(
+        start,
+        end,
+        cryptopanic_path=cryptopanic_path,
+        cryptopanic_live=cryptopanic_live,
+        cryptopanic_api_token=cryptopanic_api_token,
+        cryptopanic_base_url=cryptopanic_base_url,
+        cryptopanic_plan=cryptopanic_plan,
+        cryptopanic_public=cryptopanic_public,
+        cryptopanic_following=cryptopanic_following,
+        cryptopanic_filter=cryptopanic_filter,
+        cryptopanic_currencies=cryptopanic_currencies,
+        cryptopanic_regions=cryptopanic_regions,
+        cryptopanic_kind=cryptopanic_kind,
+        cryptopanic_search=cryptopanic_search,
+        cryptopanic_timeout=cryptopanic_timeout,
+        cryptopanic_request_ledger_path=cryptopanic_request_ledger_path,
+        cryptopanic_profile=cryptopanic_profile,
+        cryptopanic_artifact_namespace=cryptopanic_artifact_namespace,
+        cryptopanic_weekly_request_limit=cryptopanic_weekly_request_limit,
+        cryptopanic_requests_per_run_limit=cryptopanic_requests_per_run_limit,
+        cryptopanic_requests_per_day_soft_limit=cryptopanic_requests_per_day_soft_limit,
+        cryptopanic_min_seconds_between_requests=cryptopanic_min_seconds_between_requests,
+        cryptopanic_max_pages_per_query=cryptopanic_max_pages_per_query,
+        cryptopanic_max_currencies_per_request=cryptopanic_max_currencies_per_request,
+        gdelt_path=gdelt_path,
+        gdelt_live=gdelt_live,
+        gdelt_base_url=gdelt_base_url,
+        gdelt_query=gdelt_query,
+        gdelt_max_records=gdelt_max_records,
+        gdelt_timeout=gdelt_timeout,
+        project_blog_rss_path=project_blog_rss_path,
+        project_blog_rss_live=project_blog_rss_live,
+        project_blog_rss_urls=project_blog_rss_urls,
+        project_blog_rss_timeout=project_blog_rss_timeout,
+        project_blog_rss_fail_fast_on_error=project_blog_rss_fail_fast_on_error,
+        provider_health_cfg=provider_health_cfg,
+        provider_warnings=provider_warnings,
+    ))
+    events.extend(_load_external_discovery_events(
+        start,
+        end,
+        external_ipo_path=external_ipo_path,
+        sports_fixtures_path=sports_fixtures_path,
+        prediction_market_events_path=prediction_market_events_path,
+        prediction_market_events_live=prediction_market_events_live,
+        prediction_market_events_base_url=prediction_market_events_base_url,
+        prediction_market_events_limit=prediction_market_events_limit,
+        prediction_market_events_timeout=prediction_market_events_timeout,
+        provider_health_cfg=provider_health_cfg,
+        provider_warnings=provider_warnings,
+    ))
+    return events
+
+
+def _load_core_discovery_events(
+    event_path: str | Path | None,
+    start: datetime,
+    end: datetime,
+    *,
+    binance_announcements_path: str | Path | None,
+    binance_announcements_live: bool,
+    binance_announcements_api_key: str,
+    binance_announcements_api_secret: str,
+    binance_announcements_ws_url: str,
+    binance_announcements_topic: str,
+    binance_announcements_recv_window_ms: int,
+    binance_announcements_listen_seconds: float,
+    binance_announcements_max_messages: int,
+    bybit_announcements_path: str | Path | None,
+    bybit_announcements_live: bool,
+    bybit_announcements_base_url: str,
+    bybit_announcements_locale: str,
+    bybit_announcements_type: str,
+    bybit_announcements_limit: int,
+    bybit_announcements_timeout: float,
+    coinmarketcal_path: str | Path | None,
+    tokenomist_path: str | Path | None,
+) -> list[RawDiscoveredEvent]:
+    events: list[RawDiscoveredEvent] = []
     if event_path:
         events.extend(ManualJsonEventProvider(event_path).fetch_events(start, end))
     if binance_announcements_path or binance_announcements_live:
@@ -385,6 +488,50 @@ def load_discovery_events(
         events.extend(CoinMarketCalProvider(coinmarketcal_path).fetch_events(start, end))
     if tokenomist_path:
         events.extend(TokenomistProvider(tokenomist_path).fetch_events(start, end))
+    return events
+
+
+def _load_news_discovery_events(
+    start: datetime,
+    end: datetime,
+    *,
+    cryptopanic_path: str | Path | None,
+    cryptopanic_live: bool,
+    cryptopanic_api_token: str,
+    cryptopanic_base_url: str,
+    cryptopanic_plan: str,
+    cryptopanic_public: bool,
+    cryptopanic_following: bool,
+    cryptopanic_filter: str,
+    cryptopanic_currencies: str,
+    cryptopanic_regions: str,
+    cryptopanic_kind: str,
+    cryptopanic_search: str,
+    cryptopanic_timeout: float,
+    cryptopanic_request_ledger_path: str | Path | None,
+    cryptopanic_profile: str,
+    cryptopanic_artifact_namespace: str,
+    cryptopanic_weekly_request_limit: int,
+    cryptopanic_requests_per_run_limit: int,
+    cryptopanic_requests_per_day_soft_limit: int,
+    cryptopanic_min_seconds_between_requests: float,
+    cryptopanic_max_pages_per_query: int,
+    cryptopanic_max_currencies_per_request: int,
+    gdelt_path: str | Path | None,
+    gdelt_live: bool,
+    gdelt_base_url: str,
+    gdelt_query: str,
+    gdelt_max_records: int,
+    gdelt_timeout: float,
+    project_blog_rss_path: str | Path | None,
+    project_blog_rss_live: bool,
+    project_blog_rss_urls: Iterable[str] | None,
+    project_blog_rss_timeout: float,
+    project_blog_rss_fail_fast_on_error: bool,
+    provider_health_cfg: event_provider_health.EventProviderHealthConfig | None,
+    provider_warnings: list[str] | None,
+) -> list[RawDiscoveredEvent]:
+    events: list[RawDiscoveredEvent] = []
     if cryptopanic_path or cryptopanic_live:
         provider = CryptoPanicProvider(
             cryptopanic_path,
@@ -451,6 +598,24 @@ def load_discovery_events(
             health_cfg=provider_health_cfg,
             warnings=provider_warnings,
         ))
+    return events
+
+
+def _load_external_discovery_events(
+    start: datetime,
+    end: datetime,
+    *,
+    external_ipo_path: str | Path | None,
+    sports_fixtures_path: str | Path | None,
+    prediction_market_events_path: str | Path | None,
+    prediction_market_events_live: bool,
+    prediction_market_events_base_url: str,
+    prediction_market_events_limit: int,
+    prediction_market_events_timeout: float,
+    provider_health_cfg: event_provider_health.EventProviderHealthConfig | None,
+    provider_warnings: list[str] | None,
+) -> list[RawDiscoveredEvent]:
+    events: list[RawDiscoveredEvent] = []
     if external_ipo_path:
         events.extend(ExternalIpoProvider(external_ipo_path).fetch_events(start, end))
     if sports_fixtures_path:

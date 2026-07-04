@@ -231,30 +231,113 @@ def event_alpha_cycle(
             "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 with a CoinGecko universe fixture/live source."
         )
         return
+    clock_status, now, started_at, run_id = _event_alpha_cycle_runtime(event_now, profile_for_run)
+    alert_cfg = _event_alert_config_from_runtime()
+    pipeline_result = _run_event_alpha_cycle_pipeline(
+        now=now,
+        with_llm=with_llm,
+        send=send,
+        alert_cfg=alert_cfg,
+        clock_status=clock_status,
+        run_id=run_id,
+        profile=profile_for_run,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+    )
+    (
+        pipeline_result,
+        latest_core_rows,
+        hypothesis_store_result,
+        incident_store_result,
+        core_store_result,
+    ) = _write_event_alpha_cycle_support_artifacts(
+        pipeline_result,
+        now=now,
+        run_id=run_id,
+        profile=profile_for_run,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+    )
+    pipeline_result, latest_core_rows = _write_event_alpha_cycle_cards_if_enabled(
+        pipeline_result,
+        latest_core_rows,
+        now=now,
+        run_id=run_id,
+        profile=profile_for_run,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+    )
+    print(event_alpha_pipeline.format_event_alpha_pipeline_report(pipeline_result))
+    pipeline_result, store_result = _write_event_alpha_cycle_alert_snapshots(
+        pipeline_result,
+        latest_core_rows,
+        now=now,
+        run_id=run_id,
+        profile=profile_for_run,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+        clock_status=clock_status,
+    )
+    _print_event_alpha_cycle_artifact_summary(
+        store_result,
+        hypothesis_store_result,
+        incident_store_result,
+        core_store_result,
+    )
+    pipeline_result = _attach_cycle_cryptopanic_stats(pipeline_result)
+    run_row = _append_event_alpha_cycle_run_record(
+        pipeline_result,
+        profile=profile,
+        profile_for_run=profile_for_run,
+        started_at=started_at,
+        with_llm=with_llm,
+        send=send,
+    )
+    _print_event_alpha_cycle_run_ledger_summary(run_row)
+
+
+def _event_alpha_cycle_runtime(event_now: str | datetime | None, profile: str) -> tuple[Any, datetime, datetime, str]:
     clock_status = _event_clock_status(event_now)
     now = _event_research_now(event_now)
     started_at = datetime.now(timezone.utc)
-    run_id = event_alpha_run_ledger.run_id_for(started_at, profile_for_run)
-    extraction_provider = None
-    extraction_cfg = None
-    catalyst_frame_provider = None
-    catalyst_frame_cfg = None
-    relationship_provider = None
-    relationship_cfg = None
-    if with_llm:
-        extraction_cfg = _event_llm_extractor_config_from_runtime()
-        extraction_provider = _event_llm_extraction_provider(extraction_cfg)
-        catalyst_frame_cfg = _event_llm_catalyst_frame_config_from_runtime()
-        catalyst_frame_provider = _event_llm_catalyst_frame_provider(catalyst_frame_cfg)
-        relationship_cfg = _event_llm_config_from_runtime()
-        relationship_provider = _event_llm_provider(relationship_cfg)
+    run_id = event_alpha_run_ledger.run_id_for(started_at, profile)
+    return clock_status, now, started_at, run_id
+
+
+def _event_alpha_cycle_llm_inputs(with_llm: bool) -> dict[str, Any]:
+    if not with_llm:
+        return {}
+    extraction_cfg = _event_llm_extractor_config_from_runtime()
+    catalyst_frame_cfg = _event_llm_catalyst_frame_config_from_runtime()
+    relationship_cfg = _event_llm_config_from_runtime()
+    return {
+        "extraction_cfg": extraction_cfg,
+        "extraction_provider": _event_llm_extraction_provider(extraction_cfg),
+        "catalyst_frame_cfg": catalyst_frame_cfg,
+        "catalyst_frame_provider": _event_llm_catalyst_frame_provider(catalyst_frame_cfg),
+        "relationship_cfg": relationship_cfg,
+        "relationship_provider": _event_llm_provider(relationship_cfg),
+    }
+
+
+def _run_event_alpha_cycle_pipeline(
+    *,
+    now: datetime,
+    with_llm: bool,
+    send: bool,
+    alert_cfg: Any,
+    clock_status: Any,
+    run_id: str,
+    profile: str,
+    run_mode: str,
+    artifact_namespace: str | None,
+) -> Any:
     catalyst_search_cfg = _event_catalyst_search_config_from_runtime()
     catalyst_search_provider = _event_catalyst_search_provider(catalyst_search_cfg)
-    hypothesis_search_cfg = _event_impact_hypothesis_search_config_from_runtime()
     evidence_acquisition_cfg = _event_evidence_acquisition_config_from_runtime()
     evidence_acquisition_providers = _event_evidence_acquisition_providers_from_runtime(evidence_acquisition_cfg)
-    alert_cfg = _event_alert_config_from_runtime()
-    pipeline_result = event_alpha_pipeline.run_event_alpha_operating_cycle(
+    llm_inputs = _event_alpha_cycle_llm_inputs(with_llm)
+    return event_alpha_pipeline.run_event_alpha_operating_cycle(
         load_discovery_result=lambda observed, raw_event_transform: _event_discovery_result_from_config(
             now=observed,
             raw_event_transform=raw_event_transform,
@@ -262,48 +345,28 @@ def event_alpha_cycle(
         alert_cfg=alert_cfg,
         now=now,
         with_llm=with_llm,
-        extraction_provider=extraction_provider,
-        extraction_cfg=extraction_cfg,
-        catalyst_frame_provider=catalyst_frame_provider,
-        catalyst_frame_cfg=catalyst_frame_cfg,
+        extraction_provider=llm_inputs.get("extraction_provider"),
+        extraction_cfg=llm_inputs.get("extraction_cfg"),
+        catalyst_frame_provider=llm_inputs.get("catalyst_frame_provider"),
+        catalyst_frame_cfg=llm_inputs.get("catalyst_frame_cfg"),
         catalyst_search_provider=catalyst_search_provider,
         catalyst_search_cfg=catalyst_search_cfg,
         hypothesis_search_provider=catalyst_search_provider,
-        hypothesis_search_cfg=hypothesis_search_cfg,
+        hypothesis_search_cfg=_event_impact_hypothesis_search_config_from_runtime(),
         source_enrichment_cfg=_event_source_enrichment_config_from_runtime(),
-        relationship_provider=relationship_provider,
-        relationship_cfg=relationship_cfg,
+        relationship_provider=llm_inputs.get("relationship_provider"),
+        relationship_cfg=llm_inputs.get("relationship_cfg"),
         watchlist_cfg=_event_watchlist_config_from_runtime(),
         router_cfg=_event_alpha_router_config_from_runtime(),
         priors_cfg=_event_alpha_priors_config_from_runtime(),
         refresh_watchlist=True,
         route=True,
-        watchlist_monitor_enabled=config.EVENT_WATCHLIST_MONITOR_ENABLED,
-        watchlist_monitor_market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
-        watchlist_monitor_market_source=config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE,
-        watchlist_monitor_market_provider=_event_watchlist_market_provider_from_runtime(),
-        watchlist_monitor_targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
-        watchlist_monitor_max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
-        watchlist_monitor_market_cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
-        watchlist_monitor_derivatives_source=config.EVENT_WATCHLIST_MONITOR_DERIVATIVES_SOURCE,
-        watchlist_monitor_supply_source=config.EVENT_WATCHLIST_MONITOR_SUPPLY_SOURCE,
-        watchlist_monitor_derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
-        watchlist_monitor_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
-        watchlist_monitor_enrichment_max_assets=config.EVENT_WATCHLIST_MONITOR_ENRICHMENT_MAX_ASSETS,
-        watchlist_monitor_route_updates=config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES,
-        near_miss_cfg=_event_near_miss_config_from_runtime(),
-        near_miss_market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
-        near_miss_market_provider=_event_watchlist_market_provider_from_runtime()
-        if config.EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_ENABLED
-        else None,
-        near_miss_derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
-        near_miss_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
         evidence_acquisition_cfg=evidence_acquisition_cfg,
         evidence_acquisition_provider=evidence_acquisition_providers.get("default"),
         evidence_acquisition_providers_by_hint=evidence_acquisition_providers,
         evidence_acquisition_context={
             "run_id": run_id,
-            "profile": profile_for_run,
+            "profile": profile,
             "run_mode": run_mode,
             "artifact_namespace": artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE,
         },
@@ -312,15 +375,60 @@ def event_alpha_cycle(
             decisions,
             alert_cfg,
             now=now,
-            profile=profile_for_run,
+            profile=profile,
             clock_status=clock_status,
         ),
+        **_event_alpha_cycle_watchlist_monitor_kwargs(),
+        **_event_alpha_cycle_near_miss_kwargs(),
     )
+
+
+def _event_alpha_cycle_watchlist_monitor_kwargs() -> dict[str, Any]:
+    return {
+        "watchlist_monitor_enabled": config.EVENT_WATCHLIST_MONITOR_ENABLED,
+        "watchlist_monitor_market_rows": _event_watchlist_monitor_market_rows_from_runtime(),
+        "watchlist_monitor_market_source": config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE,
+        "watchlist_monitor_market_provider": _event_watchlist_market_provider_from_runtime(),
+        "watchlist_monitor_targeted_lookup": config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
+        "watchlist_monitor_max_assets": config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
+        "watchlist_monitor_market_cache_ttl_seconds": config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
+        "watchlist_monitor_derivatives_source": config.EVENT_WATCHLIST_MONITOR_DERIVATIVES_SOURCE,
+        "watchlist_monitor_supply_source": config.EVENT_WATCHLIST_MONITOR_SUPPLY_SOURCE,
+        "watchlist_monitor_derivatives_rows": _event_watchlist_monitor_derivatives_rows_from_runtime(),
+        "watchlist_monitor_supply_rows": _event_watchlist_monitor_supply_rows_from_runtime(),
+        "watchlist_monitor_enrichment_max_assets": config.EVENT_WATCHLIST_MONITOR_ENRICHMENT_MAX_ASSETS,
+        "watchlist_monitor_route_updates": config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES,
+    }
+
+
+def _event_alpha_cycle_near_miss_kwargs() -> dict[str, Any]:
+    return {
+        "near_miss_cfg": _event_near_miss_config_from_runtime(),
+        "near_miss_market_rows": _event_watchlist_monitor_market_rows_from_runtime(),
+        "near_miss_market_provider": (
+            _event_watchlist_market_provider_from_runtime()
+            if config.EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_ENABLED
+            else None
+        ),
+        "near_miss_derivatives_rows": _event_watchlist_monitor_derivatives_rows_from_runtime(),
+        "near_miss_supply_rows": _event_watchlist_monitor_supply_rows_from_runtime(),
+    }
+
+
+def _write_event_alpha_cycle_support_artifacts(
+    pipeline_result: Any,
+    *,
+    now: datetime,
+    run_id: str,
+    profile: str,
+    run_mode: str,
+    artifact_namespace: str | None,
+) -> tuple[Any, Any, Any, Any, Any]:
     pipeline_result, hypothesis_store_result = _write_event_impact_hypotheses_for_run(
         pipeline_result,
         now=now,
         run_id=run_id,
-        profile=profile_for_run,
+        profile=profile,
         run_mode=run_mode,
         artifact_namespace=artifact_namespace,
     )
@@ -328,7 +436,7 @@ def event_alpha_cycle(
         pipeline_result,
         now=now,
         run_id=run_id,
-        profile=profile_for_run,
+        profile=profile,
         run_mode=run_mode,
         artifact_namespace=artifact_namespace,
     )
@@ -336,7 +444,7 @@ def event_alpha_cycle(
         pipeline_result,
         now=now,
         run_id=run_id,
-        profile=profile_for_run,
+        profile=profile,
         run_mode=run_mode,
         artifact_namespace=artifact_namespace,
         card_paths=(),
@@ -350,41 +458,68 @@ def event_alpha_cycle(
         config.EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH,
         latest_core_rows,
         run_id=run_id,
-        profile=profile_for_run,
+        profile=profile,
         artifact_namespace=artifact_namespace,
     )
-    if config.EVENT_RESEARCH_CARDS_AUTO_WRITE and pipeline_result.router_result is not None:
-        watch_cfg = _event_watchlist_config_from_runtime()
-        watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
-        card_write = event_research_cards.write_research_cards(
-            config.EVENT_RESEARCH_CARDS_DIR,
-            watchlist_entries=watchlist.entries,
-            alert_rows=latest_core_rows,
-            route_decisions=pipeline_result.router_result.decisions,
-            selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
-            limit=config.EVENT_RESEARCH_CARDS_WRITE_LIMIT,
-            now=now,
-            lineage_context=_event_alpha_card_lineage_context(
-                run_id=run_id,
-                profile=profile_for_run,
-                run_mode=run_mode,
-                artifact_namespace=artifact_namespace,
-            ),
-        )
-        pipeline_result = replace(pipeline_result, research_card_paths=card_write.card_paths)
-        event_core_opportunity_store.update_core_opportunity_card_links(
-            _event_core_opportunity_store_config_from_runtime().path,
-            card_write.card_paths,
+    return pipeline_result, latest_core_rows, hypothesis_store_result, incident_store_result, core_store_result
+
+
+def _write_event_alpha_cycle_cards_if_enabled(
+    pipeline_result: Any,
+    latest_core_rows: Any,
+    *,
+    now: datetime,
+    run_id: str,
+    profile: str,
+    run_mode: str,
+    artifact_namespace: str | None,
+) -> tuple[Any, Any]:
+    if not config.EVENT_RESEARCH_CARDS_AUTO_WRITE or pipeline_result.router_result is None:
+        return pipeline_result, latest_core_rows
+    watch_cfg = _event_watchlist_config_from_runtime()
+    watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
+    card_write = event_research_cards.write_research_cards(
+        config.EVENT_RESEARCH_CARDS_DIR,
+        watchlist_entries=watchlist.entries,
+        alert_rows=latest_core_rows,
+        route_decisions=pipeline_result.router_result.decisions,
+        selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
+        limit=config.EVENT_RESEARCH_CARDS_WRITE_LIMIT,
+        now=now,
+        lineage_context=_event_alpha_card_lineage_context(
             run_id=run_id,
-        )
-        latest_core_rows = event_core_opportunity_store.load_core_opportunities(
-            _event_core_opportunity_store_config_from_runtime().path,
-            latest_run=True,
-            run_id=run_id,
-        ).rows
-        print(event_research_cards.format_card_write_result(card_write))
-        print("")
-    print(event_alpha_pipeline.format_event_alpha_pipeline_report(pipeline_result))
+            profile=profile,
+            run_mode=run_mode,
+            artifact_namespace=artifact_namespace,
+        ),
+    )
+    pipeline_result = replace(pipeline_result, research_card_paths=card_write.card_paths)
+    event_core_opportunity_store.update_core_opportunity_card_links(
+        _event_core_opportunity_store_config_from_runtime().path,
+        card_write.card_paths,
+        run_id=run_id,
+    )
+    latest_core_rows = event_core_opportunity_store.load_core_opportunities(
+        _event_core_opportunity_store_config_from_runtime().path,
+        latest_run=True,
+        run_id=run_id,
+    ).rows
+    print(event_research_cards.format_card_write_result(card_write))
+    print("")
+    return pipeline_result, latest_core_rows
+
+
+def _write_event_alpha_cycle_alert_snapshots(
+    pipeline_result: Any,
+    latest_core_rows: Any,
+    *,
+    now: datetime,
+    run_id: str,
+    profile: str,
+    run_mode: str,
+    artifact_namespace: str | None,
+    clock_status: Any,
+) -> tuple[Any, Any]:
     store_cfg = _event_alpha_alert_store_config_from_runtime()
     if run_mode in event_alpha_artifacts.NON_OPERATIONAL_RUN_MODES:
         store_result = event_alpha_alert_store.blocked_alert_snapshot_write(
@@ -399,7 +534,7 @@ def event_alpha_cycle(
             now=now,
             router_result=pipeline_result.router_result,
             run_id=run_id,
-            profile=profile_for_run,
+            profile=profile,
             run_mode=run_mode,
             artifact_namespace=artifact_namespace,
             research_card_paths=pipeline_result.research_card_paths,
@@ -409,7 +544,7 @@ def event_alpha_cycle(
         pipeline_result,
         clock_status=clock_status,
         run_id=run_id,
-        profile=profile_for_run,
+        profile=profile,
         run_mode=run_mode,
         artifact_namespace=artifact_namespace,
         run_ledger_path=str(_event_alpha_run_ledger_config_from_runtime().path),
@@ -421,6 +556,15 @@ def event_alpha_cycle(
         snapshot_rows_written=store_result.rows_written,
         snapshot_write_block_reason=store_result.block_reason,
     )
+    return pipeline_result, store_result
+
+
+def _print_event_alpha_cycle_artifact_summary(
+    store_result: Any,
+    hypothesis_store_result: Any,
+    incident_store_result: Any,
+    core_store_result: Any,
+) -> None:
     print("")
     print(event_alpha_alert_store.format_alert_store_write_result(store_result))
     print(
@@ -436,14 +580,28 @@ def event_alpha_cycle(
         + (f" block={incident_store_result.block_reason}" if incident_store_result.block_reason else "")
     )
     print(event_core_opportunity_store.format_core_opportunity_store_write_result(core_store_result))
-    pipeline_result = replace(
+
+
+def _attach_cycle_cryptopanic_stats(pipeline_result: Any) -> Any:
+    return replace(
         pipeline_result,
         **_cryptopanic_stats_for_pipeline_result(
             pipeline_result,
             provider_health_path=_event_provider_health_config_from_runtime().path,
         ),
     )
-    run_row = event_alpha_run_ledger.append_run_record(
+
+
+def _append_event_alpha_cycle_run_record(
+    pipeline_result: Any,
+    *,
+    profile: Any,
+    profile_for_run: str,
+    started_at: datetime,
+    with_llm: bool,
+    send: bool,
+) -> dict[str, Any]:
+    return event_alpha_run_ledger.append_run_record(
         pipeline_result,
         cfg=_event_alpha_run_ledger_config_from_runtime(),
         profile=profile_for_run,
@@ -454,6 +612,9 @@ def event_alpha_cycle(
         notification_burn_in=bool(profile and profile.notification_burn_in),
         success=True,
     )
+
+
+def _print_event_alpha_cycle_run_ledger_summary(run_row: dict[str, Any]) -> None:
     print("")
     print(
         "Event Alpha run ledger updated: "

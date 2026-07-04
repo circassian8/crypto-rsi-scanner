@@ -142,25 +142,9 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5307,
+  "function_count": 5346,
   "function_line_limit": 150,
   "functions_over_limit": [
-    {
-      "function_name": "_event_alpha_notify_cycle_body",
-      "line_count": 513,
-      "module": "crypto_rsi_scanner.cli.services.event_alpha_notifications.preview",
-      "public": false,
-      "qualname": "_event_alpha_notify_cycle_body",
-      "source_path": "crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py"
-    },
-    {
-      "function_name": "event_alpha_cycle",
-      "line_count": 251,
-      "module": "crypto_rsi_scanner.cli.services.event_alpha_research",
-      "public": true,
-      "qualname": "event_alpha_cycle",
-      "source_path": "crypto_rsi_scanner/cli/services/event_alpha_research.py"
-    },
     {
       "function_name": "build_daily_brief",
       "line_count": 884,
@@ -231,14 +215,6 @@
       "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
       "public": true,
       "qualname": "run_manual_discovery",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/discovery/manual.py"
-    },
-    {
-      "function_name": "load_discovery_events",
-      "line_count": 183,
-      "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
-      "public": true,
-      "qualname": "load_discovery_events",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/discovery/manual.py"
     },
     {
@@ -346,8 +322,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     }
   ],
-  "functions_over_limit_count": 25,
-  "generated_at": "2026-07-04T05:55:20.614230+00:00",
+  "functions_over_limit_count": 22,
+  "generated_at": "2026-07-04T06:13:52.068669+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1025,24 +1001,8 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 25,
+  "production_functions_over_limit": 22,
   "production_functions_over_limit_rows": [
-    {
-      "function_name": "_event_alpha_notify_cycle_body",
-      "line_count": 513,
-      "module": "crypto_rsi_scanner.cli.services.event_alpha_notifications.preview",
-      "public": false,
-      "qualname": "_event_alpha_notify_cycle_body",
-      "source_path": "crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py"
-    },
-    {
-      "function_name": "event_alpha_cycle",
-      "line_count": 251,
-      "module": "crypto_rsi_scanner.cli.services.event_alpha_research",
-      "public": true,
-      "qualname": "event_alpha_cycle",
-      "source_path": "crypto_rsi_scanner/cli/services/event_alpha_research.py"
-    },
     {
       "function_name": "build_daily_brief",
       "line_count": 884,
@@ -1113,14 +1073,6 @@
       "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
       "public": true,
       "qualname": "run_manual_discovery",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/discovery/manual.py"
-    },
-    {
-      "function_name": "load_discovery_events",
-      "line_count": 183,
-      "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
-      "public": true,
-      "qualname": "load_discovery_events",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/discovery/manual.py"
     },
     {
