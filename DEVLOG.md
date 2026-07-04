@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split daily brief builder function debt · Codex
+**Why:** The long-running refactor still tracks oversized function debt after
+production and legacy file-size gates passed. `build_daily_brief()` was the
+largest daily-brief renderer body and mixed artifact loading, core opportunity
+context, and Markdown section assembly in one function.
+**Changes:**
+- Split `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py`
+  into private helpers for row loading/filtering, core context preparation,
+  header/opportunity/source sections, run health, hypothesis summaries,
+  impact/quality sections, notification digest sections, watchlist/card
+  sections, and final explanatory sections.
+- Kept the public `build_daily_brief()`, `write_daily_brief()`, and
+  `format_daily_brief_result()` exports unchanged. `build_daily_brief()` is now
+  a 107-line orchestrator and no new helper exceeds the 150-line function
+  threshold.
+- Refreshed refactor class ownership, size-gate, completion-map, release
+  candidate, shim, and final reports. Current advisory inventory is `14`
+  classes and `18` functions over limits, with `gate_status=pass` and
+  `new_violation_count=0`.
+**Verify:** Focused daily-brief tests passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha -q -k "daily_brief"`
+reported `19 passed, 557 deselected`; the wider Event Alpha rendering/doctor
+slice reported `387 passed`; `make event-alpha-daily-brief PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`
+wrote the daily brief with `cards_linked=59`; `python3 tests/test_indicators.py`
+reported `745/745 passed`; safe pytest and `make test-pytest-safe PYTHON=python3`
+reported `756 passed`; `python3 -m compileall -q crypto_rsi_scanner tests`,
+`make event-alpha-integrated-radar-smoke PYTHON=python3`,
+`make event-alpha-integrated-radar-doctor PYTHON=python3`, and
+`make verify PYTHON=python3` passed.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+live sends, trading, paper-trading behavior changes, execution/order logic,
+Event Alpha RSI writes, or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split doctor context and evidence executor function debt · Codex
 **Why:** Refactor ownership debt remained after the production and legacy
 file-size gates passed. This pass reduces the largest doctor context function

@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T06:36:32.763447+00:00`
+- generated_at: `2026-07-04T06:50:22.772256+00:00`
 - public_class_count: `407`
 - classes_over_limit_count: `14`
-- functions_over_limit_count: `19`
+- functions_over_limit_count: `18`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `19`
+- production_functions_over_limit: `18`
 - modules_with_multiple_public_classes_count: `82`
 - legacy_decomposition_gate_status: `pass`
 - legacy_classes_over_limit: `3`
@@ -159,7 +159,6 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | module | function | lines | public |
 |---|---|---:|---:|
-| `crypto_rsi_scanner.event_alpha.artifacts.daily_brief.legacy_parts.builder` | `build_daily_brief` | 884 | true |
 | `crypto_rsi_scanner.event_alpha.doctor.legacy.context_loading` | `diagnose_artifacts` | 1048 | true |
 | `crypto_rsi_scanner.event_alpha.doctor.legacy.notification_delivery_checks` | `_notification_delivery_conflicts` | 251 | false |
 | `crypto_rsi_scanner.event_alpha.doctor.legacy.provider_readiness_checks` | `_integrated_radar_artifact_conflicts` | 218 | false |
