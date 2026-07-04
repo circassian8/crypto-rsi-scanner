@@ -638,7 +638,8 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["paper_trades_created"] == 0
     assert payload["normal_rsi_signal_rows_written"] == 0
     assert payload["triggered_fade_created"] == 0
-    assert payload["old_module_paths_removed"] == 0
+    assert payload["old_module_paths_removed"] == payload["deleted_shims"]
+    assert payload["deleted_shims"] >= 1
     assert payload["dead_duplicate_code_removed"] is False
     assert payload["pytest_runtime_seconds"] == 12.34
     assert payload["standalone_runner_runtime_seconds"] == 56.78
@@ -650,7 +651,7 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"] < 3000
     assert payload["legacy_artifact_doctor_core_lines"] == payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"]
     assert payload["line_counts"]["crypto_rsi_scanner/cli/services/event_alpha.py"] < 1500
-    assert payload["active_shims"] >= 115
+    assert payload["active_shims"] >= 30
     assert payload["partial_shims"] == 0
     assert payload["unmigrated_modules"] >= 1
     assert payload["unmigrated_modules"] <= 15

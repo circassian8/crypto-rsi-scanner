@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Retire first non-public Event Alpha shim batch · Codex
+**Why:** Refactor v3 can now start removing old flat Event Alpha shim paths
+that are proven unused internally and are not public compatibility entrypoints.
+Keeping those unused shims would preserve obsolete import surfaces after
+canonical imports were already enforced.
+**Changes:**
+- Removed 85 non-public top-level Event Alpha shim modules whose dependency
+  report rows had zero internal, Makefile, script, dynamic, and artifact-doc
+  references and were only referenced by the dedicated legacy compatibility
+  test before this pass.
+- Pruned deleted rows from `crypto_rsi_scanner/event_alpha/MODULE_MAP.md` and
+  `crypto_rsi_scanner/event_alpha/SHIM_REGISTRY.json`.
+- Reworked `tests/event_alpha/test_legacy_import_compatibility.py` so retained
+  old paths still resolve to canonical modules while deleted old paths now fail
+  import intentionally.
+- Added `research/EVENT_ALPHA_DELETED_SHIMS.md/json` and threaded
+  `deleted_shims` through shim dependency and refactor v3/final reports.
+- Updated `AGENTS.md`, `DECISIONS.md`, and `ROADMAP.md` to document the first
+  deletion batch and the retained-shim policy.
+**Verify:** Passed `python3 tests/test_indicators.py` (`748/748 passed`);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (`759 passed`);
+`python3 -m compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-old-import-check PYTHON=python3`; `make event-alpha-shim-report
+PYTHON=python3`; `make event-alpha-shim-dependency-report PYTHON=python3`;
+`make refactor-final-report PYTHON=python3`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; and `make verify
+PYTHON=python3`. Old-import counters are `old_path_internal_imports=0`,
+`old_path_test_imports=0`, `old_path_docs_references=0`, and
+`old_path_import_allowed_exceptions=49`; shim dependency report records
+`registry_entry_count=39` and `deleted_shims=85`.
+**Notes/risks:** Behavior-preserving only. Public compatibility shims,
+Makefile-backed module entrypoints, `scanner.py`, and `event_fade.py` were not
+removed. No live provider calls, live Telegram sends, trading, paper-trading
+behavior changes, execution/order logic, Event Alpha RSI writes, or
+Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Enforce canonical Event Alpha imports · Codex
 **Why:** Refactor v3 needs internal code and ordinary tests off old flat Event
 Alpha shim paths before any deletion phase. Compatibility imports should stay

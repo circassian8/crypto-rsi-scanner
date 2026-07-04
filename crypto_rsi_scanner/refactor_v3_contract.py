@@ -29,6 +29,7 @@ V3_GATE_NAMES = (
     "old_path_test_imports",
     "public_compatibility_shims",
     "shim_removal_blockers",
+    "deleted_shims",
     "production_files_over_1200_lines",
     "production_files_over_1500_lines",
     "public_classes_not_in_own_module",
@@ -138,6 +139,7 @@ def build_v3_gate_snapshot(
         "old_path_test_imports": int(shim_report.get("old_path_test_imports") or 0),
         "public_compatibility_shims": _public_compatibility_shim_count(shim_report),
         "shim_removal_blockers": len(shim_blocker_rows),
+        "deleted_shims": int(shim_report.get("deleted_shims") or 0),
         "production_files_over_1200_lines": len(production_over_1200_rows),
         "production_files_over_1500_lines": int(
             size_report.get("production_files_over_1500_lines")
@@ -155,7 +157,7 @@ def build_v3_gate_snapshot(
     blocker_names = [
         name
         for name in V3_GATE_NAMES
-        if name not in {"public_compatibility_shims", "old_path_import_allowed_exceptions"}
+        if name not in {"public_compatibility_shims", "deleted_shims", "old_path_import_allowed_exceptions"}
         and int(gate_values.get(name) or 0) > 0
     ]
     return {
@@ -171,6 +173,7 @@ def build_v3_gate_snapshot(
             "old_path_test_imports": "blocker",
             "public_compatibility_shims": "informational",
             "shim_removal_blockers": "blocker",
+            "deleted_shims": "informational",
             "production_files_over_1200_lines": "target_gap",
             "production_files_over_1500_lines": "blocker",
             "public_classes_not_in_own_module": "blocker",

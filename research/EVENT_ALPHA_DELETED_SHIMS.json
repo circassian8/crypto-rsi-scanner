@@ -1,0 +1,621 @@
+{
+  "deleted_shim_count": 85,
+  "deleted_shims": [
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.integrated_radar",
+      "old_path": "crypto_rsi_scanner.event_integrated_radar",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner",
+      "old_path": "crypto_rsi_scanner.event_market_anomaly_scanner",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.market_state",
+      "old_path": "crypto_rsi_scanner.event_market_state",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.market_reaction",
+      "old_path": "crypto_rsi_scanner.event_market_reaction",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.core_opportunities",
+      "old_path": "crypto_rsi_scanner.event_core_opportunities",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.core_opportunity_store",
+      "old_path": "crypto_rsi_scanner.event_core_opportunity_store",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.evidence_acquisition",
+      "old_path": "crypto_rsi_scanner.event_evidence_acquisition",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.opportunity_verdict",
+      "old_path": "crypto_rsi_scanner.event_opportunity_verdict",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses",
+      "old_path": "crypto_rsi_scanner.event_impact_hypotheses",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store",
+      "old_path": "crypto_rsi_scanner.event_impact_hypothesis_store",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.incidents",
+      "old_path": "crypto_rsi_scanner.event_incident_store",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.research_cards",
+      "old_path": "crypto_rsi_scanner.event_research_cards",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.daily_brief",
+      "old_path": "crypto_rsi_scanner.event_alpha_daily_brief",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.opportunity_audit",
+      "old_path": "crypto_rsi_scanner.event_opportunity_audit",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.pipeline",
+      "old_path": "crypto_rsi_scanner.event_alpha_notifications",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.delivery",
+      "old_path": "crypto_rsi_scanner.event_alpha_notification_delivery",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.sender",
+      "old_path": "crypto_rsi_scanner.event_alpha_notification_sender",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.runs",
+      "old_path": "crypto_rsi_scanner.event_alpha_notification_runs",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.go_no_go",
+      "old_path": "crypto_rsi_scanner.event_alpha_notification_go_no_go",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.checklist",
+      "old_path": "crypto_rsi_scanner.event_alpha_notification_checklist",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.inbox",
+      "old_path": "crypto_rsi_scanner.event_alpha_notification_inbox",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.pack",
+      "old_path": "crypto_rsi_scanner.event_alpha_notification_pack",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.pause",
+      "old_path": "crypto_rsi_scanner.event_alpha_notification_pause",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.slo",
+      "old_path": "crypto_rsi_scanner.event_alpha_notification_slo",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.readiness",
+      "old_path": "crypto_rsi_scanner.event_alpha_send_readiness",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.final_check",
+      "old_path": "crypto_rsi_scanner.event_alpha_telegram_final_check",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.recipient_check",
+      "old_path": "crypto_rsi_scanner.event_alpha_telegram_recipient_check",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.integrated_radar_outcomes",
+      "old_path": "crypto_rsi_scanner.event_integrated_radar_outcomes",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.calibration",
+      "old_path": "crypto_rsi_scanner.event_alpha_calibration",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.feedback",
+      "old_path": "crypto_rsi_scanner.event_alpha_eval_export",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.feedback",
+      "old_path": "crypto_rsi_scanner.event_alpha_feedback_readiness",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.burn_in",
+      "old_path": "crypto_rsi_scanner.event_alpha_burn_in",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.burn_in",
+      "old_path": "crypto_rsi_scanner.event_alpha_burn_in_readiness",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.burn_in",
+      "old_path": "crypto_rsi_scanner.event_alpha_burn_in_pack",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.quality",
+      "old_path": "crypto_rsi_scanner.event_alpha_quality_review",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.quality",
+      "old_path": "crypto_rsi_scanner.event_alpha_quality_coverage",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.quality",
+      "old_path": "crypto_rsi_scanner.event_alpha_signal_quality",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.quality",
+      "old_path": "crypto_rsi_scanner.event_alpha_signal_quality_export",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.quality",
+      "old_path": "crypto_rsi_scanner.event_alpha_tuning",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.priors",
+      "old_path": "crypto_rsi_scanner.event_alpha_priors",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.policy_simulator",
+      "old_path": "crypto_rsi_scanner.event_alpha_policy_simulator",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.providers.cryptopanic",
+      "old_path": "crypto_rsi_scanner.event_alpha_cryptopanic",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.providers.official_exchange",
+      "old_path": "crypto_rsi_scanner.event_official_exchange",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.providers.official_exchange_activation",
+      "old_path": "crypto_rsi_scanner.event_official_exchange_activation",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight",
+      "old_path": "crypto_rsi_scanner.event_coinalyze_preflight",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
+      "old_path": "crypto_rsi_scanner.event_live_provider_readiness",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.providers.provider_health",
+      "old_path": "crypto_rsi_scanner.event_provider_health",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.providers.source_registry",
+      "old_path": "crypto_rsi_scanner.event_source_registry",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.providers.source_packs",
+      "old_path": "crypto_rsi_scanner.event_source_packs",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight",
+      "old_path": "crypto_rsi_scanner.event_bybit_announcements_preflight",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight",
+      "old_path": "crypto_rsi_scanner.event_unlock_calendar_preflight",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness",
+      "old_path": "crypto_rsi_scanner.event_dex_onchain_readiness",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.derivatives_crowding",
+      "old_path": "crypto_rsi_scanner.event_derivatives_crowding",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.scheduled_catalysts",
+      "old_path": "crypto_rsi_scanner.event_scheduled_catalysts",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.asset_registry",
+      "old_path": "crypto_rsi_scanner.event_asset_registry",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.instrument_resolver",
+      "old_path": "crypto_rsi_scanner.event_instrument_resolver",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.market_confirmation",
+      "old_path": "crypto_rsi_scanner.event_market_confirmation",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.catalyst_search",
+      "old_path": "crypto_rsi_scanner.event_catalyst_search",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.source_enrichment",
+      "old_path": "crypto_rsi_scanner.event_source_enrichment",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.validation",
+      "old_path": "crypto_rsi_scanner.event_validation",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.discovery",
+      "old_path": "crypto_rsi_scanner.event_discovery",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.near_miss",
+      "old_path": "crypto_rsi_scanner.event_near_miss",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.classification",
+      "old_path": "crypto_rsi_scanner.event_classification",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.catalyst_frames",
+      "old_path": "crypto_rsi_scanner.event_catalyst_frames",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.claim_semantics",
+      "old_path": "crypto_rsi_scanner.event_claim_semantics",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.playbooks",
+      "old_path": "crypto_rsi_scanner.event_playbooks",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.impact_path_validator",
+      "old_path": "crypto_rsi_scanner.event_impact_path_validator",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.evidence_quality",
+      "old_path": "crypto_rsi_scanner.event_evidence_quality",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.market_enrichment",
+      "old_path": "crypto_rsi_scanner.event_market_enrichment",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.llm.extractor",
+      "old_path": "crypto_rsi_scanner.event_llm_extractor",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.llm.analyzer",
+      "old_path": "crypto_rsi_scanner.event_llm_analyzer",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.llm.evidence_planner",
+      "old_path": "crypto_rsi_scanner.event_llm_evidence_planner",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames",
+      "old_path": "crypto_rsi_scanner.event_llm_catalyst_frames",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.llm.models",
+      "old_path": "crypto_rsi_scanner.event_llm_models",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.llm.extraction_models",
+      "old_path": "crypto_rsi_scanner.event_llm_extraction_models",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.alert_store",
+      "old_path": "crypto_rsi_scanner.event_alpha_alert_store",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.alerts",
+      "old_path": "crypto_rsi_scanner.event_alerts",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.router",
+      "old_path": "crypto_rsi_scanner.event_alpha_router",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.pipeline",
+      "old_path": "crypto_rsi_scanner.event_alpha_pipeline",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.watchlist",
+      "old_path": "crypto_rsi_scanner.event_watchlist",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor",
+      "old_path": "crypto_rsi_scanner.event_watchlist_monitor",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.watchlist_enrichment",
+      "old_path": "crypto_rsi_scanner.event_watchlist_enrichment",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
+      "old_path": "crypto_rsi_scanner.event_watchlist_market",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.artifacts.replay",
+      "old_path": "crypto_rsi_scanner.event_alpha_replay",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    },
+    {
+      "date": "2026-07-04T18:50:14+00:00",
+      "new_path": "crypto_rsi_scanner.event_alpha.outcomes.feedback_labels",
+      "old_path": "crypto_rsi_scanner.event_feedback",
+      "removal_reason": "Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass.",
+      "verification_command": "make event-alpha-shim-dependency-report PYTHON=python3; make event-alpha-old-import-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make event-alpha-integrated-radar-smoke PYTHON=python3; make event-alpha-integrated-radar-doctor PYTHON=python3; make verify PYTHON=python3"
+    }
+  ],
+  "generated_at": "2026-07-04T18:50:14+00:00",
+  "no_send_rehearsal": true,
+  "normal_rsi_signal_rows_written": 0,
+  "paper_trades_created": 0,
+  "research_only": true,
+  "schema_version": "event_alpha_deleted_shims_v1",
+  "selection_policy": "First deletion batch removes non-public active shims that had no dependencies except the dedicated legacy compatibility import test and were not listed in the remaining module classification report.",
+  "strict_alerts_created": 0,
+  "telegram_sends": 0,
+  "trades_created": 0,
+  "triggered_fade_created": 0,
+  "verification_commands": [
+    "make event-alpha-shim-dependency-report PYTHON=python3",
+    "make event-alpha-old-import-check PYTHON=python3",
+    "python3 tests/test_indicators.py",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q",
+    "python3 -m compileall -q crypto_rsi_scanner tests",
+    "make event-alpha-integrated-radar-smoke PYTHON=python3",
+    "make event-alpha-integrated-radar-doctor PYTHON=python3",
+    "make verify PYTHON=python3"
+  ]
+}

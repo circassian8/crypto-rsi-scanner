@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-04 - First non-public Event Alpha shims retired
+**Status:** accepted
+**Decision:** The first refactor v3 deletion batch may remove old flat Event
+Alpha shims that are not public compatibility entrypoints, are not
+`scanner.py`, are not `event_fade.py`, have zero internal, Makefile, script,
+dynamic, and artifact-documentation references, and were referenced only by the
+dedicated legacy import compatibility test. Deleted paths are recorded in
+`research/EVENT_ALPHA_DELETED_SHIMS.md/json`; retained old paths remain in
+`crypto_rsi_scanner/event_alpha/MODULE_MAP.md` and
+`crypto_rsi_scanner/event_alpha/SHIM_REGISTRY.json`.
+**Why:** Canonical imports are already enforced, so keeping unused non-public
+shims only preserves obsolete import surfaces. Removing the proven-unused batch
+reduces refactor v3 shim debt while preserving public wrappers, Makefile module
+entrypoints, `scanner.py`, and the `event_fade.py` safety boundary.
+**Revisit when:** another retained shim has zero dependency-report references
+or is explicitly accepted as a permanent public compatibility entrypoint.
+
 ## 2026-07-04 - Event Alpha old flat imports are compatibility-only
 **Status:** accepted
 **Decision:** Internal project code and ordinary tests must import canonical

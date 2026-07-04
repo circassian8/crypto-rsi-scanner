@@ -630,6 +630,7 @@ def build_refactor_final_report(
     legacy_inventory = refactor_legacy_inventory.build_legacy_inventory(root=root)
     size_gate_report = refactor_size_gates.build_gate_report(root=root)
     v3_gate_snapshot = _build_v3_gate_snapshot(root=root, size_gate_report=size_gate_report)
+    deleted_shims = event_alpha_shims.deleted_shim_count(root=root)
     cli_service_line_counts = _cli_service_line_counts(root)
     cli_event_alpha_service_lines = cli_service_line_counts.get("crypto_rsi_scanner/cli/services/event_alpha.py")
     cli_service_bind_calls = _cli_service_bind_scanner_globals_call_sites(root)
@@ -662,9 +663,13 @@ def build_refactor_final_report(
         "normal_rsi_signal_rows_written": 0,
         "triggered_fade_created": 0,
         "compatibility_preserved": True,
-        "old_module_paths_removed": 0,
+        "old_module_paths_removed": deleted_shims,
         "dead_duplicate_code_removed": False,
-        "dead_duplicate_code_removal_note": "No obviously dead duplicate top-level Event Alpha code was removed in this pass; old module paths remain available until shim reports and import tests prove retirement is safe.",
+        "dead_duplicate_code_removal_note": (
+            "Non-public top-level Event Alpha shims listed in "
+            "research/EVENT_ALPHA_DELETED_SHIMS.json were removed after shim "
+            "dependency and old-import reports proved they were unused internally."
+        ),
         "line_counts": current_counts,
         "large_event_alpha_split_line_counts": large_event_alpha_split_line_counts,
         "baseline_line_counts": baseline_counts,

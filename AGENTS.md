@@ -340,13 +340,18 @@ top-level `event_*.py` shims:
 | `event_alpha/namespace/` | namespace status and lifecycle reporting |
 | `cli/` | parser, dispatch, and command-group modules |
 
-Old import paths remain as v1 compatibility shims. New code should import the
-new package path, and old top-level shims should not gain new implementation
-logic. `crypto_rsi_scanner.event_alpha.shims` is the shim registry: modules
-marked `active_shim` must stay compatibility-only, while `partial_shim` is
-reserved for explicit migration bridges. Run `make event-alpha-shim-report` to
-audit shim source and `make event-alpha-old-import-check` to fail old flat
-Event Alpha imports outside documented public wrappers and
+Retained old import paths remain as compatibility shims only. Non-public shims
+can be deleted after `make event-alpha-shim-dependency-report` and
+`make event-alpha-old-import-check` prove zero internal, Makefile, script,
+dynamic, artifact-doc, and unscoped documentation dependencies; deleted paths
+are recorded in `research/EVENT_ALPHA_DELETED_SHIMS.md/json`. New code should
+import the new package path, and old top-level shims should not gain new
+implementation logic. `crypto_rsi_scanner.event_alpha.shims` is the shim
+registry: modules marked `active_shim` must stay compatibility-only, while
+`partial_shim` is reserved for explicit migration bridges. Run
+`make event-alpha-shim-report` to audit shim source and
+`make event-alpha-old-import-check` to fail old flat Event Alpha imports outside
+documented public wrappers and
 `tests/event_alpha/test_legacy_import_compatibility.py`. CLI parser
 construction belongs in `cli/parser.py`, dispatch in `cli/dispatch.py`, and
 command groups in `cli/commands_*.py`. New tests belong in
@@ -484,8 +489,9 @@ work.
   and missing snapshot writes before treating burn-in artifacts as evidence.
 - Event Alpha consolidation is compatibility-first. New Event Alpha code should
   prefer `crypto_rsi_scanner/event_alpha/` and `crypto_rsi_scanner/cli/`, while
-  old top-level import paths stay available through shims until a tested move
-  removes them explicitly. Artifact doctor checks that depend on fields must
+  retained old top-level import paths stay available only through documented
+  compatibility shims until a tested move removes or explicitly keeps them.
+  Artifact doctor checks that depend on fields must
   reference `event_alpha/artifacts/schema_v1.py` first, and namespace lifecycle
   status should be inspected with `make event-alpha-namespace-lifecycle-report`
   before using a namespace for send-readiness, burn-in, or calibration.

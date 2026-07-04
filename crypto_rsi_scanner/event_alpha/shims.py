@@ -29,6 +29,8 @@ REMOVAL_CANDIDATES_JSON = "EVENT_ALPHA_SHIM_REMOVAL_CANDIDATES.json"
 REMOVAL_CANDIDATES_MD = "EVENT_ALPHA_SHIM_REMOVAL_CANDIDATES.md"
 OLD_IMPORT_CHECK_JSON = "EVENT_ALPHA_OLD_IMPORT_CHECK.json"
 OLD_IMPORT_CHECK_MD = "EVENT_ALPHA_OLD_IMPORT_CHECK.md"
+DELETED_SHIMS_JSON = "EVENT_ALPHA_DELETED_SHIMS.json"
+DELETED_SHIMS_MD = "EVENT_ALPHA_DELETED_SHIMS.md"
 SHIM_SCHEMA_VERSION = "event_alpha_shim_registry_v1"
 SHIM_DEPENDENCY_SCHEMA_VERSION = "event_alpha_shim_dependency_report_v1"
 OLD_IMPORT_CHECK_SCHEMA_VERSION = "event_alpha_old_import_check_v1"
@@ -368,6 +370,7 @@ def build_shim_dependency_report(
     public_compatibility_count = sum(
         1 for row in rows if row.get("recommended_action") == "keep_public_entrypoint"
     )
+    deleted_shim_count_value = deleted_shim_count(root=repo_root)
     old_import_check = _old_import_check_from_rows(old_import_rows)
     old_path_docs_reference_total = sum(len(row["docs_references"]) for row in rows) + sum(
         len(row["artifact_doc_references"]) for row in rows
@@ -403,6 +406,8 @@ def build_shim_dependency_report(
         "dynamic_import_reference_count": sum(len(row["dynamic_import_references"]) for row in rows),
         "artifact_doc_reference_count": sum(len(row["artifact_doc_references"]) for row in rows),
         "safe_to_remove_count": safe_to_remove_count,
+        "deleted_shims": deleted_shim_count_value,
+        "deleted_shim_manifest_path": f"research/{DELETED_SHIMS_JSON}",
         "old_path_internal_imports": old_import_check["old_path_internal_imports"],
         "old_path_test_imports": old_import_check["old_path_test_imports"],
         "old_path_docs_references": old_import_check["old_path_docs_references"],
@@ -416,6 +421,7 @@ def build_shim_dependency_report(
             "old_path_test_imports": old_import_check["old_path_test_imports"],
             "public_compatibility_shims": public_compatibility_count,
             "shim_removal_blockers": len(nonessential_blocker_rows),
+            "deleted_shims": deleted_shim_count_value,
             "old_path_docs_references": old_import_check["old_path_docs_references"],
             "old_path_import_allowed_exceptions": old_import_check["old_path_import_allowed_exceptions"],
         },
@@ -480,9 +486,11 @@ def build_old_import_check_report(
     """
     repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
     entries = registry_entries()
-    references = _scan_dependency_references(entries, repo_root=repo_root)
+    deleted_entries = deleted_shim_entries(root=repo_root)
+    checked_entries = (*entries, *deleted_entries)
+    references = _scan_dependency_references(checked_entries, repo_root=repo_root)
     rows: list[dict[str, object]] = []
-    for entry in entries:
+    for entry in checked_entries:
         rows.append(_old_import_check_row(entry, references.get(entry.old_module, {})))
     counters = _old_import_check_from_rows(rows)
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
@@ -514,11 +522,14 @@ def build_old_import_check_report(
         "triggered_fade_created": 0,
         "legacy_import_compatibility_test": LEGACY_IMPORT_COMPATIBILITY_TEST,
         "allowed_public_wrapper_modules": sorted(PUBLIC_COMPATIBILITY_SHIMS),
-        "registry_entry_count": len(rows),
+        "registry_entry_count": len(entries),
+        "deleted_shim_entry_count": len(deleted_entries),
+        "old_path_check_entry_count": len(rows),
         "old_path_internal_imports": counters["old_path_internal_imports"],
         "old_path_test_imports": counters["old_path_test_imports"],
         "old_path_docs_references": counters["old_path_docs_references"],
         "old_path_import_allowed_exceptions": counters["old_path_import_allowed_exceptions"],
+        "deleted_path_import_failure_checks": counters["deleted_path_import_failure_checks"],
         "old_path_text_references": counters["old_path_text_references"],
         "blocked_module_count": len(blockers),
         "blocked_internal_modules": [_candidate_row(row) for row in blocked_internal],
@@ -579,6 +590,48 @@ def old_import_check_counter_summary() -> tuple[int, int, int, int]:
     return _OLD_IMPORT_COUNTER_SUMMARY_CACHE
 
 
+def deleted_shim_manifest(*, root: str | Path | None = None) -> dict[str, object]:
+    """Return the checked-in deleted-shim manifest, if present."""
+    repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
+    path = repo_root / "research" / DELETED_SHIMS_JSON
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def deleted_shim_count(*, root: str | Path | None = None) -> int:
+    manifest = deleted_shim_manifest(root=root)
+    rows = manifest.get("deleted_shims")
+    return len(rows) if isinstance(rows, list) else 0
+
+
+def deleted_shim_entries(*, root: str | Path | None = None) -> tuple[ShimRegistryEntry, ...]:
+    manifest = deleted_shim_manifest(root=root)
+    rows = manifest.get("deleted_shims")
+    entries: list[ShimRegistryEntry] = []
+    if not isinstance(rows, list):
+        return ()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        old_module = str(row.get("old_path") or "")
+        new_module = str(row.get("new_path") or "")
+        if not old_module or not new_module:
+            continue
+        entries.append(
+            ShimRegistryEntry(
+                old_module=old_module,
+                new_module=new_module,
+                shim_status="deleted_shim",
+                allowed_exports=(),
+                notes="Removed non-public compatibility shim.",
+            )
+        )
+    return tuple(entries)
+
+
 def format_shim_dependency_report(report: dict[str, object]) -> str:
     lines = [
         "# Event Alpha Shim Dependency Report",
@@ -594,6 +647,7 @@ def format_shim_dependency_report(report: dict[str, object]) -> str:
         f"- docs_reference_count: {report.get('docs_reference_count', 0)}",
         f"- dynamic_import_reference_count: {report.get('dynamic_import_reference_count', 0)}",
         f"- safe_to_remove_count: {report.get('safe_to_remove_count', 0)}",
+        f"- deleted_shims: {report.get('deleted_shims', 0)}",
         f"- old_path_internal_imports: {report.get('old_path_internal_imports', 0)}",
         f"- old_path_test_imports: {report.get('old_path_test_imports', 0)}",
         f"- old_path_docs_references: {report.get('old_path_docs_references', 0)}",
@@ -621,6 +675,7 @@ def format_shim_dependency_report(report: dict[str, object]) -> str:
         "old_path_test_imports",
         "public_compatibility_shims",
         "shim_removal_blockers",
+        "deleted_shims",
         "old_path_docs_references",
         "old_path_import_allowed_exceptions",
     ):
@@ -670,10 +725,13 @@ def format_old_import_check_report(report: dict[str, object]) -> str:
         f"- generated_at: {report.get('generated_at')}",
         f"- status: {report.get('status')}",
         f"- registry_entry_count: {report.get('registry_entry_count', 0)}",
+        f"- deleted_shim_entry_count: {report.get('deleted_shim_entry_count', 0)}",
+        f"- old_path_check_entry_count: {report.get('old_path_check_entry_count', 0)}",
         f"- old_path_internal_imports: {report.get('old_path_internal_imports', 0)}",
         f"- old_path_test_imports: {report.get('old_path_test_imports', 0)}",
         f"- old_path_docs_references: {report.get('old_path_docs_references', 0)}",
         f"- old_path_import_allowed_exceptions: {report.get('old_path_import_allowed_exceptions', 0)}",
+        f"- deleted_path_import_failure_checks: {report.get('deleted_path_import_failure_checks', 0)}",
         f"- old_path_text_references: {report.get('old_path_text_references', 0)}",
         "",
         "## Policy",
@@ -860,6 +918,8 @@ def _old_import_check_row(
 
 def _old_import_check_from_rows(rows: Iterable[dict[str, object]]) -> dict[str, int]:
     rows_tuple = tuple(rows)
+    retained_rows = tuple(row for row in rows_tuple if row.get("shim_status") != "deleted_shim")
+    deleted_rows = tuple(row for row in rows_tuple if row.get("shim_status") == "deleted_shim")
     return {
         "old_path_internal_imports": sum(
             len(row.get("blocked_internal_import_references") or []) for row in rows_tuple
@@ -871,7 +931,10 @@ def _old_import_check_from_rows(rows: Iterable[dict[str, object]]) -> dict[str, 
             len(row.get("blocked_docs_references") or []) for row in rows_tuple
         ),
         "old_path_import_allowed_exceptions": sum(
-            len(row.get("allowed_import_exception_references") or []) for row in rows_tuple
+            len(row.get("allowed_import_exception_references") or []) for row in retained_rows
+        ),
+        "deleted_path_import_failure_checks": sum(
+            len(row.get("allowed_import_exception_references") or []) for row in deleted_rows
         ),
         "old_path_text_references": sum(len(row.get("text_references") or []) for row in rows_tuple),
     }
@@ -1058,6 +1121,8 @@ def _skip_dependency_path(path: Path, *, repo_root: Path) -> bool:
         f"research/{REMOVAL_CANDIDATES_MD}",
         f"research/{OLD_IMPORT_CHECK_JSON}",
         f"research/{OLD_IMPORT_CHECK_MD}",
+        f"research/{DELETED_SHIMS_JSON}",
+        f"research/{DELETED_SHIMS_MD}",
         "research/REFACTOR_FINAL_REPORT.json",
         "research/REFACTOR_FINAL_REPORT.md",
         "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",

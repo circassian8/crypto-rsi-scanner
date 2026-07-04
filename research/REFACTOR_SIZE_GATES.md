@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T18:18:19.573725+00:00`
+- generated_at: `2026-07-04T18:58:20.194139+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -56,18 +56,19 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | gate | value | severity |
 |---|---:|---|
-| `nonessential_shims_remaining` | 111 | blocker |
+| `nonessential_shims_remaining` | 26 | blocker |
 | `old_path_internal_imports` | 0 | blocker |
 | `old_path_test_imports` | 0 | blocker |
 | `public_compatibility_shims` | 13 | informational |
-| `shim_removal_blockers` | 109 | blocker |
+| `shim_removal_blockers` | 26 | blocker |
+| `deleted_shims` | 85 | informational |
 | `production_files_over_1200_lines` | 15 | target_gap |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 82 | blocker |
 | `class_exceptions_remaining` | 14 | blocker_until_reaccepted_for_v3 |
 | `functions_over_150_lines` | 0 | blocker |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
-| `old_path_import_allowed_exceptions` | 126 | informational |
+| `old_path_import_allowed_exceptions` | 49 | informational |
 
 ## Moved Existing Violations
 
@@ -122,11 +123,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1487 |
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1473 |
 | `crypto_rsi_scanner/cli/services/legacy/utility_commands.py` | 1440 |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1418 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1353 |
 | `crypto_rsi_scanner/config.py` | 1319 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
 | `crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py` | 1261 |
@@ -178,8 +179,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/rsi/test_backtest.py` | 561 |
 | `tests/rsi/test_paper_risk.py` | 379 |
 | `tests/cli/test_parser.py` | 243 |
-| `tests/event_alpha/test_shim_registry.py` | 237 |
-| `tests/event_alpha/test_legacy_import_compatibility.py` | 174 |
+| `tests/event_alpha/test_shim_registry.py` | 239 |
+| `tests/event_alpha/test_legacy_import_compatibility.py` | 170 |
 | `tests/cli/test_event_alpha_command_registry.py` | 163 |
 | `tests/cli/test_dispatch.py` | 129 |
 | `tests/rsi/_legacy_helpers.py` | 68 |

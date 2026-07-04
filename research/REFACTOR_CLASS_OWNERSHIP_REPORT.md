@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T18:17:53.448947+00:00`
+- generated_at: `2026-07-04T18:58:12.312234+00:00`
 - public_class_count: `408`
 - classes_over_limit_count: `14`
 - functions_over_limit_count: `0`
@@ -35,18 +35,19 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | gate | value | severity |
 |---|---:|---|
-| `nonessential_shims_remaining` | 111 | blocker |
+| `nonessential_shims_remaining` | 26 | blocker |
 | `old_path_internal_imports` | 0 | blocker |
 | `old_path_test_imports` | 0 | blocker |
 | `public_compatibility_shims` | 13 | informational |
-| `shim_removal_blockers` | 109 | blocker |
+| `shim_removal_blockers` | 26 | blocker |
+| `deleted_shims` | 85 | informational |
 | `production_files_over_1200_lines` | 15 | target_gap |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 82 | blocker |
 | `class_exceptions_remaining` | 14 | blocker_until_reaccepted_for_v3 |
 | `functions_over_150_lines` | 0 | blocker |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
-| `old_path_import_allowed_exceptions` | 126 | informational |
+| `old_path_import_allowed_exceptions` | 49 | informational |
 
 ## Exceptions
 
@@ -103,11 +104,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1487 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1473 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/cli/services/legacy/utility_commands.py` | 1440 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1418 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1353 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/config.py` | 1319 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 
 ## Legacy Implementation Cores

@@ -11,8 +11,8 @@ from crypto_rsi_scanner.event_alpha import shims
 def test_known_active_shims_are_minimal_compatibility_modules():
     report = shims.audit_registry()
 
-    assert report["registry_entry_count"] >= 50
-    assert report["shim_status_counts"][shims.STATUS_ACTIVE_SHIM] >= 40
+    assert report["registry_entry_count"] >= 30
+    assert report["shim_status_counts"][shims.STATUS_ACTIVE_SHIM] >= 30
     assert report["active_shim_modules_with_implementation_logic"] == 0
     assert not report["active_shim_violations"]
     assert any(
@@ -81,13 +81,15 @@ def test_shim_dependency_report_writer_outputs_references_and_candidates():
         assert removal_json == Path(tmp) / shims.REMOVAL_CANDIDATES_JSON
         assert removal_md == Path(tmp) / shims.REMOVAL_CANDIDATES_MD
         assert report["schema_version"] == shims.SHIM_DEPENDENCY_SCHEMA_VERSION
-        assert report["registry_entry_count"] >= 50
+        assert report["registry_entry_count"] >= 30
+        assert report["deleted_shims"] >= 1
         assert "internal_import_reference_count" in report
         assert "safe_to_remove_count" in report
         assert report["v3_gate_status"] == "pending"
         assert report["v3_auto_accept_ready"] is False
         assert report["v3_gates"]["nonessential_shims_remaining"] > 0
         assert report["v3_gates"]["public_compatibility_shims"] >= 1
+        assert report["v3_gates"]["deleted_shims"] == report["deleted_shims"]
         assert report["old_path_internal_imports"] == 0
         assert report["old_path_test_imports"] == 0
         assert report["old_path_docs_references"] == 0
@@ -122,6 +124,8 @@ def test_old_import_check_report_allows_only_compatibility_boundaries():
         assert report["old_path_test_imports"] == 0
         assert report["old_path_docs_references"] == 0
         assert report["old_path_import_allowed_exceptions"] >= 1
+        assert report["deleted_shim_entry_count"] >= 1
+        assert report["deleted_path_import_failure_checks"] >= 1
         assert report["legacy_import_compatibility_test"] == shims.LEGACY_IMPORT_COMPATIBILITY_TEST
         assert json_path.exists()
         assert md_path.exists()
