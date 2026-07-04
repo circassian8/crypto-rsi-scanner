@@ -17,6 +17,49 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split impact hypothesis rule builder · Codex
+**Why:** The refactor goal still has advisory oversized-function debt after the
+production and legacy size gates passed. `_hypothesis_from_rule()` was a
+contained rule-to-hypothesis assembler with focused integrated-radar fixture
+coverage, making it a safe behavior-preserving split target.
+**Changes:**
+- Split `crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/builder.py` so
+  `_hypothesis_from_rule()` is now a 109-line coordinator over focused helpers
+  for base hypothesis construction, incident fields, catalyst-frame gate fields,
+  validated-asset impact validation, and search-query diagnostics.
+- Preserved impact category/status selection, incident relevance replacement,
+  frame-gate metadata, validated-asset scoring, quality verdict fields,
+  incident aliases, and search-query diagnostic fields.
+- Regenerated refactor class ownership, size-gate, final, completion-map,
+  release-candidate, and shim reports. Current advisory inventory is `14`
+  classes and `12` functions over limits, with production size gates passing and
+  no active shim implementation leaks.
+- Updated `ROADMAP.md` to include `_hypothesis_from_rule()` in the completed
+  ownership burn-down list.
+**Verify:** Focused impact-hypothesis tests passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha/test_integrated_radar.py -q -k 'impact_hypothesis'` reported
+`10 passed, 230 deselected`; the broader integrated radar file reported
+`240 passed`. Full safe checks passed: `python3 tests/test_indicators.py`
+reported `745/745 passed`; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q` reported
+`756 passed`; `python3 -m compileall -q crypto_rsi_scanner tests`; `make
+refactor-size-gates PYTHON=python3`; `make refactor-class-ownership-report
+PYTHON=python3`; `make refactor-final-report PYTHON=python3`; `make
+event-alpha-shim-report PYTHON=python3`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1
+PYTHON=python3`; and `make verify PYTHON=python3` passed.
+**Notes/risks:** Behavior-preserving only. The strict CryptoPanic rehearsal
+doctor remains `WARN` with known non-blocking quality/incident warnings and no
+blockers. No live provider calls by default, live sends, trading, paper-trading
+behavior changes, execution/order logic, Event Alpha RSI writes, or Event
+Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split Event Alpha router decisions · Codex
 **Why:** The refactor goal still has advisory oversized-function debt after the
 production and legacy size gates passed. `_route_entry()` was a contained

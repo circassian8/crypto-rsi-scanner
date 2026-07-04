@@ -142,7 +142,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5471,
+  "function_count": 5476,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -160,14 +160,6 @@
       "public": true,
       "qualname": "send_notifications",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py"
-    },
-    {
-      "function_name": "_hypothesis_from_rule",
-      "line_count": 199,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.builder",
-      "public": false,
-      "qualname": "_hypothesis_from_rule",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/builder.py"
     },
     {
       "function_name": "validate_impact_path",
@@ -250,8 +242,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     }
   ],
-  "functions_over_limit_count": 13,
-  "generated_at": "2026-07-04T07:52:50.423265+00:00",
+  "functions_over_limit_count": 12,
+  "generated_at": "2026-07-04T08:01:01.616448+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -929,7 +921,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 13,
+  "production_functions_over_limit": 12,
   "production_functions_over_limit_rows": [
     {
       "function_name": "diagnose_artifacts",
@@ -946,14 +938,6 @@
       "public": true,
       "qualname": "send_notifications",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py"
-    },
-    {
-      "function_name": "_hypothesis_from_rule",
-      "line_count": 199,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.builder",
-      "public": false,
-      "qualname": "_hypothesis_from_rule",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/builder.py"
     },
     {
       "function_name": "validate_impact_path",

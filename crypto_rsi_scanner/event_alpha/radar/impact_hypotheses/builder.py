@@ -107,7 +107,78 @@ def _hypothesis_from_rule(
     if validated_assets and category != ImpactCategory.MARKET_ANOMALY_UNKNOWN:
         status = HypothesisStatus.VALIDATED.value
     candidate_source = _candidate_source(taxonomy_symbols, accepted_suggested, validated_assets)
-    hypothesis = EventImpactHypothesis(
+    hypothesis = _base_hypothesis_from_rule(
+        event,
+        raws,
+        rule,
+        cluster=cluster,
+        incident=incident,
+        now=now,
+        category_value=category_value,
+        sectors=sectors,
+        symbols=symbols,
+        coin_ids=coin_ids,
+        external_entities=external_entities,
+        crypto_candidate_assets=crypto_candidate_assets,
+        accepted_suggested=accepted_suggested,
+        rejected_suggested=rejected_suggested,
+        validated_assets=validated_assets,
+        candidate_source=candidate_source,
+        scope=scope,
+        confidence=confidence,
+        hypothesis_score=hypothesis_score,
+        score_components=score_components,
+        validation_stage=validation_stage,
+        quotes=quotes,
+        status=status,
+        frame_gate=frame_gate,
+        claim_rows=claim_rows,
+    )
+    if incident:
+        hypothesis = replace(hypothesis, **_incident_relevance_replace_kwargs(incident, raws, hypothesis))
+    if validated_assets and raws:
+        hypothesis = _with_validated_asset_impact_validation(
+            hypothesis,
+            raws,
+            validated_assets=validated_assets,
+            symbols=symbols,
+            coin_ids=coin_ids,
+            score_components=score_components,
+            validation_stage=validation_stage,
+            category_value=category_value,
+        )
+    return _with_search_query_diagnostics(hypothesis)
+
+
+def _base_hypothesis_from_rule(
+    event: NormalizedEvent,
+    raws: tuple[RawDiscoveredEvent, ...],
+    rule: Mapping[str, Any],
+    *,
+    cluster: event_graph.EventCluster | None,
+    incident: event_incident_graph.CanonicalIncident | None,
+    now: datetime,
+    category_value: str,
+    sectors: tuple[str, ...],
+    symbols: tuple[str, ...],
+    coin_ids: tuple[str, ...],
+    external_entities: tuple[str, ...],
+    crypto_candidate_assets: tuple[dict[str, Any], ...],
+    accepted_suggested: tuple[dict[str, Any], ...],
+    rejected_suggested: tuple[dict[str, Any], ...],
+    validated_assets: tuple[dict[str, Any], ...],
+    candidate_source: str,
+    scope: str,
+    confidence: float,
+    hypothesis_score: float,
+    score_components: dict[str, Any],
+    validation_stage: str,
+    quotes: tuple[str, ...],
+    status: str,
+    frame_gate: Mapping[str, Any],
+    claim_rows: tuple[Any, ...],
+) -> EventImpactHypothesis:
+    return EventImpactHypothesis(
         hypothesis_id=_hypothesis_id(event, category_value, sectors, symbols, incident_id=incident.incident_id if incident else None),
         event_cluster_id=incident.incident_id if incident else (cluster.cluster_id if cluster else event_graph.cluster_id_for_event(event)),
         event_type=str(event.event_type or "unknown"),
@@ -135,101 +206,130 @@ def _hypothesis_from_rule(
         warnings=_hypothesis_warnings(event, raws, category_value),
         source_raw_ids=tuple(raw.raw_id for raw in raws),
         source_event_ids=(event.event_id,),
-        validation_reasons=(
-            ("resolver_validated_candidate_asset",) if validated_assets else ()
-        ),
-        incident_confidence=_optional_score(score_components.get("incident_confidence")) if incident else None,
-        incident_id=incident.incident_id if incident else None,
-        incident_canonical_name=incident.canonical_name if incident else None,
-        incident_event_archetype=incident.event_archetype if incident else None,
-        incident_primary_subject=incident.primary_subject if incident else None,
-        incident_affected_ecosystem=incident.affected_ecosystem if incident else None,
-        incident_cause_status=incident.current_cause_status if incident else None,
-        incident_market_reaction_observed=_incident_market_reaction_observed(incident, raws) if incident else None,
-        incident_causal_mechanism_confirmed=(
+        validation_reasons=(("resolver_validated_candidate_asset",) if validated_assets else ()),
+        **_incident_hypothesis_kwargs(incident, raws, claim_rows, score_components),
+        **_frame_gate_hypothesis_kwargs(frame_gate),
+        created_at=now.isoformat(),
+    )
+
+
+def _incident_hypothesis_kwargs(
+    incident: event_incident_graph.CanonicalIncident | None,
+    raws: tuple[RawDiscoveredEvent, ...],
+    claim_rows: tuple[Any, ...],
+    score_components: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "incident_confidence": _optional_score(score_components.get("incident_confidence")) if incident else None,
+        "incident_id": incident.incident_id if incident else None,
+        "incident_canonical_name": incident.canonical_name if incident else None,
+        "incident_event_archetype": incident.event_archetype if incident else None,
+        "incident_primary_subject": incident.primary_subject if incident else None,
+        "incident_affected_ecosystem": incident.affected_ecosystem if incident else None,
+        "incident_cause_status": incident.current_cause_status if incident else None,
+        "incident_market_reaction_observed": _incident_market_reaction_observed(incident, raws) if incident else None,
+        "incident_causal_mechanism_confirmed": (
             incident.current_cause_status == event_claim_semantics.CauseStatus.CONFIRMED.value
             if incident
             else None
         ),
-        incident_link_status="linked" if incident else "no_incident",
-        incident_link_reason=None if incident else "no_canonical_incident_for_event_evidence",
-        canonical_incident_name=incident.canonical_name if incident else None,
-        event_archetype=incident.event_archetype if incident else None,
-        primary_subject=incident.primary_subject if incident else None,
-        affected_entity=incident.primary_subject if incident else None,
-        affected_ecosystem=incident.affected_ecosystem if incident else None,
-        cause_status=incident.current_cause_status if incident else event_claim_semantics.current_cause_status(claim_rows, "exploit"),
-        claim_polarities=tuple(dict.fromkeys(claim.polarity for claim in claim_rows)),
-        claim_history=tuple(_claim_to_row(claim) for claim in claim_rows[:12]),
-        main_catalyst_frame_id=incident.main_catalyst_frame_id if incident else None,
-        main_frame_type=incident.main_frame_type if incident else None,
-        main_frame_role=incident.main_frame_role if incident else None,
-        main_frame_subject=incident.main_frame_subject if incident else None,
-        main_frame_actor=incident.main_frame_actor if incident else None,
-        main_frame_object=incident.main_frame_object if incident else None,
-        main_frame_evidence_quote=incident.main_frame_evidence_quote if incident else None,
-        background_frame_ids=incident.background_frame_ids if incident else (),
-        negated_frame_ids=incident.negated_frame_ids if incident else (),
-        corrective_frame_ids=incident.corrective_frame_ids if incident else (),
-        frame_summary=tuple(dict(item) for item in incident.frame_summary) if incident else (),
-        background_context_summary=incident.background_context_summary if incident else None,
-        rejected_impact_paths=_rejected_impact_paths_from_frames(incident) if incident else (),
-        rejected_impact_paths_from_background=_rejected_impact_paths_from_frames(incident) if incident else (),
-        selected_main_catalyst_reason=incident.selected_main_catalyst_reason if incident else None,
-        rule_predicted_impact_path=incident.rule_predicted_impact_path if incident else None,
-        llm_predicted_main_frame_type=incident.llm_predicted_main_frame_type if incident else None,
-        frame_rule_disagreement=incident.frame_rule_disagreement if incident else None,
-        disagreement_resolution=incident.disagreement_resolution if incident else None,
-        frame_required=bool(frame_gate.get("frame_required")),
-        frame_status=str(frame_gate.get("frame_status") or "") or None,
-        frame_required_reason=str(frame_gate.get("frame_required_reason") or "") or None,
-        frame_gate_reason=str(frame_gate.get("frame_gate_reason") or "") or None,
-        route_block_reason=str(frame_gate.get("route_block_reason") or "") or None,
-        primary_impact_path=str(frame_gate.get("primary_impact_path") or "") or None,
-        asset_role_source=str(frame_gate.get("asset_role_source") or "") or None,
-        independent_source_domains=incident.independent_source_domains if incident else (),
-        conflicting_claims=incident.conflicting_claims if incident else (),
-        created_at=now.isoformat(),
+        "incident_link_status": "linked" if incident else "no_incident",
+        "incident_link_reason": None if incident else "no_canonical_incident_for_event_evidence",
+        "canonical_incident_name": incident.canonical_name if incident else None,
+        "event_archetype": incident.event_archetype if incident else None,
+        "primary_subject": incident.primary_subject if incident else None,
+        "affected_entity": incident.primary_subject if incident else None,
+        "affected_ecosystem": incident.affected_ecosystem if incident else None,
+        "cause_status": incident.current_cause_status if incident else event_claim_semantics.current_cause_status(claim_rows, "exploit"),
+        "claim_polarities": tuple(dict.fromkeys(claim.polarity for claim in claim_rows)),
+        "claim_history": tuple(_claim_to_row(claim) for claim in claim_rows[:12]),
+        "main_catalyst_frame_id": incident.main_catalyst_frame_id if incident else None,
+        "main_frame_type": incident.main_frame_type if incident else None,
+        "main_frame_role": incident.main_frame_role if incident else None,
+        "main_frame_subject": incident.main_frame_subject if incident else None,
+        "main_frame_actor": incident.main_frame_actor if incident else None,
+        "main_frame_object": incident.main_frame_object if incident else None,
+        "main_frame_evidence_quote": incident.main_frame_evidence_quote if incident else None,
+        "background_frame_ids": incident.background_frame_ids if incident else (),
+        "negated_frame_ids": incident.negated_frame_ids if incident else (),
+        "corrective_frame_ids": incident.corrective_frame_ids if incident else (),
+        "frame_summary": tuple(dict(item) for item in incident.frame_summary) if incident else (),
+        "background_context_summary": incident.background_context_summary if incident else None,
+        "rejected_impact_paths": _rejected_impact_paths_from_frames(incident) if incident else (),
+        "rejected_impact_paths_from_background": _rejected_impact_paths_from_frames(incident) if incident else (),
+        "selected_main_catalyst_reason": incident.selected_main_catalyst_reason if incident else None,
+        "rule_predicted_impact_path": incident.rule_predicted_impact_path if incident else None,
+        "llm_predicted_main_frame_type": incident.llm_predicted_main_frame_type if incident else None,
+        "frame_rule_disagreement": incident.frame_rule_disagreement if incident else None,
+        "disagreement_resolution": incident.disagreement_resolution if incident else None,
+        "independent_source_domains": incident.independent_source_domains if incident else (),
+        "conflicting_claims": incident.conflicting_claims if incident else (),
+    }
+
+
+def _frame_gate_hypothesis_kwargs(frame_gate: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "frame_required": bool(frame_gate.get("frame_required")),
+        "frame_status": str(frame_gate.get("frame_status") or "") or None,
+        "frame_required_reason": str(frame_gate.get("frame_required_reason") or "") or None,
+        "frame_gate_reason": str(frame_gate.get("frame_gate_reason") or "") or None,
+        "route_block_reason": str(frame_gate.get("route_block_reason") or "") or None,
+        "primary_impact_path": str(frame_gate.get("primary_impact_path") or "") or None,
+        "asset_role_source": str(frame_gate.get("asset_role_source") or "") or None,
+    }
+
+
+def _with_validated_asset_impact_validation(
+    hypothesis: EventImpactHypothesis,
+    raws: tuple[RawDiscoveredEvent, ...],
+    *,
+    validated_assets: tuple[dict[str, Any], ...],
+    symbols: tuple[str, ...],
+    coin_ids: tuple[str, ...],
+    score_components: Mapping[str, Any],
+    validation_stage: str,
+    category_value: str,
+) -> EventImpactHypothesis:
+    asset = validated_assets[0]
+    symbol = str(asset.get("symbol") or (symbols[0] if symbols else ""))
+    coin_id = str(asset.get("coin_id") or (coin_ids[0] if coin_ids else ""))
+    validation = event_impact_path_validator.validate_impact_path(
+        raws[0],
+        hypothesis,
+        symbol=symbol,
+        coin_id=coin_id,
+        score_components=score_components,
     )
-    if incident:
-        hypothesis = replace(hypothesis, **_incident_relevance_replace_kwargs(incident, raws, hypothesis))
-    if validated_assets and raws:
-        asset = validated_assets[0]
-        validation = event_impact_path_validator.validate_impact_path(
-            raws[0],
-            hypothesis,
-            symbol=str(asset.get("symbol") or (symbols[0] if symbols else "")),
-            coin_id=str(asset.get("coin_id") or (coin_ids[0] if coin_ids else "")),
-            score_components=score_components,
-        )
-        updated_components = dict(score_components)
-        updated_components.update(_impact_validation_score_components(validation))
-        updated_components.update(_impact_validation_metadata_components(validation))
-        validation = _refresh_impact_validation_score(validation, updated_components)
-        updated_components.update(_impact_validation_score_components(validation))
-        updated_components.update(_impact_validation_metadata_components(validation))
-        quality_kwargs = _quality_verdict_replace_kwargs(
-            validation,
-            impact_context=(raws[0], str(asset.get("symbol") or (symbols[0] if symbols else "")), str(asset.get("coin_id") or (coin_ids[0] if coin_ids else ""))),
-            hypothesis=hypothesis,
-            components=updated_components,
-        )
-        updated_components.update(_quality_score_components(quality_kwargs))
-        stage = validation_stage
-        if validation.required_evidence_met:
-            stage = _max_validation_stage(stage, ValidationStage.IMPACT_PATH_VALIDATED.value)
-        score = _weighted_hypothesis_score(updated_components, category_value)
-        hypothesis = replace(
-            hypothesis,
-            validation_stage=stage,
-            hypothesis_score=round(score, 2),
-            confidence=max(0.0, min(1.0, round(score / 100.0, 4))),
-            score_components=updated_components,
-            impact_path_reason=validation.impact_path_reason,
-            **_impact_validation_replace_kwargs(validation),
-            **quality_kwargs,
-        )
-        hypothesis = _with_incident_aliases(hypothesis)
+    updated_components = dict(score_components)
+    updated_components.update(_impact_validation_score_components(validation))
+    updated_components.update(_impact_validation_metadata_components(validation))
+    validation = _refresh_impact_validation_score(validation, updated_components)
+    updated_components.update(_impact_validation_score_components(validation))
+    updated_components.update(_impact_validation_metadata_components(validation))
+    quality_kwargs = _quality_verdict_replace_kwargs(
+        validation,
+        impact_context=(raws[0], symbol, coin_id),
+        hypothesis=hypothesis,
+        components=updated_components,
+    )
+    updated_components.update(_quality_score_components(quality_kwargs))
+    stage = validation_stage
+    if validation.required_evidence_met:
+        stage = _max_validation_stage(stage, ValidationStage.IMPACT_PATH_VALIDATED.value)
+    score = _weighted_hypothesis_score(updated_components, category_value)
+    return _with_incident_aliases(replace(
+        hypothesis,
+        validation_stage=stage,
+        hypothesis_score=round(score, 2),
+        confidence=max(0.0, min(1.0, round(score / 100.0, 4))),
+        score_components=updated_components,
+        impact_path_reason=validation.impact_path_reason,
+        **_impact_validation_replace_kwargs(validation),
+        **quality_kwargs,
+    ))
+
+
+def _with_search_query_diagnostics(hypothesis: EventImpactHypothesis) -> EventImpactHypothesis:
     query_details = _default_search_query_details(hypothesis)
     hypothesis = replace(
         hypothesis,
