@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-05 - Refactor v3 production size warning threshold is 1,200 lines
+**Status:** accepted
+**Decision:** Production source files over 1,200 lines are v3 maintainability
+warnings that must be split when low risk or explicitly documented as accepted
+exceptions with owner notes and revisit conditions. Production source files over
+1,500 lines remain blockers unless an exception is explicitly accepted in the
+refactor reports. Production functions over 150 lines remain blockers unless
+accepted, and class ownership gates continue to publish accepted model bundles
+and class exceptions separately from unresolved debt.
+**Why:** The v2/v3 refactor already eliminated production files over 1,500
+lines. The next useful pressure is keeping near-threshold modules visible
+without forcing risky behavior changes in stable provider, notification, radar,
+or CLI paths.
+**Revisit when:** any accepted over-1,200-line file is touched for non-trivial
+behavior changes, a safe package split can preserve imports and artifacts, or a
+new production file would cross 1,200 lines.
+
 ## 2026-07-04 - Multi-class production modules require model-bundle registration
 **Status:** accepted
 **Decision:** Production modules may contain multiple public classes only when

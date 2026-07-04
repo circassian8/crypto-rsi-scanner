@@ -17,6 +17,48 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Tighten v3 size gates and split near-threshold modules · Codex
+**Why:** Refactor v3 needed the stricter maintainability target to move from
+“under 1,500 lines” toward documented 1,200-line warnings without changing
+runtime behavior, provider gates, notification semantics, artifact schemas, or
+research-only safety boundaries.
+**Changes:**
+- Split `event_alpha/radar/pipeline.py` models into
+  `event_alpha/radar/pipeline_models.py`, reducing the pipeline to 1,136 lines.
+- Split Coinalyze preflight ledger/report rendering into
+  `event_alpha/providers/coinalyze_preflight_ledger.py` and
+  `event_alpha/providers/coinalyze_preflight_report.py`, keeping the main
+  preflight module at 1,123 lines and preserving no-call/no-send behavior.
+- Split legacy CLI utility command helpers into
+  `cli/services/legacy/utility_research_cards.py` and
+  `cli/services/legacy/utility_calibration_exports.py`, keeping
+  `utility_commands.py` at 1,096 lines while preserving scanner-level
+  monkeypatch compatibility.
+- Updated `refactor-size-gates`, `refactor-final-report`, and
+  `refactor-completion-map` so production files over 1,200 lines are warnings
+  that must be split or explicitly accepted, while production files over 1,500
+  lines remain blockers.
+- Regenerated refactor size, final, completion, release-candidate, and class
+  ownership reports and updated static tests for the stricter v3 counters.
+**Verify:** Passed `python3 tests/test_indicators.py` (`749/749 passed`);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (`760 passed`); `python3 -m compileall
+-q crypto_rsi_scanner tests`; `make refactor-size-gates PYTHON=python3`;
+`make refactor-final-report PYTHON=python3`; `make refactor-completion-map
+PYTHON=python3`; `make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-coinalyze-preflight PYTHON=python3`; `make
+event-alpha-notification-format-smoke PYTHON=python3`; and `make verify
+PYTHON=python3`.
+**Notes/risks:** Current counters: `production_files_over_1500_lines=0`,
+`production_files_over_1200_lines=12`,
+`accepted_production_files_over_1200_lines=12`,
+`unresolved_production_files_over_1200_lines=0`, `functions_over_limit_count=0`,
+and completion map `status=accepted`. The notification-format doctor still
+reports the pre-existing non-strict fixture schema safety warning, with no
+blockers. No live provider calls, live Telegram sends, trading, paper-trading
+behavior changes, execution/order logic, Event Alpha RSI writes, or Event
+Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Register multi-class model bundles in refactor gates · Codex
 **Why:** The class ownership report still counted every module with multiple
 public classes as unresolved debt, even when the module only held small

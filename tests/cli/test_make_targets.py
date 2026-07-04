@@ -870,8 +870,10 @@ def test_refactor_size_gates_static_baseline_and_new_violation_detection():
         blocked = refactor_size_gates.build_gate_report(root=root)
         assert blocked["gate_status"] == "blocked"
         assert any(row["category"] == "file_over_1500_lines" for row in blocked["new_violations"])
-        assert blocked["production_size_gate_status"] == "warning"
+        assert blocked["production_size_gate_status"] == "blocked"
         assert blocked["production_files_over_1200_lines"] == 1
+        assert blocked["accepted_production_files_over_1200_lines"] == 0
+        assert blocked["unresolved_production_files_over_1200_lines"] == 1
         assert blocked["v3_gates"]["production_files_over_1200_lines"] == 1
         assert blocked["v3_gates"]["production_files_over_1500_lines"] == 1
         assert blocked["v3_auto_accept_ready"] is False
@@ -926,8 +928,14 @@ def test_refactor_reports_list_large_legacy_implementation_cores():
     assert final_report["legacy_decomposition_gate_status"] == "pass"
     assert size_report["legacy_files_over_1500_lines"] == 0
     assert final_report["legacy_files_over_1500_lines"] == 0
-    assert size_report["production_size_gate_status"] == "pass"
-    assert final_report["production_size_gate_status"] == "pass"
+    assert size_report["production_size_gate_status"] == "warning"
+    assert final_report["production_size_gate_status"] == "warning"
+    assert size_report["production_files_over_1200_lines"] == size_report["accepted_production_files_over_1200_lines"]
+    assert size_report["unresolved_production_files_over_1200_lines"] == 0
+    assert final_report["production_files_over_1200_lines"] == final_report["accepted_production_files_over_1200_lines"]
+    assert final_report["unresolved_production_files_over_1200_lines"] == 0
+    assert size_report["production_files_over_1500_lines"] == 0
+    assert final_report["production_files_over_1500_lines"] == 0
     assert size_report["production_files_over_2000_lines"] == 0
     assert not any(
         blocker["path"] == "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"

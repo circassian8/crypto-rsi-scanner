@@ -2,20 +2,24 @@
 
 Static map of the behavior-preserving Event Alpha refactor. It records package ownership, compatibility cores, size gates, and safety boundaries.
 
-- generated_at: `2026-07-04T16:14:07+00:00`
+- generated_at: `2026-07-04T21:42:02+00:00`
 - status: `accepted`
 - scanner.py lines: `90`
 - scanner command bodies remaining: `0`
 - cli service bind sites: `5`
-- active shims: `124`
+- active shims: `9`
 - active shim logic violations: `0`
 - size gate status: `pass`
-- production size gate status: `pass`
+- production size gate status: `warning`
+- production files over 1200 lines: `12`
+- accepted production files over 1200 lines: `12`
+- unresolved production files over 1200 lines: `0`
+- production files over 1500 lines: `0`
 - production files over 2000 lines: `0`
 - production files over 3000 lines: `0`
-- accepted class exceptions: `14`
+- accepted class exceptions: `3`
 - remaining class ownership debt: `0`
-- multiple public class module status: `documented_advisory`
+- multiple public class module status: `pass`
 - test size gate status: `warning`
 - legacy decomposition gate status: `pass`
 - legacy files over 3000 lines: `0`
@@ -34,9 +38,9 @@ Static map of the behavior-preserving Event Alpha refactor. It records package o
 
 ## Class Ownership Cleanup
 
-- accepted_class_exceptions_count: `14`
+- accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
-- modules_with_multiple_public_classes_status: `documented_advisory`
+- modules_with_multiple_public_classes_status: `pass`
 
 ## Safety Invariants
 

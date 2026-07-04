@@ -101,6 +101,21 @@ def build_refactor_completion_map(
         "size_gates": {
             "gate_status": size.get("gate_status"),
             "production_size_gate_status": size.get("production_size_gate_status"),
+            "production_files_over_1200_lines": size.get("production_files_over_1200_lines"),
+            "accepted_production_files_over_1200_lines": size.get(
+                "accepted_production_files_over_1200_lines"
+            ),
+            "unresolved_production_files_over_1200_lines": size.get(
+                "unresolved_production_files_over_1200_lines"
+            ),
+            "accepted_production_files_over_1200_line_rows": size.get(
+                "accepted_production_files_over_1200_line_rows",
+                [],
+            ),
+            "unresolved_production_files_over_1200_line_rows": size.get(
+                "unresolved_production_files_over_1200_line_rows",
+                [],
+            ),
             "production_files_over_1500_lines": size.get("production_files_over_1500_lines"),
             "production_files_over_2000_lines": size.get("production_files_over_2000_lines"),
             "production_files_over_3000_lines": size.get("production_files_over_3000_lines"),
@@ -230,6 +245,10 @@ def format_completion_markdown(data: dict[str, Any]) -> str:
         f"- active shim logic violations: `{data['event_alpha_module_map']['active_shim_modules_with_implementation_logic']}`",
         f"- size gate status: `{data['size_gates']['gate_status']}`",
         f"- production size gate status: `{data['size_gates'].get('production_size_gate_status')}`",
+        f"- production files over 1200 lines: `{data['size_gates'].get('production_files_over_1200_lines')}`",
+        f"- accepted production files over 1200 lines: `{data['size_gates'].get('accepted_production_files_over_1200_lines')}`",
+        f"- unresolved production files over 1200 lines: `{data['size_gates'].get('unresolved_production_files_over_1200_lines')}`",
+        f"- production files over 1500 lines: `{data['size_gates'].get('production_files_over_1500_lines')}`",
         f"- production files over 2000 lines: `{data['size_gates'].get('production_files_over_2000_lines')}`",
         f"- production files over 3000 lines: `{data['size_gates'].get('production_files_over_3000_lines')}`",
         f"- accepted class exceptions: `{data['size_gates'].get('accepted_class_exceptions_count')}`",
@@ -325,7 +344,7 @@ def _critical_blockers(
     if size.get("gate_status") != "pass":
         blockers.append({"id": "refactor_size_gate", "reason": "refactor size gate has new violations compared to baseline"})
     if size.get("production_size_gate_status") == "blocked":
-        blockers.append({"id": "production_size_gate", "reason": "production source files over 2,000 lines remain without accepted exceptions"})
+        blockers.append({"id": "production_size_gate", "reason": "production source files over 1,500 lines remain without accepted exceptions"})
     if size.get("legacy_decomposition_gate_status") == "blocked":
         blockers.append({"id": "legacy_decomposition_gate", "reason": "legacy implementation files over 3,000 lines remain"})
     if int(final.get("active_shim_modules_with_implementation_logic") or 0) != 0:

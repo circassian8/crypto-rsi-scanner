@@ -24,12 +24,63 @@ BASELINE_JSON = "REFACTOR_SIZE_BASELINE.json"
 REPORT_JSON = "REFACTOR_SIZE_GATES.json"
 REPORT_MD = "REFACTOR_SIZE_GATES.md"
 DEFAULT_FILE_LINE_LIMIT = 1500
-PRODUCTION_WARNING_LINE_LIMIT = 1500
-PRODUCTION_BLOCKER_LINE_LIMIT = 2000
+PRODUCTION_WARNING_LINE_LIMIT = refactor_v3_contract.PRODUCTION_TARGET_LINE_LIMIT
+PRODUCTION_BLOCKER_LINE_LIMIT = refactor_v3_contract.PRODUCTION_BLOCKER_LINE_LIMIT
+PRODUCTION_LEGACY_BLOCKER_LINE_LIMIT = 2000
 PRODUCTION_HARD_BLOCKER_LINE_LIMIT = 3000
 TEST_WARNING_LINE_LIMIT = 1500
 DEFAULT_CLASS_LINE_LIMIT = ownership.DEFAULT_CLASS_LINE_LIMIT
 DEFAULT_FUNCTION_LINE_LIMIT = ownership.DEFAULT_FUNCTION_LINE_LIMIT
+ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
+    "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py": {
+        "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+        "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+    },
+    "crypto_rsi_scanner/cli/services/legacy/config_reports.py": {
+        "reason": "Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
+        "revisit_condition": "When config/report command bodies move to canonical non-legacy service modules.",
+    },
+    "crypto_rsi_scanner/config.py": {
+        "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
+        "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+    },
+    "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py": {
+        "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
+        "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
+    },
+    "crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py": {
+        "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
+        "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
+    },
+    "crypto_rsi_scanner/event_alpha/notifications/router.py": {
+        "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
+        "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
+    },
+    "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py": {
+        "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
+        "revisit_condition": "When outcome performance views gain new sections.",
+    },
+    "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py": {
+        "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+        "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+    },
+    "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py": {
+        "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
+        "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
+    },
+    "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py": {
+        "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
+        "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
+    },
+    "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py": {
+        "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
+        "revisit_condition": "When adding a new enrichment source or cache policy.",
+    },
+    "crypto_rsi_scanner/event_alpha/shims.py": {
+        "reason": "Static shim registry/data table; large by design and non-behavioral.",
+        "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
+    },
+}
 MOVED_VIOLATION_ALIASES = {
     "file:crypto_rsi_scanner/cli/services/scanner_legacy.py": "file:crypto_rsi_scanner/scanner.py",
     "class:crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py:EventAlphaArtifactDoctorResult": "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
@@ -126,11 +177,21 @@ def build_inventory(
     production_files_over_1200 = [
         row for row in production_file_rows if row["line_count"] > refactor_v3_contract.PRODUCTION_TARGET_LINE_LIMIT
     ]
+    accepted_production_files_over_1200 = [
+        _accepted_over_1200_row(row)
+        for row in production_files_over_1200
+        if str(row.get("path") or "") in ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES
+    ]
+    unresolved_production_files_over_1200 = [
+        row
+        for row in production_files_over_1200
+        if str(row.get("path") or "") not in ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES
+    ]
     production_files_over_1500 = [
-        row for row in production_file_rows if row["line_count"] > PRODUCTION_WARNING_LINE_LIMIT
+        row for row in production_file_rows if row["line_count"] > PRODUCTION_BLOCKER_LINE_LIMIT
     ]
     production_files_over_2000 = [
-        row for row in production_file_rows if row["line_count"] > PRODUCTION_BLOCKER_LINE_LIMIT
+        row for row in production_file_rows if row["line_count"] > PRODUCTION_LEGACY_BLOCKER_LINE_LIMIT
     ]
     production_files_over_3000 = [
         row for row in production_file_rows if row["line_count"] > PRODUCTION_HARD_BLOCKER_LINE_LIMIT
@@ -153,8 +214,8 @@ def build_inventory(
     ]
     production_size_gate_status = (
         "blocked"
-        if production_files_over_2000 or production_files_over_3000
-        else ("warning" if production_files_over_1500 else "pass")
+        if production_files_over_1500 or production_files_over_2000 or production_files_over_3000
+        else ("warning" if production_files_over_1200 else "pass")
     )
     test_size_gate_status = "warning" if test_files_over_1500 else "pass"
     violations = _ownership_violation_rows(long_files, class_report)
@@ -168,6 +229,16 @@ def build_inventory(
         "production_files_over_1200_lines": len(production_files_over_1200),
         "production_files_over_1200_line_rows": sorted(
             production_files_over_1200,
+            key=lambda row: (-int(row.get("line_count") or 0), str(row.get("path") or "")),
+        ),
+        "accepted_production_files_over_1200_lines": len(accepted_production_files_over_1200),
+        "accepted_production_files_over_1200_line_rows": sorted(
+            accepted_production_files_over_1200,
+            key=lambda row: (-int(row.get("line_count") or 0), str(row.get("path") or "")),
+        ),
+        "unresolved_production_files_over_1200_lines": len(unresolved_production_files_over_1200),
+        "unresolved_production_files_over_1200_line_rows": sorted(
+            unresolved_production_files_over_1200,
             key=lambda row: (-int(row.get("line_count") or 0), str(row.get("path") or "")),
         ),
         "production_files_over_1500_lines": len(production_files_over_1500),
@@ -265,6 +336,17 @@ def _ownership_violation_rows(long_files: Iterable[Mapping[str, Any]], class_rep
     return violations
 
 
+def _accepted_over_1200_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    path = str(row.get("path") or "")
+    meta = ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES.get(path, {})
+    return {
+        **dict(row),
+        "accepted": True,
+        "reason": str(meta.get("reason") or "Accepted v3 over-1200-line warning."),
+        "revisit_condition": str(meta.get("revisit_condition") or "Revisit on the next behavior-freeze split pass."),
+    }
+
+
 def build_baseline(*, root: str | Path | None = None) -> dict[str, Any]:
     inventory = build_inventory(root=root)
     return {
@@ -324,8 +406,9 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
             "new_violations_compared_to_baseline": "blocker",
             "v3_production_file_under_1200_lines": "target",
             "v3_production_file_over_1500_lines": "blocker unless explicitly accepted",
-            "production_file_over_1500_lines": "warning",
-            "production_file_over_2000_lines": "refactor-complete blocker unless explicitly exempted",
+            "production_file_over_1200_lines": "warning",
+            "production_file_over_1500_lines": "blocker unless explicitly accepted",
+            "production_file_over_2000_lines": "legacy blocker threshold retained for continuity",
             "production_file_over_3000_lines": "blocker",
             "test_file_size_debt": "tracked separately from production completion",
             "baseline_update": "explicit make refactor-size-baseline-update only",
@@ -385,6 +468,8 @@ def format_gate_report(report: dict[str, Any]) -> str:
         f"- v3_gate_status: `{report.get('v3_gate_status')}`",
         f"- v3_auto_accept_ready: `{report.get('v3_auto_accept_ready')}`",
         f"- production_files_over_1200_lines: `{report.get('production_files_over_1200_lines', 0)}`",
+        f"- accepted_production_files_over_1200_lines: `{report.get('accepted_production_files_over_1200_lines', 0)}`",
+        f"- unresolved_production_files_over_1200_lines: `{report.get('unresolved_production_files_over_1200_lines', 0)}`",
         f"- production_size_gate_status: `{report.get('production_size_gate_status')}`",
         f"- production_files_over_1500_lines: `{report.get('production_files_over_1500_lines', 0)}`",
         f"- production_files_over_2000_lines: `{report.get('production_files_over_2000_lines', 0)}`",
@@ -417,9 +502,10 @@ def format_gate_report(report: dict[str, Any]) -> str:
         "- Existing violations from `research/REFACTOR_SIZE_BASELINE.json` are warnings.",
         "- New file/function/class/module ownership violations are blockers.",
         "- Refactor v3 targets production files below 1,200 lines.",
+        "- Production files over 1,200 lines are warnings and must either be split or documented.",
         "- Refactor v3 treats production files over 1,500 lines as blockers unless explicitly accepted.",
-        "- Production files over 1,500 lines are warnings.",
-        "- Production files over 2,000 lines block refactor-complete status unless explicitly exempted.",
+        "- Production files over 1,500 lines block refactor-complete status unless explicitly accepted.",
+        "- Production files over 2,000 lines remain a legacy continuity threshold.",
         "- Production files over 3,000 lines are blockers.",
         "- Test file size debt is tracked separately and does not block production refactor completion.",
         "- Legacy implementation files over 1,500 lines are warnings.",
@@ -473,6 +559,7 @@ def format_gate_report(report: dict[str, Any]) -> str:
     ])
     for row in _limit_rows(report.get("largest_production_files"), 40):
         lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
+    _append_production_over_target_sections(lines, report)
     lines.extend([
         "",
         "## Largest Test Files",
@@ -501,6 +588,22 @@ def format_gate_report(report: dict[str, Any]) -> str:
     for row in _limit_rows(report.get("existing_violations"), 200):
         lines.append(_violation_row(row))
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _append_production_over_target_sections(lines: list[str], report: dict[str, Any]) -> None:
+    lines.extend(["", "## Accepted Production Files Over 1200 Lines", "", "| path | lines | reason | revisit |", "|---|---:|---|---|"])
+    for row in _limit_rows(report.get("accepted_production_files_over_1200_line_rows"), 120):
+        lines.append(
+            f"| `{row.get('path')}` | {row.get('line_count', 0)} | "
+            f"{row.get('reason') or ''} | {row.get('revisit_condition') or ''} |"
+        )
+    lines.extend(["", "## Unresolved Production Files Over 1200 Lines", "", "| path | lines |", "|---|---:|"])
+    unresolved_over_1200 = list(_limit_rows(report.get("unresolved_production_files_over_1200_line_rows"), 120))
+    if unresolved_over_1200:
+        for row in unresolved_over_1200:
+            lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
+    else:
+        lines.append("| none | 0 |")
 
 
 def _file_line_rows(repo_root: Path, *, file_line_limit: int) -> list[dict[str, Any]]:

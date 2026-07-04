@@ -454,6 +454,36 @@ def _class_ownership_final_fields(class_ownership: Mapping[str, Any]) -> dict[st
     }
 
 
+def _size_gate_final_fields(size_gate_report: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "production_size_gate_status": size_gate_report.get("production_size_gate_status"),
+        "production_files_over_1200_lines": size_gate_report.get("production_files_over_1200_lines"),
+        "accepted_production_files_over_1200_lines": size_gate_report.get(
+            "accepted_production_files_over_1200_lines"
+        ),
+        "unresolved_production_files_over_1200_lines": size_gate_report.get(
+            "unresolved_production_files_over_1200_lines"
+        ),
+        "accepted_production_files_over_1200_line_rows": size_gate_report.get(
+            "accepted_production_files_over_1200_line_rows",
+            [],
+        ),
+        "unresolved_production_files_over_1200_line_rows": size_gate_report.get(
+            "unresolved_production_files_over_1200_line_rows",
+            [],
+        ),
+        "production_files_over_1500_lines": size_gate_report.get("production_files_over_1500_lines"),
+        "production_files_over_2000_lines": size_gate_report.get("production_files_over_2000_lines"),
+        "production_files_over_3000_lines": size_gate_report.get("production_files_over_3000_lines"),
+        "largest_production_files": size_gate_report.get("largest_production_files", []),
+        "production_classes_over_limit": size_gate_report.get("production_classes_over_limit"),
+        "production_functions_over_limit": size_gate_report.get("production_functions_over_limit"),
+        "test_size_gate_status": size_gate_report.get("test_size_gate_status"),
+        "test_files_over_1500_lines": size_gate_report.get("test_files_over_1500_lines"),
+        "largest_test_files": size_gate_report.get("largest_test_files", []),
+    }
+
+
 def _shim_final_fields(*, deleted_shims: int, final_shim_status: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "old_module_paths_removed": deleted_shims,
@@ -573,7 +603,7 @@ def _refactor_extra_blockers(
                 {
                     "path": str(row.get("path")),
                     "blocker_reason": (
-                        "Production module remains over 2,000 lines; refactor completion must "
+                        "Production module remains over 1,500 lines; refactor completion must "
                         "document an explicit exception or split the file."
                     ),
                     "next_migration_module": "focused production split modules for this file",
@@ -735,16 +765,7 @@ def build_refactor_final_report(
         "legacy_files_over_3000_lines": legacy_inventory["legacy_files_over_3000_lines"],
         "legacy_total_lines": legacy_inventory["legacy_total_lines"],
         "largest_legacy_files": legacy_inventory["largest_legacy_files"],
-        "production_size_gate_status": size_gate_report.get("production_size_gate_status"),
-        "production_files_over_1500_lines": size_gate_report.get("production_files_over_1500_lines"),
-        "production_files_over_2000_lines": size_gate_report.get("production_files_over_2000_lines"),
-        "production_files_over_3000_lines": size_gate_report.get("production_files_over_3000_lines"),
-        "largest_production_files": size_gate_report.get("largest_production_files", []),
-        "production_classes_over_limit": size_gate_report.get("production_classes_over_limit"),
-        "production_functions_over_limit": size_gate_report.get("production_functions_over_limit"),
-        "test_size_gate_status": size_gate_report.get("test_size_gate_status"),
-        "test_files_over_1500_lines": size_gate_report.get("test_files_over_1500_lines"),
-        "largest_test_files": size_gate_report.get("largest_test_files", []),
+        **_size_gate_final_fields(size_gate_report),
         **_v3_final_fields(v3_gate_snapshot),
         "legacy_classes_over_limit": legacy_inventory["legacy_classes_over_limit"],
         "legacy_functions_over_limit": legacy_inventory["legacy_functions_over_limit"],
@@ -941,6 +962,9 @@ def _append_organization_counts_section(lines: list[str], data: dict[str, Any]) 
         ("remaining_class_ownership_debt_count", data.get("remaining_class_ownership_debt_count")),
         ("modules_with_multiple_public_classes_status", data.get("modules_with_multiple_public_classes_status")),
         ("production_size_gate_status", data.get("production_size_gate_status")),
+        ("production_files_over_1200_lines", data.get("production_files_over_1200_lines")),
+        ("accepted_production_files_over_1200_lines", data.get("accepted_production_files_over_1200_lines")),
+        ("unresolved_production_files_over_1200_lines", data.get("unresolved_production_files_over_1200_lines")),
         ("production_files_over_1500_lines", data.get("production_files_over_1500_lines")),
         ("production_files_over_2000_lines", data.get("production_files_over_2000_lines")),
         ("production_files_over_3000_lines", data.get("production_files_over_3000_lines")),
@@ -1042,27 +1066,25 @@ def _append_class_ownership_section(lines: list[str], data: dict[str, Any]) -> N
 
 
 def _append_production_size_section(lines: list[str], data: dict[str, Any]) -> None:
-    lines.extend(
-        [
-            "",
-            "## Production Size Gate",
-            "",
-            "| path | lines |",
-            "|---|---:|",
-        ]
-    )
+    lines.extend(["", "## Production Size Gate", "", "| path | lines |", "|---|---:|"])
     for row in data.get("largest_production_files", []):
         if isinstance(row, dict):
             lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
-    lines.extend(
-        [
-            "",
-            "## Test Size Gate",
-            "",
-            "| path | lines |",
-            "|---|---:|",
-        ]
-    )
+    lines.extend(["", "## Accepted Production Files Over 1200 Lines", "", "| path | lines | reason | revisit |", "|---|---:|---|---|"])
+    for row in data.get("accepted_production_files_over_1200_line_rows", []):
+        if isinstance(row, dict):
+            lines.append(
+                f"| `{row.get('path')}` | {row.get('line_count', 0)} | "
+                f"{row.get('reason') or ''} | {row.get('revisit_condition') or ''} |"
+            )
+    lines.extend(["", "## Unresolved Production Files Over 1200 Lines", "", "| path | lines |", "|---|---:|"])
+    unresolved = [row for row in data.get("unresolved_production_files_over_1200_line_rows", []) if isinstance(row, dict)]
+    if unresolved:
+        for row in unresolved:
+            lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
+    else:
+        lines.append("| none | 0 |")
+    lines.extend(["", "## Test Size Gate", "", "| path | lines |", "|---|---:|"])
     for row in data.get("largest_test_files", []):
         if isinstance(row, dict):
             lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")

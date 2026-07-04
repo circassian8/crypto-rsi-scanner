@@ -102,6 +102,7 @@ ACCEPTED_MODEL_BUNDLE_MODULES = {
     "crypto_rsi_scanner.event_alpha.radar.near_miss.models",
     "crypto_rsi_scanner.event_alpha.radar.opportunity_verdict",
     "crypto_rsi_scanner.event_alpha.radar.pipeline",
+    "crypto_rsi_scanner.event_alpha.radar.pipeline_models",
     "crypto_rsi_scanner.event_alpha.radar.playbooks",
     "crypto_rsi_scanner.event_alpha.radar.price_history",
     "crypto_rsi_scanner.event_alpha.radar.source_coverage.models",

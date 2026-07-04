@@ -16,8 +16,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
-from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request
 
 from ... import config
@@ -26,6 +24,27 @@ from ..artifacts import paths as event_artifact_paths
 from ..artifacts import schema_v1
 from ..radar import derivatives_crowding as event_derivatives_crowding
 from . import provider_health as event_provider_health
+from .coinalyze_preflight_report import (
+    format_preflight_report,
+    format_rehearsal_report,
+    _format_counts,
+    _format_metric_status,
+    _metrics_by_report_status,
+)
+from .coinalyze_preflight_ledger import (
+    RequestBudgetExceeded,
+    _LedgeredCoinalyzeOpener,
+    _LedgeredCoinalyzeResponse,
+    _append_ledger_row,
+    _default_urlopen,
+    _endpoint,
+    _ledger_row,
+    _result_count,
+    _safe_error_message,
+    _sanitized_url,
+    _secret_param,
+    _status_code,
+)
 
 
 PREFLIGHT_JSON = "event_coinalyze_preflight.json"
@@ -630,107 +649,6 @@ def _run_live_coinalyze_rehearsal(
     )
 
 
-def format_preflight_report(report: CoinalyzePreflightReport) -> str:
-    lines = [
-        "=" * 76,
-        "COINALYZE DERIVATIVES PREFLIGHT (research-only, no-call by default)",
-        "=" * 76,
-        f"provider: {report.provider}",
-        f"category: {report.category}",
-        f"generated_at: {report.generated_at}",
-        f"configured: {str(report.configured).lower()}",
-        f"preflight_status: {report.preflight_status}",
-        f"smoke_mode: {str(report.smoke_mode).lower()}",
-        f"live_call_allowed: {str(report.live_call_allowed).lower()}",
-        f"env_vars_required: {', '.join(report.env_vars_required)}",
-        f"provider_health_key: {report.provider_health_key}",
-        f"request_ledger_path: {report.request_ledger_path}",
-        f"request_budget: {report.request_budget}",
-        f"max_requests_per_run: {report.max_requests_per_run}",
-        f"timeout_seconds: {report.timeout_seconds:g}",
-        f"cache_ttl_seconds: {report.cache_ttl_seconds}",
-        f"fixture_parser_status: {report.fixture_parser_status}",
-        f"fixture_symbol_mapping_status: {report.fixture_symbol_mapping_status}",
-        f"fixture_symbols_observed: {', '.join(report.fixture_symbols_observed) or 'none'}",
-        f"supported_metrics: {', '.join(report.supported_metrics)}",
-        f"supported_metric_status: {_format_metric_status(report.supported_metric_status)}",
-        f"implemented_metrics: {_metrics_by_report_status(report.supported_metric_status, event_derivatives_crowding.METRIC_STATUS_IMPLEMENTED)}",
-        f"fixture_only_metrics: {_metrics_by_report_status(report.supported_metric_status, event_derivatives_crowding.METRIC_STATUS_FIXTURE_ONLY)}",
-        f"missing_or_planned_metrics: {_metrics_by_report_status(report.supported_metric_status, event_derivatives_crowding.METRIC_STATUS_MISSING_FROM_RESPONSE, event_derivatives_crowding.METRIC_STATUS_NOT_IMPLEMENTED, event_derivatives_crowding.METRIC_STATUS_PROVIDER_UNAVAILABLE)}",
-        f"lanes_enabled_if_healthy: {', '.join(report.lanes_enabled_if_healthy)}",
-        f"source_packs_enabled: {', '.join(report.source_packs_enabled)}",
-        "",
-        "Safety notes:",
-    ]
-    lines.extend(f"- {item}" for item in report.safety_notes)
-    if report.warnings:
-        lines.append("")
-        lines.append("Warnings:")
-        lines.extend(f"- {item}" for item in report.warnings)
-    lines.append("")
-    lines.append("No provider network calls were performed by this preflight.")
-    return "\n".join(lines)
-
-
-def format_rehearsal_report(report: CoinalyzeRehearsalReport) -> str:
-    lines = [
-        "# Coinalyze Bounded No-Send Rehearsal",
-        "",
-        "Research-only. Not a trade signal. No Telegram sends, trades, paper trades, normal RSI rows, or Event Alpha TRIGGERED_FADE.",
-        f"status: {report.status}",
-        f"provider: {report.provider}",
-        f"configured: {str(report.configured).lower()}",
-        f"allow_live_preflight: {str(report.allow_live_preflight).lower()}",
-        f"live_call_allowed: {str(report.live_call_allowed).lower()}",
-        f"no_send: {str(report.no_send).lower()}",
-        f"research_only: {str(report.research_only).lower()}",
-        f"requests_used: {report.requests_used}",
-        f"max_requests_per_run: {report.max_requests_per_run}",
-        f"symbols_requested: {', '.join(report.symbols_requested) or 'none'}",
-        f"symbols_resolved: {', '.join(report.symbols_resolved) or 'none'}",
-        f"supported_metric_status: {_format_metric_status(report.supported_metric_status)}",
-        f"implemented_metrics: {_metrics_by_report_status(report.supported_metric_status, event_derivatives_crowding.METRIC_STATUS_IMPLEMENTED)}",
-        f"fixture_only_metrics: {_metrics_by_report_status(report.supported_metric_status, event_derivatives_crowding.METRIC_STATUS_FIXTURE_ONLY)}",
-        f"missing_or_planned_metrics: {_metrics_by_report_status(report.supported_metric_status, event_derivatives_crowding.METRIC_STATUS_MISSING_FROM_RESPONSE, event_derivatives_crowding.METRIC_STATUS_NOT_IMPLEMENTED, event_derivatives_crowding.METRIC_STATUS_PROVIDER_UNAVAILABLE)}",
-        f"snapshots_written: {report.snapshots_written}",
-        f"crowding_candidates_written: {report.crowding_candidates_written}",
-        f"fade_review_candidates_written: {report.fade_review_candidates_written}",
-        f"crowding_class_counts: {_format_counts(report.crowding_class_counts)}",
-        f"fade_readiness_counts: {_format_counts(report.fade_readiness_counts)}",
-        "symbols_with_extreme_crowding: "
-        + (", ".join(report.symbols_with_extreme_crowding) or "none"),
-        "symbols_with_confirmed_long_crowding_warning: "
-        + (", ".join(report.symbols_with_confirmed_long_crowding_warning) or "none"),
-        f"provider_health_status: {report.provider_health_status}",
-        f"request_ledger_path: {report.request_ledger_path}",
-        f"derivatives_state_path: {report.derivatives_state_path}",
-        f"derivatives_crowding_candidates_path: {report.derivatives_candidates_path}",
-        f"fade_review_candidates_path: {report.fade_review_candidates_path}",
-        f"strict_alerts_created: {report.strict_alerts_created}",
-        f"telegram_sends: {report.telegram_sends}",
-        f"trades_created: {report.trades_created}",
-        f"paper_trades_created: {report.paper_trades_created}",
-        f"normal_rsi_signal_rows_written: {report.normal_rsi_signal_rows_written}",
-        f"triggered_fade_created: {report.triggered_fade_created}",
-    ]
-    if report.error_class:
-        lines.append(f"error_class: {report.error_class}")
-    if report.error_message_safe:
-        lines.append(f"error_message_safe: {report.error_message_safe}")
-    if report.warnings:
-        lines.extend(["", "Warnings:"])
-        lines.extend(f"- {warning}" for warning in report.warnings)
-    if report.status == "missing_config":
-        lines.append(f"next_step: configure {ENV_API_KEY}, then rerun without live calls first")
-    elif report.status == "live_call_blocked_by_default":
-        lines.append(f"next_step: rerun only with --event-alpha-coinalyze-allow-live-preflight or {ENV_ALLOW_LIVE_PREFLIGHT}=1 after review")
-    elif report.status == "blocked_request_budget":
-        lines.append(f"next_step: keep {ENV_PREFLIGHT_MAX_REQUESTS} small and at least the required endpoint count for this symbol mode")
-    else:
-        lines.append("next_step: regenerate source coverage/daily brief and run artifact doctor before any further activation.")
-    return "\n".join(lines)
-
-
 def effective_allow_live_preflight(value: bool = False) -> bool:
     return bool(value or str(os.getenv(ENV_ALLOW_LIVE_PREFLIGHT, "")).strip().casefold() in _TRUTHY)
 
@@ -848,24 +766,6 @@ def _counts(values: Iterable[str]) -> dict[str, int]:
         text = str(value or "").strip() or "unknown"
         out[text] = out.get(text, 0) + 1
     return dict(sorted(out.items()))
-
-
-def _format_counts(counts: Mapping[str, int]) -> str:
-    return ", ".join(f"{key}={value}" for key, value in sorted(counts.items())) or "none"
-
-
-def _format_metric_status(status: Mapping[str, str]) -> str:
-    return ", ".join(
-        f"{metric}={status.get(metric)}"
-        for metric in SUPPORTED_METRICS
-        if status.get(metric)
-    ) or "none"
-
-
-def _metrics_by_report_status(status: Mapping[str, str], *wanted: str) -> str:
-    wanted_set = {str(item) for item in wanted}
-    metrics = [metric for metric in SUPPORTED_METRICS if str(status.get(metric) or "") in wanted_set]
-    return ", ".join(metrics) if metrics else "none"
 
 
 def _metric_status_from_state_rows(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
@@ -1027,256 +927,6 @@ def _record_provider_health(
         event_provider_health.write_provider_health(cfg.path, rows)
         return mapped
     return "not_observed"
-
-
-class _LedgeredCoinalyzeOpener:
-    def __init__(
-        self,
-        *,
-        ledger_path: Path,
-        api_key: str,
-        max_requests: int,
-        opener: Callable[[Request, float], Any] | None,
-        now: datetime,
-    ) -> None:
-        self.ledger_path = ledger_path
-        self.api_key = api_key
-        self.max_requests = max_requests
-        self.opener = opener
-        self.started_now = now
-        self.used = 0
-
-    def __call__(self, request: Request, timeout: float) -> Any:
-        before = self.max_requests - self.used
-        if before <= 0:
-            exc = RequestBudgetExceeded("coinalyze request budget exceeded")
-            self._append_row(request, started_at=datetime.now(timezone.utc), finished_at=datetime.now(timezone.utc), before=before, after=before, exc=exc)
-            raise exc
-        self.used += 1
-        started = datetime.now(timezone.utc)
-        try:
-            response = (self.opener or _default_urlopen)(request, timeout)
-        except Exception as exc:  # noqa: BLE001
-            finished = datetime.now(timezone.utc)
-            self._append_row(request, started_at=started, finished_at=finished, before=before, after=before - 1, exc=exc)
-            raise
-        return _LedgeredCoinalyzeResponse(
-            response=response,
-            request=request,
-            ledger_path=self.ledger_path,
-            started_at=started,
-            budget_before=before,
-            budget_after=before - 1,
-            api_key=self.api_key,
-        )
-
-    def _append_row(
-        self,
-        request: Request,
-        *,
-        started_at: datetime,
-        finished_at: datetime,
-        before: int,
-        after: int,
-        exc: Exception,
-    ) -> None:
-        _append_ledger_row(
-            self.ledger_path,
-            _ledger_row(
-                request,
-                started_at=started_at,
-                finished_at=finished_at,
-                budget_before=before,
-                budget_after=after,
-                success=False,
-                api_key=self.api_key,
-                error=exc,
-            ),
-        )
-
-
-class _LedgeredCoinalyzeResponse:
-    def __init__(
-        self,
-        *,
-        response: Any,
-        request: Request,
-        ledger_path: Path,
-        started_at: datetime,
-        budget_before: int,
-        budget_after: int,
-        api_key: str,
-    ) -> None:
-        self.response = response
-        self.request = request
-        self.ledger_path = ledger_path
-        self.started_at = started_at
-        self.budget_before = budget_before
-        self.budget_after = budget_after
-        self.api_key = api_key
-        self.payload: bytes | None = None
-        self.entered: Any = None
-
-    def __enter__(self) -> "_LedgeredCoinalyzeResponse":
-        if hasattr(self.response, "__enter__"):
-            self.entered = self.response.__enter__()
-        else:
-            self.entered = self.response
-        return self
-
-    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
-        finished = datetime.now(timezone.utc)
-        success = exc is None
-        row = _ledger_row(
-            self.request,
-            started_at=self.started_at,
-            finished_at=finished,
-            budget_before=self.budget_before,
-            budget_after=self.budget_after,
-            success=success,
-            api_key=self.api_key,
-            response=self.entered or self.response,
-            payload=self.payload,
-            error=exc if isinstance(exc, Exception) else None,
-        )
-        _append_ledger_row(self.ledger_path, row)
-        if hasattr(self.response, "__exit__"):
-            return bool(self.response.__exit__(exc_type, exc, tb))
-        return False
-
-    def read(self) -> bytes:
-        target = self.entered or self.response
-        raw = target.read()
-        self.payload = raw
-        return raw
-
-
-class RequestBudgetExceeded(RuntimeError):
-    pass
-
-
-def _default_urlopen(request: Request, timeout: float) -> Any:
-    from urllib.request import urlopen
-
-    return urlopen(request, timeout=timeout)
-
-
-def _ledger_row(
-    request: Request,
-    *,
-    started_at: datetime,
-    finished_at: datetime,
-    budget_before: int,
-    budget_after: int,
-    success: bool,
-    api_key: str,
-    response: Any | None = None,
-    payload: bytes | None = None,
-    error: Exception | None = None,
-) -> dict[str, Any]:
-    status_code = _status_code(response, error)
-    safe_error = _safe_error_message(error, api_key) if error else None
-    return {
-        "schema_version": "event_coinalyze_request_ledger_v1",
-        "provider": "coinalyze",
-        "endpoint": _endpoint(request.full_url),
-        "sanitized_url": _sanitized_url(request.full_url),
-        "method": getattr(request, "method", None) or request.get_method(),
-        "started_at": started_at.astimezone(timezone.utc).isoformat(),
-        "finished_at": finished_at.astimezone(timezone.utc).isoformat(),
-        "duration_ms": max(0, int((finished_at - started_at).total_seconds() * 1000)),
-        "status_code": status_code,
-        "success": bool(success),
-        "result_count": _result_count(payload),
-        "error_class": type(error).__name__ if error else None,
-        "error_message_safe": safe_error,
-        "request_budget_before": budget_before,
-        "request_budget_after": budget_after,
-        "live_call_allowed": True,
-        "token_redacted": True,
-        "no_send_rehearsal": True,
-    }
-
-
-def _append_ledger_row(path: Path, row: Mapping[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
-        stamped = schema_v1.stamp_artifact_row(row, path=path)
-        fh.write(json.dumps(stamped, sort_keys=True) + "\n")
-
-
-def _endpoint(url: str) -> str:
-    parsed = urlparse(url)
-    return parsed.path.rstrip("/").rsplit("/", 1)[-1]
-
-
-def _sanitized_url(url: str) -> str:
-    parsed = urlparse(url)
-    query = urlencode(
-        [
-            (key, "<redacted>" if _secret_param(key) else value)
-            for key, value in parse_qsl(parsed.query, keep_blank_values=True)
-        ]
-    )
-    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, query, ""))
-
-
-def _secret_param(key: str) -> bool:
-    lowered = key.casefold()
-    return "key" in lowered or "token" in lowered or "secret" in lowered
-
-
-def _status_code(response: Any | None, error: Exception | None) -> int | None:
-    if isinstance(error, HTTPError):
-        return int(error.code)
-    for obj in (response,):
-        if obj is None:
-            continue
-        for attr in ("status", "code"):
-            value = getattr(obj, attr, None)
-            if value not in (None, ""):
-                try:
-                    return int(value)
-                except (TypeError, ValueError):
-                    pass
-        getcode = getattr(obj, "getcode", None)
-        if callable(getcode):
-            try:
-                return int(getcode())
-            except (TypeError, ValueError):
-                pass
-    return None
-
-
-def _result_count(payload: bytes | None) -> int | None:
-    if payload is None:
-        return None
-    try:
-        parsed = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return None
-    if isinstance(parsed, list):
-        return len(parsed)
-    if isinstance(parsed, Mapping):
-        for key in ("data", "result", "results", "snapshots"):
-            value = parsed.get(key)
-            if isinstance(value, list):
-                return len(value)
-        return 1
-    return None
-
-
-def _safe_error_message(error: Exception | None, api_key: str) -> str | None:
-    if error is None:
-        return None
-    text = str(error)
-    if isinstance(error, HTTPError):
-        text = f"HTTP {error.code}: {error.reason}"
-    elif isinstance(error, URLError):
-        text = f"URL error: {error.reason}"
-    if api_key:
-        text = text.replace(api_key, "<coinalyze-api-key>")
-    return text[:240]
 
 
 def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:

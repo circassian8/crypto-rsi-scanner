@@ -9,8 +9,8 @@
     ]
   },
   "class_ownership_cleanup": {
-    "accepted_class_exceptions_count": 14,
-    "modules_with_multiple_public_classes_status": "documented_advisory",
+    "accepted_class_exceptions_count": 3,
+    "modules_with_multiple_public_classes_status": "pass",
     "near_threshold_file_status": [
       {
         "line_count": 1498,
@@ -20,35 +20,21 @@
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1489,
-        "path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1473,
-        "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
-        "line_count": 1440,
-        "path": "crypto_rsi_scanner/cli/services/legacy/utility_commands.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
-        "line_count": 1406,
+        "line_count": 1404,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1394,
+        "line_count": 1395,
         "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -62,7 +48,7 @@
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1384,
+        "line_count": 1387,
         "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -78,40 +64,40 @@
     ],
     "provider_class_split_status": [
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "BinanceAnnouncementProvider",
-        "line_count": 107,
-        "module": "crypto_rsi_scanner.event_providers.binance_announcements.legacy",
-        "over_limit": true,
-        "owner_note": "Do not split further without signed-listener fixture parity and secret-redaction tests.",
-        "reason": "Signed/public announcement compatibility core preserves old imports and WebSocket/fixture behavior.",
-        "revisit_condition": "Revisit when Binance public rehearsal becomes a first-class activated provider path.",
-        "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py",
-        "split_status": "accepted_exception"
+        "line_count": 14,
+        "module": "crypto_rsi_scanner.event_providers.binance_announcements.provider",
+        "over_limit": false,
+        "owner_note": "",
+        "reason": "",
+        "revisit_condition": "",
+        "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/provider.py",
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "BybitAnnouncementProvider",
-        "line_count": 79,
-        "module": "crypto_rsi_scanner.event_providers.bybit_announcements.legacy",
-        "over_limit": true,
-        "owner_note": "Avoid touching Bybit request/normalization behavior outside provider-activation work.",
-        "reason": "Small HTTP announcement adapter is only slightly over the advisory class limit and already package-scoped.",
-        "revisit_condition": "Revisit when adding another Bybit announcement endpoint or response shape.",
-        "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py",
-        "split_status": "accepted_exception"
+        "line_count": 14,
+        "module": "crypto_rsi_scanner.event_providers.bybit_announcements.provider",
+        "over_limit": false,
+        "owner_note": "",
+        "reason": "",
+        "revisit_condition": "",
+        "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/provider.py",
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "CoinGeckoWatchlistMarketProvider",
-        "line_count": 116,
+        "line_count": 30,
         "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
-        "over_limit": true,
+        "over_limit": false,
         "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
         "reason": "Fixture/live market enrichment adapter is below file-size gates and tightly coupled to request budgeting and no-live defaults.",
         "revisit_condition": "Revisit when watchlist market enrichment gains another provider implementation.",
         "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist_market.py",
-        "split_status": "accepted_exception"
+        "split_status": "below_threshold"
       },
       {
         "accepted_exception": false,
@@ -126,76 +112,76 @@
         "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "CryptoPanicProvider",
-        "line_count": 340,
-        "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-        "over_limit": true,
-        "owner_note": "The package already has client/parser/request_ledger homes; moving the remaining class body should be its own provider parity pass.",
-        "reason": "Compatibility class still owns request hygiene, token redaction, quota/ledger telemetry, parser normalization, and fixture/live no-call behavior.",
-        "revisit_condition": "Revisit when CryptoPanic live activation or request-ledger semantics change.",
-        "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py",
-        "split_status": "accepted_exception"
+        "line_count": 29,
+        "module": "crypto_rsi_scanner.event_providers.cryptopanic.provider",
+        "over_limit": false,
+        "owner_note": "",
+        "reason": "",
+        "revisit_condition": "",
+        "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/provider.py",
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "GdeltProvider",
-        "line_count": 82,
+        "line_count": 14,
         "module": "crypto_rsi_scanner.event_providers.gdelt",
-        "over_limit": true,
+        "over_limit": false,
         "owner_note": "Keep current timeout/429 behavior stable; public-provider noise is expected.",
         "reason": "No-key public provider is fail-soft and only slightly over the advisory limit.",
         "revisit_condition": "Revisit when adding a second GDELT mode or durable request ledger.",
         "source_path": "crypto_rsi_scanner/event_providers/gdelt.py",
-        "split_status": "accepted_exception"
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "OpenAILLMExtractionProvider",
-        "line_count": 78,
-        "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-        "over_limit": true,
-        "owner_note": "Keep quote-validation and no-live defaults stable.",
-        "reason": "Small extraction provider is barely over the advisory threshold and shares safety semantics with the relationship provider.",
-        "revisit_condition": "Revisit with a broader OpenAI provider transport split.",
-        "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py",
-        "split_status": "accepted_exception"
+        "line_count": 28,
+        "module": "crypto_rsi_scanner.llm_providers.openai_extraction",
+        "over_limit": false,
+        "owner_note": "",
+        "reason": "",
+        "revisit_condition": "",
+        "source_path": "crypto_rsi_scanner/llm_providers/openai_extraction.py",
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "OpenAILLMRelationshipProvider",
-        "line_count": 137,
-        "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-        "over_limit": true,
-        "owner_note": "Do not alter LLM provider behavior during a refactor-only pass.",
-        "reason": "OpenAI relationship provider keeps request assembly, timeout/error handling, and structured parsing together behind explicit opt-in gates.",
-        "revisit_condition": "Revisit when adding a second live LLM backend or shared OpenAI transport abstraction.",
-        "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py",
-        "split_status": "accepted_exception"
+        "line_count": 34,
+        "module": "crypto_rsi_scanner.llm_providers.openai_relationship",
+        "over_limit": false,
+        "owner_note": "",
+        "reason": "",
+        "revisit_condition": "",
+        "source_path": "crypto_rsi_scanner/llm_providers/openai_relationship.py",
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "PredictionMarketEventsProvider",
-        "line_count": 83,
+        "line_count": 14,
         "module": "crypto_rsi_scanner.event_providers.prediction_market_events",
-        "over_limit": true,
+        "over_limit": false,
         "owner_note": "Split only when another prediction-market provider is added.",
         "reason": "Small no-key prediction-market provider keeps fixture/live parsing in one stable adapter.",
         "revisit_condition": "Revisit when Polymarket Gamma support grows beyond the current parser.",
         "source_path": "crypto_rsi_scanner/event_providers/prediction_market_events.py",
-        "split_status": "accepted_exception"
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "ProjectBlogRssProvider",
-        "line_count": 96,
+        "line_count": 11,
         "module": "crypto_rsi_scanner.event_providers.project_blog_rss",
-        "over_limit": true,
+        "over_limit": false,
         "owner_note": "Keep feed failure semantics stable unless adding a reusable RSS client layer.",
         "reason": "RSS/Atom adapter is tightly coupled to per-feed fail-soft behavior and source normalization.",
         "revisit_condition": "Revisit when project-blog sources get persistent request ledgers or richer feed classes.",
         "source_path": "crypto_rsi_scanner/event_providers/project_blog_rss.py",
-        "split_status": "accepted_exception"
+        "split_status": "below_threshold"
       }
     ],
     "remaining_class_ownership_debt_count": 0,
@@ -286,16 +272,16 @@
   },
   "event_alpha_module_map": {
     "active_shim_modules_with_implementation_logic": 0,
-    "active_shims": 124,
+    "active_shims": 9,
     "classification_report": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
     "intentionally_outside_event_alpha_modules": [
       "crypto_rsi_scanner.event_fade"
     ],
     "partial_shims": 0,
-    "top_level_event_module_count": 125,
+    "top_level_event_module_count": 10,
     "unmigrated_modules": 1
   },
-  "generated_at": "2026-07-04T16:14:07+00:00",
+  "generated_at": "2026-07-04T21:42:02+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
   "known_remaining_blockers": [],
   "live_provider_calls_allowed": false,
@@ -344,8 +330,119 @@
   "schema_version": "refactor_completion_map_v1",
   "size_gate_report": "research/REFACTOR_SIZE_GATES.json",
   "size_gates": {
-    "accepted_class_exceptions_count": 14,
-    "classes_over_limit_count": 14,
+    "accepted_class_exceptions_count": 3,
+    "accepted_production_files_over_1200_line_rows": [
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
+        "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "reason": "Static shim registry/data table; large by design and non-behavioral.",
+        "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1404,
+        "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+        "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
+        "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1395,
+        "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
+        "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
+        "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1392,
+        "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+        "reason": "Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
+        "revisit_condition": "When config/report command bodies move to canonical non-legacy service modules.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1387,
+        "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
+        "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
+        "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1319,
+        "path": "crypto_rsi_scanner/config.py",
+        "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
+        "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1275,
+        "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
+        "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
+        "revisit_condition": "When adding a new enrichment source or cache policy.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1261,
+        "path": "crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py",
+        "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
+        "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1239,
+        "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+        "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+        "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1233,
+        "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+        "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
+        "revisit_condition": "When outcome performance views gain new sections.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1223,
+        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+        "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+        "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+        "source_kind": "production"
+      }
+    ],
+    "accepted_production_files_over_1200_lines": 12,
+    "classes_over_limit_count": 3,
     "files_over_limit_count": 8,
     "functions_over_limit_count": 0,
     "gate_status": "pass",
@@ -353,10 +450,6 @@
       {
         "line_count": 933,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py"
-      },
-      {
-        "line_count": 905,
-        "path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
       },
       {
         "line_count": 779,
@@ -367,20 +460,12 @@
         "path": "crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py"
       },
       {
-        "line_count": 192,
-        "path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py"
-      },
-      {
         "line_count": 190,
         "path": "crypto_rsi_scanner/refactor_legacy_inventory.py"
       },
       {
         "line_count": 120,
         "path": "crypto_rsi_scanner/cli/services/scanner_legacy.py"
-      },
-      {
-        "line_count": 111,
-        "path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py"
       },
       {
         "line_count": 104,
@@ -429,6 +514,18 @@
       {
         "line_count": 48,
         "path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
+      },
+      {
+        "line_count": 44,
+        "path": "crypto_rsi_scanner/backtest_parts/legacy.py"
+      },
+      {
+        "line_count": 16,
+        "path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
+      },
+      {
+        "line_count": 12,
+        "path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py"
       }
     ],
     "largest_production_files": [
@@ -440,31 +537,19 @@
       },
       {
         "limit": 1500,
-        "line_count": 1489,
-        "path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "source_kind": "production"
       },
       {
         "limit": 1500,
-        "line_count": 1473,
-        "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 1440,
-        "path": "crypto_rsi_scanner/cli/services/legacy/utility_commands.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 1406,
+        "line_count": 1404,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
         "source_kind": "production"
       },
       {
         "limit": 1500,
-        "line_count": 1394,
+        "line_count": 1395,
         "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
         "source_kind": "production"
       },
@@ -476,7 +561,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 1384,
+        "line_count": 1387,
         "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
         "source_kind": "production"
       },
@@ -512,8 +597,14 @@
       },
       {
         "limit": 1500,
-        "line_count": 1222,
+        "line_count": 1223,
         "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1188,
+        "path": "crypto_rsi_scanner/refactor_final_report.py",
         "source_kind": "production"
       },
       {
@@ -536,8 +627,20 @@
       },
       {
         "limit": 1500,
+        "line_count": 1136,
+        "path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
         "line_count": 1135,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_confirmation.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1123,
+        "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
         "source_kind": "production"
       },
       {
@@ -548,14 +651,14 @@
       },
       {
         "limit": 1500,
-        "line_count": 1078,
-        "path": "crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py",
+        "line_count": 1096,
+        "path": "crypto_rsi_scanner/cli/services/legacy/utility_commands.py",
         "source_kind": "production"
       },
       {
         "limit": 1500,
-        "line_count": 1072,
-        "path": "crypto_rsi_scanner/refactor_final_report.py",
+        "line_count": 1078,
+        "path": "crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py",
         "source_kind": "production"
       },
       {
@@ -578,7 +681,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 1041,
+        "line_count": 1044,
         "path": "crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py",
         "source_kind": "production"
       },
@@ -596,6 +699,12 @@
       },
       {
         "limit": 1500,
+        "line_count": 1032,
+        "path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
         "line_count": 1002,
         "path": "crypto_rsi_scanner/event_alpha/radar/llm/extractor.py",
         "source_kind": "production"
@@ -609,18 +718,12 @@
       {
         "limit": 1500,
         "line_count": 989,
-        "path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 989,
         "path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
         "source_kind": "production"
       },
       {
         "limit": 1500,
-        "line_count": 985,
+        "line_count": 987,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/alerts.py",
         "source_kind": "production"
       },
@@ -638,19 +741,19 @@
       },
       {
         "limit": 1500,
-        "line_count": 975,
+        "line_count": 976,
         "path": "crypto_rsi_scanner/event_alpha/radar/incident_graph.py",
         "source_kind": "production"
       },
       {
         "limit": 1500,
-        "line_count": 970,
+        "line_count": 973,
         "path": "crypto_rsi_scanner/event_alpha/radar/core_opportunities.py",
         "source_kind": "production"
       },
       {
         "limit": 1500,
-        "line_count": 968,
+        "line_count": 966,
         "path": "crypto_rsi_scanner/event_alpha/radar/evidence/executor.py",
         "source_kind": "production"
       },
@@ -665,78 +768,72 @@
         "line_count": 941,
         "path": "crypto_rsi_scanner/event_alpha/radar/identity.py",
         "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 935,
-        "path": "crypto_rsi_scanner/event_alpha/config/profiles.py",
-        "source_kind": "production"
       }
     ],
     "largest_test_files": [
       {
         "limit": 1500,
-        "line_count": 16092,
+        "line_count": 16184,
         "path": "tests/event_alpha/test_integrated_radar.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 5373,
+        "line_count": 5357,
         "path": "tests/event_alpha/test_provider_readiness.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 5037,
+        "line_count": 5002,
         "path": "tests/event_alpha/test_notifications.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 4041,
+        "line_count": 4031,
         "path": "tests/event_alpha/test_outcomes.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 3981,
+        "line_count": 3995,
         "path": "tests/event_alpha/test_artifact_doctor.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 2988,
+        "line_count": 2991,
         "path": "tests/event_alpha/test_source_coverage.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 1813,
+        "line_count": 1826,
         "path": "tests/event_alpha/test_namespace_lifecycle.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 1771,
+        "line_count": 1778,
         "path": "tests/test_indicators.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 1014,
+        "line_count": 1093,
         "path": "tests/cli/test_make_targets.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 819,
+        "line_count": 825,
         "path": "tests/event_alpha/_legacy_helpers.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 734,
+        "line_count": 743,
         "path": "tests/event_alpha/test_artifact_schema.py",
         "source_kind": "test"
       },
@@ -760,14 +857,20 @@
       },
       {
         "limit": 1500,
+        "line_count": 278,
+        "path": "tests/event_alpha/test_shim_registry.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
         "line_count": 243,
         "path": "tests/cli/test_parser.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 204,
-        "path": "tests/event_alpha/test_shim_registry.py",
+        "line_count": 170,
+        "path": "tests/event_alpha/test_legacy_import_compatibility.py",
         "source_kind": "test"
       },
       {
@@ -784,7 +887,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 67,
+        "line_count": 68,
         "path": "tests/rsi/_legacy_helpers.py",
         "source_kind": "test"
       },
@@ -825,15 +928,15 @@
         "source_kind": "test"
       }
     ],
-    "legacy_classes_over_limit": 3,
+    "legacy_classes_over_limit": 0,
     "legacy_decomposition_gate_status": "pass",
     "legacy_files_over_1500_lines": 0,
     "legacy_files_over_3000_lines": 0,
     "legacy_functions_over_limit": 0,
-    "legacy_modules_with_multiple_public_classes": 2,
-    "legacy_total_lines": 4721,
-    "modules_with_multiple_public_classes_status": "documented_advisory",
-    "moved_existing_violation_count": 15,
+    "legacy_modules_with_multiple_public_classes": 1,
+    "legacy_total_lines": 3553,
+    "modules_with_multiple_public_classes_status": "pass",
+    "moved_existing_violation_count": 0,
     "near_threshold_file_status": [
       {
         "line_count": 1498,
@@ -843,35 +946,21 @@
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1489,
-        "path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1473,
-        "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
-        "line_count": 1440,
-        "path": "crypto_rsi_scanner/cli/services/legacy/utility_commands.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
-        "line_count": 1406,
+        "line_count": 1404,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1394,
+        "line_count": 1395,
         "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -885,7 +974,7 @@
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1384,
+        "line_count": 1387,
         "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -900,48 +989,49 @@
       }
     ],
     "new_violation_count": 0,
-    "production_classes_over_limit": 14,
+    "production_classes_over_limit": 3,
+    "production_files_over_1200_lines": 12,
     "production_files_over_1500_lines": 0,
     "production_files_over_2000_lines": 0,
     "production_files_over_3000_lines": 0,
     "production_functions_over_limit": 0,
-    "production_size_gate_status": "pass",
+    "production_size_gate_status": "warning",
     "provider_class_split_status": [
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "BinanceAnnouncementProvider",
-        "line_count": 107,
-        "module": "crypto_rsi_scanner.event_providers.binance_announcements.legacy",
-        "over_limit": true,
-        "owner_note": "Do not split further without signed-listener fixture parity and secret-redaction tests.",
-        "reason": "Signed/public announcement compatibility core preserves old imports and WebSocket/fixture behavior.",
-        "revisit_condition": "Revisit when Binance public rehearsal becomes a first-class activated provider path.",
-        "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py",
-        "split_status": "accepted_exception"
+        "line_count": 14,
+        "module": "crypto_rsi_scanner.event_providers.binance_announcements.provider",
+        "over_limit": false,
+        "owner_note": "",
+        "reason": "",
+        "revisit_condition": "",
+        "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/provider.py",
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "BybitAnnouncementProvider",
-        "line_count": 79,
-        "module": "crypto_rsi_scanner.event_providers.bybit_announcements.legacy",
-        "over_limit": true,
-        "owner_note": "Avoid touching Bybit request/normalization behavior outside provider-activation work.",
-        "reason": "Small HTTP announcement adapter is only slightly over the advisory class limit and already package-scoped.",
-        "revisit_condition": "Revisit when adding another Bybit announcement endpoint or response shape.",
-        "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py",
-        "split_status": "accepted_exception"
+        "line_count": 14,
+        "module": "crypto_rsi_scanner.event_providers.bybit_announcements.provider",
+        "over_limit": false,
+        "owner_note": "",
+        "reason": "",
+        "revisit_condition": "",
+        "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/provider.py",
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "CoinGeckoWatchlistMarketProvider",
-        "line_count": 116,
+        "line_count": 30,
         "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
-        "over_limit": true,
+        "over_limit": false,
         "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
         "reason": "Fixture/live market enrichment adapter is below file-size gates and tightly coupled to request budgeting and no-live defaults.",
         "revisit_condition": "Revisit when watchlist market enrichment gains another provider implementation.",
         "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist_market.py",
-        "split_status": "accepted_exception"
+        "split_status": "below_threshold"
       },
       {
         "accepted_exception": false,
@@ -956,76 +1046,76 @@
         "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "CryptoPanicProvider",
-        "line_count": 340,
-        "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
-        "over_limit": true,
-        "owner_note": "The package already has client/parser/request_ledger homes; moving the remaining class body should be its own provider parity pass.",
-        "reason": "Compatibility class still owns request hygiene, token redaction, quota/ledger telemetry, parser normalization, and fixture/live no-call behavior.",
-        "revisit_condition": "Revisit when CryptoPanic live activation or request-ledger semantics change.",
-        "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py",
-        "split_status": "accepted_exception"
+        "line_count": 29,
+        "module": "crypto_rsi_scanner.event_providers.cryptopanic.provider",
+        "over_limit": false,
+        "owner_note": "",
+        "reason": "",
+        "revisit_condition": "",
+        "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/provider.py",
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "GdeltProvider",
-        "line_count": 82,
+        "line_count": 14,
         "module": "crypto_rsi_scanner.event_providers.gdelt",
-        "over_limit": true,
+        "over_limit": false,
         "owner_note": "Keep current timeout/429 behavior stable; public-provider noise is expected.",
         "reason": "No-key public provider is fail-soft and only slightly over the advisory limit.",
         "revisit_condition": "Revisit when adding a second GDELT mode or durable request ledger.",
         "source_path": "crypto_rsi_scanner/event_providers/gdelt.py",
-        "split_status": "accepted_exception"
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "OpenAILLMExtractionProvider",
-        "line_count": 78,
-        "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-        "over_limit": true,
-        "owner_note": "Keep quote-validation and no-live defaults stable.",
-        "reason": "Small extraction provider is barely over the advisory threshold and shares safety semantics with the relationship provider.",
-        "revisit_condition": "Revisit with a broader OpenAI provider transport split.",
-        "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py",
-        "split_status": "accepted_exception"
+        "line_count": 28,
+        "module": "crypto_rsi_scanner.llm_providers.openai_extraction",
+        "over_limit": false,
+        "owner_note": "",
+        "reason": "",
+        "revisit_condition": "",
+        "source_path": "crypto_rsi_scanner/llm_providers/openai_extraction.py",
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "OpenAILLMRelationshipProvider",
-        "line_count": 137,
-        "module": "crypto_rsi_scanner.llm_providers.openai_provider",
-        "over_limit": true,
-        "owner_note": "Do not alter LLM provider behavior during a refactor-only pass.",
-        "reason": "OpenAI relationship provider keeps request assembly, timeout/error handling, and structured parsing together behind explicit opt-in gates.",
-        "revisit_condition": "Revisit when adding a second live LLM backend or shared OpenAI transport abstraction.",
-        "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py",
-        "split_status": "accepted_exception"
+        "line_count": 34,
+        "module": "crypto_rsi_scanner.llm_providers.openai_relationship",
+        "over_limit": false,
+        "owner_note": "",
+        "reason": "",
+        "revisit_condition": "",
+        "source_path": "crypto_rsi_scanner/llm_providers/openai_relationship.py",
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "PredictionMarketEventsProvider",
-        "line_count": 83,
+        "line_count": 14,
         "module": "crypto_rsi_scanner.event_providers.prediction_market_events",
-        "over_limit": true,
+        "over_limit": false,
         "owner_note": "Split only when another prediction-market provider is added.",
         "reason": "Small no-key prediction-market provider keeps fixture/live parsing in one stable adapter.",
         "revisit_condition": "Revisit when Polymarket Gamma support grows beyond the current parser.",
         "source_path": "crypto_rsi_scanner/event_providers/prediction_market_events.py",
-        "split_status": "accepted_exception"
+        "split_status": "below_threshold"
       },
       {
-        "accepted_exception": true,
+        "accepted_exception": false,
         "class_name": "ProjectBlogRssProvider",
-        "line_count": 96,
+        "line_count": 11,
         "module": "crypto_rsi_scanner.event_providers.project_blog_rss",
-        "over_limit": true,
+        "over_limit": false,
         "owner_note": "Keep feed failure semantics stable unless adding a reusable RSS client layer.",
         "reason": "RSS/Atom adapter is tightly coupled to per-feed fail-soft behavior and source normalization.",
         "revisit_condition": "Revisit when project-blog sources get persistent request ledgers or richer feed classes.",
         "source_path": "crypto_rsi_scanner/event_providers/project_blog_rss.py",
-        "split_status": "accepted_exception"
+        "split_status": "below_threshold"
       }
     ],
     "remaining_class_ownership_debt_count": 0,
@@ -1068,7 +1158,9 @@
       }
     ],
     "test_files_over_1500_lines": 8,
-    "test_size_gate_status": "warning"
+    "test_size_gate_status": "warning",
+    "unresolved_production_files_over_1200_line_rows": [],
+    "unresolved_production_files_over_1200_lines": 0
   },
   "status": "accepted",
   "telegram_sends": 0,

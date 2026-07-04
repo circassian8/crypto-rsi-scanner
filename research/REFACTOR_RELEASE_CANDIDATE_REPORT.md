@@ -1,11 +1,11 @@
 # Refactor Release-Candidate Report
 
-- generated_at: `2026-07-04T16:14:09+00:00`
+- generated_at: `2026-07-04T21:42:44+00:00`
 - status: `accepted`
 - verdict: Event Alpha refactor v2 accepted: critical behavior, safety, shim, size, scanner-facade, and regression checks passed.
 - verification_failed_commands: `0`
 - verification_total_commands: `16`
-- accepted_class_exceptions_count: `14`
+- accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
 
 ## Verification
