@@ -17,6 +17,49 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split integrated merge-family assembly · Codex
+**Why:** The refactor goal still tracks advisory oversized-function debt after
+production and legacy size gates passed. `_merge_family()` is the integrated
+radar candidate assembler with strong fixture coverage for source merging,
+Coinalyze evidence, DEX/on-chain joins, and no-side-effect safety fields.
+**Changes:**
+- Split `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py`
+  so `_merge_family()` is now a 98-line orchestrator over a private merge
+  context and focused field-group helpers for identity, source, opportunity,
+  market, derivatives, sidecar events, evidence, safety, incident/source, and
+  supporting metadata.
+- Preserved integrated candidate field names/order groups, source origin merge
+  semantics, TESTPERP/TESTFADE Coinalyze attachment behavior, DEX liquidity
+  gating, safety booleans, and Event Alpha `TRIGGERED_FADE`/RSI no-write
+  invariants.
+- Regenerated refactor class ownership, size-gate, final, completion-map,
+  release-candidate, and shim reports. Current advisory inventory is `14`
+  classes and `7` functions over limits, with `new_violation_count=0`,
+  `production_files_over_1500_lines=0`, and no active shim implementation
+  leaks.
+- Updated `ROADMAP.md` to include `_merge_family()` in the completed ownership
+  burn-down list.
+**Verify:** Focused integrated merge tests passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha/test_integrated_radar.py::test_integrated_radar_fixture_lanes_and_merge -q`
+reported `1 passed`; DEX/anomaly focused tests reported `3 passed`; broader
+files reported `240 passed` for integrated radar and `35 passed` for source
+coverage. Full safe harness passed: `python3 tests/test_indicators.py`;
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q`; `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make test-pytest-safe PYTHON=python3`; refactor
+size/class/final/completion reports; shim report; integrated radar
+smoke/doctor; notification format smoke; Telegram no-send final check; evidence
+acquisition smoke; catalyst-frame e2e; Coinalyze preflight
+smoke/preflight/no-send rehearsal; source coverage, daily brief, and notify
+preview from artifacts for `notify_llm_deep_cryptopanic_rehearsal`; strict
+CryptoPanic artifact doctor; and `make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. The strict CryptoPanic rehearsal
+doctor remains `WARN` with known non-blocking quality/incident warnings and no
+blockers. No live provider calls by default, live sends, trading, paper-trading
+behavior changes, execution/order logic, Event Alpha RSI writes, or Event
+Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split market confirmation evaluator · Codex
 **Why:** The refactor goal still tracks advisory oversized-function debt after
 production and legacy size gates passed. `evaluate_market_confirmation()` is a

@@ -17,7 +17,7 @@
   },
   "class_ownership_report": {
     "classes_over_limit_count": 14,
-    "functions_over_limit_count": 8,
+    "functions_over_limit_count": 7,
     "modules_with_multiple_public_classes_count": 82,
     "path": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
     "present": true,
@@ -85,7 +85,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-04T08:34:38+00:00",
+  "generated_at": "2026-07-04T08:46:24+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -191,6 +191,12 @@
   "largest_production_files": [
     {
       "limit": 1500,
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1473,
       "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
       "source_kind": "production"
@@ -271,12 +277,6 @@
       "limit": 1500,
       "line_count": 1222,
       "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1203,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
       "source_kind": "production"
     },
     {
@@ -852,7 +852,7 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 8,
+  "production_functions_over_limit": 7,
   "production_size_gate_status": "pass",
   "pytest_runtime_seconds": 11.538,
   "remaining_implementation_modules_by_package_target": {},

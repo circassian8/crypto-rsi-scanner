@@ -207,6 +207,48 @@ def _symbol_for_coin_id(coin_id: str) -> str:
         "first-digital-usd": "FDUSD",
     }.get(str(coin_id or "").casefold(), "")
 
+@dataclass(frozen=True)
+class _MergedFamilyContext:
+    origins: tuple[str, ...]
+    source_packs: tuple[str, ...]
+    symbol: str
+    coin_id: str
+    canonical_asset_id: str
+    resolver_confidences: list[float | None]
+    resolver_warnings: tuple[str, ...]
+    is_theme_or_sector: bool
+    is_quote_asset: bool
+    is_tradable_asset: bool
+    market_snapshot: dict[str, Any]
+    official_row: dict[str, Any] | None
+    scheduled_row: dict[str, Any] | None
+    unlock_row: dict[str, Any] | None
+    dex_row: dict[str, Any] | None
+    protocol_row: dict[str, Any] | None
+    dex_liquidity_snapshot: dict[str, Any]
+    protocol_metrics_snapshot: dict[str, Any]
+    source_strength: str
+    source_class: str
+    source_pack: str
+    impact_path: str
+    accepted_evidence_count: int
+    evidence_status: str
+    raw_reaction: event_market_reaction.MarketReactionResult
+    market_confirmation: event_market_confirmation.EventMarketConfirmationResult
+    opportunity: str
+    score: float
+    level: str
+    route: str
+    state: str
+    reason_codes: tuple[str, ...]
+    warnings: tuple[str, ...]
+    derivatives_metadata: dict[str, Any]
+    derivatives_state_snapshot: dict[str, Any] | None
+    integrated_market: dict[str, Any]
+    latest_source: str
+    latest_source_url: str
+    latest_source_title: str
+
 def _merge_family(
     key: str,
     rows: list[dict[str, Any]],
@@ -217,9 +259,99 @@ def _merge_family(
     run_id: str | None,
     observed_at: str,
 ) -> dict[str, Any]:
+    context = _merge_family_context(key, rows, observed_at=observed_at)
+    candidate = _merge_family_base_fields(
+        key,
+        run_id=run_id,
+        profile=profile,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+        candidate_id=f"iar:{_digest(key)}",
+    )
+    candidate.update(_merge_family_identity_fields(
+        rows,
+        symbol=context.symbol,
+        coin_id=context.coin_id,
+        canonical_asset_id=context.canonical_asset_id,
+        resolver_confidences=context.resolver_confidences,
+        resolver_warnings=context.resolver_warnings,
+        is_tradable_asset=context.is_tradable_asset,
+        is_theme_or_sector=context.is_theme_or_sector,
+        is_quote_asset=context.is_quote_asset,
+    ))
+    candidate.update(_merge_family_source_fields(
+        context.origins,
+        context.source_packs,
+        source_pack=context.source_pack,
+        source_class=context.source_class,
+        source_strength=context.source_strength,
+    ))
+    candidate.update(_merge_family_opportunity_fields(
+        rows,
+        context.raw_reaction,
+        context.market_confirmation,
+        opportunity=context.opportunity,
+        level=context.level,
+        route=context.route,
+        state=context.state,
+        score=context.score,
+        source_strength=context.source_strength,
+    ))
+    candidate.update(_merge_family_market_fields(
+        context.raw_reaction,
+        market_snapshot=context.market_snapshot,
+        integrated_market=context.integrated_market,
+    ))
+    candidate.update(_merge_family_derivatives_fields(
+        context.market_confirmation,
+        derivatives_metadata=context.derivatives_metadata,
+        derivatives_state_snapshot=context.derivatives_state_snapshot,
+        dex_liquidity_snapshot=context.dex_liquidity_snapshot,
+        dex_row=context.dex_row,
+        protocol_metrics_snapshot=context.protocol_metrics_snapshot,
+        protocol_row=context.protocol_row,
+    ))
+    candidate.update(_merge_family_sidecar_event_fields(
+        context.official_row,
+        context.scheduled_row,
+        context.unlock_row,
+    ))
+    candidate.update(_merge_family_evidence_fields(
+        rows,
+        context.raw_reaction,
+        opportunity=context.opportunity,
+        evidence_status=context.evidence_status,
+        accepted_evidence_count=context.accepted_evidence_count,
+        reason_codes=context.reason_codes,
+        warnings=context.warnings,
+    ))
+    candidate.update(_merge_family_safety_fields())
+    candidate.update(_merge_family_incident_source_fields(
+        rows,
+        key=key,
+        symbol=context.symbol,
+        opportunity=context.opportunity,
+        impact_path=context.impact_path,
+        latest_source=context.latest_source,
+        latest_source_url=context.latest_source_url,
+        latest_source_title=context.latest_source_title,
+    ))
+    candidate.update(_merge_family_supporting_fields(
+        rows,
+        context.origins,
+        impact_path=context.impact_path,
+        score=context.score,
+        route=context.route,
+        observed_at=observed_at,
+    ))
+    if context.opportunity == event_market_reaction.EventOpportunityType.DIAGNOSTIC.value:
+        candidate["diagnostic_row_count"] = max(1, len(rows))
+    return candidate
+
+def _merge_family_context(key: str, rows: list[dict[str, Any]], *, observed_at: str) -> _MergedFamilyContext:
     origins = tuple(dict.fromkeys(str(row.get("_source_origin") or "unknown") for row in rows))
     source_packs = tuple(dict.fromkeys(str(row.get("source_pack") or "unknown") for row in rows if row.get("source_pack")))
-    primary = _select_primary(rows)
+    _select_primary(rows)
     symbol = _text(_first_value(rows, "symbol", "validated_symbol")) or "UNKNOWN"
     coin_id = _text(_first_value(rows, "coin_id", "validated_coin_id")) or symbol.casefold()
     canonical_asset_id = _text(_first_value(rows, "canonical_asset_id")) or coin_id or symbol
@@ -306,14 +438,64 @@ def _merge_family(
             market_confirmation=market_confirmation,
         ),
     )))
-    candidate_id = f"iar:{_digest(key)}"
     derivatives_metadata = _derivatives_metadata(derivatives_row)
     derivatives_state_snapshot = dict(derivatives_row.get("derivatives_state_snapshot") or {}) if derivatives_row else None
     integrated_market = _integrated_market_confirmation(opportunity, raw_reaction, market_confirmation=market_confirmation)
     latest_source = _best_text(rows, "latest_source", "source_provider", "provider", "source")
     latest_source_url = _best_text(rows, "latest_source_url", "source_url", "url")
     latest_source_title = _best_text(rows, "latest_source_title", "source_title", "title", "event_name")
-    candidate = {
+    return _MergedFamilyContext(
+        origins=origins,
+        source_packs=source_packs,
+        symbol=symbol,
+        coin_id=coin_id,
+        canonical_asset_id=canonical_asset_id,
+        resolver_confidences=resolver_confidences,
+        resolver_warnings=resolver_warnings,
+        is_theme_or_sector=is_theme_or_sector,
+        is_quote_asset=is_quote_asset,
+        is_tradable_asset=is_tradable_asset,
+        market_snapshot=market_snapshot,
+        official_row=official_row,
+        scheduled_row=scheduled_row,
+        unlock_row=unlock_row,
+        dex_row=dex_row,
+        protocol_row=protocol_row,
+        dex_liquidity_snapshot=dex_liquidity_snapshot,
+        protocol_metrics_snapshot=protocol_metrics_snapshot,
+        source_strength=source_strength,
+        source_class=source_class,
+        source_pack=source_pack,
+        impact_path=impact_path,
+        accepted_evidence_count=accepted_evidence_count,
+        evidence_status=evidence_status,
+        raw_reaction=raw_reaction,
+        market_confirmation=market_confirmation,
+        opportunity=opportunity,
+        score=score,
+        level=level,
+        route=route,
+        state=state,
+        reason_codes=reason_codes,
+        warnings=warnings,
+        derivatives_metadata=derivatives_metadata,
+        derivatives_state_snapshot=derivatives_state_snapshot,
+        integrated_market=integrated_market,
+        latest_source=latest_source,
+        latest_source_url=latest_source_url,
+        latest_source_title=latest_source_title,
+    )
+
+def _merge_family_base_fields(
+    key: str,
+    *,
+    run_id: str | None,
+    profile: str | None,
+    run_mode: str | None,
+    artifact_namespace: str | None,
+    candidate_id: str,
+) -> dict[str, Any]:
+    return {
         "schema_version": 1,
         "row_type": "event_integrated_radar_candidate",
         "candidate_id": candidate_id,
@@ -323,6 +505,21 @@ def _merge_family(
         "profile": profile,
         "run_mode": run_mode,
         "artifact_namespace": artifact_namespace,
+    }
+
+def _merge_family_identity_fields(
+    rows: list[dict[str, Any]],
+    *,
+    symbol: str,
+    coin_id: str,
+    canonical_asset_id: str,
+    resolver_confidences: list[float | None],
+    resolver_warnings: tuple[str, ...],
+    is_tradable_asset: bool,
+    is_theme_or_sector: bool,
+    is_quote_asset: bool,
+) -> dict[str, Any]:
+    return {
         "symbol": symbol,
         "validated_symbol": symbol,
         "coin_id": coin_id,
@@ -348,12 +545,38 @@ def _merge_family(
         "quote_asset_excluded": any(_truthy(row.get("quote_asset_excluded")) for row in rows),
         "base_asset_excluded": any(_truthy(row.get("base_asset_excluded")) for row in rows),
         "diagnostics_reason": _best_text(rows, "diagnostics_reason"),
+    }
+
+def _merge_family_source_fields(
+    origins: tuple[str, ...],
+    source_packs: tuple[str, ...],
+    *,
+    source_pack: str,
+    source_class: str,
+    source_strength: str,
+) -> dict[str, Any]:
+    return {
         "source_origin": "merged" if len(origins) > 1 else origins[0],
         "source_origins": list(origins),
         "source_pack": source_pack,
         "source_packs": list(source_packs or (source_pack,)),
         "source_class": source_class,
         "source_strength": source_strength,
+    }
+
+def _merge_family_opportunity_fields(
+    rows: list[dict[str, Any]],
+    raw_reaction: event_market_reaction.MarketReactionResult,
+    market_confirmation: event_market_confirmation.EventMarketConfirmationResult,
+    *,
+    opportunity: str,
+    level: str,
+    route: str,
+    state: str,
+    score: float,
+    source_strength: str,
+) -> dict[str, Any]:
+    return {
         "opportunity_type": opportunity,
         "market_state_class": raw_reaction.market_state,
         "market_state": raw_reaction.market_state,
@@ -372,6 +595,15 @@ def _merge_family(
         "market_requirements_met": _market_requirements_met(opportunity, raw_reaction, market_confirmation=market_confirmation),
         "fade_requirements_met": _fade_requirements_met(opportunity, rows),
         "risk_requirements_met": _risk_requirements_met(opportunity, rows),
+    }
+
+def _merge_family_market_fields(
+    raw_reaction: event_market_reaction.MarketReactionResult,
+    *,
+    market_snapshot: dict[str, Any],
+    integrated_market: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
         "integrated_market_confirmation_level": integrated_market["level"],
         "integrated_market_confirmation_score": integrated_market["score"],
         "integrated_market_reaction_confirmation": integrated_market["reaction"],
@@ -380,6 +612,19 @@ def _merge_family(
         "market_state_snapshot": raw_reaction.market_state_snapshot.to_dict(),
         "latest_market_snapshot": market_snapshot,
         "market_snapshot": market_snapshot,
+    }
+
+def _merge_family_derivatives_fields(
+    market_confirmation: event_market_confirmation.EventMarketConfirmationResult,
+    *,
+    derivatives_metadata: Mapping[str, Any],
+    derivatives_state_snapshot: dict[str, Any] | None,
+    dex_liquidity_snapshot: dict[str, Any],
+    dex_row: Mapping[str, Any] | None,
+    protocol_metrics_snapshot: dict[str, Any],
+    protocol_row: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    return {
         "derivatives_state_snapshot": derivatives_state_snapshot,
         "derivatives_snapshot": derivatives_state_snapshot,
         "crowding_class": derivatives_metadata.get("crowding_class"),
@@ -405,9 +650,30 @@ def _merge_family(
         "coinalyze_source_artifact_path": derivatives_metadata.get("coinalyze_source_artifact_path"),
         "coinalyze_provider_health_status": derivatives_metadata.get("coinalyze_provider_health_status"),
         "coinalyze_freshness_status": derivatives_metadata.get("coinalyze_freshness_status"),
+    }
+
+def _merge_family_sidecar_event_fields(
+    official_row: Mapping[str, Any] | None,
+    scheduled_row: Mapping[str, Any] | None,
+    unlock_row: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    return {
         "official_exchange_event": _compact_event(official_row) if official_row else None,
         "scheduled_catalyst_event": _compact_event(scheduled_row) if scheduled_row else None,
         "unlock_event": _compact_event(unlock_row) if unlock_row else None,
+    }
+
+def _merge_family_evidence_fields(
+    rows: list[dict[str, Any]],
+    raw_reaction: event_market_reaction.MarketReactionResult,
+    *,
+    opportunity: str,
+    evidence_status: str,
+    accepted_evidence_count: int,
+    reason_codes: tuple[str, ...],
+    warnings: tuple[str, ...],
+) -> dict[str, Any]:
+    return {
         "evidence_acquisition_status": evidence_status,
         "accepted_evidence_count": accepted_evidence_count,
         "rejected_evidence_count": max(_int(row.get("rejected_evidence_count")) for row in rows),
@@ -417,22 +683,42 @@ def _merge_family(
         "why_not_alertable": list(dict.fromkeys((*raw_reaction.why_not_alertable, *_lane_why_not(opportunity, rows)))),
         "reason_codes": list(reason_codes),
         "warnings": list(warnings),
+    }
+
+def _merge_family_safety_fields() -> dict[str, bool]:
+    return {
         "research_only": True,
         "created_alert": False,
         "normal_rsi_signal_written": False,
         "triggered_fade_created": False,
         "paper_trade_created": False,
         "notification_send_enabled": False,
+    }
+
+def _merge_family_incident_source_fields(
+    rows: list[dict[str, Any]],
+    *,
+    key: str,
+    symbol: str,
+    opportunity: str,
+    impact_path: str,
+    latest_source: str,
+    latest_source_url: str,
+    latest_source_title: str,
+) -> dict[str, Any]:
+    incident_name = _canonical_incident_name(rows, symbol, opportunity)
+    event_name = _best_text(rows, "event_name", "title") or incident_name
+    return {
         "candidate_role": _best_text(rows, "candidate_role", "asset_role") or _candidate_role_for(opportunity),
         "primary_impact_path": impact_path,
         "impact_path_type": impact_path,
         "effective_playbook_type": impact_path,
         "playbook_type": impact_path,
         "impact_category": impact_path,
-        "canonical_incident_name": _canonical_incident_name(rows, symbol, opportunity),
+        "canonical_incident_name": incident_name,
         "incident_id": f"incident:{_digest(key)}",
-        "event_name": _best_text(rows, "event_name", "title") or _canonical_incident_name(rows, symbol, opportunity),
-        "latest_event_name": _best_text(rows, "event_name", "title") or _canonical_incident_name(rows, symbol, opportunity),
+        "event_name": event_name,
+        "latest_event_name": event_name,
         "latest_source": latest_source,
         "source_provider": latest_source,
         "primary_source_provider": latest_source,
@@ -440,6 +726,18 @@ def _merge_family(
         "source_url": latest_source_url,
         "latest_source_title": latest_source_title,
         "source_title": latest_source_title,
+    }
+
+def _merge_family_supporting_fields(
+    rows: list[dict[str, Any]],
+    origins: tuple[str, ...],
+    *,
+    impact_path: str,
+    score: float,
+    route: str,
+    observed_at: str,
+) -> dict[str, Any]:
+    return {
         "supporting_evidence_quotes": _supporting_quotes(rows),
         "supporting_categories": list(dict.fromkeys(_merged_list(rows, "impact_path_type") or [impact_path])),
         "supporting_impact_paths": list(dict.fromkeys(_merged_list(rows, "impact_path_type") or [impact_path])),
@@ -449,9 +747,6 @@ def _merge_family(
         "observed_at": observed_at,
         "created_at": observed_at,
     }
-    if opportunity == event_market_reaction.EventOpportunityType.DIAGNOSTIC.value:
-        candidate["diagnostic_row_count"] = max(1, len(rows))
-    return candidate
 
 def _candidate_family_key(row: Mapping[str, Any]) -> str:
     asset = _text(

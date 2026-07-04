@@ -1,5 +1,5 @@
 {
-  "class_count": 475,
+  "class_count": 476,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
@@ -142,7 +142,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5510,
+  "function_count": 5522,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -168,14 +168,6 @@
       "public": true,
       "qualname": "run_integrated_radar_cycle",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py"
-    },
-    {
-      "function_name": "_merge_family",
-      "line_count": 245,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.merge",
-      "public": false,
-      "qualname": "_merge_family",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py"
     },
     {
       "function_name": "_refresh_one_hypothesis",
@@ -210,8 +202,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     }
   ],
-  "functions_over_limit_count": 8,
-  "generated_at": "2026-07-04T08:34:31.506304+00:00",
+  "functions_over_limit_count": 7,
+  "generated_at": "2026-07-04T08:46:17.191712+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -889,7 +881,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 8,
+  "production_functions_over_limit": 7,
   "production_functions_over_limit_rows": [
     {
       "function_name": "diagnose_artifacts",
@@ -914,14 +906,6 @@
       "public": true,
       "qualname": "run_integrated_radar_cycle",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py"
-    },
-    {
-      "function_name": "_merge_family",
-      "line_count": 245,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.merge",
-      "public": false,
-      "qualname": "_merge_family",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py"
     },
     {
       "function_name": "_refresh_one_hypothesis",

@@ -131,7 +131,7 @@
     }
   ],
   "classes_over_limit_count": 14,
-  "existing_violation_count": 112,
+  "existing_violation_count": 111,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -405,17 +405,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py:run_integrated_radar_cycle"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "_merge_family",
-      "line_count": 245,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.merge",
-      "public": false,
-      "qualname": "_merge_family",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py:_merge_family"
     },
     {
       "category": "function_over_150_lines",
@@ -1198,14 +1187,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py"
     },
     {
-      "function_name": "_merge_family",
-      "line_count": 245,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.merge",
-      "public": false,
-      "qualname": "_merge_family",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py"
-    },
-    {
       "function_name": "_refresh_one_hypothesis",
       "line_count": 276,
       "module": "crypto_rsi_scanner.event_alpha.radar.near_miss.refresh",
@@ -1238,9 +1219,9 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     }
   ],
-  "functions_over_limit_count": 8,
+  "functions_over_limit_count": 7,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T08:34:30.478157+00:00",
+  "generated_at": "2026-07-04T08:46:16.173763+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1326,6 +1307,12 @@
   "largest_production_files": [
     {
       "limit": 1500,
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1473,
       "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
       "source_kind": "production"
@@ -1406,12 +1393,6 @@
       "limit": 1500,
       "line_count": 1222,
       "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1203,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
       "source_kind": "production"
     },
     {
@@ -2200,10 +2181,6 @@
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py:run_integrated_radar_cycle"
     },
     {
-      "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:_merge_family",
-      "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py:_merge_family"
-    },
-    {
       "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py:_refresh_one_hypothesis",
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/near_miss/refresh.py:_refresh_one_hypothesis"
     },
@@ -2272,7 +2249,7 @@
       "current_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.models"
     }
   ],
-  "moved_existing_violation_count": 21,
+  "moved_existing_violation_count": 20,
   "new_violation_count": 0,
   "new_violations": [],
   "no_live_provider_calls": true,
@@ -2418,7 +2395,7 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 8,
+  "production_functions_over_limit": 7,
   "production_functions_over_limit_rows": [
     {
       "function_name": "diagnose_artifacts",
@@ -2443,14 +2420,6 @@
       "public": true,
       "qualname": "run_integrated_radar_cycle",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py"
-    },
-    {
-      "function_name": "_merge_family",
-      "line_count": 245,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.merge",
-      "public": false,
-      "qualname": "_merge_family",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py"
     },
     {
       "function_name": "_refresh_one_hypothesis",
@@ -2487,7 +2456,7 @@
   ],
   "production_size_gate_status": "pass",
   "research_only": true,
-  "resolved_violation_count": 92,
+  "resolved_violation_count": 93,
   "resolved_violation_ids": [
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
     "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
@@ -2570,6 +2539,7 @@
     "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:validate_hypotheses_with_raw_events",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py:_classify_path",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py:validate_impact_path",
+    "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:_merge_family",
     "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:format_integrated_daily_brief",
     "function:crypto_rsi_scanner/event_alpha/radar/market_confirmation.py:evaluate_market_confirmation",
     "function:crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py:_candidate_from_row",
@@ -2613,7 +2583,6 @@
     "function:crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py:diagnose_artifacts",
     "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications",
     "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py:run_integrated_radar_cycle",
-    "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py:_merge_family",
     "function:crypto_rsi_scanner/event_alpha/radar/near_miss/refresh.py:_refresh_one_hypothesis",
     "function:crypto_rsi_scanner/event_alpha/radar/pipeline.py:run_event_alpha_operating_cycle",
     "function:crypto_rsi_scanner/event_alpha/radar/pipeline.py:run_event_alpha_pipeline",
@@ -2974,17 +2943,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py:run_integrated_radar_cycle"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "_merge_family",
-      "line_count": 245,
-      "module": "crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.merge",
-      "public": false,
-      "qualname": "_merge_family",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py:_merge_family"
     },
     {
       "category": "function_over_150_lines",
