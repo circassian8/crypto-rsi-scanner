@@ -88,45 +88,53 @@ class EventLLMBudgetRunTracker:
 
     def flush(self) -> EventLLMBudgetSnapshot:
         if self.cfg.ledger_path is None:
-            return EventLLMBudgetSnapshot(
-                cache_hits=self.cache_hits,
-                cache_misses=self.cache_misses,
-                calls_attempted=self.run_calls,
-                skipped_due_budget=self.skipped,
-                warning=self.warning,
-            )
-        entry = dict(self.entry)
-        entry["schema_version"] = LLM_BUDGET_SCHEMA_VERSION
-        entry["date"] = self.date
-        entry["provider"] = self.provider
-        entry["model"] = self.model
-        entry["prompt_version"] = self.prompt_version
-        entry["cache_hits"] = _int(entry.get("cache_hits")) + self.cache_hits
-        entry["cache_misses"] = _int(entry.get("cache_misses")) + self.cache_misses
-        entry["skipped_due_budget"] = _int(entry.get("skipped_due_budget")) + self.skipped
-        if self.call_kind == "extractor":
-            entry["extractor_calls_attempted"] = _int(entry.get("extractor_calls_attempted")) + self.run_calls
-        else:
-            entry["relationship_calls_attempted"] = _int(entry.get("relationship_calls_attempted")) + self.run_calls
-        entry["estimated_cost_usd"] = round(
-            _float(entry.get("estimated_cost_usd"))
-            + self.run_calls * max(0.0, self.cfg.estimated_cost_per_call_usd),
-            6,
-        )
-        entry["updated_at"] = datetime.now(timezone.utc).isoformat()
-        warning = self.warning
-        try:
-            _write_entry(self.cfg.ledger_path, entry)
-        except Exception as exc:  # noqa: BLE001
-            warning = f"LLM budget ledger write failed: {exc}"
-            log.warning("%s", warning)
-        return EventLLMBudgetSnapshot(
-            cache_hits=self.cache_hits,
-            cache_misses=self.cache_misses,
-            calls_attempted=self.run_calls,
-            skipped_due_budget=self.skipped,
-            warning=warning,
-        )
+            return _budget_snapshot(self, warning=self.warning)
+        warning = _flush_budget_tracker_entry(self)
+        return _budget_snapshot(self, warning=warning)
+
+
+def _flush_budget_tracker_entry(tracker: EventLLMBudgetRunTracker) -> str | None:
+    entry = _updated_budget_entry(tracker)
+    warning = tracker.warning
+    try:
+        _write_entry(tracker.cfg.ledger_path, entry)
+    except Exception as exc:  # noqa: BLE001
+        warning = f"LLM budget ledger write failed: {exc}"
+        log.warning("%s", warning)
+    return warning
+
+
+def _updated_budget_entry(tracker: EventLLMBudgetRunTracker) -> dict[str, Any]:
+    entry = dict(tracker.entry)
+    entry["schema_version"] = LLM_BUDGET_SCHEMA_VERSION
+    entry["date"] = tracker.date
+    entry["provider"] = tracker.provider
+    entry["model"] = tracker.model
+    entry["prompt_version"] = tracker.prompt_version
+    entry["cache_hits"] = _int(entry.get("cache_hits")) + tracker.cache_hits
+    entry["cache_misses"] = _int(entry.get("cache_misses")) + tracker.cache_misses
+    entry["skipped_due_budget"] = _int(entry.get("skipped_due_budget")) + tracker.skipped
+    if tracker.call_kind == "extractor":
+        entry["extractor_calls_attempted"] = _int(entry.get("extractor_calls_attempted")) + tracker.run_calls
+    else:
+        entry["relationship_calls_attempted"] = _int(entry.get("relationship_calls_attempted")) + tracker.run_calls
+    entry["estimated_cost_usd"] = round(
+        _float(entry.get("estimated_cost_usd"))
+        + tracker.run_calls * max(0.0, tracker.cfg.estimated_cost_per_call_usd),
+        6,
+    )
+    entry["updated_at"] = datetime.now(timezone.utc).isoformat()
+    return entry
+
+
+def _budget_snapshot(tracker: EventLLMBudgetRunTracker, *, warning: str | None) -> EventLLMBudgetSnapshot:
+    return EventLLMBudgetSnapshot(
+        cache_hits=tracker.cache_hits,
+        cache_misses=tracker.cache_misses,
+        calls_attempted=tracker.run_calls,
+        skipped_due_budget=tracker.skipped,
+        warning=warning,
+    )
 
 
 def _load_entry(

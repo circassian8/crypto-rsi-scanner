@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Reduce Event Alpha model ownership debt · Codex
+**Why:** The production-size gates are passing, but the refactor objective still
+tracks oversized classes as remaining advisory ownership debt. This pass burns
+down another low-risk slice by moving row/metadata construction out of model and
+wrapper classes without changing public methods, artifacts, provider behavior,
+or no-send research guards.
+**Changes:**
+- Moved `EvidenceAcquisitionResult.to_metadata()` construction into focused
+  metadata helpers in
+  `crypto_rsi_scanner/event_alpha/radar/evidence/models.py`.
+- Moved Coinalyze, Bybit, and live-provider readiness report row construction
+  into module-level serializer helpers while keeping existing `to_dict()`
+  compatibility methods and row schemas unchanged.
+- Split `EventLLMBudgetRunTracker.flush()` and
+  `HealthCheckedEventProvider.fetch_events()` into focused ledger/health
+  helpers while preserving budget accounting, provider backoff handling, and
+  fail-soft telemetry.
+- Refreshed refactor size, class ownership, and final reports. Current advisory
+  inventory is `22` classes and `52` functions over limits, with
+  `production_files_over_1500_lines=0`, `production_files_over_2000_lines=0`,
+  `legacy_files_over_1500_lines=0`, and `new_violation_count=0`.
+**Verify:** Focused tests passed for evidence-acquisition metadata, Coinalyze
+and Bybit provider rehearsals, live provider readiness/source coverage, LLM
+budget ledger accounting, and provider-health wrappers. Also passed:
+`python3 -m compileall -q` on touched modules, `make refactor-size-gates
+PYTHON=python3`, `make refactor-class-ownership-report PYTHON=python3`, and
+`make refactor-final-report PYTHON=python3`. Final broad verification was rerun
+before commit.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Remaining advisory debt is concentrated in large
+report/render functions and field-heavy dataclasses.
+
 ## 2026-07-04 — Continue advisory refactor ownership burn-down · Codex
 **Why:** The production-size and legacy-decomposition gates were already
 passing, but the refactor objective still tracks oversized classes/functions as

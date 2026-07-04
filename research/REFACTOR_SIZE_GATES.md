@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T03:01:40.713576+00:00`
+- generated_at: `2026-07-04T03:14:57.487713+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -10,20 +10,20 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
-- production_classes_over_limit: `28`
+- production_classes_over_limit: `22`
 - production_functions_over_limit: `52`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
-- classes_over_limit_count: `28`
+- classes_over_limit_count: `22`
 - functions_over_limit_count: `52`
 - modules_with_multiple_public_classes_count: `82`
 - new_violation_count: `0`
-- moved_existing_violation_count: `55`
+- moved_existing_violation_count: `54`
 - legacy_decomposition_gate_status: `pass`
 - legacy_files_over_1500_lines: `0`
 - legacy_files_over_3000_lines: `0`
-- legacy_total_lines: `4694`
-- legacy_classes_over_limit: `4`
+- legacy_total_lines: `4704`
+- legacy_classes_over_limit: `3`
 - legacy_functions_over_limit: `1`
 - legacy_modules_with_multiple_public_classes: `2`
 
@@ -51,7 +51,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `class:crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py:EventAlphaArtifactDoctorResult` | `class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult` |
 | `class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:EventProviderCatalystSearchProvider` | `class:crypto_rsi_scanner/event_alpha/radar/catalyst_search.py:EventProviderCatalystSearchProvider` |
 | `class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:FixtureCatalystSearchProvider` | `class:crypto_rsi_scanner/event_alpha/radar/catalyst_search.py:FixtureCatalystSearchProvider` |
-| `class:crypto_rsi_scanner/event_alpha/radar/evidence/models.py:EvidenceAcquisitionResult` | `class:crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py:EvidenceAcquisitionResult` |
 | `class:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/models.py:EventImpactHypothesis` | `class:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:EventImpactHypothesis` |
 | `class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py:EventIntegratedRadarResult` | `class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:EventIntegratedRadarResult` |
 | `class:crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py:EventAlphaSourceCoverageReport` | `class:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:EventAlphaSourceCoverageReport` |
@@ -88,6 +87,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_alert` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_alert` |
 | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_hypothesis` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_hypothesis` |
 | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_row` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_row` |
+| `public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store.models` | `public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store` |
 
 ## Legacy Decomposition Gate
 
@@ -95,7 +95,7 @@ Static source inventory only. This report does not call providers, send Telegram
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py` | 933 |
 | `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` | 888 |
-| `crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py` | 769 |
+| `crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py` | 779 |
 | `crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py` | 629 |
 | `crypto_rsi_scanner/event_providers/binance_announcements/legacy.py` | 192 |
 | `crypto_rsi_scanner/refactor_legacy_inventory.py` | 190 |
@@ -121,8 +121,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/cli/services/legacy/utility_commands.py` | 1440 |
 | `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1428 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1413 |
+| `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1400 |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 |
-| `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1392 |
 | `crypto_rsi_scanner/config.py` | 1319 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1267 |
@@ -139,11 +139,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1069 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1059 |
 | `crypto_rsi_scanner/event_alpha/radar/llm/extractor.py` | 1002 |
+| `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 997 |
 | `crypto_rsi_scanner/event_alpha/radar/scheduled_catalysts.py` | 995 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 994 |
-| `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 993 |
+| `crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py` | 988 |
 | `crypto_rsi_scanner/event_alpha/artifacts/alerts.py` | 985 |
-| `crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py` | 984 |
 | `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 980 |
 | `crypto_rsi_scanner/event_alpha/radar/impact_hypothesis_store.py` | 980 |
 | `crypto_rsi_scanner/event_alpha/radar/incident_graph.py` | 975 |
@@ -216,17 +216,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `file_over_1500_lines` | `file:tests/test_indicators.py` | 1771 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/client.py:CoinGeckoClient` | 115 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py:EventAlphaArtifactDoctorResult` | 402 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py:BybitAnnouncementsRehearsalReport` | 79 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py:CoinalyzeRehearsalReport` | 102 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py:LiveProviderReadinessProvider` | 99 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py:HealthCheckedEventProvider` | 78 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/radar/asset_registry.py:CanonicalAsset` | 96 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:FixtureCatalystSearchProvider` | 79 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:EventProviderCatalystSearchProvider` | 88 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/radar/evidence/models.py:EvidenceAcquisitionResult` | 120 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/models.py:EventImpactHypothesis` | 191 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py:EventIntegratedRadarResult` | 88 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/radar/llm/budget.py:EventLLMBudgetRunTracker` | 95 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/radar/pipeline.py:EventAlphaPipelineResult` | 245 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py:EventAlphaSourceCoverageReport` | 143 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/event_alpha/radar/watchlist/models.py:EventWatchlistEntry` | 85 |

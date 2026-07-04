@@ -185,73 +185,81 @@ class EvidenceAcquisitionResult:
     warnings: tuple[str, ...] = ()
 
     def to_metadata(self) -> dict[str, Any]:
-        reason_codes = tuple(dict.fromkeys(
-            str(code)
-            for item in self.accepted_evidence
-            for code in item.get("reason_codes", ())
-            if str(code)
-        ))
-        return {
-            "evidence_acquisition_id": self.acquisition_id,
-            "evidence_acquisition_symbol": self.symbol,
-            "evidence_acquisition_coin_id": self.coin_id,
-            "evidence_acquisition_event_name": self.event_name,
-            "evidence_acquisition_external_asset": self.external_asset,
-            "evidence_acquisition_status": self.status,
-            "evidence_acquisition_source_pack": self.source_pack,
-            "evidence_acquisition_queries_executed": self.queries_executed,
-            "evidence_acquisition_providers_used": self.providers_used,
-            "evidence_acquisition_provider_failures": self.provider_failures,
-            "evidence_acquisition_accepted_count": len(self.accepted_evidence),
-            "evidence_acquisition_rejected_count": len(self.rejected_evidence),
-            "evidence_acquisition_accepted_evidence": tuple(dict(item) for item in self.accepted_evidence[:5]),
-            "evidence_acquisition_rejected_samples": tuple(dict(item) for item in self.rejected_evidence[:5]),
-            "accepted_evidence_reason_codes": reason_codes,
-            "acquisition_evidence_status": self.acquisition_evidence_status,
-            "evidence_acquisition_score_before": self.evidence_quality_before,
-            "evidence_acquisition_score_after": self.evidence_quality_after,
-            "evidence_quality_delta": self.evidence_quality_delta,
-            "evidence_quality_upgraded": self.evidence_quality_upgraded,
-            "impact_path_validation_before_acquisition": self.impact_path_validation_before,
-            "impact_path_validation_after_acquisition": self.impact_path_validation_after,
-            "impact_path_validation_upgraded": self.impact_path_validation_upgraded,
-            "market_confirmation_upgraded": self.market_confirmation_upgraded,
-            "opportunity_score_before_acquisition": self.opportunity_score_before,
-            "opportunity_score_after_acquisition": self.opportunity_score_after,
-            "opportunity_score_delta": self.opportunity_score_delta,
-            "opportunity_level_before_acquisition": self.opportunity_level_before,
-            "opportunity_level_after_acquisition": self.opportunity_level_after,
-            "opportunity_level_delta": self.opportunity_level_delta,
-            "final_upgrade_status": self.final_upgrade_status,
-            "initial_opportunity_score": self.initial_opportunity_score,
-            "initial_opportunity_level": self.initial_opportunity_level,
-            "post_refresh_opportunity_score": self.post_refresh_opportunity_score,
-            "post_refresh_opportunity_level": self.post_refresh_opportunity_level,
-            "post_refresh_market_confirmation_score": self.post_refresh_market_confirmation_score,
-            "post_refresh_market_confirmation_level": self.post_refresh_market_confirmation_level,
-            "post_refresh_evidence_quality_score": self.post_refresh_evidence_quality_score,
-            "final_opportunity_score": self.final_opportunity_score,
-            "final_opportunity_level": self.final_opportunity_level,
-            "final_verdict_source": self.final_verdict_source,
-            "final_verdict_reason": self.final_verdict_reason,
-            "market_data_freshness": self.market_data_freshness,
-            "market_reaction_confirmation": self.market_reaction_confirmation,
-            "acquisition_upgrade_status": self.acquisition_upgrade_status,
-            "acquisition_upgrade_reason": self.acquisition_upgrade_reason,
-            "no_upgrade_reason": self.no_upgrade_reason,
-            "evidence_acquisition_warnings": self.warnings,
-            "evidence_acquisition_results": {
-                "status": self.status,
-                "queries_executed": self.queries_executed,
-                "accepted": len(self.accepted_evidence),
-                "rejected": len(self.rejected_evidence),
-                "providers_used": self.providers_used,
-                "upgrade_status": self.acquisition_upgrade_status,
-                "final_upgrade_status": self.final_upgrade_status,
-                "upgrade_reason": self.acquisition_upgrade_reason,
-                "no_upgrade_reason": self.no_upgrade_reason,
-            },
-        }
+        return evidence_acquisition_result_metadata(self)
+
+
+def evidence_acquisition_result_metadata(result: EvidenceAcquisitionResult) -> dict[str, Any]:
+    reason_codes = tuple(dict.fromkeys(
+        str(code)
+        for item in result.accepted_evidence
+        for code in item.get("reason_codes", ())
+        if str(code)
+    ))
+    return {
+        "evidence_acquisition_id": result.acquisition_id,
+        "evidence_acquisition_symbol": result.symbol,
+        "evidence_acquisition_coin_id": result.coin_id,
+        "evidence_acquisition_event_name": result.event_name,
+        "evidence_acquisition_external_asset": result.external_asset,
+        "evidence_acquisition_status": result.status,
+        "evidence_acquisition_source_pack": result.source_pack,
+        "evidence_acquisition_queries_executed": result.queries_executed,
+        "evidence_acquisition_providers_used": result.providers_used,
+        "evidence_acquisition_provider_failures": result.provider_failures,
+        "evidence_acquisition_accepted_count": len(result.accepted_evidence),
+        "evidence_acquisition_rejected_count": len(result.rejected_evidence),
+        "evidence_acquisition_accepted_evidence": tuple(dict(item) for item in result.accepted_evidence[:5]),
+        "evidence_acquisition_rejected_samples": tuple(dict(item) for item in result.rejected_evidence[:5]),
+        "accepted_evidence_reason_codes": reason_codes,
+        "acquisition_evidence_status": result.acquisition_evidence_status,
+        "evidence_acquisition_score_before": result.evidence_quality_before,
+        "evidence_acquisition_score_after": result.evidence_quality_after,
+        "evidence_quality_delta": result.evidence_quality_delta,
+        "evidence_quality_upgraded": result.evidence_quality_upgraded,
+        "impact_path_validation_before_acquisition": result.impact_path_validation_before,
+        "impact_path_validation_after_acquisition": result.impact_path_validation_after,
+        "impact_path_validation_upgraded": result.impact_path_validation_upgraded,
+        "market_confirmation_upgraded": result.market_confirmation_upgraded,
+        "opportunity_score_before_acquisition": result.opportunity_score_before,
+        "opportunity_score_after_acquisition": result.opportunity_score_after,
+        "opportunity_score_delta": result.opportunity_score_delta,
+        "opportunity_level_before_acquisition": result.opportunity_level_before,
+        "opportunity_level_after_acquisition": result.opportunity_level_after,
+        "opportunity_level_delta": result.opportunity_level_delta,
+        "final_upgrade_status": result.final_upgrade_status,
+        "initial_opportunity_score": result.initial_opportunity_score,
+        "initial_opportunity_level": result.initial_opportunity_level,
+        "post_refresh_opportunity_score": result.post_refresh_opportunity_score,
+        "post_refresh_opportunity_level": result.post_refresh_opportunity_level,
+        "post_refresh_market_confirmation_score": result.post_refresh_market_confirmation_score,
+        "post_refresh_market_confirmation_level": result.post_refresh_market_confirmation_level,
+        "post_refresh_evidence_quality_score": result.post_refresh_evidence_quality_score,
+        "final_opportunity_score": result.final_opportunity_score,
+        "final_opportunity_level": result.final_opportunity_level,
+        "final_verdict_source": result.final_verdict_source,
+        "final_verdict_reason": result.final_verdict_reason,
+        "market_data_freshness": result.market_data_freshness,
+        "market_reaction_confirmation": result.market_reaction_confirmation,
+        "acquisition_upgrade_status": result.acquisition_upgrade_status,
+        "acquisition_upgrade_reason": result.acquisition_upgrade_reason,
+        "no_upgrade_reason": result.no_upgrade_reason,
+        "evidence_acquisition_warnings": result.warnings,
+        "evidence_acquisition_results": _evidence_acquisition_result_summary(result),
+    }
+
+
+def _evidence_acquisition_result_summary(result: EvidenceAcquisitionResult) -> dict[str, Any]:
+    return {
+        "status": result.status,
+        "queries_executed": result.queries_executed,
+        "accepted": len(result.accepted_evidence),
+        "rejected": len(result.rejected_evidence),
+        "providers_used": result.providers_used,
+        "upgrade_status": result.acquisition_upgrade_status,
+        "final_upgrade_status": result.final_upgrade_status,
+        "upgrade_reason": result.acquisition_upgrade_reason,
+        "no_upgrade_reason": result.no_upgrade_reason,
+    }
 
 
 @dataclass(frozen=True)

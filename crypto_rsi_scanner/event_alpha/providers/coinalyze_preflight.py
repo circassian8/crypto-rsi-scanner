@@ -117,67 +117,75 @@ class CoinalyzeRehearsalReport:
     triggered_fade_created: int = 0
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "schema_version": "event_coinalyze_rehearsal_v1",
-            "row_type": "event_coinalyze_rehearsal_report",
-            "provider": self.provider,
-            "status": self.status,
-            "configured": self.configured,
-            "allow_live_preflight": self.allow_live_preflight,
-            "live_call_allowed": self.live_call_allowed,
-            "no_send": self.no_send,
-            "research_only": self.research_only,
-            "generated_at": self.generated_at,
-            "request_ledger_path": self.request_ledger_path,
-            "preflight_json_path": self.preflight_json_path,
-            "preflight_report_path": self.preflight_report_path,
-            "rehearsal_json_path": self.rehearsal_json_path,
-            "rehearsal_report_path": self.rehearsal_report_path,
-            "derivatives_state_path": self.derivatives_state_path,
-            "derivatives_candidates_path": self.derivatives_candidates_path,
-            "fade_review_candidates_path": self.fade_review_candidates_path,
-            "max_requests_per_run": self.max_requests_per_run,
-            "requests_used": self.requests_used,
-            "symbols_requested": list(self.symbols_requested),
-            "symbols_resolved": list(self.symbols_resolved),
-            "snapshots_written": self.snapshots_written,
-            "crowding_candidates_written": self.crowding_candidates_written,
-            "fade_review_candidates_written": self.fade_review_candidates_written,
-            "crowding_class_counts": dict(self.crowding_class_counts),
-            "fade_readiness_counts": dict(self.fade_readiness_counts),
-            "symbols_with_extreme_crowding": list(self.symbols_with_extreme_crowding),
-            "symbols_with_confirmed_long_crowding_warning": list(self.symbols_with_confirmed_long_crowding_warning),
-            "supported_metric_status": dict(self.supported_metric_status),
-            "implemented_metrics": [
-                metric
-                for metric, status in self.supported_metric_status.items()
-                if status == event_derivatives_crowding.METRIC_STATUS_IMPLEMENTED
-            ],
-            "fixture_only_metrics": [
-                metric
-                for metric, status in self.supported_metric_status.items()
-                if status == event_derivatives_crowding.METRIC_STATUS_FIXTURE_ONLY
-            ],
-            "missing_or_planned_metrics": [
-                metric
-                for metric, status in self.supported_metric_status.items()
-                if status in {
-                    event_derivatives_crowding.METRIC_STATUS_MISSING_FROM_RESPONSE,
-                    event_derivatives_crowding.METRIC_STATUS_NOT_IMPLEMENTED,
-                    event_derivatives_crowding.METRIC_STATUS_PROVIDER_UNAVAILABLE,
-                }
-            ],
-            "provider_health_status": self.provider_health_status,
-            "error_class": self.error_class,
-            "error_message_safe": self.error_message_safe,
-            "warnings": list(self.warnings),
-            "strict_alerts_created": self.strict_alerts_created,
-            "telegram_sends": self.telegram_sends,
-            "trades_created": self.trades_created,
-            "paper_trades_created": self.paper_trades_created,
-            "normal_rsi_signal_rows_written": self.normal_rsi_signal_rows_written,
-            "triggered_fade_created": self.triggered_fade_created,
-        }
+        return coinalyze_rehearsal_report_row(self)
+
+
+def coinalyze_rehearsal_report_row(report: CoinalyzeRehearsalReport) -> dict[str, Any]:
+    return {
+        "schema_version": "event_coinalyze_rehearsal_v1",
+        "row_type": "event_coinalyze_rehearsal_report",
+        "provider": report.provider,
+        "status": report.status,
+        "configured": report.configured,
+        "allow_live_preflight": report.allow_live_preflight,
+        "live_call_allowed": report.live_call_allowed,
+        "no_send": report.no_send,
+        "research_only": report.research_only,
+        "generated_at": report.generated_at,
+        "request_ledger_path": report.request_ledger_path,
+        "preflight_json_path": report.preflight_json_path,
+        "preflight_report_path": report.preflight_report_path,
+        "rehearsal_json_path": report.rehearsal_json_path,
+        "rehearsal_report_path": report.rehearsal_report_path,
+        "derivatives_state_path": report.derivatives_state_path,
+        "derivatives_candidates_path": report.derivatives_candidates_path,
+        "fade_review_candidates_path": report.fade_review_candidates_path,
+        "max_requests_per_run": report.max_requests_per_run,
+        "requests_used": report.requests_used,
+        "symbols_requested": list(report.symbols_requested),
+        "symbols_resolved": list(report.symbols_resolved),
+        "snapshots_written": report.snapshots_written,
+        "crowding_candidates_written": report.crowding_candidates_written,
+        "fade_review_candidates_written": report.fade_review_candidates_written,
+        "crowding_class_counts": dict(report.crowding_class_counts),
+        "fade_readiness_counts": dict(report.fade_readiness_counts),
+        "symbols_with_extreme_crowding": list(report.symbols_with_extreme_crowding),
+        "symbols_with_confirmed_long_crowding_warning": list(report.symbols_with_confirmed_long_crowding_warning),
+        "supported_metric_status": dict(report.supported_metric_status),
+        "implemented_metrics": _metrics_with_status(
+            report.supported_metric_status,
+            event_derivatives_crowding.METRIC_STATUS_IMPLEMENTED,
+        ),
+        "fixture_only_metrics": _metrics_with_status(
+            report.supported_metric_status,
+            event_derivatives_crowding.METRIC_STATUS_FIXTURE_ONLY,
+        ),
+        "missing_or_planned_metrics": _metrics_with_status(
+            report.supported_metric_status,
+            event_derivatives_crowding.METRIC_STATUS_MISSING_FROM_RESPONSE,
+            event_derivatives_crowding.METRIC_STATUS_NOT_IMPLEMENTED,
+            event_derivatives_crowding.METRIC_STATUS_PROVIDER_UNAVAILABLE,
+        ),
+        "provider_health_status": report.provider_health_status,
+        "error_class": report.error_class,
+        "error_message_safe": report.error_message_safe,
+        "warnings": list(report.warnings),
+        "strict_alerts_created": report.strict_alerts_created,
+        "telegram_sends": report.telegram_sends,
+        "trades_created": report.trades_created,
+        "paper_trades_created": report.paper_trades_created,
+        "normal_rsi_signal_rows_written": report.normal_rsi_signal_rows_written,
+        "triggered_fade_created": report.triggered_fade_created,
+    }
+
+
+def _metrics_with_status(metric_status: Mapping[str, str], *statuses: str) -> list[str]:
+    allowed = set(statuses)
+    return [
+        metric
+        for metric, status in metric_status.items()
+        if status in allowed
+    ]
 
 
 @dataclass(frozen=True)

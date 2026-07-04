@@ -134,62 +134,72 @@ class HealthCheckedEventProvider:
         self.last_warnings: tuple[str, ...] = ()
 
     def fetch_events(self, start: datetime, end: datetime, now: datetime | None = None) -> list[Any]:
-        observed = _as_utc(now or datetime.now(timezone.utc))
-        decision = provider_allowed(
-            self.name,
-            cfg=self.cfg,
+        return _fetch_events_with_health(self, start, end, now=now)
+
+
+def _fetch_events_with_health(
+    wrapper: HealthCheckedEventProvider,
+    start: datetime,
+    end: datetime,
+    *,
+    now: datetime | None,
+) -> list[Any]:
+    observed = _as_utc(now or datetime.now(timezone.utc))
+    decision = provider_allowed(
+        wrapper.name,
+        cfg=wrapper.cfg,
+        now=observed,
+        provider_service=wrapper.provider_service,
+        provider_role=wrapper.provider_role,
+    )
+    if not decision.allowed:
+        wrapper.last_warnings = (decision.reason or f"provider {wrapper.name} in backoff",)
+        return []
+    try:
+        rows = list(_call_with_optional_now(wrapper.provider.fetch_events, start, end, now=observed))
+    except Exception as exc:  # noqa: BLE001 - fail-soft research wrapper
+        record_provider_failure(
+            wrapper.name,
+            exc,
+            cfg=wrapper.cfg,
             now=observed,
-            provider_service=self.provider_service,
-            provider_role=self.provider_role,
+            provider_kind=wrapper.provider_kind,
+            provider_service=wrapper.provider_service,
+            provider_role=wrapper.provider_role,
         )
-        if not decision.allowed:
-            self.last_warnings = (decision.reason or f"provider {self.name} in backoff",)
-            return []
-        try:
-            rows = list(_call_with_optional_now(self.provider.fetch_events, start, end, now=observed))
-        except Exception as exc:  # noqa: BLE001 - fail-soft research wrapper
+        wrapper.last_warnings = (f"{wrapper.name} failed: {type(exc).__name__}: {exc}",)
+        return []
+    wrapper.last_warnings = tuple(str(warning) for warning in getattr(wrapper.provider, "last_warnings", ()) or ())
+    if wrapper.last_warnings:
+        if _event_warnings_are_provider_failure(wrapper.last_warnings, rows):
             record_provider_failure(
-                self.name,
-                exc,
-                cfg=self.cfg,
+                wrapper.name,
+                wrapper.last_warnings[0],
+                cfg=wrapper.cfg,
                 now=observed,
-                provider_kind=self.provider_kind,
-                provider_service=self.provider_service,
-                provider_role=self.provider_role,
+                provider_kind=wrapper.provider_kind,
+                provider_service=wrapper.provider_service,
+                provider_role=wrapper.provider_role,
             )
-            self.last_warnings = (f"{self.name} failed: {type(exc).__name__}: {exc}",)
-            return []
-        self.last_warnings = tuple(str(warning) for warning in getattr(self.provider, "last_warnings", ()) or ())
-        if self.last_warnings:
-            if _event_warnings_are_provider_failure(self.last_warnings, rows):
-                record_provider_failure(
-                    self.name,
-                    self.last_warnings[0],
-                    cfg=self.cfg,
-                    now=observed,
-                    provider_kind=self.provider_kind,
-                    provider_service=self.provider_service,
-                    provider_role=self.provider_role,
-                )
-            elif decision.reason != "provider_backoff_ignored_for_run":
-                record_provider_success(
-                    self.name,
-                    cfg=self.cfg,
-                    now=observed,
-                    provider_kind=self.provider_kind,
-                    provider_service=self.provider_service,
-                    provider_role=self.provider_role,
-                )
         elif decision.reason != "provider_backoff_ignored_for_run":
             record_provider_success(
-                self.name,
-                cfg=self.cfg,
+                wrapper.name,
+                cfg=wrapper.cfg,
                 now=observed,
-                provider_kind=self.provider_kind,
-                provider_service=self.provider_service,
-                provider_role=self.provider_role,
+                provider_kind=wrapper.provider_kind,
+                provider_service=wrapper.provider_service,
+                provider_role=wrapper.provider_role,
             )
-        return rows
+    elif decision.reason != "provider_backoff_ignored_for_run":
+        record_provider_success(
+            wrapper.name,
+            cfg=wrapper.cfg,
+            now=observed,
+            provider_kind=wrapper.provider_kind,
+            provider_service=wrapper.provider_service,
+            provider_role=wrapper.provider_role,
+        )
+    return rows
 
 
 class HealthCheckedUniverseProvider:

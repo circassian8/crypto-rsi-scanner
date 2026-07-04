@@ -16,7 +16,7 @@
     ]
   },
   "class_ownership_report": {
-    "classes_over_limit_count": 28,
+    "classes_over_limit_count": 22,
     "functions_over_limit_count": 52,
     "modules_with_multiple_public_classes_count": 82,
     "path": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
@@ -85,7 +85,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-04T03:01:50+00:00",
+  "generated_at": "2026-07-04T03:15:31+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -116,7 +116,7 @@
       "path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
     },
     {
-      "line_count": 769,
+      "line_count": 779,
       "path": "crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py"
     },
     {
@@ -209,14 +209,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1392,
-      "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+      "line_count": 1400,
+      "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
       "line_count": 1392,
-      "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
+      "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
       "source_kind": "production"
     },
     {
@@ -317,6 +317,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 997,
+      "path": "crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 995,
       "path": "crypto_rsi_scanner/event_alpha/radar/scheduled_catalysts.py",
       "source_kind": "production"
@@ -329,20 +335,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 993,
-      "path": "crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py",
+      "line_count": 988,
+      "path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
       "line_count": 985,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/alerts.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 984,
-      "path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py",
       "source_kind": "production"
     },
     {
@@ -584,7 +584,7 @@
   ],
   "legacy_artifact_doctor_core_lines": 95,
   "legacy_artifact_doctor_core_note": "Behavior-compatible doctor implementation preserved while public artifact_doctor.py is the small orchestrator.",
-  "legacy_classes_over_limit": 4,
+  "legacy_classes_over_limit": 3,
   "legacy_decomposition": {
     "largest_legacy_files": [
       {
@@ -596,7 +596,7 @@
         "path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
       },
       {
-        "line_count": 769,
+        "line_count": 779,
         "path": "crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py"
       },
       {
@@ -668,16 +668,8 @@
         "path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
       }
     ],
-    "legacy_classes_over_limit": 4,
+    "legacy_classes_over_limit": 3,
     "legacy_classes_over_limit_rows": [
-      {
-        "class_name": "HealthCheckedEventProvider",
-        "line_count": 78,
-        "module": "crypto_rsi_scanner.event_alpha.providers.provider_health_legacy",
-        "public": true,
-        "qualname": "HealthCheckedEventProvider",
-        "source_path": "crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py"
-      },
       {
         "class_name": "BinanceAnnouncementProvider",
         "line_count": 107,
@@ -740,14 +732,14 @@
       "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py",
       "crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py"
     ],
-    "legacy_total_lines": 4694
+    "legacy_total_lines": 4704
   },
   "legacy_decomposition_gate_status": "pass",
   "legacy_files_over_1500_lines": 0,
   "legacy_files_over_3000_lines": 0,
   "legacy_functions_over_limit": 1,
   "legacy_modules_with_multiple_public_classes": 2,
-  "legacy_total_lines": 4694,
+  "legacy_total_lines": 4704,
   "legacy_unregistered": 0,
   "line_counts": {
     "crypto_rsi_scanner/cli/commands_event_alpha.py": 14,
@@ -834,11 +826,11 @@
   "namespace_lifecycle_inventory": {
     "namespace_count": 45,
     "status_counts": {
-      "active_fixture_smoke": 18,
+      "active_fixture_smoke": 17,
       "active_integrated_smoke": 1,
       "active_live_rehearsal": 9,
       "active_provider_preflight": 5,
-      "active_provider_rehearsal": 4,
+      "active_provider_rehearsal": 5,
       "active_refactor_report": 1,
       "manual_review": 5,
       "quarantine": 1,
@@ -865,7 +857,7 @@
     "source_coverage": 1,
     "stale_artifacts": 1
   },
-  "production_classes_over_limit": 28,
+  "production_classes_over_limit": 22,
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
