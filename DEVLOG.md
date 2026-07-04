@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split core opportunity row serialization · Codex
+**Why:** The long-running refactor objective still tracks oversized production
+functions after the production file-size gates passed. This pass reduces a
+high-value artifact serialization function while preserving CoreOpportunity row
+schema, route gates, scoring, source coverage, and doctor behavior.
+**Changes:**
+- Split
+  `crypto_rsi_scanner/event_alpha/radar/core/serialization.py::_row_from_core_opportunity()`
+  into focused context, acquisition, policy, source, identity, market, evidence,
+  and verdict field builders.
+- Kept the public store/merge behavior and artifact fields compatible, including
+  research-card debug path handling and integrated-candidate truth reconciliation.
+- Refreshed refactor size, class ownership, final, completion-map, and release
+  candidate reports. Current advisory inventory is `22` classes and `48`
+  functions over limits, with `production_files_over_1500_lines=0`,
+  `production_files_over_2000_lines=0`, `legacy_files_over_1500_lines=0`, and
+  `new_violation_count=0`.
+**Verify:** Focused core opportunity/source coverage/doctor parity tests passed,
+along with compileall and regenerated refactor reports. Final broad verification
+for this batch was rerun before commit.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Broader refactor completion remains pending because
+large function/class ownership debt is still documented.
+
 ## 2026-07-04 — Split provider readiness and research-card render helpers · Codex
 **Why:** The production and legacy size gates now pass, but the refactor
 objective still tracks oversized production functions as advisory debt. This

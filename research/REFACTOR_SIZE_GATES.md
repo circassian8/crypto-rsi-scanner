@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T03:29:01.048453+00:00`
+- generated_at: `2026-07-04T03:48:31.361265+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -11,14 +11,14 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `22`
-- production_functions_over_limit: `49`
+- production_functions_over_limit: `48`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
 - classes_over_limit_count: `22`
-- functions_over_limit_count: `49`
+- functions_over_limit_count: `48`
 - modules_with_multiple_public_classes_count: `82`
 - new_violation_count: `0`
-- moved_existing_violation_count: `52`
+- moved_existing_violation_count: `51`
 - legacy_decomposition_gate_status: `pass`
 - legacy_files_over_1500_lines: `0`
 - legacy_files_over_3000_lines: `0`
@@ -66,7 +66,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function:crypto_rsi_scanner/event_alpha/notifications/legacy/research_review_selection.py:select_research_review_candidates_with_diagnostics` | `function:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:select_research_review_candidates_with_diagnostics` |
 | `function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications` | `function:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:send_notifications` |
 | `function:crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py:evaluate_signal_quality_case` | `function:crypto_rsi_scanner/event_alpha/outcomes/quality.py:evaluate_signal_quality_case` |
-| `function:crypto_rsi_scanner/event_alpha/radar/core/serialization.py:_row_from_core_opportunity` | `function:crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py:_row_from_core_opportunity` |
 | `function:crypto_rsi_scanner/event_alpha/radar/discovery/manual.py:load_discovery_events` | `function:crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py:load_discovery_events` |
 | `function:crypto_rsi_scanner/event_alpha/radar/discovery/manual.py:run_manual_discovery` | `function:crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py:run_manual_discovery` |
 | `function:crypto_rsi_scanner/event_alpha/radar/evidence/executor.py:_execute_request` | `function:crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py:_execute_request` |
@@ -88,6 +87,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store.models` | `public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store` |
 | `public_classes:crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.models` | `public_classes:crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy` |
 | `public_classes:crypto_rsi_scanner.event_alpha.notifications.inbox.models` | `public_classes:crypto_rsi_scanner.event_alpha.notifications.inbox` |
+| `public_classes:crypto_rsi_scanner.event_alpha.notifications.legacy.delivery_models` | `public_classes:crypto_rsi_scanner.event_alpha.notifications.pipeline_legacy` |
 
 ## Legacy Decomposition Gate
 
@@ -257,7 +257,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py:run_no_send_rehearsal` | 194 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:source_descriptor_for` | 246 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:assess_source` | 158 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/core/serialization.py:_row_from_core_opportunity` | 406 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py:normalize_derivatives_state` | 166 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/discovery/manual.py:run_manual_discovery` | 244 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/discovery/manual.py:load_discovery_events` | 183 |

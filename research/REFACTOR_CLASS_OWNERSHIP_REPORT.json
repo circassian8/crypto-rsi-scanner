@@ -214,7 +214,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5197,
+  "function_count": 5206,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -384,14 +384,6 @@
       "public": true,
       "qualname": "assess_source",
       "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
-    },
-    {
-      "function_name": "_row_from_core_opportunity",
-      "line_count": 406,
-      "module": "crypto_rsi_scanner.event_alpha.radar.core.serialization",
-      "public": false,
-      "qualname": "_row_from_core_opportunity",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/core/serialization.py"
     },
     {
       "function_name": "normalize_derivatives_state",
@@ -610,8 +602,8 @@
       "source_path": "crypto_rsi_scanner/refactor_final_report.py"
     }
   ],
-  "functions_over_limit_count": 49,
-  "generated_at": "2026-07-04T03:29:01.085584+00:00",
+  "functions_over_limit_count": 48,
+  "generated_at": "2026-07-04T03:48:31.215197+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1370,7 +1362,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 49,
+  "production_functions_over_limit": 48,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_event_alpha_notify_cycle_body",
@@ -1539,14 +1531,6 @@
       "public": true,
       "qualname": "assess_source",
       "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
-    },
-    {
-      "function_name": "_row_from_core_opportunity",
-      "line_count": 406,
-      "module": "crypto_rsi_scanner.event_alpha.radar.core.serialization",
-      "public": false,
-      "qualname": "_row_from_core_opportunity",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/core/serialization.py"
     },
     {
       "function_name": "normalize_derivatives_state",

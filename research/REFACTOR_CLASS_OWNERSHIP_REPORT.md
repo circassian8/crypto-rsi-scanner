@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T03:29:01.085584+00:00`
+- generated_at: `2026-07-04T03:48:31.215197+00:00`
 - public_class_count: `407`
 - classes_over_limit_count: `22`
-- functions_over_limit_count: `49`
+- functions_over_limit_count: `48`
 - production_classes_over_limit: `22`
-- production_functions_over_limit: `49`
+- production_functions_over_limit: `48`
 - modules_with_multiple_public_classes_count: `82`
 - legacy_decomposition_gate_status: `pass`
 - legacy_classes_over_limit: `3`
@@ -188,7 +188,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight` | `run_no_send_rehearsal` | 194 | true |
 | `crypto_rsi_scanner.event_alpha.providers.source_registry` | `source_descriptor_for` | 246 | true |
 | `crypto_rsi_scanner.event_alpha.providers.source_registry` | `assess_source` | 158 | true |
-| `crypto_rsi_scanner.event_alpha.radar.core.serialization` | `_row_from_core_opportunity` | 406 | false |
 | `crypto_rsi_scanner.event_alpha.radar.derivatives_crowding` | `normalize_derivatives_state` | 166 | true |
 | `crypto_rsi_scanner.event_alpha.radar.discovery.manual` | `run_manual_discovery` | 244 | true |
 | `crypto_rsi_scanner.event_alpha.radar.discovery.manual` | `load_discovery_events` | 183 | true |

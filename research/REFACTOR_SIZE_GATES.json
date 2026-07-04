@@ -203,7 +203,7 @@
     }
   ],
   "classes_over_limit_count": 22,
-  "existing_violation_count": 161,
+  "existing_violation_count": 160,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -771,17 +771,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:assess_source"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "_row_from_core_opportunity",
-      "line_count": 406,
-      "module": "crypto_rsi_scanner.event_alpha.radar.core.serialization",
-      "public": false,
-      "qualname": "_row_from_core_opportunity",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/core/serialization.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/core/serialization.py:_row_from_core_opportunity"
     },
     {
       "category": "function_over_150_lines",
@@ -1961,14 +1950,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
     },
     {
-      "function_name": "_row_from_core_opportunity",
-      "line_count": 406,
-      "module": "crypto_rsi_scanner.event_alpha.radar.core.serialization",
-      "public": false,
-      "qualname": "_row_from_core_opportunity",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/core/serialization.py"
-    },
-    {
       "function_name": "normalize_derivatives_state",
       "line_count": 166,
       "module": "crypto_rsi_scanner.event_alpha.radar.derivatives_crowding",
@@ -2185,9 +2166,9 @@
       "source_path": "crypto_rsi_scanner/refactor_final_report.py"
     }
   ],
-  "functions_over_limit_count": 49,
+  "functions_over_limit_count": 48,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T03:29:01.048453+00:00",
+  "generated_at": "2026-07-04T03:48:31.361265+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -3216,10 +3197,6 @@
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py:evaluate_signal_quality_case"
     },
     {
-      "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py:_row_from_core_opportunity",
-      "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/core/serialization.py:_row_from_core_opportunity"
-    },
-    {
       "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py:load_discovery_events",
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/discovery/manual.py:load_discovery_events"
     },
@@ -3352,7 +3329,7 @@
       "current_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.models"
     }
   ],
-  "moved_existing_violation_count": 52,
+  "moved_existing_violation_count": 51,
   "new_violation_count": 0,
   "new_violations": [],
   "no_live_provider_calls": true,
@@ -3570,7 +3547,7 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 49,
+  "production_functions_over_limit": 48,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_event_alpha_notify_cycle_body",
@@ -3739,14 +3716,6 @@
       "public": true,
       "qualname": "assess_source",
       "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
-    },
-    {
-      "function_name": "_row_from_core_opportunity",
-      "line_count": 406,
-      "module": "crypto_rsi_scanner.event_alpha.radar.core.serialization",
-      "public": false,
-      "qualname": "_row_from_core_opportunity",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/core/serialization.py"
     },
     {
       "function_name": "normalize_derivatives_state",
@@ -3967,7 +3936,7 @@
   ],
   "production_size_gate_status": "pass",
   "research_only": true,
-  "resolved_violation_count": 43,
+  "resolved_violation_count": 44,
   "resolved_violation_ids": [
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
     "class:crypto_rsi_scanner/event_alpha/notifications/delivery.py:NotificationDeliveryRecord",
@@ -4011,7 +3980,8 @@
     "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py:render_research_card",
     "function:crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py:_run_record",
     "function:crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py:format_run_ledger_report",
-    "function:crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py:_provider_rows"
+    "function:crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py:_provider_rows",
+    "function:crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py:_row_from_core_opportunity"
   ],
   "row_type": "refactor_size_gate_report",
   "schema_version": "refactor_size_gate_report_v1",
@@ -4070,7 +4040,6 @@
     "function:crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py:run_no_send_rehearsal",
     "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:assess_source",
     "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:source_descriptor_for",
-    "function:crypto_rsi_scanner/event_alpha/radar/core/serialization.py:_row_from_core_opportunity",
     "function:crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py:normalize_derivatives_state",
     "function:crypto_rsi_scanner/event_alpha/radar/discovery/manual.py:load_discovery_events",
     "function:crypto_rsi_scanner/event_alpha/radar/discovery/manual.py:run_manual_discovery",
@@ -4748,17 +4717,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:assess_source"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "_row_from_core_opportunity",
-      "line_count": 406,
-      "module": "crypto_rsi_scanner.event_alpha.radar.core.serialization",
-      "public": false,
-      "qualname": "_row_from_core_opportunity",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/core/serialization.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/core/serialization.py:_row_from_core_opportunity"
     },
     {
       "category": "function_over_150_lines",

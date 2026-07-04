@@ -1,6 +1,6 @@
 # Refactor Release-Candidate Report
 
-- generated_at: `2026-07-04T03:30:02+00:00`
+- generated_at: `2026-07-04T03:48:34+00:00`
 - status: `pending_with_documented_refactor_blockers`
 - verdict: Event Alpha refactor v2 pending: critical blockers remain documented below.
 - verification_failed_commands: `0`

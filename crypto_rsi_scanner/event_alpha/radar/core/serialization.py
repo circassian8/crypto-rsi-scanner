@@ -30,10 +30,74 @@ def _row_from_core_opportunity(
     artifact_namespace: str | None = None,
     card_path: str | Path | None = None,
 ) -> dict[str, Any]:
+    context = _core_row_serialization_context(
+        item,
+        generated_at=generated_at,
+        run_id=run_id,
+        profile=profile,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+        card_path=card_path,
+    )
+    row: dict[str, Any] = {}
+    for section in (
+        _core_row_identity_source_fields,
+        _core_row_opportunity_market_fields,
+        _core_row_frame_evidence_fields,
+        _core_row_verdict_fields,
+    ):
+        row.update(section(context))
+    if card_path and event_artifact_paths.has_operator_absolute_path(card_path):
+        row["card_path_abs_debug"] = str(card_path)
+        row["research_card_path_abs_debug"] = str(card_path)
+    return _apply_integrated_candidate_truth(
+        row,
+        primary=context["primary"],
+        all_rows=context["all_rows"],
+        reaction=context["reaction"],
+    )
+
+
+def _core_row_serialization_context(
+    item: event_core_opportunities.CoreOpportunity,
+    *,
+    generated_at: str,
+    run_id: str | None,
+    profile: str | None,
+    run_mode: str | None,
+    artifact_namespace: str | None,
+    card_path: str | Path | None,
+) -> dict[str, Any]:
     primary = dict(item.primary_row)
     support = [dict(row) for row in item.supporting_rows]
     diagnostics = [dict(row) for row in item.diagnostic_rows]
     all_rows = [primary, *support, *diagnostics]
+    context: dict[str, Any] = {
+        "item": item,
+        "generated_at": generated_at,
+        "run_id": run_id,
+        "profile": profile,
+        "run_mode": run_mode,
+        "artifact_namespace": artifact_namespace,
+        "card_path": card_path,
+        "primary": primary,
+        "support": support,
+        "diagnostics": diagnostics,
+        "all_rows": all_rows,
+        "support_ids": _row_ids(support),
+        "diagnostic_ids": _row_ids(diagnostics),
+    }
+    context.update(_core_row_initial_metrics(item, all_rows))
+    context.update(_core_row_acquisition_metrics(item, all_rows, context))
+    context.update(_core_row_policy_context(item, primary, all_rows, context))
+    context.update(_core_row_event_source_context(all_rows, context))
+    return context
+
+
+def _core_row_initial_metrics(
+    item: event_core_opportunities.CoreOpportunity,
+    all_rows: list[Mapping[str, Any]],
+) -> dict[str, Any]:
     market_before = _best_float(all_rows, ("market_confirmation_before", "market_confirmation_score_before"))
     market_after = _best_float(all_rows, ("market_confirmation_after", "market_confirmation_score_after", "market_confirmation_score"))
     evidence_before = _best_float(all_rows, ("evidence_quality_before", "evidence_quality_score_before"))
@@ -77,6 +141,47 @@ def _row_from_core_opportunity(
         reasons_keys=("protocol_metrics_reasons",),
         freshness_keys=("protocol_metrics_freshness_status",),
     )
+    return {
+        "market_before": market_before,
+        "market_after": market_after,
+        "evidence_before": evidence_before,
+        "evidence_after": evidence_after,
+        "source_pack": source_pack,
+        "source_class": source_class,
+        "evidence_specificity": evidence_specificity,
+        "evidence_score": evidence_score,
+        "market_level": market_level,
+        "impact_path_reason": impact_path_reason,
+        "impact_path_strength": impact_path_strength,
+        "initial_level": initial_level,
+        "initial_score": initial_score,
+        "post_level": post_level,
+        "post_score": post_score,
+        "market_context": market_context,
+        "derivatives_confirmation": derivatives_confirmation,
+        "dex_liquidity_confirmation": dex_liquidity_confirmation,
+        "protocol_metrics_confirmation": protocol_metrics_confirmation,
+    }
+
+
+def _core_row_acquisition_metrics(
+    item: event_core_opportunities.CoreOpportunity,
+    all_rows: list[Mapping[str, Any]],
+    context: Mapping[str, Any],
+) -> dict[str, Any]:
+    source_pack = context["source_pack"]
+    evidence_before = context["evidence_before"]
+    evidence_after = context["evidence_after"]
+    evidence_score = context["evidence_score"]
+    market_after = context["market_after"]
+    market_level = context["market_level"]
+    impact_path_reason = context["impact_path_reason"]
+    impact_path_strength = context["impact_path_strength"]
+    initial_level = context["initial_level"]
+    initial_score = context["initial_score"]
+    post_level = context["post_level"]
+    post_score = context["post_score"]
+    market_context = context["market_context"]
     acquisition = _build_core_evidence_acquisition_view(item.core_opportunity_id, all_rows)
     source_pack = acquisition.source_pack or source_pack
     evidence_before = acquisition.evidence_quality_before if acquisition.evidence_quality_before is not None else evidence_before
@@ -109,8 +214,47 @@ def _row_from_core_opportunity(
             "market_context_age_hours": market_context.get("market_context_age_hours"),
             "summary_only": True,
         }
-    support_ids = _row_ids(support)
-    diagnostic_ids = _row_ids(diagnostics)
+    return {
+        "acquisition": acquisition,
+        "source_pack": source_pack,
+        "evidence_before": evidence_before,
+        "evidence_after": evidence_after,
+        "evidence_score": evidence_score,
+        "market_level": market_level,
+        "impact_path_reason": impact_path_reason,
+        "impact_path_strength": impact_path_strength,
+        "initial_level": initial_level,
+        "initial_score": initial_score,
+        "post_level": post_level,
+        "post_score": post_score,
+        "accepted_source": accepted_source,
+        "latest_source": latest_source,
+        "source_count": source_count,
+        "market_summary": market_summary,
+        "market_snapshot": market_snapshot,
+    }
+
+
+def _core_row_policy_context(
+    item: event_core_opportunities.CoreOpportunity,
+    primary: Mapping[str, Any],
+    all_rows: list[Mapping[str, Any]],
+    context: Mapping[str, Any],
+) -> dict[str, Any]:
+    profile = context["profile"]
+    run_mode = context["run_mode"]
+    artifact_namespace = context["artifact_namespace"]
+    source_class = context["source_class"]
+    evidence_specificity = context["evidence_specificity"]
+    evidence_score = context["evidence_score"]
+    market_after = context["market_after"]
+    market_level = context["market_level"]
+    market_context = context["market_context"]
+    market_snapshot = context["market_snapshot"]
+    source_pack = context["source_pack"]
+    acquisition = context["acquisition"]
+    accepted_source = context["accepted_source"]
+    impact_path_reason = context["impact_path_reason"]
     live_policy_input = {
         **primary,
         "profile": profile or primary.get("profile"),
@@ -184,6 +328,26 @@ def _row_from_core_opportunity(
         "market_confirmation_score": market_after,
         "market_context_freshness_status": market_context.get("market_context_freshness_status"),
     })
+    return {
+        "live_policy_input": live_policy_input,
+        "live_policy": live_policy,
+        "final_level": final_level,
+        "final_score": final_score,
+        "final_state": final_state,
+        "final_route": final_route,
+        "route_adjustment_reason": route_adjustment_reason,
+        "final_verdict_reason": final_verdict_reason,
+        "acquisition_confirmation": acquisition_confirmation,
+        "reaction": reaction,
+    }
+
+
+def _core_row_event_source_context(
+    all_rows: list[Mapping[str, Any]],
+    context: Mapping[str, Any],
+) -> dict[str, Any]:
+    accepted_source = context["accepted_source"]
+    latest_source = context["latest_source"]
     official_event = _first_mapping(all_rows, ("official_exchange_event",))
     scheduled_event = _first_mapping(all_rows, ("scheduled_catalyst_event",))
     unlock_event = _first_mapping(all_rows, ("unlock_event",))
@@ -218,14 +382,38 @@ def _row_from_core_opportunity(
         or _mapping_text(scheduled_event, ("provider", "source_class"))
         or _mapping_text(unlock_event, ("provider", "source_class"))
     )
-    row = {
+    return {
+        "official_event": official_event,
+        "scheduled_event": scheduled_event,
+        "unlock_event": unlock_event,
+        "derivatives_state_snapshot": derivatives_state_snapshot,
+        "crowding_class": crowding_class,
+        "fade_readiness": fade_readiness,
+        "crowding_exhaustion_evidence": crowding_exhaustion_evidence,
+        "what_confirms_fade_review": what_confirms_fade_review,
+        "what_invalidates_fade_review": what_invalidates_fade_review,
+        "derivatives_warning_codes": derivatives_warning_codes,
+        "latest_source_url": latest_source_url,
+        "latest_source_title": latest_source_title,
+        "latest_source_provider": latest_source_provider,
+    }
+
+
+def _core_row_identity_source_fields(context: Mapping[str, Any]) -> dict[str, Any]:
+    item = context["item"]
+    all_rows = context["all_rows"]
+    primary = context["primary"]
+    official_event = context["official_event"]
+    scheduled_event = context["scheduled_event"]
+    unlock_event = context["unlock_event"]
+    return {
         "schema_id": "core_opportunity_v1",
         "schema_version": EVENT_CORE_OPPORTUNITY_STORE_SCHEMA_VERSION,
         "row_type": "event_core_opportunity",
-        "run_id": run_id,
-        "profile": profile,
-        "run_mode": run_mode,
-        "artifact_namespace": artifact_namespace,
+        "run_id": context["run_id"],
+        "profile": context["profile"],
+        "run_mode": context["run_mode"],
+        "artifact_namespace": context["artifact_namespace"],
         "core_opportunity_id": item.core_opportunity_id,
         "symbol": item.symbol,
         "coin_id": item.coin_id,
@@ -238,22 +426,22 @@ def _row_from_core_opportunity(
         "playbook_type": item.primary_impact_path,
         "effective_playbook_type": item.primary_impact_path,
         "latest_playbook_type": item.primary_impact_path,
-        "state": final_state,
-        "tier": final_route,
-        "latest_tier": final_route,
-        "route": final_route,
+        "state": context["final_state"],
+        "tier": context["final_route"],
+        "latest_tier": context["final_route"],
+        "route": context["final_route"],
         "primary_hypothesis_id": _first_text([primary], ("hypothesis_id", "primary_hypothesis_id")),
         "supporting_hypothesis_ids": list(item.supporting_hypothesis_ids),
         "supporting_categories": list(item.supporting_categories),
         "supporting_impact_paths": list(item.supporting_impact_paths),
         "supporting_evidence_quotes": list(item.supporting_evidence_quotes),
         "evidence_quotes": list(item.supporting_evidence_quotes),
-        "source_count": source_count,
-        "latest_source": latest_source,
-        "latest_source_url": latest_source_url,
-        "latest_source_title": latest_source_title,
-        "source_provider": latest_source_provider,
-        "source_url": latest_source_url,
+        "source_count": context["source_count"],
+        "latest_source": context["latest_source"],
+        "latest_source_url": context["latest_source_url"],
+        "latest_source_title": context["latest_source_title"],
+        "source_provider": context["latest_source_provider"],
+        "source_url": context["latest_source_url"],
         "official_exchange_event": official_event,
         "official_exchange_provider": _mapping_text(official_event, ("provider",)),
         "official_exchange": _mapping_text(official_event, ("exchange",)),
@@ -265,25 +453,38 @@ def _row_from_core_opportunity(
         "official_exchange_reason_codes": _mapping_list(official_event, ("reason_codes",)),
         "scheduled_catalyst_event": scheduled_event,
         "unlock_event": unlock_event,
-        "derivatives_state_snapshot": derivatives_state_snapshot,
-        "crowding_class": crowding_class,
-        "fade_readiness": fade_readiness,
-        "crowding_exhaustion_evidence": crowding_exhaustion_evidence,
-        "what_confirms_fade_review": what_confirms_fade_review,
-        "what_invalidates_fade_review": what_invalidates_fade_review,
-        "derivatives_warning_codes": derivatives_warning_codes,
-        "supporting_row_ids": support_ids,
-        "diagnostic_row_ids": diagnostic_ids,
+        "derivatives_state_snapshot": context["derivatives_state_snapshot"],
+        "crowding_class": context["crowding_class"],
+        "fade_readiness": context["fade_readiness"],
+        "crowding_exhaustion_evidence": context["crowding_exhaustion_evidence"],
+        "what_confirms_fade_review": context["what_confirms_fade_review"],
+        "what_invalidates_fade_review": context["what_invalidates_fade_review"],
+        "derivatives_warning_codes": context["derivatives_warning_codes"],
+        "supporting_row_ids": context["support_ids"],
+        "diagnostic_row_ids": context["diagnostic_ids"],
         "diagnostic_row_count": item.diagnostic_row_count,
         "hidden_diagnostic_count": item.diagnostic_row_count,
         "source_noise_control_count": item.source_noise_control_count,
         "quality_capped_support_count": item.quality_capped_supporting_rows,
-        "initial_opportunity_level": initial_level,
-        "initial_opportunity_score": initial_score if initial_score is not None else item.opportunity_score_final,
+        "initial_opportunity_level": context["initial_level"],
+        "initial_opportunity_score": (
+            context["initial_score"] if context["initial_score"] is not None else item.opportunity_score_final
+        ),
         "market_refresh_attempted": _any_truthy(all_rows, ("market_refresh_attempted", "targeted_market_refresh_attempted")),
         "market_refresh_success": _any_truthy(all_rows, ("market_refresh_success", "targeted_market_refresh_success")),
-        "market_snapshot": market_snapshot,
-        "latest_market_snapshot": market_snapshot,
+    }
+
+
+def _core_row_opportunity_market_fields(context: Mapping[str, Any]) -> dict[str, Any]:
+    all_rows = context["all_rows"]
+    reaction = context["reaction"]
+    market_context = context["market_context"]
+    derivatives_confirmation = context["derivatives_confirmation"]
+    dex_liquidity_confirmation = context["dex_liquidity_confirmation"]
+    protocol_metrics_confirmation = context["protocol_metrics_confirmation"]
+    return {
+        "market_snapshot": context["market_snapshot"],
+        "latest_market_snapshot": context["market_snapshot"],
         "market_state_snapshot": reaction.market_state_snapshot.to_dict(),
         "market_state": reaction.market_state,
         "market_state_class": reaction.market_state,
@@ -319,9 +520,9 @@ def _row_from_core_opportunity(
         "integrated_market_reaction_confirmation": _first_text(all_rows, ("integrated_market_reaction_confirmation",)),
         "integrated_market_context_source": _first_text(all_rows, ("integrated_market_context_source",)),
         "integrated_market_freshness_status": _first_text(all_rows, ("integrated_market_freshness_status",)),
-        "market_confirmation_score": market_after,
-        "market_confirmation_level": market_level,
-        "market_confirmation_summary": market_summary,
+        "market_confirmation_score": context["market_after"],
+        "market_confirmation_level": context["market_level"],
+        "market_confirmation_summary": context["market_summary"],
         "derivatives_confirmation_score": derivatives_confirmation.get("score"),
         "derivatives_confirmation_level": derivatives_confirmation.get("level"),
         "derivatives_confirmation_reasons": list(derivatives_confirmation.get("reasons") or ()),
@@ -335,9 +536,17 @@ def _row_from_core_opportunity(
         "protocol_metrics_reasons": list(protocol_metrics_confirmation.get("reasons") or ()),
         "protocol_metrics_freshness_status": protocol_metrics_confirmation.get("freshness_status"),
         "market_data_freshness": market_context.get("market_context_freshness_status"),
-        "market_reaction_confirmation": market_level,
-        "market_confirmation_before": market_before,
-        "market_confirmation_after": market_after,
+        "market_reaction_confirmation": context["market_level"],
+        "market_confirmation_before": context["market_before"],
+        "market_confirmation_after": context["market_after"],
+    }
+
+
+def _core_row_frame_evidence_fields(context: Mapping[str, Any]) -> dict[str, Any]:
+    all_rows = context["all_rows"]
+    acquisition = context["acquisition"]
+    source_pack = context["source_pack"]
+    return {
         "main_frame_type": _first_text(all_rows, ("main_frame_type",)),
         "main_frame_role": _first_text(all_rows, ("main_frame_role",)),
         "main_frame_subject": _first_text(all_rows, ("main_frame_subject",)),
@@ -374,31 +583,48 @@ def _row_from_core_opportunity(
         },
         "final_upgrade_status": acquisition.final_upgrade_status or _first_text(all_rows, ("final_upgrade_status", "acquisition_upgrade_status")),
         "no_upgrade_reason": acquisition.no_upgrade_reason or _first_text(all_rows, ("no_upgrade_reason",)),
-        "source_class": source_class,
-        "evidence_specificity": evidence_specificity,
-        "evidence_quality_score": evidence_score,
-        "evidence_quality_before": evidence_before,
-        "evidence_quality_after": evidence_after,
-        "impact_path_strength": impact_path_strength,
-        "impact_path_reason": impact_path_reason,
+    }
+
+
+def _core_row_verdict_fields(context: Mapping[str, Any]) -> dict[str, Any]:
+    item = context["item"]
+    final_level = context["final_level"]
+    live_policy = context["live_policy"]
+    acquisition_confirmation = context["acquisition_confirmation"]
+    card_path = context["card_path"]
+    return {
+        "source_class": context["source_class"],
+        "evidence_specificity": context["evidence_specificity"],
+        "evidence_quality_score": context["evidence_score"],
+        "evidence_quality_before": context["evidence_before"],
+        "evidence_quality_after": context["evidence_after"],
+        "impact_path_strength": context["impact_path_strength"],
+        "impact_path_reason": context["impact_path_reason"],
         "digest_eligible_by_impact_path": final_level in {"validated_digest", "watchlist", "high_priority"},
-        "manual_verification_items": _canonical_manual_verification_items(item, source_pack, final_level=final_level, live_policy=live_policy),
+        "manual_verification_items": _canonical_manual_verification_items(
+            item,
+            context["source_pack"],
+            final_level=final_level,
+            live_policy=live_policy,
+        ),
         "upgrade_requirements": _canonical_upgrade_requirements(final_level, live_policy=live_policy),
         "downgrade_warnings": _canonical_downgrade_warnings(item.primary_impact_path, final_level),
-        "post_refresh_opportunity_level": post_level,
-        "post_refresh_opportunity_score": post_score if post_score is not None else item.opportunity_score_final,
+        "post_refresh_opportunity_level": context["post_level"],
+        "post_refresh_opportunity_score": (
+            context["post_score"] if context["post_score"] is not None else item.opportunity_score_final
+        ),
         "requested_opportunity_level_before_live_confirmation": item.opportunity_level,
         "requested_opportunity_score_before_live_confirmation": item.opportunity_score_final,
         "requested_route_before_live_confirmation": item.final_route_after_quality_gate,
         "requested_state_before_live_confirmation": item.final_state_after_quality_gate,
         "final_opportunity_level": final_level,
-        "final_opportunity_score": final_score,
+        "final_opportunity_score": context["final_score"],
         "opportunity_level": final_level,
-        "opportunity_score_final": final_score,
-        "final_state_after_quality_gate": final_state,
-        "final_route_after_quality_gate": final_route,
-        "final_tier_after_quality_gate": final_route,
-        "canonical_route_adjustment_reason": route_adjustment_reason,
+        "opportunity_score_final": context["final_score"],
+        "final_state_after_quality_gate": context["final_state"],
+        "final_route_after_quality_gate": context["final_route"],
+        "final_tier_after_quality_gate": context["final_route"],
+        "canonical_route_adjustment_reason": context["route_adjustment_reason"],
         "live_confirmation_required": live_policy.required,
         "live_confirmation_passed": live_policy.confirmed,
         "live_confirmation_status": live_policy.status,
@@ -412,20 +638,19 @@ def _row_from_core_opportunity(
         "acquisition_confirmation_status": acquisition_confirmation.status,
         "acquisition_confirmation_reason": acquisition_confirmation.reason,
         "source_pack_confirmation_status": acquisition_confirmation.status,
-        "final_verdict_source": _first_text(all_rows, ("final_verdict_source", "opportunity_verdict_source", "verdict_source")) or "core_opportunity_merge",
-        "final_verdict_reason": final_verdict_reason,
+        "final_verdict_source": (
+            _first_text(context["all_rows"], ("final_verdict_source", "opportunity_verdict_source", "verdict_source"))
+            or "core_opportunity_merge"
+        ),
+        "final_verdict_reason": context["final_verdict_reason"],
         "why_opportunity_visible": item.why_opportunity_visible,
         "why_other_rows_hidden": item.why_other_rows_hidden,
         "card_path": event_artifact_paths.artifact_display_path(card_path) if card_path else None,
         "research_card_path": event_artifact_paths.artifact_display_path(card_path) if card_path else None,
         "feedback_target": item.core_opportunity_id,
         "feedback_target_type": "core_opportunity_id",
-        "generated_at": generated_at,
+        "generated_at": context["generated_at"],
     }
-    if card_path and event_artifact_paths.has_operator_absolute_path(card_path):
-        row["card_path_abs_debug"] = str(card_path)
-        row["research_card_path_abs_debug"] = str(card_path)
-    return _apply_integrated_candidate_truth(row, primary=primary, all_rows=all_rows, reaction=reaction)
 
 
 def _row_with_score_components(row: Mapping[str, Any]) -> dict[str, Any]:

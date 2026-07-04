@@ -65,7 +65,7 @@
     "top_level_event_module_count": 125,
     "unmigrated_modules": 1
   },
-  "generated_at": "2026-07-04T03:30:00+00:00",
+  "generated_at": "2026-07-04T03:48:32+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
   "known_remaining_blockers": [
     {
@@ -121,7 +121,7 @@
   "size_gates": {
     "classes_over_limit_count": 22,
     "files_over_limit_count": 8,
-    "functions_over_limit_count": 49,
+    "functions_over_limit_count": 48,
     "gate_status": "pass",
     "largest_legacy_files": [
       {
@@ -606,13 +606,13 @@
     "legacy_functions_over_limit": 1,
     "legacy_modules_with_multiple_public_classes": 2,
     "legacy_total_lines": 4704,
-    "moved_existing_violation_count": 52,
+    "moved_existing_violation_count": 51,
     "new_violation_count": 0,
     "production_classes_over_limit": 22,
     "production_files_over_1500_lines": 0,
     "production_files_over_2000_lines": 0,
     "production_files_over_3000_lines": 0,
-    "production_functions_over_limit": 49,
+    "production_functions_over_limit": 48,
     "production_size_gate_status": "pass",
     "test_files_over_1500_lines": 8,
     "test_size_gate_status": "warning"
