@@ -76,6 +76,18 @@ _TRUTHY = {"1", "true", "yes", "on"}
 
 
 @dataclass(frozen=True)
+class _CoinalyzeLiveRehearsalResult:
+    status: str
+    error_class: str | None
+    error_message_safe: str | None
+    snapshots_written: int
+    crowding_written: int
+    fade_written: int
+    candidate_rows: tuple[dict[str, Any], ...]
+    provider_health_status: str
+
+
+@dataclass(frozen=True)
 class CoinalyzeRehearsalReport:
     provider: str
     status: str
@@ -426,93 +438,31 @@ def run_no_send_rehearsal(
         error_class = "request_ledger_unwritable"
         error_message_safe = "request ledger path is not writable"
     else:
-        ledger = _LedgeredCoinalyzeOpener(
+        live_result = _run_live_coinalyze_rehearsal(
+            base=base,
             ledger_path=ledger_path,
-            api_key=_api_key(),
+            derivatives_state_path=derivatives_state_path,
+            derivatives_candidates_path=derivatives_candidates_path,
+            fade_review_path=fade_review_path,
+            provider_health_path=provider_health_path,
+            requested_symbols=requested_symbols,
+            explicit_symbols=explicit_symbols,
             max_requests=max_requests,
-            opener=opener,
-            now=observed,
-        )
-        try:
-            provider = CoinalyzeDerivativesProvider(
-                None,
-                live_enabled=True,
-                api_key=_api_key(),
-                symbols=requested_symbols if explicit_symbols else (),
-                base_symbols=requested_symbols if not explicit_symbols else (),
-                auto_symbols=not explicit_symbols,
-                base_url=config.EVENT_DISCOVERY_COINALYZE_BASE_URL,
-                timeout=float(config.EVENT_DISCOVERY_COINALYZE_TIMEOUT or 10.0),
-                history_interval=config.EVENT_DISCOVERY_COINALYZE_HISTORY_INTERVAL,
-                lookback_hours=int(config.EVENT_DISCOVERY_COINALYZE_LOOKBACK_HOURS or 24),
-                convert_to_usd=bool(config.EVENT_DISCOVERY_COINALYZE_CONVERT_TO_USD),
-                opener=ledger,
-                clock=clock,
-                required=False,
-            )
-            snapshots = provider.fetch_snapshots()
-        except Exception as exc:  # noqa: BLE001 - rehearsal must fail safely
-            snapshots = {}
-            error_class = type(exc).__name__
-            error_message_safe = _safe_error_message(exc, _api_key())
-        if provider_warnings := tuple(getattr(provider, "last_warnings", ()) or ()):
-            warnings.extend(provider_warnings)
-        ledger_rows = _read_jsonl(ledger_path)
-        status, error_class, error_message_safe = _rehearsal_status_from_ledger(
-            ledger_rows,
-            snapshots=snapshots,
-            fallback_error_class=error_class,
-            fallback_error_message=error_message_safe,
-        )
-        run_id = f"coinalyze-rehearsal-{int(observed.timestamp())}"
-        state_rows = _derivatives_state_rows(
-            snapshots.values(),
-            observed_at=observed,
             profile=profile,
             artifact_namespace=artifact_namespace,
-            run_id=run_id,
+            opener=opener,
+            clock=clock,
+            warnings=warnings,
+            observed=observed,
         )
-        candidate_evaluation_complete = False
-        if state_rows:
-            try:
-                derivatives_result = event_derivatives_crowding.run_derivatives_crowding_scan_from_state_rows(
-                    namespace_dir=base,
-                    state_rows=state_rows,
-                    profile=profile,
-                    artifact_namespace=artifact_namespace,
-                    run_mode="no_send_rehearsal",
-                    run_id=run_id,
-                    observed_at=observed,
-                    no_send_rehearsal=True,
-                    warnings=warnings,
-                )
-                candidate_rows = derivatives_result.candidate_rows
-                candidate_evaluation_complete = derivatives_result.evaluated_candidate_count >= len(state_rows)
-                crowding_written = derivatives_result.evaluated_candidate_count
-                fade_written = derivatives_result.fade_review_candidate_count
-            except Exception as exc:  # noqa: BLE001 - rehearsal artifacts must fail safe
-                _write_jsonl(derivatives_state_path, state_rows)
-                _write_jsonl(derivatives_candidates_path, [])
-                _write_jsonl(fade_review_path, [])
-                warnings.append(f"derivatives_candidate_evaluation_failed:{type(exc).__name__}")
-                error_class = error_class or type(exc).__name__
-                error_message_safe = error_message_safe or _safe_error_message(exc, _api_key())
-        if status == "live_rehearsal_success" and state_rows and not candidate_evaluation_complete:
-            status = "live_rehearsal_partial"
-            error_class = error_class or "candidate_evaluation_partial"
-            error_message_safe = error_message_safe or "derivatives candidate evaluation did not complete"
-        snapshots_written = len(state_rows)
-        provider_health_status = _record_provider_health(
-            status=status,
-            provider_health_path=provider_health_path,
-            now=observed,
-            run_id=run_id,
-            successful_ledger_rows=sum(1 for row in ledger_rows if bool(row.get("success"))),
-            derivatives_state_rows=snapshots_written,
-            candidate_evaluation_complete=candidate_evaluation_complete,
-            error_class=error_class,
-            error_message=error_message_safe,
-        )
+        status = live_result.status
+        error_class = live_result.error_class
+        error_message_safe = live_result.error_message_safe
+        snapshots_written = live_result.snapshots_written
+        crowding_written = live_result.crowding_written
+        fade_written = live_result.fade_written
+        candidate_rows = live_result.candidate_rows
+        provider_health_status = live_result.provider_health_status
 
     requests_used = len(_read_jsonl(ledger_path))
     crowding_class_counts = _counts(str(row.get("crowding_class") or "unknown") for row in candidate_rows)
@@ -555,6 +505,129 @@ def run_no_send_rehearsal(
     rehearsal_json.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     rehearsal_md.write_text(format_rehearsal_report(report) + "\n", encoding="utf-8")
     return preflight, report, (preflight_json, preflight_md, rehearsal_json, rehearsal_md)
+
+
+def _run_live_coinalyze_rehearsal(
+    *,
+    base: Path,
+    ledger_path: Path,
+    derivatives_state_path: Path,
+    derivatives_candidates_path: Path,
+    fade_review_path: Path,
+    provider_health_path: str | Path,
+    requested_symbols: tuple[str, ...],
+    explicit_symbols: bool,
+    max_requests: int,
+    profile: str | None,
+    artifact_namespace: str | None,
+    opener: Callable[[Request, float], Any] | None,
+    clock: Callable[[], float] | None,
+    warnings: list[str],
+    observed: datetime,
+) -> _CoinalyzeLiveRehearsalResult:
+    ledger = _LedgeredCoinalyzeOpener(
+        ledger_path=ledger_path,
+        api_key=_api_key(),
+        max_requests=max_requests,
+        opener=opener,
+        now=observed,
+    )
+    provider: CoinalyzeDerivativesProvider | None = None
+    try:
+        provider = CoinalyzeDerivativesProvider(
+            None,
+            live_enabled=True,
+            api_key=_api_key(),
+            symbols=requested_symbols if explicit_symbols else (),
+            base_symbols=requested_symbols if not explicit_symbols else (),
+            auto_symbols=not explicit_symbols,
+            base_url=config.EVENT_DISCOVERY_COINALYZE_BASE_URL,
+            timeout=float(config.EVENT_DISCOVERY_COINALYZE_TIMEOUT or 10.0),
+            history_interval=config.EVENT_DISCOVERY_COINALYZE_HISTORY_INTERVAL,
+            lookback_hours=int(config.EVENT_DISCOVERY_COINALYZE_LOOKBACK_HOURS or 24),
+            convert_to_usd=bool(config.EVENT_DISCOVERY_COINALYZE_CONVERT_TO_USD),
+            opener=ledger,
+            clock=clock,
+            required=False,
+        )
+        snapshots = provider.fetch_snapshots()
+        error_class = None
+        error_message_safe = None
+    except Exception as exc:  # noqa: BLE001 - rehearsal must fail safely
+        snapshots = {}
+        error_class = type(exc).__name__
+        error_message_safe = _safe_error_message(exc, _api_key())
+    if provider_warnings := tuple(getattr(provider, "last_warnings", ()) or ()):
+        warnings.extend(provider_warnings)
+    ledger_rows = _read_jsonl(ledger_path)
+    status, error_class, error_message_safe = _rehearsal_status_from_ledger(
+        ledger_rows,
+        snapshots=snapshots,
+        fallback_error_class=error_class,
+        fallback_error_message=error_message_safe,
+    )
+    run_id = f"coinalyze-rehearsal-{int(observed.timestamp())}"
+    state_rows = _derivatives_state_rows(
+        snapshots.values(),
+        observed_at=observed,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        run_id=run_id,
+    )
+    candidate_rows: tuple[dict[str, Any], ...] = ()
+    candidate_evaluation_complete = False
+    crowding_written = 0
+    fade_written = 0
+    if state_rows:
+        try:
+            derivatives_result = event_derivatives_crowding.run_derivatives_crowding_scan_from_state_rows(
+                namespace_dir=base,
+                state_rows=state_rows,
+                profile=profile,
+                artifact_namespace=artifact_namespace,
+                run_mode="no_send_rehearsal",
+                run_id=run_id,
+                observed_at=observed,
+                no_send_rehearsal=True,
+                warnings=warnings,
+            )
+            candidate_rows = derivatives_result.candidate_rows
+            candidate_evaluation_complete = derivatives_result.evaluated_candidate_count >= len(state_rows)
+            crowding_written = derivatives_result.evaluated_candidate_count
+            fade_written = derivatives_result.fade_review_candidate_count
+        except Exception as exc:  # noqa: BLE001 - rehearsal artifacts must fail safe
+            _write_jsonl(derivatives_state_path, state_rows)
+            _write_jsonl(derivatives_candidates_path, [])
+            _write_jsonl(fade_review_path, [])
+            warnings.append(f"derivatives_candidate_evaluation_failed:{type(exc).__name__}")
+            error_class = error_class or type(exc).__name__
+            error_message_safe = error_message_safe or _safe_error_message(exc, _api_key())
+    if status == "live_rehearsal_success" and state_rows and not candidate_evaluation_complete:
+        status = "live_rehearsal_partial"
+        error_class = error_class or "candidate_evaluation_partial"
+        error_message_safe = error_message_safe or "derivatives candidate evaluation did not complete"
+    snapshots_written = len(state_rows)
+    provider_health_status = _record_provider_health(
+        status=status,
+        provider_health_path=provider_health_path,
+        now=observed,
+        run_id=run_id,
+        successful_ledger_rows=sum(1 for row in ledger_rows if bool(row.get("success"))),
+        derivatives_state_rows=snapshots_written,
+        candidate_evaluation_complete=candidate_evaluation_complete,
+        error_class=error_class,
+        error_message=error_message_safe,
+    )
+    return _CoinalyzeLiveRehearsalResult(
+        status=status,
+        error_class=error_class,
+        error_message_safe=error_message_safe,
+        snapshots_written=snapshots_written,
+        crowding_written=crowding_written,
+        fade_written=fade_written,
+        candidate_rows=candidate_rows,
+        provider_health_status=provider_health_status,
+    )
 
 
 def format_preflight_report(report: CoinalyzePreflightReport) -> str:

@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T05:38:08+00:00`
+- generated_at: `2026-07-04T05:55:25+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -44,21 +44,21 @@ Research-only refactor gate report. This report does not call providers, send Te
 - intentionally_outside_event_alpha_modules: `["crypto_rsi_scanner.event_fade"]`
 - class_ownership_report: `research/REFACTOR_CLASS_OWNERSHIP_REPORT.json`
 - class_ownership_classes_over_limit: `14`
-- class_ownership_functions_over_limit: `29`
+- class_ownership_functions_over_limit: `25`
 - production_size_gate_status: `pass`
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `29`
+- production_functions_over_limit: `25`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
 - legacy_decomposition_gate_status: `pass`
 - legacy_files_over_1500_lines: `0`
 - legacy_files_over_3000_lines: `0`
-- legacy_total_lines: `4704`
+- legacy_total_lines: `4721`
 - legacy_classes_over_limit: `3`
-- legacy_functions_over_limit: `1`
+- legacy_functions_over_limit: `0`
 - legacy_modules_with_multiple_public_classes: `2`
 
 ## Newly Migrated Modules
@@ -97,11 +97,11 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 | path | lines |
 |---|---:|
+| `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1473 |
 | `crypto_rsi_scanner/cli/services/legacy/utility_commands.py` | 1440 |
 | `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1428 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1413 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1406 |
-| `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1400 |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 |
 | `crypto_rsi_scanner/config.py` | 1319 |
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1298 |
@@ -117,9 +117,9 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py` | 1078 |
 | `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1069 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1059 |
+| `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1047 |
 | `crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py` | 1033 |
 | `crypto_rsi_scanner/event_alpha/radar/llm/extractor.py` | 1002 |
-| `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 997 |
 | `crypto_rsi_scanner/event_alpha/radar/scheduled_catalysts.py` | 995 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 994 |
 | `crypto_rsi_scanner/event_alpha/providers/source_registry.py` | 989 |
@@ -136,7 +136,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 924 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py` | 918 |
 | `crypto_rsi_scanner/event_alpha/providers/official_exchange.py` | 913 |
-| `crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py` | 890 |
+| `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` | 905 |
 
 ## Test Size Gate
 
@@ -173,7 +173,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py` | 933 |
-| `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` | 888 |
+| `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` | 905 |
 | `crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py` | 779 |
 | `crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py` | 629 |
 | `crypto_rsi_scanner/event_providers/binance_announcements/legacy.py` | 192 |

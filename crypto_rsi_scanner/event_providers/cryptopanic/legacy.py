@@ -160,6 +160,55 @@ def _urlopen_with_timeout(request: Request, timeout: float) -> Any:
     return urlopen(request, timeout=timeout)
 
 
+def _reset_cryptopanic_live_fetch_state(provider: "CryptoPanicProvider") -> None:
+    provider.last_skip_reason = None
+    provider.last_status_code = None
+    provider.last_error_class = None
+    provider.last_result_count = 0
+    provider.requests_attempted = 0
+    provider.request_cache_hits = 0
+    provider.request_cache_misses = 0
+    provider.requests_deduped = 0
+    provider.invalid_currency_requests_skipped = 0
+    provider.rejected_currency_candidates = ()
+    provider._request_cache = {}
+
+
+def _missing_cryptopanic_token_events(provider: "CryptoPanicProvider") -> list[RawDiscoveredEvent]:
+    warning = "CryptoPanic live news fetch skipped: missing API token"
+    provider.last_warnings = (warning,)
+    provider.last_skip_reason = "missing_api_key"
+    if provider.required:
+        raise ValueError("CryptoPanic live fetch requires RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN")
+    log.warning(warning)
+    return []
+
+
+def _no_valid_cryptopanic_currency_events(provider: "CryptoPanicProvider") -> list[RawDiscoveredEvent]:
+    provider.last_skip_reason = "no_valid_currencies"
+    provider.last_warnings = ("CryptoPanic live news fetch skipped: no valid currency tickers",)
+    for warning in provider.last_warnings:
+        log.warning(warning)
+    return []
+
+
+def _append_unique_cryptopanic_rows(
+    rows: list[Mapping[str, Any]],
+    items: Iterable[Mapping[str, Any]],
+    seen_ids: set[str],
+) -> int:
+    added = 0
+    for item in items:
+        key = str(item.get("cryptopanic_id") or item.get("id") or item.get("url") or "")
+        if key and key in seen_ids:
+            continue
+        if key:
+            seen_ids.add(key)
+        rows.append(item)
+        added += 1
+    return added
+
+
 class CryptoPanicProvider:
     name = "cryptopanic"
 
@@ -247,26 +296,10 @@ class CryptoPanicProvider:
 
     def _fetch_live_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
         observed = self.fetched_at or datetime.now(timezone.utc)
-        self.last_skip_reason = None
-        self.last_status_code = None
-        self.last_error_class = None
-        self.last_result_count = 0
-        self.requests_attempted = 0
-        self.request_cache_hits = 0
-        self.request_cache_misses = 0
-        self.requests_deduped = 0
-        self.invalid_currency_requests_skipped = 0
-        self.rejected_currency_candidates = ()
-        self._request_cache = {}
+        _reset_cryptopanic_live_fetch_state(self)
         token = self.api_token.strip()
         if not token:
-            warning = "CryptoPanic live news fetch skipped: missing API token"
-            self.last_warnings = (warning,)
-            self.last_skip_reason = "missing_api_key"
-            if self.required:
-                raise ValueError("CryptoPanic live fetch requires RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN")
-            log.warning(warning)
-            return []
+            return _missing_cryptopanic_token_events(self)
 
         rows: list[Mapping[str, Any]] = []
         warnings: list[str] = []
@@ -276,11 +309,7 @@ class CryptoPanicProvider:
         self.invalid_currency_requests_skipped = len(plan.rejected)
         self.rejected_currency_candidates = plan.rejected
         if not batches:
-            self.last_skip_reason = "no_valid_currencies"
-            self.last_warnings = ("CryptoPanic live news fetch skipped: no valid currency tickers",)
-            for warning in self.last_warnings:
-                log.warning(warning)
-            return []
+            return _no_valid_cryptopanic_currency_events(self)
 
         for currencies in batches:
             for page in range(self.page, self.page + self.max_pages_per_query):
@@ -299,13 +328,7 @@ class CryptoPanicProvider:
                     self.request_cache_hits += 1
                     self.requests_deduped += 1
                     self._request_cache[cache_key] = cached
-                    for item in cached:
-                        key = str(item.get("cryptopanic_id") or item.get("id") or item.get("url") or "")
-                        if key and key in seen_ids:
-                            continue
-                        if key:
-                            seen_ids.add(key)
-                        rows.append(item)
+                    _append_unique_cryptopanic_rows(rows, cached, seen_ids)
                     continue
                 self.request_cache_misses += 1
                 url = self._request_url(token, currencies=currencies, page=page)
@@ -340,13 +363,7 @@ class CryptoPanicProvider:
                         _PROCESS_REQUEST_CACHE[process_cache_key] = tuple(fetched)
                     result_count = len(fetched)
                     self.last_result_count += result_count
-                    for item in fetched:
-                        key = str(item.get("cryptopanic_id") or item.get("id") or item.get("url") or "")
-                        if key and key in seen_ids:
-                            continue
-                        if key:
-                            seen_ids.add(key)
-                        rows.append(item)
+                    _append_unique_cryptopanic_rows(rows, fetched, seen_ids)
                 except Exception as exc:  # noqa: BLE001
                     if status_code is None:
                         status_code = _status_code_from_exception(exc)

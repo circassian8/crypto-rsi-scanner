@@ -346,46 +346,31 @@ def run_no_send_rehearsal(
             error_message=error_message_safe,
         )
 
-    requests_used = len(_read_jsonl(ledger_path))
-    if official_result is None:
-        exchange_count = 0
-        event_count = 0
-        candidate_count = 0
-    else:
-        exchange_count = official_result.announcement_count
-        event_count = official_result.event_count
-        candidate_count = official_result.candidate_count
-    report = BybitAnnouncementsRehearsalReport(
-        provider=PROVIDER_HEALTH_KEY,
-        status=status,
-        configured=True,
-        allow_live_preflight=allow_live,
-        live_call_allowed=bool(allow_live and no_send_rehearsal and requests_used > 0),
-        no_send=bool(no_send_rehearsal),
-        research_only=True,
-        generated_at=observed.isoformat(),
-        request_ledger_path=event_artifact_paths.artifact_display_path(ledger_path),
-        preflight_json_path=event_artifact_paths.artifact_display_path(preflight_json),
-        preflight_report_path=event_artifact_paths.artifact_display_path(preflight_md),
-        rehearsal_json_path=event_artifact_paths.artifact_display_path(rehearsal_json),
-        rehearsal_report_path=event_artifact_paths.artifact_display_path(rehearsal_md),
-        exchange_announcements_path=event_artifact_paths.artifact_display_path(exchange_announcements_path),
-        official_exchange_events_path=event_artifact_paths.artifact_display_path(official_events_path),
-        official_listing_candidates_path=event_artifact_paths.artifact_display_path(candidates_path),
-        official_exchange_report_path=event_artifact_paths.artifact_display_path(official_report_path),
+    report = _build_bybit_rehearsal_report(
+        allow_live=allow_live,
+        no_send_rehearsal=no_send_rehearsal,
+        observed=observed,
+        paths={
+            "ledger": ledger_path,
+            "preflight_json": preflight_json,
+            "preflight_md": preflight_md,
+            "rehearsal_json": rehearsal_json,
+            "rehearsal_md": rehearsal_md,
+            "exchange_announcements": exchange_announcements_path,
+            "official_events": official_events_path,
+            "candidates": candidates_path,
+            "official_report": official_report_path,
+        },
         max_pages=max_pages,
         limit=limit,
-        requests_used=requests_used,
+        status=status,
         http_successes=http_successes,
-        announcements_inspected=len(items),
-        exchange_announcements_written=exchange_count,
-        official_events_written=event_count,
-        official_listing_candidates_written=candidate_count,
-        supported_params=SUPPORTED_PARAMS,
+        items=items,
+        official_result=official_result,
         provider_health_status=provider_health_status,
         error_class=error_class,
         error_message_safe=error_message_safe,
-        warnings=tuple(dict.fromkeys(warnings)),
+        warnings=warnings,
     )
     payload = schema_v1.stamp_artifact_payload(report.to_dict(), schema_id="provider_preflight_v1", path=rehearsal_json)
     rehearsal_json.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -411,6 +396,71 @@ def run_no_send_rehearsal(
     )
     event_official_exchange_activation.write_activation_artifacts(activation_report, base)
     return preflight, report, (preflight_json, preflight_md, rehearsal_json, rehearsal_md)
+
+
+def _build_bybit_rehearsal_report(
+    *,
+    allow_live: bool,
+    no_send_rehearsal: bool,
+    observed: datetime,
+    paths: Mapping[str, Path],
+    max_pages: int,
+    limit: int,
+    status: str,
+    http_successes: int,
+    items: tuple[Mapping[str, Any], ...],
+    official_result: event_official_exchange.OfficialExchangeScanResult | None,
+    provider_health_status: str,
+    error_class: str | None,
+    error_message_safe: str | None,
+    warnings: Iterable[str],
+) -> BybitAnnouncementsRehearsalReport:
+    exchange_count, event_count, candidate_count = _official_result_counts(official_result)
+    requests_used = len(_read_jsonl(paths["ledger"]))
+    return BybitAnnouncementsRehearsalReport(
+        provider=PROVIDER_HEALTH_KEY,
+        status=status,
+        configured=True,
+        allow_live_preflight=allow_live,
+        live_call_allowed=bool(allow_live and no_send_rehearsal and requests_used > 0),
+        no_send=bool(no_send_rehearsal),
+        research_only=True,
+        generated_at=observed.isoformat(),
+        request_ledger_path=event_artifact_paths.artifact_display_path(paths["ledger"]),
+        preflight_json_path=event_artifact_paths.artifact_display_path(paths["preflight_json"]),
+        preflight_report_path=event_artifact_paths.artifact_display_path(paths["preflight_md"]),
+        rehearsal_json_path=event_artifact_paths.artifact_display_path(paths["rehearsal_json"]),
+        rehearsal_report_path=event_artifact_paths.artifact_display_path(paths["rehearsal_md"]),
+        exchange_announcements_path=event_artifact_paths.artifact_display_path(paths["exchange_announcements"]),
+        official_exchange_events_path=event_artifact_paths.artifact_display_path(paths["official_events"]),
+        official_listing_candidates_path=event_artifact_paths.artifact_display_path(paths["candidates"]),
+        official_exchange_report_path=event_artifact_paths.artifact_display_path(paths["official_report"]),
+        max_pages=max_pages,
+        limit=limit,
+        requests_used=requests_used,
+        http_successes=http_successes,
+        announcements_inspected=len(items),
+        exchange_announcements_written=exchange_count,
+        official_events_written=event_count,
+        official_listing_candidates_written=candidate_count,
+        supported_params=SUPPORTED_PARAMS,
+        provider_health_status=provider_health_status,
+        error_class=error_class,
+        error_message_safe=error_message_safe,
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _official_result_counts(
+    official_result: event_official_exchange.OfficialExchangeScanResult | None,
+) -> tuple[int, int, int]:
+    if official_result is None:
+        return 0, 0, 0
+    return (
+        official_result.announcement_count,
+        official_result.event_count,
+        official_result.candidate_count,
+    )
 
 
 def format_preflight_report(report: BybitAnnouncementsPreflightReport) -> str:

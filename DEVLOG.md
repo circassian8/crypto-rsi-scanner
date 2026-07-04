@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Reduce provider and source-coverage function debt · Codex
+**Why:** The production and legacy file-size gates already pass, but the
+refactor goal still tracks advisory oversized-function debt. This pass removes
+four more provider/source-coverage command paths from the over-limit inventory
+without changing provider request contracts, report fields, no-send behavior,
+or artifact schemas.
+**Changes:**
+- Split `build_source_coverage_report()` in
+  `crypto_rsi_scanner/event_alpha/radar/source_coverage/builder.py` into
+  focused status, provider-status, pack, and report assembly helpers.
+- Split `CryptoPanicProvider._fetch_live_events()` in
+  `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` into reset,
+  missing-token, missing-currency, and unique-row append helpers while
+  preserving request hygiene and token redaction.
+- Split Bybit announcement no-send rehearsal report assembly in
+  `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py`.
+- Split the Coinalyze live rehearsal branch in
+  `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` into a
+  private result/helper pair while preserving no-call defaults and safe
+  side-effect counters.
+- Refreshed refactor size, class ownership, and final reports. Current
+  advisory inventory is `14` classes and `25` functions over limits, with
+  `production_files_over_1500_lines=0`, `legacy_files_over_1500_lines=0`, and
+  `new_violation_count=0`.
+**Verify:** Focused source-coverage tests passed (`35 passed`), focused
+CryptoPanic provider-readiness tests passed (`7 passed`), focused Bybit/official
+exchange provider-readiness tests passed (`3 passed`), focused Coinalyze
+notification and doctor tests passed (`4 passed` across the selected slices),
+compileall passed for touched modules, and the refactor size/class/final
+reports passed with `gate_status=pass`. Full safe verification for the committed
+tree included `python3 tests/test_indicators.py`,
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q`,
+`python3 -m compileall -q crypto_rsi_scanner tests`, the Event Alpha smoke and
+no-send/provider/report targets listed in the refactor prompt, `make
+backtest-costs PYTHON=python3`, and `make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No provider calls by default, live
+sends, trading, paper-trading behavior changes, execution/order logic, Event
+Alpha RSI writes, or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split notification readiness and audit render helpers · Codex
 **Why:** The refactor goal still has advisory oversized-function debt after
 the production and legacy file-size gates passed. This pass removes five more

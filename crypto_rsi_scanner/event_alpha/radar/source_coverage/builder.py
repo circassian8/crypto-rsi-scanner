@@ -20,6 +20,19 @@ from ...providers import source_packs as event_source_packs
 from ...providers import unlock_calendar_preflight as event_unlock_calendar_preflight
 from .models import *  # noqa: F403
 
+
+@dataclass(frozen=True)
+class _SourceCoverageStats:
+    cryptopanic: dict[str, Any]
+    coinalyze: dict[str, Any]
+    bybit: dict[str, Any]
+    unlock_calendar: dict[str, Any]
+    dex_onchain: dict[str, Any]
+    activation: dict[str, Any]
+    cryptopanic_effectively_healthy: bool
+    bybit_effectively_healthy: bool
+
+
 def build_source_coverage_report(
     *,
     provider_status_report: event_provider_status.EventDiscoveryProviderStatus,
@@ -41,114 +54,250 @@ def build_source_coverage_report(
     configured = _configured_providers(provider_status_report, health_by_provider)
     acquisition = [dict(row) for row in evidence_acquisition_rows if isinstance(row, Mapping)]
     core_rows = [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)]
-    cryptopanic_stats = _cryptopanic_stats(
+    stats = _source_coverage_stats(
+        artifact_namespace=artifact_namespace,
+        artifact_namespace_dir=artifact_namespace_dir,
         configured=configured,
         health_by_provider=raw_health_by_provider,
         acquisition_rows=acquisition,
+        cryptopanic_request_ledger_path=cryptopanic_request_ledger_path,
+        cryptopanic_weekly_limit=cryptopanic_weekly_limit,
+        cryptopanic_daily_soft_limit=cryptopanic_daily_soft_limit,
+        provider_health_rows=provider_health_rows or {},
+        now=observed,
+    )
+    provider_status_overrides = _source_coverage_provider_status_overrides(
+        stats=stats,
+        configured=configured,
+        health_by_provider=health_by_provider,
+    )
+    packs = _build_source_coverage_packs(
+        acquisition_rows=acquisition,
+        core_rows=core_rows,
+        configured=configured,
+        health_by_provider=health_by_provider,
+        provider_health_rows=provider_health_rows or {},
+        provider_status_overrides=provider_status_overrides,
+        cryptopanic_effectively_healthy=stats.cryptopanic_effectively_healthy,
+        now=observed,
+    )
+    return _source_coverage_report(
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        packs=packs,
+        provider_health_rows=provider_health_rows or {},
+        acquisition_rows=acquisition,
+        core_rows=core_rows,
+        stats=stats,
+    )
+
+
+def _source_coverage_stats(
+    *,
+    artifact_namespace: str,
+    artifact_namespace_dir: str | Path | None,
+    configured: set[str],
+    health_by_provider: Mapping[str, str],
+    acquisition_rows: Iterable[Mapping[str, Any]],
+    cryptopanic_request_ledger_path: str | Path | None,
+    cryptopanic_weekly_limit: int,
+    cryptopanic_daily_soft_limit: int,
+    provider_health_rows: Mapping[str, Mapping[str, Any]],
+    now: datetime,
+) -> _SourceCoverageStats:
+    cryptopanic = _cryptopanic_stats(
+        configured=configured,
+        health_by_provider=health_by_provider,
+        acquisition_rows=acquisition_rows,
         request_ledger_path=cryptopanic_request_ledger_path,
         weekly_limit=cryptopanic_weekly_limit,
         daily_soft_limit=cryptopanic_daily_soft_limit,
-        now=observed,
-        raw_backoff_present=_raw_provider_backoff_present(provider_health_rows or {}, "cryptopanic"),
+        now=now,
+        raw_backoff_present=_raw_provider_backoff_present(provider_health_rows, "cryptopanic"),
     )
-    coinalyze_stats = _coinalyze_artifact_stats(
+    coinalyze = _coinalyze_artifact_stats(
         artifact_namespace_dir=artifact_namespace_dir,
         artifact_namespace=artifact_namespace,
-        health_by_provider=raw_health_by_provider,
+        health_by_provider=health_by_provider,
     )
-    bybit_stats = _bybit_announcements_artifact_stats(
+    bybit = _bybit_announcements_artifact_stats(
         artifact_namespace_dir=artifact_namespace_dir,
         artifact_namespace=artifact_namespace,
-        health_by_provider=raw_health_by_provider,
+        health_by_provider=health_by_provider,
     )
-    unlock_calendar_stats = _unlock_calendar_artifact_stats(
-        artifact_namespace_dir=artifact_namespace_dir,
-        artifact_namespace=artifact_namespace,
-    )
-    dex_onchain_stats = _dex_onchain_artifact_stats(
+    unlock_calendar = _unlock_calendar_artifact_stats(
         artifact_namespace_dir=artifact_namespace_dir,
         artifact_namespace=artifact_namespace,
     )
-    activation_stats = event_official_exchange_activation.activation_artifact_stats(
+    dex_onchain = _dex_onchain_artifact_stats(
+        artifact_namespace_dir=artifact_namespace_dir,
+        artifact_namespace=artifact_namespace,
+    )
+    activation = event_official_exchange_activation.activation_artifact_stats(
         artifact_namespace_dir if artifact_namespace_dir is not None else _namespace_dir(artifact_namespace)
     )
-    cryptopanic_effectively_healthy = cryptopanic_stats["coverage_status"] in {
-        "observed_healthy",
-        "observed_partial_success",
-    }
-    bybit_effectively_healthy = bybit_stats["provider_health_status"] in {
-        "observed_healthy",
-        "observed_no_results",
-        "observed_partial_success",
-    }
-    provider_status_overrides: dict[str, str] = {}
-    if cryptopanic_stats["successful_requests"] or cryptopanic_effectively_healthy:
-        provider_status_overrides["cryptopanic"] = (
-            "degraded" if cryptopanic_stats["failed_requests"] else "healthy"
-        )
-        health_by_provider["cryptopanic"] = provider_status_overrides["cryptopanic"]
-    if bybit_effectively_healthy:
-        provider_status_overrides["bybit_announcements_public"] = "healthy"
+    return _SourceCoverageStats(
+        cryptopanic=cryptopanic,
+        coinalyze=coinalyze,
+        bybit=bybit,
+        unlock_calendar=unlock_calendar,
+        dex_onchain=dex_onchain,
+        activation=activation,
+        cryptopanic_effectively_healthy=cryptopanic["coverage_status"] in {
+            "observed_healthy",
+            "observed_partial_success",
+        },
+        bybit_effectively_healthy=bybit["provider_health_status"] in {
+            "observed_healthy",
+            "observed_no_results",
+            "observed_partial_success",
+        },
+    )
+
+
+def _source_coverage_provider_status_overrides(
+    *,
+    stats: _SourceCoverageStats,
+    configured: set[str],
+    health_by_provider: dict[str, str],
+) -> dict[str, str]:
+    overrides: dict[str, str] = {}
+    if stats.cryptopanic["successful_requests"] or stats.cryptopanic_effectively_healthy:
+        overrides["cryptopanic"] = "degraded" if stats.cryptopanic["failed_requests"] else "healthy"
+        health_by_provider["cryptopanic"] = overrides["cryptopanic"]
+    if stats.bybit_effectively_healthy:
+        overrides["bybit_announcements_public"] = "healthy"
         health_by_provider["bybit_announcements_public"] = "healthy"
         configured.add("bybit_announcements_public")
-    for activation_row in activation_stats["rows"]:
-        provider = str(activation_row.get("provider") or "")
+    _apply_activation_provider_status(stats.activation["rows"], configured, health_by_provider, overrides)
+    _add_fixture_ready_providers(stats.unlock_calendar["provider_rows"], configured)
+    _add_fixture_ready_providers(stats.dex_onchain["provider_rows"], configured)
+    return overrides
+
+
+def _apply_activation_provider_status(
+    rows: Iterable[Mapping[str, Any]],
+    configured: set[str],
+    health_by_provider: dict[str, str],
+    overrides: dict[str, str],
+) -> None:
+    for row in rows:
+        provider = str(row.get("provider") or "")
         if not provider:
             continue
-        if bool(activation_row.get("configured")):
+        if bool(row.get("configured")):
             configured.add(provider)
-        if event_official_exchange_activation.row_is_healthy(activation_row):
-            provider_status_overrides[provider] = "healthy"
+        if event_official_exchange_activation.row_is_healthy(row):
+            overrides[provider] = "healthy"
             health_by_provider[provider] = "healthy"
             configured.add(provider)
-    for unlock_row in unlock_calendar_stats["provider_rows"]:
-        provider = str(unlock_row.get("provider") or "")
+
+
+def _add_fixture_ready_providers(rows: Iterable[Mapping[str, Any]], configured: set[str]) -> None:
+    for row in rows:
+        provider = str(row.get("provider") or "")
         if not provider:
             continue
-        if bool(unlock_row.get("configured")) or str(unlock_row.get("fixture_parser_status") or "") == "pass":
-            configured.add(provider)
-    for dex_row in dex_onchain_stats["provider_rows"]:
-        provider = str(dex_row.get("provider") or "")
-        if not provider:
-            continue
-        if bool(dex_row.get("configured")) or str(dex_row.get("fixture_parser_status") or "") == "pass":
+        fixture_ready = str(row.get("fixture_parser_status") or "") == "pass"
+        if bool(row.get("configured")) or fixture_ready:
             configured.add(provider)
 
-    packs: list[EventAlphaSourceCoveragePack] = []
-    for pack_name in SOURCE_COVERAGE_PACK_ORDER:
-        pack = event_source_packs.get_source_pack(pack_name)
-        preferred = tuple(dict.fromkeys(pack.preferred_providers))
-        configured_for_pack = tuple(provider for provider in preferred if provider in configured or provider in health_by_provider)
-        missing = tuple(provider for provider in preferred if provider not in configured_for_pack)
-        healthy = tuple(
-            provider for provider in configured_for_pack
-            if _provider_effective_status(provider, health_by_provider) == "healthy"
+
+def _build_source_coverage_packs(
+    *,
+    acquisition_rows: list[dict[str, Any]],
+    core_rows: list[dict[str, Any]],
+    configured: set[str],
+    health_by_provider: Mapping[str, str],
+    provider_health_rows: Mapping[str, Mapping[str, Any]],
+    provider_status_overrides: Mapping[str, str],
+    cryptopanic_effectively_healthy: bool,
+    now: datetime,
+) -> tuple[EventAlphaSourceCoveragePack, ...]:
+    return tuple(
+        _build_source_coverage_pack(
+            pack_name,
+            acquisition_rows=acquisition_rows,
+            core_rows=core_rows,
+            configured=configured,
+            health_by_provider=health_by_provider,
+            provider_health_rows=provider_health_rows,
+            provider_status_overrides=provider_status_overrides,
+            cryptopanic_effectively_healthy=cryptopanic_effectively_healthy,
+            now=now,
         )
-        unknown = tuple(
-            provider for provider in configured_for_pack
-            if _provider_effective_status(provider, health_by_provider) in {"unknown", "not_observed"}
-        )
-        degraded = tuple(
-            provider for provider in configured_for_pack
-            if _provider_effective_status(provider, health_by_provider) in {"degraded", "backoff", "unavailable"}
-        )
-        pack_rows = [row for row in acquisition if str(row.get("source_pack") or "") == pack_name]
-        accepted = sum(_accepted_count(row) for row in pack_rows)
-        rejected_only = sum(1 for row in pack_rows if _status(row) == "rejected_results_only")
-        skipped_budget = sum(1 for row in pack_rows if _status(row) == "skipped_budget")
-        unavailable = sum(1 for row in pack_rows if _status(row) in {"provider_unavailable", "provider_backoff", "failed_soft", "skipped_config"})
-        article_quality_counts = _article_quality_counts(pack_rows)
-        blocked = _coverage_blocked_count(pack_name, pack_rows=pack_rows, core_rows=core_rows)
-        absence_meaningful = _evidence_absence_meaningful(pack_name, healthy, degraded)
-        coverage_status = _pack_coverage_status(
-            configured_for_pack=configured_for_pack,
-            missing=missing,
-            healthy=healthy,
+        for pack_name in SOURCE_COVERAGE_PACK_ORDER
+    )
+
+
+def _build_source_coverage_pack(
+    pack_name: str,
+    *,
+    acquisition_rows: list[dict[str, Any]],
+    core_rows: list[dict[str, Any]],
+    configured: set[str],
+    health_by_provider: Mapping[str, str],
+    provider_health_rows: Mapping[str, Mapping[str, Any]],
+    provider_status_overrides: Mapping[str, str],
+    cryptopanic_effectively_healthy: bool,
+    now: datetime,
+) -> EventAlphaSourceCoveragePack:
+    pack = event_source_packs.get_source_pack(pack_name)
+    preferred = tuple(dict.fromkeys(pack.preferred_providers))
+    configured_for_pack = tuple(
+        provider for provider in preferred if provider in configured or provider in health_by_provider
+    )
+    missing = tuple(provider for provider in preferred if provider not in configured_for_pack)
+    healthy = tuple(
+        provider
+        for provider in configured_for_pack
+        if _provider_effective_status(provider, health_by_provider) == "healthy"
+    )
+    unknown = tuple(
+        provider
+        for provider in configured_for_pack
+        if _provider_effective_status(provider, health_by_provider) in {"unknown", "not_observed"}
+    )
+    degraded = tuple(
+        provider
+        for provider in configured_for_pack
+        if _provider_effective_status(provider, health_by_provider) in {"degraded", "backoff", "unavailable"}
+    )
+    pack_rows = [row for row in acquisition_rows if str(row.get("source_pack") or "") == pack_name]
+    accepted = sum(_accepted_count(row) for row in pack_rows)
+    rejected_only = sum(1 for row in pack_rows if _status(row) == "rejected_results_only")
+    skipped_budget = sum(1 for row in pack_rows if _status(row) == "skipped_budget")
+    unavailable = sum(
+        1
+        for row in pack_rows
+        if _status(row) in {"provider_unavailable", "provider_backoff", "failed_soft", "skipped_config"}
+    )
+    blocked = _coverage_blocked_count(pack_name, pack_rows=pack_rows, core_rows=core_rows)
+    coverage_status = _pack_coverage_status(
+        configured_for_pack=configured_for_pack,
+        missing=missing,
+        healthy=healthy,
+        unknown=unknown,
+        degraded=degraded,
+        provider_unavailable_count=unavailable,
+    )
+    return EventAlphaSourceCoveragePack(
+        source_pack=pack_name,
+        configured_providers=_sorted_tuple(configured_for_pack),
+        missing_providers=_sorted_tuple(missing),
+        healthy_providers=_sorted_tuple(healthy),
+        unknown_or_unobserved_providers=_sorted_tuple(unknown),
+        degraded_or_backoff_providers=_sorted_tuple(degraded),
+        provider_coverage_status=coverage_status,
+        provider_role_statuses=_provider_role_statuses_for_pack(
+            provider_health_rows,
+            preferred=preferred,
             unknown=unknown,
-            degraded=degraded,
-            provider_unavailable_count=unavailable,
-        )
-        coverage_gap_reason = _coverage_gap_reason(
+            now=now,
+            effective_status_overrides=provider_status_overrides,
+        ),
+        evidence_absence_meaningful=_evidence_absence_meaningful(pack_name, healthy, degraded),
+        coverage_gap_reason=_coverage_gap_reason(
             coverage_status=coverage_status,
             missing=missing,
             unknown=unknown,
@@ -157,15 +306,16 @@ def build_source_coverage_report(
             skipped_budget=skipped_budget,
             rejected_only=rejected_only,
             provider_unavailable=unavailable,
-        )
-        role_statuses = _provider_role_statuses_for_pack(
-            provider_health_rows or {},
-            preferred=preferred,
-            unknown=unknown,
-            now=observed,
-            effective_status_overrides=provider_status_overrides,
-        )
-        recommended_actions = _pack_recommended_actions(
+        ),
+        providers_missing_for_confirmation=_sorted_tuple(missing),
+        providers_degraded_for_confirmation=_sorted_tuple(degraded),
+        candidates_blocked_by_coverage_gap=blocked,
+        accepted_evidence_count=accepted,
+        rejected_only_count=rejected_only,
+        skipped_budget_count=skipped_budget,
+        provider_unavailable_count=unavailable,
+        article_quality_counts=_article_quality_counts(pack_rows),
+        recommended_actions=_pack_recommended_actions(
             pack_name,
             missing=missing,
             degraded=degraded,
@@ -174,36 +324,32 @@ def build_source_coverage_report(
             rejected_only=rejected_only,
             provider_unavailable=unavailable,
             satisfied_providers={"cryptopanic"} if cryptopanic_effectively_healthy else (),
-        )
-        packs.append(
-            EventAlphaSourceCoveragePack(
-                source_pack=pack_name,
-                configured_providers=_sorted_tuple(configured_for_pack),
-                missing_providers=_sorted_tuple(missing),
-                healthy_providers=_sorted_tuple(healthy),
-                unknown_or_unobserved_providers=_sorted_tuple(unknown),
-                degraded_or_backoff_providers=_sorted_tuple(degraded),
-                provider_coverage_status=coverage_status,
-                provider_role_statuses=role_statuses,
-                evidence_absence_meaningful=absence_meaningful,
-                coverage_gap_reason=coverage_gap_reason,
-                providers_missing_for_confirmation=_sorted_tuple(missing),
-                providers_degraded_for_confirmation=_sorted_tuple(degraded),
-                candidates_blocked_by_coverage_gap=blocked,
-                accepted_evidence_count=accepted,
-                rejected_only_count=rejected_only,
-                skipped_budget_count=skipped_budget,
-                provider_unavailable_count=unavailable,
-                article_quality_counts=article_quality_counts,
-                recommended_actions=recommended_actions,
-            )
-        )
+        ),
+    )
+
+
+def _source_coverage_report(
+    *,
+    profile: str,
+    artifact_namespace: str,
+    packs: tuple[EventAlphaSourceCoveragePack, ...],
+    provider_health_rows: Mapping[str, Mapping[str, Any]],
+    acquisition_rows: list[dict[str, Any]],
+    core_rows: list[dict[str, Any]],
+    stats: _SourceCoverageStats,
+) -> EventAlphaSourceCoverageReport:
+    cryptopanic_stats = stats.cryptopanic
+    coinalyze_stats = stats.coinalyze
+    bybit_stats = stats.bybit
+    unlock_calendar_stats = stats.unlock_calendar
+    dex_onchain_stats = stats.dex_onchain
+    activation_stats = stats.activation
     return EventAlphaSourceCoverageReport(
         profile=profile,
         artifact_namespace=artifact_namespace,
-        packs=tuple(packs),
+        packs=packs,
         provider_health_rows=len(provider_health_rows or {}),
-        acquisition_rows=len(acquisition),
+        acquisition_rows=len(acquisition_rows),
         core_rows=len(core_rows),
         cryptopanic_configured=cryptopanic_stats["configured"],
         cryptopanic_health_status=cryptopanic_stats["health_status"],
