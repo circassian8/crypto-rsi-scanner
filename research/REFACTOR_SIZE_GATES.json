@@ -40,15 +40,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py"
     },
     {
-      "class_name": "EventImpactHypothesis",
-      "exception_reason": null,
-      "line_count": 191,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.models",
-      "public": true,
-      "qualname": "EventImpactHypothesis",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/models.py"
-    },
-    {
       "class_name": "EventIntegratedRadarResult",
       "exception_reason": null,
       "line_count": 88,
@@ -193,8 +184,8 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 21,
-  "existing_violation_count": 159,
+  "classes_over_limit_count": 20,
+  "existing_violation_count": 158,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -315,18 +306,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py",
       "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:EventProviderCatalystSearchProvider"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "EventImpactHypothesis",
-      "exception_reason": null,
-      "line_count": 191,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.models",
-      "public": true,
-      "qualname": "EventImpactHypothesis",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/models.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/models.py:EventImpactHypothesis"
     },
     {
       "category": "class_over_75_lines",
@@ -2147,7 +2126,7 @@
   ],
   "functions_over_limit_count": 48,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T04:01:05.461165+00:00",
+  "generated_at": "2026-07-04T04:09:14.292098+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -3112,10 +3091,6 @@
       "current_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:FixtureCatalystSearchProvider"
     },
     {
-      "baseline_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:EventImpactHypothesis",
-      "current_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/models.py:EventImpactHypothesis"
-    },
-    {
       "baseline_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:EventIntegratedRadarResult",
       "current_violation_id": "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py:EventIntegratedRadarResult"
     },
@@ -3304,7 +3279,7 @@
       "current_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.models"
     }
   ],
-  "moved_existing_violation_count": 50,
+  "moved_existing_violation_count": 49,
   "new_violation_count": 0,
   "new_violations": [],
   "no_live_provider_calls": true,
@@ -3318,7 +3293,7 @@
     "production_file_over_3000_lines": "blocker",
     "test_file_size_debt": "tracked separately from production completion"
   },
-  "production_classes_over_limit": 21,
+  "production_classes_over_limit": 20,
   "production_classes_over_limit_rows": [
     {
       "class_name": "CoinGeckoClient",
@@ -3355,15 +3330,6 @@
       "public": true,
       "qualname": "EventProviderCatalystSearchProvider",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py"
-    },
-    {
-      "class_name": "EventImpactHypothesis",
-      "exception_reason": null,
-      "line_count": 191,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.models",
-      "public": true,
-      "qualname": "EventImpactHypothesis",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/models.py"
     },
     {
       "class_name": "EventIntegratedRadarResult",
@@ -3902,7 +3868,7 @@
   ],
   "production_size_gate_status": "pass",
   "research_only": true,
-  "resolved_violation_count": 45,
+  "resolved_violation_count": 46,
   "resolved_violation_ids": [
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
     "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
@@ -3913,6 +3879,7 @@
     "class:crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py:LiveProviderReadinessProvider",
     "class:crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py:HealthCheckedEventProvider",
     "class:crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py:EvidenceAcquisitionResult",
+    "class:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:EventImpactHypothesis",
     "class:crypto_rsi_scanner/event_alpha/radar/llm/budget.py:EventLLMBudgetRunTracker",
     "file:crypto_rsi_scanner/backtest_parts/legacy.py",
     "file:crypto_rsi_scanner/cli/services/event_alpha_notifications.py",
@@ -3960,7 +3927,6 @@
     "class:crypto_rsi_scanner/event_alpha/radar/asset_registry.py:CanonicalAsset",
     "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:EventProviderCatalystSearchProvider",
     "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:FixtureCatalystSearchProvider",
-    "class:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/models.py:EventImpactHypothesis",
     "class:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py:EventIntegratedRadarResult",
     "class:crypto_rsi_scanner/event_alpha/radar/pipeline.py:EventAlphaPipelineResult",
     "class:crypto_rsi_scanner/event_alpha/radar/source_coverage/models.py:EventAlphaSourceCoverageReport",
@@ -4236,18 +4202,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py",
       "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py:EventProviderCatalystSearchProvider"
-    },
-    {
-      "category": "class_over_75_lines",
-      "class_name": "EventImpactHypothesis",
-      "exception_reason": null,
-      "line_count": 191,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.models",
-      "public": true,
-      "qualname": "EventImpactHypothesis",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/models.py",
-      "violation_id": "class:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/models.py:EventImpactHypothesis"
     },
     {
       "category": "class_over_75_lines",

@@ -1,5 +1,5 @@
 {
-  "class_count": 431,
+  "class_count": 438,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
@@ -37,15 +37,6 @@
       "public": true,
       "qualname": "EventProviderCatalystSearchProvider",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py"
-    },
-    {
-      "class_name": "EventImpactHypothesis",
-      "exception_reason": null,
-      "line_count": 191,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.models",
-      "public": true,
-      "qualname": "EventImpactHypothesis",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/models.py"
     },
     {
       "class_name": "EventIntegratedRadarResult",
@@ -192,7 +183,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 21,
+  "classes_over_limit_count": 20,
   "exceptions": [
     {
       "module": "crypto_rsi_scanner.event_core.models",
@@ -594,7 +585,7 @@
     }
   ],
   "functions_over_limit_count": 48,
-  "generated_at": "2026-07-04T04:01:06.462312+00:00",
+  "generated_at": "2026-07-04T04:09:15.296545+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1152,7 +1143,7 @@
     "multiple_public_classes": "allowed for small value objects/enums in documented models modules",
     "public_class_over_75_lines": "should live in its own module unless documented here"
   },
-  "production_classes_over_limit": 21,
+  "production_classes_over_limit": 20,
   "production_classes_over_limit_rows": [
     {
       "class_name": "CoinGeckoClient",
@@ -1189,15 +1180,6 @@
       "public": true,
       "qualname": "EventProviderCatalystSearchProvider",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/catalyst_search/providers.py"
-    },
-    {
-      "class_name": "EventImpactHypothesis",
-      "exception_reason": null,
-      "line_count": 191,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.models",
-      "public": true,
-      "qualname": "EventImpactHypothesis",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/models.py"
     },
     {
       "class_name": "EventIntegratedRadarResult",

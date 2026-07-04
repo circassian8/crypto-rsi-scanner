@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split impact hypothesis field ownership · Codex
+**Why:** The refactor objective still tracks field-heavy Event Alpha models as
+advisory ownership debt after production file-size gates passed. This pass
+reduces another oversized class without changing hypothesis construction,
+serialization, routing, opportunity scoring, or artifact schemas.
+**Changes:**
+- Split `EventImpactHypothesis` in
+  `crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/models.py` into
+  focused private dataclass field groups for identity, validation/scoring,
+  market context, incident linkage, catalyst-frame metadata, role/verdict
+  fields, and refresh telemetry.
+- Kept the public `EventImpactHypothesis` name as a compatibility aggregate with
+  the same field order, defaults, and attributes.
+- Refreshed refactor size, class ownership, final, completion-map, and release
+  candidate reports. Current advisory inventory is `20` classes and `48`
+  functions over limits, with `production_files_over_1500_lines=0`,
+  `production_files_over_2000_lines=0`, `legacy_files_over_1500_lines=0`, and
+  `new_violation_count=0`.
+**Verify:** Impact-hypothesis focused Event Alpha tests passed
+(`431 passed`), compileall passed for the touched package/test modules, and the
+refactor report targets passed with `gate_status=pass` and the completion map
+still `accepted`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Remaining advisory debt is concentrated in large
+notification, daily-brief, doctor-context, provider/model, and
+rendering/serialization functions plus 20 oversized classes.
+
 ## 2026-07-04 — Split artifact doctor result field ownership · Codex
 **Why:** The production-size gates pass, but the refactor objective still tracks
 field-heavy classes and large functions as advisory ownership debt. This pass

@@ -69,7 +69,7 @@ class ImpactPathReason(str, Enum):
 
 
 @dataclass(frozen=True)
-class EventImpactHypothesis:
+class _ImpactHypothesisIdentityFields:
     hypothesis_id: str
     event_cluster_id: str | None
     event_type: str
@@ -84,6 +84,10 @@ class EventImpactHypothesis:
     crypto_candidate_assets: tuple[dict[str, Any], ...] = ()
     rejected_candidate_assets: tuple[dict[str, Any], ...] = ()
     candidate_source: str = "taxonomy"
+
+
+@dataclass(frozen=True)
+class _ImpactHypothesisValidationFields:
     hypothesis_scope: str = HypothesisScope.SECTOR.value
     direction_hint: str = "unknown"
     playbook_hint: str | None = None
@@ -116,6 +120,10 @@ class EventImpactHypothesis:
     why_digest_ineligible: str | None = None
     opportunity_score_v2: float | None = None
     opportunity_score_components: Mapping[str, float] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class _ImpactHypothesisMarketFields:
     evidence_quality_score: float | None = None
     source_class: str | None = None
     evidence_specificity: str | None = None
@@ -150,6 +158,10 @@ class EventImpactHypothesis:
     market_context_snapshot: Mapping[str, Any] = field(default_factory=dict)
     market_reaction_confirmed: bool | None = None
     causal_mechanism_confirmed: bool | None = None
+
+
+@dataclass(frozen=True)
+class _ImpactHypothesisIncidentFields:
     incident_confidence: float | None = None
     incident_id: str | None = None
     incident_canonical_name: str | None = None
@@ -176,6 +188,10 @@ class EventImpactHypothesis:
     cause_status: str | None = None
     claim_polarities: tuple[str, ...] = ()
     claim_history: tuple[dict[str, Any], ...] = ()
+
+
+@dataclass(frozen=True)
+class _ImpactHypothesisFrameFields:
     main_catalyst_frame_id: str | None = None
     main_frame_type: str | None = None
     main_frame_role: str | None = None
@@ -207,6 +223,10 @@ class EventImpactHypothesis:
     supporting_hypothesis_ids: tuple[str, ...] = ()
     supporting_evidence_quotes: tuple[str, ...] = ()
     supporting_hypothesis_count: int = 1
+
+
+@dataclass(frozen=True)
+class _ImpactHypothesisRoleVerdictFields:
     asset_role_source: str | None = None
     asset_kind: str | None = None
     role_source: str | None = None
@@ -227,6 +247,10 @@ class EventImpactHypothesis:
     why_not_watchlist: str | None = None
     upgrade_requirements: tuple[str, ...] = ()
     downgrade_warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class _ImpactHypothesisRefreshFields:
     market_refresh_attempted: bool | None = None
     market_refresh_success: bool | None = None
     market_refresh_provider: str | None = None
@@ -260,3 +284,16 @@ class EventImpactHypothesis:
     upgrade_reason: str | None = None
     no_upgrade_reason: str | None = None
     created_at: str | None = None
+
+
+@dataclass(frozen=True)
+class EventImpactHypothesis(
+    _ImpactHypothesisRefreshFields,
+    _ImpactHypothesisRoleVerdictFields,
+    _ImpactHypothesisFrameFields,
+    _ImpactHypothesisIncidentFields,
+    _ImpactHypothesisMarketFields,
+    _ImpactHypothesisValidationFields,
+    _ImpactHypothesisIdentityFields,
+):
+    """Compatibility aggregate for Event Alpha impact-hypothesis fields."""
