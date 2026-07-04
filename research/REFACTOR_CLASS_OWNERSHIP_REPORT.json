@@ -1,5 +1,5 @@
 {
-  "class_count": 473,
+  "class_count": 475,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
@@ -142,7 +142,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5496,
+  "function_count": 5510,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -178,14 +178,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py"
     },
     {
-      "function_name": "evaluate_market_confirmation",
-      "line_count": 281,
-      "module": "crypto_rsi_scanner.event_alpha.radar.market_confirmation",
-      "public": true,
-      "qualname": "evaluate_market_confirmation",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/market_confirmation.py"
-    },
-    {
       "function_name": "_refresh_one_hypothesis",
       "line_count": 276,
       "module": "crypto_rsi_scanner.event_alpha.radar.near_miss.refresh",
@@ -218,8 +210,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     }
   ],
-  "functions_over_limit_count": 9,
-  "generated_at": "2026-07-04T08:22:57.765160+00:00",
+  "functions_over_limit_count": 8,
+  "generated_at": "2026-07-04T08:34:31.506304+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -897,7 +889,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 9,
+  "production_functions_over_limit": 8,
   "production_functions_over_limit_rows": [
     {
       "function_name": "diagnose_artifacts",
@@ -930,14 +922,6 @@
       "public": false,
       "qualname": "_merge_family",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py"
-    },
-    {
-      "function_name": "evaluate_market_confirmation",
-      "line_count": 281,
-      "module": "crypto_rsi_scanner.event_alpha.radar.market_confirmation",
-      "public": true,
-      "qualname": "evaluate_market_confirmation",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/market_confirmation.py"
     },
     {
       "function_name": "_refresh_one_hypothesis",

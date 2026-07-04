@@ -108,6 +108,37 @@ class EventMarketConfirmationResult:
     protocol_metrics_freshness_status: str = "missing"
 
 
+@dataclass(frozen=True)
+class _MarketConfirmationContext:
+    data: EventMarketConfirmationInput
+    market: Mapping[str, Any]
+    derivatives: Mapping[str, Any]
+    dex: Mapping[str, Any]
+    protocol: Mapping[str, Any]
+    supply: Mapping[str, Any]
+    btc: Mapping[str, Any]
+    sector: Mapping[str, Any]
+    playbook: str
+    freshness: Mapping[str, Any]
+    derivatives_freshness: Mapping[str, Any]
+    dex_freshness: Mapping[str, Any]
+    protocol_freshness: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class _SupplementalConfirmation:
+    derivative_components: dict[str, float]
+    derivative_reasons: list[str]
+    derivative_score: float
+    dex_components: dict[str, float]
+    dex_reasons: list[str]
+    dex_score: float
+    dex_illiquid: bool
+    protocol_components: dict[str, float]
+    protocol_reasons: list[str]
+    protocol_score: float
+
+
 def evaluate_market_confirmation(
     data: EventMarketConfirmationInput | Mapping[str, Any] | None,
 ) -> EventMarketConfirmationResult:
@@ -115,55 +146,122 @@ def evaluate_market_confirmation(
     if data is None:
         return _insufficient(("market_snapshot", "market_anomaly_row"))
     if isinstance(data, Mapping):
-        data = EventMarketConfirmationInput(
-            market_snapshot=_mapping(data.get("market") or data.get("market_snapshot") or data),
-            market_anomaly_row=_mapping(data.get("anomaly") or data.get("market_anomaly")),
-            watchlist_market_row=_mapping(data.get("watchlist_market") or data.get("watchlist_market_row")),
-            derivatives_snapshot=_mapping(data.get("derivatives") or data.get("derivatives_snapshot")),
-            dex_liquidity_snapshot=_mapping(data.get("dex_liquidity") or data.get("dex_liquidity_snapshot") or data.get("dex")),
-            protocol_metrics_snapshot=_mapping(
-                data.get("protocol_metrics")
-                or data.get("protocol_metrics_snapshot")
-                or data.get("defillama")
-                or data.get("protocol")
-            ),
-            supply_snapshot=_mapping(data.get("supply")),
-            btc_context=_mapping(data.get("btc_context")),
-            sector_benchmark=_mapping(data.get("sector_benchmark")),
-            playbook_type=str(data.get("playbook_type") or data.get("playbook") or ""),
-            impact_category=str(data.get("impact_category") or ""),
-            now=data.get("now"),
-            market_context_observed_at=data.get("market_context_observed_at") or data.get("market_context_timestamp"),
-            market_context_source=str(data.get("market_context_source") or "") or None,
-            market_context_max_age_hours=_float(data.get("market_context_max_age_hours"))
-            or config.EVENT_MARKET_CONTEXT_MAX_AGE_HOURS,
-            allow_stale_fixture_market_context=bool(
-                data.get("allow_stale_fixture_market_context")
-                if data.get("allow_stale_fixture_market_context") is not None
-                else config.EVENT_MARKET_CONTEXT_ALLOW_STALE_FIXTURE
-            ),
-            stale_cap_level=str(data.get("stale_cap_level") or "") or None,
-        )
-
-    market = _merge_mappings(data.market_snapshot, data.market_anomaly_row, data.watchlist_market_row)
-    derivatives = _mapping(data.derivatives_snapshot)
-    dex = _mapping(data.dex_liquidity_snapshot)
-    protocol = _mapping(data.protocol_metrics_snapshot)
-    supply = _mapping(data.supply_snapshot)
-    btc = _mapping(data.btc_context)
-    sector = _mapping(data.sector_benchmark)
-    playbook = str(data.playbook_type or data.impact_category or "").casefold()
-    freshness = _market_context_freshness(data, market)
-    derivatives_freshness = _snapshot_freshness(data, derivatives, family="derivatives")
-    dex_freshness = _snapshot_freshness(data, dex, family="dex")
-    protocol_freshness = _snapshot_freshness(data, protocol, family="protocol")
+        data = _input_from_mapping(data)
+    context = _market_confirmation_context(data)
 
     components: dict[str, float] = {}
     reasons: list[str] = []
     warnings: list[str] = []
     missing: list[str] = []
-    observed_fields = 0
+    observed_fields = _apply_primary_market_components(context, components, reasons, missing)
+    supplemental, supplemental_observed = _apply_supplemental_market_components(
+        context,
+        components,
+        reasons,
+        warnings,
+        missing,
+    )
+    observed_fields += supplemental_observed
+    observed_fields += _apply_market_anomaly_score(context.market, components)
 
+    raw_score = sum(components.values())
+    if _market_anomaly_without_catalyst(context.playbook, data):
+        raw_score = min(raw_score, 35.0)
+        warnings.append("market_anomaly_without_confirmed_catalyst")
+
+    raw_score = _apply_playbook_score_adjustments(raw_score, context, supplemental, reasons, warnings, missing)
+
+    score = max(0.0, min(100.0, raw_score))
+    if observed_fields == 0:
+        return _insufficient_with_freshness(
+            tuple(dict.fromkeys(missing or ("market_snapshot", "derivatives_snapshot"))),
+            context.freshness,
+        )
+    if not reasons:
+        reasons.append(MarketConfirmationReason.NO_MARKET_REACTION.value)
+    data_quality = min(100.0, observed_fields * 16.0)
+    if score > 50 and data_quality < 35:
+        score = min(score, 50.0)
+        warnings.append("market_confirmation_capped_by_sparse_data")
+    score = _apply_market_freshness_cap(score, data, context.freshness, reasons, warnings, missing)
+    level = _level(score)
+    summary = _summary(level, score, reasons)
+    return _market_confirmation_result(
+        score=score,
+        level=level,
+        reasons=reasons,
+        warnings=warnings,
+        data_quality=data_quality,
+        missing=missing,
+        summary=summary,
+        components=components,
+        context=context,
+        supplemental=supplemental,
+    )
+
+
+def _input_from_mapping(data: Mapping[str, Any]) -> EventMarketConfirmationInput:
+    return EventMarketConfirmationInput(
+        market_snapshot=_mapping(data.get("market") or data.get("market_snapshot") or data),
+        market_anomaly_row=_mapping(data.get("anomaly") or data.get("market_anomaly")),
+        watchlist_market_row=_mapping(data.get("watchlist_market") or data.get("watchlist_market_row")),
+        derivatives_snapshot=_mapping(data.get("derivatives") or data.get("derivatives_snapshot")),
+        dex_liquidity_snapshot=_mapping(data.get("dex_liquidity") or data.get("dex_liquidity_snapshot") or data.get("dex")),
+        protocol_metrics_snapshot=_mapping(
+            data.get("protocol_metrics")
+            or data.get("protocol_metrics_snapshot")
+            or data.get("defillama")
+            or data.get("protocol")
+        ),
+        supply_snapshot=_mapping(data.get("supply")),
+        btc_context=_mapping(data.get("btc_context")),
+        sector_benchmark=_mapping(data.get("sector_benchmark")),
+        playbook_type=str(data.get("playbook_type") or data.get("playbook") or ""),
+        impact_category=str(data.get("impact_category") or ""),
+        now=data.get("now"),
+        market_context_observed_at=data.get("market_context_observed_at") or data.get("market_context_timestamp"),
+        market_context_source=str(data.get("market_context_source") or "") or None,
+        market_context_max_age_hours=_float(data.get("market_context_max_age_hours"))
+        or config.EVENT_MARKET_CONTEXT_MAX_AGE_HOURS,
+        allow_stale_fixture_market_context=bool(
+            data.get("allow_stale_fixture_market_context")
+            if data.get("allow_stale_fixture_market_context") is not None
+            else config.EVENT_MARKET_CONTEXT_ALLOW_STALE_FIXTURE
+        ),
+        stale_cap_level=str(data.get("stale_cap_level") or "") or None,
+    )
+
+
+def _market_confirmation_context(data: EventMarketConfirmationInput) -> _MarketConfirmationContext:
+    market = _merge_mappings(data.market_snapshot, data.market_anomaly_row, data.watchlist_market_row)
+    derivatives = _mapping(data.derivatives_snapshot)
+    dex = _mapping(data.dex_liquidity_snapshot)
+    protocol = _mapping(data.protocol_metrics_snapshot)
+    return _MarketConfirmationContext(
+        data=data,
+        market=market,
+        derivatives=derivatives,
+        dex=dex,
+        protocol=protocol,
+        supply=_mapping(data.supply_snapshot),
+        btc=_mapping(data.btc_context),
+        sector=_mapping(data.sector_benchmark),
+        playbook=str(data.playbook_type or data.impact_category or "").casefold(),
+        freshness=_market_context_freshness(data, market),
+        derivatives_freshness=_snapshot_freshness(data, derivatives, family="derivatives"),
+        dex_freshness=_snapshot_freshness(data, dex, family="dex"),
+        protocol_freshness=_snapshot_freshness(data, protocol, family="protocol"),
+    )
+
+
+def _apply_primary_market_components(
+    context: _MarketConfirmationContext,
+    components: dict[str, float],
+    reasons: list[str],
+    missing: list[str],
+) -> int:
+    observed_fields = 0
+    market = context.market
     return_24h = _percent_value(_first(market, "return_24h", "price_change_24h", "price_change_percentage_24h"))
     return_72h = _percent_value(_first(market, "return_72h", "price_change_72h", "return_3d"))
     return_7d = _percent_value(_first(market, "return_7d", "price_change_7d", "price_change_percentage_7d"))
@@ -184,18 +282,29 @@ def evaluate_market_confirmation(
         components["price_momentum"] = momentum
         reasons.append(MarketConfirmationReason.PRICE_MOMENTUM.value)
         if return_24h is not None:
-            if return_24h > 0 and _playbook_needs_attention(playbook):
+            if return_24h > 0 and _playbook_needs_attention(context.playbook):
                 components["upside_attention_reaction"] = min(10.0, 3.0 + return_24h * 0.10)
                 reasons.append(MarketConfirmationReason.UPSIDE_ATTENTION_REACTION.value)
-            if return_24h < 0 and _playbook_needs_downside(playbook):
+            if return_24h < 0 and _playbook_needs_downside(context.playbook):
                 components["downside_reaction"] = min(14.0, 4.0 + abs(return_24h) * 0.16)
                 reasons.append(MarketConfirmationReason.DOWNSIDE_REACTION.value)
     else:
         missing.append("large_price_move")
-        if return_24h is not None and return_24h <= -15 and _playbook_needs_downside(playbook):
+        if return_24h is not None and return_24h <= -15 and _playbook_needs_downside(context.playbook):
             components["downside_reaction"] = min(14.0, 4.0 + abs(return_24h) * 0.16)
             reasons.append(MarketConfirmationReason.DOWNSIDE_REACTION.value)
+    observed_fields += _apply_volume_components(market, components, reasons, missing)
+    observed_fields += _apply_relative_strength_components(context, return_24h, components, reasons)
+    return observed_fields
 
+
+def _apply_volume_components(
+    market: Mapping[str, Any],
+    components: dict[str, float],
+    reasons: list[str],
+    missing: list[str],
+) -> int:
+    observed_fields = 0
     volume_z = _float(_first(market, "volume_zscore_24h", "volume_zscore", "volume_z"))
     if volume_z is not None:
         observed_fields += 1
@@ -204,7 +313,6 @@ def evaluate_market_confirmation(
             reasons.append(MarketConfirmationReason.VOLUME_EXPANSION.value)
     else:
         missing.append("volume_zscore")
-
     volume_mcap = _float(_first(market, "volume_to_market_cap", "volume_mcap", "volume_mcap_ratio"))
     if volume_mcap is None:
         volume = _float(_first(market, "volume_24h", "spot_volume_24h", "total_volume"))
@@ -218,10 +326,19 @@ def evaluate_market_confirmation(
             reasons.append(MarketConfirmationReason.VOLUME_MCAP_SPIKE.value)
     else:
         missing.append("volume_mcap")
+    return observed_fields
 
-    rel_btc = _percent_value(_first(market, "relative_strength_vs_btc", "btc_relative_return"))
+
+def _apply_relative_strength_components(
+    context: _MarketConfirmationContext,
+    return_24h: float | None,
+    components: dict[str, float],
+    reasons: list[str],
+) -> int:
+    observed_fields = 0
+    rel_btc = _percent_value(_first(context.market, "relative_strength_vs_btc", "btc_relative_return"))
     if rel_btc is None and return_24h is not None:
-        btc_return = _percent_value(_first(btc, "return_24h", "btc_return_24h"))
+        btc_return = _percent_value(_first(context.btc, "return_24h", "btc_return_24h"))
         if btc_return is not None:
             rel_btc = return_24h - btc_return
     if rel_btc is not None:
@@ -229,84 +346,144 @@ def evaluate_market_confirmation(
         if rel_btc >= 15:
             components["relative_strength_vs_btc"] = min(18.0, 6.0 + rel_btc * 0.45)
             reasons.append(MarketConfirmationReason.RELATIVE_STRENGTH_VS_BTC.value)
-
-    rel_sector = _percent_value(_first(market, "relative_strength_vs_sector", "sector_relative_return"))
+    rel_sector = _percent_value(_first(context.market, "relative_strength_vs_sector", "sector_relative_return"))
     if rel_sector is None and return_24h is not None:
-        sector_return = _percent_value(_first(sector, "return_24h", "sector_return_24h"))
+        sector_return = _percent_value(_first(context.sector, "return_24h", "sector_return_24h"))
         if sector_return is not None:
             rel_sector = return_24h - sector_return
     if rel_sector is not None and rel_sector >= 15:
         observed_fields += 1
         components["relative_strength_vs_sector"] = min(15.0, 5.0 + rel_sector * 0.35)
         reasons.append(MarketConfirmationReason.RELATIVE_STRENGTH_VS_SECTOR.value)
+    return observed_fields
 
-    derivative_components, derivative_reasons, derivative_observed = _derivatives_components(derivatives)
-    if derivative_observed:
-        observed_fields += derivative_observed
-    if derivatives_freshness["status"] in {"fresh", "fixture_allowed_stale"}:
-        components.update(derivative_components)
-        reasons.extend(derivative_reasons)
-    elif derivative_observed:
-        warnings.append(f"derivatives_context_{derivatives_freshness['status']}")
-        if _playbook_needs_derivatives(playbook):
-            missing.append("needs_fresh_derivatives_confirmation")
-    elif _playbook_needs_derivatives(playbook):
-        missing.append("derivatives_provider_coverage")
 
-    liquidity_fragility = _score_like(_first(market, "liquidity_fragility", "thin_book_score"))
+def _apply_supplemental_market_components(
+    context: _MarketConfirmationContext,
+    components: dict[str, float],
+    reasons: list[str],
+    warnings: list[str],
+    missing: list[str],
+) -> tuple[_SupplementalConfirmation, int]:
+    observed_fields = 0
+    derivative_components, derivative_reasons, derivative_observed = _derivatives_components(context.derivatives)
+    observed_fields += _apply_fresh_or_missing_components(
+        "derivatives",
+        context.derivatives_freshness,
+        derivative_components,
+        derivative_reasons,
+        derivative_observed,
+        context.playbook,
+        components,
+        reasons,
+        warnings,
+        missing,
+    )
+    observed_fields += _apply_liquidity_and_supply_components(context, components, reasons)
+    dex_components, dex_reasons, dex_observed, dex_illiquid = _dex_components(context.dex)
+    observed_fields += _apply_fresh_or_missing_components(
+        "dex",
+        context.dex_freshness,
+        dex_components,
+        dex_reasons,
+        dex_observed,
+        context.playbook,
+        components,
+        reasons,
+        warnings,
+        missing,
+    )
+    protocol_components, protocol_reasons, protocol_observed = _protocol_components(context.protocol, playbook=context.playbook)
+    observed_fields += _apply_fresh_or_missing_components(
+        "protocol",
+        context.protocol_freshness,
+        protocol_components,
+        protocol_reasons,
+        protocol_observed,
+        context.playbook,
+        components,
+        reasons,
+        warnings,
+        missing,
+    )
+    return (
+        _SupplementalConfirmation(
+            derivative_components=derivative_components,
+            derivative_reasons=derivative_reasons,
+            derivative_score=_sub_confirmation_score(derivative_components),
+            dex_components=dex_components,
+            dex_reasons=dex_reasons,
+            dex_score=_sub_confirmation_score(dex_components),
+            dex_illiquid=dex_illiquid,
+            protocol_components=protocol_components,
+            protocol_reasons=protocol_reasons,
+            protocol_score=_sub_confirmation_score(protocol_components),
+        ),
+        observed_fields,
+    )
+
+
+def _apply_fresh_or_missing_components(
+    family: str,
+    freshness: Mapping[str, Any],
+    family_components: dict[str, float],
+    family_reasons: list[str],
+    observed: int,
+    playbook: str,
+    components: dict[str, float],
+    reasons: list[str],
+    warnings: list[str],
+    missing: list[str],
+) -> int:
+    if freshness["status"] in {"fresh", "fixture_allowed_stale"}:
+        components.update(family_components)
+        reasons.extend(family_reasons)
+    elif observed:
+        warnings.append(f"{family}_context_{freshness['status']}")
+        if _playbook_needs_family(playbook, family):
+            missing.append(f"needs_fresh_{_family_missing_label(family)}_confirmation")
+    elif _playbook_needs_family(playbook, family):
+        missing.append(f"{_family_missing_label(family)}_provider_coverage")
+    return observed if observed else 0
+
+
+def _apply_liquidity_and_supply_components(
+    context: _MarketConfirmationContext,
+    components: dict[str, float],
+    reasons: list[str],
+) -> int:
+    observed_fields = 0
+    liquidity_fragility = _score_like(_first(context.market, "liquidity_fragility", "thin_book_score"))
     if liquidity_fragility is not None and liquidity_fragility >= 50:
         observed_fields += 1
         components["liquidity_fragility"] = min(12.0, liquidity_fragility * 0.15)
         reasons.append(MarketConfirmationReason.LIQUIDITY_FRAGILITY.value)
-
-    supply_pressure = _score_like(_first(supply, "supply_pressure", "unlock_pressure", "unlock_pressure_score"))
+    supply_pressure = _score_like(_first(context.supply, "supply_pressure", "unlock_pressure", "unlock_pressure_score"))
     if supply_pressure is not None:
         observed_fields += 1
         if supply_pressure >= 40:
             components["supply_pressure"] = min(18.0, supply_pressure * 0.22)
             reasons.append(MarketConfirmationReason.SUPPLY_PRESSURE.value)
+    return observed_fields
 
-    dex_components, dex_reasons, dex_observed, dex_illiquid = _dex_components(dex)
-    if dex_observed:
-        observed_fields += dex_observed
-    if dex_freshness["status"] in {"fresh", "fixture_allowed_stale"}:
-        components.update(dex_components)
-        reasons.extend(dex_reasons)
-    elif dex_observed:
-        warnings.append(f"dex_context_{dex_freshness['status']}")
-        if _playbook_needs_liquidity(playbook):
-            missing.append("needs_fresh_dex_liquidity_confirmation")
-    elif _playbook_needs_liquidity(playbook):
-        missing.append("dex_liquidity_provider_coverage")
 
-    protocol_components, protocol_reasons, protocol_observed = _protocol_components(protocol, playbook=playbook)
-    if protocol_observed:
-        observed_fields += protocol_observed
-    if protocol_freshness["status"] in {"fresh", "fixture_allowed_stale"}:
-        components.update(protocol_components)
-        reasons.extend(protocol_reasons)
-    elif protocol_observed:
-        warnings.append(f"protocol_context_{protocol_freshness['status']}")
-        if _playbook_needs_protocol_metrics(playbook):
-            missing.append("needs_fresh_protocol_metrics_confirmation")
-    elif _playbook_needs_protocol_metrics(playbook):
-        missing.append("protocol_metrics_provider_coverage")
-
+def _apply_market_anomaly_score(market: Mapping[str, Any], components: dict[str, float]) -> int:
     anomaly_score = _score_like(_first(market, "anomaly_score", "score"))
-    if anomaly_score is not None:
-        observed_fields += 1
-        components["market_anomaly_score"] = min(25.0, anomaly_score * 0.25)
+    if anomaly_score is None:
+        return 0
+    components["market_anomaly_score"] = min(25.0, anomaly_score * 0.25)
+    return 1
 
-    raw_score = sum(components.values())
-    if _market_anomaly_without_catalyst(playbook, data):
-        raw_score = min(raw_score, 35.0)
-        warnings.append("market_anomaly_without_confirmed_catalyst")
 
-    derivative_score = _sub_confirmation_score(derivative_components)
-    dex_score = _sub_confirmation_score(dex_components)
-    protocol_score = _sub_confirmation_score(protocol_components)
-
-    if _playbook_needs_derivatives(playbook) and any(
+def _apply_playbook_score_adjustments(
+    raw_score: float,
+    context: _MarketConfirmationContext,
+    supplemental: _SupplementalConfirmation,
+    reasons: list[str],
+    warnings: list[str],
+    missing: list[str],
+) -> float:
+    if _playbook_needs_derivatives(context.playbook) and any(
         reason in reasons
         for reason in (
             MarketConfirmationReason.DERIVATIVES_CROWDING.value,
@@ -316,31 +493,33 @@ def evaluate_market_confirmation(
         )
     ):
         raw_score += 8.0
-    if _playbook_needs_supply(playbook) and MarketConfirmationReason.SUPPLY_PRESSURE.value in reasons:
+    if _playbook_needs_supply(context.playbook) and MarketConfirmationReason.SUPPLY_PRESSURE.value in reasons:
         raw_score += 8.0
-    if _playbook_needs_attention(playbook) and MarketConfirmationReason.PRICE_MOMENTUM.value in reasons and MarketConfirmationReason.VOLUME_EXPANSION.value in reasons:
+    if (
+        _playbook_needs_attention(context.playbook)
+        and MarketConfirmationReason.PRICE_MOMENTUM.value in reasons
+        and MarketConfirmationReason.VOLUME_EXPANSION.value in reasons
+    ):
         raw_score += 8.0
-    if _playbook_needs_attention(playbook) and dex_score >= 50:
+    if _playbook_needs_attention(context.playbook) and supplemental.dex_score >= 50:
         raw_score += 6.0
-    if _playbook_needs_protocol_metrics(playbook) and protocol_score >= 50:
+    if _playbook_needs_protocol_metrics(context.playbook) and supplemental.protocol_score >= 50:
         raw_score += 7.0
-    if dex_illiquid and _playbook_needs_liquidity(playbook):
+    if supplemental.dex_illiquid and _playbook_needs_liquidity(context.playbook):
         raw_score = min(raw_score, 74.0)
         warnings.append("dex_liquidity_sanity_cap")
         missing.append("liquidity_sanity")
+    return raw_score
 
-    score = max(0.0, min(100.0, raw_score))
-    if observed_fields == 0:
-        return _insufficient_with_freshness(
-            tuple(dict.fromkeys(missing or ("market_snapshot", "derivatives_snapshot"))),
-            freshness,
-        )
-    if not reasons:
-        reasons.append(MarketConfirmationReason.NO_MARKET_REACTION.value)
-    data_quality = min(100.0, observed_fields * 16.0)
-    if score > 50 and data_quality < 35:
-        score = min(score, 50.0)
-        warnings.append("market_confirmation_capped_by_sparse_data")
+
+def _apply_market_freshness_cap(
+    score: float,
+    data: EventMarketConfirmationInput,
+    freshness: Mapping[str, Any],
+    reasons: list[str],
+    warnings: list[str],
+    missing: list[str],
+) -> float:
     if freshness["status"] == "fresh":
         reasons.append(MarketConfirmationReason.MARKET_CONTEXT_FRESH.value)
     elif freshness["status"] == "fixture_allowed_stale":
@@ -364,8 +543,22 @@ def evaluate_market_confirmation(
         warnings.append("market_context_unknown_timestamp")
         missing.append("market_context_unknown_timestamp")
         missing.append("needs_fresh_market_confirmation")
-    level = _level(score)
-    summary = _summary(level, score, reasons)
+    return score
+
+
+def _market_confirmation_result(
+    *,
+    score: float,
+    level: str,
+    reasons: list[str],
+    warnings: list[str],
+    data_quality: float,
+    missing: list[str],
+    summary: str,
+    components: dict[str, float],
+    context: _MarketConfirmationContext,
+    supplemental: _SupplementalConfirmation,
+) -> EventMarketConfirmationResult:
     return _with_freshness(EventMarketConfirmationResult(
         market_confirmation_score=round(score, 2),
         level=level,
@@ -375,20 +568,20 @@ def evaluate_market_confirmation(
         missing_fields=tuple(dict.fromkeys(missing)),
         confirmation_summary=summary,
         score_components={key: round(value, 2) for key, value in components.items()},
-        freshness_cap_applied=freshness["status"] in {"stale", "missing", "unknown"},
-        derivatives_confirmation_score=round(derivative_score, 2),
-        derivatives_confirmation_level=_level(derivative_score),
-        derivatives_confirmation_reasons=tuple(dict.fromkeys(derivative_reasons)),
-        derivatives_freshness_status=str(derivatives_freshness.get("status") or "missing"),
-        dex_liquidity_score=round(dex_score, 2),
-        dex_liquidity_level=_level(dex_score),
-        dex_liquidity_reasons=tuple(dict.fromkeys(dex_reasons)),
-        dex_freshness_status=str(dex_freshness.get("status") or "missing"),
-        protocol_metrics_score=round(protocol_score, 2),
-        protocol_metrics_level=_level(protocol_score),
-        protocol_metrics_reasons=tuple(dict.fromkeys(protocol_reasons)),
-        protocol_metrics_freshness_status=str(protocol_freshness.get("status") or "missing"),
-    ), freshness)
+        freshness_cap_applied=context.freshness["status"] in {"stale", "missing", "unknown"},
+        derivatives_confirmation_score=round(supplemental.derivative_score, 2),
+        derivatives_confirmation_level=_level(supplemental.derivative_score),
+        derivatives_confirmation_reasons=tuple(dict.fromkeys(supplemental.derivative_reasons)),
+        derivatives_freshness_status=str(context.derivatives_freshness.get("status") or "missing"),
+        dex_liquidity_score=round(supplemental.dex_score, 2),
+        dex_liquidity_level=_level(supplemental.dex_score),
+        dex_liquidity_reasons=tuple(dict.fromkeys(supplemental.dex_reasons)),
+        dex_freshness_status=str(context.dex_freshness.get("status") or "missing"),
+        protocol_metrics_score=round(supplemental.protocol_score, 2),
+        protocol_metrics_level=_level(supplemental.protocol_score),
+        protocol_metrics_reasons=tuple(dict.fromkeys(supplemental.protocol_reasons)),
+        protocol_metrics_freshness_status=str(context.protocol_freshness.get("status") or "missing"),
+    ), context.freshness)
 
 
 def _insufficient(missing: tuple[str, ...]) -> EventMarketConfirmationResult:
@@ -867,6 +1060,24 @@ def _playbook_needs_protocol_metrics(playbook: str) -> bool:
 
 def _playbook_needs_downside(playbook: str) -> bool:
     return any(term in playbook for term in ("unlock", "supply", "security", "exploit", "regulatory", "shock", "fade"))
+
+
+def _playbook_needs_family(playbook: str, family: str) -> bool:
+    if family == "derivatives":
+        return _playbook_needs_derivatives(playbook)
+    if family == "dex":
+        return _playbook_needs_liquidity(playbook)
+    if family == "protocol":
+        return _playbook_needs_protocol_metrics(playbook)
+    return False
+
+
+def _family_missing_label(family: str) -> str:
+    return {
+        "derivatives": "derivatives",
+        "dex": "dex_liquidity",
+        "protocol": "protocol_metrics",
+    }.get(family, family)
 
 
 def _market_anomaly_without_catalyst(playbook: str, data: EventMarketConfirmationInput) -> bool:

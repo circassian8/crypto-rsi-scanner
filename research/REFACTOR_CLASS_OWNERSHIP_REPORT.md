@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T08:22:57.765160+00:00`
+- generated_at: `2026-07-04T08:34:31.506304+00:00`
 - public_class_count: `407`
 - classes_over_limit_count: `14`
-- functions_over_limit_count: `9`
+- functions_over_limit_count: `8`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `9`
+- production_functions_over_limit: `8`
 - modules_with_multiple_public_classes_count: `82`
 - legacy_decomposition_gate_status: `pass`
 - legacy_classes_over_limit: `3`
@@ -163,7 +163,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.notifications.legacy.send_plan` | `send_notifications` | 406 | true |
 | `crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.cycle` | `run_integrated_radar_cycle` | 288 | true |
 | `crypto_rsi_scanner.event_alpha.radar.integrated.legacy_parts.merge` | `_merge_family` | 245 | false |
-| `crypto_rsi_scanner.event_alpha.radar.market_confirmation` | `evaluate_market_confirmation` | 281 | true |
 | `crypto_rsi_scanner.event_alpha.radar.near_miss.refresh` | `_refresh_one_hypothesis` | 276 | false |
 | `crypto_rsi_scanner.event_alpha.radar.pipeline` | `run_event_alpha_pipeline` | 244 | true |
 | `crypto_rsi_scanner.event_alpha.radar.pipeline` | `run_event_alpha_operating_cycle` | 347 | true |
