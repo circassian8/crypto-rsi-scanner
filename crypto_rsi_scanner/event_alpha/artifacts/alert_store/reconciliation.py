@@ -170,6 +170,80 @@ def reconcile_diagnostic_support_snapshot_with_core_store(
     out.setdefault("feedback_target", out.get("diagnostic_row_id") or out.get("alert_id") or out.get("alert_key"))
     out["feedback_target_type"] = "diagnostic_support_for_core_opportunity_id"
     return _with_snapshot_quality_classification(out)
+
+
+def _snapshot_incident_fields(entry: Any, components: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "incident_id": components.get("incident_id"),
+        "hypothesis_id": components.get("hypothesis_id") or entry.hypothesis_id or entry.event_id,
+        "incident_link_status": components.get("incident_link_status") or entry.incident_link_status or (
+            "linked" if components.get("incident_id") or entry.incident_id else "no_incident"
+        ),
+        "incident_link_reason": (
+            components.get("incident_link_reason")
+            or entry.incident_link_reason
+            or (None if components.get("incident_id") or entry.incident_id else "no_canonical_incident_for_event_evidence")
+        ),
+        "incident_relevance_status": components.get("incident_relevance_status"),
+        "incident_relevance_score": components.get("incident_relevance_score"),
+        "incident_relevance_reasons": components.get("incident_relevance_reasons") or (),
+        "incident_relevance_warnings": components.get("incident_relevance_warnings") or (),
+        "canonical_persistence_reason": components.get("canonical_persistence_reason"),
+        "incident_canonical_name": components.get("incident_canonical_name") or components.get("canonical_incident_name") or entry.incident_canonical_name,
+        "canonical_incident_name": components.get("canonical_incident_name") or components.get("incident_canonical_name") or entry.incident_canonical_name,
+        "incident_event_archetype": components.get("incident_event_archetype") or components.get("event_archetype"),
+        "event_archetype": components.get("event_archetype") or components.get("incident_event_archetype"),
+        "incident_primary_subject": components.get("incident_primary_subject") or components.get("primary_subject") or entry.incident_primary_subject,
+        "primary_subject": components.get("primary_subject") or components.get("incident_primary_subject") or entry.incident_primary_subject,
+        "incident_affected_ecosystem": components.get("incident_affected_ecosystem") or components.get("affected_ecosystem") or entry.incident_affected_ecosystem,
+        "affected_ecosystem": components.get("affected_ecosystem") or components.get("incident_affected_ecosystem") or entry.incident_affected_ecosystem,
+        "incident_cause_status": components.get("incident_cause_status") or components.get("cause_status") or entry.incident_cause_status,
+        "cause_status": components.get("cause_status") or components.get("incident_cause_status") or entry.incident_cause_status,
+        "claim_polarities": components.get("claim_polarities") or (),
+        "claim_history": components.get("claim_history") or (),
+        "role_confidence": components.get("role_confidence"),
+        "role_evidence": components.get("role_evidence") or (),
+        "market_context_source": components.get("market_context_source"),
+        "market_context_observed_at": components.get("market_context_observed_at"),
+        "market_context_age_seconds": components.get("market_context_age_seconds"),
+        "market_context_age_hours": components.get("market_context_age_hours"),
+        "market_context_stale": components.get("market_context_stale"),
+        "market_context_freshness_status": components.get("market_context_freshness_status"),
+        "market_context_freshness_cap_applied": components.get("market_context_freshness_cap_applied"),
+        "market_context_data_quality": components.get("market_context_data_quality"),
+        "incident_market_reaction_observed": components.get("incident_market_reaction_observed") or components.get("market_reaction_observed") or entry.incident_market_reaction_observed,
+        "market_reaction_observed": components.get("market_reaction_observed") or components.get("incident_market_reaction_observed") or entry.incident_market_reaction_observed,
+        "market_reaction_confirmed": components.get("market_reaction_confirmed"),
+        "incident_causal_mechanism_confirmed": components.get("incident_causal_mechanism_confirmed") or components.get("causal_mechanism_confirmed") or entry.incident_causal_mechanism_confirmed,
+        "causal_mechanism_confirmed": components.get("causal_mechanism_confirmed") or components.get("incident_causal_mechanism_confirmed") or entry.incident_causal_mechanism_confirmed,
+        "incident_confidence": components.get("incident_confidence"),
+    }
+
+
+def _snapshot_opportunity_quality_fields(components: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "validation_stage": components.get("validation_stage"),
+        "impact_path_reason": components.get("impact_path_reason"),
+        "impact_path_type": components.get("impact_path_type"),
+        "impact_path_strength": components.get("impact_path_strength"),
+        "candidate_role": components.get("candidate_role"),
+        "evidence_specificity_score": components.get("evidence_specificity_score"),
+        "digest_eligible_by_impact_path": components.get("digest_eligible_by_impact_path"),
+        "why_digest_ineligible": components.get("why_digest_ineligible"),
+        "evidence_quality_score": components.get("evidence_quality_score"),
+        "source_class": components.get("source_class"),
+        "evidence_specificity": components.get("evidence_specificity"),
+        "market_confirmation_score": components.get("market_confirmation_score"),
+        "market_confirmation_level": components.get("market_confirmation_level"),
+        "opportunity_score_final": components.get("opportunity_score_final"),
+        "opportunity_level": components.get("opportunity_level"),
+        "opportunity_verdict_reasons": components.get("opportunity_verdict_reasons") or (),
+        "why_local_only": components.get("why_local_only"),
+        "why_not_watchlist": components.get("why_not_watchlist"),
+        "manual_verification_items": components.get("manual_verification_items") or (),
+    }
+
+
 def _snapshot_from_route_decision(
     decision: event_alpha_router.EventAlphaRouteDecision,
     observed: datetime,
@@ -263,68 +337,8 @@ def _snapshot_from_route_decision(
         "alertable_after_quality_gate": alertable_after_quality,
         "route_reason": decision.reason,
         "impact_category": components.get("impact_category") or playbook,
-        "incident_id": components.get("incident_id"),
-        "hypothesis_id": components.get("hypothesis_id") or entry.hypothesis_id or entry.event_id,
-        "incident_link_status": components.get("incident_link_status") or entry.incident_link_status or (
-            "linked" if components.get("incident_id") or entry.incident_id else "no_incident"
-        ),
-        "incident_link_reason": (
-            components.get("incident_link_reason")
-            or entry.incident_link_reason
-            or (None if components.get("incident_id") or entry.incident_id else "no_canonical_incident_for_event_evidence")
-        ),
-        "incident_relevance_status": components.get("incident_relevance_status"),
-        "incident_relevance_score": components.get("incident_relevance_score"),
-        "incident_relevance_reasons": components.get("incident_relevance_reasons") or (),
-        "incident_relevance_warnings": components.get("incident_relevance_warnings") or (),
-        "canonical_persistence_reason": components.get("canonical_persistence_reason"),
-        "incident_canonical_name": components.get("incident_canonical_name") or components.get("canonical_incident_name") or entry.incident_canonical_name,
-        "canonical_incident_name": components.get("canonical_incident_name") or components.get("incident_canonical_name") or entry.incident_canonical_name,
-        "incident_event_archetype": components.get("incident_event_archetype") or components.get("event_archetype"),
-        "event_archetype": components.get("event_archetype") or components.get("incident_event_archetype"),
-        "incident_primary_subject": components.get("incident_primary_subject") or components.get("primary_subject") or entry.incident_primary_subject,
-        "primary_subject": components.get("primary_subject") or components.get("incident_primary_subject") or entry.incident_primary_subject,
-        "incident_affected_ecosystem": components.get("incident_affected_ecosystem") or components.get("affected_ecosystem") or entry.incident_affected_ecosystem,
-        "affected_ecosystem": components.get("affected_ecosystem") or components.get("incident_affected_ecosystem") or entry.incident_affected_ecosystem,
-        "incident_cause_status": components.get("incident_cause_status") or components.get("cause_status") or entry.incident_cause_status,
-        "cause_status": components.get("cause_status") or components.get("incident_cause_status") or entry.incident_cause_status,
-        "claim_polarities": components.get("claim_polarities") or (),
-        "claim_history": components.get("claim_history") or (),
-        "role_confidence": components.get("role_confidence"),
-        "role_evidence": components.get("role_evidence") or (),
-        "market_context_source": components.get("market_context_source"),
-        "market_context_observed_at": components.get("market_context_observed_at"),
-        "market_context_age_seconds": components.get("market_context_age_seconds"),
-        "market_context_age_hours": components.get("market_context_age_hours"),
-        "market_context_stale": components.get("market_context_stale"),
-        "market_context_freshness_status": components.get("market_context_freshness_status"),
-        "market_context_freshness_cap_applied": components.get("market_context_freshness_cap_applied"),
-        "market_context_data_quality": components.get("market_context_data_quality"),
-        "incident_market_reaction_observed": components.get("incident_market_reaction_observed") or components.get("market_reaction_observed") or entry.incident_market_reaction_observed,
-        "market_reaction_observed": components.get("market_reaction_observed") or components.get("incident_market_reaction_observed") or entry.incident_market_reaction_observed,
-        "market_reaction_confirmed": components.get("market_reaction_confirmed"),
-        "incident_causal_mechanism_confirmed": components.get("incident_causal_mechanism_confirmed") or components.get("causal_mechanism_confirmed") or entry.incident_causal_mechanism_confirmed,
-        "causal_mechanism_confirmed": components.get("causal_mechanism_confirmed") or components.get("incident_causal_mechanism_confirmed") or entry.incident_causal_mechanism_confirmed,
-        "incident_confidence": components.get("incident_confidence"),
-        "validation_stage": components.get("validation_stage"),
-        "impact_path_reason": components.get("impact_path_reason"),
-        "impact_path_type": components.get("impact_path_type"),
-        "impact_path_strength": components.get("impact_path_strength"),
-        "candidate_role": components.get("candidate_role"),
-        "evidence_specificity_score": components.get("evidence_specificity_score"),
-        "digest_eligible_by_impact_path": components.get("digest_eligible_by_impact_path"),
-        "why_digest_ineligible": components.get("why_digest_ineligible"),
-        "evidence_quality_score": components.get("evidence_quality_score"),
-        "source_class": components.get("source_class"),
-        "evidence_specificity": components.get("evidence_specificity"),
-        "market_confirmation_score": components.get("market_confirmation_score"),
-        "market_confirmation_level": components.get("market_confirmation_level"),
-        "opportunity_score_final": components.get("opportunity_score_final"),
-        "opportunity_level": components.get("opportunity_level"),
-        "opportunity_verdict_reasons": components.get("opportunity_verdict_reasons") or (),
-        "why_local_only": components.get("why_local_only"),
-        "why_not_watchlist": components.get("why_not_watchlist"),
-        "manual_verification_items": components.get("manual_verification_items") or (),
+        **_snapshot_incident_fields(entry, components),
+        **_snapshot_opportunity_quality_fields(components),
         **quality,
         "hypothesis_score": components.get("hypothesis_score") or entry.latest_score,
         "validated_symbol": validated_symbol,

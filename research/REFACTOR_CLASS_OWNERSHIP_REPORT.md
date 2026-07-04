@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T02:17:32.589015+00:00`
+- generated_at: `2026-07-04T02:39:59.219214+00:00`
 - public_class_count: `407`
-- classes_over_limit_count: `31`
-- functions_over_limit_count: `62`
-- production_classes_over_limit: `31`
-- production_functions_over_limit: `62`
+- classes_over_limit_count: `29`
+- functions_over_limit_count: `56`
+- production_classes_over_limit: `29`
+- production_functions_over_limit: `56`
 - modules_with_multiple_public_classes_count: `82`
 - legacy_decomposition_gate_status: `pass`
 - legacy_classes_over_limit: `5`
@@ -143,8 +143,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.client` | `CoinGeckoClient` | 115 | true |  |
 | `crypto_rsi_scanner.derivatives_providers.coinalyze.legacy` | `CoinalyzeDerivativesProvider` | 189 | true |  |
 | `crypto_rsi_scanner.event_alpha.doctor.legacy.result_models` | `EventAlphaArtifactDoctorResult` | 402 | true |  |
-| `crypto_rsi_scanner.event_alpha.notifications.delivery` | `NotificationDeliveryRecord` | 123 | true |  |
-| `crypto_rsi_scanner.event_alpha.notifications.legacy.delivery_writer` | `_DeliveryWriter` | 534 | false |  |
 | `crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight` | `BybitAnnouncementsRehearsalReport` | 79 | true |  |
 | `crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight` | `CoinalyzeRehearsalReport` | 102 | true |  |
 | `crypto_rsi_scanner.event_alpha.providers.live_provider_readiness` | `LiveProviderReadinessProvider` | 99 | true |  |
@@ -176,14 +174,8 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | module | function | lines | public |
 |---|---|---:|---:|
-| `crypto_rsi_scanner.backtest_parts.legacy_parts.cli` | `main` | 227 | true |
-| `crypto_rsi_scanner.backtest_parts.legacy_parts.walk` | `walk_coin` | 153 | true |
-| `crypto_rsi_scanner.cli.services.event_alpha_fade_review` | `_write_event_fade_review_bundle` | 164 | false |
-| `crypto_rsi_scanner.cli.services.event_alpha_notifications.fixture_smoke` | `event_alpha_notify_fixture_smoke` | 732 | true |
 | `crypto_rsi_scanner.cli.services.event_alpha_notifications.preview` | `_event_alpha_notify_cycle_body` | 513 | false |
-| `crypto_rsi_scanner.cli.services.event_alpha_outcomes` | `event_alpha_export_burn_in_pack` | 159 | true |
 | `crypto_rsi_scanner.cli.services.event_alpha_research` | `event_alpha_cycle` | 251 | true |
-| `crypto_rsi_scanner.event_alpha.artifacts.alert_store.reconciliation` | `_snapshot_from_route_decision` | 168 | false |
 | `crypto_rsi_scanner.event_alpha.artifacts.daily_brief.legacy_parts.builder` | `build_daily_brief` | 884 | true |
 | `crypto_rsi_scanner.event_alpha.artifacts.locks` | `acquire_run_lock` | 174 | true |
 | `crypto_rsi_scanner.event_alpha.artifacts.opportunity_audit` | `format_opportunity_audit` | 227 | true |

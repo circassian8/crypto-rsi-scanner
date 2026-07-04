@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Burn down advisory refactor ownership debt · Codex
+**Why:** The production-size refactor gates were passing, but the prompt still
+called out oversized classes and functions as real internal debt. This pass
+reduced a low-risk slice of that advisory inventory while preserving old
+imports, CLI/Make behavior, artifact schemas, notification gates, provider
+guards, and research-only safety boundaries.
+**Changes:**
+- Split the Event Alpha notification fixture-smoke command into focused helper
+  functions and moved deterministic fixture payload builders into
+  `crypto_rsi_scanner/cli/services/event_alpha_notifications/fixture_smoke_data.py`.
+  `event_alpha_notify_fixture_smoke()` is now under the function-size target.
+- Moved `_DeliveryWriter` method implementations out of the class body into
+  module-level helpers while keeping the compatibility class and method names.
+- Extracted backtest CLI parser and trigger-comparison handling helpers so
+  `backtest_parts/legacy_parts/cli.py::main()` is below the function-size
+  target, and split the remaining `walk_coin()` append logic into a helper.
+- Moved `NotificationDeliveryRecord.to_row()` serialization into helper
+  functions while preserving the public method and row schema.
+- Split alert snapshot reconciliation, fade-review bundle writing, and burn-in
+  pack doctor handling into smaller helpers. Refreshed refactor size, class
+  ownership, final, completion-map, release-candidate, and verification
+  artifacts.
+**Verify:** Focused parity checks passed for backtest, delivery ledger,
+notification fixture smoke, fade-review bundle, integrated radar/artifact
+doctor paths, and ownership reports. The full safe 23-command regression stack
+in `research/REFACTOR_VERIFICATION_RESULTS.json` records `status=pass` with
+`failed=0`; final verification was rerun with `make verify PYTHON=python3`
+before commit.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Advisory ownership debt remains: `29` classes and
+`56` functions are still over the current limits; next candidates include
+`EventAlphaArtifactDoctorResult`, `CoinalyzeDerivativesProvider`,
+`_event_alpha_notify_cycle_body()`, `build_daily_brief()`, and
+`diagnose_artifacts()`.
+
 ## 2026-07-04 — Finish production-size refactor burn-down · Codex
 **Why:** The previous refactor passes left several production modules over the
 new size-gate thresholds and still hid meaningful implementation bodies behind

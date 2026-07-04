@@ -30,24 +30,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py"
     },
     {
-      "class_name": "NotificationDeliveryRecord",
-      "exception_reason": null,
-      "line_count": 123,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.delivery",
-      "public": true,
-      "qualname": "NotificationDeliveryRecord",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/delivery.py"
-    },
-    {
-      "class_name": "_DeliveryWriter",
-      "exception_reason": null,
-      "line_count": 534,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.legacy.delivery_writer",
-      "public": false,
-      "qualname": "_DeliveryWriter",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/delivery_writer.py"
-    },
-    {
       "class_name": "BybitAnnouncementsRehearsalReport",
       "exception_reason": null,
       "line_count": 79,
@@ -282,7 +264,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 31,
+  "classes_over_limit_count": 29,
   "exceptions": [
     {
       "module": "crypto_rsi_scanner.event_core.models",
@@ -295,41 +277,9 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5106,
+  "function_count": 5138,
   "function_line_limit": 150,
   "functions_over_limit": [
-    {
-      "function_name": "main",
-      "line_count": 227,
-      "module": "crypto_rsi_scanner.backtest_parts.legacy_parts.cli",
-      "public": true,
-      "qualname": "main",
-      "source_path": "crypto_rsi_scanner/backtest_parts/legacy_parts/cli.py"
-    },
-    {
-      "function_name": "walk_coin",
-      "line_count": 153,
-      "module": "crypto_rsi_scanner.backtest_parts.legacy_parts.walk",
-      "public": true,
-      "qualname": "walk_coin",
-      "source_path": "crypto_rsi_scanner/backtest_parts/legacy_parts/walk.py"
-    },
-    {
-      "function_name": "_write_event_fade_review_bundle",
-      "line_count": 164,
-      "module": "crypto_rsi_scanner.cli.services.event_alpha_fade_review",
-      "public": false,
-      "qualname": "_write_event_fade_review_bundle",
-      "source_path": "crypto_rsi_scanner/cli/services/event_alpha_fade_review.py"
-    },
-    {
-      "function_name": "event_alpha_notify_fixture_smoke",
-      "line_count": 732,
-      "module": "crypto_rsi_scanner.cli.services.event_alpha_notifications.fixture_smoke",
-      "public": true,
-      "qualname": "event_alpha_notify_fixture_smoke",
-      "source_path": "crypto_rsi_scanner/cli/services/event_alpha_notifications/fixture_smoke.py"
-    },
     {
       "function_name": "_event_alpha_notify_cycle_body",
       "line_count": 513,
@@ -339,28 +289,12 @@
       "source_path": "crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py"
     },
     {
-      "function_name": "event_alpha_export_burn_in_pack",
-      "line_count": 159,
-      "module": "crypto_rsi_scanner.cli.services.event_alpha_outcomes",
-      "public": true,
-      "qualname": "event_alpha_export_burn_in_pack",
-      "source_path": "crypto_rsi_scanner/cli/services/event_alpha_outcomes.py"
-    },
-    {
       "function_name": "event_alpha_cycle",
       "line_count": 251,
       "module": "crypto_rsi_scanner.cli.services.event_alpha_research",
       "public": true,
       "qualname": "event_alpha_cycle",
       "source_path": "crypto_rsi_scanner/cli/services/event_alpha_research.py"
-    },
-    {
-      "function_name": "_snapshot_from_route_decision",
-      "line_count": 168,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.alert_store.reconciliation",
-      "public": false,
-      "qualname": "_snapshot_from_route_decision",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/alert_store/reconciliation.py"
     },
     {
       "function_name": "build_daily_brief",
@@ -795,8 +729,8 @@
       "source_path": "crypto_rsi_scanner/refactor_final_report.py"
     }
   ],
-  "functions_over_limit_count": 62,
-  "generated_at": "2026-07-04T02:17:32.589015+00:00",
+  "functions_over_limit_count": 56,
+  "generated_at": "2026-07-04T02:39:59.219214+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1370,7 +1304,7 @@
     "multiple_public_classes": "allowed for small value objects/enums in documented models modules",
     "public_class_over_75_lines": "should live in its own module unless documented here"
   },
-  "production_classes_over_limit": 31,
+  "production_classes_over_limit": 29,
   "production_classes_over_limit_rows": [
     {
       "class_name": "CoinGeckoClient",
@@ -1398,24 +1332,6 @@
       "public": true,
       "qualname": "EventAlphaArtifactDoctorResult",
       "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py"
-    },
-    {
-      "class_name": "NotificationDeliveryRecord",
-      "exception_reason": null,
-      "line_count": 123,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.delivery",
-      "public": true,
-      "qualname": "NotificationDeliveryRecord",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/delivery.py"
-    },
-    {
-      "class_name": "_DeliveryWriter",
-      "exception_reason": null,
-      "line_count": 534,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.legacy.delivery_writer",
-      "public": false,
-      "qualname": "_DeliveryWriter",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/legacy/delivery_writer.py"
     },
     {
       "class_name": "BybitAnnouncementsRehearsalReport",
@@ -1652,40 +1568,8 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 62,
+  "production_functions_over_limit": 56,
   "production_functions_over_limit_rows": [
-    {
-      "function_name": "main",
-      "line_count": 227,
-      "module": "crypto_rsi_scanner.backtest_parts.legacy_parts.cli",
-      "public": true,
-      "qualname": "main",
-      "source_path": "crypto_rsi_scanner/backtest_parts/legacy_parts/cli.py"
-    },
-    {
-      "function_name": "walk_coin",
-      "line_count": 153,
-      "module": "crypto_rsi_scanner.backtest_parts.legacy_parts.walk",
-      "public": true,
-      "qualname": "walk_coin",
-      "source_path": "crypto_rsi_scanner/backtest_parts/legacy_parts/walk.py"
-    },
-    {
-      "function_name": "_write_event_fade_review_bundle",
-      "line_count": 164,
-      "module": "crypto_rsi_scanner.cli.services.event_alpha_fade_review",
-      "public": false,
-      "qualname": "_write_event_fade_review_bundle",
-      "source_path": "crypto_rsi_scanner/cli/services/event_alpha_fade_review.py"
-    },
-    {
-      "function_name": "event_alpha_notify_fixture_smoke",
-      "line_count": 732,
-      "module": "crypto_rsi_scanner.cli.services.event_alpha_notifications.fixture_smoke",
-      "public": true,
-      "qualname": "event_alpha_notify_fixture_smoke",
-      "source_path": "crypto_rsi_scanner/cli/services/event_alpha_notifications/fixture_smoke.py"
-    },
     {
       "function_name": "_event_alpha_notify_cycle_body",
       "line_count": 513,
@@ -1695,28 +1579,12 @@
       "source_path": "crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py"
     },
     {
-      "function_name": "event_alpha_export_burn_in_pack",
-      "line_count": 159,
-      "module": "crypto_rsi_scanner.cli.services.event_alpha_outcomes",
-      "public": true,
-      "qualname": "event_alpha_export_burn_in_pack",
-      "source_path": "crypto_rsi_scanner/cli/services/event_alpha_outcomes.py"
-    },
-    {
       "function_name": "event_alpha_cycle",
       "line_count": 251,
       "module": "crypto_rsi_scanner.cli.services.event_alpha_research",
       "public": true,
       "qualname": "event_alpha_cycle",
       "source_path": "crypto_rsi_scanner/cli/services/event_alpha_research.py"
-    },
-    {
-      "function_name": "_snapshot_from_route_decision",
-      "line_count": 168,
-      "module": "crypto_rsi_scanner.event_alpha.artifacts.alert_store.reconciliation",
-      "public": false,
-      "qualname": "_snapshot_from_route_decision",
-      "source_path": "crypto_rsi_scanner/event_alpha/artifacts/alert_store/reconciliation.py"
     },
     {
       "function_name": "build_daily_brief",

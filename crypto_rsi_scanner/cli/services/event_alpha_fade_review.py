@@ -27,6 +27,45 @@ def _refresh_scanner_globals() -> ModuleType:
     return bind_scanner_globals(globals())
 
 
+def _event_fade_review_bundle_paths(bundle_dir: Path) -> dict[str, Path]:
+    return {
+        "queue": bundle_dir / "labeling_queue.txt",
+        "packet": bundle_dir / "review_packet.md",
+        "balanced_packet": bundle_dir / "review_packet_balanced.md",
+        "template": bundle_dir / "review_template.csv",
+        "balanced_template": bundle_dir / "review_template_balanced.csv",
+        "report": bundle_dir / "review_report.txt",
+        "guide": bundle_dir / "review_guide.md",
+        "manifest": bundle_dir / "manifest.json",
+        "readme": bundle_dir / "README.md",
+    }
+
+
+def _write_event_fade_review_bundle_files(
+    paths: dict[str, Path],
+    *,
+    review_rows: list[dict[str, Any]],
+    limit: int | None,
+    queue: event_validation.ValidationLabelingQueue,
+    review: event_validation.EventFadeValidationReview,
+    template_rows: list[dict[str, Any]],
+    balanced_template_rows: list[dict[str, Any]],
+) -> None:
+    paths["queue"].write_text(event_validation.format_labeling_queue(queue) + "\n", encoding="utf-8")
+    paths["packet"].write_text(event_validation.format_review_packet(review_rows, limit=limit) + "\n", encoding="utf-8")
+    paths["balanced_packet"].write_text(
+        event_validation.format_balanced_review_packet(review_rows) + "\n",
+        encoding="utf-8",
+    )
+    paths["template"].write_text(event_validation.format_review_template_csv(template_rows), encoding="utf-8")
+    paths["balanced_template"].write_text(
+        event_validation.format_review_template_csv(balanced_template_rows),
+        encoding="utf-8",
+    )
+    paths["report"].write_text(event_validation.format_validation_review(review) + "\n", encoding="utf-8")
+    paths["guide"].write_text(_event_fade_review_guide(), encoding="utf-8")
+
+
 def _write_event_fade_review_bundle(
     *,
     source_rows: list[dict[str, Any]],
@@ -47,7 +86,6 @@ def _write_event_fade_review_bundle(
     _refresh_scanner_globals()
     bundle_dir = Path(out_dir).expanduser()
     bundle_dir.mkdir(parents=True, exist_ok=True)
-
     copied_sample = event_discovery.write_validation_sample(
         source_rows,
         bundle_dir / "validation_sample.jsonl",
@@ -66,7 +104,6 @@ def _write_event_fade_review_bundle(
             interval=price_interval,
         )
         effective_prices_path = str(price_export_result.out_path)
-
     fill_summary = "No price fixture supplied; outcome fields were not filled."
     fill_result: event_validation.ValidationOutcomeFillResult | None = None
     outcome_sample: Path | None = None
@@ -96,29 +133,16 @@ def _write_event_fade_review_bundle(
     balanced_template_rows = event_validation.build_balanced_review_template_rows(review_rows)
     bundle_warnings = tuple([_empty_review_bundle_message(sample_path)] if not review_rows else [])
 
-    queue_path = bundle_dir / "labeling_queue.txt"
-    packet_path = bundle_dir / "review_packet.md"
-    balanced_packet_path = bundle_dir / "review_packet_balanced.md"
-    template_path = bundle_dir / "review_template.csv"
-    balanced_template_path = bundle_dir / "review_template_balanced.csv"
-    report_path = bundle_dir / "review_report.txt"
-    guide_path = bundle_dir / "review_guide.md"
-    manifest_path = bundle_dir / "manifest.json"
-    readme_path = bundle_dir / "README.md"
-
-    queue_path.write_text(event_validation.format_labeling_queue(queue) + "\n", encoding="utf-8")
-    packet_path.write_text(event_validation.format_review_packet(review_rows, limit=limit) + "\n", encoding="utf-8")
-    balanced_packet_path.write_text(
-        event_validation.format_balanced_review_packet(review_rows) + "\n",
-        encoding="utf-8",
+    paths = _event_fade_review_bundle_paths(bundle_dir)
+    _write_event_fade_review_bundle_files(
+        paths,
+        review_rows=review_rows,
+        limit=limit,
+        queue=queue,
+        review=review,
+        template_rows=template_rows,
+        balanced_template_rows=balanced_template_rows,
     )
-    template_path.write_text(event_validation.format_review_template_csv(template_rows), encoding="utf-8")
-    balanced_template_path.write_text(
-        event_validation.format_review_template_csv(balanced_template_rows),
-        encoding="utf-8",
-    )
-    report_path.write_text(event_validation.format_validation_review(review) + "\n", encoding="utf-8")
-    guide_path.write_text(_event_fade_review_guide(), encoding="utf-8")
     manifest = _event_fade_review_bundle_manifest(
         sample_path=sample_path,
         prices_path=prices_path,
@@ -126,15 +150,15 @@ def _write_event_fade_review_bundle(
         copied_sample=copied_sample,
         price_export=price_export_result,
         outcome_sample=outcome_sample,
-        queue_path=queue_path,
-        packet_path=packet_path,
-        balanced_packet_path=balanced_packet_path,
-        template_path=template_path,
-        balanced_template_path=balanced_template_path,
+        queue_path=paths["queue"],
+        packet_path=paths["packet"],
+        balanced_packet_path=paths["balanced_packet"],
+        template_path=paths["template"],
+        balanced_template_path=paths["balanced_template"],
         balanced_template_rows=len(balanced_template_rows),
-        report_path=report_path,
-        guide_path=guide_path,
-        readme_path=readme_path,
+        report_path=paths["report"],
+        guide_path=paths["guide"],
+        readme_path=paths["readme"],
         source_rows=len(source_rows),
         review_rows=len(review_rows),
         queue=queue,
@@ -154,24 +178,24 @@ def _write_event_fade_review_bundle(
         warnings=bundle_warnings,
         generated_at=generated_at,
     )
-    manifest_path.write_text(
+    paths["manifest"].write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    readme_path.write_text(
+    paths["readme"].write_text(
         _event_fade_review_bundle_readme(
             sample_path=sample_path,
             copied_sample=copied_sample,
             price_export=price_export_result,
             outcome_sample=outcome_sample,
-            queue_path=queue_path,
-            packet_path=packet_path,
-            balanced_packet_path=balanced_packet_path,
-            template_path=template_path,
-            balanced_template_path=balanced_template_path,
-            report_path=report_path,
-            guide_path=guide_path,
-            manifest_path=manifest_path,
+            queue_path=paths["queue"],
+            packet_path=paths["packet"],
+            balanced_packet_path=paths["balanced_packet"],
+            template_path=paths["template"],
+            balanced_template_path=paths["balanced_template"],
+            report_path=paths["report"],
+            guide_path=paths["guide"],
+            manifest_path=paths["manifest"],
             rows=len(review_rows),
             queue=queue,
             review=review,

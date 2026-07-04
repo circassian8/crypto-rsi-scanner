@@ -152,80 +152,88 @@ class NotificationDeliveryRecord:
     channel_summary: dict[str, Any] = field(default_factory=dict)
 
     def to_row(self) -> dict[str, Any]:
-        status_value = self.status_detail or self.delivery_state
-        if not status_value and self.would_send and self.send_guard_enabled is False:
-            status_value = "would_send_but_guard_disabled"
-        if not status_value:
-            status_value = self.state
-        if not status_value:
-            if self.sent:
-                status_value = DELIVERY_STATE_SENT
-            elif self.failed:
-                status_value = DELIVERY_STATE_FAILED
-            elif self.would_send:
-                status_value = DELIVERY_STATE_PREVIEW
-            else:
-                status_value = "not_due"
-        no_send_rehearsal = (
-            self.delivery_mode == DELIVERY_MODE_NO_SEND_REHEARSAL
-            or status_value == STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED
-            or (self.would_send is True and self.send_guard_enabled is False)
-        )
-        row = {
-            "schema_id": "notification_delivery_v1",
-            "schema_version": DELIVERY_SCHEMA_VERSION,
-            "row_type": "event_alpha_notification_delivery",
-            "delivery_id": self.delivery_id,
-            "run_id": self.run_id,
-            "alert_id": self.alert_id,
-            "profile": self.profile,
-            "namespace": self.namespace,
-            "artifact_namespace": self.namespace,
-            "lane": self.lane,
-            "route": self.route,
-            "content_hash": self.content_hash,
-            "dedupe_key": self.dedupe_key,
-            "dedupe_bucket": self.dedupe_bucket,
-            "requested_alert_id": self.requested_alert_id,
-            "core_opportunity_id": self.core_opportunity_id,
-            "core_opportunity_ids": list(self.core_opportunity_ids),
-            "canonical_symbol": self.canonical_symbol,
-            "canonical_symbols": list(self.canonical_symbols),
-            "canonical_coin_id": self.canonical_coin_id,
-            "canonical_coin_ids": list(self.canonical_coin_ids),
-            "canonical_card_path": self.canonical_card_path,
-            "canonical_card_paths": list(self.canonical_card_paths),
-            "feedback_target": self.feedback_target,
-            "feedback_targets": list(self.feedback_targets),
-            "source_alert_ids": list(self.source_alert_ids),
-            "notification_item_ids": list(self.notification_item_ids),
-            "identity_reconciled": bool(self.identity_reconciled),
-            "identity_reconciliation_reason": self.identity_reconciliation_reason,
-            "notification_preview_path": self.notification_preview_path,
-            "notification_preview_relpath": self.notification_preview_relpath,
-            "status": status_value,
-            "delivery_mode": self.delivery_mode,
-            "delivery_state": self.delivery_state,
-            "status_detail": status_value,
-            "send_guard_enabled": self.send_guard_enabled,
-            "no_send_rehearsal": bool(no_send_rehearsal),
-            "would_send": self.would_send,
-            "sent": self.sent,
-            "failed": self.failed,
-            "state": self.state,
-            "attempted_at": self.attempted_at,
-            "delivered_at": self.delivered_at,
-            "error_class": self.error_class,
-            "error_message_safe": self.error_message_safe,
-            "recipient_count": int(self.recipient_count or 0),
-            "delivered_count": int(self.delivered_count or 0),
-            "failed_count": int(self.failed_count or 0),
-            "chunk_count": int(self.chunk_count or 0),
-            "delivered_chunks": int(self.delivered_chunks or 0),
-            "failed_chunks": int(self.failed_chunks or 0),
-            "channel_summary": _json_ready(self.channel_summary or {}),
-        }
-        return event_artifact_paths.normalize_operator_path_fields(row)
+        return _notification_delivery_record_to_row(self)
+
+
+def _notification_delivery_status_value(record: NotificationDeliveryRecord) -> str:
+    status_value = record.status_detail or record.delivery_state
+    if not status_value and record.would_send and record.send_guard_enabled is False:
+        status_value = "would_send_but_guard_disabled"
+    if not status_value:
+        status_value = record.state
+    if status_value:
+        return str(status_value)
+    if record.sent:
+        return DELIVERY_STATE_SENT
+    if record.failed:
+        return DELIVERY_STATE_FAILED
+    if record.would_send:
+        return DELIVERY_STATE_PREVIEW
+    return "not_due"
+
+
+def _notification_delivery_record_to_row(record: NotificationDeliveryRecord) -> dict[str, Any]:
+    status_value = _notification_delivery_status_value(record)
+    no_send_rehearsal = (
+        record.delivery_mode == DELIVERY_MODE_NO_SEND_REHEARSAL
+        or status_value == STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED
+        or (record.would_send is True and record.send_guard_enabled is False)
+    )
+    row = {
+        "schema_id": "notification_delivery_v1",
+        "schema_version": DELIVERY_SCHEMA_VERSION,
+        "row_type": "event_alpha_notification_delivery",
+        "delivery_id": record.delivery_id,
+        "run_id": record.run_id,
+        "alert_id": record.alert_id,
+        "profile": record.profile,
+        "namespace": record.namespace,
+        "artifact_namespace": record.namespace,
+        "lane": record.lane,
+        "route": record.route,
+        "content_hash": record.content_hash,
+        "dedupe_key": record.dedupe_key,
+        "dedupe_bucket": record.dedupe_bucket,
+        "requested_alert_id": record.requested_alert_id,
+        "core_opportunity_id": record.core_opportunity_id,
+        "core_opportunity_ids": list(record.core_opportunity_ids),
+        "canonical_symbol": record.canonical_symbol,
+        "canonical_symbols": list(record.canonical_symbols),
+        "canonical_coin_id": record.canonical_coin_id,
+        "canonical_coin_ids": list(record.canonical_coin_ids),
+        "canonical_card_path": record.canonical_card_path,
+        "canonical_card_paths": list(record.canonical_card_paths),
+        "feedback_target": record.feedback_target,
+        "feedback_targets": list(record.feedback_targets),
+        "source_alert_ids": list(record.source_alert_ids),
+        "notification_item_ids": list(record.notification_item_ids),
+        "identity_reconciled": bool(record.identity_reconciled),
+        "identity_reconciliation_reason": record.identity_reconciliation_reason,
+        "notification_preview_path": record.notification_preview_path,
+        "notification_preview_relpath": record.notification_preview_relpath,
+        "status": status_value,
+        "delivery_mode": record.delivery_mode,
+        "delivery_state": record.delivery_state,
+        "status_detail": status_value,
+        "send_guard_enabled": record.send_guard_enabled,
+        "no_send_rehearsal": bool(no_send_rehearsal),
+        "would_send": record.would_send,
+        "sent": record.sent,
+        "failed": record.failed,
+        "state": record.state,
+        "attempted_at": record.attempted_at,
+        "delivered_at": record.delivered_at,
+        "error_class": record.error_class,
+        "error_message_safe": record.error_message_safe,
+        "recipient_count": int(record.recipient_count or 0),
+        "delivered_count": int(record.delivered_count or 0),
+        "failed_count": int(record.failed_count or 0),
+        "chunk_count": int(record.chunk_count or 0),
+        "delivered_chunks": int(record.delivered_chunks or 0),
+        "failed_chunks": int(record.failed_chunks or 0),
+        "channel_summary": _json_ready(record.channel_summary or {}),
+    }
+    return event_artifact_paths.normalize_operator_path_fields(row)
 
 
 @dataclass(frozen=True)

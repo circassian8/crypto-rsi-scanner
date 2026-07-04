@@ -16,8 +16,8 @@
     ]
   },
   "class_ownership_report": {
-    "classes_over_limit_count": 31,
-    "functions_over_limit_count": 62,
+    "classes_over_limit_count": 29,
+    "functions_over_limit_count": 56,
     "modules_with_multiple_public_classes_count": 82,
     "path": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
     "present": true,
@@ -29,10 +29,10 @@
   "cli_service_line_counts": {
     "crypto_rsi_scanner/cli/services/__init__.py": 8,
     "crypto_rsi_scanner/cli/services/event_alpha.py": 46,
-    "crypto_rsi_scanner/cli/services/event_alpha_fade_review.py": 493,
+    "crypto_rsi_scanner/cli/services/event_alpha_fade_review.py": 517,
     "crypto_rsi_scanner/cli/services/event_alpha_integrated.py": 479,
     "crypto_rsi_scanner/cli/services/event_alpha_namespace.py": 50,
-    "crypto_rsi_scanner/cli/services/event_alpha_outcomes.py": 365,
+    "crypto_rsi_scanner/cli/services/event_alpha_outcomes.py": 382,
     "crypto_rsi_scanner/cli/services/event_alpha_provider_preflights.py": 71,
     "crypto_rsi_scanner/cli/services/event_alpha_reports.py": 296,
     "crypto_rsi_scanner/cli/services/event_alpha_research.py": 994,
@@ -85,7 +85,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-04T02:17:33+00:00",
+  "generated_at": "2026-07-04T02:40:00+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -299,7 +299,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1061,
+      "line_count": 1069,
       "path": "crypto_rsi_scanner/event_alpha/notifications/delivery.py",
       "source_kind": "production"
     },
@@ -873,11 +873,11 @@
     "source_coverage": 1,
     "stale_artifacts": 1
   },
-  "production_classes_over_limit": 31,
+  "production_classes_over_limit": 29,
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 62,
+  "production_functions_over_limit": 56,
   "production_size_gate_status": "pass",
   "pytest_runtime_seconds": 11.538,
   "remaining_implementation_modules_by_package_target": {},

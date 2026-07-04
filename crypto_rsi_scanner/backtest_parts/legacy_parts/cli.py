@@ -67,7 +67,9 @@ def _validate_cli_args(p: argparse.ArgumentParser, args: argparse.Namespace) -> 
         p.error("--pit and --pit-volume are mutually exclusive")
     if args.compare_triggers and args.pit:
         p.error("--compare-triggers is not supported with --pit; use --pit-volume or the default Binance path")
-def main(argv=None) -> None:
+
+
+def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Backtest RSI setups vs regime base rates.")
     p.add_argument("--top-n", type=int, default=80, help="Top-N coins by mcap.")
     p.add_argument("--days", type=int, default=1460,
@@ -127,6 +129,43 @@ def main(argv=None) -> None:
     p.add_argument("--min-signals", type=int, default=0,
                    help="Exit non-zero if fewer than this many graded observations are produced.")
     p.add_argument("-v", "--verbose", action="store_true")
+    return p
+
+
+def _run_trigger_comparison_command(args: argparse.Namespace) -> None:
+    if args.export_priors:
+        log.warning("--export-priors is ignored with --compare-triggers")
+    pit_cache_dir = None if args.no_pit_cache else Path(args.pit_cache_dir).expanduser()
+    if args.pit_volume:
+        if args.fixture_dir:
+            log.warning("--fixture-dir is ignored with --pit-volume")
+        log.info("Volume-PIT trigger A/B: top-%d by trailing %dd volume (%dd history)...",
+                 args.top_n, args.volume_window, args.days)
+        results, ok = run_pit_volume_triggers(
+            args.top_n,
+            args.days,
+            cache_dir=pit_cache_dir,
+            refresh_cache=args.refresh_pit_cache,
+            volume_window=args.volume_window,
+        )
+    elif args.symbols:
+        universe = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+        log.info("Trigger A/B on %d symbols (%dd, paginated)...", len(universe), args.days)
+        results, ok = run_triggers(universe, args.days, fixture_dir=args.fixture_dir)
+    elif args.fixture_dir:
+        universe = fixture_symbols(args.fixture_dir)[:args.top_n]
+        log.info("Trigger A/B on %d symbols (%dd, paginated)...", len(universe), args.days)
+        results, ok = run_triggers(universe, args.days, fixture_dir=args.fixture_dir)
+    else:
+        universe = cg_top_symbols(args.top_n)
+        log.info("Trigger A/B on %d symbols (%dd, paginated)...", len(universe), args.days)
+        results, ok = run_triggers(universe, args.days, fixture_dir=args.fixture_dir)
+    log.info("Done: %d usable coins", ok)
+    print("\n" + format_trigger_comparison(results) + "\n")
+
+
+def main(argv=None) -> None:
+    p = _build_parser()
     args = p.parse_args(argv)
     _validate_cli_args(p, args)
 
@@ -136,35 +175,7 @@ def main(argv=None) -> None:
     )
 
     if args.compare_triggers:
-        if args.export_priors:
-            log.warning("--export-priors is ignored with --compare-triggers")
-        pit_cache_dir = None if args.no_pit_cache else Path(args.pit_cache_dir).expanduser()
-        if args.pit_volume:
-            if args.fixture_dir:
-                log.warning("--fixture-dir is ignored with --pit-volume")
-            log.info("Volume-PIT trigger A/B: top-%d by trailing %dd volume (%dd history)...",
-                     args.top_n, args.volume_window, args.days)
-            results, ok = run_pit_volume_triggers(
-                args.top_n,
-                args.days,
-                cache_dir=pit_cache_dir,
-                refresh_cache=args.refresh_pit_cache,
-                volume_window=args.volume_window,
-            )
-        elif args.symbols:
-            universe = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
-            log.info("Trigger A/B on %d symbols (%dd, paginated)...", len(universe), args.days)
-            results, ok = run_triggers(universe, args.days, fixture_dir=args.fixture_dir)
-        elif args.fixture_dir:
-            universe = fixture_symbols(args.fixture_dir)[:args.top_n]
-            log.info("Trigger A/B on %d symbols (%dd, paginated)...", len(universe), args.days)
-            results, ok = run_triggers(universe, args.days, fixture_dir=args.fixture_dir)
-        else:
-            universe = cg_top_symbols(args.top_n)
-            log.info("Trigger A/B on %d symbols (%dd, paginated)...", len(universe), args.days)
-            results, ok = run_triggers(universe, args.days, fixture_dir=args.fixture_dir)
-        log.info("Done: %d usable coins", ok)
-        print("\n" + format_trigger_comparison(results) + "\n")
+        _run_trigger_comparison_command(args)
         return
 
     if args.pit_volume:

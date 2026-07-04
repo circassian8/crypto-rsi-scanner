@@ -7,7 +7,17 @@ from __future__ import annotations
 
 from importlib import import_module as _import_module
 
-_MODULE_NAMES = ('bindings', 'preview', 'fixture_smoke', 'go_no_go', 'pack_export', 'send_readiness', 'final_check', 'delivery_reports')
+_MODULE_NAMES = (
+    'bindings',
+    'fixture_smoke_data',
+    'preview',
+    'fixture_smoke',
+    'go_no_go',
+    'pack_export',
+    'send_readiness',
+    'final_check',
+    'delivery_reports',
+)
 _MODULES = tuple(_import_module(f"{__name__}.{_name}") for _name in _MODULE_NAMES)
 _EXPORTS = {}
 for _module in _MODULES:

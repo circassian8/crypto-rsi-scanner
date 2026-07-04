@@ -177,6 +177,37 @@ def event_alpha_burn_in_readiness_report(
     print(event_alpha_burn_in_readiness.format_burn_in_readiness(readiness))
 
 
+def _burn_in_pack_artifact_doctor(
+    *,
+    artifacts: dict[str, Any],
+    context: Any,
+    artifact_namespace: str | None,
+    include_test_artifacts: bool,
+    include_legacy_artifacts: bool,
+) -> Any:
+    cards_dir = Path(config.EVENT_RESEARCH_CARDS_DIR)
+    return event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=artifacts["runs"].rows,
+        alert_rows=artifacts["alerts"].rows,
+        feedback_rows=artifacts["feedback_rows"],
+        outcome_rows=artifacts["outcome_rows"],
+        hypothesis_rows=artifacts["hypotheses"].rows,
+        core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
+        watchlist_rows=artifacts["watchlist"].entries,
+        incident_rows=artifacts["incidents"].rows,
+        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
+        card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
+        provider_health_rows=artifacts["provider_rows"],
+        llm_budget_rows=artifacts["budget_rows"],
+        profile=config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE or None,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+        inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
+        strict=bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT),
+    )
+
+
 def event_alpha_export_burn_in_pack(
     out_path: str,
     days: int = 7,
@@ -245,26 +276,12 @@ def event_alpha_export_burn_in_pack(
         include_test_artifacts=include_test_artifacts,
         include_legacy_artifacts=include_legacy_artifacts,
     )
-    cards_dir = Path(config.EVENT_RESEARCH_CARDS_DIR)
-    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
-        run_rows=artifacts["runs"].rows,
-        alert_rows=artifacts["alerts"].rows,
-        feedback_rows=artifacts["feedback_rows"],
-        outcome_rows=artifacts["outcome_rows"],
-        hypothesis_rows=artifacts["hypotheses"].rows,
-        core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
-        watchlist_rows=artifacts["watchlist"].entries,
-        incident_rows=artifacts["incidents"].rows,
-        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
-        card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
-        provider_health_rows=artifacts["provider_rows"],
-        llm_budget_rows=artifacts["budget_rows"],
-        profile=config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE or None,
+    doctor = _burn_in_pack_artifact_doctor(
+        artifacts=artifacts,
+        context=context,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_legacy_artifacts=include_legacy_artifacts,
-        inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
-        strict=bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT),
     )
     router_result = event_alpha_router.route_watchlist(
         artifacts["watchlist"],

@@ -241,6 +241,61 @@ def build_state_frames(
             "knife_bucket": knife.map(falling_knife_bucket),
         }, index=idx)
     return out
+
+
+def _append_backtest_signal_rows(
+    signals: list,
+    *,
+    closes: pd.Series,
+    closes_v: np.ndarray,
+    t: int,
+    n: int,
+    entry: float,
+    setup: str,
+    exp: str,
+    regime: str,
+    conv: int,
+    vol_t: float,
+    mom_t: float,
+    mkt: str,
+    label: str,
+    state: dict,
+) -> None:
+    for h in HORIZONS:
+        if t + h >= n or entry <= 0:
+            continue
+        ret = (closes_v[t + h] / entry - 1.0) * 100.0
+        signals.append({
+            "setup": setup, "exp": exp, "regime": regime, "h": h,
+            "ret": ret, "fav": favorable(exp, ret), "conv": conv,
+            "vol": vol_t, "mom": mom_t, "mkt": mkt,
+            "ts": closes.index[t], "symbol": label,
+            "vol_state": state.get("vol_state"),
+            "breadth_state": state.get("breadth_state"),
+            "rs_bucket": state.get("rs_bucket"),
+            "liquidity_bucket": state.get("liquidity_bucket"),
+            "knife_bucket": state.get("knife_bucket"),
+            "falling_knife_score": state.get("falling_knife_score"),
+        })
+
+
+def _regime_at(closes: pd.Series, sma_l: pd.Series, sma_s: pd.Series, t: int) -> str:
+    sl, ss = sma_l.iloc[t], sma_s.iloc[t]
+    if np.isnan(sl) or np.isnan(ss):
+        return "UNKNOWN"
+    price = closes.iloc[t]
+    slope = 0.0
+    j = t - config.REGIME_SLOPE_LOOKBACK
+    if j >= 0 and not np.isnan(sma_l.iloc[j]):
+        slope = sl - sma_l.iloc[j]
+    above, aligned = price > sl, ss > sl
+    if above and aligned and slope >= 0:
+        return "UPTREND"
+    if (not above) and (not aligned) and slope <= 0:
+        return "DOWNTREND"
+    return "RANGE"
+
+
 def walk_coin(df: pd.DataFrame, signals: list, regime_base: dict,
               cond_base: dict | None = None, member=None,
               mkt_arr=None, mkt_base: dict | None = None,
@@ -278,22 +333,6 @@ def walk_coin(df: pd.DataFrame, signals: list, regime_base: dict,
     sma_s = closes.rolling(config.REGIME_SHORT_MA).mean()
     sma_l = closes.rolling(config.REGIME_LONG_MA).mean()
 
-    def regime_at(t: int) -> str:
-        sl, ss = sma_l.iloc[t], sma_s.iloc[t]
-        if np.isnan(sl) or np.isnan(ss):
-            return "UNKNOWN"
-        price = closes.iloc[t]
-        slope = 0.0
-        j = t - config.REGIME_SLOPE_LOOKBACK
-        if j >= 0 and not np.isnan(sma_l.iloc[j]):
-            slope = sl - sma_l.iloc[j]
-        above, aligned = price > sl, ss > sl
-        if above and aligned and slope >= 0:
-            return "UPTREND"
-        if (not above) and (not aligned) and slope <= 0:
-            return "DOWNTREND"
-        return "RANGE"
-
     prev_in_ob = prev_in_os = False
     closes_v = closes.to_numpy()
     rsi_v = rsi_full.to_numpy()
@@ -303,7 +342,7 @@ def walk_coin(df: pd.DataFrame, signals: list, regime_base: dict,
         if np.isnan(cur_rsi):
             prev_in_ob = prev_in_os = False
             continue
-        regime = regime_at(t)
+        regime = _regime_at(closes, sma_l, sma_s, t)
         entry = closes_v[t]
 
         in_universe = member is None or bool(member[t])
@@ -378,19 +417,20 @@ def walk_coin(df: pd.DataFrame, signals: list, regime_base: dict,
             ),
         }
         conv = conviction_score(sig)
-        for h in HORIZONS:
-            if t + h >= n or entry <= 0:
-                continue
-            ret = (closes_v[t + h] / entry - 1.0) * 100.0
-            signals.append({
-                "setup": setup, "exp": exp, "regime": regime, "h": h,
-                "ret": ret, "fav": favorable(exp, ret), "conv": conv,
-                "vol": vol_t, "mom": mom_t, "mkt": mkt,
-                "ts": closes.index[t], "symbol": label,
-                "vol_state": state.get("vol_state"),
-                "breadth_state": state.get("breadth_state"),
-                "rs_bucket": state.get("rs_bucket"),
-                "liquidity_bucket": state.get("liquidity_bucket"),
-                "knife_bucket": state.get("knife_bucket"),
-                "falling_knife_score": state.get("falling_knife_score"),
-            })
+        _append_backtest_signal_rows(
+            signals,
+            closes=closes,
+            closes_v=closes_v,
+            t=t,
+            n=n,
+            entry=entry,
+            setup=setup,
+            exp=exp,
+            regime=regime,
+            conv=conv,
+            vol_t=vol_t,
+            mom_t=mom_t,
+            mkt=mkt,
+            label=label,
+            state=state,
+        )
