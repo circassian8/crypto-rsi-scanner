@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-04 - Final class ownership exceptions are documented
+**Status:** accepted
+**Decision:** The remaining 14 oversized classes are accepted refactor v2
+exceptions with explicit owner notes and revisit conditions in
+`research/REFACTOR_CLASS_OWNERSHIP_REPORT.md/json`. They are advisory class
+ownership debt only, not product behavior blockers, while reports must continue
+to expose `accepted_class_exceptions`, `remaining_class_ownership_debt`,
+`provider_class_split_status`, `storage_mixin_exception_status`, and
+`near_threshold_file_status`.
+**Why:** Splitting these provider adapters, LLM providers, storage mixins, and
+field-rich data models in a final cleanup pass would risk request contracts,
+redaction, no-call defaults, SQLite behavior, or schema identity semantics
+without adding user-visible value. The safer baseline is to document them
+precisely and keep progressive size gates blocking new violations.
+**Revisit when:** one of the recorded per-class revisit conditions triggers,
+such as a new provider mode, storage schema migration, shared provider
+transport, or schema v2 identity split.
+
 ## 2026-07-04 - Production size gates are separate from test and ownership debt
 **Status:** accepted
 **Decision:** Refactor acceptance distinguishes production file-size gates from

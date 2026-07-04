@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T09:57:47.511773+00:00`
+- generated_at: `2026-07-04T16:13:15.048255+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -16,7 +16,10 @@ Static source inventory only. This report does not call providers, send Telegram
 - test_files_over_1500_lines: `8`
 - classes_over_limit_count: `14`
 - functions_over_limit_count: `0`
+- accepted_class_exceptions_count: `14`
+- remaining_class_ownership_debt_count: `0`
 - modules_with_multiple_public_classes_count: `82`
+- modules_with_multiple_public_classes_status: `documented_advisory`
 - new_violation_count: `0`
 - moved_existing_violation_count: `15`
 - legacy_decomposition_gate_status: `pass`
@@ -113,6 +116,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 1135 |
 | `crypto_rsi_scanner/cli/services/legacy/rsi_scan.py` | 1103 |
 | `crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py` | 1078 |
+| `crypto_rsi_scanner/refactor_final_report.py` | 1072 |
 | `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1069 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1059 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1047 |
@@ -124,7 +128,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 989 |
 | `crypto_rsi_scanner/event_alpha/providers/source_registry.py` | 989 |
 | `crypto_rsi_scanner/event_alpha/artifacts/alerts.py` | 985 |
-| `crypto_rsi_scanner/refactor_final_report.py` | 984 |
 | `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 980 |
 | `crypto_rsi_scanner/event_alpha/radar/impact_hypothesis_store.py` | 980 |
 | `crypto_rsi_scanner/event_alpha/radar/incident_graph.py` | 975 |

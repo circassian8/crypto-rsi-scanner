@@ -9,6 +9,236 @@
       ".github/workflows/verify.yml"
     ]
   },
+  "class_ownership_cleanup": {
+    "accepted_class_exceptions_count": 14,
+    "modules_with_multiple_public_classes_status": "documented_advisory",
+    "near_threshold_file_status": [
+      {
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1489,
+        "path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1473,
+        "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1440,
+        "path": "crypto_rsi_scanner/cli/services/legacy/utility_commands.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1406,
+        "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1394,
+        "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1392,
+        "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1384,
+        "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1319,
+        "path": "crypto_rsi_scanner/config.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      }
+    ],
+    "provider_class_split_status": [
+      {
+        "accepted_exception": true,
+        "class_name": "BinanceAnnouncementProvider",
+        "line_count": 107,
+        "module": "crypto_rsi_scanner.event_providers.binance_announcements.legacy",
+        "over_limit": true,
+        "owner_note": "Do not split further without signed-listener fixture parity and secret-redaction tests.",
+        "reason": "Signed/public announcement compatibility core preserves old imports and WebSocket/fixture behavior.",
+        "revisit_condition": "Revisit when Binance public rehearsal becomes a first-class activated provider path.",
+        "source_path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py",
+        "split_status": "accepted_exception"
+      },
+      {
+        "accepted_exception": true,
+        "class_name": "BybitAnnouncementProvider",
+        "line_count": 79,
+        "module": "crypto_rsi_scanner.event_providers.bybit_announcements.legacy",
+        "over_limit": true,
+        "owner_note": "Avoid touching Bybit request/normalization behavior outside provider-activation work.",
+        "reason": "Small HTTP announcement adapter is only slightly over the advisory class limit and already package-scoped.",
+        "revisit_condition": "Revisit when adding another Bybit announcement endpoint or response shape.",
+        "source_path": "crypto_rsi_scanner/event_providers/bybit_announcements/legacy.py",
+        "split_status": "accepted_exception"
+      },
+      {
+        "accepted_exception": true,
+        "class_name": "CoinGeckoWatchlistMarketProvider",
+        "line_count": 116,
+        "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
+        "over_limit": true,
+        "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
+        "reason": "Fixture/live market enrichment adapter is below file-size gates and tightly coupled to request budgeting and no-live defaults.",
+        "revisit_condition": "Revisit when watchlist market enrichment gains another provider implementation.",
+        "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist_market.py",
+        "split_status": "accepted_exception"
+      },
+      {
+        "accepted_exception": false,
+        "class_name": "CoinalyzeDerivativesProvider",
+        "line_count": 54,
+        "module": "crypto_rsi_scanner.derivatives_providers.coinalyze.legacy",
+        "over_limit": false,
+        "owner_note": "",
+        "reason": "",
+        "revisit_condition": "",
+        "source_path": "crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py",
+        "split_status": "below_threshold"
+      },
+      {
+        "accepted_exception": true,
+        "class_name": "CryptoPanicProvider",
+        "line_count": 340,
+        "module": "crypto_rsi_scanner.event_providers.cryptopanic.legacy",
+        "over_limit": true,
+        "owner_note": "The package already has client/parser/request_ledger homes; moving the remaining class body should be its own provider parity pass.",
+        "reason": "Compatibility class still owns request hygiene, token redaction, quota/ledger telemetry, parser normalization, and fixture/live no-call behavior.",
+        "revisit_condition": "Revisit when CryptoPanic live activation or request-ledger semantics change.",
+        "source_path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py",
+        "split_status": "accepted_exception"
+      },
+      {
+        "accepted_exception": true,
+        "class_name": "GdeltProvider",
+        "line_count": 82,
+        "module": "crypto_rsi_scanner.event_providers.gdelt",
+        "over_limit": true,
+        "owner_note": "Keep current timeout/429 behavior stable; public-provider noise is expected.",
+        "reason": "No-key public provider is fail-soft and only slightly over the advisory limit.",
+        "revisit_condition": "Revisit when adding a second GDELT mode or durable request ledger.",
+        "source_path": "crypto_rsi_scanner/event_providers/gdelt.py",
+        "split_status": "accepted_exception"
+      },
+      {
+        "accepted_exception": true,
+        "class_name": "OpenAILLMExtractionProvider",
+        "line_count": 78,
+        "module": "crypto_rsi_scanner.llm_providers.openai_provider",
+        "over_limit": true,
+        "owner_note": "Keep quote-validation and no-live defaults stable.",
+        "reason": "Small extraction provider is barely over the advisory threshold and shares safety semantics with the relationship provider.",
+        "revisit_condition": "Revisit with a broader OpenAI provider transport split.",
+        "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py",
+        "split_status": "accepted_exception"
+      },
+      {
+        "accepted_exception": true,
+        "class_name": "OpenAILLMRelationshipProvider",
+        "line_count": 137,
+        "module": "crypto_rsi_scanner.llm_providers.openai_provider",
+        "over_limit": true,
+        "owner_note": "Do not alter LLM provider behavior during a refactor-only pass.",
+        "reason": "OpenAI relationship provider keeps request assembly, timeout/error handling, and structured parsing together behind explicit opt-in gates.",
+        "revisit_condition": "Revisit when adding a second live LLM backend or shared OpenAI transport abstraction.",
+        "source_path": "crypto_rsi_scanner/llm_providers/openai_provider.py",
+        "split_status": "accepted_exception"
+      },
+      {
+        "accepted_exception": true,
+        "class_name": "PredictionMarketEventsProvider",
+        "line_count": 83,
+        "module": "crypto_rsi_scanner.event_providers.prediction_market_events",
+        "over_limit": true,
+        "owner_note": "Split only when another prediction-market provider is added.",
+        "reason": "Small no-key prediction-market provider keeps fixture/live parsing in one stable adapter.",
+        "revisit_condition": "Revisit when Polymarket Gamma support grows beyond the current parser.",
+        "source_path": "crypto_rsi_scanner/event_providers/prediction_market_events.py",
+        "split_status": "accepted_exception"
+      },
+      {
+        "accepted_exception": true,
+        "class_name": "ProjectBlogRssProvider",
+        "line_count": 96,
+        "module": "crypto_rsi_scanner.event_providers.project_blog_rss",
+        "over_limit": true,
+        "owner_note": "Keep feed failure semantics stable unless adding a reusable RSS client layer.",
+        "reason": "RSS/Atom adapter is tightly coupled to per-feed fail-soft behavior and source normalization.",
+        "revisit_condition": "Revisit when project-blog sources get persistent request ledgers or richer feed classes.",
+        "source_path": "crypto_rsi_scanner/event_providers/project_blog_rss.py",
+        "split_status": "accepted_exception"
+      }
+    ],
+    "remaining_class_ownership_debt_count": 0,
+    "storage_mixin_exception_status": [
+      {
+        "accepted_exception": true,
+        "class_name": "MigrationsMixin",
+        "exception_status": "accepted_exception",
+        "line_count": 88,
+        "module": "crypto_rsi_scanner.storage_parts.migrations",
+        "over_limit": true,
+        "owner_note": "DB schema behavior must not change in this cleanup pass.",
+        "reason": "SQLite migration ownership is intentionally centralized to avoid untested schema drift.",
+        "revisit_condition": "Revisit only with explicit migration tests and backup/restore verification.",
+        "source_path": "crypto_rsi_scanner/storage_parts/migrations.py"
+      },
+      {
+        "accepted_exception": true,
+        "class_name": "SignalsMixin",
+        "exception_status": "accepted_exception",
+        "line_count": 129,
+        "module": "crypto_rsi_scanner.storage_parts.signals",
+        "over_limit": true,
+        "owner_note": "Avoid splitting storage write paths without SQLite roundtrip parity tests.",
+        "reason": "Signal persistence methods share schema assumptions, row serialization, and outcome lookup behavior.",
+        "revisit_condition": "Revisit when storage schema v2 or a repository layer is introduced.",
+        "source_path": "crypto_rsi_scanner/storage_parts/signals.py"
+      },
+      {
+        "accepted_exception": true,
+        "class_name": "WatchlistMixin",
+        "exception_status": "accepted_exception",
+        "line_count": 89,
+        "module": "crypto_rsi_scanner.storage_parts.watchlist",
+        "over_limit": true,
+        "owner_note": "No DB schema or paper/watchlist behavior changes in this refactor pass.",
+        "reason": "Watchlist persistence methods are stable DB helpers and only slightly exceed the advisory limit.",
+        "revisit_condition": "Revisit when watchlist storage grows new tables or migrations.",
+        "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
+      }
+    ]
+  },
   "doctor_registry_coverage": {
     "legacy_unregistered": 0,
     "legacy_unregistered_note": "",
@@ -29,7 +259,7 @@
     },
     "remaining_legacy_unregistered_details": []
   },
-  "generated_at": "2026-07-04T10:01:28+00:00",
+  "generated_at": "2026-07-04T16:14:09+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
   "known_remaining_blockers": [],
   "line_counts": {
@@ -132,10 +362,123 @@
   },
   "status": "accepted",
   "verification": {
-    "commands": [],
+    "commands": [
+      {
+        "command": "python3 tests/test_indicators.py",
+        "elapsed_seconds": 26.808,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q",
+        "elapsed_seconds": 27.569,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "python3 -m compileall -q crypto_rsi_scanner tests",
+        "elapsed_seconds": 0.059,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-size-gates PYTHON=python3",
+        "elapsed_seconds": 1.167,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-class-ownership-report PYTHON=python3",
+        "elapsed_seconds": 1.069,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-final-report PYTHON=python3",
+        "elapsed_seconds": 1.282,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-shim-report PYTHON=python3",
+        "elapsed_seconds": 0.057,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-integrated-radar-smoke PYTHON=python3",
+        "elapsed_seconds": 1.87,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-integrated-radar-doctor PYTHON=python3",
+        "elapsed_seconds": 0.822,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-notification-format-smoke PYTHON=python3",
+        "elapsed_seconds": 2.182,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-telegram-no-send-final-check-fast PYTHON=python3",
+        "elapsed_seconds": 3.006,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-preflight-smoke PYTHON=python3",
+        "elapsed_seconds": 0.761,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-preflight PYTHON=python3",
+        "elapsed_seconds": 0.678,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3",
+        "elapsed_seconds": 0.705,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3",
+        "elapsed_seconds": 1.981,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make verify PYTHON=python3",
+        "elapsed_seconds": 28.312,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      }
+    ],
     "failed_commands": 0,
     "status": "pass",
-    "total_commands": 0,
+    "total_commands": 16,
     "total_elapsed_seconds": null
   }
 }

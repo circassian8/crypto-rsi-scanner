@@ -411,6 +411,33 @@ def _class_ownership_summary(root: Path) -> dict[str, Any]:
         "classes_over_limit_count": int(data.get("classes_over_limit_count") or 0),
         "functions_over_limit_count": int(data.get("functions_over_limit_count") or 0),
         "modules_with_multiple_public_classes_count": int(data.get("modules_with_multiple_public_classes_count") or 0),
+        "accepted_class_exceptions_count": int(data.get("accepted_class_exceptions_count") or 0),
+        "accepted_class_exceptions": data.get("accepted_class_exceptions", []),
+        "remaining_class_ownership_debt_count": int(data.get("remaining_class_ownership_debt_count") or 0),
+        "remaining_class_ownership_debt": data.get("remaining_class_ownership_debt", []),
+        "provider_class_split_status": data.get("provider_class_split_status", []),
+        "storage_mixin_exception_status": data.get("storage_mixin_exception_status", []),
+        "near_threshold_file_status": data.get("near_threshold_file_status", []),
+        "modules_with_multiple_public_classes_status": data.get("modules_with_multiple_public_classes_status"),
+        "modules_with_multiple_public_classes_revisit_condition": data.get(
+            "modules_with_multiple_public_classes_revisit_condition"
+        ),
+    }
+
+
+def _class_ownership_final_fields(class_ownership: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "accepted_class_exceptions": class_ownership.get("accepted_class_exceptions", []),
+        "accepted_class_exceptions_count": class_ownership.get("accepted_class_exceptions_count"),
+        "remaining_class_ownership_debt": class_ownership.get("remaining_class_ownership_debt", []),
+        "remaining_class_ownership_debt_count": class_ownership.get("remaining_class_ownership_debt_count"),
+        "provider_class_split_status": class_ownership.get("provider_class_split_status", []),
+        "storage_mixin_exception_status": class_ownership.get("storage_mixin_exception_status", []),
+        "near_threshold_file_status": class_ownership.get("near_threshold_file_status", []),
+        "modules_with_multiple_public_classes_status": class_ownership.get("modules_with_multiple_public_classes_status"),
+        "modules_with_multiple_public_classes_revisit_condition": class_ownership.get(
+            "modules_with_multiple_public_classes_revisit_condition"
+        ),
     }
 
 
@@ -669,6 +696,7 @@ def build_refactor_final_report(
         "migrated_modules_this_run_count": len(MIGRATED_MODULES_THIS_RUN),
         "remaining_module_classification": classification,
         "class_ownership_report": class_ownership,
+        **_class_ownership_final_fields(class_ownership),
         "legacy_decomposition": legacy_inventory,
         "legacy_decomposition_gate_status": legacy_inventory["legacy_decomposition_gate_status"],
         "legacy_files_over_1500_lines": legacy_inventory["legacy_files_over_1500_lines"],
@@ -767,6 +795,9 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             f"- class_ownership_report: `{data.get('class_ownership_report', {}).get('path')}`",
             f"- class_ownership_classes_over_limit: `{data.get('class_ownership_report', {}).get('classes_over_limit_count')}`",
             f"- class_ownership_functions_over_limit: `{data.get('class_ownership_report', {}).get('functions_over_limit_count')}`",
+            f"- accepted_class_exceptions_count: `{data.get('accepted_class_exceptions_count')}`",
+            f"- remaining_class_ownership_debt_count: `{data.get('remaining_class_ownership_debt_count')}`",
+            f"- modules_with_multiple_public_classes_status: `{data.get('modules_with_multiple_public_classes_status')}`",
             f"- production_size_gate_status: `{data.get('production_size_gate_status')}`",
             f"- production_files_over_1500_lines: `{data.get('production_files_over_1500_lines')}`",
             f"- production_files_over_2000_lines: `{data.get('production_files_over_2000_lines')}`",
@@ -789,6 +820,7 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
     )
     _append_migrated_modules_section(lines, data)
     _append_production_size_section(lines, data)
+    _append_class_ownership_section(lines, data)
     _append_legacy_decomposition_section(lines, data)
     lines.extend(
         [
@@ -858,6 +890,62 @@ def _append_legacy_decomposition_section(lines: list[str], data: dict[str, Any])
     for row in data.get("largest_legacy_files", []):
         if isinstance(row, dict):
             lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
+
+
+def _append_class_ownership_section(lines: list[str], data: dict[str, Any]) -> None:
+    lines.extend(
+        [
+            "",
+            "## Class Ownership Cleanup",
+            "",
+            f"- accepted_class_exceptions_count: `{data.get('accepted_class_exceptions_count')}`",
+            f"- remaining_class_ownership_debt_count: `{data.get('remaining_class_ownership_debt_count')}`",
+            f"- modules_with_multiple_public_classes_status: `{data.get('modules_with_multiple_public_classes_status')}`",
+            f"- modules_with_multiple_public_classes_revisit_condition: {data.get('modules_with_multiple_public_classes_revisit_condition')}",
+            "",
+            "### Provider Class Split Status",
+            "",
+            "| class | module | lines | status | revisit condition |",
+            "|---|---|---:|---|---|",
+        ]
+    )
+    for row in data.get("provider_class_split_status", []):
+        if isinstance(row, dict):
+            lines.append(
+                f"| `{row.get('class_name')}` | `{row.get('module')}` | {row.get('line_count', 0)} | "
+                f"{row.get('split_status') or row.get('exception_status') or ''} | "
+                f"{row.get('revisit_condition') or ''} |"
+            )
+    lines.extend(
+        [
+            "",
+            "### Storage Mixin Exception Status",
+            "",
+            "| class | module | lines | status | revisit condition |",
+            "|---|---|---:|---|---|",
+        ]
+    )
+    for row in data.get("storage_mixin_exception_status", []):
+        if isinstance(row, dict):
+            lines.append(
+                f"| `{row.get('class_name')}` | `{row.get('module')}` | {row.get('line_count', 0)} | "
+                f"{row.get('exception_status') or ''} | {row.get('revisit_condition') or ''} |"
+            )
+    lines.extend(
+        [
+            "",
+            "### Near-Threshold Production Files",
+            "",
+            "| path | lines | status | revisit condition |",
+            "|---|---:|---|---|",
+        ]
+    )
+    for row in data.get("near_threshold_file_status", []):
+        if isinstance(row, dict):
+            lines.append(
+                f"| `{row.get('path')}` | {row.get('line_count', 0)} | {row.get('status') or ''} | "
+                f"{row.get('revisit_condition') or ''} |"
+            )
 
 
 def _append_production_size_section(lines: list[str], data: dict[str, Any]) -> None:

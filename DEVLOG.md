@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Document final class ownership exceptions · Codex
+**Why:** The final refactor cleanup still reported 14 oversized classes, but
+splitting the remaining provider adapters, storage mixins, LLM providers, and
+field-rich data models would risk stable request contracts, redaction, no-call
+defaults, SQLite behavior, or schema identity semantics for an advisory size
+threshold.
+**Changes:**
+- Added explicit accepted class exceptions to
+  `crypto_rsi_scanner/refactor_class_ownership_report.py` with owner notes and
+  revisit conditions for the remaining 14 oversized classes.
+- Propagated `accepted_class_exceptions`,
+  `remaining_class_ownership_debt`, `provider_class_split_status`,
+  `storage_mixin_exception_status`, and `near_threshold_file_status` through
+  the class ownership, size-gate, final, completion-map, and release-candidate
+  reports.
+- Regenerated refactor report artifacts. Current report state is
+  `classes_over_limit_count=14`, `accepted_class_exceptions_count=14`,
+  `remaining_class_ownership_debt_count=0`, `functions_over_limit_count=0`,
+  `production_files_over_1500_lines=0`, `legacy_files_over_1500_lines=0`, and
+  `new_violation_count=0`.
+- Updated `ROADMAP.md` and `DECISIONS.md` so future passes revisit these
+  classes only when their documented provider/storage/LLM/schema conditions
+  trigger.
+**Verify:** Passed the full safe cleanup harness and wrote
+`research/REFACTOR_VERIFICATION_RESULTS.json` with `16` commands,
+`0` failures: `python3 tests/test_indicators.py`;
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q`; `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make refactor-size-gates PYTHON=python3`;
+`make refactor-class-ownership-report PYTHON=python3`;
+`make refactor-final-report PYTHON=python3`; `make event-alpha-shim-report
+PYTHON=python3`; integrated radar smoke/doctor; notification format smoke;
+Telegram no-send final check; Coinalyze preflight smoke/preflight/no-send
+rehearsal; strict CryptoPanic artifact doctor; and `make verify PYTHON=python3`.
+`make refactor-completion-map PYTHON=python3` then accepted the release-candidate
+artifacts from the fresh verification record.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+live sends, trading, paper-trading behavior changes, execution/order logic,
+Event Alpha RSI writes, or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split artifact doctor diagnosis phases · Codex
 **Why:** The refactor burn-down still had one oversized production function:
 `diagnose_artifacts()` in the legacy artifact-doctor context loader. The

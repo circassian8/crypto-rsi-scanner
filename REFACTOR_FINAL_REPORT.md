@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T09:57:49+00:00`
+- generated_at: `2026-07-04T16:13:17+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -45,6 +45,9 @@ Research-only refactor gate report. This report does not call providers, send Te
 - class_ownership_report: `research/REFACTOR_CLASS_OWNERSHIP_REPORT.json`
 - class_ownership_classes_over_limit: `14`
 - class_ownership_functions_over_limit: `0`
+- accepted_class_exceptions_count: `14`
+- remaining_class_ownership_debt_count: `0`
+- modules_with_multiple_public_classes_status: `documented_advisory`
 - production_size_gate_status: `pass`
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
@@ -117,6 +120,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 1135 |
 | `crypto_rsi_scanner/cli/services/legacy/rsi_scan.py` | 1103 |
 | `crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py` | 1078 |
+| `crypto_rsi_scanner/refactor_final_report.py` | 1072 |
 | `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1069 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1059 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1047 |
@@ -128,7 +132,6 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 989 |
 | `crypto_rsi_scanner/event_alpha/providers/source_registry.py` | 989 |
 | `crypto_rsi_scanner/event_alpha/artifacts/alerts.py` | 985 |
-| `crypto_rsi_scanner/refactor_final_report.py` | 984 |
 | `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 980 |
 | `crypto_rsi_scanner/event_alpha/radar/impact_hypothesis_store.py` | 980 |
 | `crypto_rsi_scanner/event_alpha/radar/incident_graph.py` | 975 |
@@ -167,6 +170,50 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `tests/cli/__init__.py` | 1 |
 | `tests/event_alpha/__init__.py` | 1 |
 | `tests/rsi/__init__.py` | 1 |
+
+## Class Ownership Cleanup
+
+- accepted_class_exceptions_count: `14`
+- remaining_class_ownership_debt_count: `0`
+- modules_with_multiple_public_classes_status: `documented_advisory`
+- modules_with_multiple_public_classes_revisit_condition: Reduce package model/helper modules opportunistically when changing them; do not churn stable compatibility modules solely to reduce this advisory count.
+
+### Provider Class Split Status
+
+| class | module | lines | status | revisit condition |
+|---|---|---:|---|---|
+| `BinanceAnnouncementProvider` | `crypto_rsi_scanner.event_providers.binance_announcements.legacy` | 107 | accepted_exception | Revisit when Binance public rehearsal becomes a first-class activated provider path. |
+| `BybitAnnouncementProvider` | `crypto_rsi_scanner.event_providers.bybit_announcements.legacy` | 79 | accepted_exception | Revisit when adding another Bybit announcement endpoint or response shape. |
+| `CoinGeckoWatchlistMarketProvider` | `crypto_rsi_scanner.event_alpha.radar.watchlist_market` | 116 | accepted_exception | Revisit when watchlist market enrichment gains another provider implementation. |
+| `CoinalyzeDerivativesProvider` | `crypto_rsi_scanner.derivatives_providers.coinalyze.legacy` | 54 | below_threshold |  |
+| `CryptoPanicProvider` | `crypto_rsi_scanner.event_providers.cryptopanic.legacy` | 340 | accepted_exception | Revisit when CryptoPanic live activation or request-ledger semantics change. |
+| `GdeltProvider` | `crypto_rsi_scanner.event_providers.gdelt` | 82 | accepted_exception | Revisit when adding a second GDELT mode or durable request ledger. |
+| `OpenAILLMExtractionProvider` | `crypto_rsi_scanner.llm_providers.openai_provider` | 78 | accepted_exception | Revisit with a broader OpenAI provider transport split. |
+| `OpenAILLMRelationshipProvider` | `crypto_rsi_scanner.llm_providers.openai_provider` | 137 | accepted_exception | Revisit when adding a second live LLM backend or shared OpenAI transport abstraction. |
+| `PredictionMarketEventsProvider` | `crypto_rsi_scanner.event_providers.prediction_market_events` | 83 | accepted_exception | Revisit when Polymarket Gamma support grows beyond the current parser. |
+| `ProjectBlogRssProvider` | `crypto_rsi_scanner.event_providers.project_blog_rss` | 96 | accepted_exception | Revisit when project-blog sources get persistent request ledgers or richer feed classes. |
+
+### Storage Mixin Exception Status
+
+| class | module | lines | status | revisit condition |
+|---|---|---:|---|---|
+| `MigrationsMixin` | `crypto_rsi_scanner.storage_parts.migrations` | 88 | accepted_exception | Revisit only with explicit migration tests and backup/restore verification. |
+| `SignalsMixin` | `crypto_rsi_scanner.storage_parts.signals` | 129 | accepted_exception | Revisit when storage schema v2 or a repository layer is introduced. |
+| `WatchlistMixin` | `crypto_rsi_scanner.storage_parts.watchlist` | 89 | accepted_exception | Revisit when watchlist storage grows new tables or migrations. |
+
+### Near-Threshold Production Files
+
+| path | lines | status | revisit condition |
+|---|---:|---|---|
+| `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py` | 1498 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1489 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1473 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/cli/services/legacy/utility_commands.py` | 1440 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1406 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1394 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1384 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/config.py` | 1319 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 
 ## Legacy Decomposition Gate
 

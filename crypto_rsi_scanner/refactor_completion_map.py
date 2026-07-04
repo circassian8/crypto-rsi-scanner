@@ -107,6 +107,14 @@ def build_refactor_completion_map(
             "largest_production_files": size.get("largest_production_files", []),
             "production_classes_over_limit": size.get("production_classes_over_limit"),
             "production_functions_over_limit": size.get("production_functions_over_limit"),
+            "accepted_class_exceptions_count": size.get("accepted_class_exceptions_count"),
+            "remaining_class_ownership_debt_count": size.get("remaining_class_ownership_debt_count"),
+            "modules_with_multiple_public_classes_status": size.get(
+                "modules_with_multiple_public_classes_status"
+            ),
+            "provider_class_split_status": size.get("provider_class_split_status", []),
+            "storage_mixin_exception_status": size.get("storage_mixin_exception_status", []),
+            "near_threshold_file_status": size.get("near_threshold_file_status", []),
             "test_size_gate_status": size.get("test_size_gate_status"),
             "test_files_over_1500_lines": size.get("test_files_over_1500_lines"),
             "largest_test_files": size.get("largest_test_files", []),
@@ -128,6 +136,16 @@ def build_refactor_completion_map(
         },
         "schema_validation_coverage": _schema_validation_summary(root),
         "doctor_registry_coverage": final.get("doctor_plugin_migration", {}),
+        "class_ownership_cleanup": {
+            "accepted_class_exceptions_count": final.get("accepted_class_exceptions_count"),
+            "remaining_class_ownership_debt_count": final.get("remaining_class_ownership_debt_count"),
+            "provider_class_split_status": final.get("provider_class_split_status", []),
+            "storage_mixin_exception_status": final.get("storage_mixin_exception_status", []),
+            "near_threshold_file_status": final.get("near_threshold_file_status", []),
+            "modules_with_multiple_public_classes_status": final.get(
+                "modules_with_multiple_public_classes_status"
+            ),
+        },
         "namespace_lifecycle_inventory": final.get("namespace_lifecycle_inventory", {}),
         "ci_status": final.get("ci_static_safety", {}),
         "verification": verification,
@@ -164,6 +182,7 @@ def build_release_candidate_report(
         "shim_summary": completion["event_alpha_module_map"],
         "schema_validation_coverage": completion["schema_validation_coverage"],
         "doctor_registry_coverage": completion["doctor_registry_coverage"],
+        "class_ownership_cleanup": completion["class_ownership_cleanup"],
         "namespace_lifecycle_inventory": completion["namespace_lifecycle_inventory"],
         "ci_status": completion["ci_status"],
         "verification": completion["verification"],
@@ -213,6 +232,9 @@ def format_completion_markdown(data: dict[str, Any]) -> str:
         f"- production size gate status: `{data['size_gates'].get('production_size_gate_status')}`",
         f"- production files over 2000 lines: `{data['size_gates'].get('production_files_over_2000_lines')}`",
         f"- production files over 3000 lines: `{data['size_gates'].get('production_files_over_3000_lines')}`",
+        f"- accepted class exceptions: `{data['size_gates'].get('accepted_class_exceptions_count')}`",
+        f"- remaining class ownership debt: `{data['size_gates'].get('remaining_class_ownership_debt_count')}`",
+        f"- multiple public class module status: `{data['size_gates'].get('modules_with_multiple_public_classes_status')}`",
         f"- test size gate status: `{data['size_gates'].get('test_size_gate_status')}`",
         f"- legacy decomposition gate status: `{data['size_gates'].get('legacy_decomposition_gate_status')}`",
         f"- legacy files over 3000 lines: `{data['size_gates'].get('legacy_files_over_3000_lines')}`",
@@ -237,6 +259,14 @@ def format_completion_markdown(data: dict[str, Any]) -> str:
         lines.append("- none")
     lines.extend([
         "",
+        "## Class Ownership Cleanup",
+        "",
+        f"- accepted_class_exceptions_count: `{data['class_ownership_cleanup'].get('accepted_class_exceptions_count')}`",
+        f"- remaining_class_ownership_debt_count: `{data['class_ownership_cleanup'].get('remaining_class_ownership_debt_count')}`",
+        f"- modules_with_multiple_public_classes_status: `{data['class_ownership_cleanup'].get('modules_with_multiple_public_classes_status')}`",
+    ])
+    lines.extend([
+        "",
         "## Safety Invariants",
         "",
     ])
@@ -254,6 +284,8 @@ def format_release_markdown(data: dict[str, Any]) -> str:
         f"- verdict: {data['rc_verdict']}",
         f"- verification_failed_commands: `{data['verification'].get('failed_commands')}`",
         f"- verification_total_commands: `{data['verification'].get('total_commands')}`",
+        f"- accepted_class_exceptions_count: `{data['class_ownership_cleanup'].get('accepted_class_exceptions_count')}`",
+        f"- remaining_class_ownership_debt_count: `{data['class_ownership_cleanup'].get('remaining_class_ownership_debt_count')}`",
         "",
         "## Verification",
         "",
@@ -311,6 +343,8 @@ def _normalize_verification_results(results: dict[str, Any] | None) -> dict[str,
     if not isinstance(results, dict) or not results:
         return {"status": "not_run", "commands": [], "total_commands": 0, "failed_commands": 0}
     commands = results.get("commands")
+    if not isinstance(commands, list):
+        commands = results.get("results")
     if not isinstance(commands, list):
         commands = []
     failed = [row for row in commands if isinstance(row, dict) and int(row.get("returncode") or 0) != 0]
