@@ -1627,6 +1627,8 @@ def test_makefile_has_event_llm_extract_eval_target():
 def test_event_llm_extract_scanner_report_uses_runtime_config():
     import contextlib
     import io
+    import tempfile
+    from pathlib import Path
     from crypto_rsi_scanner import config, scanner, event_alpha_notification_delivery as delivery
 
     path = _llm_extraction_golden_fixture_path()
@@ -1656,8 +1658,10 @@ def test_event_llm_extract_scanner_report_uses_runtime_config():
         "EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES": config.EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES,
         "EVENT_LLM_EXTRACTOR_CACHE_PATH": config.EVENT_LLM_EXTRACTOR_CACHE_PATH,
         "EVENT_LLM_EXTRACTOR_PROMPT_VERSION": config.EVENT_LLM_EXTRACTOR_PROMPT_VERSION,
+        "EVENT_LLM_BUDGET_LEDGER_PATH": config.EVENT_LLM_BUDGET_LEDGER_PATH,
         "EVENT_LLM_MAX_PARALLEL_CALLS": config.EVENT_LLM_MAX_PARALLEL_CALLS,
     }
+    budget_tmp = tempfile.TemporaryDirectory()
     config.EVENT_DISCOVERY_EVENTS_PATH = path
     config.EVENT_DISCOVERY_ALIASES_PATH = _llm_golden_fixture_path()
     config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = None
@@ -1683,6 +1687,7 @@ def test_event_llm_extract_scanner_report_uses_runtime_config():
     config.EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES = True
     config.EVENT_LLM_EXTRACTOR_CACHE_PATH = None
     config.EVENT_LLM_EXTRACTOR_PROMPT_VERSION = "llm_raw_event_extraction_v1"
+    config.EVENT_LLM_BUDGET_LEDGER_PATH = Path(budget_tmp.name) / "event_llm_budget.json"
     config.EVENT_LLM_MAX_PARALLEL_CALLS = 1
     try:
         out = io.StringIO()
@@ -1695,6 +1700,7 @@ def test_event_llm_extract_scanner_report_uses_runtime_config():
     finally:
         for name, value in original.items():
             setattr(config, name, value)
+        budget_tmp.cleanup()
 
 
 def test_event_market_enrichment_from_coingecko_rows():
@@ -4571,6 +4577,7 @@ def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
         "EVENT_ALPHA_ARTIFACT_NAMESPACE",
         "EVENT_ALPHA_ARTIFACT_BASE_DIR",
         "EVENT_ALERTS_ENABLED",
+        "EVENT_LLM_BUDGET_LEDGER_PATH",
         "EVENT_LLM_EXTRACTOR_MODE",
         "EVENT_LLM_EXTRACTOR_PROVIDER",
         "EVENT_LLM_MODE",
@@ -4642,6 +4649,7 @@ def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
         config.EVENT_ALPHA_ARTIFACT_NAMESPACE = "test"
         config.EVENT_ALPHA_ARTIFACT_BASE_DIR = Path(tmp)
         config.EVENT_ALERTS_ENABLED = False
+        config.EVENT_LLM_BUDGET_LEDGER_PATH = Path(tmp) / "event_llm_budget.json"
         config.EVENT_LLM_EXTRACTOR_MODE = "advisory"
         config.EVENT_LLM_EXTRACTOR_PROVIDER = "fixture"
         config.EVENT_LLM_MODE = "shadow"

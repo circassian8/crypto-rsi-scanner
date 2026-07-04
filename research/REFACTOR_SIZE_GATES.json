@@ -131,7 +131,7 @@
     }
   ],
   "classes_over_limit_count": 14,
-  "existing_violation_count": 119,
+  "existing_violation_count": 118,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -145,7 +145,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 16084,
+      "line_count": 16092,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "severity": "warning",
       "source_kind": "test",
@@ -405,17 +405,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/router.py:_route_entry"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "evaluate_signal_quality_case",
-      "line_count": 211,
-      "module": "crypto_rsi_scanner.event_alpha.outcomes.quality.case_eval",
-      "public": true,
-      "qualname": "evaluate_signal_quality_case",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py:evaluate_signal_quality_case"
     },
     {
       "category": "function_over_150_lines",
@@ -1206,7 +1195,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 16084,
+      "line_count": 16092,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "source_kind": "test"
     },
@@ -1273,14 +1262,6 @@
       "public": false,
       "qualname": "_route_entry",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/router.py"
-    },
-    {
-      "function_name": "evaluate_signal_quality_case",
-      "line_count": 211,
-      "module": "crypto_rsi_scanner.event_alpha.outcomes.quality.case_eval",
-      "public": true,
-      "qualname": "evaluate_signal_quality_case",
-      "source_path": "crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py"
     },
     {
       "function_name": "_hypothesis_from_rule",
@@ -1371,9 +1352,9 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     }
   ],
-  "functions_over_limit_count": 15,
+  "functions_over_limit_count": 14,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T07:23:11.178385+00:00",
+  "generated_at": "2026-07-04T07:43:00.474909+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1701,7 +1682,7 @@
   "largest_test_files": [
     {
       "limit": 1500,
-      "line_count": 16084,
+      "line_count": 16092,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "source_kind": "test"
     },
@@ -2329,10 +2310,6 @@
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications"
     },
     {
-      "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/outcomes/quality.py:evaluate_signal_quality_case",
-      "current_violation_id": "function:crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py:evaluate_signal_quality_case"
-    },
-    {
       "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:_hypothesis_from_rule",
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/builder.py:_hypothesis_from_rule"
     },
@@ -2413,7 +2390,7 @@
       "current_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.models"
     }
   ],
-  "moved_existing_violation_count": 23,
+  "moved_existing_violation_count": 22,
   "new_violation_count": 0,
   "new_violations": [],
   "no_live_provider_calls": true,
@@ -2559,7 +2536,7 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 15,
+  "production_functions_over_limit": 14,
   "production_functions_over_limit_rows": [
     {
       "function_name": "diagnose_artifacts",
@@ -2584,14 +2561,6 @@
       "public": false,
       "qualname": "_route_entry",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/router.py"
-    },
-    {
-      "function_name": "evaluate_signal_quality_case",
-      "line_count": 211,
-      "module": "crypto_rsi_scanner.event_alpha.outcomes.quality.case_eval",
-      "public": true,
-      "qualname": "evaluate_signal_quality_case",
-      "source_path": "crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py"
     },
     {
       "function_name": "_hypothesis_from_rule",
@@ -2684,7 +2653,7 @@
   ],
   "production_size_gate_status": "pass",
   "research_only": true,
-  "resolved_violation_count": 85,
+  "resolved_violation_count": 86,
   "resolved_violation_ids": [
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
     "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
@@ -2749,6 +2718,7 @@
     "function:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:write_notification_plan_preview",
     "function:crypto_rsi_scanner/event_alpha/notifications/provider_status.py:build_event_discovery_provider_status",
     "function:crypto_rsi_scanner/event_alpha/notifications/readiness.py:build_send_readiness",
+    "function:crypto_rsi_scanner/event_alpha/outcomes/quality.py:evaluate_signal_quality_case",
     "function:crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py:run_no_send_rehearsal",
     "function:crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py:run_no_send_rehearsal",
     "function:crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py:_provider_rows",
@@ -2803,7 +2773,6 @@
     "function:crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py:diagnose_artifacts",
     "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications",
     "function:crypto_rsi_scanner/event_alpha/notifications/router.py:_route_entry",
-    "function:crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py:evaluate_signal_quality_case",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/builder.py:_hypothesis_from_rule",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py:_classify_path",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py:validate_impact_path",
@@ -2911,7 +2880,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 16084,
+      "line_count": 16092,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "severity": "warning",
       "source_kind": "test",
@@ -3171,17 +3140,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/router.py:_route_entry"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "evaluate_signal_quality_case",
-      "line_count": 211,
-      "module": "crypto_rsi_scanner.event_alpha.outcomes.quality.case_eval",
-      "public": true,
-      "qualname": "evaluate_signal_quality_case",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py:evaluate_signal_quality_case"
     },
     {
       "category": "function_over_150_lines",

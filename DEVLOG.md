@@ -17,6 +17,62 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split signal quality case evaluator · Codex
+**Why:** The refactor goal still has advisory oversized-function debt after the
+production and legacy size gates passed. `evaluate_signal_quality_case()` was a
+self-contained fixture evaluator for signal-quality cases, making it a safe
+behavior-preserving split target.
+**Changes:**
+- Split `crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py` so
+  `evaluate_signal_quality_case()` is now a 136-line orchestrator over focused
+  helpers for market confirmation, score components, routing caps, actual-result
+  assembly, causal mechanism status, and diagnostic visibility.
+- Preserved the existing expected/actual output keys, reason-code ordering,
+  identity-rejection cap behavior, and incident/market/evidence fields.
+- Isolated two LLM extraction fixture tests from the persistent local
+  `event_llm_budget.json` ledger by assigning temporary budget ledgers inside
+  the tests; this keeps runtime budget behavior unchanged while making tests
+  deterministic against stale local artifacts.
+- Regenerated refactor class ownership, size-gate, final, completion-map,
+  release-candidate, and shim reports. Current advisory inventory is `14`
+  classes and `14` functions over limits, with production size gates passing and
+  no active shim implementation leaks.
+- Updated `ROADMAP.md` to include `evaluate_signal_quality_case()` in the
+  completed ownership burn-down list.
+**Verify:** Focused checks passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha/test_outcomes.py -q`
+reported `50 passed`; the two isolated LLM fixture tests passed individually.
+Full safe checks passed: `python3 tests/test_indicators.py` reported
+`745/745 passed`; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q` reported
+`756 passed`; `python3 -m compileall -q crypto_rsi_scanner tests`; `make
+test-pytest-safe PYTHON=python3`; `make refactor-size-gates PYTHON=python3`;
+`make refactor-class-ownership-report PYTHON=python3`; `make
+refactor-final-report PYTHON=python3`; `make event-alpha-shim-report
+PYTHON=python3`; `make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`; `make
+event-alpha-notification-format-smoke PYTHON=python3`; `make
+event-alpha-telegram-no-send-final-check-fast PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-preflight PYTHON=python3`; `make
+event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`; `make
+event-alpha-source-coverage-report PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`;
+`make backtest-costs PYTHON=python3`; and `make verify PYTHON=python3` passed.
+**Notes/risks:** Behavior-preserving only. The strict CryptoPanic rehearsal
+doctor remains `WARN` with known non-blocking quality/incident warnings and no
+blockers. No live provider calls by default, live sends, trading, paper-trading
+behavior changes, execution/order logic, Event Alpha RSI writes, or Event
+Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split integrated radar doctor conflicts · Codex
 **Why:** The refactor goal still has advisory oversized-function debt after the
 production and legacy size gates passed. `_integrated_radar_artifact_conflicts()`

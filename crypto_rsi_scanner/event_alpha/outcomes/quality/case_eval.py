@@ -74,44 +74,20 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         (_normalized_event_for_case(case, raw),),
         {raw.raw_id: raw},
     )[0]
-    market = event_market_confirmation.evaluate_market_confirmation(
-        event_market_confirmation.EventMarketConfirmationInput(
-            market_snapshot=_mapping(case.get("market_snapshot")),
-            derivatives_snapshot=_mapping(case.get("derivatives_snapshot")),
-            supply_snapshot=_mapping(case.get("supply_snapshot")),
-            btc_context=_mapping(case.get("btc_context")),
-            sector_benchmark=_mapping(case.get("sector_benchmark")),
-            playbook_type=str(case.get("playbook_hint") or case.get("impact_category") or ""),
-            impact_category=str(case.get("impact_category") or ""),
-            now=case.get("now") or "2026-06-15T16:00:00Z",
-            market_context_observed_at=(
-                case.get("market_context_observed_at")
-                if "market_context_observed_at" in case
-                else raw.fetched_at.isoformat()
-            ),
-            market_context_source=str(case.get("market_context_source") or "fixture_signal_quality"),
-            market_context_max_age_hours=float(case.get("market_context_max_age_hours") or 6.0),
-            allow_stale_fixture_market_context=bool(case.get("allow_stale_fixture_market_context", True)),
-            stale_cap_level=str(case.get("stale_cap_level") or "weak"),
-        )
-    )
+    market = _market_confirmation_for_case(case, raw)
     evidence = event_evidence_quality.evaluate_evidence_quality(
         raw,
         hypothesis=hypothesis,
         symbol=symbol,
         coin_id=coin_id,
     )
-    components = dict(case.get("score_components") or {})
-    components.update({
-        "market_confirmation": market.market_confirmation_score,
-        "source_quality": evidence.evidence_quality_score,
-        "source_class": evidence.source_class,
-        "evidence_specificity": evidence.evidence_specificity,
-        "validation_strength": 95.0 if not identity_rejection and symbol else 30.0,
-        "candidate_asset_strength": 90.0 if not identity_rejection and symbol else 10.0,
-        "timing_event_window": float(case.get("timing_event_window") or components.get("event_clarity") or 70.0),
-        "liquidity_tradability": max(float(case.get("liquidity_tradability") or 0.0), market.market_confirmation_score),
-    })
+    components = _score_components_for_case(
+        case,
+        market=market,
+        evidence=evidence,
+        identity_rejection=identity_rejection,
+        symbol=symbol,
+    )
     verdict = event_opportunity_verdict.evaluate_opportunity(
         impact_path=impact,
         market_confirmation=market,
@@ -119,28 +95,21 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         hypothesis=hypothesis,
         score_components=components,
     )
-    opportunity_level = verdict.opportunity_level
-    route_tier = _route_tier(opportunity_level)
-    digest = verdict.digest_eligible
-    watchlist = verdict.watchlist_eligible
-    high_priority = verdict.high_priority_eligible
-    reason_codes = tuple(dict.fromkeys((
-        *(verdict.verdict_reason_codes or ()),
-        *(verdict.missing_requirements or ()),
-        *(evidence.reason_codes or ()),
-        *(market.reasons or ()),
-        *(market.warnings or ()),
-        impact.impact_path_reason,
-    )))
-    blocked = verdict.why_local_only or verdict.why_not_watchlist
-    if identity_rejection:
-        opportunity_level = "local_only"
-        route_tier = "STORE_ONLY"
-        digest = False
-        watchlist = False
-        high_priority = False
-        blocked = identity_rejection
-        reason_codes = tuple(dict.fromkeys((*reason_codes, identity_rejection, "needs_identity_validation")))
+    (
+        opportunity_level,
+        route_tier,
+        digest,
+        watchlist,
+        high_priority,
+        blocked,
+        reason_codes,
+    ) = _routing_outcome_for_case(
+        verdict,
+        evidence=evidence,
+        market=market,
+        impact=impact,
+        identity_rejection=identity_rejection,
+    )
     incident_hypothesis_generated = bool(
         case.get(
             "incident_hypothesis_generated",
@@ -185,7 +154,154 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         identity_rejection=identity_rejection,
         false_positive_reason=false_positive_reason,
     )
-    actual = {
+    actual = _actual_signal_quality_case(
+        raw=raw,
+        claims=claims,
+        archetype=archetype,
+        impact=impact,
+        market=market,
+        evidence=evidence,
+        incident=incident,
+        incident_relevance=incident_relevance,
+        core=core,
+        reported_impact_path=reported_impact_path,
+        reported_role=reported_role,
+        opportunity_level=opportunity_level,
+        route_tier=route_tier,
+        digest=digest,
+        watchlist=watchlist,
+        high_priority=high_priority,
+        reason_codes=reason_codes,
+        blocked=blocked,
+        identity_rejection=identity_rejection,
+        false_positive_reason=false_positive_reason,
+        brief_section=brief_section,
+    )
+    expected = _expected(case)
+    diffs, stages = _diff_expected(expected, actual)
+    return SignalQualityCaseResult(
+        case_id=case_id,
+        title=title,
+        passed=not diffs,
+        stage_failures=tuple(stages),
+        expected=expected,
+        actual=actual,
+        diffs=tuple(diffs),
+    )
+
+
+def _market_confirmation_for_case(
+    case: Mapping[str, Any],
+    raw: RawDiscoveredEvent,
+) -> event_market_confirmation.EventMarketConfirmationResult:
+    observed_at = (
+        case.get("market_context_observed_at")
+        if "market_context_observed_at" in case
+        else raw.fetched_at.isoformat()
+    )
+    return event_market_confirmation.evaluate_market_confirmation(
+        event_market_confirmation.EventMarketConfirmationInput(
+            market_snapshot=_mapping(case.get("market_snapshot")),
+            derivatives_snapshot=_mapping(case.get("derivatives_snapshot")),
+            supply_snapshot=_mapping(case.get("supply_snapshot")),
+            btc_context=_mapping(case.get("btc_context")),
+            sector_benchmark=_mapping(case.get("sector_benchmark")),
+            playbook_type=str(case.get("playbook_hint") or case.get("impact_category") or ""),
+            impact_category=str(case.get("impact_category") or ""),
+            now=case.get("now") or "2026-06-15T16:00:00Z",
+            market_context_observed_at=observed_at,
+            market_context_source=str(case.get("market_context_source") or "fixture_signal_quality"),
+            market_context_max_age_hours=float(case.get("market_context_max_age_hours") or 6.0),
+            allow_stale_fixture_market_context=bool(case.get("allow_stale_fixture_market_context", True)),
+            stale_cap_level=str(case.get("stale_cap_level") or "weak"),
+        )
+    )
+
+
+def _score_components_for_case(
+    case: Mapping[str, Any],
+    *,
+    market: event_market_confirmation.EventMarketConfirmationResult,
+    evidence: event_evidence_quality.EvidenceQualityResult,
+    identity_rejection: str | None,
+    symbol: str | None,
+) -> dict[str, Any]:
+    components = dict(case.get("score_components") or {})
+    components.update({
+        "market_confirmation": market.market_confirmation_score,
+        "source_quality": evidence.evidence_quality_score,
+        "source_class": evidence.source_class,
+        "evidence_specificity": evidence.evidence_specificity,
+        "validation_strength": 95.0 if not identity_rejection and symbol else 30.0,
+        "candidate_asset_strength": 90.0 if not identity_rejection and symbol else 10.0,
+        "timing_event_window": float(case.get("timing_event_window") or components.get("event_clarity") or 70.0),
+        "liquidity_tradability": max(float(case.get("liquidity_tradability") or 0.0), market.market_confirmation_score),
+    })
+    return components
+
+
+def _routing_outcome_for_case(
+    verdict: event_opportunity_verdict.OpportunityVerdict,
+    *,
+    evidence: event_evidence_quality.EvidenceQualityResult,
+    market: event_market_confirmation.EventMarketConfirmationResult,
+    impact: event_impact_path_validator.ImpactPathValidation,
+    identity_rejection: str | None,
+) -> tuple[str, str, bool, bool, bool, str | None, tuple[str, ...]]:
+    opportunity_level = verdict.opportunity_level
+    route_tier = _route_tier(opportunity_level)
+    digest = verdict.digest_eligible
+    watchlist = verdict.watchlist_eligible
+    high_priority = verdict.high_priority_eligible
+    reason_codes = tuple(dict.fromkeys((
+        *(verdict.verdict_reason_codes or ()),
+        *(verdict.missing_requirements or ()),
+        *(evidence.reason_codes or ()),
+        *(market.reasons or ()),
+        *(market.warnings or ()),
+        impact.impact_path_reason,
+    )))
+    blocked = verdict.why_local_only or verdict.why_not_watchlist
+    if identity_rejection:
+        opportunity_level = "local_only"
+        route_tier = "STORE_ONLY"
+        digest = False
+        watchlist = False
+        high_priority = False
+        blocked = identity_rejection
+        reason_codes = tuple(dict.fromkeys((*reason_codes, identity_rejection, "needs_identity_validation")))
+    return opportunity_level, route_tier, digest, watchlist, high_priority, blocked, reason_codes
+
+
+def _actual_signal_quality_case(
+    *,
+    raw: RawDiscoveredEvent,
+    claims: Iterable[Any],
+    archetype: str,
+    impact: event_impact_path_validator.ImpactPathValidation,
+    market: event_market_confirmation.EventMarketConfirmationResult,
+    evidence: event_evidence_quality.EvidenceQualityResult,
+    incident: Any,
+    incident_relevance: Mapping[str, Any],
+    core: Any,
+    reported_impact_path: str,
+    reported_role: str,
+    opportunity_level: str,
+    route_tier: str,
+    digest: bool,
+    watchlist: bool,
+    high_priority: bool,
+    reason_codes: tuple[str, ...],
+    blocked: str | None,
+    identity_rejection: str | None,
+    false_positive_reason: str,
+    brief_section: str,
+) -> dict[str, Any]:
+    catalyst_frame = (raw.raw_json if isinstance(raw.raw_json, Mapping) else {}).get(
+        "llm_catalyst_frame_validation",
+        {},
+    )
+    return {
         "impact_path_type": reported_impact_path,
         "candidate_role": reported_role,
         "claim_polarities": tuple(dict.fromkeys(claim.polarity for claim in claims)),
@@ -194,11 +310,7 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         "primary_subject": impact.primary_subject,
         "affected_ecosystem": impact.affected_ecosystem,
         "market_reaction_confirmed": market.level in {"weak", "moderate", "strong"},
-        "causal_mechanism_confirmed": impact.cause_status == "confirmed" or (
-            impact.impact_path_strength in {"strong", "medium"}
-            and impact.impact_path_type != "market_dislocation_unknown"
-            and impact.impact_path_reason not in {"alleged_exploit_unconfirmed", "cause_unknown_market_dislocation"}
-        ),
+        "causal_mechanism_confirmed": _causal_mechanism_confirmed(impact),
         "evidence_specificity": evidence.evidence_specificity,
         "market_confirmation_level": market.level,
         "market_context_freshness_status": market.market_context_freshness_status,
@@ -221,27 +333,14 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         "quality_blocked_link_count": incident_relevance.get("quality_blocked_link_count"),
         "unknown_role_link_count": incident_relevance.get("unknown_role_link_count"),
         "link_quality_reasons": incident_relevance.get("link_quality_reasons"),
-        "diagnostic_hidden_by_default": incident_relevance["incident_relevance_status"] in {
-            event_incident_store.RELEVANCE_RAW_OBSERVATION,
-            event_incident_store.RELEVANCE_EXTERNAL_CONTEXT_ONLY,
-            event_incident_store.RELEVANCE_DIAGNOSTIC_ONLY,
-            event_incident_store.RELEVANCE_REJECTED_INCIDENT,
-        },
+        "diagnostic_hidden_by_default": _incident_hidden_by_default(incident_relevance),
         "external_context_hidden_by_default": incident_relevance["incident_relevance_status"]
         == event_incident_store.RELEVANCE_EXTERNAL_CONTEXT_ONLY,
         "selected_main_frame_type": incident.main_frame_type,
         "background_frame_count": _frame_role_count(incident.frame_summary, {"background_context", "historical_context"}),
         "negated_frame_count": _frame_role_count(incident.frame_summary, {"negated_claim", "corrective_context"}),
-        "frame_rule_disagreement": bool(
-            (raw.raw_json if isinstance(raw.raw_json, Mapping) else {})
-            .get("llm_catalyst_frame_validation", {})
-            .get("frame_rule_disagreement", False)
-        ),
-        "frame_disagreement_resolution": (
-            (raw.raw_json if isinstance(raw.raw_json, Mapping) else {})
-            .get("llm_catalyst_frame_validation", {})
-            .get("resolution")
-        ),
+        "frame_rule_disagreement": bool(catalyst_frame.get("frame_rule_disagreement", False)),
+        "frame_disagreement_resolution": catalyst_frame.get("resolution"),
         "core_opportunity_id": core.core_opportunity_id if core is not None else None,
         "aggregation_status": "core_opportunity" if core is not None else "no_validated_core",
         "near_miss_inclusion": _near_miss_status(opportunity_level, route_tier, identity_rejection),
@@ -252,17 +351,23 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         "human_readable_reason": _human_readable_reason(blocked, identity_rejection, reason_codes),
         "frame_counter_status": "frame_present" if incident.main_frame_type else "frame_not_required_or_missing",
     }
-    expected = _expected(case)
-    diffs, stages = _diff_expected(expected, actual)
-    return SignalQualityCaseResult(
-        case_id=case_id,
-        title=title,
-        passed=not diffs,
-        stage_failures=tuple(stages),
-        expected=expected,
-        actual=actual,
-        diffs=tuple(diffs),
+
+
+def _causal_mechanism_confirmed(impact: event_impact_path_validator.ImpactPathValidation) -> bool:
+    return impact.cause_status == "confirmed" or (
+        impact.impact_path_strength in {"strong", "medium"}
+        and impact.impact_path_type != "market_dislocation_unknown"
+        and impact.impact_path_reason not in {"alleged_exploit_unconfirmed", "cause_unknown_market_dislocation"}
     )
+
+
+def _incident_hidden_by_default(incident_relevance: Mapping[str, Any]) -> bool:
+    return incident_relevance["incident_relevance_status"] in {
+        event_incident_store.RELEVANCE_RAW_OBSERVATION,
+        event_incident_store.RELEVANCE_EXTERNAL_CONTEXT_ONLY,
+        event_incident_store.RELEVANCE_DIAGNOSTIC_ONLY,
+        event_incident_store.RELEVANCE_REJECTED_INCIDENT,
+    }
 def format_signal_quality_eval(result: SignalQualityEvalResult) -> str:
     lines = [
         "=" * 76,

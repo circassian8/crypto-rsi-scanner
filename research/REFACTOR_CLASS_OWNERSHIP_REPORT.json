@@ -142,7 +142,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5439,
+  "function_count": 5445,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -168,14 +168,6 @@
       "public": false,
       "qualname": "_route_entry",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/router.py"
-    },
-    {
-      "function_name": "evaluate_signal_quality_case",
-      "line_count": 211,
-      "module": "crypto_rsi_scanner.event_alpha.outcomes.quality.case_eval",
-      "public": true,
-      "qualname": "evaluate_signal_quality_case",
-      "source_path": "crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py"
     },
     {
       "function_name": "_hypothesis_from_rule",
@@ -266,8 +258,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     }
   ],
-  "functions_over_limit_count": 15,
-  "generated_at": "2026-07-04T07:23:11.088804+00:00",
+  "functions_over_limit_count": 14,
+  "generated_at": "2026-07-04T07:43:01.484675+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -945,7 +937,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 15,
+  "production_functions_over_limit": 14,
   "production_functions_over_limit_rows": [
     {
       "function_name": "diagnose_artifacts",
@@ -970,14 +962,6 @@
       "public": false,
       "qualname": "_route_entry",
       "source_path": "crypto_rsi_scanner/event_alpha/notifications/router.py"
-    },
-    {
-      "function_name": "evaluate_signal_quality_case",
-      "line_count": 211,
-      "module": "crypto_rsi_scanner.event_alpha.outcomes.quality.case_eval",
-      "public": true,
-      "qualname": "evaluate_signal_quality_case",
-      "source_path": "crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py"
     },
     {
       "function_name": "_hypothesis_from_rule",
