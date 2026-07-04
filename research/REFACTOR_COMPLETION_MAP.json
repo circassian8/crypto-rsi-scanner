@@ -65,7 +65,7 @@
     "top_level_event_module_count": 125,
     "unmigrated_modules": 1
   },
-  "generated_at": "2026-07-04T08:12:54+00:00",
+  "generated_at": "2026-07-04T08:23:00+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
   "known_remaining_blockers": [],
   "live_provider_calls_allowed": false,
@@ -116,7 +116,7 @@
   "size_gates": {
     "classes_over_limit_count": 14,
     "files_over_limit_count": 8,
-    "functions_over_limit_count": 10,
+    "functions_over_limit_count": 9,
     "gate_status": "pass",
     "largest_legacy_files": [
       {
@@ -227,6 +227,12 @@
       },
       {
         "limit": 1500,
+        "line_count": 1394,
+        "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
         "line_count": 1392,
         "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
         "source_kind": "production"
@@ -259,12 +265,6 @@
         "limit": 1500,
         "line_count": 1261,
         "path": "crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 1247,
-        "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
         "source_kind": "production"
       },
       {
@@ -607,7 +607,7 @@
     "production_files_over_1500_lines": 0,
     "production_files_over_2000_lines": 0,
     "production_files_over_3000_lines": 0,
-    "production_functions_over_limit": 10,
+    "production_functions_over_limit": 9,
     "production_size_gate_status": "pass",
     "test_files_over_1500_lines": 8,
     "test_size_gate_status": "warning"

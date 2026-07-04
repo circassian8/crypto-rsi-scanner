@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T08:12:51.404460+00:00`
+- generated_at: `2026-07-04T08:22:56.736691+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -11,11 +11,11 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `10`
+- production_functions_over_limit: `9`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
 - classes_over_limit_count: `14`
-- functions_over_limit_count: `10`
+- functions_over_limit_count: `9`
 - modules_with_multiple_public_classes_count: `82`
 - new_violation_count: `0`
 - moved_existing_violation_count: `21`
@@ -103,13 +103,13 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1451 |
 | `crypto_rsi_scanner/cli/services/legacy/utility_commands.py` | 1440 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1406 |
+| `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1394 |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1384 |
 | `crypto_rsi_scanner/config.py` | 1319 |
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1298 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
 | `crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py` | 1261 |
-| `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1247 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1239 |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1222 |
@@ -215,7 +215,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py:_merge_family` | 245 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/market_confirmation.py:evaluate_market_confirmation` | 281 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/near_miss/refresh.py:_refresh_one_hypothesis` | 276 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py:evaluate_opportunity` | 245 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/pipeline.py:run_event_alpha_pipeline` | 244 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/pipeline.py:run_event_alpha_operating_cycle` | 347 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/validation/review.py:review_validation_sample` | 280 |

@@ -17,6 +17,50 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split opportunity verdict evaluator · Codex
+**Why:** The refactor goal still tracks advisory oversized-function debt after
+production and legacy size gates passed. `evaluate_opportunity()` is a pure
+Event Alpha verdict scorer with focused outcome and integrated-radar coverage,
+making it a safe behavior-preserving split target.
+**Changes:**
+- Split `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` so
+  `evaluate_opportunity()` is now a 94-line orchestrator over private helpers
+  for context extraction, score assembly, incident/ecosystem caps, direct/proxy
+  boosts, missing requirements, level selection, and freshness watchlist caps.
+- Preserved final score component keys, opportunity levels, reason codes,
+  missing requirements, manual-verification text, live-confirmation caps, and
+  market-freshness downgrade behavior.
+- Regenerated refactor class ownership, size-gate, final, completion-map,
+  release-candidate, and shim reports. Current advisory inventory is `14`
+  classes and `9` functions over limits, with production and legacy size gates
+  passing and no active shim implementation leaks.
+- Updated `ROADMAP.md` to include `evaluate_opportunity()` in the completed
+  ownership burn-down list.
+**Verify:** Focused verdict tests passed:
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha/test_outcomes.py::test_event_market_evidence_and_opportunity_verdict_quality_layers -q`
+reported `1 passed`; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha/test_integrated_radar.py -q -k 'opportunity or verdict or live_confirmation'`
+reported `15 passed, 225 deselected`; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+python3 -m pytest tests/event_alpha/test_outcomes.py -q -k 'opportunity or
+verdict or market_evidence or live_confirmation'` reported `2 passed, 48
+deselected`; broader files reported `240 passed` for integrated radar and `50
+passed` for outcomes. Full safe harness passed: `python3 tests/test_indicators.py`
+reported `745/745 passed`; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q` reported
+`756 passed`; `python3 -m compileall -q crypto_rsi_scanner tests`; `make
+test-pytest-safe PYTHON=python3`; refactor size/class/final/completion reports;
+shim report; integrated radar smoke/doctor; notification format smoke; Telegram
+no-send final check; evidence acquisition smoke; catalyst-frame e2e; Coinalyze
+preflight smoke/preflight/no-send rehearsal; source coverage, daily brief, and
+notify preview from artifacts for `notify_llm_deep_cryptopanic_rehearsal`;
+strict CryptoPanic artifact doctor; and `make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. The strict CryptoPanic rehearsal
+doctor remains `WARN` with known non-blocking quality/incident warnings and no
+blockers. No live provider calls by default, live sends, trading, paper-trading
+behavior changes, execution/order logic, Event Alpha RSI writes, or Event
+Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split impact path validator ownership · Codex
 **Why:** The refactor goal still tracks advisory oversized-function debt after
 production and legacy size gates passed. `validate_impact_path()` and

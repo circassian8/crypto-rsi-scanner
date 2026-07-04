@@ -67,6 +67,38 @@ class VerdictAwareUpgradeDowngradeText:
     missing_evidence_text: str
 
 
+@dataclass(frozen=True)
+class _OpportunityContext:
+    components: dict[str, Any]
+    path_strength: str
+    path_type: str
+    role: str
+    evidence_specificity: str
+    source_class: str
+    category: str
+    playbook: str
+    cause_status: str
+    claim_polarities: tuple[str, ...]
+    incident_confidence: float
+    market_reaction_confirmed: bool
+    causal_mechanism_confirmed: bool
+    market_freshness_status: str
+    market_freshness_cap_applied: bool
+
+
+@dataclass(frozen=True)
+class _OpportunityScores:
+    impact_score: float
+    market_score: float
+    evidence_score: float
+    timing_score: float
+    liquidity_score: float
+    resolver_score: float
+    incident_confidence: float
+    score: float
+    final_components: dict[str, float]
+
+
 def evaluate_opportunity(
     *,
     impact_path: event_impact_path_validator.ImpactPathValidation | None,
@@ -76,20 +108,105 @@ def evaluate_opportunity(
     score_components: Mapping[str, Any] | None = None,
 ) -> OpportunityVerdict:
     """Combine path, market, evidence, timing, liquidity, and resolver confidence."""
+    context = _opportunity_context(
+        impact_path=impact_path,
+        market_confirmation=market_confirmation,
+        evidence_quality=evidence_quality,
+        hypothesis=hypothesis,
+        score_components=score_components,
+    )
+    scores = _opportunity_scores(context, impact_path, market_confirmation, evidence_quality)
+    score = scores.score
+    reasons: list[str] = []
+    missing: list[str] = []
+    verify: list[str] = []
+    incident_score_cap: float | None = None
+    ecosystem_score_cap: float | None = None
+
+    hard_local = _hard_local_reason(
+        context.path_type,
+        context.role,
+        context.evidence_specificity,
+        context.source_class,
+        context.components,
+    )
+    if hard_local:
+        return _verdict(
+            score=min(score, 39.0),
+            level=OpportunityLevel.LOCAL_ONLY.value,
+            reason_codes=(hard_local,),
+            missing=(hard_local,),
+            verify=("confirm this is not source noise before reviewing further",),
+            why_local_only=hard_local,
+            why_not_watchlist=hard_local,
+            components=scores.final_components,
+        )
+
+    if context.path_type == event_impact_path_validator.ImpactPathType.GENERIC_COOCCURRENCE_ONLY.value:
+        reasons.append("generic_cooccurrence_cap")
+        score = min(score, 49.0)
+        missing.append("explained_token_impact_path")
+        verify.append("find source text explaining why the catalyst affects the token")
+
+    if context.cause_status == "ruled_out" and context.path_type == event_impact_path_validator.ImpactPathType.EXPLOIT_SECURITY_EVENT.value:
+        return _verdict(
+            score=min(score, 39.0),
+            level=OpportunityLevel.LOCAL_ONLY.value,
+            reason_codes=("incident_cause_ruled_out",),
+            missing=("confirmed_causal_mechanism",),
+            verify=("do not treat ruled-out exploit language as an exploit catalyst",),
+            why_local_only="incident_cause_ruled_out",
+            why_not_watchlist="incident_cause_ruled_out",
+            components=scores.final_components,
+        )
+
+    score, incident_score_cap, ecosystem_score_cap, weak_macro = _apply_opportunity_caps(
+        score,
+        context,
+        scores,
+        reasons,
+        missing,
+        verify,
+    )
+    direct_event = _is_direct_event(context)
+    proxy_event = _is_proxy_event(context)
+    score = _apply_opportunity_boosts(score, context, scores, direct_event, proxy_event, reasons)
+    if incident_score_cap is not None:
+        score = min(score, incident_score_cap)
+    if ecosystem_score_cap is not None:
+        score = min(score, ecosystem_score_cap)
+    _append_opportunity_missing_requirements(context, scores, reasons, missing, verify)
+    level = _opportunity_level(score, context, scores, weak_macro=weak_macro)
+    level = _apply_freshness_watchlist_cap(level, score, context, scores, reasons, missing, verify)
+
+    why_local = None if level != OpportunityLevel.LOCAL_ONLY.value else (missing[0] if missing else "score_below_digest_threshold")
+    why_not_watchlist = None if level in {OpportunityLevel.WATCHLIST.value, OpportunityLevel.HIGH_PRIORITY.value} else (
+        missing[0] if missing else "score_or_confirmation_below_watchlist_threshold"
+    )
+    return _verdict(
+        score=score,
+        level=level,
+        reason_codes=tuple(dict.fromkeys(reasons or ("scored_by_final_opportunity_model",))),
+        missing=tuple(dict.fromkeys(missing)),
+        verify=tuple(dict.fromkeys(verify or ("verify source, catalyst timing, market reaction, and liquidity",))),
+        why_local_only=why_local,
+        why_not_watchlist=why_not_watchlist,
+        components=scores.final_components,
+    )
+
+
+def _opportunity_context(
+    *,
+    impact_path: event_impact_path_validator.ImpactPathValidation | None,
+    market_confirmation: event_market_confirmation.EventMarketConfirmationResult | None,
+    evidence_quality: event_evidence_quality.EvidenceQualityResult | None,
+    hypothesis: object | None,
+    score_components: Mapping[str, Any] | None,
+) -> _OpportunityContext:
     components = dict(score_components or getattr(hypothesis, "score_components", {}) or {})
     path_strength = str(getattr(impact_path, "impact_path_strength", "") or components.get("impact_path_strength") or "")
     path_type = str(getattr(impact_path, "impact_path_type", "") or components.get("impact_path_type") or "")
     role = str(getattr(impact_path, "candidate_role", "") or components.get("candidate_role") or "")
-    evidence_specificity = str(getattr(evidence_quality, "evidence_specificity", "") or components.get("evidence_specificity") or "")
-    source_class = str(getattr(evidence_quality, "source_class", "") or components.get("source_class") or "")
-    category = str(getattr(hypothesis, "impact_category", "") or components.get("impact_category") or "")
-    playbook = str(getattr(hypothesis, "playbook_hint", "") or components.get("playbook_type") or category)
-    cause_status = str(
-        getattr(impact_path, "cause_status", "")
-        or getattr(hypothesis, "cause_status", "")
-        or components.get("cause_status")
-        or ""
-    )
     claim_polarities = tuple(
         str(value)
         for value in (
@@ -100,22 +217,50 @@ def evaluate_opportunity(
         )
         if str(value)
     )
-    incident_confidence = _score(
-        components.get("incident_confidence"),
-        getattr(hypothesis, "incident_confidence", None),
-    )
-    market_reaction_confirmed = bool(
-        components.get("market_reaction_confirmed")
-        if components.get("market_reaction_confirmed") is not None
-        else getattr(hypothesis, "market_reaction_confirmed", False)
-    )
-    causal_mechanism_confirmed = bool(
-        components.get("causal_mechanism_confirmed")
-        if components.get("causal_mechanism_confirmed") is not None
-        else getattr(hypothesis, "causal_mechanism_confirmed", False)
+    return _OpportunityContext(
+        components=components,
+        path_strength=path_strength,
+        path_type=path_type,
+        role=role,
+        evidence_specificity=str(getattr(evidence_quality, "evidence_specificity", "") or components.get("evidence_specificity") or ""),
+        source_class=str(getattr(evidence_quality, "source_class", "") or components.get("source_class") or ""),
+        category=str(getattr(hypothesis, "impact_category", "") or components.get("impact_category") or ""),
+        playbook=str(getattr(hypothesis, "playbook_hint", "") or components.get("playbook_type") or getattr(hypothesis, "impact_category", "") or components.get("impact_category") or ""),
+        cause_status=str(
+            getattr(impact_path, "cause_status", "")
+            or getattr(hypothesis, "cause_status", "")
+            or components.get("cause_status")
+            or ""
+        ),
+        claim_polarities=claim_polarities,
+        incident_confidence=_score(components.get("incident_confidence"), getattr(hypothesis, "incident_confidence", None)),
+        market_reaction_confirmed=bool(
+            components.get("market_reaction_confirmed")
+            if components.get("market_reaction_confirmed") is not None
+            else getattr(hypothesis, "market_reaction_confirmed", False)
+        ),
+        causal_mechanism_confirmed=bool(
+            components.get("causal_mechanism_confirmed")
+            if components.get("causal_mechanism_confirmed") is not None
+            else getattr(hypothesis, "causal_mechanism_confirmed", False)
+        ),
+        market_freshness_status=str(getattr(market_confirmation, "market_context_freshness_status", "") or components.get("market_context_freshness_status") or ""),
+        market_freshness_cap_applied=bool(
+            getattr(market_confirmation, "freshness_cap_applied", False)
+            or components.get("freshness_cap_applied")
+            or components.get("market_context_freshness_cap_applied")
+        ),
     )
 
-    impact_score = _path_strength_score(path_strength)
+
+def _opportunity_scores(
+    context: _OpportunityContext,
+    impact_path: event_impact_path_validator.ImpactPathValidation | None,
+    market_confirmation: event_market_confirmation.EventMarketConfirmationResult | None,
+    evidence_quality: event_evidence_quality.EvidenceQualityResult | None,
+) -> _OpportunityScores:
+    components = context.components
+    impact_score = _path_strength_score(context.path_strength)
     market_score = _score(getattr(market_confirmation, "market_confirmation_score", None), components.get("market_confirmation"))
     evidence_score = _score(getattr(evidence_quality, "evidence_quality_score", None), components.get("source_quality"))
     timing_score = _score(components.get("timing_event_window"), components.get("event_time_quality"), components.get("event_clarity"))
@@ -133,16 +278,10 @@ def evaluate_opportunity(
         "timing_event_window": timing_score,
         "liquidity_tradability": liquidity_score,
         "llm_resolver_confidence": resolver_score,
-        "incident_confidence": incident_confidence,
-        "market_reaction_confirmed": 100.0 if market_reaction_confirmed else 0.0,
-        "causal_mechanism_confirmed": 100.0 if causal_mechanism_confirmed else 0.0,
+        "incident_confidence": context.incident_confidence,
+        "market_reaction_confirmed": 100.0 if context.market_reaction_confirmed else 0.0,
+        "causal_mechanism_confirmed": 100.0 if context.causal_mechanism_confirmed else 0.0,
     }
-    market_freshness_status = str(getattr(market_confirmation, "market_context_freshness_status", "") or components.get("market_context_freshness_status") or "")
-    market_freshness_cap_applied = bool(
-        getattr(market_confirmation, "freshness_cap_applied", False)
-        or components.get("freshness_cap_applied")
-        or components.get("market_context_freshness_cap_applied")
-    )
     score = (
         impact_score * 0.30
         + market_score * 0.25
@@ -151,167 +290,175 @@ def evaluate_opportunity(
         + liquidity_score * 0.10
         + resolver_score * 0.05
     )
-    reasons: list[str] = []
-    missing: list[str] = []
-    verify: list[str] = []
+    return _OpportunityScores(
+        impact_score=impact_score,
+        market_score=market_score,
+        evidence_score=evidence_score,
+        timing_score=timing_score,
+        liquidity_score=liquidity_score,
+        resolver_score=resolver_score,
+        incident_confidence=context.incident_confidence,
+        score=score,
+        final_components=final_components,
+    )
+
+
+def _apply_opportunity_caps(
+    score: float,
+    context: _OpportunityContext,
+    scores: _OpportunityScores,
+    reasons: list[str],
+    missing: list[str],
+    verify: list[str],
+) -> tuple[float, float | None, float | None, bool]:
     incident_score_cap: float | None = None
     ecosystem_score_cap: float | None = None
-
-    hard_local = _hard_local_reason(path_type, role, evidence_specificity, source_class, components)
-    if hard_local:
-        return _verdict(
-            score=min(score, 39.0),
-            level=OpportunityLevel.LOCAL_ONLY.value,
-            reason_codes=(hard_local,),
-            missing=(hard_local,),
-            verify=("confirm this is not source noise before reviewing further",),
-            why_local_only=hard_local,
-            why_not_watchlist=hard_local,
-            components=final_components,
-        )
-
-    if path_type == event_impact_path_validator.ImpactPathType.GENERIC_COOCCURRENCE_ONLY.value:
-        reasons.append("generic_cooccurrence_cap")
-        score = min(score, 49.0)
-        missing.append("explained_token_impact_path")
-        verify.append("find source text explaining why the catalyst affects the token")
-
-    if cause_status == "ruled_out" and path_type == event_impact_path_validator.ImpactPathType.EXPLOIT_SECURITY_EVENT.value:
-        return _verdict(
-            score=min(score, 39.0),
-            level=OpportunityLevel.LOCAL_ONLY.value,
-            reason_codes=("incident_cause_ruled_out",),
-            missing=("confirmed_causal_mechanism",),
-            verify=("do not treat ruled-out exploit language as an exploit catalyst",),
-            why_local_only="incident_cause_ruled_out",
-            why_not_watchlist="incident_cause_ruled_out",
-            components=final_components,
-        )
-
-    if cause_status in {"suspected", "unknown"} or any(value in {"rumored", "alleged", "uncertain"} for value in claim_polarities):
-        if path_type == event_impact_path_validator.ImpactPathType.EXPLOIT_SECURITY_EVENT.value:
+    if context.cause_status in {"suspected", "unknown"} or any(value in {"rumored", "alleged", "uncertain"} for value in context.claim_polarities):
+        if context.path_type == event_impact_path_validator.ImpactPathType.EXPLOIT_SECURITY_EVENT.value:
             reasons.append("unconfirmed_incident_cause_cap")
             incident_score_cap = 59.0
             missing.append("confirmed_incident_cause")
             verify.append("confirm whether the suspected incident cause was later confirmed or ruled out")
-
-    if role == event_impact_path_validator.CandidateRole.ECOSYSTEM_AFFECTED_ASSET.value and not market_reaction_confirmed:
+    if context.role == event_impact_path_validator.CandidateRole.ECOSYSTEM_AFFECTED_ASSET.value and not context.market_reaction_confirmed:
         reasons.append("ecosystem_asset_requires_market_reaction")
         ecosystem_score_cap = 64.0
         missing.append("ecosystem_market_reaction_confirmation")
         verify.append("verify contagion into the affected ecosystem asset, not only the third-party incident")
-
-    weak_macro = path_strength in {"weak", "none"} or path_type in {
+    weak_macro = context.path_strength in {"weak", "none"} or context.path_type in {
         event_impact_path_validator.ImpactPathType.MACRO_ATTENTION_ONLY.value,
         event_impact_path_validator.ImpactPathType.TECHNOLOGY_RISK.value,
         event_impact_path_validator.ImpactPathType.MARKET_STRUCTURE_POLICY.value,
     }
-    if weak_macro and market_score < 75:
+    if weak_macro and scores.market_score < 75:
         reasons.append("weak_macro_requires_strong_market_confirmation")
         score = min(score, 54.0)
         missing.append("needs_strong_market_confirmation")
         verify.append("verify abnormal market reaction, not just policy/macro co-occurrence")
+    return score, incident_score_cap, ecosystem_score_cap, weak_macro
 
-    direct_event = path_type in {
+
+def _is_direct_event(context: _OpportunityContext) -> bool:
+    return context.path_type in {
         event_impact_path_validator.ImpactPathType.DIRECT_TOKEN_EVENT.value,
         event_impact_path_validator.ImpactPathType.STRATEGIC_INVESTMENT_OR_VALUATION.value,
         event_impact_path_validator.ImpactPathType.LISTING_LIQUIDITY_EVENT.value,
         event_impact_path_validator.ImpactPathType.UNLOCK_SUPPLY_EVENT.value,
         event_impact_path_validator.ImpactPathType.EXPLOIT_SECURITY_EVENT.value,
-    } or "listing" in category or "unlock" in category or "security" in category
-    proxy_event = role in {
+    } or "listing" in context.category or "unlock" in context.category or "security" in context.category
+
+
+def _is_proxy_event(context: _OpportunityContext) -> bool:
+    return context.role in {
         event_impact_path_validator.CandidateRole.PROXY_INSTRUMENT.value,
         event_impact_path_validator.CandidateRole.PROXY_VENUE.value,
-    } or "proxy" in playbook
+    } or "proxy" in context.playbook
 
-    if direct_event and evidence_score >= 75:
+
+def _apply_opportunity_boosts(
+    score: float,
+    context: _OpportunityContext,
+    scores: _OpportunityScores,
+    direct_event: bool,
+    proxy_event: bool,
+    reasons: list[str],
+) -> float:
+    if direct_event and scores.evidence_score >= 75:
         reasons.append("direct_token_event_with_strong_evidence")
         score = max(score, 66.0)
-    if direct_event and evidence_score >= 75 and market_score >= 50:
+    if direct_event and scores.evidence_score >= 75 and scores.market_score >= 50:
         reasons.append("direct_token_event_market_confirmed")
         score = max(score, 78.0)
     if (
         direct_event
-        and role == event_impact_path_validator.CandidateRole.DIRECT_SUBJECT.value
-        and cause_status == "confirmed"
-        and incident_confidence >= 65
+        and context.role == event_impact_path_validator.CandidateRole.DIRECT_SUBJECT.value
+        and context.cause_status == "confirmed"
+        and scores.incident_confidence >= 65
     ):
         reasons.append("confirmed_direct_incident")
         score = max(score, 72.0)
     if (
         direct_event
-        and role == event_impact_path_validator.CandidateRole.DIRECT_SUBJECT.value
-        and causal_mechanism_confirmed
-        and market_reaction_confirmed
+        and context.role == event_impact_path_validator.CandidateRole.DIRECT_SUBJECT.value
+        and context.causal_mechanism_confirmed
+        and context.market_reaction_confirmed
     ):
         reasons.append("confirmed_causal_incident_with_market_reaction")
         score = max(score, 80.0)
-    if proxy_event and path_strength in {"strong", "medium"} and evidence_score >= 65:
+    if proxy_event and context.path_strength in {"strong", "medium"} and scores.evidence_score >= 65:
         reasons.append("proxy_impact_path_explained")
         score = max(score, 65.0)
-    if proxy_event and market_score >= 50:
+    if proxy_event and scores.market_score >= 50:
         reasons.append("proxy_market_attention_confirmed")
         score = max(score, 76.0)
-    if incident_score_cap is not None:
-        score = min(score, incident_score_cap)
-    if ecosystem_score_cap is not None:
-        score = min(score, ecosystem_score_cap)
-    if market_score < 40:
+    return score
+
+
+def _append_opportunity_missing_requirements(
+    context: _OpportunityContext,
+    scores: _OpportunityScores,
+    reasons: list[str],
+    missing: list[str],
+    verify: list[str],
+) -> None:
+    if scores.market_score < 40:
         missing.append("market_confirmation")
         verify.append("check price, volume, OI/funding, and liquidity before treating as watchlist")
-    if market_freshness_status in {"stale", "missing", "unknown"} or market_freshness_cap_applied:
+    if context.market_freshness_status in {"stale", "missing", "unknown"} or context.market_freshness_cap_applied:
         reasons.append(
             {
                 "stale": "market_context_stale_capped",
                 "missing": "market_context_missing",
                 "unknown": "market_context_unknown_timestamp",
-            }.get(market_freshness_status, "market_context_stale_capped")
+            }.get(context.market_freshness_status, "market_context_stale_capped")
         )
         missing.append("needs_fresh_market_confirmation")
         verify.append("refresh market context before watchlist/high-priority treatment")
-    if evidence_score < 60:
+    if scores.evidence_score < 60:
         missing.append("higher_quality_source")
         verify.append("find official, structured, or crypto-native evidence linking token and catalyst")
-    if path_strength not in {"strong", "medium"}:
-        missing.append(_impact_path_missing_reason(path_type, role, market_score))
-    if timing_score < 40:
+    if context.path_strength not in {"strong", "medium"}:
+        missing.append(_impact_path_missing_reason(context.path_type, context.role, scores.market_score))
+    if scores.timing_score < 40:
         missing.append("event_window_or_timing")
         verify.append("confirm the event date/window and whether the catalyst has passed")
 
-    if score >= 88 and market_score >= 65 and evidence_score >= 70 and not weak_macro:
-        level = OpportunityLevel.HIGH_PRIORITY.value
-    elif score >= 78 and market_score >= 50 and evidence_score >= 65 and path_strength in {"strong", "medium"}:
-        level = OpportunityLevel.WATCHLIST.value
-    elif score >= 65 and evidence_score >= 60 and impact_score >= 60:
-        level = OpportunityLevel.VALIDATED_DIGEST.value
-    elif score >= 45:
-        level = OpportunityLevel.EXPLORATORY.value
-    else:
-        level = OpportunityLevel.LOCAL_ONLY.value
 
+def _opportunity_level(
+    score: float,
+    context: _OpportunityContext,
+    scores: _OpportunityScores,
+    *,
+    weak_macro: bool,
+) -> str:
+    if score >= 88 and scores.market_score >= 65 and scores.evidence_score >= 70 and not weak_macro:
+        return OpportunityLevel.HIGH_PRIORITY.value
+    if score >= 78 and scores.market_score >= 50 and scores.evidence_score >= 65 and context.path_strength in {"strong", "medium"}:
+        return OpportunityLevel.WATCHLIST.value
+    if score >= 65 and scores.evidence_score >= 60 and scores.impact_score >= 60:
+        return OpportunityLevel.VALIDATED_DIGEST.value
+    if score >= 45:
+        return OpportunityLevel.EXPLORATORY.value
+    return OpportunityLevel.LOCAL_ONLY.value
+
+
+def _apply_freshness_watchlist_cap(
+    level: str,
+    score: float,
+    context: _OpportunityContext,
+    scores: _OpportunityScores,
+    reasons: list[str],
+    missing: list[str],
+    verify: list[str],
+) -> str:
     if (
-        market_freshness_status in {"stale", "missing", "unknown"}
-        or market_freshness_cap_applied
+        context.market_freshness_status in {"stale", "missing", "unknown"}
+        or context.market_freshness_cap_applied
     ) and level in {OpportunityLevel.WATCHLIST.value, OpportunityLevel.HIGH_PRIORITY.value}:
         reasons.append("market_context_freshness_watchlist_cap")
         missing.append("needs_fresh_market_confirmation")
         verify.append("run a targeted market refresh before treating this as watchlist/high-priority")
-        level = OpportunityLevel.VALIDATED_DIGEST.value if score >= 65 and evidence_score >= 60 and impact_score >= 60 else OpportunityLevel.EXPLORATORY.value
-
-    why_local = None if level != OpportunityLevel.LOCAL_ONLY.value else (missing[0] if missing else "score_below_digest_threshold")
-    why_not_watchlist = None if level in {OpportunityLevel.WATCHLIST.value, OpportunityLevel.HIGH_PRIORITY.value} else (
-        missing[0] if missing else "score_or_confirmation_below_watchlist_threshold"
-    )
-    return _verdict(
-        score=score,
-        level=level,
-        reason_codes=tuple(dict.fromkeys(reasons or ("scored_by_final_opportunity_model",))),
-        missing=tuple(dict.fromkeys(missing)),
-        verify=tuple(dict.fromkeys(verify or ("verify source, catalyst timing, market reaction, and liquidity",))),
-        why_local_only=why_local,
-        why_not_watchlist=why_not_watchlist,
-        components=final_components,
-    )
+        return OpportunityLevel.VALIDATED_DIGEST.value if score >= 65 and scores.evidence_score >= 60 and scores.impact_score >= 60 else OpportunityLevel.EXPLORATORY.value
+    return level
 
 
 def live_confirmation_required(

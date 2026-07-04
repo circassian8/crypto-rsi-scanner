@@ -1,5 +1,5 @@
 {
-  "class_count": 471,
+  "class_count": 473,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
@@ -142,7 +142,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5487,
+  "function_count": 5496,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -194,14 +194,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/near_miss/refresh.py"
     },
     {
-      "function_name": "evaluate_opportunity",
-      "line_count": 245,
-      "module": "crypto_rsi_scanner.event_alpha.radar.opportunity_verdict",
-      "public": true,
-      "qualname": "evaluate_opportunity",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py"
-    },
-    {
       "function_name": "run_event_alpha_pipeline",
       "line_count": 244,
       "module": "crypto_rsi_scanner.event_alpha.radar.pipeline",
@@ -226,8 +218,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/validation/review.py"
     }
   ],
-  "functions_over_limit_count": 10,
-  "generated_at": "2026-07-04T08:12:52.430781+00:00",
+  "functions_over_limit_count": 9,
+  "generated_at": "2026-07-04T08:22:57.765160+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -905,7 +897,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 10,
+  "production_functions_over_limit": 9,
   "production_functions_over_limit_rows": [
     {
       "function_name": "diagnose_artifacts",
@@ -954,14 +946,6 @@
       "public": false,
       "qualname": "_refresh_one_hypothesis",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/near_miss/refresh.py"
-    },
-    {
-      "function_name": "evaluate_opportunity",
-      "line_count": 245,
-      "module": "crypto_rsi_scanner.event_alpha.radar.opportunity_verdict",
-      "public": true,
-      "qualname": "evaluate_opportunity",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py"
     },
     {
       "function_name": "run_event_alpha_pipeline",
