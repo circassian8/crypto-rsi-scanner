@@ -36,6 +36,38 @@ _REVIEW_QUEUE_WEIGHTS = {
     REVIEW_QUEUE_LOCAL_ONLY_LEARNING_ROW: 250.0,
     REVIEW_QUEUE_DIAGNOSTIC_ONLY: 50.0,
 }
+
+
+@dataclass(frozen=True)
+class _InboxSourceRows:
+    runs: list[dict[str, Any]]
+    alerts: list[dict[str, Any]]
+    feedback: list[dict[str, Any]]
+    deliveries: list[dict[str, Any]]
+    core_rows: list[dict[str, Any]]
+    cards_dir: Path
+    card_paths: dict[str, Path]
+    card_paths_by_core: dict[str, Path]
+    reviewed_ids: set[str]
+    watch_by_alert: dict[str, event_watchlist.EventWatchlistEntry]
+    delivery_state_by_run: dict[str, str]
+
+
+@dataclass(frozen=True)
+class _InboxReviewQueues:
+    sent_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
+    partial_delivered_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
+    would_send_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
+    would_send_blocked_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
+    weak_validated_local_only: tuple[EventAlphaNotificationInboxItem, ...]
+    quality_gated_local_only: tuple[EventAlphaNotificationInboxItem, ...]
+    legacy_quality_conflicts: tuple[EventAlphaNotificationInboxItem, ...]
+    research_review_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
+    exploratory_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
+    high_priority_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
+    triggered_fade_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
+
+
 def build_notification_inbox(
     *,
     notification_runs: Iterable[Mapping[str, Any]],
@@ -55,32 +87,26 @@ def build_notification_inbox(
     include_diagnostics: bool = False,
 ) -> EventAlphaNotificationInboxResult:
     """Join notification, alert, card, and feedback artifacts into review queues."""
-    runs = [dict(row) for row in notification_runs if isinstance(row, Mapping)]
-    alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
-    feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
-    deliveries = [dict(row) for row in notification_delivery_rows if isinstance(row, Mapping)]
-    core_rows = [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)]
-    cards_dir = Path(research_cards_dir).expanduser()
-    card_paths = _card_paths(cards_dir)
-    card_paths_by_core = _card_paths_by_core_id(cards_dir)
-    reviewed_ids = _reviewed_ids(feedback)
-    watch_by_alert = {
-        event_alpha_router.alert_id_for_entry(entry): entry
-        for entry in watchlist_entries
-    }
-    runs_by_id = {str(row.get("run_id") or ""): row for row in runs if row.get("run_id")}
-    delivery_state_by_run = _latest_delivery_state_by_run(deliveries)
+    source = _load_inbox_source_rows(
+        notification_runs=notification_runs,
+        alert_rows=alert_rows,
+        feedback_rows=feedback_rows,
+        research_cards_dir=research_cards_dir,
+        notification_delivery_rows=notification_delivery_rows,
+        watchlist_entries=watchlist_entries,
+        core_opportunity_rows=core_opportunity_rows,
+    )
     all_review_items = _build_event_alpha_review_items_from_rows(
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_diagnostics=True,
-        notification_runs=runs,
-        alert_rows=alerts,
-        feedback_rows=feedback,
-        research_cards_dir=cards_dir,
-        notification_delivery_rows=deliveries,
+        notification_runs=source.runs,
+        alert_rows=source.alerts,
+        feedback_rows=source.feedback,
+        research_cards_dir=source.cards_dir,
+        notification_delivery_rows=source.deliveries,
         watchlist_entries=watchlist_entries,
-        core_opportunity_rows=core_rows,
+        core_opportunity_rows=source.core_rows,
     )
     canonical_review_items = tuple(item for item in all_review_items if not item.is_diagnostic)
     diagnostic_review_items = tuple(item for item in all_review_items if item.is_diagnostic)
@@ -88,78 +114,114 @@ def build_notification_inbox(
         item for item in all_review_items
         if include_diagnostics or not item.is_diagnostic
     ]
-    quality_gated_local_only = tuple(
-        item for item in items
+    queues = _build_inbox_review_queues(
+        items=items,
+        canonical_review_items=canonical_review_items,
+        source=source,
+        include_legacy_conflicts=include_legacy_conflicts,
+    )
+    outcomes = _read_jsonl(Path(outcomes_path).expanduser()) if outcomes_path else []
+    return EventAlphaNotificationInboxResult(
+        profile=str(profile or "default"),
+        artifact_namespace=str(artifact_namespace or "default"),
+        notification_runs_path=Path(notification_runs_path).expanduser(),
+        alert_store_path=Path(alert_store_path).expanduser(),
+        feedback_path=Path(feedback_path).expanduser(),
+        research_cards_dir=source.cards_dir,
+        outcomes_path=Path(outcomes_path).expanduser() if outcomes_path else None,
+        notification_runs_read=len(source.runs),
+        alert_rows_read=len(source.alerts),
+        feedback_rows_read=len(source.feedback),
+        research_cards_read=len(source.card_paths),
+        outcome_rows_read=len(outcomes),
+        sent_without_feedback=queues.sent_without_feedback,
+        partial_delivered_without_feedback=queues.partial_delivered_without_feedback,
+        would_send_without_feedback=queues.would_send_without_feedback,
+        would_send_blocked_without_feedback=queues.would_send_blocked_without_feedback,
+        weak_validated_local_only=queues.weak_validated_local_only,
+        quality_gated_local_only=queues.quality_gated_local_only,
+        legacy_quality_conflicts=queues.legacy_quality_conflicts,
+        research_review_without_feedback=queues.research_review_without_feedback,
+        exploratory_without_feedback=queues.exploratory_without_feedback,
+        high_priority_unreviewed=queues.high_priority_unreviewed,
+        triggered_fade_unreviewed=queues.triggered_fade_unreviewed,
+        heartbeat_only_runs=tuple(row for row in source.runs if _heartbeat_only(row)),
+        duplicate_or_in_flight_runs=tuple(row for row in source.runs if _delivery_suppressed_run(row, source.delivery_state_by_run)),
+        provider_degraded_runs=tuple(row for row in source.runs if _provider_degraded(row)),
+        canonical_review_items=canonical_review_items,
+        diagnostic_review_items_hidden=diagnostic_review_items if not include_diagnostics else (),
+        diagnostic_review_items=diagnostic_review_items if include_diagnostics else (),
+        canonical_review_items_with_cards=sum(1 for item in canonical_review_items if item.card_path),
+        canonical_review_items_with_feedback_targets=sum(1 for item in canonical_review_items if item.feedback_target),
+        diagnostic_review_items_with_feedback_targets=sum(1 for item in diagnostic_review_items if item.feedback_target),
+        include_diagnostics=include_diagnostics,
+    )
+
+
+def _load_inbox_source_rows(
+    *,
+    notification_runs: Iterable[Mapping[str, Any]],
+    alert_rows: Iterable[Mapping[str, Any]],
+    feedback_rows: Iterable[Mapping[str, Any]],
+    research_cards_dir: str | Path,
+    notification_delivery_rows: Iterable[Mapping[str, Any]],
+    watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry],
+    core_opportunity_rows: Iterable[Mapping[str, Any]],
+) -> _InboxSourceRows:
+    runs = [dict(row) for row in notification_runs if isinstance(row, Mapping)]
+    alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
+    feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    deliveries = [dict(row) for row in notification_delivery_rows if isinstance(row, Mapping)]
+    core_rows = [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)]
+    cards_dir = Path(research_cards_dir).expanduser()
+    card_paths = _card_paths(cards_dir)
+    return _InboxSourceRows(
+        runs=runs,
+        alerts=alerts,
+        feedback=feedback,
+        deliveries=deliveries,
+        core_rows=core_rows,
+        cards_dir=cards_dir,
+        card_paths=card_paths,
+        card_paths_by_core=_card_paths_by_core_id(cards_dir),
+        reviewed_ids=_reviewed_ids(feedback),
+        watch_by_alert={
+            event_alpha_router.alert_id_for_entry(entry): entry
+            for entry in watchlist_entries
+        },
+        delivery_state_by_run=_latest_delivery_state_by_run(deliveries),
+    )
+
+
+def _build_inbox_review_queues(
+    *,
+    items: Iterable[EventAlphaNotificationInboxItem],
+    canonical_review_items: tuple[EventAlphaNotificationInboxItem, ...],
+    source: _InboxSourceRows,
+    include_legacy_conflicts: bool,
+) -> _InboxReviewQueues:
+    item_rows = tuple(items)
+    countable = lambda item: _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
+    quality_gated = tuple(
+        item for item in item_rows
         if not item.is_diagnostic
         if item.snapshot_quality_classification == event_alpha_alert_store.SNAPSHOT_QUALITY_GATED_LOCAL
         and not item.reviewed
     )
-    legacy_quality_conflicts = tuple(
-        item for item in items
-        if not item.is_diagnostic
-        if item.snapshot_quality_classification in _INBOX_LEGACY_CONFLICT_CLASSIFICATIONS
-        and not item.reviewed
-    )
-    partial_delivered_without_feedback = tuple(
-        item for item in items
-        if not item.is_diagnostic
-        if item.delivery_state == delivery.STATE_PARTIAL_DELIVERED
-        and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
-        and not item.reviewed
-    )
-    sent_without_feedback = tuple(
-        item for item in items
-        if not item.is_diagnostic
-        if item.sent
-        and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
-        and item.delivery_state != delivery.STATE_PARTIAL_DELIVERED
-        and not item.reviewed
-    )
-    would_send_without_feedback = tuple(
-        item for item in items
-        if not item.is_diagnostic
-        if item.would_send
-        and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
-        and not item.sent
-        and not item.blocked_by_guard
-        and not item.reviewed
-    )
-    would_send_blocked_without_feedback = tuple(
-        item for item in items
-        if not item.is_diagnostic
-        if item.blocked_by_guard
-        and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
-        and not item.reviewed
-    )
-    weak_validated_local_only = tuple(
-        item for item in items
-        if not item.is_diagnostic
-        if not item.quality_gate_block_reason and _is_weak_validated_local_only(item, alerts) and not item.reviewed
-    )
-    high_priority_unreviewed = tuple(
-        item for item in items
-        if not item.is_diagnostic
-        and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
-        and not item.reviewed and item.item_type == "core_opportunity"
-        and not (item.sent or item.would_send or item.blocked_by_guard)
-    )
-    triggered_fade_unreviewed = tuple(
-        item for item in items
-        if not item.is_diagnostic
-        and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
-        and not item.reviewed and _is_triggered_fade(item)
-        and not (item.sent or item.would_send or item.blocked_by_guard)
+    local_core_learning = tuple(
+        item for item in item_rows
+        if not item.is_diagnostic and item.item_type == "local_core_learning" and not item.reviewed
     )
     near_miss_core_items = tuple(
-        item for item in items
+        item for item in item_rows
         if not item.is_diagnostic and item.item_type == "near_miss_core" and not item.reviewed
     )
     exploratory_delivery_items = tuple(
         item for item in _digest_delivery_items(
-            deliveries,
-            watch_by_alert,
-            reviewed_ids,
-            card_paths,
+            source.deliveries,
+            source.watch_by_alert,
+            source.reviewed_ids,
+            source.card_paths,
             lane=event_alpha_notifications.LANE_EXPLORATORY_DIGEST,
             default_tier="EXPLORATORY",
             default_playbook="exploratory",
@@ -169,10 +231,10 @@ def build_notification_inbox(
     )
     research_review_delivery_items = tuple(
         item for item in _digest_delivery_items(
-            deliveries,
-            watch_by_alert,
-            reviewed_ids,
-            card_paths,
+            source.deliveries,
+            source.watch_by_alert,
+            source.reviewed_ids,
+            source.card_paths,
             lane=event_alpha_notifications.LANE_RESEARCH_REVIEW_DIGEST,
             default_tier="RESEARCH_REVIEW",
             default_playbook="research_review_digest",
@@ -180,47 +242,52 @@ def build_notification_inbox(
         )
         if not item.reviewed
     )
-    exploratory_without_feedback = (*near_miss_core_items, *exploratory_delivery_items)
-    local_core_learning = tuple(
-        item for item in items
-        if not item.is_diagnostic and item.item_type == "local_core_learning" and not item.reviewed
-    )
-    quality_gated_local_only = tuple(dict.fromkeys((*quality_gated_local_only, *local_core_learning)))
-    outcomes = _read_jsonl(Path(outcomes_path).expanduser()) if outcomes_path else []
-    return EventAlphaNotificationInboxResult(
-        profile=str(profile or "default"),
-        artifact_namespace=str(artifact_namespace or "default"),
-        notification_runs_path=Path(notification_runs_path).expanduser(),
-        alert_store_path=Path(alert_store_path).expanduser(),
-        feedback_path=Path(feedback_path).expanduser(),
-        research_cards_dir=cards_dir,
-        outcomes_path=Path(outcomes_path).expanduser() if outcomes_path else None,
-        notification_runs_read=len(runs),
-        alert_rows_read=len(alerts),
-        feedback_rows_read=len(feedback),
-        research_cards_read=len(card_paths),
-        outcome_rows_read=len(outcomes),
-        sent_without_feedback=sent_without_feedback,
-        partial_delivered_without_feedback=partial_delivered_without_feedback,
-        would_send_without_feedback=would_send_without_feedback,
-        would_send_blocked_without_feedback=would_send_blocked_without_feedback,
-        weak_validated_local_only=weak_validated_local_only,
-        quality_gated_local_only=quality_gated_local_only,
-        legacy_quality_conflicts=legacy_quality_conflicts,
+    return _InboxReviewQueues(
+        sent_without_feedback=tuple(
+            item for item in item_rows
+            if not item.is_diagnostic and item.sent and countable(item)
+            and item.delivery_state != delivery.STATE_PARTIAL_DELIVERED and not item.reviewed
+        ),
+        partial_delivered_without_feedback=tuple(
+            item for item in item_rows
+            if not item.is_diagnostic and item.delivery_state == delivery.STATE_PARTIAL_DELIVERED
+            and countable(item) and not item.reviewed
+        ),
+        would_send_without_feedback=tuple(
+            item for item in item_rows
+            if not item.is_diagnostic and item.would_send and countable(item)
+            and not item.sent and not item.blocked_by_guard and not item.reviewed
+        ),
+        would_send_blocked_without_feedback=tuple(
+            item for item in item_rows
+            if not item.is_diagnostic and item.blocked_by_guard and countable(item) and not item.reviewed
+        ),
+        weak_validated_local_only=tuple(
+            item for item in item_rows
+            if not item.is_diagnostic
+            if not item.quality_gate_block_reason and _is_weak_validated_local_only(item, source.alerts) and not item.reviewed
+        ),
+        quality_gated_local_only=tuple(dict.fromkeys((*quality_gated, *local_core_learning))),
+        legacy_quality_conflicts=tuple(
+            item for item in item_rows
+            if not item.is_diagnostic
+            if item.snapshot_quality_classification in _INBOX_LEGACY_CONFLICT_CLASSIFICATIONS
+            and not item.reviewed
+        ),
         research_review_without_feedback=research_review_delivery_items,
-        exploratory_without_feedback=exploratory_without_feedback,
-        high_priority_unreviewed=high_priority_unreviewed,
-        triggered_fade_unreviewed=triggered_fade_unreviewed,
-        heartbeat_only_runs=tuple(row for row in runs if _heartbeat_only(row)),
-        duplicate_or_in_flight_runs=tuple(row for row in runs if _delivery_suppressed_run(row, delivery_state_by_run)),
-        provider_degraded_runs=tuple(row for row in runs if _provider_degraded(row)),
-        canonical_review_items=canonical_review_items,
-        diagnostic_review_items_hidden=diagnostic_review_items if not include_diagnostics else (),
-        diagnostic_review_items=diagnostic_review_items if include_diagnostics else (),
-        canonical_review_items_with_cards=sum(1 for item in canonical_review_items if item.card_path),
-        canonical_review_items_with_feedback_targets=sum(1 for item in canonical_review_items if item.feedback_target),
-        diagnostic_review_items_with_feedback_targets=sum(1 for item in diagnostic_review_items if item.feedback_target),
-        include_diagnostics=include_diagnostics,
+        exploratory_without_feedback=(*near_miss_core_items, *exploratory_delivery_items),
+        high_priority_unreviewed=tuple(
+            item for item in item_rows
+            if not item.is_diagnostic and countable(item)
+            and not item.reviewed and item.item_type == "core_opportunity"
+            and not (item.sent or item.would_send or item.blocked_by_guard)
+        ),
+        triggered_fade_unreviewed=tuple(
+            item for item in item_rows
+            if not item.is_diagnostic and countable(item)
+            and not item.reviewed and _is_triggered_fade(item)
+            and not (item.sent or item.would_send or item.blocked_by_guard)
+        ),
     )
 def build_event_alpha_review_items(
     profile: str | None,

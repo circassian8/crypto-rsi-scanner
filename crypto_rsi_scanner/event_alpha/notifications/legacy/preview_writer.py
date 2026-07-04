@@ -22,169 +22,31 @@ def write_notification_plan_preview(
     card_map = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
     wrote_section = False
     section_status = status or "would_send"
-    for lane in (
-        LANE_TRIGGERED_FADE,
-        LANE_INSTANT_ESCALATION,
-        LANE_DAILY_DIGEST,
-        LANE_RESEARCH_REVIEW_DIGEST,
-        LANE_EXPLORATORY_DIGEST,
-    ):
-        research_review = lane == LANE_RESEARCH_REVIEW_DIGEST
-        exploratory = lane == LANE_EXPLORATORY_DIGEST
-        if research_review:
-            items = list(plan.research_review_items)
-        else:
-            items = list(plan.exploratory_items if exploratory else plan.decisions_by_lane.get(lane, []))
-        if not items:
-            continue
-        if research_review:
-            message = format_research_review_telegram_digest(
-                items,
-                profile=profile,
-                card_path_by_alert_id=card_map,
-                core_row_by_alert_id=plan.core_row_by_alert_id,
-                cfg=cfg,
-                eligible_count=plan.research_review_eligible_count,
-                skipped_items=plan.research_review_skipped_items,
-            )
-            identity = _delivery_identity_for_decisions(
-                [item.decision for item in items],
-                core_row_by_alert_id=plan.core_row_by_alert_id,
-                card_path_by_alert_id=card_map,
-                lane=lane,
-                preview_path=writer.preview_path,
-            )
-            route_label = "RESEARCH_REVIEW_DIGEST"
-        elif exploratory:
-            message = format_exploratory_telegram_digest(
-                items,
-                profile=profile,
-                card_path_by_alert_id=card_map,
-                cfg=cfg,
-            )
-            identity = _delivery_identity_for_decisions(
-                [item.decision for item in items],
-                core_row_by_alert_id=plan.core_row_by_alert_id,
-                card_path_by_alert_id=card_map,
-                lane=lane,
-                preview_path=writer.preview_path,
-            )
-            route_label = "EXPLORATORY_DIGEST"
-        else:
-            message = format_core_opportunity_telegram_digest(
-                items,
-                profile=profile,
-                card_path_by_alert_id=card_map,
-                core_row_by_alert_id=plan.core_row_by_alert_id,
-                pipeline_result=pipeline_result,
-                max_items=cfg.daily_digest_max_items if lane == LANE_DAILY_DIGEST else None,
-            )
-            identity = _delivery_identity_for_decisions(
-                items,
-                core_row_by_alert_id=plan.core_row_by_alert_id,
-                card_path_by_alert_id=card_map,
-                lane=lane,
-                preview_path=writer.preview_path,
-            )
-            route_label = _route_label(items)
-        writer.write_preview(
-            message=message,
+    for lane in _notification_preview_lanes():
+        wrote_section = _write_plan_lane_preview(
+            plan,
             lane=lane,
-            route=route_label,
-            identity=identity,
-            would_send=True,
-            sent=False,
-            status=section_status,
-            preview_only=not record_delivery_rows,
-            delivery_row_not_written_reason=delivery_row_not_written_reason if not record_delivery_rows else None,
-        )
-        if record_delivery_rows:
-            alert_ids = list(identity.notification_item_ids)
-            dedupe_key, dedupe_bucket = writer._dedupe_key(message, lane, alert_ids)
-            writer._append(
-                alert_ids=alert_ids,
-                lane=lane,
-                route=route_label,
-                content_hash=writer._hash(message, lane, alert_ids),
-                dedupe_key=dedupe_key,
-                dedupe_bucket=dedupe_bucket,
-                state=delivery.STATE_BLOCKED,
-                identity=identity,
-                error_class="preview_only",
-                error_message=delivery_row_not_written_reason or "preview_command",
-                delivery_mode=delivery.DELIVERY_MODE_PREVIEW_ONLY,
-                delivery_state=delivery.DELIVERY_STATE_PREVIEW,
-                status_detail=delivery.STATUS_DETAIL_PREVIEW_ONLY,
-                send_guard_enabled=False,
-                would_send=True,
-                sent=False,
-                failed=False,
-                channel_summary=_research_review_channel_summary(plan) if research_review else None,
-            )
-        wrote_section = True
+            writer=writer,
+            profile=profile,
+            cfg=cfg,
+            pipeline_result=pipeline_result,
+            card_map=card_map,
+            section_status=section_status,
+            record_delivery_rows=record_delivery_rows,
+            delivery_row_not_written_reason=delivery_row_not_written_reason,
+        ) or wrote_section
 
     if plan.heartbeat_due:
-        heartbeat_identity = DeliveryIdentity(
-            notification_item_ids=("heartbeat",),
-            source_alert_ids=("heartbeat",),
-            requested_alert_id="heartbeat",
-            alert_id="heartbeat",
-            identity_reconciled=False,
-            identity_reconciliation_reason="heartbeat",
-            notification_preview_path=str(writer.preview_path),
-            notification_preview_relpath=delivery.notification_preview_relpath_for_path(writer.preview_path),
+        _write_heartbeat_preview(
+            plan,
+            writer=writer,
+            profile=profile,
+            pipeline_result=pipeline_result,
+            send_guard_status=send_guard_status,
+            section_status=section_status,
+            record_delivery_rows=record_delivery_rows,
+            delivery_row_not_written_reason=delivery_row_not_written_reason,
         )
-        writer.write_preview(
-            message=format_health_heartbeat(
-                profile=profile,
-                result=_notification_preview_result(
-                    pipeline_result,
-                    plan=plan,
-                    delivered_by_lane={lane: 0 for lane in LANES},
-                ),
-                now=writer.now,
-                send_guard_status=send_guard_status,
-            ),
-            lane=LANE_HEALTH_HEARTBEAT,
-            route="HEALTH_HEARTBEAT",
-            identity=heartbeat_identity,
-            would_send=True,
-            sent=False,
-            status=section_status,
-            preview_only=not record_delivery_rows,
-            delivery_row_not_written_reason=delivery_row_not_written_reason if not record_delivery_rows else None,
-        )
-        if record_delivery_rows:
-            message = format_health_heartbeat(
-                profile=profile,
-                result=_notification_preview_result(
-                    pipeline_result,
-                    plan=plan,
-                    delivered_by_lane={lane: 0 for lane in LANES},
-                ),
-                now=writer.now,
-                send_guard_status=send_guard_status,
-            )
-            dedupe_key, dedupe_bucket = writer._dedupe_key(message, LANE_HEALTH_HEARTBEAT, ["heartbeat"])
-            writer._append(
-                alert_ids=["heartbeat"],
-                lane=LANE_HEALTH_HEARTBEAT,
-                route="HEALTH_HEARTBEAT",
-                content_hash=writer._hash(message, LANE_HEALTH_HEARTBEAT, ["heartbeat"]),
-                dedupe_key=dedupe_key,
-                dedupe_bucket=dedupe_bucket,
-                state=delivery.STATE_BLOCKED,
-                identity=heartbeat_identity,
-                error_class="preview_only",
-                error_message=delivery_row_not_written_reason or "preview_command",
-                delivery_mode=delivery.DELIVERY_MODE_PREVIEW_ONLY,
-                delivery_state=delivery.DELIVERY_STATE_PREVIEW,
-                status_detail=delivery.STATUS_DETAIL_PREVIEW_ONLY,
-                send_guard_enabled=False,
-                would_send=True,
-                sent=False,
-                failed=False,
-            )
         wrote_section = True
 
     if not wrote_section:
@@ -193,6 +55,244 @@ def write_notification_plan_preview(
             profile=profile,
             pipeline_result=_notification_preview_result(pipeline_result, plan=plan, block_reason=reason),
             reason=reason,
+        )
+
+
+def _notification_preview_lanes() -> tuple[str, ...]:
+    return (
+        LANE_TRIGGERED_FADE,
+        LANE_INSTANT_ESCALATION,
+        LANE_DAILY_DIGEST,
+        LANE_RESEARCH_REVIEW_DIGEST,
+        LANE_EXPLORATORY_DIGEST,
+    )
+
+
+def _plan_items_for_preview_lane(
+    plan: EventAlphaNotificationPlan,
+    lane: str,
+) -> tuple[list[Any], bool, bool]:
+    research_review = lane == LANE_RESEARCH_REVIEW_DIGEST
+    exploratory = lane == LANE_EXPLORATORY_DIGEST
+    if research_review:
+        return list(plan.research_review_items), research_review, exploratory
+    if exploratory:
+        return list(plan.exploratory_items), research_review, exploratory
+    return list(plan.decisions_by_lane.get(lane, [])), research_review, exploratory
+
+
+def _preview_lane_payload(
+    plan: EventAlphaNotificationPlan,
+    lane: str,
+    *,
+    items: list[Any],
+    research_review: bool,
+    exploratory: bool,
+    writer: "_DeliveryWriter",
+    profile: str | None,
+    cfg: EventAlphaNotificationConfig,
+    pipeline_result: Any | None,
+    card_map: Mapping[str, str | Path],
+) -> tuple[str, DeliveryIdentity, str]:
+    if research_review:
+        message = format_research_review_telegram_digest(
+            items,
+            profile=profile,
+            card_path_by_alert_id=card_map,
+            core_row_by_alert_id=plan.core_row_by_alert_id,
+            cfg=cfg,
+            eligible_count=plan.research_review_eligible_count,
+            skipped_items=plan.research_review_skipped_items,
+        )
+        identity_items = [item.decision for item in items]
+        route_label = "RESEARCH_REVIEW_DIGEST"
+    elif exploratory:
+        message = format_exploratory_telegram_digest(
+            items,
+            profile=profile,
+            card_path_by_alert_id=card_map,
+            cfg=cfg,
+        )
+        identity_items = [item.decision for item in items]
+        route_label = "EXPLORATORY_DIGEST"
+    else:
+        message = format_core_opportunity_telegram_digest(
+            items,
+            profile=profile,
+            card_path_by_alert_id=card_map,
+            core_row_by_alert_id=plan.core_row_by_alert_id,
+            pipeline_result=pipeline_result,
+            max_items=cfg.daily_digest_max_items if lane == LANE_DAILY_DIGEST else None,
+        )
+        identity_items = items
+        route_label = _route_label(items)
+    identity = _delivery_identity_for_decisions(
+        identity_items,
+        core_row_by_alert_id=plan.core_row_by_alert_id,
+        card_path_by_alert_id=card_map,
+        lane=lane,
+        preview_path=writer.preview_path,
+    )
+    return message, identity, route_label
+
+
+def _append_preview_delivery_row(
+    *,
+    writer: "_DeliveryWriter",
+    message: str,
+    lane: str,
+    route: str,
+    identity: DeliveryIdentity,
+    error_message: str | None,
+    channel_summary: Mapping[str, Any] | None = None,
+) -> None:
+    alert_ids = list(identity.notification_item_ids)
+    dedupe_key, dedupe_bucket = writer._dedupe_key(message, lane, alert_ids)
+    writer._append(
+        alert_ids=alert_ids,
+        lane=lane,
+        route=route,
+        content_hash=writer._hash(message, lane, alert_ids),
+        dedupe_key=dedupe_key,
+        dedupe_bucket=dedupe_bucket,
+        state=delivery.STATE_BLOCKED,
+        identity=identity,
+        error_class="preview_only",
+        error_message=error_message or "preview_command",
+        delivery_mode=delivery.DELIVERY_MODE_PREVIEW_ONLY,
+        delivery_state=delivery.DELIVERY_STATE_PREVIEW,
+        status_detail=delivery.STATUS_DETAIL_PREVIEW_ONLY,
+        send_guard_enabled=False,
+        would_send=True,
+        sent=False,
+        failed=False,
+        channel_summary=channel_summary,
+    )
+
+
+def _write_plan_lane_preview(
+    plan: EventAlphaNotificationPlan,
+    *,
+    lane: str,
+    writer: "_DeliveryWriter",
+    profile: str | None,
+    cfg: EventAlphaNotificationConfig,
+    pipeline_result: Any | None,
+    card_map: Mapping[str, str | Path],
+    section_status: str,
+    record_delivery_rows: bool,
+    delivery_row_not_written_reason: str | None,
+) -> bool:
+    items, research_review, exploratory = _plan_items_for_preview_lane(plan, lane)
+    if not items:
+        return False
+    message, identity, route_label = _preview_lane_payload(
+        plan,
+        lane,
+        items=items,
+        research_review=research_review,
+        exploratory=exploratory,
+        writer=writer,
+        profile=profile,
+        cfg=cfg,
+        pipeline_result=pipeline_result,
+        card_map=card_map,
+    )
+    writer.write_preview(
+        message=message,
+        lane=lane,
+        route=route_label,
+        identity=identity,
+        would_send=True,
+        sent=False,
+        status=section_status,
+        preview_only=not record_delivery_rows,
+        delivery_row_not_written_reason=delivery_row_not_written_reason if not record_delivery_rows else None,
+    )
+    if record_delivery_rows:
+        _append_preview_delivery_row(
+            writer=writer,
+            message=message,
+            lane=lane,
+            route=route_label,
+            identity=identity,
+            error_message=delivery_row_not_written_reason,
+            channel_summary=_research_review_channel_summary(plan) if research_review else None,
+        )
+    return True
+
+
+def _heartbeat_identity(writer: "_DeliveryWriter") -> DeliveryIdentity:
+    return DeliveryIdentity(
+        notification_item_ids=("heartbeat",),
+        source_alert_ids=("heartbeat",),
+        requested_alert_id="heartbeat",
+        alert_id="heartbeat",
+        identity_reconciled=False,
+        identity_reconciliation_reason="heartbeat",
+        notification_preview_path=str(writer.preview_path),
+        notification_preview_relpath=delivery.notification_preview_relpath_for_path(writer.preview_path),
+    )
+
+
+def _heartbeat_preview_message(
+    plan: EventAlphaNotificationPlan,
+    *,
+    profile: str | None,
+    pipeline_result: Any | None,
+    writer: "_DeliveryWriter",
+    send_guard_status: str | None,
+) -> str:
+    return format_health_heartbeat(
+        profile=profile,
+        result=_notification_preview_result(
+            pipeline_result,
+            plan=plan,
+            delivered_by_lane={lane: 0 for lane in LANES},
+        ),
+        now=writer.now,
+        send_guard_status=send_guard_status,
+    )
+
+
+def _write_heartbeat_preview(
+    plan: EventAlphaNotificationPlan,
+    *,
+    writer: "_DeliveryWriter",
+    profile: str | None,
+    pipeline_result: Any | None,
+    send_guard_status: str | None,
+    section_status: str,
+    record_delivery_rows: bool,
+    delivery_row_not_written_reason: str | None,
+) -> None:
+    heartbeat_identity = _heartbeat_identity(writer)
+    message = _heartbeat_preview_message(
+        plan,
+        profile=profile,
+        pipeline_result=pipeline_result,
+        writer=writer,
+        send_guard_status=send_guard_status,
+    )
+    writer.write_preview(
+        message=message,
+        lane=LANE_HEALTH_HEARTBEAT,
+        route="HEALTH_HEARTBEAT",
+        identity=heartbeat_identity,
+        would_send=True,
+        sent=False,
+        status=section_status,
+        preview_only=not record_delivery_rows,
+        delivery_row_not_written_reason=delivery_row_not_written_reason if not record_delivery_rows else None,
+    )
+    if record_delivery_rows:
+        _append_preview_delivery_row(
+            writer=writer,
+            message=message,
+            lane=LANE_HEALTH_HEARTBEAT,
+            route="HEALTH_HEARTBEAT",
+            identity=heartbeat_identity,
+            error_message=delivery_row_not_written_reason,
         )
 
 def _preview_summary_lines(sections: Iterable[Mapping[str, Any]]) -> list[str]:

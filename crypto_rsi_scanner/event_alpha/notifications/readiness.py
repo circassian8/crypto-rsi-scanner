@@ -37,6 +37,14 @@ class EventAlphaSendReadinessResult:
     warnings: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class _SendReadinessRows:
+    runs: list[dict[str, Any]]
+    core_rows: list[dict[str, Any]]
+    alerts: list[dict[str, Any]]
+    deliveries: list[dict[str, Any]]
+
+
 def build_send_readiness(
     *,
     profile: str | None,
@@ -53,38 +61,20 @@ def build_send_readiness(
     include_legacy_artifacts: bool = False,
 ) -> EventAlphaSendReadinessResult:
     """Return a final read-only readiness verdict for a profile namespace."""
-    runs = event_alpha_artifacts.filter_artifact_rows(
-        [dict(row) for row in run_rows if isinstance(row, Mapping)],
+    rows = _filtered_send_readiness_rows(
+        run_rows=run_rows,
+        core_opportunity_rows=core_opportunity_rows,
+        alert_rows=alert_rows,
+        delivery_rows=delivery_rows,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_legacy_artifacts=include_legacy_artifacts,
     )
-    core_rows = event_alpha_artifacts.filter_artifact_rows(
-        [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)],
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    alerts = event_alpha_artifacts.filter_artifact_rows(
-        [dict(row) for row in alert_rows if isinstance(row, Mapping)],
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    deliveries = _filter_delivery_rows(
-        [dict(row) for row in delivery_rows if isinstance(row, Mapping)],
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
-    )
-    latest_run = _latest_run(runs)
+    latest_run = _latest_run(rows.runs)
     latest_run_id = str(latest_run.get("run_id") or "") if latest_run else None
     latest_deliveries = [
-        row for row in delivery.latest_rows_by_delivery(deliveries)
+        row for row in delivery.latest_rows_by_delivery(rows.deliveries)
         if not latest_run_id or str(row.get("run_id") or "") == latest_run_id
     ]
     resolved_preview_path, preview_source = _resolve_preview_path(
@@ -93,8 +83,101 @@ def build_send_readiness(
         artifact_namespace=artifact_namespace,
     )
     resolved_preview = str(resolved_preview_path) if resolved_preview_path else None
-    blockers: list[str] = []
-    warnings: list[str] = []
+    blockers = [
+        *_namespace_send_readiness_blockers(
+            resolved_preview_path=resolved_preview_path,
+            preview_path=preview_path,
+            artifact_namespace=artifact_namespace,
+        ),
+        *_latest_run_blockers(latest_run),
+        *_artifact_doctor_send_readiness_blockers(artifact_doctor, preview_source=preview_source),
+        *_preview_path_blockers(resolved_preview),
+        *_send_guard_blockers(send_guard_enabled=send_guard_enabled, telegram_ready=telegram_ready),
+    ]
+    warnings = _send_readiness_warnings(send_guard_enabled=send_guard_enabled)
+    latest_core_ids = {
+        str(row.get("core_opportunity_id") or "").strip()
+        for row in rows.core_rows
+        if not latest_run_id or str(row.get("run_id") or "") == latest_run_id
+    }
+    blockers.extend(_delivery_send_readiness_blockers(
+        latest_deliveries,
+        latest_core_ids=latest_core_ids,
+        send_guard_enabled=send_guard_enabled,
+    ))
+    would_send_cores = [
+        row for row in rows.core_rows
+        if (not latest_run_id or str(row.get("run_id") or "") == latest_run_id)
+        and _route_is_alertable(row)
+    ]
+    blockers.extend(_core_send_readiness_blockers(would_send_cores))
+
+    blockers = list(dict.fromkeys(blockers))
+    warnings = list(dict.fromkeys(warnings))
+    completed = bool(latest_run.get("cycle_completed", latest_run is not None)) if latest_run else False
+    return EventAlphaSendReadinessResult(
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        latest_run_id=latest_run_id,
+        ready=not blockers,
+        no_send_rehearsal=not send_guard_enabled,
+        send_guard_enabled=bool(send_guard_enabled),
+        telegram_ready=bool(telegram_ready),
+        preview_path=resolved_preview,
+        preview_path_source=preview_source,
+        latest_run_completed=completed,
+        artifact_doctor_status=str(artifact_doctor.status or "unknown"),
+        alertable_items=sum(1 for row in would_send_cores),
+        delivery_rows_checked=len(latest_deliveries),
+        core_rows_checked=len(rows.core_rows),
+        blockers=tuple(blockers),
+        warnings=tuple(warnings),
+    )
+
+
+def _filtered_send_readiness_rows(
+    *,
+    run_rows: Iterable[Mapping[str, Any]],
+    core_opportunity_rows: Iterable[Mapping[str, Any]],
+    alert_rows: Iterable[Mapping[str, Any]],
+    delivery_rows: Iterable[Mapping[str, Any]],
+    profile: str | None,
+    artifact_namespace: str | None,
+    include_test_artifacts: bool,
+    include_legacy_artifacts: bool,
+) -> _SendReadinessRows:
+    filter_kwargs = {
+        "profile": profile,
+        "artifact_namespace": artifact_namespace,
+        "include_test_artifacts": include_test_artifacts,
+        "include_legacy_artifacts": include_legacy_artifacts,
+    }
+    return _SendReadinessRows(
+        runs=event_alpha_artifacts.filter_artifact_rows(
+            [dict(row) for row in run_rows if isinstance(row, Mapping)],
+            **filter_kwargs,
+        ),
+        core_rows=event_alpha_artifacts.filter_artifact_rows(
+            [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)],
+            **filter_kwargs,
+        ),
+        alerts=event_alpha_artifacts.filter_artifact_rows(
+            [dict(row) for row in alert_rows if isinstance(row, Mapping)],
+            **filter_kwargs,
+        ),
+        deliveries=_filter_delivery_rows(
+            [dict(row) for row in delivery_rows if isinstance(row, Mapping)],
+            **filter_kwargs,
+        ),
+    )
+
+
+def _namespace_send_readiness_blockers(
+    *,
+    resolved_preview_path: Path | None,
+    preview_path: str | Path | None,
+    artifact_namespace: str | None,
+) -> list[str]:
     namespace_dir = None
     if resolved_preview_path is not None:
         namespace_dir = resolved_preview_path.expanduser().parent
@@ -104,18 +187,29 @@ def build_send_readiness(
         namespace_dir = Path("event_fade_cache") / str(artifact_namespace)
     namespace_status = event_alpha_namespace_status.load_namespace_status(namespace_dir)
     if event_alpha_namespace_status.is_inactive(namespace_status):
-        blockers.append("artifact namespace is stale/deprecated and blocked for send-readiness")
-    elif namespace_status and not namespace_status.safe_for_send_readiness:
-        blockers.append("artifact namespace is marked unsafe for send-readiness")
+        return ["artifact namespace is stale/deprecated and blocked for send-readiness"]
+    if namespace_status and not namespace_status.safe_for_send_readiness:
+        return ["artifact namespace is marked unsafe for send-readiness"]
+    return []
 
+
+def _latest_run_blockers(latest_run: Mapping[str, Any] | None) -> list[str]:
     if latest_run is None:
-        blockers.append("no latest Event Alpha run found for this profile/namespace")
-    else:
-        if not bool(latest_run.get("cycle_completed", latest_run.get("success", True))):
-            blockers.append("latest run did not complete")
-        if not bool(latest_run.get("success", True)):
-            blockers.append("latest run is marked unsuccessful")
+        return ["no latest Event Alpha run found for this profile/namespace"]
+    blockers: list[str] = []
+    if not bool(latest_run.get("cycle_completed", latest_run.get("success", True))):
+        blockers.append("latest run did not complete")
+    if not bool(latest_run.get("success", True)):
+        blockers.append("latest run is marked unsuccessful")
+    return blockers
 
+
+def _artifact_doctor_send_readiness_blockers(
+    artifact_doctor: event_alpha_artifact_doctor.EventAlphaArtifactDoctorResult,
+    *,
+    preview_source: str,
+) -> list[str]:
+    blockers: list[str] = []
     if str(artifact_doctor.status or "").upper() == "BLOCKED" or artifact_doctor.blockers:
         blockers.append("strict artifact doctor has blockers")
     if artifact_doctor.notification_preview_missing and preview_source == "missing":
@@ -144,22 +238,36 @@ def build_send_readiness(
         blockers.append("delivery rows have inconsistent delivery_state")
     if getattr(artifact_doctor, "delivery_would_send_sent_failed_inconsistent", 0):
         blockers.append("delivery rows have inconsistent would_send/sent/failed flags")
+    return blockers
 
+
+def _preview_path_blockers(resolved_preview: str | None) -> list[str]:
     if not resolved_preview:
-        blockers.append("notification preview path was not recorded")
-    elif not Path(resolved_preview).expanduser().exists():
-        blockers.append("notification preview path does not exist")
+        return ["notification preview path was not recorded"]
+    if not Path(resolved_preview).expanduser().exists():
+        return ["notification preview path does not exist"]
+    return []
 
+
+def _send_guard_blockers(*, send_guard_enabled: bool, telegram_ready: bool) -> list[str]:
     if send_guard_enabled and not telegram_ready:
-        blockers.append("Telegram token/chat id missing while send guard is enabled")
-    if not send_guard_enabled:
-        warnings.append("no-send rehearsal: send guard disabled; real Telegram sends remain blocked")
+        return ["Telegram token/chat id missing while send guard is enabled"]
+    return []
 
-    latest_core_ids = {
-        str(row.get("core_opportunity_id") or "").strip()
-        for row in core_rows
-        if not latest_run_id or str(row.get("run_id") or "") == latest_run_id
-    }
+
+def _send_readiness_warnings(*, send_guard_enabled: bool) -> list[str]:
+    if not send_guard_enabled:
+        return ["no-send rehearsal: send guard disabled; real Telegram sends remain blocked"]
+    return []
+
+
+def _delivery_send_readiness_blockers(
+    latest_deliveries: Iterable[Mapping[str, Any]],
+    *,
+    latest_core_ids: set[str],
+    send_guard_enabled: bool,
+) -> list[str]:
+    blockers: list[str] = []
     for row in latest_deliveries:
         status_detail = str(row.get("status_detail") or "").strip()
         delivery_state = str(row.get("delivery_state") or "").strip()
@@ -172,34 +280,35 @@ def build_send_readiness(
             blockers.append("delivery row missing explicit delivery_mode")
         if bool(row.get("sent")) and not send_guard_enabled:
             blockers.append("delivery row says sent while send guard is disabled")
-        if (
-            status_detail == delivery.STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED
-            and bool(row.get("send_guard_enabled"))
-        ):
+        if status_detail == delivery.STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED and bool(row.get("send_guard_enabled")):
             blockers.append("no-send rehearsal delivery row has send_guard_enabled=true")
-        lane = str(row.get("lane") or "")
-        if lane not in {"daily_digest", "instant_escalation", "triggered_fade"}:
-            continue
-        state = str(row.get("state") or "")
-        if state not in {
-            delivery.STATE_DELIVERED,
-            delivery.STATE_PARTIAL_DELIVERED,
-            delivery.STATE_BLOCKED,
-            delivery.STATE_SKIPPED_DUPLICATE,
-            delivery.STATE_SKIPPED_IN_FLIGHT,
-        }:
-            continue
-        core_id = str(row.get("core_opportunity_id") or "").strip()
-        if not core_id:
-            blockers.append("delivery row missing canonical core opportunity identity")
-        elif latest_core_ids and core_id not in latest_core_ids:
-            blockers.append("delivery row references core opportunity missing from core store")
+        blockers.extend(_delivery_core_identity_blockers(row, latest_core_ids=latest_core_ids))
+    return blockers
 
-    would_send_cores = [
-        row for row in core_rows
-        if (not latest_run_id or str(row.get("run_id") or "") == latest_run_id)
-        and _route_is_alertable(row)
-    ]
+
+def _delivery_core_identity_blockers(row: Mapping[str, Any], *, latest_core_ids: set[str]) -> list[str]:
+    lane = str(row.get("lane") or "")
+    if lane not in {"daily_digest", "instant_escalation", "triggered_fade"}:
+        return []
+    state = str(row.get("state") or "")
+    if state not in {
+        delivery.STATE_DELIVERED,
+        delivery.STATE_PARTIAL_DELIVERED,
+        delivery.STATE_BLOCKED,
+        delivery.STATE_SKIPPED_DUPLICATE,
+        delivery.STATE_SKIPPED_IN_FLIGHT,
+    }:
+        return []
+    core_id = str(row.get("core_opportunity_id") or "").strip()
+    if not core_id:
+        return ["delivery row missing canonical core opportunity identity"]
+    if latest_core_ids and core_id not in latest_core_ids:
+        return ["delivery row references core opportunity missing from core store"]
+    return []
+
+
+def _core_send_readiness_blockers(would_send_cores: Iterable[Mapping[str, Any]]) -> list[str]:
+    blockers: list[str] = []
     for row in would_send_cores:
         if _core_is_rejected_or_unconfirmed(row):
             blockers.append(
@@ -208,28 +317,7 @@ def build_send_readiness(
             )
         if _route_value(row) == "TRIGGERED_FADE" and str(row.get("effective_playbook_type") or row.get("playbook_type") or "") != "proxy_fade":
             blockers.append("TRIGGERED_FADE core is not proxy_fade")
-
-    blockers = list(dict.fromkeys(blockers))
-    warnings = list(dict.fromkeys(warnings))
-    completed = bool(latest_run.get("cycle_completed", latest_run is not None)) if latest_run else False
-    return EventAlphaSendReadinessResult(
-        profile=profile,
-        artifact_namespace=artifact_namespace,
-        latest_run_id=latest_run_id,
-        ready=not blockers,
-        no_send_rehearsal=not send_guard_enabled,
-        send_guard_enabled=bool(send_guard_enabled),
-        telegram_ready=bool(telegram_ready),
-        preview_path=resolved_preview,
-        preview_path_source=preview_source,
-        latest_run_completed=completed,
-        artifact_doctor_status=str(artifact_doctor.status or "unknown"),
-        alertable_items=sum(1 for row in would_send_cores),
-        delivery_rows_checked=len(latest_deliveries),
-        core_rows_checked=len(core_rows),
-        blockers=tuple(blockers),
-        warnings=tuple(warnings),
-    )
+    return blockers
 
 
 def format_send_readiness(result: EventAlphaSendReadinessResult) -> str:

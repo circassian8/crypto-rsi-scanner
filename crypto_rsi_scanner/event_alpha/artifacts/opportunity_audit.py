@@ -103,7 +103,86 @@ def format_opportunity_audit(
     feedback_labels = tuple(
         dict.fromkeys(str(item.get("label") or item.get("feedback") or "") for item in feedback_matches)
     )
-    lines = [
+    return "\n".join(_opportunity_audit_lines(
+        clean=clean,
+        profile=profile,
+        match=match,
+        core_resolution=core_resolution,
+        row=row,
+        components=components,
+        core_view=core_view,
+        core_match=core_match,
+        incident=incident,
+        near_miss=near_miss,
+        daily_section=daily_section,
+        card_group=card_group,
+        matching_cards=matching_cards,
+        feedback_target=feedback_target,
+        feedback_status=feedback_status,
+        feedback_labels=feedback_labels,
+        verdict_copy=verdict_copy,
+        upgrade=upgrade,
+        include_diagnostics=include_diagnostics,
+    ))
+
+
+def _opportunity_audit_lines(
+    *,
+    clean: str,
+    profile: str | None,
+    match: Mapping[str, Any],
+    core_resolution: event_core_opportunities.CanonicalCoreOpportunityResolution,
+    row: Mapping[str, Any],
+    components: Mapping[str, Any],
+    core_view: event_core_opportunity_store.CanonicalCoreOpportunityView,
+    core_match: event_core_opportunities.CoreOpportunity | None,
+    incident: Mapping[str, Any] | None,
+    near_miss: event_near_miss.EventNearMissCandidate | None,
+    daily_section: str,
+    card_group: str,
+    matching_cards: Iterable[Path],
+    feedback_target: str,
+    feedback_status: str,
+    feedback_labels: Iterable[str],
+    verdict_copy: event_opportunity_verdict.VerdictAwareUpgradeDowngradeText,
+    upgrade: event_opportunity_verdict.UpgradePathExplanation,
+    include_diagnostics: bool,
+) -> list[str]:
+    return [
+        *_opportunity_audit_header_lines(clean, profile, match, core_resolution, row),
+        *_candidate_summary_audit_lines(row, components, core_match, include_diagnostics=include_diagnostics),
+        *_operator_presentation_audit_lines(row, components, core_match, near_miss, daily_section, card_group, matching_cards, feedback_target),
+        *_evidence_chain_audit_lines(row, components),
+        *_identity_decision_audit_lines(row, components),
+        "## Incident",
+        *_incident_lines(incident, row, components),
+        "",
+        *_impact_and_evidence_quality_audit_lines(row, components),
+        "## Source coverage and acquisition plan",
+        *_source_acquisition_audit_lines(row, components),
+        *_official_exchange_audit_section(row, components),
+        "",
+        *_market_confirmation_audit_lines(row, components),
+        *_opportunity_lane_audit_lines(row, components),
+        *_final_verdict_audit_lines(row, components),
+        "## Near-miss status",
+        *_near_miss_lines(near_miss, row),
+        "",
+        *_router_and_reconciliation_audit_lines(match, core_view, row, include_diagnostics=include_diagnostics),
+        *_notification_feedback_audit_lines(row, feedback_status, feedback_labels),
+        *_upgrade_downgrade_audit_lines(row, components, verdict_copy, upgrade, feedback_target, profile),
+        "No secrets, Telegram sends, trades, paper rows, normal RSI rows, or event-fade state were touched.",
+    ]
+
+
+def _opportunity_audit_header_lines(
+    clean: str,
+    profile: str | None,
+    match: Mapping[str, Any],
+    core_resolution: event_core_opportunities.CanonicalCoreOpportunityResolution,
+    row: Mapping[str, Any],
+) -> list[str]:
+    return [
         "=" * 76,
         "EVENT OPPORTUNITY AUDIT (research-only)",
         "=" * 76,
@@ -116,6 +195,17 @@ def format_opportunity_audit(
         f"canonical resolution warnings: {_list_value(core_resolution.warnings) if core_resolution.warnings else 'none'}",
         f"quality_field_source: {_quality_source(row)}",
         "",
+    ]
+
+
+def _candidate_summary_audit_lines(
+    row: Mapping[str, Any],
+    components: Mapping[str, Any],
+    core_match: event_core_opportunities.CoreOpportunity | None,
+    *,
+    include_diagnostics: bool,
+) -> list[str]:
+    return [
         "## Candidate summary",
         f"- symbol/coin: {_value(row, 'symbol', components.get('validated_symbol'), default='SECTOR')}/{_value(row, 'coin_id', components.get('validated_coin_id'), default='unknown')}",
         f"- event/hypothesis: {_value(row, 'event_id', 'hypothesis_id', default='unknown')}",
@@ -124,13 +214,33 @@ def format_opportunity_audit(
         f"- state/tier: {_value(row, 'state', default='unknown')} / {_value(row, 'tier', 'latest_tier', default='unknown')}",
         "",
         *(_core_opportunity_lines(core_match, include_diagnostics=include_diagnostics) if core_match is not None else []),
+    ]
+
+
+def _operator_presentation_audit_lines(
+    row: Mapping[str, Any],
+    components: Mapping[str, Any],
+    core_match: event_core_opportunities.CoreOpportunity | None,
+    near_miss: event_near_miss.EventNearMissCandidate | None,
+    daily_section: str,
+    card_group: str,
+    matching_cards: Iterable[Path],
+    feedback_target: str,
+) -> list[str]:
+    card_paths = tuple(matching_cards)
+    return [
         "## Operator Presentation",
         f"- Daily brief section: {daily_section}",
         f"- Research card group: {card_group}",
-        f"- Card path: {_list_value(str(path) for path in matching_cards) if matching_cards else 'none'}",
+        f"- Card path: {_list_value(str(path) for path in card_paths) if card_paths else 'none'}",
         f"- Feedback target: {feedback_target}",
         "- Reason: " + _operator_presentation_reason(row, components, core_match, near_miss),
         "",
+    ]
+
+
+def _evidence_chain_audit_lines(row: Mapping[str, Any], components: Mapping[str, Any]) -> list[str]:
+    return [
         "## Evidence chain",
         f"- raw source summary: {_value(row, 'raw_evidence_summary', 'event_name', 'latest_event_name', default='unknown')}",
         f"- source/provider: {_value(row, 'source', 'latest_source', default='unknown')}",
@@ -141,6 +251,11 @@ def format_opportunity_audit(
         f"- crypto candidates: {_asset_list(row.get('crypto_candidate_assets') or components.get('crypto_candidate_assets'))}",
         f"- rejected candidates: {_asset_list(row.get('rejected_candidate_assets') or components.get('rejected_candidate_assets'))}",
         "",
+    ]
+
+
+def _identity_decision_audit_lines(row: Mapping[str, Any], components: Mapping[str, Any]) -> list[str]:
+    return [
         "## Identity decision",
         f"- validated symbol: {components.get('validated_symbol') or row.get('validated_symbol') or row.get('symbol') or 'unknown'}",
         f"- validated coin_id: {components.get('validated_coin_id') or row.get('validated_coin_id') or row.get('coin_id') or 'unknown'}",
@@ -154,9 +269,11 @@ def format_opportunity_audit(
         f"- role validation failures: {_list_value(components.get('role_validation_failures') or row.get('role_validation_failures'))}",
         f"- identity warnings: {_list_value(row.get('warnings') or components.get('warnings'))}",
         "",
-        "## Incident",
-        *_incident_lines(incident, row, components),
-        "",
+    ]
+
+
+def _impact_and_evidence_quality_audit_lines(row: Mapping[str, Any], components: Mapping[str, Any]) -> list[str]:
+    return [
         "## Impact path decision",
         f"- impact path: {components.get('impact_path_type') or row.get('impact_path_type') or components.get('primary_impact_path') or row.get('primary_impact_path') or 'unknown'}",
         f"- strength: {components.get('impact_path_strength') or row.get('impact_path_strength') or 'unknown'}",
@@ -167,10 +284,11 @@ def format_opportunity_audit(
         f"- source/evidence: {components.get('source_class') or row.get('source_class') or 'unknown'} / {components.get('evidence_specificity') or row.get('evidence_specificity') or 'unknown'}",
         f"- evidence score: {components.get('evidence_quality_score') or row.get('evidence_quality_score') or 'n/a'}",
         "",
-        "## Source coverage and acquisition plan",
-        *_source_acquisition_audit_lines(row, components),
-        *_official_exchange_audit_section(row, components),
-        "",
+    ]
+
+
+def _market_confirmation_audit_lines(row: Mapping[str, Any], components: Mapping[str, Any]) -> list[str]:
+    return [
         "## Market confirmation decision",
         f"- market level/score: {components.get('market_confirmation_level') or row.get('market_confirmation_level') or 'unknown'} / {components.get('market_confirmation_score') or row.get('market_confirmation_score') or 'n/a'}",
         f"- market freshness: {components.get('market_context_freshness_status') or row.get('market_context_freshness_status') or 'unknown'} "
@@ -188,6 +306,11 @@ def format_opportunity_audit(
         f"{components.get('protocol_metrics_score') or row.get('protocol_metrics_score') or 'n/a'} "
         f"freshness={components.get('protocol_metrics_freshness_status') or row.get('protocol_metrics_freshness_status') or 'unknown'}",
         "",
+    ]
+
+
+def _opportunity_lane_audit_lines(row: Mapping[str, Any], components: Mapping[str, Any]) -> list[str]:
+    return [
         "## Opportunity lane decision",
         f"- opportunity type: {components.get('opportunity_type') or row.get('opportunity_type') or 'unknown'}",
         f"- market state: {components.get('market_state_class') or row.get('market_state_class') or components.get('market_state') or row.get('market_state') or 'unknown'}",
@@ -200,6 +323,11 @@ def format_opportunity_audit(
         f"- what invalidates: {_list_value(components.get('what_invalidates') or row.get('what_invalidates') or components.get('opportunity_type_what_invalidates') or row.get('opportunity_type_what_invalidates'))}",
         f"- why not alertable: {_list_value(components.get('why_not_alertable') or row.get('why_not_alertable') or components.get('opportunity_type_why_not_alertable') or row.get('opportunity_type_why_not_alertable'))}",
         "",
+    ]
+
+
+def _final_verdict_audit_lines(row: Mapping[str, Any], components: Mapping[str, Any]) -> list[str]:
+    return [
         "## Final opportunity verdict",
         f"- level/score: {components.get('final_opportunity_level') or row.get('final_opportunity_level') or components.get('opportunity_level') or row.get('opportunity_level') or 'unknown'} / {components.get('final_opportunity_score') or row.get('final_opportunity_score') or components.get('opportunity_score_final') or row.get('opportunity_score_final') or 'n/a'}",
         f"- source/reason: {components.get('final_verdict_source') or row.get('final_verdict_source') or 'initial'} / {components.get('final_verdict_reason') or row.get('final_verdict_reason') or 'none'}",
@@ -207,9 +335,17 @@ def format_opportunity_audit(
         f"- why local-only: {_human_reason_value(components.get('why_local_only') or row.get('why_local_only')) or 'none'}",
         f"- why not watchlist: {_human_reason_value(components.get('why_not_watchlist') or row.get('why_not_watchlist')) or 'none'}",
         "",
-        "## Near-miss status",
-        *_near_miss_lines(near_miss, row),
-        "",
+    ]
+
+
+def _router_and_reconciliation_audit_lines(
+    match: Mapping[str, Any],
+    core_view: event_core_opportunity_store.CanonicalCoreOpportunityView,
+    row: Mapping[str, Any],
+    *,
+    include_diagnostics: bool,
+) -> list[str]:
+    return [
         "## Router decision",
         f"- route: {_value(row, 'route', default=match.get('route') or 'not_routed')}",
         f"- notification lane: {_value(row, 'lane', default=match.get('lane') or 'local_only')}",
@@ -219,35 +355,56 @@ def format_opportunity_audit(
         "## Alert snapshot / core reconciliation",
         *_snapshot_core_reconciliation_lines(core_view, row, include_diagnostics=include_diagnostics),
         "",
+    ]
+
+
+def _notification_feedback_audit_lines(
+    row: Mapping[str, Any],
+    feedback_status: str,
+    feedback_labels: Iterable[str],
+) -> list[str]:
+    labels = tuple(feedback_labels)
+    return [
         "## Notification and feedback status",
         f"- delivery status: {_value(row, 'delivered_status', 'delivery_state', default='not_delivered_or_unknown')}",
         f"- feedback status: {feedback_status}",
-        f"- feedback label: {_list_value(feedback_labels) if feedback_labels else _value(row, 'label', 'feedback', default='none')}",
+        f"- feedback label: {_list_value(labels) if labels else _value(row, 'label', 'feedback', default='none')}",
         f"- outcome status: {_value(row, 'outcome_status', default='pending_or_unknown')}",
         "",
+    ]
+
+
+def _upgrade_downgrade_audit_lines(
+    row: Mapping[str, Any],
+    components: Mapping[str, Any],
+    verdict_copy: event_opportunity_verdict.VerdictAwareUpgradeDowngradeText,
+    upgrade: event_opportunity_verdict.UpgradePathExplanation,
+    feedback_target: str,
+    profile: str | None,
+) -> list[str]:
+    promoted = _is_promoted_audit_row(components, row)
+    return [
         "## Missing evidence",
         f"- missing requirements: {_audit_missing_evidence_text(components, row, verdict_copy)}",
         "",
         "## What would upgrade this candidate",
         "- " + (
             verdict_copy.upgrade_text
-            if _is_promoted_audit_row(components, row)
+            if promoted
             else (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=8) or verdict_copy.upgrade_text)
         ),
         "",
         "## What would downgrade / invalidate this candidate",
         "- " + (
             verdict_copy.downgrade_text
-            if _is_promoted_audit_row(components, row)
+            if promoted
             else (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=8) or verdict_copy.downgrade_text)
         ),
         "",
         "## Feedback command",
         f"- make event-feedback-watch PROFILE={profile or 'notify_llm'} FEEDBACK_TARGET='{feedback_target}'",
         "",
-        "No secrets, Telegram sends, trades, paper rows, normal RSI rows, or event-fade state were touched.",
     ]
-    return "\n".join(lines)
 
 
 def _snapshot_core_reconciliation_lines(

@@ -87,10 +87,8 @@ def _status(
     )
 
 
-def build_event_discovery_provider_status(cfg: Any) -> EventDiscoveryProviderStatus:
-    """Return redacted provider readiness for the event-discovery workflow."""
-
-    sources = (
+def _event_source_statuses(cfg: Any) -> tuple[ProviderStatus, ...]:
+    return (
         _status(
             name="manual_json",
             category="event_source",
@@ -212,7 +210,9 @@ def build_event_discovery_provider_status(cfg: Any) -> EventDiscoveryProviderSta
         ),
     )
 
-    enrichment = (
+
+def _event_enrichment_statuses(cfg: Any) -> tuple[ProviderStatus, ...]:
+    return (
         _status(
             name="asset_aliases",
             category="enrichment",
@@ -277,6 +277,8 @@ def build_event_discovery_provider_status(cfg: Any) -> EventDiscoveryProviderSta
         ),
     )
 
+
+def _provider_status_warnings(cfg: Any, sources: tuple[ProviderStatus, ...]) -> tuple[str, ...]:
     warnings: list[str] = []
     if not any(item.ready for item in sources):
         warnings.append(
@@ -293,7 +295,10 @@ def build_event_discovery_provider_status(cfg: Any) -> EventDiscoveryProviderSta
         warnings.append("Project blog/RSS live mode is enabled but no RSS/Atom URLs are configured.")
     if cfg.EVENT_DISCOVERY_COINALYZE_LIVE and not _present(cfg.EVENT_DISCOVERY_COINALYZE_API_KEY):
         warnings.append("Coinalyze live enrichment is enabled but the API key is missing.")
+    return tuple(warnings)
 
+
+def _provider_status_next_steps(sources: tuple[ProviderStatus, ...]) -> tuple[str, ...]:
     next_steps = (
         "Enable at least one event source, for example public RSS feeds, Polymarket prediction events, GDELT live, CryptoPanic live, or local event fixtures.",
         "No-key option: make event-fade-public-rss-review-cycle EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1",
@@ -305,6 +310,14 @@ def build_event_discovery_provider_status(cfg: Any) -> EventDiscoveryProviderSta
             "Run: make event-fade-configured-review-cycle EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1",
             "Review the generated bundle sidecar/packet, then run main.py --event-fade-review-sample on the reviewed sample.",
         )
+    return next_steps
+
+
+def build_event_discovery_provider_status(cfg: Any) -> EventDiscoveryProviderStatus:
+    """Return redacted provider readiness for the event-discovery workflow."""
+
+    sources = _event_source_statuses(cfg)
+    enrichment = _event_enrichment_statuses(cfg)
 
     return EventDiscoveryProviderStatus(
         mode=str(getattr(cfg, "EVENT_DISCOVERY_MODE", "research_only")),
@@ -313,8 +326,8 @@ def build_event_discovery_provider_status(cfg: Any) -> EventDiscoveryProviderSta
         horizon_days=int(cfg.EVENT_DISCOVERY_HORIZON_DAYS),
         sources=sources,
         enrichment=enrichment,
-        warnings=tuple(warnings),
-        next_steps=next_steps,
+        warnings=_provider_status_warnings(cfg, sources),
+        next_steps=_provider_status_next_steps(sources),
     )
 
 

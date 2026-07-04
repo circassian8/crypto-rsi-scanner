@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split notification readiness and audit render helpers · Codex
+**Why:** The refactor goal still has advisory oversized-function debt after
+the production and legacy file-size gates passed. This pass removes five more
+pure/reporting/readiness functions from the over-limit inventory without
+changing no-send notification semantics, provider readiness calculations, or
+opportunity-audit wording.
+**Changes:**
+- Split notification inbox row loading and review-queue classification out of
+  `build_notification_inbox()` in
+  `crypto_rsi_scanner/event_alpha/notifications/inbox/builder.py`.
+- Split lane and heartbeat preview writing out of
+  `write_notification_plan_preview()` in
+  `crypto_rsi_scanner/event_alpha/notifications/legacy/preview_writer.py`.
+- Split provider source/enrichment rows, warnings, and next steps out of
+  `build_event_discovery_provider_status()` in
+  `crypto_rsi_scanner/event_alpha/notifications/provider_status.py`.
+- Split send-readiness row filtering and blocker collection out of
+  `build_send_readiness()` in
+  `crypto_rsi_scanner/event_alpha/notifications/readiness.py`.
+- Split `format_opportunity_audit()` into focused Markdown section helpers in
+  `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py`.
+- Refreshed refactor size, class ownership, final, and completion reports.
+  Current advisory inventory is `14` classes and `29` functions over limits,
+  with `production_files_over_1500_lines=0`, `legacy_files_over_1500_lines=0`,
+  and `new_violation_count=0`.
+**Verify:** Focused notification, send-readiness, provider-status, and
+opportunity-audit pytest slices passed; compileall passed for touched modules;
+`make refactor-size-gates`, `make refactor-class-ownership-report`,
+`make refactor-final-report`, and `make refactor-completion-map` passed. Full
+safe verification for the committed tree: `python3 tests/test_indicators.py`,
+safe pytest for `tests/event_alpha tests/rsi tests/cli tests/test_indicators.py`,
+`python3 -m compileall -q crypto_rsi_scanner tests`,
+`make event-alpha-notification-format-smoke`,
+`make event-alpha-telegram-no-send-final-check-fast`,
+`make event-alpha-notify-preview-from-artifacts ...`,
+`make event-alpha-artifact-doctor ... STRICT=1`, and `make verify PYTHON=python3`.
+**Notes/risks:** Behavior-preserving only. No provider calls, live sends,
+trading, paper-trading behavior changes, execution/order logic, Event Alpha RSI
+writes, or Event Alpha-created `TRIGGERED_FADE` were added.
+
 ## 2026-07-04 — Split source registry and source coverage report helpers · Codex
 **Why:** The active refactor goal still has advisory oversized-function debt
 after the runtime and artifact-size gates passed. This pass removes four more

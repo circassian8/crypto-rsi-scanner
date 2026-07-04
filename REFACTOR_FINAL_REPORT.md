@@ -2,7 +2,7 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-04T05:22:54+00:00`
+- generated_at: `2026-07-04T05:38:08+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `0`
@@ -44,13 +44,13 @@ Research-only refactor gate report. This report does not call providers, send Te
 - intentionally_outside_event_alpha_modules: `["crypto_rsi_scanner.event_fade"]`
 - class_ownership_report: `research/REFACTOR_CLASS_OWNERSHIP_REPORT.json`
 - class_ownership_classes_over_limit: `14`
-- class_ownership_functions_over_limit: `34`
+- class_ownership_functions_over_limit: `29`
 - production_size_gate_status: `pass`
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `14`
-- production_functions_over_limit: `34`
+- production_functions_over_limit: `29`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
 - legacy_decomposition_gate_status: `pass`
@@ -100,13 +100,13 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `crypto_rsi_scanner/cli/services/legacy/utility_commands.py` | 1440 |
 | `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` | 1428 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1413 |
+| `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1406 |
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1400 |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 |
 | `crypto_rsi_scanner/config.py` | 1319 |
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1298 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
 | `crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py` | 1261 |
-| `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1249 |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1247 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1239 |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 |
