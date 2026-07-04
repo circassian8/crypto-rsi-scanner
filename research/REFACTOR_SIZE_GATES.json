@@ -131,7 +131,7 @@
     }
   ],
   "classes_over_limit_count": 14,
-  "existing_violation_count": 146,
+  "existing_violation_count": 142,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -463,17 +463,6 @@
     },
     {
       "category": "function_over_150_lines",
-      "function_name": "build_go_no_go",
-      "line_count": 159,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.go_no_go",
-      "public": true,
-      "qualname": "build_go_no_go",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/go_no_go.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/go_no_go.py:build_go_no_go"
-    },
-    {
-      "category": "function_over_150_lines",
       "function_name": "build_notification_inbox",
       "line_count": 186,
       "module": "crypto_rsi_scanner.event_alpha.notifications.inbox.builder",
@@ -595,17 +584,6 @@
     },
     {
       "category": "function_over_150_lines",
-      "function_name": "normalize_derivatives_state",
-      "line_count": 166,
-      "module": "crypto_rsi_scanner.event_alpha.radar.derivatives_crowding",
-      "public": true,
-      "qualname": "normalize_derivatives_state",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py:normalize_derivatives_state"
-    },
-    {
-      "category": "function_over_150_lines",
       "function_name": "run_manual_discovery",
       "line_count": 244,
       "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
@@ -661,17 +639,6 @@
     },
     {
       "category": "function_over_150_lines",
-      "function_name": "format_impact_hypothesis_report",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.report",
-      "public": true,
-      "qualname": "format_impact_hypothesis_report",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/report.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/report.py:format_impact_hypothesis_report"
-    },
-    {
-      "category": "function_over_150_lines",
       "function_name": "validate_impact_path",
       "line_count": 181,
       "module": "crypto_rsi_scanner.event_alpha.radar.impact_path_validator",
@@ -724,17 +691,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/market_confirmation.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/market_confirmation.py:evaluate_market_confirmation"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "_candidate_from_row",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.radar.near_miss.candidates",
-      "public": false,
-      "qualname": "_candidate_from_row",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/near_miss/candidates.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/near_miss/candidates.py:_candidate_from_row"
     },
     {
       "category": "function_over_150_lines",
@@ -1612,14 +1568,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/reporting.py"
     },
     {
-      "function_name": "build_go_no_go",
-      "line_count": 159,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.go_no_go",
-      "public": true,
-      "qualname": "build_go_no_go",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/go_no_go.py"
-    },
-    {
       "function_name": "build_notification_inbox",
       "line_count": 186,
       "module": "crypto_rsi_scanner.event_alpha.notifications.inbox.builder",
@@ -1708,14 +1656,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
     },
     {
-      "function_name": "normalize_derivatives_state",
-      "line_count": 166,
-      "module": "crypto_rsi_scanner.event_alpha.radar.derivatives_crowding",
-      "public": true,
-      "qualname": "normalize_derivatives_state",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py"
-    },
-    {
       "function_name": "run_manual_discovery",
       "line_count": 244,
       "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
@@ -1756,14 +1696,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/builder.py"
     },
     {
-      "function_name": "format_impact_hypothesis_report",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.report",
-      "public": true,
-      "qualname": "format_impact_hypothesis_report",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/report.py"
-    },
-    {
       "function_name": "validate_impact_path",
       "line_count": 181,
       "module": "crypto_rsi_scanner.event_alpha.radar.impact_path_validator",
@@ -1802,14 +1734,6 @@
       "public": true,
       "qualname": "evaluate_market_confirmation",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/market_confirmation.py"
-    },
-    {
-      "function_name": "_candidate_from_row",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.radar.near_miss.candidates",
-      "public": false,
-      "qualname": "_candidate_from_row",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/near_miss/candidates.py"
     },
     {
       "function_name": "_refresh_one_hypothesis",
@@ -1884,9 +1808,9 @@
       "source_path": "crypto_rsi_scanner/refactor_final_report.py"
     }
   ],
-  "functions_over_limit_count": 42,
+  "functions_over_limit_count": 38,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T04:56:58.284222+00:00",
+  "generated_at": "2026-07-04T05:10:28.314141+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -2038,6 +1962,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1239,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1233,
       "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
       "source_kind": "production"
@@ -2058,12 +1988,6 @@
       "limit": 1500,
       "line_count": 1181,
       "path": "crypto_rsi_scanner/event_fade.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1171,
-      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
       "source_kind": "production"
     },
     {
@@ -2903,20 +2827,12 @@
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/builder.py:_hypothesis_from_rule"
     },
     {
-      "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:format_impact_hypothesis_report",
-      "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/report.py:format_impact_hypothesis_report"
-    },
-    {
       "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:run_integrated_radar_cycle",
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py:run_integrated_radar_cycle"
     },
     {
       "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:_merge_family",
       "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py:_merge_family"
-    },
-    {
-      "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py:_candidate_from_row",
-      "current_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/near_miss/candidates.py:_candidate_from_row"
     },
     {
       "baseline_violation_id": "function:crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py:_refresh_one_hypothesis",
@@ -2995,7 +2911,7 @@
       "current_violation_id": "public_classes:crypto_rsi_scanner.event_alpha.radar.watchlist.models"
     }
   ],
-  "moved_existing_violation_count": 38,
+  "moved_existing_violation_count": 36,
   "new_violation_count": 0,
   "new_violations": [],
   "no_live_provider_calls": true,
@@ -3141,7 +3057,7 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 42,
+  "production_functions_over_limit": 38,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_event_alpha_notify_cycle_body",
@@ -3206,14 +3122,6 @@
       "public": true,
       "qualname": "format_artifact_doctor_report",
       "source_path": "crypto_rsi_scanner/event_alpha/doctor/legacy/reporting.py"
-    },
-    {
-      "function_name": "build_go_no_go",
-      "line_count": 159,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.go_no_go",
-      "public": true,
-      "qualname": "build_go_no_go",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/go_no_go.py"
     },
     {
       "function_name": "build_notification_inbox",
@@ -3304,14 +3212,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py"
     },
     {
-      "function_name": "normalize_derivatives_state",
-      "line_count": 166,
-      "module": "crypto_rsi_scanner.event_alpha.radar.derivatives_crowding",
-      "public": true,
-      "qualname": "normalize_derivatives_state",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py"
-    },
-    {
       "function_name": "run_manual_discovery",
       "line_count": 244,
       "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
@@ -3352,14 +3252,6 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/builder.py"
     },
     {
-      "function_name": "format_impact_hypothesis_report",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.report",
-      "public": true,
-      "qualname": "format_impact_hypothesis_report",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/report.py"
-    },
-    {
       "function_name": "validate_impact_path",
       "line_count": 181,
       "module": "crypto_rsi_scanner.event_alpha.radar.impact_path_validator",
@@ -3398,14 +3290,6 @@
       "public": true,
       "qualname": "evaluate_market_confirmation",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/market_confirmation.py"
-    },
-    {
-      "function_name": "_candidate_from_row",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.radar.near_miss.candidates",
-      "public": false,
-      "qualname": "_candidate_from_row",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/near_miss/candidates.py"
     },
     {
       "function_name": "_refresh_one_hypothesis",
@@ -3482,7 +3366,7 @@
   ],
   "production_size_gate_status": "pass",
   "research_only": true,
-  "resolved_violation_count": 58,
+  "resolved_violation_count": 62,
   "resolved_violation_ids": [
     "class:crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py:CoinalyzeDerivativesProvider",
     "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
@@ -3534,11 +3418,15 @@
     "function:crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py:render_research_card",
     "function:crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py:_run_record",
     "function:crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py:format_run_ledger_report",
+    "function:crypto_rsi_scanner/event_alpha/notifications/go_no_go.py:build_go_no_go",
     "function:crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py:select_research_review_candidates_with_diagnostics",
     "function:crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py:_provider_rows",
     "function:crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py:_row_from_core_opportunity",
+    "function:crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py:normalize_derivatives_state",
+    "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:format_impact_hypothesis_report",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py:validate_hypotheses_with_raw_events",
     "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py:format_integrated_daily_brief",
+    "function:crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py:_candidate_from_row",
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_alert",
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_hypothesis",
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py:_entry_from_row"
@@ -3579,7 +3467,6 @@
     "function:crypto_rsi_scanner/event_alpha/doctor/legacy/notification_delivery_checks.py:_notification_delivery_conflicts",
     "function:crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py:_integrated_radar_artifact_conflicts",
     "function:crypto_rsi_scanner/event_alpha/doctor/legacy/reporting.py:format_artifact_doctor_report",
-    "function:crypto_rsi_scanner/event_alpha/notifications/go_no_go.py:build_go_no_go",
     "function:crypto_rsi_scanner/event_alpha/notifications/inbox/builder.py:build_notification_inbox",
     "function:crypto_rsi_scanner/event_alpha/notifications/legacy/preview_writer.py:write_notification_plan_preview",
     "function:crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py:send_notifications",
@@ -3591,19 +3478,16 @@
     "function:crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py:run_no_send_rehearsal",
     "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:assess_source",
     "function:crypto_rsi_scanner/event_alpha/providers/source_registry.py:source_descriptor_for",
-    "function:crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py:normalize_derivatives_state",
     "function:crypto_rsi_scanner/event_alpha/radar/discovery/manual.py:load_discovery_events",
     "function:crypto_rsi_scanner/event_alpha/radar/discovery/manual.py:run_manual_discovery",
     "function:crypto_rsi_scanner/event_alpha/radar/evidence/executor.py:_execute_request",
     "function:crypto_rsi_scanner/event_alpha/radar/evidence/executor.py:_validate_raw_result",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/builder.py:_hypothesis_from_rule",
-    "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/report.py:format_impact_hypothesis_report",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py:_classify_path",
     "function:crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py:validate_impact_path",
     "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py:run_integrated_radar_cycle",
     "function:crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py:_merge_family",
     "function:crypto_rsi_scanner/event_alpha/radar/market_confirmation.py:evaluate_market_confirmation",
-    "function:crypto_rsi_scanner/event_alpha/radar/near_miss/candidates.py:_candidate_from_row",
     "function:crypto_rsi_scanner/event_alpha/radar/near_miss/refresh.py:_refresh_one_hypothesis",
     "function:crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py:evaluate_opportunity",
     "function:crypto_rsi_scanner/event_alpha/radar/pipeline.py:run_event_alpha_operating_cycle",
@@ -4027,17 +3911,6 @@
     },
     {
       "category": "function_over_150_lines",
-      "function_name": "build_go_no_go",
-      "line_count": 159,
-      "module": "crypto_rsi_scanner.event_alpha.notifications.go_no_go",
-      "public": true,
-      "qualname": "build_go_no_go",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/notifications/go_no_go.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/notifications/go_no_go.py:build_go_no_go"
-    },
-    {
-      "category": "function_over_150_lines",
       "function_name": "build_notification_inbox",
       "line_count": 186,
       "module": "crypto_rsi_scanner.event_alpha.notifications.inbox.builder",
@@ -4159,17 +4032,6 @@
     },
     {
       "category": "function_over_150_lines",
-      "function_name": "normalize_derivatives_state",
-      "line_count": 166,
-      "module": "crypto_rsi_scanner.event_alpha.radar.derivatives_crowding",
-      "public": true,
-      "qualname": "normalize_derivatives_state",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py:normalize_derivatives_state"
-    },
-    {
-      "category": "function_over_150_lines",
       "function_name": "run_manual_discovery",
       "line_count": 244,
       "module": "crypto_rsi_scanner.event_alpha.radar.discovery.manual",
@@ -4225,17 +4087,6 @@
     },
     {
       "category": "function_over_150_lines",
-      "function_name": "format_impact_hypothesis_report",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.report",
-      "public": true,
-      "qualname": "format_impact_hypothesis_report",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/report.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/report.py:format_impact_hypothesis_report"
-    },
-    {
-      "category": "function_over_150_lines",
       "function_name": "validate_impact_path",
       "line_count": 181,
       "module": "crypto_rsi_scanner.event_alpha.radar.impact_path_validator",
@@ -4288,17 +4139,6 @@
       "severity": "warning",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/market_confirmation.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/market_confirmation.py:evaluate_market_confirmation"
-    },
-    {
-      "category": "function_over_150_lines",
-      "function_name": "_candidate_from_row",
-      "line_count": 158,
-      "module": "crypto_rsi_scanner.event_alpha.radar.near_miss.candidates",
-      "public": false,
-      "qualname": "_candidate_from_row",
-      "severity": "warning",
-      "source_path": "crypto_rsi_scanner/event_alpha/radar/near_miss/candidates.py",
-      "violation_id": "function:crypto_rsi_scanner/event_alpha/radar/near_miss/candidates.py:_candidate_from_row"
     },
     {
       "category": "function_over_150_lines",

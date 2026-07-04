@@ -1,145 +1,258 @@
 {
   "commands_expected": 23,
   "commands_run": 23,
-  "elapsed_seconds": 134.049,
+  "no_live_provider_calls_by_default": true,
+  "no_live_telegram_sends": true,
+  "no_trading_paper_execution_rsi_or_triggered_fade_changes": true,
+  "research_only": true,
   "results": [
     {
-      "command": "python3 tests/test_indicators.py",
-      "elapsed_seconds": 25.316,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/01.log",
-      "returncode": 0
+      "command": [
+        "python3",
+        "tests/test_indicators.py"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/01_python3_tests_test_indicators.py.log",
+      "returncode": 0,
+      "seconds": 25.295
     },
     {
-      "command": "env PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q",
-      "elapsed_seconds": 25.835,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/02.log",
-      "returncode": 0
+      "command": [
+        "env",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
+        "python3",
+        "-m",
+        "pytest",
+        "tests/event_alpha",
+        "tests/rsi",
+        "tests/cli",
+        "tests/test_indicators.py",
+        "-q"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/02_env_PYTEST_DISABLE_PLUGIN_AUTOLOAD-1_python3.log",
+      "returncode": 0,
+      "seconds": 25.957
     },
     {
-      "command": "python3 -m compileall -q crypto_rsi_scanner tests",
-      "elapsed_seconds": 0.047,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/03.log",
-      "returncode": 0
+      "command": [
+        "python3",
+        "-m",
+        "compileall",
+        "-q",
+        "crypto_rsi_scanner",
+        "tests"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/03_python3_-m_compileall.log",
+      "returncode": 0,
+      "seconds": 0.041
     },
     {
-      "command": "make test-pytest-safe PYTHON=python3",
-      "elapsed_seconds": 26.209,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/04.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "test-pytest-safe",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/04_make_test-pytest-safe_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 26.002
     },
     {
-      "command": "make refactor-size-gates PYTHON=python3",
-      "elapsed_seconds": 1.114,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/05.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "refactor-size-gates",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/05_make_refactor-size-gates_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 1.115
     },
     {
-      "command": "make refactor-class-ownership-report PYTHON=python3",
-      "elapsed_seconds": 1.004,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/06.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "refactor-class-ownership-report",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/06_make_refactor-class-ownership-report_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 1.005
     },
     {
-      "command": "make refactor-final-report PYTHON=python3",
-      "elapsed_seconds": 1.188,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/07.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "refactor-final-report",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/07_make_refactor-final-report_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 1.188
     },
     {
-      "command": "make event-alpha-shim-report PYTHON=python3",
-      "elapsed_seconds": 0.057,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/08.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-shim-report",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/08_make_event-alpha-shim-report_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 0.056
     },
     {
-      "command": "make event-alpha-integrated-radar-smoke PYTHON=python3",
-      "elapsed_seconds": 1.817,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/09.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-integrated-radar-smoke",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/09_make_event-alpha-integrated-radar-smoke_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 1.808
     },
     {
-      "command": "make event-alpha-integrated-radar-doctor PYTHON=python3",
-      "elapsed_seconds": 0.796,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/10.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-integrated-radar-doctor",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/10_make_event-alpha-integrated-radar-doctor_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 0.795
     },
     {
-      "command": "make event-alpha-notification-format-smoke PYTHON=python3",
-      "elapsed_seconds": 2.1,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/11.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-notification-format-smoke",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/11_make_event-alpha-notification-format-smoke_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 2.083
     },
     {
-      "command": "make event-alpha-telegram-no-send-final-check-fast PYTHON=python3",
-      "elapsed_seconds": 2.831,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/12.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-telegram-no-send-final-check-fast",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/12_make_event-alpha-telegram-no-send-final-check-fast_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 2.839
     },
     {
-      "command": "make event-alpha-evidence-acquisition-smoke PYTHON=python3",
-      "elapsed_seconds": 4.431,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/13.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-evidence-acquisition-smoke",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/13_make_event-alpha-evidence-acquisition-smoke_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 4.434
     },
     {
-      "command": "make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3",
-      "elapsed_seconds": 4.239,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/14.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-catalyst-frame-e2e-cycle",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/14_make_event-alpha-catalyst-frame-e2e-cycle_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 4.257
     },
     {
-      "command": "make event-alpha-coinalyze-preflight-smoke PYTHON=python3",
-      "elapsed_seconds": 0.675,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/15.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-coinalyze-preflight-smoke",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/15_make_event-alpha-coinalyze-preflight-smoke_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 0.661
     },
     {
-      "command": "make event-alpha-coinalyze-preflight PYTHON=python3",
-      "elapsed_seconds": 0.649,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/16.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-coinalyze-preflight",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/16_make_event-alpha-coinalyze-preflight_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 0.662
     },
     {
-      "command": "make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3",
-      "elapsed_seconds": 0.641,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/17.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-coinalyze-no-send-rehearsal",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/17_make_event-alpha-coinalyze-no-send-rehearsal_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 0.659
     },
     {
-      "command": "make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
-      "elapsed_seconds": 0.644,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/18.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-source-coverage-report",
+        "PROFILE=notify_llm_deep",
+        "ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/18_make_event-alpha-source-coverage-report_PROFILE-notify_llm_deep.log",
+      "returncode": 0,
+      "seconds": 0.653
     },
     {
-      "command": "make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
-      "elapsed_seconds": 4.448,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/19.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-daily-brief",
+        "PROFILE=notify_llm_deep",
+        "ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/19_make_event-alpha-daily-brief_PROFILE-notify_llm_deep.log",
+      "returncode": 0,
+      "seconds": 4.444
     },
     {
-      "command": "make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
-      "elapsed_seconds": 1.048,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/20.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-notify-preview-from-artifacts",
+        "PROFILE=notify_llm_deep",
+        "ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/20_make_event-alpha-notify-preview-from-artifacts_PROFILE-notify_llm_deep.log",
+      "returncode": 0,
+      "seconds": 1.05
     },
     {
-      "command": "make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3",
-      "elapsed_seconds": 1.656,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/21.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "event-alpha-artifact-doctor",
+        "PROFILE=notify_llm_deep",
+        "ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal",
+        "STRICT=1",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/21_make_event-alpha-artifact-doctor_PROFILE-notify_llm_deep.log",
+      "returncode": 0,
+      "seconds": 1.681
     },
     {
-      "command": "make backtest-costs PYTHON=python3",
-      "elapsed_seconds": 0.557,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/22.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "backtest-costs",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/22_make_backtest-costs_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 0.554
     },
     {
-      "command": "make verify PYTHON=python3",
-      "elapsed_seconds": 26.747,
-      "log_path": "/tmp/crypto_rsi_refactor_verification_current/23.log",
-      "returncode": 0
+      "command": [
+        "make",
+        "verify",
+        "PYTHON=python3"
+      ],
+      "log_path": "/tmp/crypto_rsi_refactor_verification_current/23_make_verify_PYTHON-python3.log",
+      "returncode": 0,
+      "seconds": 26.722
     }
   ],
   "safety_env": {
@@ -150,5 +263,7 @@
     "RSI_EVENT_ALPHA_CRYPTOPANIC_ALLOW_LIVE_PREFLIGHT": "0",
     "RSI_EVENT_ALPHA_TELEGRAM_ALLOW_SEND": "0"
   },
+  "schema_version": "refactor_verification_results_v1",
+  "seconds": 133.965,
   "status": "pass"
 }

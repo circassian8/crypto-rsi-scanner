@@ -54,6 +54,21 @@ class EventAlphaNotificationGoNoGoResult:
     final_recommendation: str = "NOT_READY"
 
 
+@dataclass
+class _GoNoGoBaseFindings:
+    lock_state: str
+    lock_message: str
+    provider_sources: int
+    provider_enrichment: int
+    backoff_count: int
+    delivery_writable: bool
+    runs_writable: bool
+    cards_writable: bool
+    blockers: list[str]
+    warnings: list[str]
+    real_send_blockers: list[str]
+
+
 RECOMMEND_READY_NO_SEND_REVIEW = "READY_FOR_NO_SEND_REVIEW"
 RECOMMEND_READY_SEND = "READY_FOR_SEND"
 RECOMMEND_NOT_READY = "NOT_READY"
@@ -86,43 +101,23 @@ def build_go_no_go(
     delivery_history_rows: Iterable[Mapping[str, Any]] = (),
 ) -> EventAlphaNotificationGoNoGoResult:
     """Build a deterministic readiness decision from existing runtime checks."""
-    lock_state = str(getattr(lock_status, "state", "unknown") or "unknown")
-    lock_message = str(getattr(lock_status, "message", "") or "")
-    provider_sources = int(getattr(provider_status, "ready_event_source_count", 0) or 0)
-    provider_enrichment = int(getattr(provider_status, "ready_enrichment_count", 0) or 0)
-    backoff_count = sum(1 for row in provider_health_rows.values() if row.get("disabled_until"))
-    delivery_writable = _path_writable(Path(delivery_ledger_path).expanduser(), is_dir=False)
-    runs_writable = _path_writable(Path(notification_run_ledger_path).expanduser(), is_dir=False)
-    cards_writable = _path_writable(Path(research_cards_dir).expanduser(), is_dir=True)
-    fixed_clock_blocked = _fixed_clock_blocked(clock_status)
-
-    blockers: list[str] = []
-    warnings: list[str] = []
-    if not delivery_writable:
-        blockers.append("delivery ledger is not writable")
-    if not runs_writable:
-        blockers.append("notification run ledger is not writable")
-    if not cards_writable:
-        blockers.append("research cards directory is not writable")
-    if lock_state == "held":
-        blockers.append("fresh notification lock is held")
-    elif lock_state == "stale":
-        warnings.append("notification lock is stale and can be recovered by the cycle")
-    if fixed_clock_blocked:
-        blockers.append("fixed research clock blocks notification sends")
-    real_send_blockers: list[str] = []
-    if not telegram_ready:
-        real_send_blockers.append("telegram config is missing")
-    if not send_guard_enabled:
-        real_send_blockers.append("RSI_EVENT_ALERTS_ENABLED is not set")
-    if notifications_paused:
-        blockers.append(f"notifications paused: {pause_reason or 'operator pause'}")
-    if str(artifact_doctor_status).upper() == "BLOCKED":
-        blockers.append("artifact doctor status is BLOCKED")
-    if provider_sources <= 0:
-        warnings.append("no active event sources; only heartbeat/would-send accounting may run")
-    if backoff_count:
-        warnings.append(f"{backoff_count} provider(s) currently in backoff")
+    findings = _build_go_no_go_base_findings(
+        lock_status=lock_status,
+        provider_status=provider_status,
+        provider_health_rows=provider_health_rows,
+        delivery_ledger_path=delivery_ledger_path,
+        notification_run_ledger_path=notification_run_ledger_path,
+        research_cards_dir=research_cards_dir,
+        artifact_doctor_status=artifact_doctor_status,
+        clock_status=clock_status,
+        telegram_ready=telegram_ready,
+        send_guard_enabled=send_guard_enabled,
+        notifications_paused=notifications_paused,
+        pause_reason=pause_reason,
+    )
+    blockers = findings.blockers
+    warnings = findings.warnings
+    real_send_blockers = findings.real_send_blockers
 
     readiness_blockers = tuple(str(item) for item in getattr(send_readiness, "blockers", ()) or ())
     readiness_warnings = tuple(str(item) for item in getattr(send_readiness, "warnings", ()) or ())
@@ -185,14 +180,14 @@ def build_go_no_go(
         ready_to_send_now=ready_to_send,
         telegram_ready=bool(telegram_ready),
         send_guard_enabled=bool(send_guard_enabled),
-        lock_state=lock_state,
-        lock_message=lock_message,
-        provider_ready_event_sources=provider_sources,
-        provider_ready_enrichment_sources=provider_enrichment,
-        provider_backoff_count=backoff_count,
-        delivery_ledger_writable=delivery_writable,
-        notification_run_ledger_writable=runs_writable,
-        research_cards_writable=cards_writable,
+        lock_state=findings.lock_state,
+        lock_message=findings.lock_message,
+        provider_ready_event_sources=findings.provider_sources,
+        provider_ready_enrichment_sources=findings.provider_enrichment,
+        provider_backoff_count=findings.backoff_count,
+        delivery_ledger_writable=findings.delivery_writable,
+        notification_run_ledger_writable=findings.runs_writable,
+        research_cards_writable=findings.cards_writable,
         artifact_doctor_status=str(artifact_doctor_status or "unknown"),
         llm_budget_status=str(llm_budget_status or "unknown"),
         notifications_paused=bool(notifications_paused),
@@ -205,7 +200,7 @@ def build_go_no_go(
         provider_health_report_command=f"make event-alpha-provider-health-report PROFILE={clean_profile}",
         provider_reset_command=(
             f"make event-alpha-provider-health-reset PROFILE={clean_profile} PROVIDER_KEY=all CONFIRM=1"
-            if backoff_count > 0
+            if findings.backoff_count > 0
             else None
         ),
         delivery_report_command=f"make event-alpha-notification-deliveries-report PROFILE={clean_profile}",
@@ -221,6 +216,71 @@ def build_go_no_go(
         alertable_candidates_count=getattr(send_readiness, "alertable_items", None),
         would_send_lanes=would_send_lanes,
         final_recommendation=recommendation,
+    )
+
+
+def _build_go_no_go_base_findings(
+    *,
+    lock_status: Any,
+    provider_status: Any,
+    provider_health_rows: Mapping[str, Mapping[str, Any]],
+    delivery_ledger_path: str | Path,
+    notification_run_ledger_path: str | Path,
+    research_cards_dir: str | Path,
+    artifact_doctor_status: str,
+    clock_status: Mapping[str, Any],
+    telegram_ready: bool,
+    send_guard_enabled: bool,
+    notifications_paused: bool,
+    pause_reason: str,
+) -> _GoNoGoBaseFindings:
+    lock_state = str(getattr(lock_status, "state", "unknown") or "unknown")
+    lock_message = str(getattr(lock_status, "message", "") or "")
+    provider_sources = int(getattr(provider_status, "ready_event_source_count", 0) or 0)
+    provider_enrichment = int(getattr(provider_status, "ready_enrichment_count", 0) or 0)
+    backoff_count = sum(1 for row in provider_health_rows.values() if row.get("disabled_until"))
+    delivery_writable = _path_writable(Path(delivery_ledger_path).expanduser(), is_dir=False)
+    runs_writable = _path_writable(Path(notification_run_ledger_path).expanduser(), is_dir=False)
+    cards_writable = _path_writable(Path(research_cards_dir).expanduser(), is_dir=True)
+    blockers: list[str] = []
+    warnings: list[str] = []
+    real_send_blockers: list[str] = []
+    if not delivery_writable:
+        blockers.append("delivery ledger is not writable")
+    if not runs_writable:
+        blockers.append("notification run ledger is not writable")
+    if not cards_writable:
+        blockers.append("research cards directory is not writable")
+    if lock_state == "held":
+        blockers.append("fresh notification lock is held")
+    elif lock_state == "stale":
+        warnings.append("notification lock is stale and can be recovered by the cycle")
+    if _fixed_clock_blocked(clock_status):
+        blockers.append("fixed research clock blocks notification sends")
+    if not telegram_ready:
+        real_send_blockers.append("telegram config is missing")
+    if not send_guard_enabled:
+        real_send_blockers.append("RSI_EVENT_ALERTS_ENABLED is not set")
+    if notifications_paused:
+        blockers.append(f"notifications paused: {pause_reason or 'operator pause'}")
+    if str(artifact_doctor_status).upper() == "BLOCKED":
+        blockers.append("artifact doctor status is BLOCKED")
+    if provider_sources <= 0:
+        warnings.append("no active event sources; only heartbeat/would-send accounting may run")
+    if backoff_count:
+        warnings.append(f"{backoff_count} provider(s) currently in backoff")
+    return _GoNoGoBaseFindings(
+        lock_state=lock_state,
+        lock_message=lock_message,
+        provider_sources=provider_sources,
+        provider_enrichment=provider_enrichment,
+        backoff_count=backoff_count,
+        delivery_writable=delivery_writable,
+        runs_writable=runs_writable,
+        cards_writable=cards_writable,
+        blockers=blockers,
+        warnings=warnings,
+        real_send_blockers=real_send_blockers,
     )
 
 

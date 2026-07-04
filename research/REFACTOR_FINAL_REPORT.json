@@ -17,7 +17,7 @@
   },
   "class_ownership_report": {
     "classes_over_limit_count": 14,
-    "functions_over_limit_count": 42,
+    "functions_over_limit_count": 38,
     "modules_with_multiple_public_classes_count": 82,
     "path": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
     "present": true,
@@ -85,7 +85,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-04T04:57:00+00:00",
+  "generated_at": "2026-07-04T05:10:30+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -257,6 +257,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1239,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1233,
       "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
       "source_kind": "production"
@@ -277,12 +283,6 @@
       "limit": 1500,
       "line_count": 1181,
       "path": "crypto_rsi_scanner/event_fade.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1171,
-      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
       "source_kind": "production"
     },
     {
@@ -861,7 +861,7 @@
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 42,
+  "production_functions_over_limit": 38,
   "production_size_gate_status": "pass",
   "pytest_runtime_seconds": 11.538,
   "remaining_implementation_modules_by_package_target": {},

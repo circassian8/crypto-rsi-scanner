@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-04 — Split near-threshold readiness and artifact normalizers · Codex
+**Why:** The refactor goal still has advisory oversized-function debt even
+after production and legacy file-size gates passed. This pass removes four
+near-threshold functions from the over-limit inventory without changing
+notification readiness, impact-hypothesis reporting, near-miss selection, or
+derivatives-state artifact semantics.
+**Changes:**
+- Split base blocker/warning assembly out of `build_go_no_go()` in
+  `crypto_rsi_scanner/event_alpha/notifications/go_no_go.py`.
+- Split summary/detail rendering helpers out of `format_impact_hypothesis_report()`
+  in `crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/report.py`.
+- Split near-miss candidate eligibility state from returned candidate assembly
+  in `crypto_rsi_scanner/event_alpha/radar/near_miss/candidates.py`.
+- Split derivatives metric extraction, metric presence, and per-metric
+  freshness calculation out of `normalize_derivatives_state()` in
+  `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py`.
+- Refreshed refactor size and class ownership reports. Current advisory
+  inventory is `14` classes and `38` functions over limits, with
+  `production_files_over_1500_lines=0`, `production_files_over_2000_lines=0`,
+  `legacy_files_over_1500_lines=0`, and `new_violation_count=0`.
+**Verify:** Focused notification tests passed (`67 passed`), focused
+near-miss/impact/derivatives tests passed (`26 passed` and `35 passed`),
+Coinalyze preflight smoke passed, compileall passed for touched modules and
+the full `crypto_rsi_scanner tests` tree, and refactor size/class reports
+passed with `gate_status=pass`.
+**Notes/risks:** Behavior-preserving only. No live provider calls by default,
+no live Telegram sends, no trading, no paper-trading behavior changes, no
+execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
+`TRIGGERED_FADE` were added. Remaining advisory function debt includes larger
+notification cycle, daily brief, doctor context/report, provider registry,
+pipeline, validation, source-coverage, and opportunity-scoring functions.
+
 ## 2026-07-04 — Split near-threshold report and selection functions · Codex
 **Why:** The refactor goal still has oversized function debt after production
 and legacy file gates passed. This pass removes three near-threshold functions

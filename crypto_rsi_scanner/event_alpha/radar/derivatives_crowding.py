@@ -75,6 +75,27 @@ class DerivativesCrowdingScanResult:
     warnings: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class _DerivativesMetricValues:
+    long_liq: float | None
+    short_liq: float | None
+    liquidation_imbalance: float | None
+    perp_volume: float | None
+    spot_volume: float | None
+    perp_spot_ratio: float | None
+    funding: float | None
+    predicted_funding: float | None
+    funding_z: float | None
+    open_interest: float | None
+    open_interest_delta_1h: float | None
+    open_interest_delta_4h: float | None
+    open_interest_delta_24h: float | None
+    futures_return_24h: float | None
+    futures_return_4h: float | None
+    long_short_ratio: float | None
+    basis: float | None
+
+
 def run_derivatives_crowding_scan(
     *,
     namespace_dir: str | Path,
@@ -252,83 +273,22 @@ def normalize_derivatives_state(
     explicit_freshness = _explicit_freshness_status(row)
     symbol = _base_symbol(row)
     coin_id = _text(_first(row, "coin_id", "id", "asset_id"))
-    long_liq = _float(_first(row, "liquidation_long_usd", "long_liquidations_usd", "long_liquidations", "liquidations_long"))
-    short_liq = _float(_first(row, "liquidation_short_usd", "short_liquidations_usd", "short_liquidations", "liquidations_short"))
-    liquidation_imbalance = _float(_first(row, "liquidation_imbalance", "long_liquidation_imbalance", "liquidation_skew"))
-    if liquidation_imbalance is None:
-        liquidation_imbalance = _liquidation_imbalance(long_liq, short_liq)
-    perp_volume = _float(_first(row, "perp_volume", "futures_volume_24h", "volume_24h"))
-    spot_volume = _float(_first(row, "spot_volume", "spot_volume_24h"))
-    perp_spot_ratio = _float(_first(row, "perp_spot_volume_ratio"))
-    if perp_spot_ratio is None and perp_volume is not None and spot_volume and spot_volume > 0:
-        perp_spot_ratio = perp_volume / spot_volume
-    funding = _float(_first(row, "funding_rate", "funding_rate_8h", "funding"))
-    predicted_funding = _float(_first(row, "predicted_funding_rate", "predicted_funding"))
-    funding_z = _float(_first(row, "funding_zscore", "funding_rate_zscore"))
-    open_interest = _float(_first(row, "open_interest", "oi"))
-    open_interest_delta_1h = _pct(_first(row, "open_interest_delta_1h", "oi_delta_1h", "open_interest_1h_change_pct"))
-    open_interest_delta_4h = _pct(_first(row, "open_interest_delta_4h", "oi_delta_4h", "open_interest_4h_change_pct"))
-    open_interest_delta_24h = _pct(_first(row, "open_interest_delta_24h", "open_interest_24h_change_pct", "oi_24h_change_pct", "open_interest_change_24h"))
-    futures_return_24h = _pct(_first(row, "futures_price_return_24h_pct", "futures_price_24h_change_pct", "price_return_24h", "return_24h", "price_change_24h"))
-    futures_return_4h = _pct(_first(row, "futures_price_return_4h_pct", "futures_price_4h_change_pct", "price_return_4h", "return_4h", "price_change_4h"))
-    long_short_ratio = _float(_first(row, "long_short_ratio"))
-    basis = _float(_first(row, "basis"))
-    open_interest_freshness = _metric_freshness(
+    values = _derivatives_metric_values(row)
+    freshness = _derivatives_freshness_fields(
         row,
         observed_at=observed,
-        value_present=open_interest is not None or open_interest_delta_24h is not None or open_interest_delta_4h is not None,
         fallback_timestamp=source_timestamp,
         fallback_status=explicit_freshness,
-        keys=("open_interest_timestamp", "open_interest_history_timestamp", "open_interest_observed_at"),
-    )
-    funding_freshness = _metric_freshness(
-        row,
-        observed_at=observed,
-        value_present=funding is not None or predicted_funding is not None or funding_z is not None,
-        fallback_timestamp=source_timestamp,
-        fallback_status=explicit_freshness,
-        keys=("funding_timestamp", "predicted_funding_timestamp", "funding_observed_at", "predicted_funding_observed_at"),
-    )
-    liquidation_freshness = _metric_freshness(
-        row,
-        observed_at=observed,
-        value_present=long_liq is not None or short_liq is not None or liquidation_imbalance is not None,
-        fallback_timestamp=source_timestamp,
-        fallback_status=explicit_freshness,
-        keys=("liquidation_timestamp", "liquidation_observed_at"),
-    )
-    long_short_freshness = _metric_freshness(
-        row,
-        observed_at=observed,
-        value_present=long_short_ratio is not None,
-        fallback_timestamp=source_timestamp,
-        fallback_status=explicit_freshness,
-        keys=("long_short_timestamp", "long_short_observed_at"),
-    )
-    basis_freshness = _metric_freshness(
-        row,
-        observed_at=observed,
-        value_present=basis is not None,
-        fallback_timestamp=source_timestamp,
-        fallback_status=explicit_freshness,
-        keys=("basis_timestamp", "basis_observed_at"),
+        values=values,
     )
     derivatives_snapshot_freshness = _combined_freshness_status(
-        open_interest_freshness,
-        funding_freshness,
-        liquidation_freshness,
-        long_short_freshness,
-        basis_freshness,
+        freshness["open_interest_freshness"],
+        freshness["funding_freshness"],
+        freshness["liquidation_freshness"],
+        freshness["long_short_freshness"],
+        freshness["basis_freshness"],
     )
-    metric_values = {
-        "open_interest": open_interest is not None or open_interest_delta_24h is not None or open_interest_delta_4h is not None,
-        "funding_rate": funding is not None,
-        "predicted_funding": predicted_funding is not None,
-        "liquidations": long_liq is not None or short_liq is not None or liquidation_imbalance is not None,
-        "long_short_ratio": long_short_ratio is not None,
-        "basis": basis is not None,
-        "perp_volume": perp_volume is not None or perp_spot_ratio is not None,
-    }
+    metric_values = _derivatives_metric_presence(values)
     supported_metric_status = _supported_metric_status(metric_values, provider_unavailable=bool(row.get("provider_unavailable")))
     open_interest_unit = _unit(row, "open_interest_unit", default="usd_notional")
     funding_rate_unit = _unit(row, "funding_rate_unit", default="decimal_rate")
@@ -338,8 +298,8 @@ def normalize_derivatives_state(
     warnings = _derivatives_warnings(
         timestamp=observed_source,
         observed_at=observed,
-        funding_rate=funding,
-        open_interest=open_interest,
+        funding_rate=values.funding,
+        open_interest=values.open_interest,
     )
     return {
         "schema_version": 1,
@@ -355,32 +315,32 @@ def normalize_derivatives_state(
         "provider": _text(_first(row, "provider")) or "coinalyze",
         "market": _text(_first(row, "market", "market_symbol", "symbol")) or None,
         "exchange": _text(_first(row, "exchange")) or None,
-        "open_interest": open_interest,
-        "open_interest_delta_1h": open_interest_delta_1h,
-        "open_interest_delta_4h": open_interest_delta_4h,
-        "open_interest_delta_24h": open_interest_delta_24h,
-        "funding_rate": funding,
-        "predicted_funding_rate": predicted_funding,
-        "funding_zscore": funding_z,
-        "futures_price_return_24h_pct": futures_return_24h,
-        "futures_price_return_4h_pct": futures_return_4h,
-        "liquidation_long_usd": long_liq,
-        "liquidation_short_usd": short_liq,
-        "liquidation_imbalance": liquidation_imbalance,
-        "long_short_ratio": long_short_ratio,
-        "basis": basis,
-        "perp_volume": perp_volume,
-        "spot_volume": spot_volume,
-        "perp_spot_volume_ratio": perp_spot_ratio,
+        "open_interest": values.open_interest,
+        "open_interest_delta_1h": values.open_interest_delta_1h,
+        "open_interest_delta_4h": values.open_interest_delta_4h,
+        "open_interest_delta_24h": values.open_interest_delta_24h,
+        "funding_rate": values.funding,
+        "predicted_funding_rate": values.predicted_funding,
+        "funding_zscore": values.funding_z,
+        "futures_price_return_24h_pct": values.futures_return_24h,
+        "futures_price_return_4h_pct": values.futures_return_4h,
+        "liquidation_long_usd": values.long_liq,
+        "liquidation_short_usd": values.short_liq,
+        "liquidation_imbalance": values.liquidation_imbalance,
+        "long_short_ratio": values.long_short_ratio,
+        "basis": values.basis,
+        "perp_volume": values.perp_volume,
+        "spot_volume": values.spot_volume,
+        "perp_spot_volume_ratio": values.perp_spot_ratio,
         "supported_metric_status": supported_metric_status,
         "implemented_metrics": tuple(metric for metric, status in supported_metric_status.items() if status == METRIC_STATUS_IMPLEMENTED and metric_values.get(metric)),
         "fixture_only_metrics": tuple(metric for metric, status in supported_metric_status.items() if status == METRIC_STATUS_FIXTURE_ONLY and metric_values.get(metric)),
         "missing_metrics": tuple(metric for metric, status in supported_metric_status.items() if status in {METRIC_STATUS_MISSING_FROM_RESPONSE, METRIC_STATUS_NOT_IMPLEMENTED, METRIC_STATUS_PROVIDER_UNAVAILABLE}),
-        "open_interest_freshness": open_interest_freshness,
-        "funding_freshness": funding_freshness,
-        "liquidation_freshness": liquidation_freshness,
-        "long_short_freshness": long_short_freshness,
-        "basis_freshness": basis_freshness,
+        "open_interest_freshness": freshness["open_interest_freshness"],
+        "funding_freshness": freshness["funding_freshness"],
+        "liquidation_freshness": freshness["liquidation_freshness"],
+        "long_short_freshness": freshness["long_short_freshness"],
+        "basis_freshness": freshness["basis_freshness"],
         "derivatives_snapshot_freshness_status": derivatives_snapshot_freshness,
         "freshness_status": derivatives_snapshot_freshness,
         "open_interest_unit": open_interest_unit,
@@ -400,6 +360,114 @@ def normalize_derivatives_state(
         "research_only": True,
         "created_alert": False,
         "notification_send_enabled": False,
+    }
+
+
+def _derivatives_metric_values(row: Mapping[str, Any]) -> _DerivativesMetricValues:
+    long_liq = _float(_first(row, "liquidation_long_usd", "long_liquidations_usd", "long_liquidations", "liquidations_long"))
+    short_liq = _float(_first(row, "liquidation_short_usd", "short_liquidations_usd", "short_liquidations", "liquidations_short"))
+    liquidation_imbalance = _float(_first(row, "liquidation_imbalance", "long_liquidation_imbalance", "liquidation_skew"))
+    if liquidation_imbalance is None:
+        liquidation_imbalance = _liquidation_imbalance(long_liq, short_liq)
+    perp_volume = _float(_first(row, "perp_volume", "futures_volume_24h", "volume_24h"))
+    spot_volume = _float(_first(row, "spot_volume", "spot_volume_24h"))
+    perp_spot_ratio = _float(_first(row, "perp_spot_volume_ratio"))
+    if perp_spot_ratio is None and perp_volume is not None and spot_volume and spot_volume > 0:
+        perp_spot_ratio = perp_volume / spot_volume
+    return _DerivativesMetricValues(
+        long_liq=long_liq,
+        short_liq=short_liq,
+        liquidation_imbalance=liquidation_imbalance,
+        perp_volume=perp_volume,
+        spot_volume=spot_volume,
+        perp_spot_ratio=perp_spot_ratio,
+        funding=_float(_first(row, "funding_rate", "funding_rate_8h", "funding")),
+        predicted_funding=_float(_first(row, "predicted_funding_rate", "predicted_funding")),
+        funding_z=_float(_first(row, "funding_zscore", "funding_rate_zscore")),
+        open_interest=_float(_first(row, "open_interest", "oi")),
+        open_interest_delta_1h=_pct(_first(row, "open_interest_delta_1h", "oi_delta_1h", "open_interest_1h_change_pct")),
+        open_interest_delta_4h=_pct(_first(row, "open_interest_delta_4h", "oi_delta_4h", "open_interest_4h_change_pct")),
+        open_interest_delta_24h=_pct(_first(row, "open_interest_delta_24h", "open_interest_24h_change_pct", "oi_24h_change_pct", "open_interest_change_24h")),
+        futures_return_24h=_pct(_first(row, "futures_price_return_24h_pct", "futures_price_24h_change_pct", "price_return_24h", "return_24h", "price_change_24h")),
+        futures_return_4h=_pct(_first(row, "futures_price_return_4h_pct", "futures_price_4h_change_pct", "price_return_4h", "return_4h", "price_change_4h")),
+        long_short_ratio=_float(_first(row, "long_short_ratio")),
+        basis=_float(_first(row, "basis")),
+    )
+
+
+def _derivatives_metric_presence(values: _DerivativesMetricValues) -> dict[str, bool]:
+    return {
+        "open_interest": (
+            values.open_interest is not None
+            or values.open_interest_delta_24h is not None
+            or values.open_interest_delta_4h is not None
+        ),
+        "funding_rate": values.funding is not None,
+        "predicted_funding": values.predicted_funding is not None,
+        "liquidations": (
+            values.long_liq is not None
+            or values.short_liq is not None
+            or values.liquidation_imbalance is not None
+        ),
+        "long_short_ratio": values.long_short_ratio is not None,
+        "basis": values.basis is not None,
+        "perp_volume": values.perp_volume is not None or values.perp_spot_ratio is not None,
+    }
+
+
+def _derivatives_freshness_fields(
+    row: Mapping[str, Any],
+    *,
+    observed_at: datetime,
+    fallback_timestamp: datetime | None,
+    fallback_status: str | None,
+    values: _DerivativesMetricValues,
+) -> dict[str, str]:
+    return {
+        "open_interest_freshness": _metric_freshness(
+            row,
+            observed_at=observed_at,
+            value_present=(
+                values.open_interest is not None
+                or values.open_interest_delta_24h is not None
+                or values.open_interest_delta_4h is not None
+            ),
+            fallback_timestamp=fallback_timestamp,
+            fallback_status=fallback_status,
+            keys=("open_interest_timestamp", "open_interest_history_timestamp", "open_interest_observed_at"),
+        ),
+        "funding_freshness": _metric_freshness(
+            row,
+            observed_at=observed_at,
+            value_present=values.funding is not None or values.predicted_funding is not None or values.funding_z is not None,
+            fallback_timestamp=fallback_timestamp,
+            fallback_status=fallback_status,
+            keys=("funding_timestamp", "predicted_funding_timestamp", "funding_observed_at", "predicted_funding_observed_at"),
+        ),
+        "liquidation_freshness": _metric_freshness(
+            row,
+            observed_at=observed_at,
+            value_present=values.long_liq is not None or values.short_liq is not None or values.liquidation_imbalance is not None,
+            fallback_timestamp=fallback_timestamp,
+            fallback_status=fallback_status,
+            keys=("liquidation_timestamp", "liquidation_observed_at"),
+        ),
+        "long_short_freshness": _metric_freshness(
+            row,
+            observed_at=observed_at,
+            value_present=values.long_short_ratio is not None,
+            fallback_timestamp=fallback_timestamp,
+            fallback_status=fallback_status,
+            keys=("long_short_timestamp", "long_short_observed_at"),
+        ),
+        "basis_freshness": _metric_freshness(
+            row,
+            observed_at=observed_at,
+            value_present=values.basis is not None,
+            fallback_timestamp=fallback_timestamp,
+            fallback_status=fallback_status,
+            keys=("basis_timestamp", "basis_observed_at"),
+        ),
     }
 
 

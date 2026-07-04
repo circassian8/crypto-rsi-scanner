@@ -164,12 +164,115 @@ _OPTIONAL_HYPOTHESIS_FIELDS = {
 }
 
 
+@dataclass(frozen=True)
+class _NearMissCandidateState:
+    quality: Mapping[str, Any]
+    symbol: str
+    coin_id: str
+    score: float
+    level: str
+    final_route: str
+    alertable: bool
+    missing: tuple[str, ...]
+    route_inconsistent: bool
+
+
 def _candidate_from_row(
     row: Mapping[str, Any],
     *,
     route: Mapping[str, Any] | None,
     cfg: EventNearMissConfig,
 ) -> EventNearMissCandidate | None:
+    state = _near_miss_candidate_state(row, route=route, cfg=cfg)
+    if state is None:
+        return None
+    pack = event_source_packs.source_pack_for_playbook(
+        str(row.get("playbook_type") or row.get("latest_effective_playbook_type") or state.quality.get("playbook_type") or ""),
+        impact_path_type=str(state.quality.get("impact_path_type") or row.get("impact_path_type") or ""),
+        impact_category=str(row.get("impact_category") or state.quality.get("impact_category") or ""),
+    )
+    provider_status = str(row.get("provider_coverage_status") or state.quality.get("provider_coverage_status") or "")
+    source_assessment = event_source_registry.assess_source(
+        row,
+        symbol=state.symbol,
+        coin_id=state.coin_id,
+        playbook_type=str(row.get("playbook_type") or state.quality.get("playbook_type") or ""),
+        provider_coverage_status=provider_status or None,
+    )
+    source_gap = event_source_registry.coverage_gap_reason(
+        source_assessment.provider,
+        source_assessment.provider_coverage_status,
+    )
+    missing = state.missing
+    if source_gap:
+        missing = tuple(dict.fromkeys((*missing, "needs_source_coverage", source_gap)))
+    pack_eval = event_source_packs.evaluate_pack_evidence({**row, **source_assessment.to_metadata()}, pack=pack)
+    pack_missing = tuple(str(item) for item in pack_eval.get("source_pack_missing_evidence") or ())
+    if pack_missing:
+        missing = tuple(dict.fromkeys((*missing, *pack_missing)))
+    priority = _priority_score(state.score, state.level, missing, route_inconsistent=state.route_inconsistent)
+    queries = _evidence_refresh_queries(row, max_queries=cfg.max_source_queries)
+    planner_request = event_llm_evidence_planner.request_from_row(
+        {
+            **dict(row),
+            **source_assessment.to_metadata(),
+            "source_pack": pack.name,
+            "source_pack_missing_evidence": pack_missing,
+            "opportunity_level": state.level,
+            "opportunity_score_final": state.score,
+        },
+        missing_evidence=missing,
+        source_pack=pack.name,
+    )
+    planner_result = event_llm_evidence_planner.plan_evidence(planner_request)
+    plan_metadata = planner_result.to_metadata()
+    plan_selected = planner_result.selected and event_llm_evidence_planner.should_plan_evidence({
+            **dict(row),
+            "opportunity_level": state.level,
+            "opportunity_score_final": state.score,
+            "missing_requirements": missing,
+            "source_pack": pack.name,
+    })
+    return EventNearMissCandidate(
+        near_miss_id=_near_miss_id(row, symbol=state.symbol, coin_id=state.coin_id),
+        refresh_id=_refresh_id(row, symbol=state.symbol, coin_id=state.coin_id),
+        symbol=state.symbol,
+        coin_id=state.coin_id,
+        core_opportunity_id=_core_opportunity_id_for_row(row),
+        hypothesis_id=_optional_str(row.get("hypothesis_id")),
+        incident_id=_optional_str(row.get("incident_id")),
+        opportunity_level_before=state.level,
+        opportunity_score_before=state.score,
+        final_route_before=state.final_route or None,
+        missing_evidence=missing,
+        recommended_refresh_actions=_recommended_refresh_actions(missing, row, pack=pack),
+        priority_score=priority,
+        market_context_before=_market_context(row, source=str(row.get("market_context_source") or "existing"), now=datetime.now(timezone.utc), cfg=cfg),
+        market_context_source=str(row.get("market_context_source") or state.quality.get("market_context_source") or "") or None,
+        market_context_age_seconds=_float(row.get("market_context_age_seconds") or state.quality.get("market_context_age_seconds")),
+        market_context_data_quality=str(row.get("market_context_freshness_status") or state.quality.get("market_context_freshness_status") or row.get("market_context_data_quality") or state.quality.get("market_context_data_quality") or "") or None,
+        market_confirmation_before=_float(state.quality.get("market_confirmation_score")),
+        evidence_quality_before=_float(state.quality.get("evidence_quality_score")),
+        evidence_refresh_queries=queries,
+        source_pack=pack.name,
+        provider_coverage_status=source_assessment.provider_coverage_status,
+        evidence_absence_is_meaningful=source_assessment.evidence_absence_is_meaningful,
+        source_coverage_gap=source_gap,
+        source_quality_prior=source_assessment.source_quality_prior,
+        source_confidence_cap=source_assessment.confidence_cap,
+        evidence_acquisition_attempted=plan_selected,
+        evidence_acquisition_plan=plan_metadata if plan_selected else None,
+        evidence_acquisition_failures=tuple(planner_result.provider_gaps),
+        warnings=tuple(dict.fromkeys((*source_assessment.warnings, *planner_result.warnings))),
+    )
+
+
+def _near_miss_candidate_state(
+    row: Mapping[str, Any],
+    *,
+    route: Mapping[str, Any] | None,
+    cfg: EventNearMissConfig,
+) -> _NearMissCandidateState | None:
     if not row:
         return None
     quality = event_alpha_quality_fields.ensure_quality_fields(row, components=_quality_components_for_row(row))
@@ -206,11 +309,7 @@ def _candidate_from_row(
     level = str(quality.get("opportunity_level") or "local_only")
     final_route = _final_route_for_route(route) if route is not None else str(row.get("final_route_after_quality_gate") or row.get("route") or "")
     alertable = event_alpha_router.route_value_is_alertable(final_route) if final_route else False
-    if str(row.get("row_type") or "") == "event_core_opportunity" and (
-        alertable
-        or final_route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value
-        or level in {"validated_digest", "watchlist", "high_priority"}
-    ):
+    if _row_is_promoted_core_opportunity(row, level=level, final_route=final_route, alertable=alertable):
         return None
     market_refresh_reasons = _market_refresh_reasons(quality, row)
     if level in {"watchlist", "high_priority"} and not market_refresh_reasons:
@@ -223,6 +322,55 @@ def _candidate_from_row(
     route_inconsistent = level in {"validated_digest", "watchlist", "high_priority"} and not alertable
     blocked_by_refreshable = any(_refreshable_missing_reason(value) for value in missing)
     blocked_by_market_refresh = any(_refreshable_market_reason(value) for value in missing)
+    if _near_miss_has_fresh_context(
+        level=level,
+        near_watchlist=near_watchlist,
+        blocked_by_refreshable=blocked_by_refreshable,
+        blocked_by_market_refresh=blocked_by_market_refresh,
+        route_inconsistent=route_inconsistent,
+    ):
+        return None
+    if alertable and not (blocked_by_refreshable or near_watchlist or route_inconsistent):
+        return None
+    if not (near_digest or near_watchlist or route_inconsistent or blocked_by_refreshable):
+        return None
+    if level == "local_only" and score < cfg.digest_threshold - cfg.near_threshold_points and not blocked_by_refreshable:
+        return None
+    return _NearMissCandidateState(
+        quality=quality,
+        symbol=symbol,
+        coin_id=coin_id,
+        score=score,
+        level=level,
+        final_route=final_route,
+        alertable=alertable,
+        missing=missing,
+        route_inconsistent=route_inconsistent,
+    )
+
+
+def _row_is_promoted_core_opportunity(
+    row: Mapping[str, Any],
+    *,
+    level: str,
+    final_route: str,
+    alertable: bool,
+) -> bool:
+    return str(row.get("row_type") or "") == "event_core_opportunity" and (
+        alertable
+        or final_route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value
+        or level in {"validated_digest", "watchlist", "high_priority"}
+    )
+
+
+def _near_miss_has_fresh_context(
+    *,
+    level: str,
+    near_watchlist: bool,
+    blocked_by_refreshable: bool,
+    blocked_by_market_refresh: bool,
+    route_inconsistent: bool,
+) -> bool:
     promoted_with_fresh_context = (
         level in {"watchlist", "high_priority"}
         and not blocked_by_refreshable
@@ -236,92 +384,7 @@ def _candidate_from_row(
         and not blocked_by_market_refresh
         and not route_inconsistent
     )
-    if alertable and not (blocked_by_refreshable or near_watchlist or route_inconsistent):
-        return None
-    if promoted_with_fresh_context or digest_with_fresh_context:
-        return None
-    if not (near_digest or near_watchlist or route_inconsistent or blocked_by_refreshable):
-        return None
-    if level == "local_only" and score < cfg.digest_threshold - cfg.near_threshold_points and not blocked_by_refreshable:
-        return None
-    pack = event_source_packs.source_pack_for_playbook(
-        str(row.get("playbook_type") or row.get("latest_effective_playbook_type") or quality.get("playbook_type") or ""),
-        impact_path_type=str(quality.get("impact_path_type") or row.get("impact_path_type") or ""),
-        impact_category=str(row.get("impact_category") or quality.get("impact_category") or ""),
-    )
-    provider_status = str(row.get("provider_coverage_status") or quality.get("provider_coverage_status") or "")
-    source_assessment = event_source_registry.assess_source(
-        row,
-        symbol=symbol,
-        coin_id=coin_id,
-        playbook_type=str(row.get("playbook_type") or quality.get("playbook_type") or ""),
-        provider_coverage_status=provider_status or None,
-    )
-    source_gap = event_source_registry.coverage_gap_reason(
-        source_assessment.provider,
-        source_assessment.provider_coverage_status,
-    )
-    if source_gap:
-        missing = tuple(dict.fromkeys((*missing, "needs_source_coverage", source_gap)))
-    pack_eval = event_source_packs.evaluate_pack_evidence({**row, **source_assessment.to_metadata()}, pack=pack)
-    pack_missing = tuple(str(item) for item in pack_eval.get("source_pack_missing_evidence") or ())
-    if pack_missing:
-        missing = tuple(dict.fromkeys((*missing, *pack_missing)))
-    priority = _priority_score(score, level, missing, route_inconsistent=route_inconsistent)
-    queries = _evidence_refresh_queries(row, max_queries=cfg.max_source_queries)
-    planner_request = event_llm_evidence_planner.request_from_row(
-        {
-            **dict(row),
-            **source_assessment.to_metadata(),
-            "source_pack": pack.name,
-            "source_pack_missing_evidence": pack_missing,
-            "opportunity_level": level,
-            "opportunity_score_final": score,
-        },
-        missing_evidence=missing,
-        source_pack=pack.name,
-    )
-    planner_result = event_llm_evidence_planner.plan_evidence(planner_request)
-    plan_metadata = planner_result.to_metadata()
-    plan_selected = planner_result.selected and event_llm_evidence_planner.should_plan_evidence({
-        **dict(row),
-        "opportunity_level": level,
-        "opportunity_score_final": score,
-        "missing_requirements": missing,
-        "source_pack": pack.name,
-    })
-    return EventNearMissCandidate(
-        near_miss_id=_near_miss_id(row, symbol=symbol, coin_id=coin_id),
-        refresh_id=_refresh_id(row, symbol=symbol, coin_id=coin_id),
-        symbol=symbol,
-        coin_id=coin_id,
-        core_opportunity_id=_core_opportunity_id_for_row(row),
-        hypothesis_id=_optional_str(row.get("hypothesis_id")),
-        incident_id=_optional_str(row.get("incident_id")),
-        opportunity_level_before=level,
-        opportunity_score_before=score,
-        final_route_before=final_route or None,
-        missing_evidence=missing,
-        recommended_refresh_actions=_recommended_refresh_actions(missing, row, pack=pack),
-        priority_score=priority,
-        market_context_before=_market_context(row, source=str(row.get("market_context_source") or "existing"), now=datetime.now(timezone.utc), cfg=cfg),
-        market_context_source=str(row.get("market_context_source") or quality.get("market_context_source") or "") or None,
-        market_context_age_seconds=_float(row.get("market_context_age_seconds") or quality.get("market_context_age_seconds")),
-        market_context_data_quality=str(row.get("market_context_freshness_status") or quality.get("market_context_freshness_status") or row.get("market_context_data_quality") or quality.get("market_context_data_quality") or "") or None,
-        market_confirmation_before=_float(quality.get("market_confirmation_score")),
-        evidence_quality_before=_float(quality.get("evidence_quality_score")),
-        evidence_refresh_queries=queries,
-        source_pack=pack.name,
-        provider_coverage_status=source_assessment.provider_coverage_status,
-        evidence_absence_is_meaningful=source_assessment.evidence_absence_is_meaningful,
-        source_coverage_gap=source_gap,
-        source_quality_prior=source_assessment.source_quality_prior,
-        source_confidence_cap=source_assessment.confidence_cap,
-        evidence_acquisition_attempted=plan_selected,
-        evidence_acquisition_plan=plan_metadata if plan_selected else None,
-        evidence_acquisition_failures=tuple(planner_result.provider_gaps),
-        warnings=tuple(dict.fromkeys((*source_assessment.warnings, *planner_result.warnings))),
-    )
+    return promoted_with_fresh_context or digest_with_fresh_context
 
 
 def _near_miss_group_key(row: Mapping[str, Any], candidate: EventNearMissCandidate) -> tuple[str, str, str, str]:
