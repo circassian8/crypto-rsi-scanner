@@ -892,6 +892,12 @@ def test_architecture_final_report_make_target_is_available():
     assert "architecture-transitional-file-check:" in makefile
     assert "architecture-naming-check:" in makefile or "architecture-terminology-check architecture-naming-check:" in makefile
     assert "architecture-class-ownership-report:" in makefile
+    assert "INCLUDE_HISTORICAL ?= $(INCLUDE_LEGACY)" in makefile
+    assert "STRICT_HISTORICAL ?= $(STRICT_LEGACY)" in makefile
+    assert "EVENT_ALPHA_INCLUDE_HISTORICAL_ARG" in makefile
+    assert "EVENT_ALPHA_INCLUDE_LEGACY_ARG" not in makefile
+    assert "EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_HISTORICAL_ARG" in makefile
+    assert "EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_LEGACY_ARG" not in makefile
     assert "$(python) -m crypto_rsi_scanner.project_health.class_ownership" in makefile.casefold()
     assert "$(python) -m crypto_rsi_scanner.project_health.transitional_file_check" in makefile.casefold()
     assert "$(python) -m crypto_rsi_scanner.project_health.terminology_check" in makefile.casefold()
@@ -960,6 +966,49 @@ def test_architecture_transitional_and_terminology_reports_are_static():
     assert term["classification_counts"]["CLI_backwards_compatibility_alias"] >= 1
     assert term["classification_counts"]["historical_artifact_semantics"] >= 1
     assert term["blockers"] == []
+
+
+def test_architecture_naming_check_blocks_active_refactor_reports_but_allows_archive():
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from crypto_rsi_scanner.project_health import terminology_check as architecture_naming_check
+
+    canonical_reports = (
+        "ARCHITECTURE_BASELINE.json",
+        "ARCHITECTURE_SIZE_GATES.json",
+        "ARCHITECTURE_CLASS_OWNERSHIP_REPORT.json",
+        "ARCHITECTURE_FINAL_REPORT.json",
+        "ARCHITECTURE_COMPLETION_MAP.json",
+        "ARCHITECTURE_CONTRACT.json",
+        "ARCHITECTURE_TRANSITIONAL_FILE_REPORT.json",
+    )
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        research = root / "research"
+        research.mkdir()
+        for name in canonical_reports:
+            (research / name).write_text("{}\n", encoding="utf-8")
+        (research / "REFACTOR_FINAL_REPORT.md").write_text("historical\n", encoding="utf-8")
+
+        active = architecture_naming_check.build_report(root=root)
+        assert active["status"] == "BLOCKED"
+        assert active["active_refactor_reports_remaining"] == 1
+        assert active["blockers"][0]["path"] == "research/REFACTOR_FINAL_REPORT.md"
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        research = root / "research"
+        archive = research / "archive" / "refactor_history"
+        archive.mkdir(parents=True)
+        for name in canonical_reports:
+            (research / name).write_text("{}\n", encoding="utf-8")
+        (archive / "REFACTOR_FINAL_REPORT.md").write_text("historical refactor report\n", encoding="utf-8")
+
+        archived = architecture_naming_check.build_report(root=root)
+        assert archived["status"] == "OK"
+        assert archived["active_refactor_reports_remaining"] == 0
+        assert archived["blockers"] == []
 
 
 def test_architecture_completion_map_generation_writes_release_candidate_reports():

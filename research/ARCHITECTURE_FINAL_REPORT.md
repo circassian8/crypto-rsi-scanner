@@ -2,7 +2,7 @@
 
 Research-only architecture gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-05T13:29:37+00:00`
+- generated_at: `2026-07-05T14:28:20+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `124`
@@ -10,7 +10,7 @@ Research-only architecture gate report. This report does not call providers, sen
 - retained_public_shims_count: `0`
 - shim_dependency_report_cache_status: `miss`
 - shim_dependency_include_runtime_artifacts: `False`
-- shim_dependency_scan_duration_seconds: `1.266`
+- shim_dependency_scan_duration_seconds: `1.26`
 - shim_dependency_skipped_artifact_files: `1285`
 - shim_dependency_skipped_large_files: `1`
 - v3_gate_status: `accepted_with_documented_exceptions`
@@ -157,10 +157,10 @@ Research-only architecture gate report. This report does not call providers, sen
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 |
 | `crypto_rsi_scanner/config.py` | 1319 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
+| `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1268 |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1239 |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 |
-| `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1231 |
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 1155 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py` | 1145 |
@@ -202,10 +202,10 @@ Research-only architecture gate report. This report does not call providers, sen
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | Route-gate decision logic is dense and behavior-critical for no-send notification eligibility. | When route-decision/gate snapshots cover every lane and quality-gate cap. |
 | `crypto_rsi_scanner/config.py` | 1319 | Central environment/config contract; splitting risks import-time default and env-var behavior drift. | When a dedicated config-v2 migration freeze and env snapshot tests exist. |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 | Provider/cache enrichment flow is stable and below blocker threshold. | When adding a new enrichment source or cache policy. |
+| `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1268 | Stable argparse flag bundle; splitting individual flag groups risks CLI default drift. | Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule. |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 | Legacy notification-plan compatibility core; no-send semantics are more important than churn. | When notification plan rows are covered by schema-level golden fixtures. |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1239 | Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage. | When adding a new derivatives metric family or crowding class. |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 | Outcome maturation/report code is stable and below the blocker threshold. | When outcome performance views gain new sections. |
-| `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1231 | Stable argparse flag bundle; splitting individual flag groups risks CLI default drift. | Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule. |
 
 ## Unresolved Production Files Over 1200 Lines
 
@@ -225,14 +225,14 @@ Research-only architecture gate report. This report does not call providers, sen
 | `tests/event_alpha/test_source_coverage.py` | 2991 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
 | `tests/test_indicators.py` | 1779 |
-| `tests/cli/test_make_targets.py` | 1322 |
+| `tests/cli/test_make_targets.py` | 1371 |
 | `tests/event_alpha/_api_helpers.py` | 825 |
 | `tests/event_alpha/test_artifact_schema.py` | 743 |
 | `tests/rsi/test_indicators_core.py` | 694 |
 | `tests/rsi/test_backtest.py` | 561 |
 | `tests/event_alpha/test_shim_registry.py` | 515 |
 | `tests/rsi/test_paper_risk.py` | 379 |
-| `tests/cli/test_parser.py` | 276 |
+| `tests/cli/test_parser.py` | 308 |
 | `tests/cli/test_event_alpha_command_registry.py` | 202 |
 | `tests/cli/test_dispatch.py` | 129 |
 | `tests/cli/test_relative_import_integrity.py` | 88 |

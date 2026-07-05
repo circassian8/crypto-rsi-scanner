@@ -19,6 +19,7 @@ REPORT_SCHEMA_VERSION = "project_health_naming_cleanup_report_v1"
 REPORT_JSON = "PROJECT_HEALTH_NAMING_CLEANUP_REPORT.json"
 REPORT_MD = "PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md"
 HISTORICAL_REPORT_PREFIXES = ("RE" + "FACTOR_", "FINAL_" + "RE" + "FACTOR_")
+REFACTOR_HISTORY_ARCHIVE = "research/archive/refactor_history"
 LEGACY_RE = re.compile(r"legacy", re.IGNORECASE)
 REFACTOR_RE = re.compile(r"refactor", re.IGNORECASE)
 SOURCE_SUFFIXES = {".py"}
@@ -68,7 +69,9 @@ CLI_ALIAS_TOKENS = (
     "--event-alpha-artifact-doctor-strict-legacy",
     "legacy_included",
     "include_legacy",
+    "INCLUDE_LEGACY",
     "strict_legacy",
+    "STRICT_LEGACY",
 )
 ARTIFACT_SEMANTIC_TOKENS = (
     "legacy/default",
@@ -129,6 +132,7 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
     legacy_named_files = _legacy_named_files(repo_root)
     refactor_named_files = _refactor_named_source_files(repo_root)
+    active_refactor_reports = _active_refactor_report_files(repo_root)
     occurrences = _legacy_occurrences(repo_root)
     classifications = Counter(str(row["classification"]) for row in occurrences)
     actions = Counter(str(row["action"]) for row in occurrences)
@@ -137,6 +141,7 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         occurrences=occurrences,
         legacy_named_files=legacy_named_files,
         refactor_named_files=refactor_named_files,
+        active_refactor_reports=active_refactor_reports,
     )
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
@@ -172,6 +177,8 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         "transitional_named_files_remaining": len(legacy_named_files),
         "refactor_named_source_files": refactor_named_files,
         "refactor_named_source_files_remaining": len(refactor_named_files),
+        "active_refactor_reports": active_refactor_reports,
+        "active_refactor_reports_remaining": len(active_refactor_reports),
         "top_level_refactor_python_files_remaining": len(
             [row for row in refactor_named_files if str(row.get("path") or "").startswith("crypto_rsi_scanner/refactor_")]
         ),
@@ -183,10 +190,11 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         "occurrences": occurrences,
         "policy": {
             "legacy_implementation_files": "not_allowed",
-            "cli_legacy_flags": "backwards-compatible aliases only",
+            "cli_legacy_flags": "deprecated hidden backwards-compatible aliases only",
             "artifact_legacy_fields": "historical artifact row semantics; preserve compatibility",
             "docs_legacy_wording": "allowed only for historical/refactor records or explicit artifact compatibility semantics",
             "refactor_tooling_names": "not allowed for current source/import/help/runbook surfaces; allowed only as historical aliases",
+            "refactor_report_files": "active root/research refactor-era reports are not allowed; archived copies under research/archive/refactor_history are historical records",
         },
         "safety_invariants": {
             "research_only": True,
@@ -227,6 +235,7 @@ def format_report(report: dict[str, Any]) -> str:
         f"- legacy_occurrences: `{report.get('legacy_occurrences', 0)}`",
         f"- legacy_named_files_remaining: `{report.get('legacy_named_files_remaining', 0)}`",
         f"- refactor_named_source_files_remaining: `{report.get('refactor_named_source_files_remaining', 0)}`",
+        f"- active_refactor_reports_remaining: `{report.get('active_refactor_reports_remaining', 0)}`",
         "",
         "## Classification Counts",
         "",
@@ -307,8 +316,8 @@ def _classify_occurrence(rel: str, line: str, *, path: Path, term: str) -> tuple
         return "accepted_exception", "should_keep", "naming gate owns migration-era naming classifier policy"
     if term_lower == "refactor":
         return _classify_refactor_occurrence(rel, line, path=path)
-    if any(token in lowered for token in CLI_ALIAS_TOKENS):
-        return "CLI_backwards_compatibility_alias", "should_keep", "old CLI/Make aliases remain supported while canonical historical aliases exist"
+    if any(token.casefold() in lowered for token in CLI_ALIAS_TOKENS):
+        return "CLI_backwards_compatibility_alias", "should_keep", "old CLI/Make aliases are deprecated hidden compatibility inputs while canonical historical aliases exist"
     if is_test and ("feature_legacy.py" in lowered or "legacy_path" in lowered or "legacy_" in lowered):
         return "test_fixture_name", "should_keep", "test fixture covers historical artifact or transitional gate behavior"
     if any(token in lowered for token in STALE_SOURCE_PATTERNS):
@@ -347,6 +356,14 @@ def _classify_refactor_occurrence(rel: str, line: str, *, path: Path) -> tuple[s
     is_doc = _is_doc_path(rel)
     if rel == "crypto_rsi_scanner/project_health/terminology_check.py":
         return "accepted_exception", "should_keep", "naming gate owns refactor-word classifier policy"
+    if rel.startswith(f"{REFACTOR_HISTORY_ARCHIVE}/"):
+        return "historical_reference_keep", "should_keep", "archived historical refactor report"
+    if is_test and (
+        "active_refactor_reports" in lowered
+        or "refactor_final_report" in lowered
+        or "refactor_history" in lowered
+    ):
+        return "test_fixture_name", "should_keep", "test fixture covers archived-report gate behavior"
     if rel in {"DECISIONS.md", "DEVLOG.md"}:
         return "historical_reference_keep", "should_keep", "durable historical record"
     if rel == "ROADMAP.md" and line.lstrip().startswith("| done |"):
@@ -387,12 +404,15 @@ def _blockers(
     occurrences: list[dict[str, Any]],
     legacy_named_files: list[dict[str, str]],
     refactor_named_files: list[dict[str, str]],
+    active_refactor_reports: list[dict[str, str]],
 ) -> list[dict[str, Any]]:
     blockers: list[dict[str, Any]] = []
     for row in legacy_named_files:
         blockers.append({"path": row["path"], "line": None, "reason": "migration-era legacy-named file exists"})
     for row in refactor_named_files:
         blockers.append({"path": row["path"], "line": None, "reason": "migration-era refactor-named source file exists"})
+    for row in active_refactor_reports:
+        blockers.append({"path": row["path"], "line": None, "reason": "active refactor-era report must be archived under research/archive/refactor_history"})
     for row in occurrences:
         classification = str(row.get("classification") or "")
         action = str(row.get("action") or "")
@@ -459,6 +479,22 @@ def _refactor_named_source_files(repo_root: Path) -> list[dict[str, str]]:
     return rows
 
 
+def _active_refactor_report_files(repo_root: Path) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for root in (repo_root, repo_root / "research"):
+        if not root.exists():
+            continue
+        for pattern in ("REFACTOR_*.json", "REFACTOR_*.md", "FINAL_REFACTOR_*.json", "FINAL_REFACTOR_*.md"):
+            for path in sorted(root.glob(pattern)):
+                if not path.is_file():
+                    continue
+                rel = _rel(path, repo_root)
+                if rel.startswith(f"{REFACTOR_HISTORY_ARCHIVE}/"):
+                    continue
+                rows.append({"path": rel})
+    return rows
+
+
 def _canonical_report_status(repo_root: Path) -> dict[str, bool]:
     expected = {
         "ARCHITECTURE_BASELINE.json": repo_root / "research" / "ARCHITECTURE_BASELINE.json",
@@ -489,6 +525,8 @@ def _iter_scan_files(repo_root: Path) -> Iterable[Path]:
         for path in root.rglob("*"):
             if _skip_path(path) or not path.is_file():
                 continue
+            if _is_refactor_history_archive_path(path, repo_root):
+                continue
             if path.name in {REPORT_JSON, REPORT_MD}:
                 continue
             if path.parent.name == "research" and path.name.startswith(HISTORICAL_REPORT_PREFIXES):
@@ -512,6 +550,14 @@ def _is_doc_path(rel: str) -> bool:
 
 def _skip_path(path: Path) -> bool:
     return any(part in SKIP_DIR_NAMES for part in path.parts)
+
+
+def _is_refactor_history_archive_path(path: Path, repo_root: Path) -> bool:
+    try:
+        rel = path.relative_to(repo_root).as_posix()
+    except ValueError:
+        return False
+    return rel.startswith(f"{REFACTOR_HISTORY_ARCHIVE}/")
 
 
 def _rel(path: Path, repo_root: Path) -> str:

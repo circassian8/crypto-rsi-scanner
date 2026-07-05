@@ -5,7 +5,11 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
+
+import pytest
 
 from crypto_rsi_scanner.cli.parser import (
     build_parser,
@@ -94,7 +98,7 @@ def test_build_parser_preserves_artifact_doctor_and_notification_flags():
         "--event-alpha-artifact-doctor-delivery-scope",
         "latest_run",
         "--event-alpha-doctor-schema-only",
-        "--event-alpha-doctor-skip-legacy-checks",
+        "--event-alpha-doctor-skip-historical-checks",
     ])
     assert doctor.event_alpha_artifact_doctor is True
     assert doctor.event_alpha_artifact_doctor_strict is True
@@ -144,6 +148,25 @@ def test_event_alpha_historical_artifact_aliases_match_legacy_flags():
     assert new_doctor.event_alpha_artifact_doctor_strict_api is True
     assert old_doctor.event_alpha_artifact_doctor_delivery_scope == "legacy_included"
     assert new_doctor.event_alpha_artifact_doctor_delivery_scope == "historical_included"
+
+
+def test_event_alpha_help_hides_legacy_named_aliases():
+    parser = build_parser()
+    buffer = StringIO()
+    with pytest.raises(SystemExit):
+        with redirect_stdout(buffer):
+            parser.parse_args(["--help"])
+    help_text = buffer.getvalue()
+    assert "--include-historical-artifacts" in help_text
+    assert "--event-alpha-doctor-skip-historical-checks" in help_text
+    assert "--event-alpha-include-historical-artifacts" in help_text
+    assert "--event-alpha-artifact-doctor-strict-historical" in help_text
+    assert "historical_included" in help_text
+    assert "--include-legacy" not in help_text
+    assert "--event-alpha-doctor-skip-legacy-checks" not in help_text
+    assert "--event-alpha-include-legacy-artifacts" not in help_text
+    assert "--event-alpha-artifact-doctor-strict-legacy" not in help_text
+    assert "legacy_included" not in help_text
 
 
 def test_build_parser_preserves_provider_preflight_flags():
@@ -273,4 +296,13 @@ def test_cli_flag_snapshot_exists_and_preserves_representative_defaults():
     assert rows["--dry-run"]["default"] is False
     assert rows["--event-alpha-coinalyze-preflight"]["command_group"] == "event_alpha_coinalyze"
     assert rows["--event-alpha-coinalyze-allow-live-preflight"]["default"] is False
+    assert "--include-historical-artifacts" in rows
+    assert rows["--include-historical-artifacts"]["destination"] == "include_legacy"
+    assert "--event-alpha-include-historical-artifacts" in rows
+    assert "--event-alpha-doctor-skip-historical-checks" in rows
+    assert "--event-alpha-artifact-doctor-strict-historical" in rows
+    assert "--include-legacy" not in rows
+    assert "--event-alpha-include-legacy-artifacts" not in rows
+    assert "--event-alpha-doctor-skip-legacy-checks" not in rows
+    assert "--event-alpha-artifact-doctor-strict-legacy" not in rows
     assert payload["safety"]["live_provider_calls_allowed_by_default"] is False

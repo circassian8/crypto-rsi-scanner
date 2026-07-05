@@ -34,9 +34,9 @@ rows, or create `TRIGGERED_FADE`.
   historical artifact row semantics, backwards-compatible CLI aliases,
   tombstone/deleted-shim records, test fixtures, generated compatibility report
   fields, and historical DEVLOG/ROADMAP/DECISIONS entries.
-- Canonical CLI wording should use `historical` / `historical artifacts`;
-  old `legacy` flags and `legacy_included` scope remain parse-compatible
-  aliases and report-field compatibility only.
+- Canonical CLI wording should use `historical` / `historical artifacts`.
+  Old `legacy` flags and `legacy_included` scope remain hidden,
+  parse-compatible deprecated aliases and report-field compatibility only.
 
 ## Safety Boundary
 

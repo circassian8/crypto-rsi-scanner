@@ -1472,6 +1472,15 @@
     {
       "accepted": true,
       "limit": 1500,
+      "line_count": 1268,
+      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+      "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+      "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
       "line_count": 1261,
       "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
       "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
@@ -1494,15 +1503,6 @@
       "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
       "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
       "revisit_condition": "When outcome performance views gain new sections.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
-      "line_count": 1231,
-      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-      "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-      "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
       "source_kind": "production"
     }
   ],
@@ -1533,7 +1533,7 @@
       "crypto_rsi_scanner/event_alpha/notifications/pipeline_core.py"
     ],
     "api_total_lines": 0,
-    "generated_at": "2026-07-05T13:29:32+00:00",
+    "generated_at": "2026-07-05T14:28:14+00:00",
     "largest_api_files": [],
     "no_live_provider_calls": true,
     "normal_rsi_signal_rows_written": 0,
@@ -4625,7 +4625,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-05T13:29:37+00:00",
+  "generated_at": "2026-07-05T14:28:20+00:00",
   "generator": "crypto_rsi_scanner.project_health.architecture_report",
   "historical_row_type_alias": "refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
@@ -4705,6 +4705,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1268,
+      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1261,
       "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
       "source_kind": "production"
@@ -4719,12 +4725,6 @@
       "limit": 1500,
       "line_count": 1233,
       "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1231,
-      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
       "source_kind": "production"
     },
     {
@@ -4941,7 +4941,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1322,
+      "line_count": 1371,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
@@ -4983,7 +4983,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 276,
+      "line_count": 308,
       "path": "tests/cli/test_parser.py",
       "source_kind": "test"
     },
@@ -6782,18 +6782,18 @@
     "include_runtime_artifacts": false,
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "ARCHITECTURE_FINAL_REPORT.md:1783258070",
-      "DEVLOG.md:1783258155",
-      "research/ARCHITECTURE_ACCEPTANCE_REPORT.md:1783258070",
-      "research/ARCHITECTURE_COMPLETION_MAP.md:1783258104",
-      "research/ARCHITECTURE_CONTRACT.md:1783258070"
+      "AGENTS.md:1783261683",
+      "ARCHITECTURE_FINAL_REPORT.md:1783261205",
+      "DEVLOG.md:1783261181",
+      "research/ARCHITECTURE_ACCEPTANCE_REPORT.md:1783261205",
+      "research/ARCHITECTURE_CONTRACT.md:1783261205"
     ],
-    "newest_source_mtime": 1783258164.7174854,
+    "newest_source_mtime": 1783261690.961903,
     "regex_compile_count": 0,
-    "report_mtime": 1783257810.9037519,
-    "scan_duration_seconds": 1.266,
+    "report_mtime": 1783260863.808767,
+    "scan_duration_seconds": 1.26,
     "scanned_artifact_files": 0,
-    "scanned_doc_files": 44,
+    "scanned_doc_files": 45,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
     "scanned_source_files": 607,
@@ -6814,13 +6814,13 @@
     ],
     "skipped_dirs": 63,
     "skipped_large_file_samples": [
-      "research/FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.json"
+      "research/archive/refactor_history/FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.json"
     ],
     "skipped_large_files": 1,
     "skipped_suffix_files": 0
   },
-  "shim_dependency_scan_duration_seconds": 1.266,
-  "shim_dependency_scanned_doc_files": 44,
+  "shim_dependency_scan_duration_seconds": 1.26,
+  "shim_dependency_scanned_doc_files": 45,
   "shim_dependency_scanned_source_files": 607,
   "shim_dependency_scanned_test_files": 29,
   "shim_dependency_skipped_artifact_files": 1285,
@@ -6884,7 +6884,7 @@
     "deleted_shims_count": 124,
     "event_alpha_public_compatibility_entrypoints_path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
     "event_fade_safety_exception_present": true,
-    "generated_at": "2026-07-05T13:29:32.590458+00:00",
+    "generated_at": "2026-07-05T14:28:14.799958+00:00",
     "historical_row_type_alias": "final_refactor_transitional_file_report",
     "migration_named_dirs": [],
     "migration_named_dirs_count": 0,
@@ -7080,6 +7080,15 @@
         {
           "accepted": true,
           "limit": 1500,
+          "line_count": 1268,
+          "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+          "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+          "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
           "line_count": 1261,
           "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
           "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
@@ -7102,15 +7111,6 @@
           "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
           "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
           "revisit_condition": "When outcome performance views gain new sections.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1231,
-          "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-          "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-          "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
           "source_kind": "production"
         }
       ]
@@ -7202,6 +7202,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1268,
+        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1261,
         "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
         "threshold": 1200
@@ -7214,11 +7219,6 @@
       {
         "line_count": 1233,
         "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1231,
-        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
         "threshold": 1200
       }
     ],
@@ -7365,6 +7365,15 @@
           {
             "accepted": true,
             "limit": 1500,
+            "line_count": 1268,
+            "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+            "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+            "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
             "line_count": 1261,
             "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
             "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
@@ -7387,15 +7396,6 @@
             "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
             "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
             "revisit_condition": "When outcome performance views gain new sections.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1231,
-            "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-            "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-            "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
             "source_kind": "production"
           }
         ]

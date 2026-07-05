@@ -17,6 +17,58 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Archive refactor history and hide legacy aliases · Codex
+**Why:** The architecture refactor is complete, but historical `REFACTOR_*`
+reports and visible legacy-named CLI/Make affordances still made the repo look
+mid-migration. This pass preserves behavior while moving history out of the
+active report surface and making current user-facing names canonical.
+**Changes:**
+- Moved historical `REFACTOR_*` and `FINAL_REFACTOR_*` report artifacts into
+  `research/archive/refactor_history/` with a README and JSON manifest.
+- Removed active `research/REFACTOR_FINAL_REPORT.*` files and kept current
+  health outputs under `ARCHITECTURE_*` / `PROJECT_HEALTH_*` names.
+- Updated Event Alpha CLI help, parser snapshots, Make variables, and docs to
+  prefer `historical` naming while preserving hidden/backwards-compatible
+  legacy aliases and Make variable fallbacks.
+- Hardened the architecture naming check so active refactor-era reports are
+  blockers, while archived history and explicit compatibility aliases are
+  classified instead of renamed.
+- Refreshed architecture, shim, old-import, transitional-file, size, class
+  ownership, and project-health naming reports.
+**Verify:** `python3 tests/test_indicators.py` (`764/764 passed`);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (`781 passed`); `python3 -m compileall
+-q crypto_rsi_scanner tests`; `make architecture-naming-check PYTHON=python3`;
+`make architecture-transitional-file-check PYTHON=python3`; `make
+architecture-size-gates PYTHON=python3`; `make
+architecture-class-ownership-report PYTHON=python3`; `make
+architecture-final-report PYTHON=python3`; `make architecture-cleanliness-check
+PYTHON=python3`; `make event-alpha-old-import-check PYTHON=python3`; `make
+event-alpha-shim-dependency-report PYTHON=python3`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make
+event-alpha-notification-format-smoke PYTHON=python3`; `make
+event-alpha-telegram-no-send-final-check-fast PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-preflight PYTHON=python3`; `make
+event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`; `make
+event-alpha-source-coverage-report PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1
+PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** Legacy-named CLI flags and Make variables remain parse-compatible
+but hidden/deprecated. `event-alpha-catalyst-frame-e2e-cycle` still exits 0 with
+its known fixture-namespace strict doctor blockers. No live provider calls,
+live Telegram sends, trading, paper trading, normal RSI signal writes, or Event
+Alpha-created `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-05 — Finish architecture naming cleanup · Codex
 **Why:** The project-health tooling had been made permanent, but current source,
 tests, reports, and Makefile targets still exposed migration-era naming. The

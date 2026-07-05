@@ -98,6 +98,7 @@ FEEDBACK_NOTES ?=
 CONFIRM ?= 0
 STRICT ?= 0
 INCLUDE_LEGACY ?= 0
+INCLUDE_HISTORICAL ?= $(INCLUDE_LEGACY)
 LATEST ?= 0
 ALL_HISTORY ?= 0
 RUN_ID ?=
@@ -112,9 +113,11 @@ PROVIDER_ALL ?= 0
 EVENT_ALPHA_BURN_IN_PACK ?= event_alpha_burn_in_pack.zip
 EVENT_ALPHA_NOTIFICATION_PACK ?= event_alpha_notification_pack.zip
 EVENT_ALPHA_LAUNCHD_OUT ?= research/generated_$(PROFILE).plist
-EVENT_ALPHA_INCLUDE_LEGACY_ARG = $(if $(filter 1 true yes,$(INCLUDE_LEGACY)),--event-alpha-include-historical-artifacts,)
+STRICT_LEGACY ?= 0
+STRICT_HISTORICAL ?= $(STRICT_LEGACY)
+EVENT_ALPHA_INCLUDE_HISTORICAL_ARG = $(if $(filter 1 true yes,$(INCLUDE_HISTORICAL)),--event-alpha-include-historical-artifacts,)
 EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG = $(if $(filter 1 true yes,$(STRICT)),--event-alpha-artifact-doctor-strict,)
-EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_LEGACY_ARG = $(if $(filter 1 true yes,$(STRICT_LEGACY)),--event-alpha-artifact-doctor-strict-historical,)
+EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_HISTORICAL_ARG = $(if $(filter 1 true yes,$(STRICT_HISTORICAL)),--event-alpha-artifact-doctor-strict-historical,)
 EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE ?=
 EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE_ARG = $(if $(strip $(EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE)),--event-alpha-artifact-doctor-delivery-scope $(EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE),)
 EVENT_ALPHA_IGNORE_BACKOFF_ARG = $(if $(filter 1 true yes,$(IGNORE_BACKOFF)),--ignore-provider-backoff,)
@@ -317,7 +320,7 @@ help:
 	@echo "  make event-alpha-evidence-acquisition-smoke  Fixture no-send proof of source-pack evidence acquisition"
 	@echo "  make event-alpha-quality-frame-live-smoke  Live-style no-send frame quality smoke; no Telegram"
 	@echo "  make event-alpha-feedback-readiness PROFILE=notify_llm_quality_frame  Check card/inbox/feedback lineage readiness"
-	@echo "  INCLUDE_LEGACY=1 may be added to burn-in/readiness/doctor targets for migration review"
+	@echo "  INCLUDE_HISTORICAL=1 may be added to burn-in/readiness/doctor targets for historical artifact review"
 	@echo "  make event-alpha-tuning-worksheet  Print weekly tuning suggestions without applying changes"
 	@echo "  make event-alpha-export-burn-in-pack  Write clean burn-in review zip"
 	@echo "  make event-alpha-launchd-template  Print Event Alpha launchd/cron template locations"
@@ -1904,7 +1907,7 @@ event-impact-hypotheses-report:
 		$(if $(filter 1 true yes,$(ALL_HISTORY)),--all-history,) \
 		$(if $(strip $(RUN_ID)),--run-id $(RUN_ID),) \
 		$(if $(strip $(SINCE)),--since $(SINCE),) \
-		$(if $(filter 1 true yes,$(INCLUDE_LEGACY)),--include-historical-artifacts,)
+		$(if $(filter 1 true yes,$(INCLUDE_HISTORICAL)),--include-historical-artifacts,)
 
 event-incidents-report:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
@@ -1913,7 +1916,7 @@ event-incidents-report:
 		$(if $(filter 1 true yes,$(LATEST)),--latest-run,) \
 		$(if $(filter 1 true yes,$(ALL_HISTORY)),--all-history,) \
 		$(if $(strip $(RUN_ID)),--run-id $(RUN_ID),) \
-		$(if $(filter 1 true yes,$(INCLUDE_LEGACY)),--include-historical-artifacts,)
+		$(if $(filter 1 true yes,$(INCLUDE_HISTORICAL)),--include-historical-artifacts,)
 
 event-impact-hypotheses-inbox:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
@@ -2077,7 +2080,7 @@ event-alpha-export-eval-cases:
 event-alpha-explain-last-run:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
-	$(PYTHON) main.py --event-alpha-explain-last-run --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-explain-last-run --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG)
 
 event-alpha-daily-brief:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
@@ -2086,7 +2089,7 @@ event-alpha-daily-brief:
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
 	RSI_EVENT_RESEARCH_CARDS_DIR=$(EVENT_RESEARCH_CARDS_DIR) \
 	RSI_EVENT_ALPHA_DAILY_BRIEF_PATH=$(EVENT_ALPHA_DAILY_BRIEF_PATH) \
-	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) $(EVENT_ALPHA_INCLUDE_TEST_ARG) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) $(EVENT_ALPHA_INCLUDE_TEST_ARG) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG)
 
 event-alpha-replay:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
@@ -2131,21 +2134,21 @@ event-alpha-burn-in-scorecard:
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
 	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
-	$(PYTHON) main.py --event-alpha-burn-in-scorecard --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-burn-in-scorecard --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG)
 
 event-alpha-burn-in-checklist:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
 	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
-	$(PYTHON) main.py --event-alpha-burn-in-checklist --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-burn-in-checklist --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG)
 
 event-alpha-v1-readiness:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
 	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
-	$(PYTHON) main.py --event-alpha-v1-readiness --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-v1-readiness --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG)
 
 event-alpha-health-guard:
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
@@ -2153,7 +2156,7 @@ event-alpha-health-guard:
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
 	RSI_EVENT_ALPHA_HEALTH_REQUIRE_PROFILE=$(PROFILE) \
-	$(PYTHON) main.py --event-alpha-health-guard --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-health-guard --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG)
 
 event-alpha-doctor-check-registry:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.doctor.check_registry
@@ -2178,7 +2181,7 @@ event-alpha-artifact-doctor:
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
 	RSI_EVENT_ALPHA_FEEDBACK_PATH=$(EVENT_ALPHA_PROFILE_DIR)/event_alpha_feedback.jsonl \
 	RSI_EVENT_RESEARCH_CARDS_DIR=$(EVENT_RESEARCH_CARDS_DIR) \
-	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) $(EVENT_ALPHA_INCLUDE_TEST_ARG) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_LEGACY_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE_ARG)
+	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) $(EVENT_ALPHA_INCLUDE_TEST_ARG) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_HISTORICAL_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE_ARG)
 
 event-alpha-tuning-worksheet:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
@@ -2191,7 +2194,7 @@ event-alpha-export-burn-in-pack:
 	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
-	$(PYTHON) main.py --event-alpha-export-burn-in-pack $(EVENT_ALPHA_BURN_IN_PACK) --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-export-burn-in-pack $(EVENT_ALPHA_BURN_IN_PACK) --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG)
 
 event-alpha-launchd-template:
 	@echo "Launchd template: research/event_alpha_launchd_template.plist"

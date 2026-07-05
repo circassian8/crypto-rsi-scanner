@@ -1452,12 +1452,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5768,
+  "function_count": 5773,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-05T13:23:21.473934+00:00",
+  "generated_at": "2026-07-05T14:14:10.550928+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3364,6 +3364,14 @@
         },
         {
           "accepted": true,
+          "line_count": 1268,
+          "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+          "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+          "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+          "threshold": 1200
+        },
+        {
+          "accepted": true,
           "line_count": 1261,
           "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
           "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
@@ -3384,14 +3392,6 @@
           "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
           "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
           "revisit_condition": "When outcome performance views gain new sections.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1231,
-          "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-          "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-          "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
           "threshold": 1200
         }
       ]
@@ -3482,6 +3482,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1268,
+        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1261,
         "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
         "threshold": 1200
@@ -3494,11 +3499,6 @@
       {
         "line_count": 1233,
         "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1231,
-        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
         "threshold": 1200
       }
     ],
@@ -3592,6 +3592,14 @@
           },
           {
             "accepted": true,
+            "line_count": 1268,
+            "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+            "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+            "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+            "threshold": 1200
+          },
+          {
+            "accepted": true,
             "line_count": 1261,
             "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
             "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
@@ -3612,14 +3620,6 @@
             "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
             "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
             "revisit_condition": "When outcome performance views gain new sections.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1231,
-            "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-            "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-            "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
             "threshold": 1200
           }
         ]

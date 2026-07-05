@@ -1,0 +1,49 @@
+{
+  "schema_version": "refactor_history_archive_manifest_v1",
+  "archived_at": "2026-07-05T00:00:00Z",
+  "archive_path": "research/archive/refactor_history",
+  "reason": "Historical refactor-era reports were moved out of the active research root after architecture/project-health naming became canonical.",
+  "current_report_patterns": [
+    "research/ARCHITECTURE_*",
+    "research/PROJECT_HEALTH_*",
+    "research/EVENT_ALPHA_*"
+  ],
+  "policy": {
+    "current_tools_write_refactor_reports_by_default": false,
+    "new_code_uses_refactor_era_names": false,
+    "archive_is_historical_only": true
+  },
+  "root_duplicates_removed": [
+    "REFACTOR_FINAL_REPORT.json",
+    "REFACTOR_FINAL_REPORT.md"
+  ],
+  "archived_files": [
+    "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.json",
+    "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.md",
+    "FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.json",
+    "FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.md",
+    "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.json",
+    "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.md",
+    "REFACTOR_BASELINE.json",
+    "REFACTOR_BASELINE.md",
+    "REFACTOR_CLASS_OWNERSHIP_REPORT.json",
+    "REFACTOR_CLASS_OWNERSHIP_REPORT.md",
+    "REFACTOR_COMPLETION_MAP.json",
+    "REFACTOR_COMPLETION_MAP.md",
+    "REFACTOR_FINAL_REPORT.json",
+    "REFACTOR_FINAL_REPORT.md",
+    "REFACTOR_RELEASE_CANDIDATE_REPORT.json",
+    "REFACTOR_RELEASE_CANDIDATE_REPORT.md",
+    "REFACTOR_SIZE_BASELINE.json",
+    "REFACTOR_SIZE_GATES.json",
+    "REFACTOR_SIZE_GATES.md",
+    "REFACTOR_V3_CONTRACT.json",
+    "REFACTOR_V3_CONTRACT.md",
+    "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.json",
+    "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.md",
+    "REFACTOR_V4_FINAL_REPORT.json",
+    "REFACTOR_V4_FINAL_REPORT.md",
+    "REFACTOR_VERIFICATION_RESULTS.json",
+    "REFACTOR_VERIFICATION_RESULTS.md"
+  ]
+}

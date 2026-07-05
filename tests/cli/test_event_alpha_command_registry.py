@@ -67,7 +67,7 @@ def test_event_alpha_handle_is_small_registry_bridge():
     assert len(inspect.getsourcelines(commands_event_alpha.handle)[0]) < 150
 
 
-def test_event_impact_hypotheses_report_dispatch_uses_current_include_legacy_flag(monkeypatch):
+def test_event_impact_hypotheses_report_dispatch_uses_current_include_historical_flag(monkeypatch):
     parser = build_parser()
     calls = []
 
@@ -79,7 +79,7 @@ def test_event_impact_hypotheses_report_dispatch_uses_current_include_legacy_fla
         "--event-impact-hypotheses-report",
         "--event-alpha-profile",
         "fixture",
-        "--include-legacy",
+        "--include-historical-artifacts",
     ])
 
     assert registry_dispatch._dispatch_event_alpha_command_section_2(args) is True

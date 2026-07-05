@@ -1596,10 +1596,10 @@ fixtures. Use `make event-alpha-quality-frame-live-smoke` when you need a fresh
 `make event-alpha-notify-llm-quality-frame-smoke` for the offline fixture proof.
 
 The report defaults to the latest stored `run_id` while still printing
-total/latest/historical/legacy availability. Use `ALL_HISTORY=1` for the older
+total/latest/historical/default availability. Use `ALL_HISTORY=1` for the older
 full-history view, `RUN_ID=<id>` for a specific cycle, and `SINCE=<iso-time>` for
 a time window.
-Add `INCLUDE_LEGACY=1` only when intentionally reviewing old/missing-schema
+Add `INCLUDE_HISTORICAL=1` only when intentionally reviewing old/missing-schema
 rows. Hypothesis reports now separate generated queries from executed queries
 and show query counts by `candidate_discovery`, `candidate_validation`, and
 `market_confirmation`. `notify_llm` and `notify_llm_deep` can execute a bounded
@@ -2067,8 +2067,8 @@ daily-brief/index card-group mismatches. Fresh alert snapshots must carry
 `alertable_after_quality_gate`, and a consistent quality verdict. Strict mode
 blocks fresh/current rows whose final route is alertable while the opportunity
 verdict is local-only, zero-score, or insufficient-data. Legacy quality-route
-conflicts are warnings by default; use `STRICT_LEGACY=1` only for a deliberate
-migration audit that should fail on old pre-quality rows.
+conflicts are warnings by default; use `STRICT_HISTORICAL=1` only for a
+deliberate historical-artifact audit that should fail on old pre-quality rows.
 
 The doctor also checks watchlist lifecycle consistency. Fresh/current rows with
 active `WATCHLIST` / `HIGH_PRIORITY` state that contradict a local-only,
@@ -2076,7 +2076,7 @@ zero-score, or insufficient-data quality verdict must either carry a non-active
 `final_state_after_quality_gate` with `state_quality_capped=true`, or strict
 doctor blocks the namespace. Properly capped rows are visible in daily brief and
 quality review local-only sections, not in active watchlist sections. Legacy
-uncapped rows are migration warnings unless `STRICT_LEGACY=1` is set. The
+uncapped rows are migration warnings unless `STRICT_HISTORICAL=1` is set. The
 doctor also reports incident relevance health: missing relevance fields,
 canonical unlinked incidents, active incidents without qualified links, linked
 incidents without qualified links, weak unqualified links, quality-blocked links
@@ -2092,14 +2092,14 @@ and duplicate store-row counts. Missing core-store rows block strict
 non-legacy/non-test operational checks, while legacy/test migration checks warn
 so old artifacts remain inspectable.
 
-For migration review only, include legacy/default rows explicitly:
+For historical artifact review only, include historical/default rows explicitly:
 
 ```bash
-INCLUDE_LEGACY=1 make event-alpha-burn-in-scorecard PROFILE=no_key_live
-INCLUDE_LEGACY=1 make event-alpha-artifact-doctor PROFILE=no_key_live
+INCLUDE_HISTORICAL=1 make event-alpha-burn-in-scorecard PROFILE=no_key_live
+INCLUDE_HISTORICAL=1 make event-alpha-artifact-doctor PROFILE=no_key_live
 ```
 
-Do not use legacy-included reports as promotion evidence. They are for
+Do not use historical-included reports as promotion evidence. They are for
 understanding older artifacts while new namespaced burn-in rows accumulate.
 
 For explicit v1 gate flags across scheduled burn-in, research-send readiness,

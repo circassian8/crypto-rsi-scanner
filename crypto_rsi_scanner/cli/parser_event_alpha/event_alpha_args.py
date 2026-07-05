@@ -4,6 +4,16 @@ from __future__ import annotations
 
 import argparse
 
+
+def _historical_delivery_scope(value: str) -> str:
+    allowed = {"latest_run", "all_rows", "historical_included", "legacy_included"}
+    if value not in allowed:
+        raise argparse.ArgumentTypeError(
+            "expected one of: latest_run, all_rows, historical_included"
+        )
+    return value
+
+
 def _add_event_alpha_args_section_1(parser: argparse.ArgumentParser, event_alpha_profiles, event_feedback) -> None:
     parser.add_argument("--top-n", type=int, default=None, help="Number of coins to scan.")
     parser.add_argument(
@@ -402,10 +412,15 @@ def _add_event_alpha_args_section_3(parser: argparse.ArgumentParser, event_alpha
     )
     parser.add_argument(
         "--include-historical-artifacts",
+        dest="include_legacy",
+        action="store_true",
+        help="For impact-hypothesis reports, include historical/default rows with missing schema lineage.",
+    )
+    parser.add_argument(
         "--include-legacy",
         dest="include_legacy",
         action="store_true",
-        help="For impact-hypothesis reports, include historical/default rows with missing schema lineage. --include-legacy is kept as a backwards-compatible alias.",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--event-alpha-run-ledger-path",
@@ -540,6 +555,8 @@ def _add_event_alpha_args_section_4(parser: argparse.ArgumentParser, event_alpha
         action="store_true",
         help="Print Event Alpha run freshness/safety guard status.",
     )
+
+def _add_event_alpha_args_section_4b(parser: argparse.ArgumentParser, event_alpha_profiles, event_feedback) -> None:
     parser.add_argument(
         "--event-alpha-artifact-doctor",
         action="store_true",
@@ -552,10 +569,15 @@ def _add_event_alpha_args_section_4(parser: argparse.ArgumentParser, event_alpha
     )
     parser.add_argument(
         "--event-alpha-doctor-skip-historical-checks",
+        dest="event_alpha_doctor_skip_api_checks",
+        action="store_true",
+        help="Development-only: skip historical imperative artifact-doctor checks after schema phases.",
+    )
+    parser.add_argument(
         "--event-alpha-doctor-skip-legacy-checks",
         dest="event_alpha_doctor_skip_api_checks",
         action="store_true",
-        help="Development-only: skip historical imperative artifact-doctor checks after schema phases. The legacy-named flag is a backwards-compatible alias.",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--event-alpha-tuning-worksheet",
@@ -910,10 +932,15 @@ def _add_event_alpha_args_section_7(parser: argparse.ArgumentParser, event_alpha
     )
     parser.add_argument(
         "--event-alpha-include-historical-artifacts",
+        dest="event_alpha_include_api_artifacts",
+        action="store_true",
+        help="Include historical/default Event Alpha artifact rows in artifact reports for migration review.",
+    )
+    parser.add_argument(
         "--event-alpha-include-legacy-artifacts",
         dest="event_alpha_include_api_artifacts",
         action="store_true",
-        help="Include historical/default Event Alpha artifact rows in artifact reports for migration review. The legacy-named flag is a backwards-compatible alias.",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--event-alpha-include-stale-artifacts",
@@ -927,16 +954,22 @@ def _add_event_alpha_args_section_7(parser: argparse.ArgumentParser, event_alpha
     )
     parser.add_argument(
         "--event-alpha-artifact-doctor-strict-historical",
+        dest="event_alpha_artifact_doctor_strict_api",
+        action="store_true",
+        help="With strict artifact doctor, also escalate historical quality-route conflicts to blockers.",
+    )
+    parser.add_argument(
         "--event-alpha-artifact-doctor-strict-legacy",
         dest="event_alpha_artifact_doctor_strict_api",
         action="store_true",
-        help="With strict artifact doctor, also escalate historical quality-route conflicts to blockers. The legacy-named flag is a backwards-compatible alias.",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--event-alpha-artifact-doctor-delivery-scope",
-        choices=("latest_run", "all_rows", "legacy_included", "historical_included"),
+        type=_historical_delivery_scope,
+        metavar="{latest_run,all_rows,historical_included}",
         default=None,
-        help="Scope strict notification-delivery identity checks; default checks the latest run when available. Use historical_included for historical/default rows; legacy_included is a backwards-compatible value.",
+        help="Scope strict notification-delivery identity checks; default checks the latest run when available. Use historical_included for historical/default rows.",
     )
     parser.add_argument(
         "--event-alpha-profile-report",
@@ -993,6 +1026,8 @@ def _add_event_alpha_args_section_7(parser: argparse.ArgumentParser, event_alpha
         action="store_true",
         help="Listen briefly to live Binance announcements and append raw research JSONL cache artifacts.",
     )
+
+def _add_event_alpha_args_section_7b(parser: argparse.ArgumentParser, event_alpha_profiles, event_feedback) -> None:
     parser.add_argument(
         "--event-fade-auto-report",
         action="store_true",
@@ -1224,8 +1259,10 @@ def add_event_alpha_args(parser: argparse.ArgumentParser) -> None:
     _add_event_alpha_args_section_2(parser, event_alpha_profiles, event_feedback)
     _add_event_alpha_args_section_3(parser, event_alpha_profiles, event_feedback)
     _add_event_alpha_args_section_4(parser, event_alpha_profiles, event_feedback)
+    _add_event_alpha_args_section_4b(parser, event_alpha_profiles, event_feedback)
     _add_event_alpha_args_section_5(parser, event_alpha_profiles, event_feedback)
     _add_event_alpha_args_section_6(parser, event_alpha_profiles, event_feedback)
     _add_event_alpha_args_section_7(parser, event_alpha_profiles, event_feedback)
+    _add_event_alpha_args_section_7b(parser, event_alpha_profiles, event_feedback)
     _add_event_alpha_args_section_8(parser, event_alpha_profiles, event_feedback)
     _add_event_alpha_args_section_9(parser, event_alpha_profiles, event_feedback)

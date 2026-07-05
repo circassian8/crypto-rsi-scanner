@@ -111,7 +111,7 @@
       "command_group": "option",
       "default": false,
       "destination": "event_alpha_artifact_doctor_strict_api",
-      "flag": "--event-alpha-artifact-doctor-strict-legacy"
+      "flag": "--event-alpha-artifact-doctor-strict-historical"
     },
     {
       "action_type": "_StoreAction",
@@ -293,7 +293,7 @@
       "command_group": "option",
       "default": false,
       "destination": "event_alpha_doctor_skip_api_checks",
-      "flag": "--event-alpha-doctor-skip-legacy-checks"
+      "flag": "--event-alpha-doctor-skip-historical-checks"
     },
     {
       "action_type": "_StoreTrueAction",
@@ -377,7 +377,7 @@
       "command_group": "option",
       "default": false,
       "destination": "event_alpha_include_api_artifacts",
-      "flag": "--event-alpha-include-legacy-artifacts"
+      "flag": "--event-alpha-include-historical-artifacts"
     },
     {
       "action_type": "_StoreTrueAction",
@@ -1461,8 +1461,8 @@
       "action_type": "_StoreTrueAction",
       "command_group": "option",
       "default": false,
-      "destination": "include_api",
-      "flag": "--include-legacy"
+      "destination": "include_legacy",
+      "flag": "--include-historical-artifacts"
     },
     {
       "action_type": "_StoreTrueAction",

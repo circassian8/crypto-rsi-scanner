@@ -2,7 +2,7 @@
 
 Research-only release-candidate report. This report does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-05T13:29:38.009688+00:00`
+- generated_at: `2026-07-05T14:28:20.390449+00:00`
 - acceptance_status: `accepted`
 - critical_gate_status: `pass`
 - commands_passed: `26/26`
