@@ -1499,7 +1499,7 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1226,
+      "line_count": 1231,
       "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
       "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
       "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
@@ -4582,7 +4582,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-05T05:31:04+00:00",
+  "generated_at": "2026-07-05T10:04:58+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -4605,8 +4605,8 @@
   },
   "largest_api_files": [
     {
-      "line_count": 257,
-      "path": "crypto_rsi_scanner/refactor_legacy_file_check.py"
+      "line_count": 399,
+      "path": "crypto_rsi_scanner/refactor_legacy_terminology_check.py"
     }
   ],
   "largest_production_files": [
@@ -4684,7 +4684,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1226,
+      "line_count": 1231,
       "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
       "source_kind": "production"
     },
@@ -4902,7 +4902,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1265,
+      "line_count": 1314,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
@@ -4944,7 +4944,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 243,
+      "line_count": 276,
       "path": "tests/cli/test_parser.py",
       "source_kind": "test"
     },
@@ -5033,8 +5033,8 @@
   "legacy_decomposition": {
     "largest_api_files": [
       {
-        "line_count": 257,
-        "path": "crypto_rsi_scanner/refactor_legacy_file_check.py"
+        "line_count": 399,
+        "path": "crypto_rsi_scanner/refactor_legacy_terminology_check.py"
       }
     ],
     "legacy_classes_over_limit": 0,
@@ -5056,7 +5056,7 @@
       "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py",
       "crypto_rsi_scanner/event_alpha/notifications/pipeline_core.py"
     ],
-    "legacy_total_lines": 257
+    "legacy_total_lines": 399
   },
   "legacy_decomposition_gate_status": "pass",
   "legacy_file_retirement": {
@@ -5071,13 +5071,20 @@
     "deleted_shims_count": 124,
     "event_alpha_public_compatibility_entrypoints_path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
     "event_fade_safety_exception_present": true,
-    "generated_at": "2026-07-05T05:30:58.809265+00:00",
+    "generated_at": "2026-07-05T10:04:52.947179+00:00",
+    "legacy_alias_schema_version": "final_refactor_legacy_retirement_report_v1",
     "legacy_named_dirs": [],
     "legacy_named_dirs_count": 0,
     "legacy_named_files": [],
     "legacy_named_files_count": 0,
     "legacy_named_files_remaining": 0,
     "legacy_named_files_with_implementation": 0,
+    "migration_named_dirs": [],
+    "migration_named_dirs_count": 0,
+    "migration_named_files": [],
+    "migration_named_files_count": 0,
+    "migration_named_files_remaining": 0,
+    "migration_named_files_with_implementation": 0,
     "no_send_rehearsal": true,
     "nonessential_shims_remaining": 0,
     "normal_rsi_signal_rows_written": 0,
@@ -5087,7 +5094,7 @@
     "retained_public_entrypoints": 0,
     "retained_public_shims": [],
     "retained_public_shims_count": 0,
-    "row_type": "final_refactor_legacy_retirement_report",
+    "row_type": "final_refactor_transitional_file_report",
     "safety_invariants": {
       "no_event_alpha_rsi_writes": true,
       "no_event_alpha_triggered_fade": true,
@@ -5100,13 +5107,19 @@
       "research_only": true
     },
     "scanner_entrypoint_exception_present": true,
-    "schema_version": "final_refactor_legacy_retirement_report_v1",
+    "schema_version": "final_refactor_transitional_file_report_v1",
     "status": "OK",
     "strict_alerts_created": 0,
     "telegram_sends": 0,
     "top_level_event_modules": [],
     "top_level_event_modules_count": 0,
     "trades_created": 0,
+    "transitional_named_dirs": [],
+    "transitional_named_dirs_count": 0,
+    "transitional_named_files": [],
+    "transitional_named_files_count": 0,
+    "transitional_named_files_remaining": 0,
+    "transitional_named_files_with_implementation": 0,
     "triggered_fade_created": 0
   },
   "legacy_file_retirement_status": "OK",
@@ -5120,7 +5133,7 @@
   "legacy_named_files_with_implementation": 0,
   "legacy_retained_public_shims_count": 0,
   "legacy_top_level_event_modules_count": 0,
-  "legacy_total_lines": 257,
+  "legacy_total_lines": 399,
   "legacy_unregistered": 0,
   "line_counts": {
     "crypto_rsi_scanner/cli/commands_event_alpha.py": 14,
@@ -5162,7 +5175,7 @@
       "blocker_reason": "",
       "current_lines": 36,
       "gate_status": "pass",
-      "next_migration_module": "crypto_rsi_scanner/event_alpha/doctor/checks/safety.py, namespace.py, stale_artifacts.py, and focused legacy counter plugins",
+      "next_migration_module": "crypto_rsi_scanner/event_alpha/doctor/checks/safety.py, namespace.py, stale_artifacts.py, and focused historical-row counter plugins",
       "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py",
       "reduced_by_lines": null,
       "reduction_pct": null,
@@ -6837,19 +6850,18 @@
     "include_runtime_artifacts": false,
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "crypto_rsi_scanner/refactor_completion_map.py:1783229413",
-      "research/REFACTOR_V4_FINAL_REPORT.md:1783228920",
-      "tests/cli/test_make_targets.py:1783229419"
+      "research/FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.md:1783245893",
+      "research/REFACTOR_V4_FINAL_REPORT.md:1783245462"
     ],
-    "newest_source_mtime": 1783229418.8389742,
+    "newest_source_mtime": 1783245893.1396108,
     "regex_compile_count": 0,
-    "report_mtime": 1783228902.1212382,
-    "scan_duration_seconds": 1.2417,
+    "report_mtime": 1783245457.451144,
+    "scan_duration_seconds": 1.272,
     "scanned_artifact_files": 0,
-    "scanned_doc_files": 33,
+    "scanned_doc_files": 35,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
-    "scanned_source_files": 605,
+    "scanned_source_files": 606,
     "scanned_test_files": 29,
     "skipped_artifact_files": 1285,
     "skipped_binary_files": 0,
@@ -6866,16 +6878,18 @@
       "crypto_rsi_scanner/llm_providers/__pycache__"
     ],
     "skipped_dirs": 62,
-    "skipped_large_file_samples": [],
-    "skipped_large_files": 0,
+    "skipped_large_file_samples": [
+      "research/FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.json"
+    ],
+    "skipped_large_files": 1,
     "skipped_suffix_files": 0
   },
-  "shim_dependency_scan_duration_seconds": 1.2417,
-  "shim_dependency_scanned_doc_files": 33,
-  "shim_dependency_scanned_source_files": 605,
+  "shim_dependency_scan_duration_seconds": 1.272,
+  "shim_dependency_scanned_doc_files": 35,
+  "shim_dependency_scanned_source_files": 606,
   "shim_dependency_scanned_test_files": 29,
   "shim_dependency_skipped_artifact_files": 1285,
-  "shim_dependency_skipped_large_files": 0,
+  "shim_dependency_skipped_large_files": 1,
   "shim_removal_blockers": 0,
   "shim_status_counts": {},
   "standalone_runner_runtime_seconds": 11.191,
@@ -7094,7 +7108,7 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1226,
+          "line_count": 1231,
           "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
           "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
           "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
@@ -7203,7 +7217,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1226,
+        "line_count": 1231,
         "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
         "threshold": 1200
       }
@@ -7378,7 +7392,7 @@
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1226,
+            "line_count": 1231,
             "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
             "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
             "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",

@@ -1,4 +1,4 @@
-"""Source Coverage Checks for the legacy artifact doctor."""
+"""Source Coverage Checks for the artifact doctor."""
 
 from __future__ import annotations
 

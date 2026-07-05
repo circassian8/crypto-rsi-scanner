@@ -17,7 +17,7 @@ from ...artifacts import paths as event_artifact_paths
 from .. import core_opportunities as event_core_opportunities
 from .. import market_reaction as event_market_reaction
 from .. import opportunity_verdict as event_opportunity_verdict
-from .models import *  # noqa: F403 - split modules share legacy model names
+from .models import *  # noqa: F403 - split modules share historical model names
 
 
 def _load_alert_rows(path: str | Path | None) -> list[dict[str, Any]]:

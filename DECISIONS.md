@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-05 - Final refactor terminology uses historical/transitional wording
+**Status:** accepted
+**Decision:** New refactor code and docs use transitional-file and historical
+artifact wording instead of describing current implementation as legacy. The
+canonical static checker is `make refactor-transitional-file-check`; the old
+`make refactor-legacy-file-check` target remains only as an operator-compatible
+alias. Canonical CLI flags now include historical-artifact aliases while old
+`legacy` flags and report fields remain supported for backwards compatibility
+and historical artifact row semantics.
+**Why:** Refactor v3 is accepted with old flat Event Alpha shims retired, so
+continuing to call current modules “legacy” makes future ownership ambiguous.
+The terminology report makes remaining `legacy` occurrences explicit and gates
+stale source wording without breaking existing CLI/scripts/artifact schemas.
+**Revisit when:** artifact schema v2 removes legacy-named compatibility fields,
+or a future CLI-breaking release retires the old parser aliases.
+
 ## 2026-07-05 - Final Event Alpha refactor accepted: no legacy files, no old flat Event Alpha imports, canonical module architecture only
 **Status:** accepted
 **Decision:** The final Event Alpha refactor is accepted. No internal

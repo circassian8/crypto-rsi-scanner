@@ -1,4 +1,4 @@
-"""Delivery Models for the legacy notification pipeline."""
+"""Delivery models for the notification pipeline."""
 
 from __future__ import annotations
 

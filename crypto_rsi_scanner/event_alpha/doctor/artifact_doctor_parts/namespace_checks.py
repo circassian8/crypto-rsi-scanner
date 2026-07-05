@@ -1,4 +1,4 @@
-"""Namespace Checks for the legacy artifact doctor."""
+"""Namespace Checks for the artifact doctor."""
 
 from __future__ import annotations
 

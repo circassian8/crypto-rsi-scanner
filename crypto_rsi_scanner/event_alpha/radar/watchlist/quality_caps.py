@@ -13,7 +13,7 @@ from .... import event_fade
 import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
 import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
 import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
-from .models import *  # noqa: F403 - split modules share legacy model names
+from .models import *  # noqa: F403 - split modules share historical model names
 
 
 def quality_cap_watchlist_state(

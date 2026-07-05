@@ -1,4 +1,4 @@
-"""Source Coverage helpers for legacy research cards."""
+"""Source Coverage helpers for research cards."""
 
 from __future__ import annotations
 

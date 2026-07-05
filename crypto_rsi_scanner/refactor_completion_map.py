@@ -362,7 +362,7 @@ def _critical_blockers(
     if size.get("production_size_gate_status") == "blocked":
         blockers.append({"id": "production_size_gate", "reason": "production source files over 1,500 lines remain without accepted exceptions"})
     if size.get("legacy_decomposition_gate_status") == "blocked":
-        blockers.append({"id": "legacy_decomposition_gate", "reason": "legacy implementation files over 3,000 lines remain"})
+        blockers.append({"id": "legacy_decomposition_gate", "reason": "transitional implementation files over 3,000 lines remain"})
     if int(final.get("active_shim_modules_with_implementation_logic") or 0) != 0:
         blockers.append({"id": "active_shim_logic", "reason": "active shim modules contain implementation logic"})
     if int(final.get("scanner_command_body_functions_remaining") or 0) != 0:
@@ -375,7 +375,9 @@ def _critical_blockers(
 
 
 def _final_refactor_gate_summary(final: dict[str, Any], *, root: Path) -> dict[str, Any]:
-    legacy_retirement = _read_json(root / "research" / "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.json")
+    legacy_retirement = _read_json(root / "research" / "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.json")
+    if not legacy_retirement:
+        legacy_retirement = _read_json(root / "research" / "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.json")
     final_shim_status = _read_json(root / "research" / "EVENT_ALPHA_FINAL_SHIM_STATUS.json")
     deleted_shims_count = _first_present(
         final.get("deleted_shims_count"),

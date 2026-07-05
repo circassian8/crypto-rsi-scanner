@@ -2,7 +2,7 @@
 
 Research artifact only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: 2026-07-05T05:21:42.120806+00:00
+- generated_at: 2026-07-05T09:57:37.449834+00:00
 - status: OK
 - registry_entry_count: 0
 - internal_import_reference_count: 0
@@ -21,12 +21,12 @@ Research artifact only. This report does not call providers, send Telegram messa
 - v3_auto_accept_ready: True
 - include_runtime_artifacts: False
 - cache_status: miss
-- scan_duration_seconds: 1.2166
-- scanned_source_files: 605
-- scanned_doc_files: 33
+- scan_duration_seconds: 1.2267
+- scanned_source_files: 606
+- scanned_doc_files: 35
 - scanned_test_files: 29
 - skipped_artifact_files: 1285
-- skipped_large_files: 0
+- skipped_large_files: 1
 - skipped_dirs: 62
 
 ## Policy

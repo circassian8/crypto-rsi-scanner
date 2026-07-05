@@ -1,4 +1,4 @@
-"""Rsi Scan commands from the legacy scanner service."""
+"""Rsi Scan commands from the scanner service."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Heartbeat for the legacy notification pipeline."""
+"""Heartbeat helpers for the notification pipeline."""
 
 from __future__ import annotations
 

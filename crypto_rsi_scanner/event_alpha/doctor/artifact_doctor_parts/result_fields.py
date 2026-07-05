@@ -1,4 +1,4 @@
-"""Declarative field wiring for the legacy artifact doctor result."""
+"""Declarative field wiring for the artifact doctor result."""
 
 from __future__ import annotations
 

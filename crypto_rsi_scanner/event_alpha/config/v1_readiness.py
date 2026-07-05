@@ -134,7 +134,7 @@ def build_v1_readiness(
         warnings.append("no Event Alpha run ledger rows found; calibrated research send still needs burn-in evidence")
         commands.append("make event-alpha-cycle-profile PROFILE=no_key_live")
         if legacy_rows_available and not include_api_artifacts:
-            warnings.append("legacy/default run rows were ignored; run namespaced burn-in commands or pass --event-alpha-include-legacy-artifacts for migration review")
+            warnings.append("legacy/default run rows were ignored; run namespaced burn-in commands or pass --event-alpha-include-historical-artifacts for migration review")
     if not ready_send:
         commands.append("make event-alpha-burn-in-checklist")
     if not ready_burn_in:

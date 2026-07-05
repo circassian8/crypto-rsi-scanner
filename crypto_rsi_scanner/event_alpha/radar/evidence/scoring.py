@@ -21,7 +21,7 @@ from .. import catalyst_search as event_catalyst_search
 from .. import core_opportunities as event_core_opportunities
 from .. import impact_hypotheses as event_impact_hypotheses
 from .. import source_enrichment as event_source_enrichment
-from .models import *  # noqa: F403 - split modules share legacy model names
+from .models import *  # noqa: F403 - split modules share historical model names
 
 
 def _apply_final_verdict_metadata(components: dict[str, Any], result: EvidenceAcquisitionResult) -> None:

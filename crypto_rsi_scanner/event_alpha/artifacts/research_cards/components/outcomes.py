@@ -1,4 +1,4 @@
-"""Outcomes helpers for legacy research cards."""
+"""Outcomes helpers for research cards."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Notification Checks for the legacy artifact doctor."""
+"""Notification Checks for the artifact doctor."""
 
 from __future__ import annotations
 

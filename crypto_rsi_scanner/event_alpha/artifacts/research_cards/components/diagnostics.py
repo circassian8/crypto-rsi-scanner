@@ -1,4 +1,4 @@
-"""Diagnostics helpers for legacy research cards."""
+"""Diagnostics helpers for research cards."""
 
 from __future__ import annotations
 

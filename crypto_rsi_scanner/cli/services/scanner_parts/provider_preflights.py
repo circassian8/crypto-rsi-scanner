@@ -1,4 +1,4 @@
-"""Provider Preflights commands from the legacy scanner service."""
+"""Provider Preflights commands from the scanner service."""
 
 from __future__ import annotations
 

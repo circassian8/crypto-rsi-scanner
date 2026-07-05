@@ -1,4 +1,4 @@
-"""Integrated Radar Checks for the legacy artifact doctor."""
+"""Integrated Radar Checks for the artifact doctor."""
 
 from __future__ import annotations
 

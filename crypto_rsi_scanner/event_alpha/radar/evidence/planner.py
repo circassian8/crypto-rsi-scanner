@@ -3,6 +3,6 @@
 from __future__ import annotations
 
 from .acquisition_api import EvidenceAcquisitionRequest
-from .models import *  # noqa: F403 - split modules share legacy model names
+from .models import *  # noqa: F403 - split modules share historical model names
 
 __all__ = ("EvidenceAcquisitionRequest",)

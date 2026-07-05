@@ -1,4 +1,4 @@
-"""Send Plan for the legacy notification pipeline."""
+"""Send-plan helpers for the notification pipeline."""
 
 from __future__ import annotations
 

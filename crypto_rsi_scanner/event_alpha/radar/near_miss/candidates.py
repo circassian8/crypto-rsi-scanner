@@ -15,7 +15,7 @@ import crypto_rsi_scanner.event_alpha.radar.market_confirmation as event_market_
 import crypto_rsi_scanner.event_alpha.radar.opportunity_verdict as event_opportunity_verdict
 import crypto_rsi_scanner.event_alpha.providers.source_packs as event_source_packs
 import crypto_rsi_scanner.event_alpha.providers.source_registry as event_source_registry
-from .models import *  # noqa: F403 - split modules share legacy model names
+from .models import *  # noqa: F403 - split modules share historical model names
 
 
 def is_upgrade_candidate(candidate: EventNearMissCandidate) -> bool:

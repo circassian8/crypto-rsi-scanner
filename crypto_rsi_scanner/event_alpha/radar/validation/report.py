@@ -13,7 +13,7 @@ from typing import Any, Iterable, Mapping
 from urllib.parse import quote_plus, urlparse
 
 from ..discovery import VALIDATION_SAMPLE_FIELDS, VALIDATION_SAMPLE_SCHEMA_VERSION
-from .models import *  # noqa: F403 - split modules share legacy model names
+from .models import *  # noqa: F403 - split modules share historical model names
 
 
 def format_validation_review(review: EventFadeValidationReview) -> str:

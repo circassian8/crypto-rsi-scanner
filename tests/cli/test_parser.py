@@ -113,6 +113,39 @@ def test_build_parser_preserves_artifact_doctor_and_notification_flags():
     assert dispatch_key_from_args(preview) == "event_alpha_notify_preview"
 
 
+def test_event_alpha_historical_artifact_aliases_match_legacy_flags():
+    parser = build_parser()
+    old_impact = parser.parse_args(["--event-impact-hypotheses-report", "--include-legacy"])
+    new_impact = parser.parse_args(["--event-impact-hypotheses-report", "--include-historical-artifacts"])
+    assert old_impact.include_legacy is True
+    assert new_impact.include_legacy is True
+
+    old_doctor = parser.parse_args([
+        "--event-alpha-artifact-doctor",
+        "--event-alpha-doctor-skip-legacy-checks",
+        "--event-alpha-include-legacy-artifacts",
+        "--event-alpha-artifact-doctor-strict-legacy",
+        "--event-alpha-artifact-doctor-delivery-scope",
+        "legacy_included",
+    ])
+    new_doctor = parser.parse_args([
+        "--event-alpha-artifact-doctor",
+        "--event-alpha-doctor-skip-historical-checks",
+        "--event-alpha-include-historical-artifacts",
+        "--event-alpha-artifact-doctor-strict-historical",
+        "--event-alpha-artifact-doctor-delivery-scope",
+        "historical_included",
+    ])
+    assert old_doctor.event_alpha_doctor_skip_api_checks is True
+    assert new_doctor.event_alpha_doctor_skip_api_checks is True
+    assert old_doctor.event_alpha_include_api_artifacts is True
+    assert new_doctor.event_alpha_include_api_artifacts is True
+    assert old_doctor.event_alpha_artifact_doctor_strict_api is True
+    assert new_doctor.event_alpha_artifact_doctor_strict_api is True
+    assert old_doctor.event_alpha_artifact_doctor_delivery_scope == "legacy_included"
+    assert new_doctor.event_alpha_artifact_doctor_delivery_scope == "historical_included"
+
+
 def test_build_parser_preserves_provider_preflight_flags():
     parser = build_parser()
     readiness = parser.parse_args(["--event-alpha-live-provider-readiness"])

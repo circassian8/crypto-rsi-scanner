@@ -401,9 +401,11 @@ def _add_event_alpha_args_section_3(parser: argparse.ArgumentParser, event_alpha
         help="For impact-hypothesis reports, show rows observed at or after this ISO timestamp.",
     )
     parser.add_argument(
+        "--include-historical-artifacts",
         "--include-legacy",
+        dest="include_legacy",
         action="store_true",
-        help="For impact-hypothesis reports, include legacy/missing-schema rows in filtered output.",
+        help="For impact-hypothesis reports, include historical/default rows with missing schema lineage. --include-legacy is kept as a backwards-compatible alias.",
     )
     parser.add_argument(
         "--event-alpha-run-ledger-path",
@@ -549,10 +551,11 @@ def _add_event_alpha_args_section_4(parser: argparse.ArgumentParser, event_alpha
         help="Run only namespace, schema, and schema safety phases of the Event Alpha artifact doctor.",
     )
     parser.add_argument(
+        "--event-alpha-doctor-skip-historical-checks",
         "--event-alpha-doctor-skip-legacy-checks",
         dest="event_alpha_doctor_skip_api_checks",
         action="store_true",
-        help="Development-only: skip legacy imperative artifact-doctor checks after schema phases.",
+        help="Development-only: skip historical imperative artifact-doctor checks after schema phases. The legacy-named flag is a backwards-compatible alias.",
     )
     parser.add_argument(
         "--event-alpha-tuning-worksheet",
@@ -906,10 +909,11 @@ def _add_event_alpha_args_section_7(parser: argparse.ArgumentParser, event_alpha
         help="Include Event Alpha rows marked test/fixture/replay in artifact reports.",
     )
     parser.add_argument(
+        "--event-alpha-include-historical-artifacts",
         "--event-alpha-include-legacy-artifacts",
         dest="event_alpha_include_api_artifacts",
         action="store_true",
-        help="Include legacy/default Event Alpha artifact rows in artifact reports for migration review.",
+        help="Include historical/default Event Alpha artifact rows in artifact reports for migration review. The legacy-named flag is a backwards-compatible alias.",
     )
     parser.add_argument(
         "--event-alpha-include-stale-artifacts",
@@ -922,16 +926,17 @@ def _add_event_alpha_args_section_7(parser: argparse.ArgumentParser, event_alpha
         help="Escalate fresh/current artifact mismatches, mixed namespaces, and unknown IDs to artifact-doctor blockers.",
     )
     parser.add_argument(
+        "--event-alpha-artifact-doctor-strict-historical",
         "--event-alpha-artifact-doctor-strict-legacy",
         dest="event_alpha_artifact_doctor_strict_api",
         action="store_true",
-        help="With strict artifact doctor, also escalate legacy quality-route conflicts to blockers.",
+        help="With strict artifact doctor, also escalate historical quality-route conflicts to blockers. The legacy-named flag is a backwards-compatible alias.",
     )
     parser.add_argument(
         "--event-alpha-artifact-doctor-delivery-scope",
-        choices=("latest_run", "all_rows", "legacy_included"),
+        choices=("latest_run", "all_rows", "legacy_included", "historical_included"),
         default=None,
-        help="Scope strict notification-delivery identity checks; default checks the latest run when available.",
+        help="Scope strict notification-delivery identity checks; default checks the latest run when available. Use historical_included for historical/default rows; legacy_included is a backwards-compatible value.",
     )
     parser.add_argument(
         "--event-alpha-profile-report",

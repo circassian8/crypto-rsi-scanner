@@ -1,3 +1,3 @@
-"""Focused legacy research-card implementation modules."""
+"""Focused research-card implementation modules."""
 
 from __future__ import annotations

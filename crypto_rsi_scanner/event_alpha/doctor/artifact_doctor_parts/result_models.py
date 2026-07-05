@@ -1,4 +1,4 @@
-"""Result Models for the legacy artifact doctor."""
+"""Result Models for the artifact doctor."""
 
 from __future__ import annotations
 

@@ -8,7 +8,7 @@ from .status import DoctorStatus
 
 
 def aggregate_doctor_results(result: Any) -> Any:
-    """Return the legacy-compatible aggregate result unchanged."""
+    """Return the compatibility-preserving aggregate result unchanged."""
 
     return result
 

@@ -1,4 +1,4 @@
-"""Preview Writer for the legacy notification pipeline."""
+"""Preview writer for the notification pipeline."""
 
 from __future__ import annotations
 

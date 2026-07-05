@@ -1,4 +1,4 @@
-"""Research Review helpers for legacy daily brief."""
+"""Research Review helpers for daily brief."""
 
 from __future__ import annotations
 

@@ -1499,7 +1499,7 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1226,
+      "line_count": 1231,
       "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
       "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
       "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
@@ -1681,7 +1681,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 634,
+  "file_count": 635,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -1738,11 +1738,11 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-05T05:21:44.844965+00:00",
+  "generated_at": "2026-07-05T09:57:38.850834+00:00",
   "largest_api_files": [
     {
-      "line_count": 257,
-      "path": "crypto_rsi_scanner/refactor_legacy_file_check.py"
+      "line_count": 399,
+      "path": "crypto_rsi_scanner/refactor_legacy_terminology_check.py"
     }
   ],
   "largest_production_files": [
@@ -1820,7 +1820,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1226,
+      "line_count": 1231,
       "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
       "source_kind": "production"
     },
@@ -2038,7 +2038,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1263,
+      "line_count": 1314,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
@@ -2080,7 +2080,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 243,
+      "line_count": 276,
       "path": "tests/cli/test_parser.py",
       "source_kind": "test"
     },
@@ -2182,7 +2182,7 @@
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py",
     "crypto_rsi_scanner/event_alpha/notifications/pipeline_core.py"
   ],
-  "legacy_total_lines": 257,
+  "legacy_total_lines": 399,
   "modules_with_multiple_public_classes": [],
   "modules_with_multiple_public_classes_count": 0,
   "modules_with_multiple_public_classes_status": "pass",
@@ -3749,7 +3749,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1226,
+      "line_count": 1231,
       "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
       "source_kind": "production"
     }
@@ -4292,7 +4292,7 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1226,
+          "line_count": 1231,
           "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
           "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
           "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
@@ -4400,7 +4400,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1226,
+        "line_count": 1231,
         "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
         "threshold": 1200
       }
@@ -4575,7 +4575,7 @@
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1226,
+            "line_count": 1231,
             "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
             "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
             "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",

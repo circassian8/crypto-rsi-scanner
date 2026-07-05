@@ -1,4 +1,4 @@
-"""Utilities for the legacy notification pipeline."""
+"""Utilities for the notification pipeline."""
 
 from __future__ import annotations
 

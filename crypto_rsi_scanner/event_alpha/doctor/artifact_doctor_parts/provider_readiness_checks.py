@@ -1,4 +1,4 @@
-"""Provider Readiness Checks for the legacy artifact doctor."""
+"""Provider Readiness Checks for the artifact doctor."""
 
 from __future__ import annotations
 

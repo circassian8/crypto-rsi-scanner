@@ -1,6 +1,6 @@
 """Integrated Event Alpha radar cycle.
 
-Compatibility aggregator over focused legacy integrated-radar modules.
+Compatibility aggregator over focused integrated-radar modules.
 It writes local artifacts only: no Telegram sends, paper trades, normal RSI signal rows, order logic, or event-fade triggers.
 """
 

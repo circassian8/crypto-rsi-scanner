@@ -19,7 +19,7 @@ from typing import Any, Mapping
 from . import refactor_baseline
 from . import refactor_api_inventory
 from . import refactor_final_v4_report
-from . import refactor_legacy_file_check
+from . import refactor_transitional_file_check
 from . import refactor_size_gates
 from . import refactor_v3_contract
 from .event_alpha import shims as event_alpha_shims
@@ -49,7 +49,7 @@ MAJOR_TARGETS = {
     },
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": {
         "target_lines_lt": 300,
-        "next_migration_module": "crypto_rsi_scanner/event_alpha/doctor/checks/safety.py, namespace.py, stale_artifacts.py, and focused legacy counter plugins",
+        "next_migration_module": "crypto_rsi_scanner/event_alpha/doctor/checks/safety.py, namespace.py, stale_artifacts.py, and focused historical-row counter plugins",
         "risk": "Doctor extraction can silently change strict/WARN semantics, report counter names, or stale namespace handling if compatibility tests do not pin output.",
         "blocker_reason": "artifact_doctor.py should remain a small public orchestrator/export surface.",
     },
@@ -612,10 +612,10 @@ def _refactor_extra_blockers(
                 {
                     "path": str(row.get("path")),
                     "blocker_reason": (
-                        "Legacy implementation core remains over 3,000 lines; wrappers are not enough "
+                        "Transitional implementation core remains over 3,000 lines; wrappers are not enough "
                         "to mark the refactor complete."
                     ),
-                    "next_migration_module": "focused legacy decomposition modules for this file",
+                    "next_migration_module": "focused transitional decomposition modules for this file",
                     "risk": "Moving too much at once can change CLI, doctor, notification, card, brief, or radar semantics.",
                 }
             )
@@ -957,7 +957,7 @@ def build_refactor_final_report(
     classification = _remaining_module_classification(root)
     class_ownership = _class_ownership_summary(root)
     legacy_inventory = refactor_api_inventory.build_api_inventory(root=root)
-    legacy_file_report = refactor_legacy_file_check.build_report(root=root)
+    legacy_file_report = refactor_transitional_file_check.build_report(root=root)
     size_gate_report = refactor_size_gates.build_gate_report(root=root)
     v3_gate_snapshot = _build_v3_gate_snapshot(root=root, size_gate_report=size_gate_report)
     deleted_shims = event_alpha_shims.deleted_shim_count(root=root)

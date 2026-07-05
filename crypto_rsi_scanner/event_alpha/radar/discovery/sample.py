@@ -43,7 +43,7 @@ from ....supply_providers.arkham import ArkhamSupplyProvider
 from ....supply_providers.dune import DuneSupplyProvider
 from ....supply_providers.etherscan import EtherscanSupplyProvider
 from ....supply_providers.tokenomist import TokenomistSupplyProvider
-from .models import *  # noqa: F403 - split modules share legacy model names
+from .models import *  # noqa: F403 - split modules share historical model names
 
 
 def event_fade_validation_sample_rows(

@@ -26,6 +26,18 @@ rows, or create `TRIGGERED_FADE`.
 - Docs and runbooks should show canonical package paths; old paths may appear
   only when they clearly describe tombstoned paths or historical decisions.
 - Artifact doctor warns if a deleted shim file is reintroduced.
+- Migration-era implementation filenames are checked by
+  `make refactor-transitional-file-check`. The old
+  `make refactor-legacy-file-check` target is retained only as an alias for
+  operators and historical automation.
+- Remaining `legacy` terminology is checked by
+  `make refactor-legacy-terminology-check`. Accepted occurrences are limited to
+  historical artifact row semantics, backwards-compatible CLI aliases,
+  tombstone/deleted-shim records, test fixtures, generated compatibility report
+  fields, and historical DEVLOG/ROADMAP/DECISIONS entries.
+- Canonical CLI wording should use `historical` / `historical artifacts`;
+  old `legacy` flags and `legacy_included` scope remain parse-compatible
+  aliases and report-field compatibility only.
 
 ## Safety Boundary
 

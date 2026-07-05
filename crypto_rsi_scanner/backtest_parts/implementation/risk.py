@@ -47,7 +47,7 @@ from ...state_features import (
     volume_price_state,
 )
 from ...universe import candidate_count, filter_markets, format_exclusions
-# Shared globals are injected by legacy.py after import.
+# Shared globals are injected by the package initializer after import.
 from .data import *  # noqa: F403
 
 def _time_folds(signals: list, folds: int, horizon: int) -> list[list[dict]]:

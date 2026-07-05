@@ -1,4 +1,4 @@
-"""Opportunity Lanes helpers for legacy daily brief."""
+"""Opportunity Lanes helpers for daily brief."""
 
 from __future__ import annotations
 

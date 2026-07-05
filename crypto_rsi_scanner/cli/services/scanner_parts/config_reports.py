@@ -1,4 +1,4 @@
-"""Config Reports commands from the legacy scanner service."""
+"""Config Reports commands from the scanner service."""
 
 from __future__ import annotations
 

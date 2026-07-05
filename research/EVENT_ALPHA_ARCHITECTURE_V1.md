@@ -75,9 +75,17 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
   remain. Future work must not recreate them except through an explicit public
   compatibility decision. Temporary glue, re-export-only modules, and old-path
   comments belong in tombstone reports, not in production packages.
-- Legacy-named implementation files are not part of the final architecture.
-  Run `make refactor-legacy-file-check`, `make refactor-size-gates`, and
-  `make refactor-final-report` after moving code.
+- Migration-era implementation filenames are not part of the final
+  architecture. Run `make refactor-transitional-file-check`,
+  `make refactor-legacy-terminology-check`, `make refactor-size-gates`, and
+  `make refactor-final-report` after moving code. The older
+  `make refactor-legacy-file-check` target remains a backwards-compatible alias
+  for the transitional-file check only.
+- Remaining `legacy` wording is allowed only for historical artifact row
+  semantics, generated compatibility report fields, old CLI aliases, tombstone
+  records, or historical decision/log entries. New user-facing flags should use
+  the historical-artifact wording, while parser support for old aliases remains
+  compatibility-only.
 - `crypto_rsi_scanner.event_alpha.shims` is the tombstone and deleted-path audit
   registry. It emits shim, dependency, and old-import reports with zero active
   flat Event Alpha shims. Artifact doctor warns if a deleted old shim path is

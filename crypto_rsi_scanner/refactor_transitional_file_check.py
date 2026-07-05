@@ -1,4 +1,4 @@
-"""Final refactor v3 legacy-file retirement gate.
+"""Final refactor v3 transitional-file gate.
 
 This module performs static filesystem checks only. It does not import scanner,
 providers, notification code, storage, or Event Alpha runtime modules.
@@ -13,9 +13,12 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-REPORT_SCHEMA_VERSION = "final_refactor_legacy_retirement_report_v1"
-REPORT_JSON = "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.json"
-REPORT_MD = "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.md"
+REPORT_SCHEMA_VERSION = "final_refactor_transitional_file_report_v1"
+REPORT_JSON = "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.json"
+REPORT_MD = "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.md"
+LEGACY_ALIAS_SCHEMA_VERSION = "final_refactor_legacy_retirement_report_v1"
+LEGACY_ALIAS_JSON = "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.json"
+LEGACY_ALIAS_MD = "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.md"
 PUBLIC_ENTRYPOINTS_JSON = "PUBLIC_COMPATIBILITY_ENTRYPOINTS.json"
 EVENT_ALPHA_PUBLIC_ENTRYPOINTS_JSON = "EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json"
 LEGACY_FILE_NAMES = {"legacy.py", "compat.py", "compatibility.py"}
@@ -37,22 +40,23 @@ SKIP_DIR_NAMES = {
 def build_report(*, root: str | Path | None = None, generated_at: datetime | None = None) -> dict[str, Any]:
     repo_root = Path(root).expanduser() if root is not None else Path(__file__).resolve().parents[1]
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
-    legacy_named_files = _legacy_named_files(repo_root)
-    legacy_named_dirs = _legacy_named_dirs(repo_root)
+    transitional_named_files = _transitional_named_files(repo_root)
+    transitional_named_dirs = _transitional_named_dirs(repo_root)
     flat_event_modules = _flat_event_modules(repo_root)
     retained_public_shims = _retained_public_shims(repo_root)
     deleted_shim_count = _deleted_shim_count(repo_root)
     scanner_entrypoint = repo_root / "crypto_rsi_scanner" / "scanner.py"
     event_fade = repo_root / "crypto_rsi_scanner" / "event_fade.py"
     blockers = [
-        *({"kind": "legacy_named_file", **row} for row in legacy_named_files),
-        *({"kind": "legacy_named_dir", **row} for row in legacy_named_dirs),
+        *({"kind": "transitional_named_file", **row} for row in transitional_named_files),
+        *({"kind": "transitional_named_dir", **row} for row in transitional_named_dirs),
         *({"kind": "flat_event_module", **row} for row in flat_event_modules),
         *({"kind": "retained_public_shim", **row} for row in retained_public_shims),
     ]
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
-        "row_type": "final_refactor_legacy_retirement_report",
+        "legacy_alias_schema_version": LEGACY_ALIAS_SCHEMA_VERSION,
+        "row_type": "final_refactor_transitional_file_report",
         "generated_at": generated,
         "research_only": True,
         "no_send_rehearsal": True,
@@ -63,10 +67,19 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         "normal_rsi_signal_rows_written": 0,
         "triggered_fade_created": 0,
         "status": "BLOCKED" if blockers else "OK",
-        "legacy_named_files_count": len(legacy_named_files),
-        "legacy_named_files_remaining": len(legacy_named_files),
+        "transitional_named_files_count": len(transitional_named_files),
+        "transitional_named_files_remaining": len(transitional_named_files),
+        "transitional_named_files_with_implementation": 0,
+        "transitional_named_dirs_count": len(transitional_named_dirs),
+        "migration_named_files_count": len(transitional_named_files),
+        "migration_named_files_remaining": len(transitional_named_files),
+        "migration_named_files_with_implementation": 0,
+        "migration_named_dirs_count": len(transitional_named_dirs),
+        # Historical compatibility keys consumed by existing refactor reports.
+        "legacy_named_files_count": len(transitional_named_files),
+        "legacy_named_files_remaining": len(transitional_named_files),
         "legacy_named_files_with_implementation": 0,
-        "legacy_named_dirs_count": len(legacy_named_dirs),
+        "legacy_named_dirs_count": len(transitional_named_dirs),
         "compatibility_named_files_remaining": 0,
         "top_level_event_modules_count": len(flat_event_modules),
         "retained_public_shims_count": len(retained_public_shims),
@@ -77,8 +90,12 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         "scanner_entrypoint_exception_present": scanner_entrypoint.exists(),
         "public_compatibility_entrypoints_path": f"research/{PUBLIC_ENTRYPOINTS_JSON}",
         "event_alpha_public_compatibility_entrypoints_path": f"research/{EVENT_ALPHA_PUBLIC_ENTRYPOINTS_JSON}",
-        "legacy_named_files": legacy_named_files,
-        "legacy_named_dirs": legacy_named_dirs,
+        "transitional_named_files": transitional_named_files,
+        "transitional_named_dirs": transitional_named_dirs,
+        "migration_named_files": transitional_named_files,
+        "migration_named_dirs": transitional_named_dirs,
+        "legacy_named_files": transitional_named_files,
+        "legacy_named_dirs": transitional_named_dirs,
         "top_level_event_modules": flat_event_modules,
         "allowed_top_level_event_modules": [
             {
@@ -109,23 +126,28 @@ def write_report(*, root: str | Path | None = None, out_dir: str | Path | None =
     report = build_report(root=repo_root)
     json_path = target / REPORT_JSON
     md_path = target / REPORT_MD
-    json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    md_path.write_text(format_report(report), encoding="utf-8")
+    payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    markdown = format_report(report)
+    json_path.write_text(payload, encoding="utf-8")
+    md_path.write_text(markdown, encoding="utf-8")
+    # Compatibility aliases for existing dashboards and historical automation.
+    (target / LEGACY_ALIAS_JSON).write_text(payload, encoding="utf-8")
+    (target / LEGACY_ALIAS_MD).write_text(markdown, encoding="utf-8")
     return json_path, md_path, report
 
 
 def format_report(report: dict[str, Any]) -> str:
     lines = [
-        "# Final Refactor Legacy Retirement Report",
+        "# Final Refactor Transitional File Report",
         "",
-        "Research artifact only. This static gate does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.",
+        "Research artifact only. This static gate checks migration-era file names and flat Event Alpha modules. It does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.",
         "",
         f"- generated_at: `{report.get('generated_at')}`",
         f"- status: `{report.get('status')}`",
-        f"- legacy_named_files_count: `{report.get('legacy_named_files_count', 0)}`",
-        f"- legacy_named_files_remaining: `{report.get('legacy_named_files_remaining', 0)}`",
-        f"- legacy_named_files_with_implementation: `{report.get('legacy_named_files_with_implementation', 0)}`",
-        f"- legacy_named_dirs_count: `{report.get('legacy_named_dirs_count', 0)}`",
+        f"- transitional_named_files_count: `{report.get('transitional_named_files_count', 0)}`",
+        f"- transitional_named_files_remaining: `{report.get('transitional_named_files_remaining', 0)}`",
+        f"- transitional_named_files_with_implementation: `{report.get('transitional_named_files_with_implementation', 0)}`",
+        f"- transitional_named_dirs_count: `{report.get('transitional_named_dirs_count', 0)}`",
         f"- compatibility_named_files_remaining: `{report.get('compatibility_named_files_remaining', 0)}`",
         f"- top_level_event_modules_count: `{report.get('top_level_event_modules_count', 0)}`",
         f"- retained_public_shims_count: `{report.get('retained_public_shims_count', 0)}`",
@@ -152,7 +174,7 @@ def format_report(report: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _legacy_named_files(repo_root: Path) -> list[dict[str, str]]:
+def _transitional_named_files(repo_root: Path) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for path in _iter_code_paths(repo_root):
         if not path.is_file():
@@ -164,7 +186,7 @@ def _legacy_named_files(repo_root: Path) -> list[dict[str, str]]:
     return rows
 
 
-def _legacy_named_dirs(repo_root: Path) -> list[dict[str, str]]:
+def _transitional_named_dirs(repo_root: Path) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for root_name in ("crypto_rsi_scanner", "tests"):
         root = repo_root / root_name
@@ -240,10 +262,10 @@ def main(argv: list[str] | None = None) -> int:
     print(json_path)
     print(md_path)
     print(f"status={report['status']}")
-    print(f"legacy_named_files_count={report['legacy_named_files_count']}")
-    print(f"legacy_named_files_remaining={report['legacy_named_files_remaining']}")
-    print(f"legacy_named_files_with_implementation={report['legacy_named_files_with_implementation']}")
-    print(f"legacy_named_dirs_count={report['legacy_named_dirs_count']}")
+    print(f"transitional_named_files_count={report['transitional_named_files_count']}")
+    print(f"transitional_named_files_remaining={report['transitional_named_files_remaining']}")
+    print(f"transitional_named_files_with_implementation={report['transitional_named_files_with_implementation']}")
+    print(f"transitional_named_dirs_count={report['transitional_named_dirs_count']}")
     print(f"compatibility_named_files_remaining={report['compatibility_named_files_remaining']}")
     print(f"top_level_event_modules_count={report['top_level_event_modules_count']}")
     print(f"retained_public_shims_count={report['retained_public_shims_count']}")

@@ -1,4 +1,4 @@
-"""Cycle helpers for legacy integrated radar."""
+"""Cycle helpers for integrated radar."""
 
 from __future__ import annotations
 

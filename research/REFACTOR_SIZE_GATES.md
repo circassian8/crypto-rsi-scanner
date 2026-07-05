@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-05T05:21:44.844965+00:00`
+- generated_at: `2026-07-05T09:57:38.850834+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -34,7 +34,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - legacy_decomposition_gate_status: `pass`
 - legacy_files_over_1500_lines: `0`
 - legacy_files_over_3000_lines: `0`
-- legacy_total_lines: `257`
+- legacy_total_lines: `399`
 - legacy_classes_over_limit: `0`
 - legacy_functions_over_limit: `0`
 - legacy_modules_with_multiple_public_classes: `0`
@@ -50,8 +50,8 @@ Static source inventory only. This report does not call providers, send Telegram
 - Production files over 2,000 lines remain a legacy continuity threshold.
 - Production files over 3,000 lines are blockers.
 - Test file size debt is tracked separately and does not block production refactor completion.
-- Legacy implementation files over 1,500 lines are warnings.
-- Legacy implementation files over 3,000 lines block refactor-complete status.
+- Transitional implementation files over 1,500 lines are warnings.
+- Transitional implementation files over 3,000 lines block refactor-complete status.
 - New production modules with multiple public classes are blockers unless registered as accepted model bundles.
 - Baseline updates require the explicit `make refactor-size-baseline-update` target.
 
@@ -87,7 +87,7 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `crypto_rsi_scanner/refactor_legacy_file_check.py` | 257 |
+| `crypto_rsi_scanner/refactor_legacy_terminology_check.py` | 399 |
 
 ## Largest Production Files
 
@@ -105,7 +105,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1239 |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 |
-| `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1226 |
+| `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1231 |
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 1155 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py` | 1145 |
@@ -150,7 +150,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 | Legacy notification-plan compatibility core; no-send semantics are more important than churn. | When notification plan rows are covered by schema-level golden fixtures. |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1239 | Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage. | When adding a new derivatives metric family or crowding class. |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 | Outcome maturation/report code is stable and below the blocker threshold. | When outcome performance views gain new sections. |
-| `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1226 | Stable argparse flag bundle; splitting individual flag groups risks CLI default drift. | Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule. |
+| `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1231 | Stable argparse flag bundle; splitting individual flag groups risks CLI default drift. | Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule. |
 
 ## Unresolved Production Files Over 1200 Lines
 
@@ -170,14 +170,14 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_source_coverage.py` | 2991 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
 | `tests/test_indicators.py` | 1779 |
-| `tests/cli/test_make_targets.py` | 1263 |
+| `tests/cli/test_make_targets.py` | 1314 |
 | `tests/event_alpha/_api_helpers.py` | 825 |
 | `tests/event_alpha/test_artifact_schema.py` | 743 |
 | `tests/rsi/test_indicators_core.py` | 694 |
 | `tests/rsi/test_backtest.py` | 561 |
 | `tests/event_alpha/test_shim_registry.py` | 515 |
 | `tests/rsi/test_paper_risk.py` | 379 |
-| `tests/cli/test_parser.py` | 243 |
+| `tests/cli/test_parser.py` | 276 |
 | `tests/cli/test_event_alpha_command_registry.py` | 202 |
 | `tests/cli/test_dispatch.py` | 129 |
 | `tests/cli/test_relative_import_integrity.py` | 88 |

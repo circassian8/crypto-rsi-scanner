@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Final refactor terminology cleanup · Codex
+**Why:** Refactor v3 retired the old flat Event Alpha shim surface, but some
+current code/docs still used “legacy” wording for transitional implementation
+concepts. The final pass needed canonical terminology without breaking old CLI
+aliases or artifact schema compatibility fields.
+**Changes:**
+- Renamed the static file-name gate to
+  `crypto_rsi_scanner/refactor_transitional_file_check.py` and added
+  `make refactor-transitional-file-check`, while keeping
+  `make refactor-legacy-file-check` as a backwards-compatible alias.
+- Added `crypto_rsi_scanner/refactor_legacy_terminology_check.py`,
+  `make refactor-legacy-terminology-check`, and
+  `research/FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.md/json` to classify all
+  remaining `legacy` occurrences as historical artifact semantics, CLI
+  compatibility aliases, test fixtures, accepted exceptions, or blockers.
+- Added historical-artifact CLI aliases for the Event Alpha include/doctor
+  flags and delivery scope while preserving the old aliases and artifact fields.
+- Replaced stale source docstrings/comments that described current
+  implementation modules as legacy, and updated architecture, shim-retirement,
+  roadmap, decisions, and generated refactor reports.
+**Verify:** Full requested safe verification passed and was recorded in
+`research/REFACTOR_VERIFICATION_RESULTS.md/json`: `python3
+tests/test_indicators.py` (`762/762 passed`), safe pytest (`779 passed`),
+compileall, transitional/legacy terminology checks, old-import/shim/size/class
+reports, refactor final report, integrated radar smoke/doctor, notification
+format smoke, Telegram no-send final check, strict CryptoPanic artifact doctor,
+and `make verify PYTHON=python3`. `research/REFACTOR_V3_RELEASE_CANDIDATE_REPORT`
+now records `commands_passed=17/17`, `critical_gate_status=pass`, and
+`legacy_named_files_remaining=0`.
+**Notes/risks:** Remaining `legacy` strings are intentional compatibility
+aliases, generated historical report fields, test fixtures, or historical
+records. No live provider calls, Telegram sends, trading, paper trading, normal
+RSI writes, or Event Alpha-created `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-05 — Complete final refactor acceptance audit · Codex
 **Why:** The final objective required the completion map and decision log to
 prove the same final-retirement state as the refactor reports. The reports were

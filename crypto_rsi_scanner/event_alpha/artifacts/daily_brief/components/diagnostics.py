@@ -1,4 +1,4 @@
-"""Diagnostics helpers for legacy daily brief."""
+"""Diagnostics helpers for daily brief."""
 
 from __future__ import annotations
 

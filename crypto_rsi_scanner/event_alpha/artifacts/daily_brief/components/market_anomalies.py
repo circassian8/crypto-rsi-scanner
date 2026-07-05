@@ -1,4 +1,4 @@
-"""Market Anomalies helpers for legacy daily brief."""
+"""Market Anomalies helpers for daily brief."""
 
 from __future__ import annotations
 

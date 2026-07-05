@@ -1,4 +1,4 @@
-"""Source Coverage helpers for legacy daily brief."""
+"""Source Coverage helpers for daily brief."""
 
 from __future__ import annotations
 

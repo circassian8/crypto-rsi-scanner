@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-05T05:21:45.930120+00:00`
+- generated_at: `2026-07-05T09:57:39.945696+00:00`
 - public_class_count: `408`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `0`
@@ -105,7 +105,7 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `crypto_rsi_scanner/refactor_legacy_file_check.py` | 257 |
+| `crypto_rsi_scanner/refactor_legacy_terminology_check.py` | 399 |
 
 ## Accepted Model Bundles
 

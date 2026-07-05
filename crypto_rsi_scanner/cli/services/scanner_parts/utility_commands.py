@@ -1,4 +1,4 @@
-"""Utility Commands commands from the legacy scanner service."""
+"""Utility Commands commands from the scanner service."""
 
 from __future__ import annotations
 

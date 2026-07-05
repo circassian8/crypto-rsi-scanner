@@ -1,4 +1,4 @@
-"""Notification Delivery Checks for the legacy artifact doctor."""
+"""Notification Delivery Checks for the artifact doctor."""
 
 from __future__ import annotations
 
@@ -587,7 +587,7 @@ def _normalize_delivery_strict_scope(
     strict: bool,
 ) -> str:
     cleaned = str(value or "").strip().casefold()
-    if cleaned in {"latest_run", "all_rows", "legacy_included"}:
+    if cleaned in {"latest_run", "all_rows", "legacy_included", "historical_included"}:
         return cleaned
     if strict and latest_run_id:
         return "latest_run"

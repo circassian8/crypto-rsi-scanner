@@ -1,4 +1,4 @@
-"""Context Loading for the legacy artifact doctor."""
+"""Context Loading for the artifact doctor."""
 
 from __future__ import annotations
 

@@ -8,7 +8,7 @@ from .context import DoctorContext
 def discover_namespace_artifacts(context: DoctorContext) -> DoctorContext:
     """Resolve namespace-level artifact inputs.
 
-    The legacy core still performs the concrete loading so current semantics and
+    The artifact doctor core still performs the concrete loading so current semantics and
     monkeypatch points remain unchanged during this refactor pass.
     """
 

@@ -1,4 +1,4 @@
-"""Market State helpers for legacy research cards."""
+"""Market State helpers for research cards."""
 
 from __future__ import annotations
 

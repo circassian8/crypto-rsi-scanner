@@ -20,7 +20,7 @@ Statuses:
   a docstring, imports, `globals().update(...)`, `__all__`, and comments. New
   implementation logic belongs in the new package path.
 - `partial_shim`: the old module is a known migration bridge and may still
-  contain legacy implementation logic until a later phase.
+  contain transitional implementation logic only during an explicit migration phase.
 - `not_migrated`: the module has not been moved yet and should not be judged by
   active-shim source rules.
 
@@ -53,7 +53,7 @@ Current phase:
   `event_providers.binance_announcements`, and `event_alpha.providers.health`.
   New logic should land in their focused `models`, `provider`, `client`,
   `parser`, `loader`, `entries`, `review`, or `report` modules rather than in
-  the legacy cores.
+  the compatibility cores.
 - Shared refactor facades follow the same rule outside the top-level
   `event_*.py` shim registry: `storage.py` owns only the public `Storage`
   facade over `storage_parts/`, `backtest.py` owns the historical backtest

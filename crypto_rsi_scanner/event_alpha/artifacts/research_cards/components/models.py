@@ -1,4 +1,4 @@
-"""Models helpers for legacy research cards."""
+"""Models helpers for research cards."""
 
 from __future__ import annotations
 

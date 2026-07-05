@@ -1,4 +1,4 @@
-"""Research Review Selection for the legacy notification pipeline."""
+"""Research-review selection for the notification pipeline."""
 
 from __future__ import annotations
 

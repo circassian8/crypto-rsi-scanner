@@ -45,7 +45,7 @@ def run_namespace_lifecycle_checks(context: DoctorContext) -> DoctorContext:
 def diagnose_artifacts(*args: Any, **kwargs: Any) -> Any:
     """Run the artifact doctor through explicit phases.
 
-    The phases are intentionally side-effect neutral in this pass; the legacy
+    The phases are intentionally side-effect neutral in this pass; the artifact doctor
     core remains the source of behavior until each category is migrated behind
     regression coverage.
     """

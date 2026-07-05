@@ -1,4 +1,4 @@
-"""Reporting for the legacy artifact doctor."""
+"""Reporting for the artifact doctor."""
 
 from __future__ import annotations
 

@@ -713,6 +713,9 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["public_compatibility_shims"] == payload["v3_gates"]["public_compatibility_shims"]
     assert payload["public_compatibility_shims"] == 0
     assert payload["legacy_file_retirement_status"] == "OK"
+    assert payload["legacy_file_retirement"]["schema_version"] == "final_refactor_transitional_file_report_v1"
+    assert payload["legacy_file_retirement"]["transitional_named_files_count"] == 0
+    assert payload["legacy_file_retirement"]["transitional_named_files_remaining"] == 0
     assert payload["legacy_named_files_count"] == 0
     assert payload["legacy_named_files_remaining"] == 0
     assert payload["legacy_named_files_with_implementation"] == 0
@@ -877,8 +880,13 @@ def test_refactor_final_report_make_target_is_available():
     module_text = (root / "crypto_rsi_scanner" / "refactor_final_report.py").read_text(encoding="utf-8").casefold()
 
     assert "refactor-final-report:" in makefile
+    assert "refactor-transitional-file-check:" in makefile
+    assert "refactor-legacy-file-check: refactor-transitional-file-check" in makefile
+    assert "refactor-legacy-terminology-check:" in makefile
     assert "refactor-class-ownership-report:" in makefile
     assert "$(python) -m crypto_rsi_scanner.refactor_class_ownership_report" in makefile.casefold()
+    assert "$(python) -m crypto_rsi_scanner.refactor_transitional_file_check" in makefile.casefold()
+    assert "$(python) -m crypto_rsi_scanner.refactor_legacy_terminology_check" in makefile.casefold()
     assert "$(python) -m crypto_rsi_scanner.refactor_final_report" in makefile.casefold()
     assert "PYTEST_RUNTIME_SECONDS" in makefile
     assert "STANDALONE_RUNTIME_SECONDS" in makefile
@@ -904,6 +912,47 @@ def test_event_alpha_shim_dependency_report_make_target_is_available():
     assert "Deleted old Event Alpha imports are tombstoned" in policy_text
     assert "must not create\n`TRIGGERED_FADE`" in policy_text
     assert "event_fade.py" in policy_text
+
+
+def test_refactor_transitional_and_terminology_reports_are_static():
+    import json
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from crypto_rsi_scanner import refactor_legacy_terminology_check
+    from crypto_rsi_scanner import refactor_transitional_file_check
+
+    with TemporaryDirectory() as tmp:
+        out_dir = Path(tmp)
+        trans_json, trans_md, trans = refactor_transitional_file_check.write_report(
+            root=REPO_ROOT,
+            out_dir=out_dir,
+        )
+        term_json, term_md, term = refactor_legacy_terminology_check.write_report(
+            root=REPO_ROOT,
+            out_dir=out_dir,
+        )
+        legacy_alias = out_dir / refactor_transitional_file_check.LEGACY_ALIAS_JSON
+
+        assert trans_json.exists()
+        assert trans_md.exists()
+        assert legacy_alias.exists()
+        assert term_json.exists()
+        assert term_md.exists()
+        assert json.loads(trans_json.read_text(encoding="utf-8")) == trans
+        assert json.loads(legacy_alias.read_text(encoding="utf-8")) == trans
+        assert json.loads(term_json.read_text(encoding="utf-8")) == term
+
+    assert trans["schema_version"] == "final_refactor_transitional_file_report_v1"
+    assert trans["status"] == "OK"
+    assert trans["transitional_named_files_remaining"] == 0
+    assert trans["legacy_named_files_remaining"] == 0
+    assert term["schema_version"] == "final_refactor_legacy_terminology_report_v1"
+    assert term["status"] == "OK"
+    assert term["legacy_named_files_remaining"] == 0
+    assert term["classification_counts"]["CLI_backwards_compatibility_alias"] >= 1
+    assert term["classification_counts"]["historical_artifact_semantics"] >= 1
+    assert term["blockers"] == []
 
 
 def test_refactor_completion_map_generation_writes_release_candidate_reports():

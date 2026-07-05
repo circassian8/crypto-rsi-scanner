@@ -1,4 +1,4 @@
-"""Fade Review commands from the legacy scanner service."""
+"""Fade Review commands from the scanner service."""
 
 from __future__ import annotations
 

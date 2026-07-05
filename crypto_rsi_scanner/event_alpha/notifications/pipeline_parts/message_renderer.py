@@ -1,4 +1,4 @@
-"""Message Renderer for the legacy notification pipeline."""
+"""Message renderer for the notification pipeline."""
 
 from __future__ import annotations
 

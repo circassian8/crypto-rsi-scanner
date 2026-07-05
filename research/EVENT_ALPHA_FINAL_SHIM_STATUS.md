@@ -2,7 +2,7 @@
 
 Research artifact only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: 2026-07-05T05:21:42.120806+00:00
+- generated_at: 2026-07-05T09:57:37.449834+00:00
 - removed_shims_count: 124
 - retained_public_shims_count: 0
 - nonessential_shims_remaining: 0

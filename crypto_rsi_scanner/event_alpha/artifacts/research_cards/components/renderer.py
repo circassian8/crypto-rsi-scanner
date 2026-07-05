@@ -1,4 +1,4 @@
-"""Renderer helpers for legacy research cards."""
+"""Renderer helpers for research cards."""
 
 from __future__ import annotations
 

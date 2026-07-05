@@ -252,7 +252,7 @@
     },
     "remaining_api_unregistered_details": []
   },
-  "generated_at": "2026-07-05T05:31:14+00:00",
+  "generated_at": "2026-07-05T10:05:08+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
   "known_remaining_blockers": [],
   "line_counts": {
@@ -358,112 +358,119 @@
     "commands": [
       {
         "command": "python3 tests/test_indicators.py",
-        "elapsed_seconds": 26.808,
+        "elapsed_seconds": 192.42,
         "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q",
-        "elapsed_seconds": 27.569,
+        "elapsed_seconds": 197.551,
         "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "python3 -m compileall -q crypto_rsi_scanner tests",
-        "elapsed_seconds": 0.059,
+        "elapsed_seconds": 0.058,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-transitional-file-check PYTHON=python3",
+        "elapsed_seconds": 0.052,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-legacy-file-check PYTHON=python3",
+        "elapsed_seconds": 0.049,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make refactor-legacy-terminology-check PYTHON=python3",
+        "elapsed_seconds": 0.246,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-old-import-check PYTHON=python3",
+        "elapsed_seconds": 1.459,
+        "index": null,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-shim-dependency-report PYTHON=python3",
+        "elapsed_seconds": 1.459,
         "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make refactor-size-gates PYTHON=python3",
-        "elapsed_seconds": 1.167,
+        "elapsed_seconds": 1.309,
         "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make refactor-class-ownership-report PYTHON=python3",
-        "elapsed_seconds": 1.069,
+        "elapsed_seconds": 1.12,
         "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make refactor-final-report PYTHON=python3",
-        "elapsed_seconds": 1.282,
-        "index": null,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-shim-report PYTHON=python3",
-        "elapsed_seconds": 0.057,
+        "elapsed_seconds": 1.626,
         "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-integrated-radar-smoke PYTHON=python3",
-        "elapsed_seconds": 1.87,
+        "elapsed_seconds": 6.049,
         "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-integrated-radar-doctor PYTHON=python3",
-        "elapsed_seconds": 0.822,
+        "elapsed_seconds": 4.95,
         "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-notification-format-smoke PYTHON=python3",
-        "elapsed_seconds": 2.182,
+        "elapsed_seconds": 6.509,
         "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-telegram-no-send-final-check-fast PYTHON=python3",
-        "elapsed_seconds": 3.006,
-        "index": null,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-coinalyze-preflight-smoke PYTHON=python3",
-        "elapsed_seconds": 0.761,
-        "index": null,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-coinalyze-preflight PYTHON=python3",
-        "elapsed_seconds": 0.678,
-        "index": null,
-        "returncode": 0,
-        "status": "pass"
-      },
-      {
-        "command": "make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3",
-        "elapsed_seconds": 0.705,
+        "elapsed_seconds": 7.152,
         "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3",
-        "elapsed_seconds": 1.981,
+        "elapsed_seconds": 6.273,
         "index": null,
         "returncode": 0,
         "status": "pass"
       },
       {
         "command": "make verify PYTHON=python3",
-        "elapsed_seconds": 28.312,
+        "elapsed_seconds": 389.639,
         "index": null,
         "returncode": 0,
         "status": "pass"
@@ -471,7 +478,7 @@
     ],
     "failed_commands": 0,
     "status": "pass",
-    "total_commands": 16,
+    "total_commands": 17,
     "total_elapsed_seconds": null
   }
 }

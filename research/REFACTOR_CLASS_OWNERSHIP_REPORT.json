@@ -1442,16 +1442,16 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5745,
+  "function_count": 5760,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-05T05:21:45.930120+00:00",
+  "generated_at": "2026-07-05T09:57:39.945696+00:00",
   "largest_api_files": [
     {
-      "line_count": 257,
-      "path": "crypto_rsi_scanner/refactor_legacy_file_check.py"
+      "line_count": 399,
+      "path": "crypto_rsi_scanner/refactor_legacy_terminology_check.py"
     }
   ],
   "legacy_classes_over_limit": 0,
@@ -1463,7 +1463,7 @@
   "legacy_functions_over_limit_rows": [],
   "legacy_modules_with_multiple_public_classes": 0,
   "legacy_modules_with_multiple_public_classes_rows": [],
-  "legacy_total_lines": 257,
+  "legacy_total_lines": 399,
   "modules_with_multiple_public_classes": [],
   "modules_with_multiple_public_classes_count": 0,
   "modules_with_multiple_public_classes_revisit_condition": "Register tiny model bundles explicitly or split behaviorful public classes before adding new multi-class production modules.",
@@ -3392,7 +3392,7 @@
         },
         {
           "accepted": true,
-          "line_count": 1226,
+          "line_count": 1231,
           "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
           "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
           "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
@@ -3500,7 +3500,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1226,
+        "line_count": 1231,
         "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
         "threshold": 1200
       }
@@ -3619,7 +3619,7 @@
           },
           {
             "accepted": true,
-            "line_count": 1226,
+            "line_count": 1231,
             "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
             "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
             "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",

@@ -1,4 +1,4 @@
-"""Utilities helpers for legacy integrated radar."""
+"""Utilities helpers for integrated radar."""
 
 from __future__ import annotations
 
