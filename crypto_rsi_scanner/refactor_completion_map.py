@@ -40,6 +40,7 @@ def build_refactor_completion_map(
     critical_blockers = _critical_blockers(final, size, verification)
     status = "accepted" if not critical_blockers else "pending_with_blockers"
     line_counts = final.get("line_counts", {})
+    final_refactor_gates = _final_refactor_gate_summary(final, root=root)
     return {
         "schema_version": COMPLETION_SCHEMA_VERSION,
         "generated_at": _now(),
@@ -83,6 +84,7 @@ def build_refactor_completion_map(
             "intentionally_outside_event_alpha_modules": final.get("intentionally_outside_event_alpha_modules", []),
             "classification_report": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
         },
+        "final_refactor_gates": final_refactor_gates,
         "cli_refactor": {
             "cli_event_alpha_service_lines": final.get("cli_event_alpha_service_lines"),
             "scanner_command_body_functions_remaining": final.get("scanner_command_body_functions_remaining"),
@@ -232,6 +234,7 @@ def write_refactor_completion_map(
 
 
 def format_completion_markdown(data: dict[str, Any]) -> str:
+    final_gates = data.get("final_refactor_gates", {})
     lines = [
         "# Refactor Completion Map",
         "",
@@ -258,6 +261,18 @@ def format_completion_markdown(data: dict[str, Any]) -> str:
         f"- test size gate status: `{data['size_gates'].get('test_size_gate_status')}`",
         f"- legacy decomposition gate status: `{data['size_gates'].get('legacy_decomposition_gate_status')}`",
         f"- legacy files over 3000 lines: `{data['size_gates'].get('legacy_files_over_3000_lines')}`",
+        f"- legacy_named_files_remaining: `{final_gates.get('legacy_named_files_remaining')}`",
+        f"- legacy_named_files_with_implementation: `{final_gates.get('legacy_named_files_with_implementation')}`",
+        f"- compatibility_named_files_remaining: `{final_gates.get('compatibility_named_files_remaining')}`",
+        f"- old_path_internal_imports: `{final_gates.get('old_path_internal_imports')}`",
+        f"- old_path_test_imports: `{final_gates.get('old_path_test_imports')}`",
+        f"- old_path_docs_references: `{final_gates.get('old_path_docs_references')}`",
+        f"- nonessential_shims_remaining: `{final_gates.get('nonessential_shims_remaining')}`",
+        f"- retained_public_entrypoints: `{final_gates.get('retained_public_entrypoints')}`",
+        f"- deleted_shims_count: `{final_gates.get('deleted_shims_count')}`",
+        f"- canonical_import_coverage: `{final_gates.get('canonical_import_coverage')}`",
+        f"- event_fade_safety_exception_present: `{final_gates.get('event_fade_safety_exception_present')}`",
+        f"- scanner_entrypoint_exception_present: `{final_gates.get('scanner_entrypoint_exception_present')}`",
         f"- verification status: `{data['verification']['status']}`",
         "",
         "## Transitional Compatibility Cores",
@@ -357,6 +372,45 @@ def _critical_blockers(
     if verification.get("status") == "not_run":
         blockers.append({"id": "verification_not_recorded", "reason": "release-candidate verification results were not supplied"})
     return blockers
+
+
+def _final_refactor_gate_summary(final: dict[str, Any], *, root: Path) -> dict[str, Any]:
+    legacy_retirement = _read_json(root / "research" / "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.json")
+    final_shim_status = _read_json(root / "research" / "EVENT_ALPHA_FINAL_SHIM_STATUS.json")
+    deleted_shims_count = _first_present(
+        final.get("deleted_shims_count"),
+        legacy_retirement.get("deleted_shims_count"),
+        final_shim_status.get("deleted_shims_count"),
+        final_shim_status.get("removed_shims_count"),
+    )
+    old_imports_clean = (
+        int(final.get("old_path_internal_imports") or 0) == 0
+        and int(final.get("old_path_test_imports") or 0) == 0
+        and int(final.get("old_path_docs_references") or 0) == 0
+        and int(final.get("old_path_import_allowed_exceptions") or 0) == 0
+    )
+    return {
+        "legacy_named_files_remaining": final.get("legacy_named_files_remaining"),
+        "legacy_named_files_with_implementation": final.get("legacy_named_files_with_implementation"),
+        "compatibility_named_files_remaining": final.get("compatibility_named_files_remaining"),
+        "old_path_internal_imports": final.get("old_path_internal_imports"),
+        "old_path_test_imports": final.get("old_path_test_imports"),
+        "old_path_docs_references": final.get("old_path_docs_references"),
+        "old_path_import_allowed_exceptions": final.get("old_path_import_allowed_exceptions"),
+        "nonessential_shims_remaining": final.get("nonessential_shims_remaining"),
+        "retained_public_entrypoints": final.get("retained_public_entrypoints"),
+        "deleted_shims_count": deleted_shims_count,
+        "canonical_import_coverage": "pass" if old_imports_clean else "blocked",
+        "event_fade_safety_exception_present": final.get("event_fade_safety_exception_present"),
+        "scanner_entrypoint_exception_present": final.get("scanner_entrypoint_exception_present"),
+    }
+
+
+def _first_present(*values: Any) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return None
 
 
 def _normalize_verification_results(results: dict[str, Any] | None) -> dict[str, Any]:

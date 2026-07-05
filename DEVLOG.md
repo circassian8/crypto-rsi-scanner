@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Complete final refactor acceptance audit · Codex
+**Why:** The final objective required the completion map and decision log to
+prove the same final-retirement state as the refactor reports. The reports were
+already accepted, but the durable decision title and completion-map final gate
+summary needed to be explicit.
+**Changes:**
+- Added the exact final acceptance decision:
+  “Final Event Alpha refactor accepted: no legacy files, no old flat Event Alpha
+  imports, canonical module architecture only.”
+- Added `final_refactor_gates` to `research/REFACTOR_COMPLETION_MAP.json/md`,
+  including legacy-file, compatibility-file, old-import, shim, canonical import,
+  deleted-shim, `event_fade.py`, and `scanner.py` exception counters.
+- Added completion-map test assertions for the final zero counters and canonical
+  import coverage.
+**Verify:** `make refactor-completion-map PYTHON=python3` passed; focused
+completion-map pytest passed (`1 passed`); `make event-alpha-old-import-check
+PYTHON=python3`, `make refactor-legacy-file-check PYTHON=python3`, `make
+event-alpha-shim-dependency-report PYTHON=python3`, and `make
+refactor-final-report PYTHON=python3` passed; the full requested safe
+verification chain passed; after the final deletion-counter report fix,
+`python3 -m compileall -q crypto_rsi_scanner tests`, focused completion-map
+pytest, and `make verify PYTHON=python3` passed again.
+**Notes/risks:** This is report/decision/test coverage only. It does not change
+provider activation, notification gates, scoring, trading, paper, RSI writes, or
+`TRIGGERED_FADE` behavior.
+
 ## 2026-07-05 — Finish refactor sealing and CLI report dispatch regression · Codex
 **Why:** The refactor-sealing verification uncovered one remaining CLI registry
 regression: `--event-impact-hypotheses-report` and `--event-incidents-report`

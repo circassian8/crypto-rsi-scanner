@@ -2,7 +2,7 @@
 
 Static map of the behavior-preserving Event Alpha refactor. It records package ownership, compatibility cores, size gates, and safety boundaries.
 
-- generated_at: `2026-07-05T04:02:50+00:00`
+- generated_at: `2026-07-05T05:31:06+00:00`
 - status: `accepted`
 - scanner.py lines: `90`
 - scanner command bodies remaining: `0`
@@ -23,6 +23,18 @@ Static map of the behavior-preserving Event Alpha refactor. It records package o
 - test size gate status: `warning`
 - legacy decomposition gate status: `pass`
 - legacy files over 3000 lines: `0`
+- legacy_named_files_remaining: `0`
+- legacy_named_files_with_implementation: `0`
+- compatibility_named_files_remaining: `0`
+- old_path_internal_imports: `0`
+- old_path_test_imports: `0`
+- old_path_docs_references: `0`
+- nonessential_shims_remaining: `0`
+- retained_public_entrypoints: `0`
+- deleted_shims_count: `124`
+- canonical_import_coverage: `pass`
+- event_fade_safety_exception_present: `True`
+- scanner_entrypoint_exception_present: `True`
 - verification status: `pass`
 
 ## Transitional Compatibility Cores

@@ -1834,7 +1834,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 424,
+          "line": 446,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -1858,7 +1858,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 424,
+          "line": 446,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -1962,7 +1962,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 2623,
+          "line": 2647,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2019,15 +2019,16 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-05T05:03:15.052531+00:00",
+  "generated_at": "2026-07-05T05:38:13.660064+00:00",
   "include_runtime_artifacts": false,
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "DEVLOG.md:1783227765",
-    "ROADMAP.md:1783227777",
-    "research/REFACTOR_V4_FINAL_REPORT.md:1783227316"
+    "crypto_rsi_scanner/refactor_completion_map.py:1783229413",
+    "research/FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.md:1783229892",
+    "research/REFACTOR_V4_FINAL_REPORT.md:1783229464",
+    "tests/cli/test_make_targets.py:1783229419"
   ],
-  "newest_source_mtime": 1783227777.206601,
+  "newest_source_mtime": 1783229892.271313,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2039,7 +2040,7 @@
   "old_path_text_references": 3,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1783227021.518822,
+  "report_mtime": 1783228900.720343,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2048,14 +2049,15 @@
     "include_runtime_artifacts": false,
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "DEVLOG.md:1783227765",
-      "ROADMAP.md:1783227777",
-      "research/REFACTOR_V4_FINAL_REPORT.md:1783227316"
+      "crypto_rsi_scanner/refactor_completion_map.py:1783229413",
+      "research/FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.md:1783229892",
+      "research/REFACTOR_V4_FINAL_REPORT.md:1783229464",
+      "tests/cli/test_make_targets.py:1783229419"
     ],
-    "newest_source_mtime": 1783227777.206601,
+    "newest_source_mtime": 1783229892.271313,
     "regex_compile_count": 124,
-    "report_mtime": 1783227021.518822,
-    "scan_duration_seconds": 1.2989,
+    "report_mtime": 1783228900.720343,
+    "scan_duration_seconds": 1.3148,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 33,
     "scanned_makefile_files": 1,
@@ -2081,7 +2083,7 @@
     "skipped_large_files": 0,
     "skipped_suffix_files": 0
   },
-  "scan_duration_seconds": 1.2989,
+  "scan_duration_seconds": 1.3148,
   "scanned_doc_files": 33,
   "scanned_source_files": 605,
   "scanned_test_files": 29,

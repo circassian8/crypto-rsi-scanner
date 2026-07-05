@@ -2,15 +2,15 @@
 
 Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-05T05:03:18+00:00`
+- generated_at: `2026-07-05T05:31:04+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `124`
 - removed_shims_count: `124`
 - retained_public_shims_count: `0`
-- shim_dependency_report_cache_status: `hit`
+- shim_dependency_report_cache_status: `miss`
 - shim_dependency_include_runtime_artifacts: `False`
-- shim_dependency_scan_duration_seconds: `1.22`
+- shim_dependency_scan_duration_seconds: `1.2417`
 - shim_dependency_skipped_artifact_files: `1285`
 - shim_dependency_skipped_large_files: `0`
 - v3_gate_status: `accepted_with_documented_exceptions`
@@ -225,7 +225,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `tests/event_alpha/test_source_coverage.py` | 2991 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
 | `tests/test_indicators.py` | 1779 |
-| `tests/cli/test_make_targets.py` | 1250 |
+| `tests/cli/test_make_targets.py` | 1265 |
 | `tests/event_alpha/_api_helpers.py` | 825 |
 | `tests/event_alpha/test_artifact_schema.py` | 743 |
 | `tests/rsi/test_indicators_core.py` | 694 |

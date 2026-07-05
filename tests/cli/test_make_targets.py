@@ -945,10 +945,25 @@ def test_refactor_completion_map_generation_writes_release_candidate_reports():
     assert completion["scanner_facade"]["line_count"] < 2000
     assert completion["cli_refactor"]["scanner_command_body_functions_remaining"] == 0
     assert completion["size_gates"]["gate_status"] == "pass"
+    gates = completion["final_refactor_gates"]
+    assert gates["legacy_named_files_remaining"] == 0
+    assert gates["legacy_named_files_with_implementation"] == 0
+    assert gates["compatibility_named_files_remaining"] == 0
+    assert gates["old_path_internal_imports"] == 0
+    assert gates["old_path_test_imports"] == 0
+    assert gates["old_path_docs_references"] == 0
+    assert gates["nonessential_shims_remaining"] == 0
+    assert gates["retained_public_entrypoints"] == 0
+    assert isinstance(gates["deleted_shims_count"], int)
+    assert gates["deleted_shims_count"] >= 0
+    assert gates["canonical_import_coverage"] == "pass"
+    assert gates["event_fade_safety_exception_present"] is True
+    assert gates["scanner_entrypoint_exception_present"] is True
     assert completion["verification"]["status"] == "pass"
     assert release["schema_version"] == "refactor_release_candidate_report_v2"
     assert release["status"] in {"accepted", "pending_with_documented_refactor_blockers"}
     assert "Refactor Completion Map" in markdown
+    assert "canonical_import_coverage" in markdown
 
 
 def test_refactor_completion_map_make_target_is_static_and_no_live_runtime_path():

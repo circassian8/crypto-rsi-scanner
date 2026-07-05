@@ -21,7 +21,7 @@
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1437,
+        "line_count": 1488,
         "path": "crypto_rsi_scanner/refactor_final_report.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -252,7 +252,7 @@
     },
     "remaining_api_unregistered_details": []
   },
-  "generated_at": "2026-07-05T04:02:53+00:00",
+  "generated_at": "2026-07-05T05:31:14+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
   "known_remaining_blockers": [],
   "line_counts": {

@@ -4582,7 +4582,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-05T05:03:18+00:00",
+  "generated_at": "2026-07-05T05:31:04+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -4902,7 +4902,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1250,
+      "line_count": 1265,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
@@ -5071,7 +5071,7 @@
     "deleted_shims_count": 124,
     "event_alpha_public_compatibility_entrypoints_path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
     "event_fade_safety_exception_present": true,
-    "generated_at": "2026-07-05T05:03:16.806395+00:00",
+    "generated_at": "2026-07-05T05:30:58.809265+00:00",
     "legacy_named_dirs": [],
     "legacy_named_dirs_count": 0,
     "legacy_named_files": [],
@@ -6830,17 +6830,21 @@
   "scanner_entrypoint_exception_present": true,
   "schema_version": "refactor_final_report_v1",
   "shim_dependency_include_runtime_artifacts": false,
-  "shim_dependency_report_cache_status": "hit",
+  "shim_dependency_report_cache_status": "miss",
   "shim_dependency_scan_accounting": {
-    "cache_status": "hit",
+    "cache_status": "miss",
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "max_file_bytes": 1000000,
-    "newer_source_mtime_paths": [],
-    "newest_source_mtime": 1783227777.206601,
+    "newer_source_mtime_paths": [
+      "crypto_rsi_scanner/refactor_completion_map.py:1783229413",
+      "research/REFACTOR_V4_FINAL_REPORT.md:1783228920",
+      "tests/cli/test_make_targets.py:1783229419"
+    ],
+    "newest_source_mtime": 1783229418.8389742,
     "regex_compile_count": 0,
-    "report_mtime": 1783227796.6321075,
-    "scan_duration_seconds": 1.22,
+    "report_mtime": 1783228902.1212382,
+    "scan_duration_seconds": 1.2417,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 33,
     "scanned_makefile_files": 1,
@@ -6866,7 +6870,7 @@
     "skipped_large_files": 0,
     "skipped_suffix_files": 0
   },
-  "shim_dependency_scan_duration_seconds": 1.22,
+  "shim_dependency_scan_duration_seconds": 1.2417,
   "shim_dependency_scanned_doc_files": 33,
   "shim_dependency_scanned_source_files": 605,
   "shim_dependency_scanned_test_files": 29,

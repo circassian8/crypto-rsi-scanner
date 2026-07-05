@@ -2,7 +2,7 @@
 
 Research artifact only. This static gate does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-05T04:45:44.537487+00:00`
+- generated_at: `2026-07-05T05:38:12.247452+00:00`
 - status: `OK`
 - legacy_named_files_count: `0`
 - legacy_named_files_remaining: `0`

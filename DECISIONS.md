@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-05 - Final Event Alpha refactor accepted: no legacy files, no old flat Event Alpha imports, canonical module architecture only
+**Status:** accepted
+**Decision:** The final Event Alpha refactor is accepted. No internal
+`legacy.py`, `legacy_*.py`, `*_legacy.py`, `compat.py`, or `compatibility.py`
+migration files remain; old flat Event Alpha import paths are retired; no
+nonessential public shims remain; and new code must use canonical
+`crypto_rsi_scanner.event_alpha.*` package paths. `scanner.py` remains only the
+CLI entrypoint wrapper, and `event_fade.py` remains intentionally outside Event
+Alpha as the safety boundary for `TRIGGERED_FADE`.
+**Why:** The final retirement and refactor reports show
+`legacy_named_files_remaining=0`, `legacy_named_files_with_implementation=0`,
+`compatibility_named_files_remaining=0`, `old_path_internal_imports=0`,
+`old_path_test_imports=0`, `old_path_docs_references=0`,
+`nonessential_shims_remaining=0`, `retained_public_entrypoints=0`,
+`production_files_over_1500_lines=0`, `functions_over_150_lines=0`, and
+`legacy_unregistered=0`. The integrated radar doctor and full safe verification
+passed without live provider calls, live sends, trading, paper trading, normal
+RSI writes, or Event Alpha-created `TRIGGERED_FADE`.
+**Revisit when:** an explicit public compatibility requirement is accepted, a
+new legacy/compat file is proposed, a deleted old flat import path needs to be
+restored, or a future package-boundary refactor changes Event Alpha ownership.
+
 ## 2026-07-05 - Flat Event Alpha shims are fully retired
 **Status:** accepted
 **Decision:** No old flat Event Alpha public compatibility shims remain. Deleted

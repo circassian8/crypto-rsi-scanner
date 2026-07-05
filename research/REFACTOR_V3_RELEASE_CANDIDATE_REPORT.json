@@ -206,7 +206,7 @@
   "duration_seconds_total": 98.327,
   "event_fade_safety_exception_present": true,
   "functions_over_150_lines": 0,
-  "generated_at": "2026-07-05T05:03:18.256281+00:00",
+  "generated_at": "2026-07-05T05:31:04.160627+00:00",
   "legacy_named_files_remaining": 0,
   "legacy_named_files_with_implementation": 0,
   "model_bundles": [

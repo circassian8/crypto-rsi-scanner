@@ -2,7 +2,7 @@
 
 Research-only final refactor report. This report does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-05T05:03:18.256281+00:00`
+- generated_at: `2026-07-05T05:31:04.160627+00:00`
 - acceptance_status: `accepted`
 - critical_gate_status: `pass`
 - final_refactor_status: `accepted`
