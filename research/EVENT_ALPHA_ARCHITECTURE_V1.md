@@ -56,7 +56,7 @@ layout gives new code a home while old import paths continue to work.
 - `crypto_rsi_scanner/backtest_parts/`: RSI backtest package surfaces for CLI,
   engine, results, costs, risk/membership, reports, and data helpers.
   `crypto_rsi_scanner/backtest.py` remains the historical CLI/helper facade
-  over the compatibility core.
+  over the canonical backtest API.
 
 `crypto_rsi_scanner/event_alpha/MODULE_MAP.md` records the current package map
 and the fact that no old flat Event Alpha public compatibility shims remain.
@@ -71,17 +71,17 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
 - Docs should show canonical package paths, and tombstone tests cover deleted
   old import failure in `tests/event_alpha/test_no_old_event_alpha_imports.py`.
 - New code should import the new package paths listed in the package map.
-- Old top-level `crypto_rsi_scanner/event_*.py` shim modules should not gain
-  new implementation logic. They may re-export symbols, hold compatibility
-  comments, or contain temporary glue only when a tested migration requires it.
-- Legacy implementation files are transitional compatibility only. Files over
-  1,500 lines are warnings, and files over 3,000 lines block refactor
-  completion even when public wrappers are small. Run `make refactor-size-gates`
-  and `make refactor-final-report` after moving legacy code.
-- `crypto_rsi_scanner.event_alpha.shims` is the shim registry. It marks mapped
-  modules as `active_shim`, `partial_shim`, or `not_migrated`; active shims are
-  compatibility-only and `make event-alpha-shim-report` audits the boundary.
-  Artifact doctor warns if a deleted old shim path is reintroduced.
+- No old top-level `crypto_rsi_scanner/event_*.py` Event Alpha shim modules
+  remain. Future work must not recreate them except through an explicit public
+  compatibility decision. Temporary glue, re-export-only modules, and old-path
+  comments belong in tombstone reports, not in production packages.
+- Legacy-named implementation files are not part of the final architecture.
+  Run `make refactor-legacy-file-check`, `make refactor-size-gates`, and
+  `make refactor-final-report` after moving code.
+- `crypto_rsi_scanner.event_alpha.shims` is the tombstone and deleted-path audit
+  registry. It emits shim, dependency, and old-import reports with zero active
+  flat Event Alpha shims. Artifact doctor warns if a deleted old shim path is
+  reintroduced.
 - CLI parser construction belongs in `crypto_rsi_scanner/cli/parser.py`.
   `build_parser()` is an orchestrator over `parser_base.py`,
   `parser_event_alpha.py`, `parser_notifications.py`,
@@ -126,10 +126,10 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
 - `event_fade.py` is intentionally outside the Event Alpha package during v1.
   Future refactors must not move it under Event Alpha unless a new explicit
   decision preserves the deterministic `TRIGGERED_FADE` ownership boundary.
-- `event_clock.py` and `event_models.py` are shared event infrastructure, not
+- `event_clock.py` and `event_models.py` were shared event infrastructure, not
   Event Alpha-specific implementation. Their implementations now live under
-  neutral `crypto_rsi_scanner/event_core/` modules, with old top-level imports
-  kept as active compatibility shims.
+  neutral `crypto_rsi_scanner/event_core/` modules; old flat Event Alpha import
+  paths are tombstoned rather than retained as shims.
 - Provider calls and Telegram sends stay opt-in and guarded; tests and CI run
   no live provider calls and no live Telegram sends by default.
 - Tests and smokes require no API keys and must not print secrets.
@@ -151,7 +151,7 @@ The public artifact doctor entrypoint is intentionally small:
 and `aggregation.py`. Report rendering enters through
 `doctor/report_sections/summary.py`, with focused section modules available for
 future migrations. The behavior-compatible core is preserved as
-`event_alpha.doctor.legacy_artifact_doctor` until each remaining check can move
+`event_alpha.doctor.artifact_doctor_core` until each remaining check can move
 behind fixture-backed plugin tests without changing strict/WARN semantics.
 
 Artifact implementation code now lives in package modules:
@@ -164,46 +164,45 @@ Artifact implementation code now lives in package modules:
 - `event_alpha.artifacts.locks` for profile/namespace run locks.
 - `event_alpha.namespace.status` for stale/deprecated namespace markers.
 
-The retained top-level artifact imports remain public compatibility shims with
-no runtime deprecation warnings. Deleted old imports are allowed to fail.
-Artifact paths and output schemas must stay unchanged unless a separate
-migration explicitly updates schema v1 consumers.
+No retained top-level artifact import shims remain. Deleted old imports are
+allowed to fail; artifact paths and output schemas must stay unchanged unless a
+separate migration explicitly updates schema v1 consumers.
 
 ## Internal Large-Module Split
 
 The largest Event Alpha internal modules have small public wrappers and
-behavior-compatible legacy cores. New code should use the focused module homes
-and should not grow the legacy cores:
+behavior-compatible canonical cores. New code should use the focused module
+homes and should not recreate migration-era wrappers:
 
 - `event_alpha.notifications.pipeline` is the public notification orchestrator.
   Models, selection, preview writing, delivery writing, message rendering,
   heartbeat wording, skip telemetry, plan building, and safety helpers have
-  focused modules under `event_alpha.notifications/`. The compatibility core is
-  `event_alpha.notifications.pipeline_api`.
+  focused modules under `event_alpha.notifications/`. The core implementation
+  module is `event_alpha.notifications.pipeline_core`.
 - `event_alpha.artifacts.research_cards` is now a package. Models, renderer,
   index, lineage, and card section modules live under
-  `event_alpha.artifacts.research_cards/`; the compatibility core is
-  `event_alpha.artifacts.research_cards.legacy`.
+  `event_alpha.artifacts.research_cards/`; the public API module is
+  `event_alpha.artifacts.research_cards.api`.
 - `event_alpha.artifacts.daily_brief` is now a package. Builder, context,
   models, renderer, and daily-brief section modules live under
-  `event_alpha.artifacts.daily_brief/`; the compatibility core is
-  `event_alpha.artifacts.daily_brief.legacy`.
+  `event_alpha.artifacts.daily_brief/`; the public API module is
+  `event_alpha.artifacts.daily_brief.api`.
 - `event_alpha.radar.integrated_radar` is the public integrated-radar wrapper.
   Cycle, inputs, sidecars, merge, family, policy, artifact writer, report, and
-  manifest homes live under `event_alpha.radar.integrated/`; the compatibility
-  core is `event_alpha.radar.integrated.legacy`.
+  manifest homes live under `event_alpha.radar.integrated/`; the public API
+  module is `event_alpha.radar.integrated.api`.
 - `event_alpha.radar.impact_hypotheses` is now a package. Models, rules,
   builder, store, report, inbox, scoring, and lineage homes live under
-  `event_alpha.radar.impact_hypotheses/`; the compatibility core is
-  `event_alpha.radar.impact_hypotheses.legacy`.
+  `event_alpha.radar.impact_hypotheses/`; the public API module is
+  `event_alpha.radar.impact_hypotheses.api`.
 - `event_alpha.radar.core_opportunity_store` is the public store wrapper.
   Core models, store operations, serialization, aggregation, merge, card links,
-  and validators live under `event_alpha.radar.core/`; the compatibility core
+  and validators live under `event_alpha.radar.core/`; the store API module
   is `event_alpha.radar.core.store_api`.
 - `event_alpha.radar.evidence_acquisition` is the public evidence wrapper.
   Evidence models, planner, executor, validators, scoring, providers, report,
   and serialization homes live under `event_alpha.radar.evidence/`; the
-  compatibility core is `event_alpha.radar.evidence.acquisition_api`.
+  acquisition API module is `event_alpha.radar.evidence.acquisition_api`.
 - Medium radar packages now follow the same ownership pattern:
   `event_alpha.radar.validation/` owns validation models, review, sample, and
   report helpers; `event_alpha.radar.discovery/` owns discovery models, manual
@@ -211,8 +210,8 @@ and should not grow the legacy cores:
   `event_alpha.radar.watchlist/` owns watchlist models, entry builders, market
   helpers, enrichment helpers, and reports; and
   `event_alpha.radar.near_miss/` owns near-miss models, refresh, candidate
-  selection, and reports. Their `legacy.py` cores preserve existing behavior
-  while individual helpers are migrated behind tests.
+  selection, and reports. Package `api.py` modules expose the stable public
+  surface without migration-era legacy filenames.
 
 This split is behavior-preserving. It does not change artifact schemas, card
 copy, daily-brief grouping, notification delivery rows, source/provider
@@ -278,9 +277,10 @@ provider/client/parser surfaces, and official announcement adapters live under
 `event_providers/bybit_announcements/` and
 `event_providers/binance_announcements/`. Event Alpha provider-health wrappers
 live under `event_alpha.providers.health/` with
-`event_alpha.providers.provider_health` kept as the compatibility import.
-Current size gate after this provider move: `125` top-level `event_*.py` files,
-`29` compatibility shims, and `96` remaining top-level implementation files.
+`event_alpha.providers.provider_health` kept as the public package import.
+Current final-retirement gate: only `crypto_rsi_scanner/event_fade.py` remains
+as a top-level event module, retained public shims are zero, and old flat Event
+Alpha imports are tombstoned.
 
 ## Notification Implementation Move
 

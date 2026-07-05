@@ -200,7 +200,7 @@ _EVENT_ALPHA_DISPATCH_ATTRS = (
     "ignore_provider_backoff",
     "include_diagnostic_incidents",
     "include_external_context_incidents",
-    "include_api",
+    "include_legacy",
     "include_raw_incidents",
     "json",
     "latest_run",

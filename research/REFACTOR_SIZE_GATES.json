@@ -1400,7 +1400,7 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1437,
+      "line_count": 1488,
       "path": "crypto_rsi_scanner/refactor_final_report.py",
       "reason": "Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together.",
       "revisit_condition": "When final-report sections can be split with byte-stable JSON/Markdown fixture comparisons.",
@@ -1681,7 +1681,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 633,
+  "file_count": 634,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -1738,10 +1738,10 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-05T04:18:26.735092+00:00",
+  "generated_at": "2026-07-05T04:55:13.763479+00:00",
   "largest_api_files": [
     {
-      "line_count": 231,
+      "line_count": 257,
       "path": "crypto_rsi_scanner/refactor_legacy_file_check.py"
     }
   ],
@@ -1754,7 +1754,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1437,
+      "line_count": 1488,
       "path": "crypto_rsi_scanner/refactor_final_report.py",
       "source_kind": "production"
     },
@@ -2038,7 +2038,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1231,
+      "line_count": 1250,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
@@ -2068,7 +2068,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 492,
+      "line_count": 515,
       "path": "tests/event_alpha/test_shim_registry.py",
       "source_kind": "test"
     },
@@ -2086,7 +2086,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 163,
+      "line_count": 202,
       "path": "tests/cli/test_event_alpha_command_registry.py",
       "source_kind": "test"
     },
@@ -2182,7 +2182,7 @@
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py",
     "crypto_rsi_scanner/event_alpha/notifications/pipeline_core.py"
   ],
-  "legacy_total_lines": 231,
+  "legacy_total_lines": 257,
   "modules_with_multiple_public_classes": [],
   "modules_with_multiple_public_classes_count": 0,
   "modules_with_multiple_public_classes_status": "pass",
@@ -3564,7 +3564,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1437,
+      "line_count": 1488,
       "path": "crypto_rsi_scanner/refactor_final_report.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -3683,7 +3683,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1437,
+      "line_count": 1488,
       "path": "crypto_rsi_scanner/refactor_final_report.py",
       "source_kind": "production"
     },
@@ -4193,7 +4193,7 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1437,
+          "line_count": 1488,
           "path": "crypto_rsi_scanner/refactor_final_report.py",
           "reason": "Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together.",
           "revisit_condition": "When final-report sections can be split with byte-stable JSON/Markdown fixture comparisons.",
@@ -4345,7 +4345,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1437,
+        "line_count": 1488,
         "path": "crypto_rsi_scanner/refactor_final_report.py",
         "threshold": 1200
       },
@@ -4476,7 +4476,7 @@
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1437,
+            "line_count": 1488,
             "path": "crypto_rsi_scanner/refactor_final_report.py",
             "reason": "Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together.",
             "revisit_condition": "When final-report sections can be split with byte-stable JSON/Markdown fixture comparisons.",

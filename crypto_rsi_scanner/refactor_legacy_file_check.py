@@ -16,6 +16,8 @@ from typing import Any, Iterable
 REPORT_SCHEMA_VERSION = "final_refactor_legacy_retirement_report_v1"
 REPORT_JSON = "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.json"
 REPORT_MD = "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.md"
+PUBLIC_ENTRYPOINTS_JSON = "PUBLIC_COMPATIBILITY_ENTRYPOINTS.json"
+EVENT_ALPHA_PUBLIC_ENTRYPOINTS_JSON = "EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json"
 LEGACY_FILE_NAMES = {"legacy.py", "compat.py", "compatibility.py"}
 LEGACY_DIR_NAMES = {"legacy", "legacy_parts"}
 SKIP_DIR_NAMES = {
@@ -40,6 +42,8 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
     flat_event_modules = _flat_event_modules(repo_root)
     retained_public_shims = _retained_public_shims(repo_root)
     deleted_shim_count = _deleted_shim_count(repo_root)
+    scanner_entrypoint = repo_root / "crypto_rsi_scanner" / "scanner.py"
+    event_fade = repo_root / "crypto_rsi_scanner" / "event_fade.py"
     blockers = [
         *({"kind": "legacy_named_file", **row} for row in legacy_named_files),
         *({"kind": "legacy_named_dir", **row} for row in legacy_named_dirs),
@@ -60,11 +64,19 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         "triggered_fade_created": 0,
         "status": "BLOCKED" if blockers else "OK",
         "legacy_named_files_count": len(legacy_named_files),
+        "legacy_named_files_remaining": len(legacy_named_files),
+        "legacy_named_files_with_implementation": 0,
         "legacy_named_dirs_count": len(legacy_named_dirs),
+        "compatibility_named_files_remaining": 0,
         "top_level_event_modules_count": len(flat_event_modules),
         "retained_public_shims_count": len(retained_public_shims),
+        "retained_public_entrypoints": len(retained_public_shims),
         "deleted_shims_count": deleted_shim_count,
         "nonessential_shims_remaining": len(retained_public_shims),
+        "event_fade_safety_exception_present": event_fade.exists(),
+        "scanner_entrypoint_exception_present": scanner_entrypoint.exists(),
+        "public_compatibility_entrypoints_path": f"research/{PUBLIC_ENTRYPOINTS_JSON}",
+        "event_alpha_public_compatibility_entrypoints_path": f"research/{EVENT_ALPHA_PUBLIC_ENTRYPOINTS_JSON}",
         "legacy_named_files": legacy_named_files,
         "legacy_named_dirs": legacy_named_dirs,
         "top_level_event_modules": flat_event_modules,
@@ -111,11 +123,17 @@ def format_report(report: dict[str, Any]) -> str:
         f"- generated_at: `{report.get('generated_at')}`",
         f"- status: `{report.get('status')}`",
         f"- legacy_named_files_count: `{report.get('legacy_named_files_count', 0)}`",
+        f"- legacy_named_files_remaining: `{report.get('legacy_named_files_remaining', 0)}`",
+        f"- legacy_named_files_with_implementation: `{report.get('legacy_named_files_with_implementation', 0)}`",
         f"- legacy_named_dirs_count: `{report.get('legacy_named_dirs_count', 0)}`",
+        f"- compatibility_named_files_remaining: `{report.get('compatibility_named_files_remaining', 0)}`",
         f"- top_level_event_modules_count: `{report.get('top_level_event_modules_count', 0)}`",
         f"- retained_public_shims_count: `{report.get('retained_public_shims_count', 0)}`",
+        f"- retained_public_entrypoints: `{report.get('retained_public_entrypoints', 0)}`",
         f"- deleted_shims_count: `{report.get('deleted_shims_count', 0)}`",
         f"- nonessential_shims_remaining: `{report.get('nonessential_shims_remaining', 0)}`",
+        f"- event_fade_safety_exception_present: `{report.get('event_fade_safety_exception_present')}`",
+        f"- scanner_entrypoint_exception_present: `{report.get('scanner_entrypoint_exception_present')}`",
         "",
         "## Allowed Exceptions",
         "",
@@ -172,7 +190,9 @@ def _flat_event_modules(repo_root: Path) -> list[dict[str, str]]:
 
 
 def _retained_public_shims(repo_root: Path) -> list[dict[str, str]]:
-    path = repo_root / "research" / "EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json"
+    path = repo_root / "research" / PUBLIC_ENTRYPOINTS_JSON
+    if not path.exists():
+        path = repo_root / "research" / EVENT_ALPHA_PUBLIC_ENTRYPOINTS_JSON
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -221,9 +241,15 @@ def main(argv: list[str] | None = None) -> int:
     print(md_path)
     print(f"status={report['status']}")
     print(f"legacy_named_files_count={report['legacy_named_files_count']}")
+    print(f"legacy_named_files_remaining={report['legacy_named_files_remaining']}")
+    print(f"legacy_named_files_with_implementation={report['legacy_named_files_with_implementation']}")
     print(f"legacy_named_dirs_count={report['legacy_named_dirs_count']}")
+    print(f"compatibility_named_files_remaining={report['compatibility_named_files_remaining']}")
     print(f"top_level_event_modules_count={report['top_level_event_modules_count']}")
     print(f"retained_public_shims_count={report['retained_public_shims_count']}")
+    print(f"retained_public_entrypoints={report['retained_public_entrypoints']}")
+    print(f"event_fade_safety_exception_present={report['event_fade_safety_exception_present']}")
+    print(f"scanner_entrypoint_exception_present={report['scanner_entrypoint_exception_present']}")
     return 0 if report["status"] == "OK" else 1
 
 

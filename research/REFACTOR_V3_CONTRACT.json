@@ -5,7 +5,7 @@
     "public_classes": "Public classes should live in their own modules."
   },
   "feature_policy": "Behavior-preserving refactor only; do not add product features.",
-  "generated_at": "2026-07-05T04:18:29.412050+00:00",
+  "generated_at": "2026-07-05T05:03:18.252774+00:00",
   "intentional_exceptions": [
     {
       "module": "crypto_rsi_scanner.event_fade",

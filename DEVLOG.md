@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Finish refactor sealing and CLI report dispatch regression · Codex
+**Why:** The refactor-sealing verification uncovered one remaining CLI registry
+regression: `--event-impact-hypotheses-report` and `--event-incidents-report`
+still read the stale `args.include_api` namespace attribute after the parser
+standardized on `--include-legacy`.
+**Changes:**
+- Updated the Event Alpha command registry dispatch bridge to read
+  `include_legacy` while preserving fallback compatibility for any supplied
+  `include_api` namespace and the historical `--all-history` behavior.
+- Updated registry metadata from `include_api` to `include_legacy` and added
+  focused parser-backed dispatch regression tests for impact-hypothesis and
+  incident reports.
+- Regenerated the final refactor, shim, old-import, class ownership, size-gate,
+  and legacy-retirement reports after the final sealing pass. Current final
+  reports show `v3_gate_status=accepted_with_documented_exceptions`,
+  `v3_blockers=[]`, `production_files_over_1500_lines=0`,
+  `functions_over_150_lines=0`, `retained_public_shims_count=0`, and
+  `old_path_internal_imports=0`.
+**Verify:** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/cli/test_event_alpha_command_registry.py -q` passed (`7 passed`); `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed; `python3
+tests/test_indicators.py` passed (`760/760`); `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py
+-q` passed (`777 passed`); `python3 -m compileall -q crypto_rsi_scanner tests`
+passed; `make event-alpha-old-import-check PYTHON=python3`,
+`make event-alpha-shim-dependency-report PYTHON=python3`, `make
+refactor-size-gates PYTHON=python3`, `make refactor-class-ownership-report
+PYTHON=python3`, `make refactor-final-report PYTHON=python3`, `make
+event-alpha-integrated-radar-doctor PYTHON=python3`, and `make
+export-src-with-artifacts-smoke PYTHON=python3` passed; `make verify
+PYTHON=python3` passed.
+**Notes/risks:** The remaining over-1,200-line files and 3 storage mixin class
+exceptions are accepted/documented warnings, not blockers. No live provider
+calls, Telegram sends, trading, paper trading, normal RSI writes, or Event Alpha
+`TRIGGERED_FADE` side effects were introduced.
+
 ## 2026-07-05 — Seal refactor v3 report and export hygiene · Codex
 **Why:** The release-candidate report accepted refactor v3, but the final
 report family still described accepted over-1,200-line files and accepted

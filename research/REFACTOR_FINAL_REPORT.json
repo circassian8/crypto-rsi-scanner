@@ -1400,7 +1400,7 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1437,
+      "line_count": 1488,
       "path": "crypto_rsi_scanner/refactor_final_report.py",
       "reason": "Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together.",
       "revisit_condition": "When final-report sections can be split with byte-stable JSON/Markdown fixture comparisons.",
@@ -4294,7 +4294,7 @@
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1437,
+        "line_count": 1488,
         "path": "crypto_rsi_scanner/refactor_final_report.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -4528,6 +4528,7 @@
     "crypto_rsi_scanner/cli/services/scanner_api.py": 120
   },
   "commands_event_alpha_handle_lines": 2,
+  "compatibility_named_files_remaining": 0,
   "compatibility_preserved": true,
   "dead_duplicate_code_removal_note": "Non-public top-level Event Alpha shims listed in research/EVENT_ALPHA_DELETED_SHIMS.json were removed after shim dependency and old-import reports proved they were unused internally.",
   "dead_duplicate_code_removed": false,
@@ -4574,13 +4575,14 @@
     },
     "remaining_api_unregistered_details": []
   },
+  "event_fade_safety_exception_present": true,
   "functions_over_150_lines": 0,
   "gate_summary": {
     "blocked": 0,
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-05T04:18:29+00:00",
+  "generated_at": "2026-07-05T05:03:18+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -4603,7 +4605,7 @@
   },
   "largest_api_files": [
     {
-      "line_count": 231,
+      "line_count": 257,
       "path": "crypto_rsi_scanner/refactor_legacy_file_check.py"
     }
   ],
@@ -4616,7 +4618,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1437,
+      "line_count": 1488,
       "path": "crypto_rsi_scanner/refactor_final_report.py",
       "source_kind": "production"
     },
@@ -4900,7 +4902,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1231,
+      "line_count": 1250,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
@@ -4930,7 +4932,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 492,
+      "line_count": 515,
       "path": "tests/event_alpha/test_shim_registry.py",
       "source_kind": "test"
     },
@@ -4948,7 +4950,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 163,
+      "line_count": 202,
       "path": "tests/cli/test_event_alpha_command_registry.py",
       "source_kind": "test"
     },
@@ -5031,7 +5033,7 @@
   "legacy_decomposition": {
     "largest_api_files": [
       {
-        "line_count": 231,
+        "line_count": 257,
         "path": "crypto_rsi_scanner/refactor_legacy_file_check.py"
       }
     ],
@@ -5054,7 +5056,7 @@
       "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py",
       "crypto_rsi_scanner/event_alpha/notifications/pipeline_core.py"
     ],
-    "legacy_total_lines": 231
+    "legacy_total_lines": 257
   },
   "legacy_decomposition_gate_status": "pass",
   "legacy_file_retirement": {
@@ -5065,17 +5067,24 @@
       }
     ],
     "blockers": [],
+    "compatibility_named_files_remaining": 0,
     "deleted_shims_count": 124,
-    "generated_at": "2026-07-05T04:18:27.944968+00:00",
+    "event_alpha_public_compatibility_entrypoints_path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
+    "event_fade_safety_exception_present": true,
+    "generated_at": "2026-07-05T05:03:16.806395+00:00",
     "legacy_named_dirs": [],
     "legacy_named_dirs_count": 0,
     "legacy_named_files": [],
     "legacy_named_files_count": 0,
+    "legacy_named_files_remaining": 0,
+    "legacy_named_files_with_implementation": 0,
     "no_send_rehearsal": true,
     "nonessential_shims_remaining": 0,
     "normal_rsi_signal_rows_written": 0,
     "paper_trades_created": 0,
+    "public_compatibility_entrypoints_path": "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
     "research_only": true,
+    "retained_public_entrypoints": 0,
     "retained_public_shims": [],
     "retained_public_shims_count": 0,
     "row_type": "final_refactor_legacy_retirement_report",
@@ -5090,6 +5099,7 @@
       "no_secrets": true,
       "research_only": true
     },
+    "scanner_entrypoint_exception_present": true,
     "schema_version": "final_refactor_legacy_retirement_report_v1",
     "status": "OK",
     "strict_alerts_created": 0,
@@ -5106,9 +5116,11 @@
   "legacy_modules_with_multiple_public_classes": 0,
   "legacy_named_dirs_count": 0,
   "legacy_named_files_count": 0,
+  "legacy_named_files_remaining": 0,
+  "legacy_named_files_with_implementation": 0,
   "legacy_retained_public_shims_count": 0,
   "legacy_top_level_event_modules_count": 0,
-  "legacy_total_lines": 231,
+  "legacy_total_lines": 257,
   "legacy_unregistered": 0,
   "line_counts": {
     "crypto_rsi_scanner/cli/commands_event_alpha.py": 14,
@@ -6585,7 +6597,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1437,
+      "line_count": 1488,
       "path": "crypto_rsi_scanner/refactor_final_report.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -6787,6 +6799,7 @@
     }
   ],
   "public_classes_not_in_own_module": 0,
+  "public_compatibility_entrypoints_path": "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
   "public_compatibility_shims": 0,
   "pytest_runtime_seconds": 11.538,
   "remaining_class_ownership_debt": [],
@@ -6807,12 +6820,14 @@
   },
   "removed_shims_count": 124,
   "research_only": true,
+  "retained_public_entrypoints": 0,
   "retained_public_shims_count": 0,
   "retained_shims_with_reason": [],
   "runtime_note": "Runtimes are measured verification values supplied by the operator; null means not measured during report generation.",
   "scanner_bind_scanner_globals_call_sites": 6,
   "scanner_command_body_function_names": [],
   "scanner_command_body_functions_remaining": 0,
+  "scanner_entrypoint_exception_present": true,
   "schema_version": "refactor_final_report_v1",
   "shim_dependency_include_runtime_artifacts": false,
   "shim_dependency_report_cache_status": "hit",
@@ -6822,15 +6837,15 @@
     "include_runtime_artifacts": false,
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [],
-    "newest_source_mtime": 1783225094.7437623,
+    "newest_source_mtime": 1783227777.206601,
     "regex_compile_count": 0,
-    "report_mtime": 1783225105.3400197,
-    "scan_duration_seconds": 1.2106,
+    "report_mtime": 1783227796.6321075,
+    "scan_duration_seconds": 1.22,
     "scanned_artifact_files": 0,
-    "scanned_doc_files": 31,
+    "scanned_doc_files": 33,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
-    "scanned_source_files": 604,
+    "scanned_source_files": 605,
     "scanned_test_files": 29,
     "skipped_artifact_files": 1285,
     "skipped_binary_files": 0,
@@ -6851,9 +6866,9 @@
     "skipped_large_files": 0,
     "skipped_suffix_files": 0
   },
-  "shim_dependency_scan_duration_seconds": 1.2106,
-  "shim_dependency_scanned_doc_files": 31,
-  "shim_dependency_scanned_source_files": 604,
+  "shim_dependency_scan_duration_seconds": 1.22,
+  "shim_dependency_scanned_doc_files": 33,
+  "shim_dependency_scanned_source_files": 605,
   "shim_dependency_scanned_test_files": 29,
   "shim_dependency_skipped_artifact_files": 1285,
   "shim_dependency_skipped_large_files": 0,
@@ -6976,7 +6991,7 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1437,
+          "line_count": 1488,
           "path": "crypto_rsi_scanner/refactor_final_report.py",
           "reason": "Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together.",
           "revisit_condition": "When final-report sections can be split with byte-stable JSON/Markdown fixture comparisons.",
@@ -7129,7 +7144,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1437,
+        "line_count": 1488,
         "path": "crypto_rsi_scanner/refactor_final_report.py",
         "threshold": 1200
       },
@@ -7260,7 +7275,7 @@
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1437,
+            "line_count": 1488,
             "path": "crypto_rsi_scanner/refactor_final_report.py",
             "reason": "Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together.",
             "revisit_condition": "When final-report sections can be split with byte-stable JSON/Markdown fixture comparisons.",

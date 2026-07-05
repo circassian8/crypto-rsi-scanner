@@ -1,98 +1,18 @@
 {
-  "entries": [
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.context",
-      "notes": "public compatibility entrypoint retained after v3 shim retirement",
-      "old_module": "crypto_rsi_scanner.event_alpha_artifacts",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.paths",
-      "notes": "public compatibility entrypoint retained after v3 shim retirement",
-      "old_module": "crypto_rsi_scanner.event_artifact_paths",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.run_ledger",
-      "notes": "public compatibility entrypoint retained after v3 shim retirement",
-      "old_module": "crypto_rsi_scanner.event_alpha_run_ledger",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.retention",
-      "notes": "public compatibility entrypoint retained after v3 shim retirement",
-      "old_module": "crypto_rsi_scanner.event_alpha_retention",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.locks",
-      "notes": "public compatibility entrypoint retained after v3 shim retirement",
-      "old_module": "crypto_rsi_scanner.event_alpha_run_lock",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.doctor.artifact_doctor",
-      "notes": "public compatibility entrypoint retained after v3 shim retirement",
-      "old_module": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.config.profiles",
-      "notes": "public compatibility entrypoint retained after v3 shim retirement",
-      "old_module": "crypto_rsi_scanner.event_alpha_profiles",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
-      "notes": "public compatibility entrypoint retained after v3 shim retirement",
-      "old_module": "crypto_rsi_scanner.event_alpha_v1_readiness",
-      "shim_status": "active_shim"
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "new_module": "crypto_rsi_scanner.event_alpha.config.preflight",
-      "notes": "public compatibility entrypoint retained after v3 shim retirement",
-      "old_module": "crypto_rsi_scanner.event_alpha_preflight",
-      "shim_status": "active_shim"
-    }
-  ],
-  "entry_count": 9,
-  "generated_at": "2026-07-04T19:22:48+00:00",
+  "entries": [],
+  "entry_count": 0,
+  "generated_at": "2026-07-05T04:30:00+00:00",
   "nonessential_shims_remaining": 0,
   "old_import_tombstone_policy": {
-    "compatibility_tests_cover_retained_public_entrypoints_only": true,
+    "compatibility_tests_cover_retained_public_entrypoints_only": false,
     "deleted_old_imports_allowed_to_fail": true,
     "docs_show_new_path": true,
-    "doctor_warns_if_deleted_path_reintroduced": true
+    "doctor_warns_if_deleted_path_reintroduced": true,
+    "no_retained_public_entrypoints": true
   },
-  "public_compatibility_entrypoints_path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
-  "removed_shims_count": 115,
-  "retained_public_shims_count": 9,
+  "public_compatibility_entrypoints_path": "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
+  "event_alpha_public_compatibility_entrypoints_path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
+  "removed_shims_count": 124,
+  "retained_public_shims_count": 0,
   "schema_version": "event_alpha_shim_registry_v1"
 }

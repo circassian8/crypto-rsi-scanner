@@ -19,6 +19,19 @@ def test_no_active_flat_event_alpha_shims_remain():
     assert not report["active_shim_violations"]
 
 
+def test_checked_in_shim_registry_has_no_retained_old_paths():
+    import json
+
+    registry = json.loads(Path("crypto_rsi_scanner/event_alpha/SHIM_REGISTRY.json").read_text(encoding="utf-8"))
+
+    assert registry["entry_count"] == 0
+    assert registry["entries"] == []
+    assert registry["retained_public_shims_count"] == 0
+    assert registry["removed_shims_count"] == 124
+    assert registry["public_compatibility_entrypoints_path"] == "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json"
+    assert registry["old_import_tombstone_policy"]["no_retained_public_entrypoints"] is True
+
+
 def test_partial_shim_with_implementation_logic_is_not_active_shim_violation():
     entry = shims.ShimRegistryEntry(
         old_module="crypto_rsi_scanner.event_alpha_fixture_partial",
@@ -115,11 +128,21 @@ def test_shim_dependency_report_writer_outputs_references_and_candidates():
 def test_public_compatibility_entrypoint_artifact_documents_retained_shims():
     import json
 
+    generic = json.loads(Path("research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json").read_text(encoding="utf-8"))
+    generic_markdown = Path("research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.md").read_text(encoding="utf-8")
     artifact = json.loads(Path("research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json").read_text(encoding="utf-8"))
     markdown = Path("research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md").read_text(encoding="utf-8")
 
+    assert generic["retained_public_entrypoints_count"] == 0
+    assert generic["retained_public_shims_count"] == 0
+    assert generic["entrypoints"] == []
+    assert generic["old_import_tombstone_policy"]["deleted_old_imports_allowed_to_fail"] is True
+    assert generic["old_import_tombstone_policy"]["no_retained_public_entrypoints"] is True
+    assert "No old flat Event Alpha public compatibility entrypoints remain" in generic_markdown
+    assert "crypto_rsi_scanner.event_fade" in generic_markdown
     assert artifact["retained_public_shims_count"] == 0
     assert artifact["entrypoints"] == []
+    assert artifact["public_compatibility_entrypoints_path"] == "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json"
     assert artifact["old_import_tombstone_policy"]["deleted_old_imports_allowed_to_fail"] is True
     assert artifact["old_import_tombstone_policy"]["no_retained_public_entrypoints"] is True
     assert "Deleted old imports are allowed to fail" in markdown

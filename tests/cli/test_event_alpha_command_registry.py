@@ -17,6 +17,7 @@ from crypto_rsi_scanner.cli.services import (
     event_alpha_research,
 )
 from crypto_rsi_scanner.cli.event_alpha_command_registry import EVENT_ALPHA_COMMANDS
+from crypto_rsi_scanner.cli.event_alpha_command_registry import dispatch as registry_dispatch
 from crypto_rsi_scanner.cli.parser import build_parser
 
 
@@ -64,6 +65,44 @@ def test_event_alpha_registry_covers_parser_command_flags():
 
 def test_event_alpha_handle_is_small_registry_bridge():
     assert len(inspect.getsourcelines(commands_event_alpha.handle)[0]) < 150
+
+
+def test_event_impact_hypotheses_report_dispatch_uses_current_include_legacy_flag(monkeypatch):
+    parser = build_parser()
+    calls = []
+
+    def fake_report(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(registry_dispatch, "event_impact_hypotheses_report", fake_report, raising=False)
+    args = parser.parse_args([
+        "--event-impact-hypotheses-report",
+        "--event-alpha-profile",
+        "fixture",
+        "--include-legacy",
+    ])
+
+    assert registry_dispatch._dispatch_event_alpha_command_section_2(args) is True
+    assert calls and calls[0]["include_api"] is True
+
+
+def test_event_incidents_report_dispatch_does_not_require_stale_include_api_attr(monkeypatch):
+    parser = build_parser()
+    calls = []
+
+    def fake_report(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(registry_dispatch, "event_incidents_report", fake_report, raising=False)
+    args = parser.parse_args([
+        "--event-incidents-report",
+        "--event-alpha-profile",
+        "fixture",
+    ])
+    assert not hasattr(args, "include_api")
+
+    assert registry_dispatch._dispatch_event_alpha_command_section_2(args) is True
+    assert calls and calls[0]["include_api"] is False
 
 
 def test_event_alpha_service_modules_export_expected_categories():

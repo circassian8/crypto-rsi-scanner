@@ -204,7 +204,10 @@
     "legacy_unregistered": 0
   },
   "duration_seconds_total": 98.327,
+  "event_alpha_public_compatibility_entrypoints_manifest": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
   "event_fade_safety_exception_present": true,
+  "final_refactor_contract": "no legacy files, no old flat Event Alpha imports, canonical module architecture only",
+  "final_refactor_status": "accepted",
   "functions_over_150_lines": 0,
   "generated_at": "2026-07-05T05:03:18.256281+00:00",
   "legacy_named_files_remaining": 0,
@@ -1574,6 +1577,7 @@
   "old_path_test_imports": 0,
   "production_files_over_1200_lines": 13,
   "production_files_over_1500_lines": 0,
+  "public_compatibility_entrypoints_manifest": "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
   "public_compatibility_entrypoints_path": "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
   "refactor_final_v3_accepted_exceptions": {
     "class_exceptions_remaining": {
@@ -1756,7 +1760,7 @@
   "retained_public_entrypoints": 0,
   "retained_public_shims": [],
   "retained_public_shims_count": 0,
-  "row_type": "refactor_v3_release_candidate_report",
+  "row_type": "refactor_v4_final_report",
   "safety_invariant_confirmation": {
     "event_fade_remains_outside_event_alpha": true,
     "no_event_alpha_rsi_signal_writes": true,
@@ -1770,7 +1774,7 @@
     "research_only": true
   },
   "scanner_entrypoint_exception_present": true,
-  "schema_version": "refactor_v3_release_candidate_report_v1",
+  "schema_version": "refactor_v4_final_report_v1",
   "source_reports": {
     "old_import_check": "research/EVENT_ALPHA_OLD_IMPORT_CHECK.json",
     "refactor_class_ownership": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",

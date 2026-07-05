@@ -533,7 +533,7 @@ def test_event_alpha_architecture_docs_capture_v1_guardrails():
         "old import",
         "compatibility shims",
         "new code should import",
-        "should not gain new implementation logic",
+        "must not recreate",
         "cli/parser.py",
         "cli/dispatch.py",
         "cli/commands_*.py",
@@ -636,8 +636,12 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
         assert paths["markdown"].exists()
         assert (out_dir / refactor_v3_contract.CONTRACT_JSON).exists()
         assert (out_dir / refactor_v3_contract.CONTRACT_MD).exists()
+        assert (out_dir / refactor_final_report.V3_RELEASE_CANDIDATE_JSON).exists()
+        assert (out_dir / refactor_final_report.V4_FINAL_JSON).exists()
+        assert (out_dir / refactor_final_report.V4_FINAL_MD).exists()
         payload = json.loads(paths["json"].read_text(encoding="utf-8"))
         contract = json.loads((out_dir / refactor_v3_contract.CONTRACT_JSON).read_text(encoding="utf-8"))
+        v4_report = json.loads((out_dir / refactor_final_report.V4_FINAL_JSON).read_text(encoding="utf-8"))
         markdown = paths["markdown"].read_text(encoding="utf-8")
 
     assert payload["schema_version"] == "refactor_final_report_v1"
@@ -710,9 +714,24 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["public_compatibility_shims"] == 0
     assert payload["legacy_file_retirement_status"] == "OK"
     assert payload["legacy_named_files_count"] == 0
+    assert payload["legacy_named_files_remaining"] == 0
+    assert payload["legacy_named_files_with_implementation"] == 0
     assert payload["legacy_named_dirs_count"] == 0
+    assert payload["compatibility_named_files_remaining"] == 0
     assert payload["legacy_top_level_event_modules_count"] == 0
     assert payload["legacy_retained_public_shims_count"] == 0
+    assert payload["retained_public_entrypoints"] == 0
+    assert payload["event_fade_safety_exception_present"] is True
+    assert payload["scanner_entrypoint_exception_present"] is True
+    assert payload["public_compatibility_entrypoints_path"] == "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json"
+    assert v4_report["schema_version"] == "refactor_v4_final_report_v1"
+    assert v4_report["final_refactor_status"] == "accepted"
+    assert v4_report["critical_gates"]["legacy_named_files_zero"] == "pass"
+    assert v4_report["critical_gates"]["compatibility_named_files_zero"] == "pass"
+    assert v4_report["critical_gates"]["retained_public_entrypoints_zero"] == "pass"
+    assert v4_report["critical_gates"]["event_fade_safety_exception_present"] == "pass"
+    assert v4_report["critical_gates"]["scanner_entrypoint_exception_present"] == "pass"
+    assert v4_report["public_compatibility_entrypoints_manifest"] == "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json"
     assert payload["nonessential_shims_remaining"] == 0
     assert "nonessential_shims_remaining" not in payload["v3_auto_accept_blockers"]
     assert payload["remaining_implementation_modules_by_package_target"] == {}

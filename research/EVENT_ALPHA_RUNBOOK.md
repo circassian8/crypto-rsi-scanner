@@ -32,13 +32,14 @@ Package ownership for new code:
 - `event_alpha/namespace`: namespace status and lifecycle reporting.
 - `cli/`: parser, dispatch, and command-group modules.
 
-Only retained public old import paths remain as compatibility surfaces. The
-retained entrypoints are documented in
+No retained old flat Event Alpha import paths remain as compatibility surfaces.
+Any future retained entrypoint must be documented in
+`research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json` and mirrored in
 `research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json`; deleted old
 imports are tombstoned and are allowed to fail. New code and docs should use
-canonical package paths, compatibility tests cover only retained public
-entrypoints, and old top-level modules should not receive new implementation
-logic. Artifact doctor warns if a deleted old shim path is reintroduced.
+canonical package paths, tombstone tests cover deleted old paths, and old
+top-level modules should not receive new implementation logic. Artifact doctor
+warns if a deleted old shim path is reintroduced.
 
 CLI rules:
 

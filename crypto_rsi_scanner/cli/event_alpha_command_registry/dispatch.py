@@ -17,6 +17,13 @@ from ..services import (
 from .models import *  # noqa: F403
 from .metadata import *  # noqa: F403
 
+def _include_legacy_api_artifacts(args) -> bool:
+    return bool(
+        getattr(args, "include_api", False)
+        or getattr(args, "include_legacy", False)
+        or getattr(args, "all_history", False)
+    )
+
 def _dispatch_event_alpha_command_section_1(args) -> bool:
     if args.event_fade_report:
         event_fade_report(verbose=args.verbose, event_now=args.event_now)
@@ -256,7 +263,7 @@ def _dispatch_event_alpha_command_section_2(args) -> bool:
             latest_run=latest_hypothesis_run,
             run_id=args.run_id,
             since=args.since,
-            include_api=args.include_api or args.all_history,
+            include_api=_include_legacy_api_artifacts(args),
         )
         return True
     if args.event_impact_hypotheses_inbox:
@@ -278,7 +285,7 @@ def _dispatch_event_alpha_command_section_2(args) -> bool:
             artifact_namespace=args.event_alpha_artifact_namespace or None,
             latest_run=latest_incident_run,
             run_id=args.run_id,
-            include_api=args.include_api or args.all_history,
+            include_api=_include_legacy_api_artifacts(args),
             include_diagnostic=args.include_diagnostic_incidents,
             include_raw=args.include_raw_incidents,
             include_external_context=args.include_external_context_incidents,

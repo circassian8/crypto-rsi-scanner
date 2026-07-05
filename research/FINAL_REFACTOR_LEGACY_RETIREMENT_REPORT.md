@@ -2,14 +2,20 @@
 
 Research artifact only. This static gate does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-05T03:53:43.498785+00:00`
+- generated_at: `2026-07-05T04:45:44.537487+00:00`
 - status: `OK`
 - legacy_named_files_count: `0`
+- legacy_named_files_remaining: `0`
+- legacy_named_files_with_implementation: `0`
 - legacy_named_dirs_count: `0`
+- compatibility_named_files_remaining: `0`
 - top_level_event_modules_count: `0`
 - retained_public_shims_count: `0`
+- retained_public_entrypoints: `0`
 - deleted_shims_count: `124`
 - nonessential_shims_remaining: `0`
+- event_fade_safety_exception_present: `True`
+- scanner_entrypoint_exception_present: `True`
 
 ## Allowed Exceptions
 

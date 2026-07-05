@@ -1,8 +1,7 @@
-"""Event Alpha compatibility-shim registry and audit report.
+"""Event Alpha old-path tombstone and shim-retirement reports.
 
-The registry is intentionally source-code oriented. It keeps old top-level
-Event Alpha modules available while making it measurable when an active shim
-starts accumulating implementation logic again.
+No old flat Event Alpha compatibility shims remain. The registry stays in place
+as a static guard so deleted old paths cannot be reintroduced quietly.
 """
 
 from __future__ import annotations
@@ -58,6 +57,7 @@ _DOC_COMPATIBILITY_FILES = {
     "research/EVENT_ALPHA_ARCHITECTURE_V1.md",
     "research/EVENT_ALPHA_CONSOLIDATION_PLAN.md",
     "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
+    "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
     "research/EVENT_ALPHA_RUNBOOK.md",
     "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
 }
@@ -562,7 +562,7 @@ def build_final_shim_status_report(
         "old_path_import_allowed_exceptions": old_import_check.get("old_path_import_allowed_exceptions", 0),
         "deleted_path_import_failure_checks": old_import_check.get("deleted_path_import_failure_checks", 0),
         "nonessential_shims_remaining": gates.get("nonessential_shims_remaining", 0),
-        "public_compatibility_policy": "Only explicitly retained public compatibility entrypoints remain. Non-public old Event Alpha shim paths are expected to fail import after deletion.",
+        "public_compatibility_policy": "No retained old flat Event Alpha compatibility entrypoints remain. Any future public bridge must be documented in research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json; non-public old Event Alpha shim paths are expected to fail import after deletion.",
     }
 
 
@@ -943,7 +943,7 @@ def format_old_import_check_report(report: dict[str, object]) -> str:
         "## Policy",
         "",
         "- Product code and ordinary tests must import canonical Event Alpha package paths.",
-        f"- Old flat shim imports are allowed only in `{LEGACY_IMPORT_COMPATIBILITY_TEST}`, shim modules themselves, `scanner.py`, and documented public compatibility wrappers.",
+        f"- Old flat shim imports are allowed only in `{LEGACY_IMPORT_COMPATIBILITY_TEST}`, shim modules themselves, `scanner.py`, and entrypoints explicitly documented in `research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json`.",
         "- `event_fade.py` remains intentionally outside Event Alpha and is not an old Event Alpha shim.",
         "",
         "## Blockers",

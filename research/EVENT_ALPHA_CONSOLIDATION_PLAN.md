@@ -37,21 +37,23 @@ move every Event Alpha module or rewrite `scanner.py` in one pass.
 
 ## Import And CLI Rules
 
-- Only retained public old import paths remain as compatibility shims.
-- Retained entrypoints are documented in
+- No retained old flat Event Alpha import paths remain as compatibility shims.
+- Any future retained entrypoint must be documented in
+  `research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json` and mirrored in
   `research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json` with path,
-  reason, expected lifetime, and owner note.
+  reason, expected lifetime, and owner note before it is restored.
 - Deleted old imports are tombstoned and are allowed to fail; docs should show
   canonical package paths.
 - New code should import new package paths.
-- Old top-level shim modules must not gain new implementation logic.
-- Compatibility tests cover retained public entrypoints only, and artifact
+- Old top-level shim modules must not be recreated without an explicit public
+  compatibility decision.
+- Tombstone tests cover deleted old paths, and artifact
   doctor warns if a deleted old shim path is reintroduced.
 - Parser construction belongs in `cli/parser.py`.
 - Dispatch belongs in `cli/dispatch.py`.
 - Command bodies move behind `cli/commands_*.py` one group at a time.
-- `scanner.py`, `main.py`, Make targets, flags, defaults, and old imports stay
-  compatible until an explicit migration says otherwise.
+- `scanner.py`, `main.py`, Make targets, flags, and defaults stay compatible
+  until an explicit migration says otherwise.
 
 ## Test Rules
 

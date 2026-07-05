@@ -1,10 +1,13 @@
-# Refactor V3 Release Candidate Report
+# Refactor V4 Final Report
 
-Research-only release-candidate report. This report does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created `TRIGGERED_FADE`.
+Research-only final refactor report. This report does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created `TRIGGERED_FADE`.
 
 - generated_at: `2026-07-05T05:03:18.256281+00:00`
 - acceptance_status: `accepted`
 - critical_gate_status: `pass`
+- final_refactor_status: `accepted`
+- final_refactor_contract: `no legacy files, no old flat Event Alpha imports, canonical module architecture only`
+- public_compatibility_entrypoints_manifest: `research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json`
 - commands_passed: `16/16`
 - duration_seconds_total: `98.327`
 

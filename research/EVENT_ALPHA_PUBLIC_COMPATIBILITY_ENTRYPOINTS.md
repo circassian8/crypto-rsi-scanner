@@ -2,8 +2,9 @@
 
 Research artifact only. This inventory does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-05T03:41:38+00:00`
+- generated_at: `2026-07-05T04:30:00+00:00`
 - retained_public_shims_count: `0`
+- Generic public compatibility manifest: `research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json`
 - removed_shims_count: `124`
 
 ## Tombstone Policy

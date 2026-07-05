@@ -18,6 +18,7 @@ from typing import Any, Mapping
 
 from . import refactor_baseline
 from . import refactor_api_inventory
+from . import refactor_final_v4_report
 from . import refactor_legacy_file_check
 from . import refactor_size_gates
 from . import refactor_v3_contract
@@ -31,6 +32,8 @@ REPORT_JSON = "REFACTOR_FINAL_REPORT.json"
 REPORT_MD = "REFACTOR_FINAL_REPORT.md"
 V3_RELEASE_CANDIDATE_JSON = "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.json"
 V3_RELEASE_CANDIDATE_MD = "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.md"
+V4_FINAL_JSON = refactor_final_v4_report.V4_FINAL_JSON
+V4_FINAL_MD = refactor_final_v4_report.V4_FINAL_MD
 MAJOR_TARGETS = {
     "crypto_rsi_scanner/scanner.py": {
         "target_lines_lt": 2000,
@@ -501,6 +504,24 @@ def _shim_final_fields(*, deleted_shims: int, final_shim_status: Mapping[str, An
     }
 
 
+def _legacy_file_final_fields(report: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "legacy_file_retirement": report,
+        "legacy_file_retirement_status": report["status"],
+        "legacy_named_files_count": report["legacy_named_files_count"],
+        "legacy_named_files_remaining": report.get("legacy_named_files_remaining", report["legacy_named_files_count"]),
+        "legacy_named_files_with_implementation": report.get("legacy_named_files_with_implementation", 0),
+        "legacy_named_dirs_count": report["legacy_named_dirs_count"],
+        "compatibility_named_files_remaining": report.get("compatibility_named_files_remaining", 0),
+        "legacy_top_level_event_modules_count": report["top_level_event_modules_count"],
+        "legacy_retained_public_shims_count": report["retained_public_shims_count"],
+        "retained_public_entrypoints": report.get("retained_public_entrypoints", report["retained_public_shims_count"]),
+        "event_fade_safety_exception_present": report.get("event_fade_safety_exception_present", False),
+        "scanner_entrypoint_exception_present": report.get("scanner_entrypoint_exception_present", False),
+        "public_compatibility_entrypoints_path": report.get("public_compatibility_entrypoints_path"),
+    }
+
+
 def _line_gate_rows(
     *,
     root: Path,
@@ -693,6 +714,12 @@ def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str,
         "namespace_unknown_zero": "pass" if int(final_report.get("unknown_namespace_count") or 0) == 0 else "blocked",
         "shim_dependency_status_ok": "pass" if int(final_report.get("old_path_import_allowed_exceptions") or 0) == 0 else "blocked",
         "legacy_file_retirement_ok": "pass" if final_report.get("legacy_file_retirement_status") == "OK" else "blocked",
+        "legacy_named_files_zero": "pass" if int(final_report.get("legacy_named_files_remaining") or 0) == 0 else "blocked",
+        "legacy_named_files_with_implementation_zero": "pass" if int(final_report.get("legacy_named_files_with_implementation") or 0) == 0 else "blocked",
+        "compatibility_named_files_zero": "pass" if int(final_report.get("compatibility_named_files_remaining") or 0) == 0 else "blocked",
+        "retained_public_entrypoints_zero": "pass" if int(final_report.get("retained_public_entrypoints") or 0) == 0 else "blocked",
+        "event_fade_safety_exception_present": "pass" if final_report.get("event_fade_safety_exception_present") is True else "blocked",
+        "scanner_entrypoint_exception_present": "pass" if final_report.get("scanner_entrypoint_exception_present") is True else "blocked",
     }
     critical_failures = [name for name, status in critical_gates.items() if status != "pass"]
     critical_status = "pass" if not critical_failures else "blocked"
@@ -741,6 +768,13 @@ def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str,
         "retained_public_shims": final_report.get("retained_shims_with_reason", []),
         "deleted_shims_count": final_report.get("deleted_shims"),
         "deleted_shims_manifest": "research/EVENT_ALPHA_DELETED_SHIMS.json",
+        "legacy_named_files_remaining": final_report.get("legacy_named_files_remaining"),
+        "legacy_named_files_with_implementation": final_report.get("legacy_named_files_with_implementation"),
+        "compatibility_named_files_remaining": final_report.get("compatibility_named_files_remaining"),
+        "retained_public_entrypoints": final_report.get("retained_public_entrypoints"),
+        "event_fade_safety_exception_present": final_report.get("event_fade_safety_exception_present"),
+        "scanner_entrypoint_exception_present": final_report.get("scanner_entrypoint_exception_present"),
+        "public_compatibility_entrypoints_path": final_report.get("public_compatibility_entrypoints_path"),
         "old_path_internal_imports": final_report.get("old_path_internal_imports"),
         "old_path_test_imports": final_report.get("old_path_test_imports"),
         "old_path_docs_references": final_report.get("old_path_docs_references"),
@@ -808,7 +842,14 @@ def _format_v3_release_candidate_markdown(report: Mapping[str, Any]) -> str:
             "",
             f"- top_level_event_module_count: `{report.get('top_level_event_module_count')}`",
             f"- retained_public_shims_count: `{report.get('retained_public_shims_count')}`",
+            f"- retained_public_entrypoints: `{report.get('retained_public_entrypoints')}`",
             f"- deleted_shims_count: `{report.get('deleted_shims_count')}`",
+            f"- legacy_named_files_remaining: `{report.get('legacy_named_files_remaining')}`",
+            f"- legacy_named_files_with_implementation: `{report.get('legacy_named_files_with_implementation')}`",
+            f"- compatibility_named_files_remaining: `{report.get('compatibility_named_files_remaining')}`",
+            f"- event_fade_safety_exception_present: `{report.get('event_fade_safety_exception_present')}`",
+            f"- scanner_entrypoint_exception_present: `{report.get('scanner_entrypoint_exception_present')}`",
+            f"- public_compatibility_entrypoints_path: `{report.get('public_compatibility_entrypoints_path')}`",
             f"- old_path_internal_imports: `{report.get('old_path_internal_imports')}`",
             f"- old_path_test_imports: `{report.get('old_path_test_imports')}`",
             f"- old_path_docs_references: `{report.get('old_path_docs_references')}`",
@@ -865,16 +906,18 @@ def _format_v3_release_candidate_markdown(report: Mapping[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _write_v3_release_candidate_report(*, root: Path, output_dir: Path, final_report: Mapping[str, Any]) -> None:
+def _write_v3_release_candidate_report(*, root: Path, output_dir: Path, final_report: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
     report = _build_v3_release_candidate_report(root=root, final_report=final_report)
+    markdown = _format_v3_release_candidate_markdown(report)
     (output_dir / V3_RELEASE_CANDIDATE_JSON).write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     (output_dir / V3_RELEASE_CANDIDATE_MD).write_text(
-        _format_v3_release_candidate_markdown(report),
+        markdown,
         encoding="utf-8",
     )
+    return report, markdown
 
 
 def build_refactor_final_report(
@@ -990,12 +1033,7 @@ def build_refactor_final_report(
         "class_ownership_report": class_ownership,
         **_class_ownership_final_fields(class_ownership),
         "legacy_decomposition": legacy_inventory,
-        "legacy_file_retirement": legacy_file_report,
-        "legacy_file_retirement_status": legacy_file_report["status"],
-        "legacy_named_files_count": legacy_file_report["legacy_named_files_count"],
-        "legacy_named_dirs_count": legacy_file_report["legacy_named_dirs_count"],
-        "legacy_top_level_event_modules_count": legacy_file_report["top_level_event_modules_count"],
-        "legacy_retained_public_shims_count": legacy_file_report["retained_public_shims_count"],
+        **_legacy_file_final_fields(legacy_file_report),
         "legacy_decomposition_gate_status": legacy_inventory["legacy_decomposition_gate_status"],
         "legacy_files_over_1500_lines": legacy_inventory["legacy_files_over_1500_lines"],
         "legacy_files_over_3000_lines": legacy_inventory["legacy_files_over_3000_lines"],
@@ -1222,9 +1260,16 @@ def _append_organization_counts_section(lines: list[str], data: dict[str, Any]) 
         ("legacy_decomposition_gate_status", data.get("legacy_decomposition_gate_status")),
         ("legacy_file_retirement_status", data.get("legacy_file_retirement_status")),
         ("legacy_named_files_count", data.get("legacy_named_files_count")),
+        ("legacy_named_files_remaining", data.get("legacy_named_files_remaining")),
+        ("legacy_named_files_with_implementation", data.get("legacy_named_files_with_implementation")),
         ("legacy_named_dirs_count", data.get("legacy_named_dirs_count")),
+        ("compatibility_named_files_remaining", data.get("compatibility_named_files_remaining")),
         ("legacy_top_level_event_modules_count", data.get("legacy_top_level_event_modules_count")),
         ("legacy_retained_public_shims_count", data.get("legacy_retained_public_shims_count")),
+        ("retained_public_entrypoints", data.get("retained_public_entrypoints")),
+        ("event_fade_safety_exception_present", data.get("event_fade_safety_exception_present")),
+        ("scanner_entrypoint_exception_present", data.get("scanner_entrypoint_exception_present")),
+        ("public_compatibility_entrypoints_path", data.get("public_compatibility_entrypoints_path")),
         ("legacy_files_over_1500_lines", data.get("legacy_files_over_1500_lines")),
         ("legacy_files_over_3000_lines", data.get("legacy_files_over_3000_lines")),
         ("legacy_total_lines", data.get("legacy_total_lines")),
@@ -1399,7 +1444,13 @@ def write_refactor_final_report(
     refactor_v3_contract.write_refactor_v3_contract(out_dir=output_dir, root=root)
     json_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(format_refactor_final_markdown(data), encoding="utf-8")
-    _write_v3_release_candidate_report(root=root, output_dir=output_dir, final_report=data)
+    v3_report, v3_markdown = _write_v3_release_candidate_report(root=root, output_dir=output_dir, final_report=data)
+    refactor_final_v4_report.write_v4_final_report(
+        output_dir=output_dir,
+        v3_report=v3_report,
+        v3_markdown=v3_markdown,
+        final_report=data,
+    )
     if out_dir is None:
         (root / REPORT_JSON).write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         (root / REPORT_MD).write_text(format_refactor_final_markdown(data), encoding="utf-8")

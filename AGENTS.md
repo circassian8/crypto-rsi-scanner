@@ -345,6 +345,7 @@ are tombstoned and allowed to fail; their manifest is
 `research/EVENT_ALPHA_DELETED_SHIMS.md/json`. New code should import the new
 package path, docs should show canonical package paths, and any future public
 compatibility bridge must be explicitly documented in
+`research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json` and mirrored in
 `research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json` before it is
 retained. `crypto_rsi_scanner.event_alpha.shims` is the tombstone registry, and
 artifact doctor warns if a deleted shim file is reintroduced. Run
@@ -487,9 +488,10 @@ work.
   to diagnose mixed namespaces, orphan snapshots, missing provider/budget rows,
   and missing snapshot writes before treating burn-in artifacts as evidence.
 - Event Alpha consolidation is compatibility-first. New Event Alpha code should
-  prefer `crypto_rsi_scanner/event_alpha/` and `crypto_rsi_scanner/cli/`, while
-  retained old top-level import paths stay available only through documented
-  compatibility shims until a tested move removes or explicitly keeps them.
+  use `crypto_rsi_scanner/event_alpha/` and `crypto_rsi_scanner/cli/`. Old flat
+  Event Alpha import paths are tombstoned, not retained; any future public
+  bridge needs an explicit decision and entry in
+  `research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json`.
   Artifact doctor checks that depend on fields must
   reference `event_alpha/artifacts/schema_v1.py` first, and namespace lifecycle
   status should be inspected with `make event-alpha-namespace-lifecycle-report`

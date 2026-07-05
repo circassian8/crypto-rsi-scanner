@@ -1442,15 +1442,15 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5739,
+  "function_count": 5744,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-05T04:18:27.831511+00:00",
+  "generated_at": "2026-07-05T04:55:14.845467+00:00",
   "largest_api_files": [
     {
-      "line_count": 231,
+      "line_count": 257,
       "path": "crypto_rsi_scanner/refactor_legacy_file_check.py"
     }
   ],
@@ -1463,7 +1463,7 @@
   "legacy_functions_over_limit_rows": [],
   "legacy_modules_with_multiple_public_classes": 0,
   "legacy_modules_with_multiple_public_classes_rows": [],
-  "legacy_total_lines": 231,
+  "legacy_total_lines": 257,
   "modules_with_multiple_public_classes": [],
   "modules_with_multiple_public_classes_count": 0,
   "modules_with_multiple_public_classes_revisit_condition": "Register tiny model bundles explicitly or split behaviorful public classes before adding new multi-class production modules.",
@@ -2844,7 +2844,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1437,
+      "line_count": 1488,
       "path": "crypto_rsi_scanner/refactor_final_report.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -3304,7 +3304,7 @@
         },
         {
           "accepted": true,
-          "line_count": 1437,
+          "line_count": 1488,
           "path": "crypto_rsi_scanner/refactor_final_report.py",
           "reason": "Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together.",
           "revisit_condition": "When final-report sections can be split with byte-stable JSON/Markdown fixture comparisons.",
@@ -3445,7 +3445,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1437,
+        "line_count": 1488,
         "path": "crypto_rsi_scanner/refactor_final_report.py",
         "threshold": 1200
       },
@@ -3531,7 +3531,7 @@
           },
           {
             "accepted": true,
-            "line_count": 1437,
+            "line_count": 1488,
             "path": "crypto_rsi_scanner/refactor_final_report.py",
             "reason": "Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together.",
             "revisit_condition": "When final-report sections can be split with byte-stable JSON/Markdown fixture comparisons.",

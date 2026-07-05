@@ -16,8 +16,9 @@ rows, or create `TRIGGERED_FADE`.
   compatibility-breaking decision, release notes, and targeted tests.
 - `scanner.py` may remain a compatibility CLI entrypoint.
 - Public compatibility shims must be listed explicitly in the shim dependency
-  report and in `research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json`
-  before they are retained; the current retained set is empty.
+  report, in `research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json`, and mirrored
+  in `research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json` before
+  they are retained; the current retained set is empty.
 - A shim marked `active_shim` must contain only compatibility imports,
   `globals().update(...)`, `__all__`, comments, and a module docstring.
 - Tests may keep targeted old-import tombstone coverage for deleted paths. New

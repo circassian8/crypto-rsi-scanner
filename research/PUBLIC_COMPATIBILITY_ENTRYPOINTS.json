@@ -1,5 +1,6 @@
 {
   "entrypoints": [],
+  "event_alpha_public_compatibility_entrypoints_path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
   "generated_at": "2026-07-05T04:30:00+00:00",
   "intentional_non_event_alpha_entrypoints": [
     {
@@ -18,9 +19,9 @@
     "doctor_warns_if_deleted_path_reintroduced": true,
     "no_retained_public_entrypoints": true
   },
-  "public_compatibility_entrypoints_path": "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
   "removed_shims_count": 124,
+  "retained_public_entrypoints_count": 0,
   "retained_public_shims_count": 0,
-  "row_type": "event_alpha_public_compatibility_entrypoints",
-  "schema_version": "event_alpha_public_compatibility_entrypoints_v1"
+  "row_type": "public_compatibility_entrypoints",
+  "schema_version": "public_compatibility_entrypoints_v1"
 }
