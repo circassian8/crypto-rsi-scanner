@@ -17,6 +17,23 @@ from ..services import (
 from .models import *  # noqa: F403
 from .metadata import *  # noqa: F403
 
+
+_FEEDBACK_SHORTCUT_ATTRS = (
+    ("event_feedback_useful", "useful"),
+    ("event_feedback_junk", "junk"),
+    ("event_feedback_watch", "watch"),
+    ("event_feedback_false_positive", "false_positive"),
+    ("event_feedback_late", "late"),
+    ("event_feedback_source_noise", "source_noise"),
+    ("event_feedback_needs_confirmation", "needs_confirmation"),
+    ("event_feedback_duplicate", "duplicate"),
+    ("event_feedback_promising_source_type", "promising_source_type"),
+    ("event_feedback_traded", "traded_elsewhere"),
+    ("event_feedback_ignore", "ignored"),
+    ("event_feedback_missed", "missed"),
+)
+
+
 def _include_legacy_api_artifacts(args) -> bool:
     return bool(
         getattr(args, "include_api", False)
@@ -679,15 +696,8 @@ def _dispatch_event_alpha_command_section_5(args) -> bool:
             artifact_namespace=args.event_alpha_artifact_namespace or None,
         )
         return True
-    feedback_shortcuts = (
-        (args.event_feedback_useful, "useful"),
-        (args.event_feedback_junk, "junk"),
-        (args.event_feedback_watch, "watch"),
-        (args.event_feedback_traded, "traded_elsewhere"),
-        (args.event_feedback_ignore, "ignored"),
-        (args.event_feedback_missed, "missed"),
-    )
-    for target, label in feedback_shortcuts:
+    for attr, label in _FEEDBACK_SHORTCUT_ATTRS:
+        target = getattr(args, attr)
         if target is not None:
             event_feedback_shortcut(
                 target,

@@ -20,6 +20,13 @@ crypto_rsi_scanner_source_with_artifacts.zip
 crypto-rsi-scanner-source-with-artifacts*.zip
 event_alpha_burn_in_pack.zip
 *_burn_in_pack.zip
+research/PAPER_RISK_RESEARCH.json
+research/PAPER_RISK_RESEARCH.md
+research/conviction_priors_shadow_report.json
+research/conviction_priors_shadow_report.md
+research/event_alpha_burn_in_archive_manifest.json
+research/event_alpha_burn_in_archive_checksums.json
+research/event_alpha_burn_in_evidence_archive.zip
 
 # Python
 __pycache__/

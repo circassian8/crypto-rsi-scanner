@@ -234,6 +234,39 @@ def test_conviction_rewards_confluence():
     assert 0 <= strong <= 100
 
 
+def test_extreme_severity_does_not_create_high_conviction_for_no_edge_setup():
+    score = conviction_score({
+        "flag": "OB",
+        "severity": "EXTREME",
+        "setup_type": "breakdown_risk",
+        "market_aligned": "adverse",
+        "rsi_4h": 82,
+        "rsi_weekly": 78,
+        "volume_ratio": 3.0,
+        "divergence": "bearish",
+        "rsi_z": 3.0,
+    })
+    assert score <= 54
+
+
+def test_extreme_severity_still_monotonic_for_edge_setup():
+    base = {
+        "flag": "OB",
+        "setup_type": "mean_reversion",
+        "market_aligned": "favorable",
+        "rsi_4h": 72,
+        "rsi_weekly": 68,
+        "volume_ratio": 1.8,
+        "divergence": "bearish",
+        "rsi_z": 2.2,
+    }
+    watch = conviction_score({**base, "severity": "WATCH"})
+    alert = conviction_score({**base, "severity": "ALERT"})
+    extreme = conviction_score({**base, "severity": "EXTREME"})
+    assert watch < alert < extreme
+    assert extreme >= 65
+
+
 def test_conviction_uses_edge_prior_when_setup_known():
     favorable = conviction_score({
         "flag": "OS", "severity": "WATCH", "setup_type": "dip_buy",

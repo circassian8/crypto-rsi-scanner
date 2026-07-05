@@ -5,6 +5,22 @@ from __future__ import annotations
 import argparse
 
 
+_FEEDBACK_SHORTCUT_ARGS = (
+    ("--event-feedback-useful", "Shortcut: mark TARGET as useful."),
+    ("--event-feedback-junk", "Shortcut: mark TARGET as junk."),
+    ("--event-feedback-watch", "Shortcut: mark TARGET as watch."),
+    ("--event-feedback-false-positive", "Shortcut: mark TARGET as false positive."),
+    ("--event-feedback-late", "Shortcut: mark TARGET as late."),
+    ("--event-feedback-source-noise", "Shortcut: mark TARGET as source noise."),
+    ("--event-feedback-needs-confirmation", "Shortcut: mark TARGET as needs confirmation."),
+    ("--event-feedback-duplicate", "Shortcut: mark TARGET as duplicate."),
+    ("--event-feedback-promising-source-type", "Shortcut: mark TARGET as promising source type."),
+    ("--event-feedback-traded", "Shortcut: mark TARGET as traded elsewhere."),
+    ("--event-feedback-ignore", "Shortcut: mark TARGET as ignored."),
+    ("--event-feedback-missed", "Shortcut: record a missed opportunity."),
+)
+
+
 def _historical_delivery_scope(value: str) -> str:
     allowed = {"latest_run", "all_rows", "historical_included", "legacy_included"}
     if value not in allowed:
@@ -864,12 +880,7 @@ def _add_event_alpha_args_section_6(parser: argparse.ArgumentParser, event_alpha
         action="store_true",
         help="Print lightweight Event Alpha feedback artifact rows.",
     )
-    parser.add_argument("--event-feedback-useful", metavar="TARGET", help="Shortcut: mark TARGET as useful.")
-    parser.add_argument("--event-feedback-junk", metavar="TARGET", help="Shortcut: mark TARGET as junk.")
-    parser.add_argument("--event-feedback-watch", metavar="TARGET", help="Shortcut: mark TARGET as watch.")
-    parser.add_argument("--event-feedback-traded", metavar="TARGET", help="Shortcut: mark TARGET as traded elsewhere.")
-    parser.add_argument("--event-feedback-ignore", metavar="TARGET", help="Shortcut: mark TARGET as ignored.")
-    parser.add_argument("--event-feedback-missed", metavar="SYMBOL_OR_COIN_ID", help="Shortcut: record a missed opportunity.")
+    _add_event_feedback_shortcut_args(parser)
     parser.add_argument(
         "--event-llm-shadow-report",
         action="store_true",
@@ -903,6 +914,12 @@ def _add_event_alpha_args_section_6(parser: argparse.ArgumentParser, event_alpha
         default=None,
         help="Provider health key selector for --event-alpha-provider-health-reset, such as gdelt:event_source.",
     )
+
+
+def _add_event_feedback_shortcut_args(parser: argparse.ArgumentParser) -> None:
+    for flag, help_text in _FEEDBACK_SHORTCUT_ARGS:
+        metavar = "SYMBOL_OR_COIN_ID" if flag == "--event-feedback-missed" else "TARGET"
+        parser.add_argument(flag, metavar=metavar, help=help_text)
 
 def _add_event_alpha_args_section_7(parser: argparse.ArgumentParser, event_alpha_profiles, event_feedback) -> None:
     parser.add_argument(

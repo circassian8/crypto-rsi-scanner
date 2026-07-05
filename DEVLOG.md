@@ -17,6 +17,54 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Operationalize Event Alpha burn-in loop · Codex
+**Why:** The Radar North Star defined the architecture and 30-day burn-in goals,
+but operators still needed a repeatable no-send loop, review inbox, feedback
+progress, source-yield measurement, and shadow-only risk/prior reports that do
+not mutate runtime behavior.
+**Changes:**
+- Added separate burn-in contract artifacts via `make event-alpha-burn-in-contract`
+  and kept `event-alpha-radar-north-star` as the source-of-truth writer.
+- Added safe operational modules under
+  `crypto_rsi_scanner/event_alpha/operations/` for daily no-send burn-in runs,
+  daily review inboxes, feedback progress, scorecards, weekly measurement,
+  source-yield reporting, and burn-in evidence archives.
+- Added Make targets for the daily burn-in loop, review/progress/measurement,
+  source-yield, shadow conviction priors, paper-risk research, archive export,
+  and expanded append-only feedback shortcuts.
+- Fixed RSI conviction scoring so an `EXTREME` signal cannot become
+  high-conviction solely when the setup has no measured edge, while preserving
+  monotonicity for edge-bearing setups.
+- Split paper conviction-bucket reporting into actionable/control/all diagnostic
+  cohorts and added research-only paper risk scenario reporting without changing
+  paper opening/closing behavior.
+- Ignored generated local burn-in archive/paper-risk/prior-shadow artifacts so
+  machine-local runtime evidence is not committed.
+**Verify:** Focused pytest for burn-in operations, command registry, conviction,
+paper-risk, and Make targets; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m
+pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q` (793
+passed); `python3 tests/test_indicators.py` (769/769 passed); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make event-alpha-integrated-radar-doctor
+PYTHON=python3`; `make verify PYTHON=python3`; `make event-alpha-radar-north-star`; `make
+event-alpha-burn-in-contract`; `make event-alpha-feedback-progress
+PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal
+PYTHON=python3`; `make event-alpha-burn-in-weekly-measurement
+PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal
+PYTHON=python3`; `make event-alpha-source-yield-report
+PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal
+PYTHON=python3`; `make conviction-priors-shadow-report PYTHON=python3`; `make
+paper-risk-research PYTHON=python3`; `make event-alpha-daily-review-inbox
+PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal
+PYTHON=python3`; `make event-alpha-burn-in-scorecard PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`; `make
+event-alpha-archive-burn-in-evidence PYTHON=python3`; `make
+event-alpha-daily-live-no-send-burn-in PYTHON=python3` (12 passed, 1 skipped, 0
+failed).
+**Notes/risks:** The archive scanner deliberately blocks explicit secret-looking
+fields and ignores natural-language `sk-...` false positives. Generated local
+reports and evidence archives remain ignored runtime artifacts; checked-in
+source is the code, tests, and static North Star/burn-in contract.
+
 ## 2026-07-05 — Add faster safe test loops · Codex
 **Why:** The suite is slow because the strict release gate intentionally runs the
 standalone compatibility runner and the pytest package suite. Local iteration

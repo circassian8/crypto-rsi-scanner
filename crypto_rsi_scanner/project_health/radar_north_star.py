@@ -18,6 +18,8 @@ from typing import Any, Mapping
 REPORT_SCHEMA_VERSION = "event_alpha_radar_north_star_v1"
 REPORT_JSON = "EVENT_ALPHA_RADAR_NORTH_STAR.json"
 REPORT_MD = "EVENT_ALPHA_RADAR_NORTH_STAR.md"
+BURN_IN_CONTRACT_JSON = "event_alpha_burn_in_contract.json"
+BURN_IN_CONTRACT_MD = "event_alpha_burn_in_contract.md"
 LANE_NAMES = (
     "EARLY_LONG_RESEARCH",
     "CONFIRMED_LONG_RESEARCH",
@@ -429,6 +431,57 @@ def write_north_star(
     md_path = target / REPORT_MD
     json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(format_north_star(payload), encoding="utf-8")
+    write_burn_in_contract(root=repo_root, out_dir=target, generated_at=generated_at)
+    return json_path, md_path, payload
+
+
+def build_burn_in_contract(*, generated_at: datetime | None = None) -> dict[str, Any]:
+    generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
+    return {
+        "schema_version": "event_alpha_burn_in_contract_v1",
+        "row_type": "event_alpha_burn_in_contract",
+        "generated_at": generated,
+        "research_only": True,
+        "no_send_rehearsal": True,
+        "strict_alerts_created": 0,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "paper_trades_created": 0,
+        "normal_rsi_signal_rows_written": 0,
+        "triggered_fade_created": 0,
+        **deepcopy(BURN_IN_CONTRACT),
+        "opportunity_lanes": deepcopy(OPPORTUNITY_LANES),
+        "human_labeling": deepcopy(HUMAN_LABELING_ROLE),
+        "source_activation_order": list(SOURCE_ACTIVATION_ORDER),
+        "safety_invariants": {
+            "research_only": True,
+            "no_live_trading": True,
+            "no_event_alpha_paper_trading": True,
+            "no_execution_order_logic": True,
+            "no_event_alpha_rsi_signal_rows": True,
+            "no_event_alpha_triggered_fade": True,
+            "no_live_telegram_sends": True,
+            "no_live_provider_calls_by_default": True,
+            "no_api_keys_in_tests": True,
+            "no_secrets": True,
+        },
+    }
+
+
+def write_burn_in_contract(
+    *,
+    root: str | Path | None = None,
+    out_dir: str | Path | None = None,
+    generated_at: datetime | None = None,
+) -> tuple[Path, Path, dict[str, Any]]:
+    repo_root = Path(root).expanduser() if root is not None else repo_root_from_module()
+    target = Path(out_dir).expanduser() if out_dir is not None else repo_root / "research"
+    target.mkdir(parents=True, exist_ok=True)
+    payload = build_burn_in_contract(generated_at=generated_at)
+    json_path = target / BURN_IN_CONTRACT_JSON
+    md_path = target / BURN_IN_CONTRACT_MD
+    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    md_path.write_text(format_burn_in_contract(payload), encoding="utf-8")
     return json_path, md_path, payload
 
 
@@ -437,11 +490,17 @@ def north_star_status(*, root: str | Path | None = None) -> dict[str, Any]:
     research = repo_root / "research"
     json_path = research / REPORT_JSON
     md_path = research / REPORT_MD
+    contract_json_path = research / BURN_IN_CONTRACT_JSON
+    contract_md_path = research / BURN_IN_CONTRACT_MD
     status: dict[str, Any] = {
         "json_path": json_path.relative_to(repo_root).as_posix(),
         "markdown_path": md_path.relative_to(repo_root).as_posix(),
         "json_present": json_path.exists(),
         "markdown_present": md_path.exists(),
+        "contract_json_path": contract_json_path.relative_to(repo_root).as_posix(),
+        "contract_markdown_path": contract_md_path.relative_to(repo_root).as_posix(),
+        "contract_json_present": contract_json_path.exists(),
+        "contract_markdown_present": contract_md_path.exists(),
         "document_present": json_path.exists() and md_path.exists(),
         "burn_in_contract_present": False,
         "all_lanes_present": False,
@@ -463,19 +522,85 @@ def north_star_status(*, root: str | Path | None = None) -> dict[str, Any]:
     if not json_path.exists() or not md_path.exists():
         status["warnings"].append({"check": "north_star_document_missing", "path": "research"})
     burn_in = payload.get("burn_in_contract") if isinstance(payload.get("burn_in_contract"), Mapping) else {}
+    separate_burn_in: Mapping[str, Any] = {}
+    if contract_json_path.exists():
+        try:
+            loaded_contract = json.loads(contract_json_path.read_text(encoding="utf-8"))
+            if isinstance(loaded_contract, Mapping):
+                separate_burn_in = loaded_contract
+            else:
+                status["warnings"].append({"check": "burn_in_contract_json_invalid", "path": status["contract_json_path"]})
+        except (OSError, json.JSONDecodeError):
+            status["warnings"].append({"check": "burn_in_contract_json_invalid", "path": status["contract_json_path"]})
     lanes = payload.get("opportunity_lanes") if isinstance(payload.get("opportunity_lanes"), Mapping) else {}
     missing_lanes = [lane for lane in LANE_NAMES if lane not in lanes]
-    status["burn_in_contract_present"] = bool(burn_in)
+    status["burn_in_contract_present"] = bool(burn_in) and contract_json_path.exists() and contract_md_path.exists()
     status["all_lanes_present"] = not missing_lanes
     status["missing_lanes"] = missing_lanes
-    status["auto_apply_thresholds"] = burn_in.get("auto_apply_thresholds") if burn_in else None
-    if not burn_in:
+    status["auto_apply_thresholds"] = (
+        separate_burn_in.get("auto_apply_thresholds")
+        if separate_burn_in
+        else burn_in.get("auto_apply_thresholds") if burn_in else None
+    )
+    if not burn_in or not contract_json_path.exists() or not contract_md_path.exists():
         status["warnings"].append({"check": "burn_in_contract_missing", "path": status["json_path"]})
     if missing_lanes:
         status["warnings"].append({"check": "north_star_lanes_missing", "missing_lanes": missing_lanes})
-    if burn_in.get("auto_apply_thresholds") is True:
+    if burn_in.get("auto_apply_thresholds") is True or separate_burn_in.get("auto_apply_thresholds") is True:
         status["blockers"].append({"check": "auto_apply_thresholds_true", "path": status["json_path"]})
     return status
+
+
+def format_burn_in_contract(payload: Mapping[str, Any]) -> str:
+    lines = [
+        "# Event Alpha Burn-In Contract",
+        "",
+        "Research-only 30-day burn-in operating contract. This document does not authorize live trading, Event Alpha paper trading, execution/order logic, normal RSI signal writes, Event Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by default, or secret handling changes.",
+        "",
+        f"- generated_at: `{payload.get('generated_at')}`",
+        f"- schema_version: `{payload.get('schema_version')}`",
+        f"- duration_days: `{payload.get('duration_days')}`",
+        f"- min_live_no_send_cycles: `{payload.get('min_live_no_send_cycles')}`",
+        f"- min_real_candidates: `{payload.get('min_real_candidates')}`",
+        f"- min_human_labels: `{payload.get('min_human_labels')}`",
+        f"- min_labeled_near_misses: `{payload.get('min_labeled_near_misses')}`",
+        f"- min_outcome_rows: `{payload.get('min_outcome_rows')}`",
+        f"- auto_apply_thresholds: `{payload.get('auto_apply_thresholds')}`",
+        f"- no_auto_threshold_changes: `{payload.get('no_auto_threshold_changes')}`",
+        "",
+        "## Opportunity Lanes",
+        "",
+    ]
+    lanes = payload.get("opportunity_lanes") if isinstance(payload.get("opportunity_lanes"), Mapping) else {}
+    for lane_name in LANE_NAMES:
+        lane = lanes.get(lane_name)
+        if not isinstance(lane, Mapping):
+            continue
+        lines.append(f"### {lane_name}")
+        lines.append(f"- allowed_notification_route: {lane.get('allowed_notification_route')}")
+        lines.append("- strict_blockers:")
+        for item in lane.get("strict_blockers", []):
+            lines.append(f"  - {item}")
+        lines.append("- machine_outcome_labels:")
+        for item in lane.get("outcome_labels", []):
+            lines.append(f"  - {item}")
+        lines.append("- human_label_types:")
+        for item in lane.get("human_label_types", []):
+            lines.append(f"  - {item}")
+        lines.append("")
+    lines.extend(["## Promotion/Freeze Criteria", ""])
+    criteria = payload.get("promotion_freeze_criteria") if isinstance(payload.get("promotion_freeze_criteria"), Mapping) else {}
+    for lane_name in LANE_NAMES:
+        lines.append(f"- {lane_name}:")
+        for item in criteria.get(lane_name, []):
+            lines.append(f"  - {item}")
+    lines.extend(["", "## Freeze Criteria", ""])
+    for item in payload.get("freeze_criteria", []):
+        lines.append(f"- {item}")
+    lines.extend(["", "## Safety", ""])
+    for key, value in sorted((payload.get("safety_invariants") or {}).items()):
+        lines.append(f"- {key}: `{value}`")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def format_north_star(payload: Mapping[str, Any]) -> str:
@@ -583,7 +708,16 @@ def _burn_in(payload: Mapping[str, Any]) -> Mapping[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Write the Event Alpha Radar North Star contract.")
     parser.add_argument("--out-dir", default="research")
+    parser.add_argument("--burn-in-contract-only", action="store_true")
     args = parser.parse_args(argv)
+    if args.burn_in_contract_only:
+        json_path, md_path, payload = write_burn_in_contract(out_dir=args.out_dir)
+        print(json_path)
+        print(md_path)
+        print(f"schema_version={payload['schema_version']}")
+        print(f"auto_apply_thresholds={payload['auto_apply_thresholds']}")
+        print("No providers, Telegram sends, trades, paper trades, RSI rows, or Event Alpha TRIGGERED_FADE were changed.")
+        return 0
     json_path, md_path, payload = write_north_star(out_dir=args.out_dir)
     print(json_path)
     print(md_path)

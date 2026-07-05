@@ -108,6 +108,13 @@ def _stats(trades: list[dict]) -> dict | None:
         return None
     n = len(rets)
     wins = sum(1 for r in rets if r > 0)
+    ordered_rets = sorted(rets)
+    trimmed = ordered_rets[1:-1] if len(ordered_rets) > 4 else ordered_rets
+    mae_values = [
+        float(t.get("mae_pct"))
+        for t in trades
+        if t.get("mae_pct") is not None
+    ]
     # sequential equity by exit time (overlap ignored — an edge proxy)
     ordered = sorted((t for t in trades if t.get("ret_pct") is not None),
                      key=lambda t: t.get("exit_at") or "")
@@ -120,6 +127,13 @@ def _stats(trades: list[dict]) -> dict | None:
         "n": n, "win": 100.0 * wins / n,
         "avg": statistics.fmean(rets), "med": statistics.median(rets),
         "total": sum(rets), "equity": eq, "maxdd": 100.0 * maxdd,
+        "count": n,
+        "win_rate": 100.0 * wins / n,
+        "avg_return": statistics.fmean(rets),
+        "median_return": statistics.median(rets),
+        "trimmed_mean": statistics.fmean(trimmed),
+        "worst_case": min(rets),
+        "max_adverse_excursion": min(mae_values) if mae_values else min(rets),
     }
 
 
@@ -152,6 +166,40 @@ def _group_stats(trades: list[dict], key_fn) -> dict[str, dict | None]:
     for trade in trades:
         groups[str(key_fn(trade) or "?")].append(trade)
     return {label: _stats(rows) for label, rows in sorted(groups.items())}
+
+
+def _conviction_bucket_scope_stats(closed: list[dict]) -> dict[str, dict[str, dict | None]]:
+    groups = {
+        "actionable": [t for t in closed if _is_actionable(t)],
+        "control": [t for t in closed if not _is_actionable(t)],
+        "all_diagnostic": closed,
+    }
+    return {
+        scope: _group_stats(rows, lambda t: _conviction_bucket(t.get("conviction")))
+        for scope, rows in groups.items()
+    }
+
+
+def _conviction_bucket_rows(closed: list[dict]) -> list[dict]:
+    rows: list[dict] = []
+    for scope, stats_by_bucket in _conviction_bucket_scope_stats(closed).items():
+        for bucket, stats in stats_by_bucket.items():
+            if not stats:
+                continue
+            rows.append(
+                {
+                    "cohort_scope": scope,
+                    "conviction_bucket": bucket,
+                    "count": stats["count"],
+                    "win_rate": stats["win_rate"],
+                    "avg_return": stats["avg_return"],
+                    "median_return": stats["median_return"],
+                    "trimmed_mean": stats["trimmed_mean"],
+                    "worst_case": stats["worst_case"],
+                    "max_adverse_excursion": stats["max_adverse_excursion"],
+                }
+            )
+    return rows
 
 
 def _state_doc(trade: dict) -> dict:
@@ -234,6 +282,8 @@ def summary(storage, now: datetime | None = None) -> dict:
         "by_market_regime": _group_stats(closed, lambda t: t.get("market_regime") or "?"),
         "by_market_alignment": _group_stats(closed, lambda t: t.get("market_aligned") or "?"),
         "by_conviction_bucket": _group_stats(closed, lambda t: _conviction_bucket(t.get("conviction"))),
+        "by_conviction_bucket_by_scope": _conviction_bucket_scope_stats(closed),
+        "conviction_bucket_cohorts": _conviction_bucket_rows(closed),
         "by_state": _state_group_stats(closed),
         "open_positions": [_open_position(t) for t in open_],
     }
@@ -298,6 +348,20 @@ def report(storage, now: datetime | None = None, *, cohorts: bool = False) -> st
         for bucket in present_buckets:
             out.append(_fmt_stats(bucket, _stats([t for t in closed
                                                   if _conviction_bucket(t.get("conviction")) == bucket])))
+        scoped = _conviction_bucket_scope_stats(closed)
+        for scope, rows in scoped.items():
+            scoped_buckets = [bucket for bucket in buckets if bucket in rows and rows[bucket]]
+            if not scoped_buckets:
+                continue
+            title = {
+                "actionable": "actionable",
+                "control": "control",
+                "all_diagnostic": "all rows diagnostic",
+            }.get(scope, scope)
+            out.append(f"\nBy conviction bucket ({title}):")
+            out.append(header.replace("book", "conviction"))
+            for bucket in scoped_buckets:
+                out.append(_fmt_stats(bucket, rows[bucket]))
 
     if cohorts and closed:
         out.append("\nBy state cohort:")

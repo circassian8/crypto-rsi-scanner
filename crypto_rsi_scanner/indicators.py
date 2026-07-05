@@ -211,10 +211,15 @@ def conviction_score(sig: dict) -> int:
     if abs(z) >= 2.0:
         score += 5
 
+    setup_type = sig.get("setup_type")
+    no_edge_setup = bool(setup_type) and not setup_has_edge(setup_type)
+
     if severity == "APPROACHING":
         score = min(score, 35)
-    if severity == "EXTREME":
+    if severity == "EXTREME" and not no_edge_setup:
         score = max(score, 65)
+    if no_edge_setup:
+        score = min(score, 54)
 
     return int(max(0, min(100, score)))
 

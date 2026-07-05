@@ -239,8 +239,41 @@ def test_paper_report_empty_and_populated():
     assert data["books"]["actionable"]["n"] == 1
     assert data["by_conviction_bucket"]["65-79"]["n"] == 1
     assert data["by_conviction_bucket"]["0-49"]["n"] == 1
+    assert data["by_conviction_bucket_by_scope"]["actionable"]["65-79"]["n"] == 1
+    assert data["by_conviction_bucket_by_scope"]["control"]["0-49"]["n"] == 1
+    cohort_rows = data["conviction_bucket_cohorts"]
+    assert any(
+        row["cohort_scope"] == "actionable"
+        and row["conviction_bucket"] == "65-79"
+        and row["count"] == 1
+        and "trimmed_mean" in row
+        and "worst_case" in row
+        and "max_adverse_excursion" in row
+        for row in cohort_rows
+    )
     assert data["by_state"]["volatility"]["high"]["n"] == 1
     st.close()
+
+
+def test_paper_risk_research_scenarios_are_report_only(tmp_path):
+    from crypto_rsi_scanner import paper_risk_research
+
+    trades = [
+        {"setup_type": "mean_reversion", "market_regime": "CHOP", "direction": "long", "entry_price": 100, "exit_price": 110, "ret_pct": 10.0},
+        {"setup_type": "breakdown_risk", "market_regime": "DOWNTREND", "direction": "short", "entry_price": 100, "exit_price": 108, "ret_pct": -8.0},
+        {"setup_type": "trend_continuation", "market_regime": "DOWNTREND", "direction": "long", "entry_price": 100, "exit_price": 92, "ret_pct": -8.0},
+    ]
+    payload = paper_risk_research.build_research_report_from_trades(trades, out_dir=tmp_path)
+    assert payload["paper_opening_behavior_changed"] is False
+    assert payload["execution_logic_changed"] is False
+    assert payload["auto_apply"] is False
+    assert payload["scenarios"]["baseline"]["count"] == 3
+    assert payload["scenarios"]["exclude_breakdown_risk"]["count"] == 2
+    assert payload["scenarios"]["mean_reversion_chop_only"]["count"] == 1
+    assert payload["scenarios"]["stop_10_pct_shadow"]["stopped_count"] == 0
+    metrics = paper_risk_research.path_metrics(100, [95, 90, 110], direction="long", stop_pct=10)
+    assert metrics["stopped"] is True
+    assert metrics["return_pct"] == -10
 
 
 def test_refresh_paper_closes_without_scan_or_alerts():

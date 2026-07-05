@@ -2,7 +2,7 @@
 
 Research-only architecture and burn-in operating contract. This document does not authorize live trading, Event Alpha paper trading, execution/order logic, normal RSI signal writes, Event Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by default, or secret handling changes.
 
-- generated_at: `2026-07-05T18:48:57.040374+00:00`
+- generated_at: `2026-07-05T19:40:13.395912+00:00`
 - schema_version: `event_alpha_radar_north_star_v1`
 - purpose: Align future Event Alpha work around a measurable crypto market radar and 30-day no-send burn-in contract.
 - auto_apply_thresholds: `False`
