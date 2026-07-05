@@ -2,7 +2,7 @@
 
 Research-only architecture gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-05T11:39:45+00:00`
+- generated_at: `2026-07-05T13:29:37+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `124`
@@ -10,9 +10,9 @@ Research-only architecture gate report. This report does not call providers, sen
 - retained_public_shims_count: `0`
 - shim_dependency_report_cache_status: `miss`
 - shim_dependency_include_runtime_artifacts: `False`
-- shim_dependency_scan_duration_seconds: `1.2502`
+- shim_dependency_scan_duration_seconds: `1.266`
 - shim_dependency_skipped_artifact_files: `1285`
-- shim_dependency_skipped_large_files: `2`
+- shim_dependency_skipped_large_files: `1`
 - v3_gate_status: `accepted_with_documented_exceptions`
 - v3_auto_accept_ready: `False`
 
@@ -44,8 +44,8 @@ Research-only architecture gate report. This report does not call providers, sen
 - scanner_api_service_lines: `120`
 - parser_build_parser_lines: `25`
 - commands_event_alpha_handle_lines: `2`
-- legacy_artifact_doctor_core_lines: `91`
-- legacy_artifact_doctor_core_note: `Behavior-compatible doctor implementation preserved while public artifact_doctor.py is the small orchestrator.`
+- api_artifact_doctor_core_lines: `91`
+- api_artifact_doctor_core_note: `Behavior-compatible doctor implementation preserved while public artifact_doctor.py is the small orchestrator.`
 - large_event_alpha_split_line_counts: `{"core_opportunity_store_api": 50, "core_opportunity_store_wrapper": 14, "daily_brief_api": 82, "daily_brief_wrapper": 32, "evidence_acquisition_api": 50, "evidence_acquisition_wrapper": 14, "impact_hypotheses_api": 59, "impact_hypotheses_wrapper": 14, "integrated_radar_api": 83, "integrated_radar_wrapper": 32, "notifications_pipeline_core": 104, "notifications_pipeline_wrapper": 49, "research_cards_api": 85, "research_cards_wrapper": 14}`
 - cli_flag_snapshot_path: `research/CLI_FLAG_SNAPSHOT.json`
 - scanner_command_body_functions_remaining: `0`
@@ -68,25 +68,25 @@ Research-only architecture gate report. This report does not call providers, sen
 - production_functions_over_limit: `0`
 - test_size_gate_status: `warning`
 - test_files_over_1500_lines: `8`
-- legacy_decomposition_gate_status: `pass`
-- legacy_file_retirement_status: `OK`
-- legacy_named_files_count: `0`
-- legacy_named_files_remaining: `0`
-- legacy_named_files_with_implementation: `0`
-- legacy_named_dirs_count: `0`
+- api_decomposition_gate_status: `pass`
+- transitional_file_status: `OK`
+- transitional_named_files_count: `0`
+- transitional_named_files_remaining: `0`
+- transitional_named_files_with_implementation: `0`
+- transitional_named_dirs_count: `0`
 - compatibility_named_files_remaining: `0`
-- legacy_top_level_event_modules_count: `0`
-- legacy_retained_public_shims_count: `0`
+- transitional_top_level_event_modules_count: `0`
+- transitional_retained_public_shims_count: `0`
 - retained_public_entrypoints: `0`
 - event_fade_safety_exception_present: `True`
 - scanner_entrypoint_exception_present: `True`
 - public_compatibility_entrypoints_path: `research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json`
-- legacy_files_over_1500_lines: `0`
-- legacy_files_over_3000_lines: `0`
-- legacy_total_lines: `0`
-- legacy_classes_over_limit: `0`
-- legacy_functions_over_limit: `0`
-- legacy_modules_with_multiple_public_classes: `0`
+- api_files_over_1500_lines: `0`
+- api_files_over_3000_lines: `0`
+- api_total_lines: `0`
+- api_classes_over_limit: `0`
+- api_functions_over_limit: `0`
+- api_modules_with_multiple_public_classes: `0`
 
 ## Architecture V3 Finalization Gates
 
@@ -149,7 +149,7 @@ Research-only architecture gate report. This report does not call providers, sen
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 |
-| `crypto_rsi_scanner/project_health/architecture_report.py` | 1485 |
+| `crypto_rsi_scanner/project_health/architecture_report.py` | 1472 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1431 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 |
@@ -194,11 +194,11 @@ Research-only architecture gate report. This report does not call providers, sen
 | path | lines | reason | revisit |
 |---|---:|---|---|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 | Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged. | When identity/source/market/derivatives merge golden fixtures can be compared before and after split. |
-| `crypto_rsi_scanner/project_health/architecture_report.py` | 1485 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
+| `crypto_rsi_scanner/project_health/architecture_report.py` | 1472 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1431 | Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral. | When deleted-shim reporting can be split from old-import linting without changing gate output. |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 | Dense operator audit renderer with many cross-section helper dependencies. | When audit sections are split with golden Markdown fixture comparison. |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | Verdict scoring and live-confirmation policy share many ordered caps and guardrails. | When verdict snapshots cover each opportunity level and cap reason. |
-| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 | Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to canonical non-legacy service modules. |
+| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 | Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to focused service modules. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | Route-gate decision logic is dense and behavior-critical for no-send notification eligibility. | When route-decision/gate snapshots cover every lane and quality-gate cap. |
 | `crypto_rsi_scanner/config.py` | 1319 | Central environment/config contract; splitting risks import-time default and env-var behavior drift. | When a dedicated config-v2 migration freeze and env snapshot tests exist. |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 | Provider/cache enrichment flow is stable and below blocker threshold. | When adding a new enrichment source or cache policy. |
@@ -225,7 +225,7 @@ Research-only architecture gate report. This report does not call providers, sen
 | `tests/event_alpha/test_source_coverage.py` | 2991 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
 | `tests/test_indicators.py` | 1779 |
-| `tests/cli/test_make_targets.py` | 1323 |
+| `tests/cli/test_make_targets.py` | 1322 |
 | `tests/event_alpha/_api_helpers.py` | 825 |
 | `tests/event_alpha/test_artifact_schema.py` | 743 |
 | `tests/rsi/test_indicators_core.py` | 694 |
@@ -285,7 +285,7 @@ Research-only architecture gate report. This report does not call providers, sen
 | path | lines | status | revisit condition |
 |---|---:|---|---|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/project_health/architecture_report.py` | 1485 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/project_health/architecture_report.py` | 1472 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1431 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
@@ -293,20 +293,20 @@ Research-only architecture gate report. This report does not call providers, sen
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/config.py` | 1319 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 
-## Legacy Decomposition Gate
+## API Decomposition Gate
 
 | path | lines |
 |---|---:|
 
 ## Doctor Plugin Migration
 
-- legacy_unregistered: `0`
-- legacy_unregistered_target: `5`
-- legacy_unregistered_status: `pass`
+- api_unregistered: `0`
+- api_unregistered_target: `5`
+- api_unregistered_status: `pass`
 - plugin_check_counts: `{"integrated_radar": 3, "namespace": 1, "notifications": 1, "outcomes": 1, "paths": 1, "provider_readiness": 2, "safety": 1, "secrets": 0, "source_coverage": 1, "stale_artifacts": 1}`
 - migrated_this_run: `29`
 
-### Remaining Legacy-Unregistered Doctor Sites
+### Remaining Unregistered Doctor Sites
 
 | check | next plugin | reason |
 |---|---|---|

@@ -22,17 +22,13 @@ COMPLETION_JSON = "ARCHITECTURE_COMPLETION_MAP.json"
 COMPLETION_MD = "ARCHITECTURE_COMPLETION_MAP.md"
 RELEASE_JSON = "ARCHITECTURE_RELEASE_CANDIDATE_REPORT.json"
 RELEASE_MD = "ARCHITECTURE_RELEASE_CANDIDATE_REPORT.md"
-LEGACY_COMPLETION_JSON = "REFACTOR_COMPLETION_MAP.json"
-LEGACY_COMPLETION_MD = "REFACTOR_COMPLETION_MAP.md"
-LEGACY_RELEASE_JSON = "REFACTOR_RELEASE_CANDIDATE_REPORT.json"
-LEGACY_RELEASE_MD = "REFACTOR_RELEASE_CANDIDATE_REPORT.md"
 
 
 def repo_root_from_module() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def build_refactor_completion_map(
+def build_architecture_completion_map(
     *,
     root: Path | None = None,
     verification_results: dict[str, Any] | None = None,
@@ -44,7 +40,7 @@ def build_refactor_completion_map(
     critical_blockers = _critical_blockers(final, size, verification)
     status = "accepted" if not critical_blockers else "pending_with_blockers"
     line_counts = final.get("line_counts", {})
-    final_refactor_gates = _final_refactor_gate_summary(final, root=root)
+    final_architecture_gates = _final_architecture_gate_summary(final, root=root)
     cli_summary = {
         "cli_event_alpha_service_lines": final.get("cli_event_alpha_service_lines"),
         "scanner_command_body_functions_remaining": final.get("scanner_command_body_functions_remaining"),
@@ -86,7 +82,7 @@ def build_refactor_completion_map(
                 "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py",
                 "line_count": line_counts.get("crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"),
                 "reason": "Preserves strict/WARN artifact doctor semantics while plugin migrations continue.",
-                "next_work": "Move legacy checks into focused doctor plugins with counter-preserving fixtures.",
+                "next_work": "Move remaining unregistered checks into focused doctor plugins with counter-preserving fixtures.",
             },
         ],
         "event_alpha_module_map": {
@@ -98,16 +94,14 @@ def build_refactor_completion_map(
             "intentionally_outside_event_alpha_modules": final.get("intentionally_outside_event_alpha_modules", []),
             "classification_report": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
         },
-        "final_refactor_gates": final_refactor_gates,
-        "final_architecture_gates": final_refactor_gates,
-        "cli_refactor": cli_summary,
+        "final_architecture_gates": final_architecture_gates,
         "cli_architecture": cli_summary,
-        "doctor_refactor": {
+        "doctor_architecture": {
             "public_doctor_lines": line_counts.get("crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"),
             "top_level_doctor_shim_lines": None,
             "top_level_doctor_shim_status": "deleted",
-            "legacy_doctor_core_lines": line_counts.get("crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"),
-            "legacy_unregistered": final.get("legacy_unregistered"),
+            "historical_doctor_core_lines": line_counts.get("crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"),
+            "api_unregistered": final.get("api_unregistered"),
             "plugin_check_counts": final.get("plugin_check_counts", {}),
         },
         "size_gates": {
@@ -145,20 +139,20 @@ def build_refactor_completion_map(
             "test_size_gate_status": size.get("test_size_gate_status"),
             "test_files_over_1500_lines": size.get("test_files_over_1500_lines"),
             "largest_test_files": size.get("largest_test_files", []),
-            "legacy_decomposition_gate_status": size.get("legacy_decomposition_gate_status"),
+            "api_decomposition_gate_status": size.get("api_decomposition_gate_status"),
             "new_violation_count": size.get("new_violation_count"),
             "moved_existing_violation_count": size.get("moved_existing_violation_count"),
             "files_over_limit_count": size.get("files_over_limit_count"),
             "functions_over_limit_count": size.get("functions_over_limit_count"),
             "classes_over_limit_count": size.get("classes_over_limit_count"),
-            "legacy_files_over_1500_lines": size.get("legacy_files_over_1500_lines"),
-            "legacy_files_over_3000_lines": size.get("legacy_files_over_3000_lines"),
-            "legacy_total_lines": size.get("legacy_total_lines"),
+            "api_files_over_1500_lines": size.get("api_files_over_1500_lines"),
+            "api_files_over_3000_lines": size.get("api_files_over_3000_lines"),
+            "api_total_lines": size.get("api_total_lines"),
             "largest_api_files": size.get("largest_api_files", []),
-            "legacy_classes_over_limit": size.get("legacy_classes_over_limit"),
-            "legacy_functions_over_limit": size.get("legacy_functions_over_limit"),
-            "legacy_modules_with_multiple_public_classes": size.get(
-                "legacy_modules_with_multiple_public_classes"
+            "api_classes_over_limit": size.get("api_classes_over_limit"),
+            "api_functions_over_limit": size.get("api_functions_over_limit"),
+            "api_modules_with_multiple_public_classes": size.get(
+                "api_modules_with_multiple_public_classes"
             ),
         },
         "schema_validation_coverage": _schema_validation_summary(root),
@@ -186,12 +180,12 @@ def build_release_candidate_report(
     root: Path | None = None,
     verification_results: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    completion = build_refactor_completion_map(root=root, verification_results=verification_results)
+    completion = build_architecture_completion_map(root=root, verification_results=verification_results)
     status = "accepted" if completion["status"] == "accepted" else "pending_with_documented_architecture_blockers"
     verdict = (
-        "Event Alpha refactor v2 accepted: critical behavior, safety, shim, size, scanner-facade, and regression checks passed."
+        "Event Alpha architecture accepted: critical behavior, safety, shim, size, scanner-facade, and regression checks passed."
         if status == "accepted"
-        else "Event Alpha refactor v2 pending: critical blockers remain documented below."
+        else "Event Alpha architecture pending: critical blockers remain documented below."
     )
     return {
         "schema_version": RELEASE_SCHEMA_VERSION,
@@ -220,7 +214,7 @@ def build_release_candidate_report(
     }
 
 
-def write_refactor_completion_map(
+def write_architecture_completion_map(
     *,
     root: Path | None = None,
     out_dir: Path | None = None,
@@ -229,7 +223,7 @@ def write_refactor_completion_map(
     root = (root or repo_root_from_module()).resolve()
     output_dir = out_dir or root / "research"
     output_dir.mkdir(parents=True, exist_ok=True)
-    completion = build_refactor_completion_map(root=root, verification_results=verification_results)
+    completion = build_architecture_completion_map(root=root, verification_results=verification_results)
     release = build_release_candidate_report(root=root, verification_results=verification_results)
     paths = {
         "completion_json": output_dir / COMPLETION_JSON,
@@ -245,15 +239,11 @@ def write_refactor_completion_map(
     paths["completion_markdown"].write_text(completion_markdown, encoding="utf-8")
     paths["release_json"].write_text(release_payload, encoding="utf-8")
     paths["release_markdown"].write_text(release_markdown, encoding="utf-8")
-    (output_dir / LEGACY_COMPLETION_JSON).write_text(completion_payload, encoding="utf-8")
-    (output_dir / LEGACY_COMPLETION_MD).write_text(completion_markdown, encoding="utf-8")
-    (output_dir / LEGACY_RELEASE_JSON).write_text(release_payload, encoding="utf-8")
-    (output_dir / LEGACY_RELEASE_MD).write_text(release_markdown, encoding="utf-8")
     return paths
 
 
 def format_completion_markdown(data: dict[str, Any]) -> str:
-    final_gates = data.get("final_refactor_gates", {})
+    final_gates = data.get("final_architecture_gates", {})
     lines = [
         "# Architecture Completion Map",
         "",
@@ -262,8 +252,8 @@ def format_completion_markdown(data: dict[str, Any]) -> str:
         f"- generated_at: `{data['generated_at']}`",
         f"- status: `{data['status']}`",
         f"- scanner.py lines: `{data['scanner_facade']['line_count']}`",
-        f"- scanner command bodies remaining: `{data['cli_refactor']['scanner_command_body_functions_remaining']}`",
-        f"- cli service bind sites: `{data['cli_refactor']['cli_service_bind_scanner_globals_call_sites']}`",
+        f"- scanner command bodies remaining: `{data['cli_architecture']['scanner_command_body_functions_remaining']}`",
+        f"- cli service bind sites: `{data['cli_architecture']['cli_service_bind_scanner_globals_call_sites']}`",
         f"- active shims: `{data['event_alpha_module_map']['active_shims']}`",
         f"- active shim logic violations: `{data['event_alpha_module_map']['active_shim_modules_with_implementation_logic']}`",
         f"- size gate status: `{data['size_gates']['gate_status']}`",
@@ -278,10 +268,10 @@ def format_completion_markdown(data: dict[str, Any]) -> str:
         f"- remaining class ownership debt: `{data['size_gates'].get('remaining_class_ownership_debt_count')}`",
         f"- multiple public class module status: `{data['size_gates'].get('modules_with_multiple_public_classes_status')}`",
         f"- test size gate status: `{data['size_gates'].get('test_size_gate_status')}`",
-        f"- legacy decomposition gate status: `{data['size_gates'].get('legacy_decomposition_gate_status')}`",
-        f"- legacy files over 3000 lines: `{data['size_gates'].get('legacy_files_over_3000_lines')}`",
-        f"- legacy_named_files_remaining: `{final_gates.get('legacy_named_files_remaining')}`",
-        f"- legacy_named_files_with_implementation: `{final_gates.get('legacy_named_files_with_implementation')}`",
+        f"- api decomposition gate status: `{data['size_gates'].get('api_decomposition_gate_status')}`",
+        f"- api files over 3000 lines: `{data['size_gates'].get('api_files_over_3000_lines')}`",
+        f"- transitional_named_files_remaining: `{final_gates.get('transitional_named_files_remaining')}`",
+        f"- transitional_named_files_with_implementation: `{final_gates.get('transitional_named_files_with_implementation')}`",
         f"- compatibility_named_files_remaining: `{final_gates.get('compatibility_named_files_remaining')}`",
         f"- old_path_internal_imports: `{final_gates.get('old_path_internal_imports')}`",
         f"- old_path_test_imports: `{final_gates.get('old_path_test_imports')}`",
@@ -331,7 +321,7 @@ def format_completion_markdown(data: dict[str, Any]) -> str:
 
 def format_release_markdown(data: dict[str, Any]) -> str:
     lines = [
-        "# Refactor Release-Candidate Report",
+        "# Architecture Release-Candidate Report",
         "",
         f"- generated_at: `{data['generated_at']}`",
         f"- status: `{data['status']}`",
@@ -380,8 +370,8 @@ def _critical_blockers(
         blockers.append({"id": "architecture_size_gate", "reason": "architecture size gate has new violations compared to baseline"})
     if size.get("production_size_gate_status") == "blocked":
         blockers.append({"id": "production_size_gate", "reason": "production source files over 1,500 lines remain without accepted exceptions"})
-    if size.get("legacy_decomposition_gate_status") == "blocked":
-        blockers.append({"id": "legacy_decomposition_gate", "reason": "transitional implementation files over 3,000 lines remain"})
+    if size.get("api_decomposition_gate_status") == "blocked":
+        blockers.append({"id": "api_decomposition_gate", "reason": "transitional implementation files over 3,000 lines remain"})
     if int(final.get("active_shim_modules_with_implementation_logic") or 0) != 0:
         blockers.append({"id": "active_shim_logic", "reason": "active shim modules contain implementation logic"})
     if int(final.get("scanner_command_body_functions_remaining") or 0) != 0:
@@ -393,16 +383,12 @@ def _critical_blockers(
     return blockers
 
 
-def _final_refactor_gate_summary(final: dict[str, Any], *, root: Path) -> dict[str, Any]:
-    legacy_retirement = _read_json(root / "research" / "ARCHITECTURE_TRANSITIONAL_FILE_REPORT.json")
-    if not legacy_retirement:
-        legacy_retirement = _read_json(root / "research" / "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.json")
-    if not legacy_retirement:
-        legacy_retirement = _read_json(root / "research" / "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.json")
+def _final_architecture_gate_summary(final: dict[str, Any], *, root: Path) -> dict[str, Any]:
+    api_retirement = _read_json(root / "research" / "ARCHITECTURE_TRANSITIONAL_FILE_REPORT.json")
     final_shim_status = _read_json(root / "research" / "EVENT_ALPHA_FINAL_SHIM_STATUS.json")
     deleted_shims_count = _first_present(
         final.get("deleted_shims_count"),
-        legacy_retirement.get("deleted_shims_count"),
+        api_retirement.get("deleted_shims_count"),
         final_shim_status.get("deleted_shims_count"),
         final_shim_status.get("removed_shims_count"),
     )
@@ -413,8 +399,8 @@ def _final_refactor_gate_summary(final: dict[str, Any], *, root: Path) -> dict[s
         and int(final.get("old_path_import_allowed_exceptions") or 0) == 0
     )
     return {
-        "legacy_named_files_remaining": final.get("legacy_named_files_remaining"),
-        "legacy_named_files_with_implementation": final.get("legacy_named_files_with_implementation"),
+        "transitional_named_files_remaining": final.get("transitional_named_files_remaining"),
+        "transitional_named_files_with_implementation": final.get("transitional_named_files_with_implementation"),
         "compatibility_named_files_remaining": final.get("compatibility_named_files_remaining"),
         "old_path_internal_imports": final.get("old_path_internal_imports"),
         "old_path_test_imports": final.get("old_path_test_imports"),
@@ -480,7 +466,7 @@ def _schema_validation_summary(root: Path) -> dict[str, Any]:
 def _monolith_reductions(completion: dict[str, Any]) -> dict[str, Any]:
     return {
         "scanner_py": completion["scanner_facade"],
-        "doctor": completion["doctor_refactor"],
+        "doctor": completion["doctor_architecture"],
         "tests_umbrella": {
             "path": "tests/test_indicators.py",
             "target_lines_lt": 2000,
@@ -524,7 +510,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out-dir", default=None)
     parser.add_argument("--verification-results", default=None)
     args = parser.parse_args(argv)
-    paths = write_refactor_completion_map(
+    paths = write_architecture_completion_map(
         out_dir=Path(args.out_dir).expanduser() if args.out_dir else None,
         verification_results=_load_verification(args.verification_results),
     )
@@ -536,11 +522,6 @@ def main(argv: list[str] | None = None) -> int:
     print(f"status={completion.get('status')}")
     print(f"scanner_lines={completion.get('scanner_facade', {}).get('line_count')}")
     return 0 if completion.get("status") in {"accepted", "pending_with_blockers"} else 1
-
-
-build_architecture_completion_map = build_refactor_completion_map
-write_architecture_completion_map = write_refactor_completion_map
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

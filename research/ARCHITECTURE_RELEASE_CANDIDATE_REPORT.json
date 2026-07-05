@@ -21,7 +21,7 @@
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1485,
+        "line_count": 1472,
         "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -225,7 +225,7 @@
         "line_count": 89,
         "module": "crypto_rsi_scanner.storage_parts.watchlist",
         "over_limit": true,
-        "owner_note": "No DB schema or paper/watchlist behavior changes in this refactor pass.",
+        "owner_note": "No DB schema or paper/watchlist behavior changes in this architecture-maintenance pass.",
         "reason": "Watchlist persistence methods are stable DB helpers and only slightly exceed the advisory limit.",
         "revisit_condition": "Revisit when watchlist storage grows new tables or migrations.",
         "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
@@ -233,10 +233,10 @@
     ]
   },
   "doctor_registry_coverage": {
-    "legacy_unregistered": 0,
-    "legacy_unregistered_note": "",
-    "legacy_unregistered_status": "pass",
-    "legacy_unregistered_target": 5,
+    "api_unregistered": 0,
+    "api_unregistered_note": "",
+    "api_unregistered_status": "pass",
+    "api_unregistered_target": 5,
     "migrated_this_run": 29,
     "plugin_check_counts": {
       "integrated_radar": 3,
@@ -252,15 +252,10 @@
     },
     "remaining_api_unregistered_details": []
   },
-  "generated_at": "2026-07-05T11:40:01+00:00",
+  "generated_at": "2026-07-05T13:30:07+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_release_candidate_report",
-  "known_remaining_blockers": [
-    {
-      "id": "verification_not_recorded",
-      "reason": "release-candidate verification results were not supplied"
-    }
-  ],
+  "known_remaining_blockers": [],
   "line_counts": {
     "crypto_rsi_scanner/cli/commands_event_alpha.py": 14,
     "crypto_rsi_scanner/cli/parser.py": 225,
@@ -284,8 +279,8 @@
   },
   "monolith_size_reductions": {
     "doctor": {
-      "legacy_doctor_core_lines": 91,
-      "legacy_unregistered": 0,
+      "api_unregistered": 0,
+      "historical_doctor_core_lines": 91,
       "plugin_check_counts": {
         "integrated_radar": 3,
         "namespace": 1,
@@ -329,7 +324,7 @@
     "unknown_namespace_count": 0,
     "unknown_namespaces": []
   },
-  "rc_verdict": "Event Alpha refactor v2 pending: critical blockers remain documented below.",
+  "rc_verdict": "Event Alpha architecture accepted: critical behavior, safety, shim, size, scanner-facade, and regression checks passed.",
   "row_type": "architecture_release_candidate_report",
   "safety_invariants": {
     "no_event_alpha_created_triggered_fade": true,
@@ -360,11 +355,195 @@
     "top_level_event_module_count": 1,
     "unmigrated_modules": 1
   },
-  "status": "pending_with_documented_architecture_blockers",
+  "status": "accepted",
   "verification": {
-    "commands": [],
+    "commands": [
+      {
+        "command": "python3 tests/test_indicators.py",
+        "elapsed_seconds": 177,
+        "index": 1,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q",
+        "elapsed_seconds": 202,
+        "index": 2,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "python3 -m compileall -q crypto_rsi_scanner tests",
+        "elapsed_seconds": 1,
+        "index": 3,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make architecture-naming-check PYTHON=python3",
+        "elapsed_seconds": 1,
+        "index": 4,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make architecture-transitional-file-check PYTHON=python3",
+        "elapsed_seconds": 1,
+        "index": 5,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make architecture-size-gates PYTHON=python3",
+        "elapsed_seconds": 3,
+        "index": 6,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make architecture-class-ownership-report PYTHON=python3",
+        "elapsed_seconds": 2,
+        "index": 7,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make architecture-final-report PYTHON=python3",
+        "elapsed_seconds": 6,
+        "index": 8,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make architecture-completion-map PYTHON=python3",
+        "elapsed_seconds": 22,
+        "index": 9,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make architecture-cleanliness-check PYTHON=python3",
+        "elapsed_seconds": 6,
+        "index": 10,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-old-import-check PYTHON=python3",
+        "elapsed_seconds": 2,
+        "index": 11,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-shim-dependency-report PYTHON=python3",
+        "elapsed_seconds": 2,
+        "index": 12,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-integrated-radar-smoke PYTHON=python3",
+        "elapsed_seconds": 3,
+        "index": 13,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-integrated-radar-doctor PYTHON=python3",
+        "elapsed_seconds": 1,
+        "index": 14,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-notification-format-smoke PYTHON=python3",
+        "elapsed_seconds": 3,
+        "index": 15,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-telegram-no-send-final-check-fast PYTHON=python3",
+        "elapsed_seconds": 4,
+        "index": 16,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-evidence-acquisition-smoke PYTHON=python3",
+        "elapsed_seconds": 5,
+        "index": 17,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3",
+        "elapsed_seconds": 5,
+        "index": 18,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-preflight-smoke PYTHON=python3",
+        "elapsed_seconds": 1,
+        "index": 19,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-preflight PYTHON=python3",
+        "elapsed_seconds": 1,
+        "index": 20,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3",
+        "elapsed_seconds": 1,
+        "index": 21,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+        "elapsed_seconds": 1,
+        "index": 22,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+        "elapsed_seconds": 5,
+        "index": 23,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+        "elapsed_seconds": 2,
+        "index": 24,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3",
+        "elapsed_seconds": 3,
+        "index": 25,
+        "returncode": 0,
+        "status": "pass"
+      },
+      {
+        "command": "make verify PYTHON=python3",
+        "elapsed_seconds": 78,
+        "index": 26,
+        "returncode": 0,
+        "status": "pass"
+      }
+    ],
     "failed_commands": 0,
-    "status": "not_run",
-    "total_commands": 0
+    "status": "pass",
+    "total_commands": 26,
+    "total_elapsed_seconds": 540
   }
 }

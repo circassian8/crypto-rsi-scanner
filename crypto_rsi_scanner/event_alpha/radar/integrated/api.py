@@ -19,7 +19,7 @@ from .pipeline_parts import report as _report
 from .pipeline_parts import sidecars as _sidecars
 from .pipeline_parts import utilities as _utilities
 
-_LEGACY_MODULES: tuple[ModuleType, ...] = (
+_API_MODULES: tuple[ModuleType, ...] = (
     _cycle,
     _merge,
     _models,
@@ -27,7 +27,7 @@ _LEGACY_MODULES: tuple[ModuleType, ...] = (
     _sidecars,
     _utilities,
 )
-_LEGACY_MODULE_EXPORTS: dict[ModuleType, set[str]] = {
+_API_MODULE_EXPORTS: dict[ModuleType, set[str]] = {
     _cycle: set(getattr(_cycle, "__all__", ())),
     _merge: set(getattr(_merge, "__all__", ())),
     _models: set(getattr(_models, "__all__", ())),
@@ -35,7 +35,7 @@ _LEGACY_MODULE_EXPORTS: dict[ModuleType, set[str]] = {
     _sidecars: set(getattr(_sidecars, "__all__", ())),
     _utilities: set(getattr(_utilities, "__all__", ())),
 }
-_WRAPPED_LEGACY_CALLS: dict[str, Any] = {}
+_WRAPPED_API_CALLS: dict[str, Any] = {}
 
 
 def _sync_api_module_globals() -> None:
@@ -45,12 +45,12 @@ def _sync_api_module_globals() -> None:
         if not name.startswith("__")
         and name not in {
             "ModuleType", "Any", "functools", "inspect",
-            "_LEGACY_MODULES", "_LEGACY_MODULE_EXPORTS", "_WRAPPED_LEGACY_CALLS",
+            "_API_MODULES", "_API_MODULE_EXPORTS", "_WRAPPED_API_CALLS",
             "_sync_api_module_globals", "_wrap_api_call", "_install_api_modules",
         }
     }
-    for module in _LEGACY_MODULES:
-        local_exports = _LEGACY_MODULE_EXPORTS[module]
+    for module in _API_MODULES:
+        local_exports = _API_MODULE_EXPORTS[module]
         for name, value in source.items():
             if name in local_exports:
                 continue
@@ -63,13 +63,13 @@ def _wrap_api_call(module: ModuleType, name: str, func: Any) -> Any:
         _sync_api_module_globals()
         return getattr(module, name)(*args, **kwargs)
 
-    _WRAPPED_LEGACY_CALLS[name] = _wrapped
+    _WRAPPED_API_CALLS[name] = _wrapped
     return _wrapped
 
 
 def _install_api_modules() -> None:
-    for module in _LEGACY_MODULES:
-        for name in _LEGACY_MODULE_EXPORTS[module]:
+    for module in _API_MODULES:
+        for name in _API_MODULE_EXPORTS[module]:
             value = getattr(module, name)
             if inspect.isfunction(value) and getattr(value, "__module__", "") == module.__name__:
                 globals()[name] = _wrap_api_call(module, name, value)
@@ -80,4 +80,4 @@ def _install_api_modules() -> None:
 _install_api_modules()
 _sync_api_module_globals()
 
-__all__ = tuple(sorted(name for module in _LEGACY_MODULES for name in _LEGACY_MODULE_EXPORTS[module]))
+__all__ = tuple(sorted(name for module in _API_MODULES for name in _API_MODULE_EXPORTS[module]))

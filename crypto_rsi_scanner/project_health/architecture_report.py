@@ -29,12 +29,8 @@ from ..event_alpha.namespace import lifecycle as namespace_lifecycle
 REPORT_SCHEMA_VERSION = "architecture_final_report_v1"
 REPORT_JSON = "ARCHITECTURE_FINAL_REPORT.json"
 REPORT_MD = "ARCHITECTURE_FINAL_REPORT.md"
-LEGACY_REPORT_JSON = "REFACTOR_FINAL_REPORT.json"
-LEGACY_REPORT_MD = "REFACTOR_FINAL_REPORT.md"
 V3_RELEASE_CANDIDATE_JSON = "ARCHITECTURE_RELEASE_REPORT.json"
 V3_RELEASE_CANDIDATE_MD = "ARCHITECTURE_RELEASE_REPORT.md"
-LEGACY_V3_RELEASE_CANDIDATE_JSON = "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.json"
-LEGACY_V3_RELEASE_CANDIDATE_MD = "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.md"
 V4_FINAL_JSON = release_report.V4_FINAL_JSON
 V4_FINAL_MD = release_report.V4_FINAL_MD
 MAJOR_TARGETS = {
@@ -135,8 +131,6 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 def _baseline_line_counts(root: Path) -> dict[str, int | None]:
     data = _load_json(root / "research" / "ARCHITECTURE_BASELINE.json")
-    if not data:
-        data = _load_json(root / "research" / "REFACTOR_BASELINE.json")
     counts = data.get("line_counts")
     if isinstance(counts, dict):
         return {
@@ -264,8 +258,8 @@ def _doctor_api_unregistered_details() -> list[dict[str, str]]:
             "next_plugin": "integrated_radar.py",
         },
         {
-            "check": "legacy_alert_snapshot_lineage",
-            "reason": "Legacy rows are intentionally tolerated in some scopes and blocked in others.",
+            "check": "api_alert_snapshot_lineage",
+            "reason": "Historical rows are intentionally tolerated in some scopes and blocked in others.",
             "next_plugin": "stale_artifacts.py",
         },
         {
@@ -275,7 +269,7 @@ def _doctor_api_unregistered_details() -> list[dict[str, str]]:
         },
         {
             "check": "outcomes_without_matching_alert_snapshot",
-            "reason": "Outcome lineage severity depends on strict mode and legacy artifact scope.",
+            "reason": "Outcome lineage severity depends on strict mode and historical artifact scope.",
             "next_plugin": "outcomes.py",
         },
         {
@@ -391,8 +385,6 @@ def _remaining_module_classification(root: Path) -> dict[str, Any]:
 
 def _class_ownership_summary(root: Path) -> dict[str, Any]:
     path = root / "research" / "ARCHITECTURE_CLASS_OWNERSHIP_REPORT.json"
-    if not path.exists():
-        path = root / "research" / "REFACTOR_CLASS_OWNERSHIP_REPORT.json"
     data = _load_json(path)
     if not data:
         return {
@@ -489,17 +481,23 @@ def _shim_final_fields(*, deleted_shims: int, final_shim_status: Mapping[str, An
         ),
     }
 
-def _legacy_file_final_fields(report: Mapping[str, Any]) -> dict[str, Any]:
+def _transitional_file_final_fields(report: Mapping[str, Any]) -> dict[str, Any]:
     return {
-        "legacy_file_retirement": report,
-        "legacy_file_retirement_status": report["status"],
-        "legacy_named_files_count": report["legacy_named_files_count"],
-        "legacy_named_files_remaining": report.get("legacy_named_files_remaining", report["legacy_named_files_count"]),
-        "legacy_named_files_with_implementation": report.get("legacy_named_files_with_implementation", 0),
-        "legacy_named_dirs_count": report["legacy_named_dirs_count"],
+        "transitional_file_report": report,
+        "transitional_file_status": report["status"],
+        "transitional_named_files_count": report["transitional_named_files_count"],
+        "transitional_named_files_remaining": report.get(
+            "transitional_named_files_remaining",
+            report["transitional_named_files_count"],
+        ),
+        "transitional_named_files_with_implementation": report.get(
+            "transitional_named_files_with_implementation",
+            0,
+        ),
+        "transitional_named_dirs_count": report["transitional_named_dirs_count"],
         "compatibility_named_files_remaining": report.get("compatibility_named_files_remaining", 0),
-        "legacy_top_level_event_modules_count": report["top_level_event_modules_count"],
-        "legacy_retained_public_shims_count": report["retained_public_shims_count"],
+        "transitional_top_level_event_modules_count": report["top_level_event_modules_count"],
+        "transitional_retained_public_shims_count": report["retained_public_shims_count"],
         "retained_public_entrypoints": report.get("retained_public_entrypoints", report["retained_public_shims_count"]),
         "event_fade_safety_exception_present": report.get("event_fade_safety_exception_present", False),
         "scanner_entrypoint_exception_present": report.get("scanner_entrypoint_exception_present", False),
@@ -540,32 +538,32 @@ def _line_gate_rows(
         )
     return rows
 
-def _doctor_plugin_migration_summary(*, legacy_unregistered: int, root: Path) -> dict[str, Any]:
+def _doctor_plugin_migration_summary(*, api_unregistered: int, root: Path) -> dict[str, Any]:
     return {
         "plugin_check_counts": _doctor_plugin_check_counts(root),
-        "legacy_unregistered": legacy_unregistered,
-        "legacy_unregistered_target": 5,
-        "legacy_unregistered_status": "pass" if legacy_unregistered <= 5 else "documented_blocker",
-        "legacy_unregistered_note": "" if legacy_unregistered <= 5 else "Remaining imperative doctor append sites are documented for the next plugin migration batch.",
-        "remaining_api_unregistered_details": _doctor_api_unregistered_details() if legacy_unregistered > 5 else [],
+        "api_unregistered": api_unregistered,
+        "api_unregistered_target": 5,
+        "api_unregistered_status": "pass" if api_unregistered <= 5 else "documented_blocker",
+        "api_unregistered_note": "" if api_unregistered <= 5 else "Remaining imperative doctor append sites are documented for the next plugin migration batch.",
+        "remaining_api_unregistered_details": _doctor_api_unregistered_details() if api_unregistered > 5 else [],
         "migrated_this_run": len(MIGRATED_MODULES_THIS_RUN),
     }
 
-def _refactor_extra_blockers(
+def _architecture_extra_blockers(
     *,
-    legacy_unregistered: int,
+    api_unregistered: int,
     cli_event_alpha_service_lines: int | None,
     cli_service_bind_calls: int,
-    legacy_inventory: Mapping[str, Any],
-    legacy_file_report: Mapping[str, Any],
+    api_inventory: Mapping[str, Any],
+    transitional_file_report: Mapping[str, Any],
     size_gate_report: Mapping[str, Any],
 ) -> list[dict[str, str]]:
     extra_blockers: list[dict[str, str]] = []
-    if legacy_unregistered > 5:
+    if api_unregistered > 5:
         extra_blockers.append(
             {
                 "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py",
-                "blocker_reason": "legacy_unregistered doctor append sites remain above the requested <=5 target.",
+                "blocker_reason": "api_unregistered doctor append sites remain above the requested <=5 target.",
                 "next_migration_module": "crypto_rsi_scanner/event_alpha/doctor/checks/safety.py and integrated_radar.py",
                 "risk": "Moving the last imperative checks without enough fixtures can change blocker/WARN semantics.",
             }
@@ -588,27 +586,27 @@ def _refactor_extra_blockers(
                 "risk": "Removing the runtime binding too early can break historical helper/config resolution for Makefile-backed commands.",
             }
         )
-    if legacy_inventory["legacy_decomposition_gate_status"] == "blocked":
-        for row in legacy_inventory["legacy_decomposition_blockers"]:
+    if api_inventory["api_decomposition_gate_status"] == "blocked":
+        for row in api_inventory["api_decomposition_blockers"]:
             extra_blockers.append(
                 {
                     "path": str(row.get("path")),
                     "blocker_reason": (
                         "Transitional implementation core remains over 3,000 lines; wrappers are not enough "
-                        "to mark the refactor complete."
+                        "to mark the architecture cleanup complete."
                     ),
                     "next_migration_module": "focused transitional decomposition modules for this file",
                     "risk": "Moving too much at once can change CLI, doctor, notification, card, brief, or radar semantics.",
                 }
             )
-    if legacy_file_report.get("status") == "BLOCKED":
-        for row in legacy_file_report.get("blockers", []):
+    if transitional_file_report.get("status") == "BLOCKED":
+        for row in transitional_file_report.get("blockers", []):
             if not isinstance(row, dict):
                 continue
             extra_blockers.append(
                 {
                     "path": str(row.get("path")),
-                    "blocker_reason": "Final refactor v3 legacy-retirement gate found a migration-era filename, directory, retained shim, or flat Event Alpha module.",
+                    "blocker_reason": "Final architecture gate found a migration-era filename, directory, retained shim, or flat Event Alpha module.",
                     "next_migration_module": "Delete the old file/path or move it to a canonical package name; keep only scanner.py and event_fade.py as documented exceptions.",
                     "risk": "Leaving migration-era paths allows new code to drift back into old compatibility surfaces.",
                 }
@@ -621,7 +619,7 @@ def _refactor_extra_blockers(
                 {
                     "path": str(row.get("path")),
                     "blocker_reason": (
-                        "Production module remains over 1,500 lines; refactor completion must "
+                        "Production module remains over 1,500 lines; architecture completion must "
                         "document an explicit exception or split the file."
                     ),
                     "next_migration_module": "focused production split modules for this file",
@@ -670,13 +668,11 @@ def _old_import_deprecation_plan() -> list[dict[str, str]]:
 
 def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str, Any]) -> dict[str, Any]:
     verification = _load_json(root / "research" / "ARCHITECTURE_VERIFICATION_RESULTS.json")
-    if not verification:
-        verification = _load_json(root / "research" / "REFACTOR_VERIFICATION_RESULTS.json")
     commands = verification.get("commands") if isinstance(verification.get("commands"), list) else []
     failed_commands = verification.get("failed_commands") if isinstance(verification.get("failed_commands"), list) else []
     critical_gates = {
         "all_commands_passed": "pass" if not failed_commands else "blocked",
-        "refactor_final_has_no_blockers": "pass" if not final_report.get("blockers") else "blocked",
+        "architecture_final_has_no_blockers": "pass" if not final_report.get("blockers") else "blocked",
         "only_event_fade_top_level_implementation": (
             "pass"
             if final_report.get("intentionally_outside_event_alpha_modules") == ["crypto_rsi_scanner.event_fade"]
@@ -691,12 +687,16 @@ def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str,
         "functions_over_150_zero": "pass" if int(final_report.get("functions_over_150_lines") or 0) == 0 else "blocked",
         "oversized_classes_are_accepted": "pass" if int(final_report.get("remaining_class_ownership_debt_count") or 0) == 0 else "blocked",
         "unresolved_multi_class_modules_zero": "pass" if int(final_report.get("unresolved_multi_class_modules_count") or 0) == 0 else "blocked",
-        "doctor_registry_api_unregistered_zero": "pass" if int(final_report.get("legacy_unregistered") or 0) == 0 else "blocked",
+        "doctor_registry_api_unregistered_zero": "pass" if int(final_report.get("api_unregistered") or 0) == 0 else "blocked",
         "namespace_unknown_zero": "pass" if int(final_report.get("unknown_namespace_count") or 0) == 0 else "blocked",
         "shim_dependency_status_ok": "pass" if int(final_report.get("old_path_import_allowed_exceptions") or 0) == 0 else "blocked",
-        "legacy_file_retirement_ok": "pass" if final_report.get("legacy_file_retirement_status") == "OK" else "blocked",
-        "legacy_named_files_zero": "pass" if int(final_report.get("legacy_named_files_remaining") or 0) == 0 else "blocked",
-        "legacy_named_files_with_implementation_zero": "pass" if int(final_report.get("legacy_named_files_with_implementation") or 0) == 0 else "blocked",
+        "transitional_file_status_ok": "pass" if final_report.get("transitional_file_status") == "OK" else "blocked",
+        "transitional_named_files_zero": (
+            "pass" if int(final_report.get("transitional_named_files_remaining") or 0) == 0 else "blocked"
+        ),
+        "transitional_named_files_with_implementation_zero": (
+            "pass" if int(final_report.get("transitional_named_files_with_implementation") or 0) == 0 else "blocked"
+        ),
         "compatibility_named_files_zero": "pass" if int(final_report.get("compatibility_named_files_remaining") or 0) == 0 else "blocked",
         "retained_public_entrypoints_zero": "pass" if int(final_report.get("retained_public_entrypoints") or 0) == 0 else "blocked",
         "event_fade_safety_exception_present": "pass" if final_report.get("event_fade_safety_exception_present") is True else "blocked",
@@ -726,12 +726,12 @@ def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str,
         "commands_passed": max(0, int(verification.get("total_commands") or len(commands)) - len(failed_commands)),
         "commands_total": int(verification.get("total_commands") or len(commands)),
         "duration_seconds_total": verification.get("elapsed_seconds"),
-        "refactor_final_v3_gate_status": final_report.get("v3_gate_status"),
-        "refactor_final_v3_auto_accept_ready": final_report.get("v3_auto_accept_ready"),
-        "refactor_final_v3_auto_accept_blockers": final_report.get("v3_auto_accept_blockers", []),
-        "refactor_final_v3_blockers": final_report.get("v3_blockers", []),
-        "refactor_final_v3_pending_exceptions": final_report.get("v3_pending_exceptions", []),
-        "refactor_final_v3_accepted_exceptions": accepted_exceptions,
+        "architecture_v3_gate_status": final_report.get("v3_gate_status"),
+        "architecture_v3_auto_accept_ready": final_report.get("v3_auto_accept_ready"),
+        "architecture_v3_auto_accept_blockers": final_report.get("v3_auto_accept_blockers", []),
+        "architecture_v3_blockers": final_report.get("v3_blockers", []),
+        "architecture_v3_pending_exceptions": final_report.get("v3_pending_exceptions", []),
+        "architecture_v3_accepted_exceptions": accepted_exceptions,
         "accepted_warning_gates": sorted(accepted_exceptions),
         "production_files_over_1200_lines": final_report.get("production_files_over_1200_lines"),
         "accepted_production_files_over_1200_line_rows": final_report.get("accepted_production_files_over_1200_line_rows", []),
@@ -750,8 +750,10 @@ def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str,
         "retained_public_shims": final_report.get("retained_shims_with_reason", []),
         "deleted_shims_count": final_report.get("deleted_shims"),
         "deleted_shims_manifest": "research/EVENT_ALPHA_DELETED_SHIMS.json",
-        "legacy_named_files_remaining": final_report.get("legacy_named_files_remaining"),
-        "legacy_named_files_with_implementation": final_report.get("legacy_named_files_with_implementation"),
+        "transitional_named_files_remaining": final_report.get("transitional_named_files_remaining"),
+        "transitional_named_files_with_implementation": final_report.get(
+            "transitional_named_files_with_implementation"
+        ),
         "compatibility_named_files_remaining": final_report.get("compatibility_named_files_remaining"),
         "retained_public_entrypoints": final_report.get("retained_public_entrypoints"),
         "event_fade_safety_exception_present": final_report.get("event_fade_safety_exception_present"),
@@ -761,17 +763,12 @@ def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str,
         "old_path_test_imports": final_report.get("old_path_test_imports"),
         "old_path_docs_references": final_report.get("old_path_docs_references"),
         "old_path_import_allowed_exceptions": final_report.get("old_path_import_allowed_exceptions"),
-        "doctor_registry_status": {"legacy_unregistered": final_report.get("legacy_unregistered")},
+        "doctor_registry_status": {"api_unregistered": final_report.get("api_unregistered")},
         "namespace_lifecycle_status": final_report.get("namespace_lifecycle_inventory", {}),
         "source_reports": {
             "architecture_final": "research/ARCHITECTURE_FINAL_REPORT.json",
             "architecture_size_gates": "research/ARCHITECTURE_SIZE_GATES.json",
             "architecture_class_ownership": "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.json",
-            "legacy_aliases": {
-                "refactor_final": "research/REFACTOR_FINAL_REPORT.json",
-                "refactor_size_gates": "research/REFACTOR_SIZE_GATES.json",
-                "refactor_class_ownership": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
-            },
             "shim_dependency": "research/EVENT_ALPHA_SHIM_DEPENDENCY_REPORT.json",
             "old_import_check": "research/EVENT_ALPHA_OLD_IMPORT_CHECK.json",
         },
@@ -793,7 +790,7 @@ def _format_v3_release_candidate_markdown(report: Mapping[str, Any]) -> str:
     total = report.get("commands_total") or 0
     passed = report.get("commands_passed") or 0
     lines = [
-        "# Refactor V3 Release Candidate Report",
+        "# Architecture Release Candidate Report",
         "",
         "Research-only release-candidate report. This report does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created `TRIGGERED_FADE`.",
         "",
@@ -820,9 +817,9 @@ def _format_v3_release_candidate_markdown(report: Mapping[str, Any]) -> str:
             "|---|---:|",
             f"| `production_files_over_1200_lines` | `{report.get('production_files_over_1200_lines')}` |",
             f"| `accepted_class_exceptions_count` | `{report.get('accepted_class_exceptions_count')}` |",
-            f"| `refactor_final_v3_gate_status` | `{report.get('refactor_final_v3_gate_status')}` |",
-            f"| `refactor_final_v3_auto_accept_blockers` | `{report.get('refactor_final_v3_auto_accept_blockers')}` |",
-            f"| `refactor_final_v3_blockers` | `{report.get('refactor_final_v3_blockers')}` |",
+            f"| `architecture_v3_gate_status` | `{report.get('architecture_v3_gate_status')}` |",
+            f"| `architecture_v3_auto_accept_blockers` | `{report.get('architecture_v3_auto_accept_blockers')}` |",
+            f"| `architecture_v3_blockers` | `{report.get('architecture_v3_blockers')}` |",
             "",
             "## Event Module And Shim Status",
             "",
@@ -830,8 +827,8 @@ def _format_v3_release_candidate_markdown(report: Mapping[str, Any]) -> str:
             f"- retained_public_shims_count: `{report.get('retained_public_shims_count')}`",
             f"- retained_public_entrypoints: `{report.get('retained_public_entrypoints')}`",
             f"- deleted_shims_count: `{report.get('deleted_shims_count')}`",
-            f"- legacy_named_files_remaining: `{report.get('legacy_named_files_remaining')}`",
-            f"- legacy_named_files_with_implementation: `{report.get('legacy_named_files_with_implementation')}`",
+            f"- transitional_named_files_remaining: `{report.get('transitional_named_files_remaining')}`",
+            f"- transitional_named_files_with_implementation: `{report.get('transitional_named_files_with_implementation')}`",
             f"- compatibility_named_files_remaining: `{report.get('compatibility_named_files_remaining')}`",
             f"- event_fade_safety_exception_present: `{report.get('event_fade_safety_exception_present')}`",
             f"- scanner_entrypoint_exception_present: `{report.get('scanner_entrypoint_exception_present')}`",
@@ -902,14 +899,6 @@ def _write_v3_release_candidate_report(*, root: Path, output_dir: Path, final_re
         markdown,
         encoding="utf-8",
     )
-    (output_dir / LEGACY_V3_RELEASE_CANDIDATE_JSON).write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    (output_dir / LEGACY_V3_RELEASE_CANDIDATE_MD).write_text(
-        markdown,
-        encoding="utf-8",
-    )
     return report, markdown
 
 def build_architecture_report(
@@ -948,8 +937,8 @@ def build_architecture_report(
     ci_static_safety = _ci_static_safety(root)
     classification = _remaining_module_classification(root)
     class_ownership = _class_ownership_summary(root)
-    legacy_inventory = api_inventory.build_api_inventory(root=root)
-    legacy_file_report = transitional_file_check.build_report(root=root)
+    api_inventory_data = api_inventory.build_api_inventory(root=root)
+    transitional_file_report = transitional_file_check.build_report(root=root)
     size_gate_report = size_gates.build_gate_report(root=root)
     v3_gate_snapshot = _build_v3_gate_snapshot(root=root, size_gate_report=size_gate_report)
     deleted_shims = event_alpha_shims.deleted_shim_count(root=root)
@@ -963,15 +952,19 @@ def build_architecture_report(
     cli_service_bind_calls = _cli_service_bind_scanner_globals_call_sites(root)
     parser_build_parser_lines = _function_line_count(root, "crypto_rsi_scanner/cli/parser.py", "build_parser")
     commands_event_alpha_handle_lines = _function_line_count(root, "crypto_rsi_scanner/cli/commands_event_alpha.py", "handle")
-    legacy_doctor_core_lines = current_counts.get("crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py")
-    legacy_unregistered = int(registry_summary.get("legacy_unregistered") or 0)
-    doctor_plugin_migration = _doctor_plugin_migration_summary(legacy_unregistered=legacy_unregistered, root=root)
-    extra_blockers = _refactor_extra_blockers(
-        legacy_unregistered=legacy_unregistered,
+    api_doctor_core_lines = current_counts.get("crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py")
+    doctor_api_unregistered = int(
+        registry_summary.get("legacy_unregistered")
+        or registry_summary.get("api_unregistered")
+        or 0
+    )
+    doctor_plugin_migration = _doctor_plugin_migration_summary(api_unregistered=doctor_api_unregistered, root=root)
+    extra_blockers = _architecture_extra_blockers(
+        api_unregistered=doctor_api_unregistered,
         cli_event_alpha_service_lines=cli_event_alpha_service_lines,
         cli_service_bind_calls=cli_service_bind_calls,
-        legacy_inventory=legacy_inventory,
-        legacy_file_report=legacy_file_report,
+        api_inventory=api_inventory_data,
+        transitional_file_report=transitional_file_report,
         size_gate_report=size_gate_report,
     )
     return {
@@ -1016,8 +1009,8 @@ def build_architecture_report(
         "cli_service_line_counts": cli_service_line_counts,
         "parser_build_parser_lines": parser_build_parser_lines,
         "commands_event_alpha_handle_lines": commands_event_alpha_handle_lines,
-        "legacy_artifact_doctor_core_lines": legacy_doctor_core_lines,
-        "legacy_artifact_doctor_core_note": "Behavior-compatible doctor implementation preserved while public artifact_doctor.py is the small orchestrator.",
+        "api_artifact_doctor_core_lines": api_doctor_core_lines,
+        "api_artifact_doctor_core_note": "Behavior-compatible doctor implementation preserved while public artifact_doctor.py is the small orchestrator.",
         "cli_flag_snapshot_path": "research/CLI_FLAG_SNAPSHOT.json",
         "scanner_command_body_functions_remaining": len(scanner_command_bodies),
         "scanner_command_body_function_names": scanner_command_bodies,
@@ -1026,23 +1019,23 @@ def build_architecture_report(
         "remaining_module_classification": classification,
         "class_ownership_report": class_ownership,
         **_class_ownership_final_fields(class_ownership),
-        "legacy_decomposition": legacy_inventory,
-        **_legacy_file_final_fields(legacy_file_report),
-        "legacy_decomposition_gate_status": legacy_inventory["legacy_decomposition_gate_status"],
-        "legacy_files_over_1500_lines": legacy_inventory["legacy_files_over_1500_lines"],
-        "legacy_files_over_3000_lines": legacy_inventory["legacy_files_over_3000_lines"],
-        "legacy_total_lines": legacy_inventory["legacy_total_lines"],
-        "largest_api_files": legacy_inventory["largest_api_files"],
+        "api_decomposition": api_inventory_data,
+        **_transitional_file_final_fields(transitional_file_report),
+        "api_decomposition_gate_status": api_inventory_data["api_decomposition_gate_status"],
+        "api_files_over_1500_lines": api_inventory_data["api_files_over_1500_lines"],
+        "api_files_over_3000_lines": api_inventory_data["api_files_over_3000_lines"],
+        "api_total_lines": api_inventory_data["api_total_lines"],
+        "largest_api_files": api_inventory_data["largest_api_files"],
         **_size_gate_final_fields(size_gate_report),
         **_v3_final_fields(v3_gate_snapshot),
-        "legacy_classes_over_limit": legacy_inventory["legacy_classes_over_limit"],
-        "legacy_functions_over_limit": legacy_inventory["legacy_functions_over_limit"],
-        "legacy_modules_with_multiple_public_classes": legacy_inventory["legacy_modules_with_multiple_public_classes"],
+        "api_classes_over_limit": api_inventory_data["api_classes_over_limit"],
+        "api_functions_over_limit": api_inventory_data["api_functions_over_limit"],
+        "api_modules_with_multiple_public_classes": api_inventory_data["api_modules_with_multiple_public_classes"],
         "remaining_implementation_modules_by_package_target": classification["remaining_implementation_modules_by_package_target"],
         "intentionally_outside_event_alpha_modules": classification["intentionally_outside_event_alpha_modules"],
         "doctor_plugin_migration": doctor_plugin_migration,
         "plugin_check_counts": doctor_plugin_migration["plugin_check_counts"],
-        "legacy_unregistered": legacy_unregistered,
+        "api_unregistered": doctor_api_unregistered,
         "namespace_lifecycle_inventory": namespace_inventory,
         "unknown_namespace_count": namespace_inventory["unknown_namespace_count"],
         "ci_static_safety": ci_static_safety,
@@ -1054,7 +1047,7 @@ def build_architecture_report(
         "deprecation_plan": _old_import_deprecation_plan(),
     }
 
-def format_refactor_final_markdown(data: dict[str, Any]) -> str:
+def format_architecture_report_markdown(data: dict[str, Any]) -> str:
     lines = [
         "# Architecture Final Report",
         "",
@@ -1119,13 +1112,13 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             "",
             "## Doctor Plugin Migration",
             "",
-            f"- legacy_unregistered: `{data['legacy_unregistered']}`",
-            f"- legacy_unregistered_target: `{data['doctor_plugin_migration']['legacy_unregistered_target']}`",
-            f"- legacy_unregistered_status: `{data['doctor_plugin_migration']['legacy_unregistered_status']}`",
+            f"- api_unregistered: `{data['api_unregistered']}`",
+            f"- api_unregistered_target: `{data['doctor_plugin_migration']['api_unregistered_target']}`",
+            f"- api_unregistered_status: `{data['doctor_plugin_migration']['api_unregistered_status']}`",
             f"- plugin_check_counts: `{json.dumps(data.get('plugin_check_counts', {}), sort_keys=True)}`",
             f"- migrated_this_run: `{data['doctor_plugin_migration']['migrated_this_run']}`",
             "",
-            "### Remaining Legacy-Unregistered Doctor Sites",
+            "### Remaining Unregistered Doctor Sites",
             "",
             "| check | next plugin | reason |",
             "|---|---|---|",
@@ -1198,7 +1191,7 @@ def _append_api_decomposition_section(lines: list[str], data: dict[str, Any]) ->
     lines.extend(
         [
             "",
-            "## Legacy Decomposition Gate",
+            "## API Decomposition Gate",
             "",
             "| path | lines |",
             "|---|---:|",
@@ -1222,8 +1215,8 @@ def _append_organization_counts_section(lines: list[str], data: dict[str, Any]) 
         ("scanner_api_service_lines", data.get("line_counts", {}).get("crypto_rsi_scanner/cli/services/scanner_api.py")),
         ("parser_build_parser_lines", data.get("parser_build_parser_lines")),
         ("commands_event_alpha_handle_lines", data.get("commands_event_alpha_handle_lines")),
-        ("legacy_artifact_doctor_core_lines", data.get("legacy_artifact_doctor_core_lines")),
-        ("legacy_artifact_doctor_core_note", data.get("legacy_artifact_doctor_core_note")),
+        ("api_artifact_doctor_core_lines", data.get("api_artifact_doctor_core_lines")),
+        ("api_artifact_doctor_core_note", data.get("api_artifact_doctor_core_note")),
         ("large_event_alpha_split_line_counts", json.dumps(data.get("large_event_alpha_split_line_counts", {}), sort_keys=True)),
         ("cli_flag_snapshot_path", data.get("cli_flag_snapshot_path")),
         ("scanner_command_body_functions_remaining", data["scanner_command_body_functions_remaining"]),
@@ -1246,25 +1239,25 @@ def _append_organization_counts_section(lines: list[str], data: dict[str, Any]) 
         ("production_functions_over_limit", data.get("production_functions_over_limit")),
         ("test_size_gate_status", data.get("test_size_gate_status")),
         ("test_files_over_1500_lines", data.get("test_files_over_1500_lines")),
-        ("legacy_decomposition_gate_status", data.get("legacy_decomposition_gate_status")),
-        ("legacy_file_retirement_status", data.get("legacy_file_retirement_status")),
-        ("legacy_named_files_count", data.get("legacy_named_files_count")),
-        ("legacy_named_files_remaining", data.get("legacy_named_files_remaining")),
-        ("legacy_named_files_with_implementation", data.get("legacy_named_files_with_implementation")),
-        ("legacy_named_dirs_count", data.get("legacy_named_dirs_count")),
+        ("api_decomposition_gate_status", data.get("api_decomposition_gate_status")),
+        ("transitional_file_status", data.get("transitional_file_status")),
+        ("transitional_named_files_count", data.get("transitional_named_files_count")),
+        ("transitional_named_files_remaining", data.get("transitional_named_files_remaining")),
+        ("transitional_named_files_with_implementation", data.get("transitional_named_files_with_implementation")),
+        ("transitional_named_dirs_count", data.get("transitional_named_dirs_count")),
         ("compatibility_named_files_remaining", data.get("compatibility_named_files_remaining")),
-        ("legacy_top_level_event_modules_count", data.get("legacy_top_level_event_modules_count")),
-        ("legacy_retained_public_shims_count", data.get("legacy_retained_public_shims_count")),
+        ("transitional_top_level_event_modules_count", data.get("transitional_top_level_event_modules_count")),
+        ("transitional_retained_public_shims_count", data.get("transitional_retained_public_shims_count")),
         ("retained_public_entrypoints", data.get("retained_public_entrypoints")),
         ("event_fade_safety_exception_present", data.get("event_fade_safety_exception_present")),
         ("scanner_entrypoint_exception_present", data.get("scanner_entrypoint_exception_present")),
         ("public_compatibility_entrypoints_path", data.get("public_compatibility_entrypoints_path")),
-        ("legacy_files_over_1500_lines", data.get("legacy_files_over_1500_lines")),
-        ("legacy_files_over_3000_lines", data.get("legacy_files_over_3000_lines")),
-        ("legacy_total_lines", data.get("legacy_total_lines")),
-        ("legacy_classes_over_limit", data.get("legacy_classes_over_limit")),
-        ("legacy_functions_over_limit", data.get("legacy_functions_over_limit")),
-        ("legacy_modules_with_multiple_public_classes", data.get("legacy_modules_with_multiple_public_classes")),
+        ("api_files_over_1500_lines", data.get("api_files_over_1500_lines")),
+        ("api_files_over_3000_lines", data.get("api_files_over_3000_lines")),
+        ("api_total_lines", data.get("api_total_lines")),
+        ("api_classes_over_limit", data.get("api_classes_over_limit")),
+        ("api_functions_over_limit", data.get("api_functions_over_limit")),
+        ("api_modules_with_multiple_public_classes", data.get("api_modules_with_multiple_public_classes")),
     ]
     lines.extend(["", "## Organization Counts", ""])
     lines.extend(f"- {key}: `{value}`" for key, value in rows)
@@ -1431,11 +1424,9 @@ def write_architecture_report(
     architecture_contract.write_architecture_contract(out_dir=output_dir, root=root)
     transitional_file_check.write_report(root=root, out_dir=output_dir)
     payload = json.dumps(data, indent=2, sort_keys=True) + "\n"
-    markdown = format_refactor_final_markdown(data)
+    markdown = format_architecture_report_markdown(data)
     json_path.write_text(payload, encoding="utf-8")
     md_path.write_text(markdown, encoding="utf-8")
-    (output_dir / LEGACY_REPORT_JSON).write_text(payload, encoding="utf-8")
-    (output_dir / LEGACY_REPORT_MD).write_text(markdown, encoding="utf-8")
     v3_report, v3_markdown = _write_v3_release_candidate_report(root=root, output_dir=output_dir, final_report=data)
     release_report.write_v4_final_report(
         output_dir=output_dir,
@@ -1446,15 +1437,11 @@ def write_architecture_report(
     if out_dir is None:
         (root / REPORT_JSON).write_text(payload, encoding="utf-8")
         (root / REPORT_MD).write_text(markdown, encoding="utf-8")
-        (root / LEGACY_REPORT_JSON).write_text(payload, encoding="utf-8")
-        (root / LEGACY_REPORT_MD).write_text(markdown, encoding="utf-8")
     return {"json": json_path, "markdown": md_path}
 
-build_refactor_final_report = build_architecture_report
-write_refactor_final_report = write_architecture_report
 build_architecture_final_report = build_architecture_report
 write_architecture_final_report = write_architecture_report
-format_architecture_markdown = format_refactor_final_markdown
+format_architecture_markdown = format_architecture_report_markdown
 
 def _optional_float(value: str | None) -> float | None:
     if value in (None, ""):
@@ -1462,7 +1449,7 @@ def _optional_float(value: str | None) -> float | None:
     return float(value)
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Write refactor final gate report artifacts.")
+    parser = argparse.ArgumentParser(description="Write architecture final gate report artifacts.")
     parser.add_argument("--out-dir", default=None)
     parser.add_argument("--pytest-runtime-seconds", default=None)
     parser.add_argument("--standalone-runtime-seconds", default=None)

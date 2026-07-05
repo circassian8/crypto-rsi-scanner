@@ -1,0 +1,193 @@
+{
+  "generated_at": "2026-07-05T13:28:00Z",
+  "notes": [
+    "Final naming cleanup verification run. Commands below are safe/offline or no-send fixture/rehearsal paths.",
+    "event-alpha-catalyst-frame-e2e-cycle exited 0; its embedded research doctor still documents fixture-namespace review blockers and was not changed in this behavior-preserving naming pass."
+  ],
+  "commands": [
+    {
+      "index": 1,
+      "command": "python3 tests/test_indicators.py",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 177
+    },
+    {
+      "index": 2,
+      "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 202
+    },
+    {
+      "index": 3,
+      "command": "python3 -m compileall -q crypto_rsi_scanner tests",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 1
+    },
+    {
+      "index": 4,
+      "command": "make architecture-naming-check PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 1
+    },
+    {
+      "index": 5,
+      "command": "make architecture-transitional-file-check PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 1
+    },
+    {
+      "index": 6,
+      "command": "make architecture-size-gates PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 3
+    },
+    {
+      "index": 7,
+      "command": "make architecture-class-ownership-report PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 2
+    },
+    {
+      "index": 8,
+      "command": "make architecture-final-report PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 6
+    },
+    {
+      "index": 9,
+      "command": "make architecture-completion-map PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 22
+    },
+    {
+      "index": 10,
+      "command": "make architecture-cleanliness-check PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 6
+    },
+    {
+      "index": 11,
+      "command": "make event-alpha-old-import-check PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 2
+    },
+    {
+      "index": 12,
+      "command": "make event-alpha-shim-dependency-report PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 2
+    },
+    {
+      "index": 13,
+      "command": "make event-alpha-integrated-radar-smoke PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 3
+    },
+    {
+      "index": 14,
+      "command": "make event-alpha-integrated-radar-doctor PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 1
+    },
+    {
+      "index": 15,
+      "command": "make event-alpha-notification-format-smoke PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 3
+    },
+    {
+      "index": 16,
+      "command": "make event-alpha-telegram-no-send-final-check-fast PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 4
+    },
+    {
+      "index": 17,
+      "command": "make event-alpha-evidence-acquisition-smoke PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 5
+    },
+    {
+      "index": 18,
+      "command": "make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 5
+    },
+    {
+      "index": 19,
+      "command": "make event-alpha-coinalyze-preflight-smoke PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 1
+    },
+    {
+      "index": 20,
+      "command": "make event-alpha-coinalyze-preflight PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 1
+    },
+    {
+      "index": 21,
+      "command": "make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 1
+    },
+    {
+      "index": 22,
+      "command": "make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 1
+    },
+    {
+      "index": 23,
+      "command": "make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 5
+    },
+    {
+      "index": 24,
+      "command": "make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 2
+    },
+    {
+      "index": 25,
+      "command": "make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 3
+    },
+    {
+      "index": 26,
+      "command": "make verify PYTHON=python3",
+      "returncode": 0,
+      "status": "pass",
+      "elapsed_seconds": 78
+    }
+  ],
+  "status": "pass",
+  "total_elapsed_seconds": 540
+}

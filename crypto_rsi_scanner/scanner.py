@@ -2,7 +2,7 @@
 
 The implementation body now lives in
 ``crypto_rsi_scanner.cli.services.scanner_api`` while the public root module
-keeps old imports and monkeypatch-heavy tests working during the v1/v2 refactor.
+keeps historical public imports and monkeypatch-heavy tests working.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Any
 from .cli.services import scanner_api as _api
 
 _WRAPPED_CALLS: dict[str, Any] = {}
-_ORIGINAL_LEGACY_FUNCTIONS: dict[str, Any] = {}
+_ORIGINAL_API_FUNCTIONS: dict[str, Any] = {}
 
 
 def _sync_api_overrides() -> None:
@@ -22,15 +22,15 @@ def _sync_api_overrides() -> None:
         if _name in {
             "_api",
             "_WRAPPED_CALLS",
-            "_ORIGINAL_LEGACY_FUNCTIONS",
+            "_ORIGINAL_API_FUNCTIONS",
             "_sync_api_overrides",
             "_wrap_api_call",
             "_install_api_exports",
         } or _name.startswith("__"):
             continue
         if _WRAPPED_CALLS.get(_name) is _value:
-            if _name in _ORIGINAL_LEGACY_FUNCTIONS:
-                setattr(_api, _name, _ORIGINAL_LEGACY_FUNCTIONS[_name])
+            if _name in _ORIGINAL_API_FUNCTIONS:
+                setattr(_api, _name, _ORIGINAL_API_FUNCTIONS[_name])
             continue
         if hasattr(_api, _name):
             setattr(_api, _name, _value)
@@ -57,15 +57,15 @@ def _wrap_api_call(name: str, func: Any) -> Any:
 
 
 def _install_api_exports() -> None:
-    legacy_wrapped_names = set(getattr(_api, "_WRAPPED_LEGACY_CALLS", {}))
+    wrapped_api_names = set(getattr(_api, "_WRAPPED_API_CALLS", {}))
     for _name in dir(_api):
         if _name.startswith("__"):
             continue
         if _name in {
-            "_LEGACY_MODULES",
-            "_LEGACY_MODULE_EXPORTS",
-            "_ORIGINAL_LEGACY_MODULE_VALUES",
-            "_WRAPPED_LEGACY_CALLS",
+            "_API_MODULES",
+            "_API_MODULE_EXPORTS",
+            "_ORIGINAL_API_MODULE_VALUES",
+            "_WRAPPED_API_CALLS",
             "_sync_api_module_globals",
             "_wrap_api_call",
             "_install_api_modules",
@@ -73,9 +73,9 @@ def _install_api_exports() -> None:
             continue
         _value = getattr(_api, _name)
         if inspect.isfunction(_value) and (
-            _name in legacy_wrapped_names or getattr(_value, "__module__", None) == _api.__name__
+            _name in wrapped_api_names or getattr(_value, "__module__", None) == _api.__name__
         ):
-            _ORIGINAL_LEGACY_FUNCTIONS[_name] = _value
+            _ORIGINAL_API_FUNCTIONS[_name] = _value
             globals()[_name] = _wrap_api_call(_name, _value)
         else:
             globals()[_name] = _value

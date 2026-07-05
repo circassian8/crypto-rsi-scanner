@@ -23,8 +23,6 @@ from . import architecture_contract
 REPORT_SCHEMA_VERSION = "architecture_class_ownership_report_v1"
 REPORT_JSON = "ARCHITECTURE_CLASS_OWNERSHIP_REPORT.json"
 REPORT_MD = "ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md"
-LEGACY_REPORT_JSON = "REFACTOR_CLASS_OWNERSHIP_REPORT.json"
-LEGACY_REPORT_MD = "REFACTOR_CLASS_OWNERSHIP_REPORT.md"
 DEFAULT_CLASS_LINE_LIMIT = 75
 DEFAULT_FUNCTION_LINE_LIMIT = 150
 
@@ -201,7 +199,7 @@ ACCEPTED_CLASS_EXCEPTIONS: dict[str, dict[str, str]] = {
         "status": "accepted_exception",
         "category": "llm_provider",
         "reason": "OpenAI relationship provider keeps request assembly, timeout/error handling, and structured parsing together behind explicit opt-in gates.",
-        "owner_note": "Do not alter LLM provider behavior during a refactor-only pass.",
+        "owner_note": "Do not alter LLM provider behavior during a architecture-maintenance pass.",
         "revisit_condition": "Revisit when adding a second live LLM backend or shared OpenAI transport abstraction.",
     },
     "crypto_rsi_scanner.llm_providers.openai_provider.OpenAILLMExtractionProvider": {
@@ -233,7 +231,7 @@ ACCEPTED_CLASS_EXCEPTIONS: dict[str, dict[str, str]] = {
         "status": "accepted_exception",
         "category": "storage_mixin",
         "reason": "Watchlist persistence methods are stable DB helpers and only slightly exceed the advisory limit.",
-        "owner_note": "No DB schema or paper/watchlist behavior changes in this refactor pass.",
+        "owner_note": "No DB schema or paper/watchlist behavior changes in this architecture-maintenance pass.",
         "revisit_condition": "Revisit when watchlist storage grows new tables or migrations.",
     },
 }
@@ -352,7 +350,7 @@ def build_report(
         }
         for module, reason in sorted(MODULE_EXCEPTIONS.items())
     ]
-    legacy_inventory = api_inventory.build_api_inventory(
+    api_inventory_data = api_inventory.build_api_inventory(
         root=repo_root,
         class_line_limit=class_line_limit,
         function_line_limit=function_line_limit,
@@ -424,21 +422,21 @@ def build_report(
         "accepted_model_bundles": accepted_model_bundles,
         "unresolved_multi_class_modules": unresolved_multi_class_modules,
         "modules_with_multiple_public_classes": unresolved_multi_class_modules,
-        "legacy_files_over_1500_lines": legacy_inventory["legacy_files_over_1500_lines"],
-        "legacy_files_over_3000_lines": legacy_inventory["legacy_files_over_3000_lines"],
-        "legacy_total_lines": legacy_inventory["legacy_total_lines"],
-        "largest_api_files": legacy_inventory["largest_api_files"],
-        "legacy_classes_over_limit": legacy_inventory["legacy_classes_over_limit"],
-        "legacy_functions_over_limit": legacy_inventory["legacy_functions_over_limit"],
-        "legacy_modules_with_multiple_public_classes": legacy_inventory[
-            "legacy_modules_with_multiple_public_classes"
+        "api_files_over_1500_lines": api_inventory_data["api_files_over_1500_lines"],
+        "api_files_over_3000_lines": api_inventory_data["api_files_over_3000_lines"],
+        "api_total_lines": api_inventory_data["api_total_lines"],
+        "largest_api_files": api_inventory_data["largest_api_files"],
+        "api_classes_over_limit": api_inventory_data["api_classes_over_limit"],
+        "api_functions_over_limit": api_inventory_data["api_functions_over_limit"],
+        "api_modules_with_multiple_public_classes": api_inventory_data[
+            "api_modules_with_multiple_public_classes"
         ],
-        "legacy_classes_over_limit_rows": legacy_inventory["legacy_classes_over_limit_rows"],
-        "legacy_functions_over_limit_rows": legacy_inventory["legacy_functions_over_limit_rows"],
-        "legacy_modules_with_multiple_public_classes_rows": legacy_inventory[
-            "legacy_modules_with_multiple_public_classes_rows"
+        "api_classes_over_limit_rows": api_inventory_data["api_classes_over_limit_rows"],
+        "api_functions_over_limit_rows": api_inventory_data["api_functions_over_limit_rows"],
+        "api_modules_with_multiple_public_classes_rows": api_inventory_data[
+            "api_modules_with_multiple_public_classes_rows"
         ],
-        "legacy_decomposition_gate_status": legacy_inventory["legacy_decomposition_gate_status"],
+        "api_decomposition_gate_status": api_inventory_data["api_decomposition_gate_status"],
         "exceptions": exception_rows,
         "policy": {
             "public_class_over_75_lines": "should live in its own module unless documented here",
@@ -446,7 +444,7 @@ def build_report(
                 "blocker unless the module is registered as an accepted model bundle or module exception"
             ),
             "internal_helper_class_over_75_lines": "should be split or documented",
-            "new_multi_public_class_module": "fails refactor gates unless registered as a model bundle",
+            "new_multi_public_class_module": "fails architecture gates unless registered as a model bundle",
         },
     }
 
@@ -613,8 +611,6 @@ def write_report(
     markdown = format_report(report)
     json_path.write_text(payload, encoding="utf-8")
     md_path.write_text(markdown, encoding="utf-8")
-    (target / LEGACY_REPORT_JSON).write_text(payload, encoding="utf-8")
-    (target / LEGACY_REPORT_MD).write_text(markdown, encoding="utf-8")
     return json_path, md_path, report
 
 
@@ -643,18 +639,18 @@ def format_report(report: dict[str, Any]) -> str:
         f"- multi_public_class_modules_count: `{report.get('multi_public_class_modules_count', 0)}`",
         f"- accepted_model_bundles_count: `{report.get('accepted_model_bundles_count', 0)}`",
         f"- unresolved_multi_class_modules_count: `{report.get('unresolved_multi_class_modules_count', 0)}`",
-        f"- legacy_decomposition_gate_status: `{report.get('legacy_decomposition_gate_status')}`",
-        f"- legacy_classes_over_limit: `{report.get('legacy_classes_over_limit', 0)}`",
-        f"- legacy_functions_over_limit: `{report.get('legacy_functions_over_limit', 0)}`",
-        f"- legacy_modules_with_multiple_public_classes: `{report.get('legacy_modules_with_multiple_public_classes', 0)}`",
+        f"- api_decomposition_gate_status: `{report.get('api_decomposition_gate_status')}`",
+        f"- api_classes_over_limit: `{report.get('api_classes_over_limit', 0)}`",
+        f"- api_functions_over_limit: `{report.get('api_functions_over_limit', 0)}`",
+        f"- api_modules_with_multiple_public_classes: `{report.get('api_modules_with_multiple_public_classes', 0)}`",
         "",
         "## Policy",
         "",
         "- Every public class over 75 lines should live in its own module unless documented as an exception.",
         "- Multiple tiny value objects/enums/protocol DTOs may live together only when registered as accepted model bundles.",
         "- Internal helper classes over 75 lines should also be split or documented.",
-        "- Refactor v3 expects public classes to live in their own modules unless the module is a documented model bundle.",
-        "- Refactor v3 treats documented class exceptions as accepted exceptions; unaccepted class debt remains pending or blocked.",
+        "- Architecture policy expects public classes to live in their own modules unless the module is a documented model bundle.",
+        "- Architecture policy treats documented class exceptions as accepted exceptions; unaccepted class debt remains pending or blocked.",
         "- `event_fade.py` remains outside Event Alpha; Event Alpha may produce `FADE_SHORT_REVIEW` research artifacts but must not create `TRIGGERED_FADE`.",
         "",
     ]
@@ -724,7 +720,7 @@ def format_report(report: dict[str, Any]) -> str:
         )
     lines.extend([
         "",
-        "## Legacy Implementation Cores",
+        "## API Implementation Cores",
         "",
         "| path | lines |",
         "|---|---:|",
@@ -808,7 +804,7 @@ def _append_multi_class_sections(lines: list[str], report: dict[str, Any]) -> No
 def _append_v3_class_gate_section(lines: list[str], report: dict[str, Any]) -> None:
     lines.extend(
         [
-            "## Refactor V3 Gates",
+            "## Architecture Gates",
             "",
             "| gate | value | severity |",
             "|---|---:|---|",
@@ -910,7 +906,7 @@ def _limit_rows(rows: object, limit: int) -> Iterable[dict[str, Any]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Write refactor class/function ownership report artifacts.")
+    parser = argparse.ArgumentParser(description="Write architecture class/function ownership report artifacts.")
     parser.add_argument("--out-dir", default=None)
     args = parser.parse_args(argv)
     json_path, md_path, report = write_report(out_dir=args.out_dir)

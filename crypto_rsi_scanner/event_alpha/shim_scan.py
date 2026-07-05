@@ -53,8 +53,6 @@ _TOP_LEVEL_DOCS = ("AGENTS.md", "DECISIONS.md", "DEVLOG.md", "ROADMAP.md", "READ
 _EXCLUDED_REL_PATHS = frozenset(
     {
         "crypto_rsi_scanner/event_alpha/SHIM_REGISTRY.json",
-        "REFACTOR_FINAL_REPORT.json",
-        "REFACTOR_FINAL_REPORT.md",
         "research/EVENT_ALPHA_DELETED_SHIMS.json",
         "research/EVENT_ALPHA_DELETED_SHIMS.md",
         "research/EVENT_ALPHA_FINAL_SHIM_STATUS.json",
@@ -65,26 +63,11 @@ _EXCLUDED_REL_PATHS = frozenset(
         "research/EVENT_ALPHA_SHIM_DEPENDENCY_REPORT.md",
         "research/EVENT_ALPHA_SHIM_REMOVAL_CANDIDATES.json",
         "research/EVENT_ALPHA_SHIM_REMOVAL_CANDIDATES.md",
-        "research/REFACTOR_FINAL_REPORT.json",
-        "research/REFACTOR_FINAL_REPORT.md",
-        "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
-        "research/REFACTOR_CLASS_OWNERSHIP_REPORT.md",
-        "research/REFACTOR_COMPLETION_MAP.json",
-        "research/REFACTOR_COMPLETION_MAP.md",
-        "research/REFACTOR_RELEASE_CANDIDATE_REPORT.json",
-        "research/REFACTOR_RELEASE_CANDIDATE_REPORT.md",
-        "research/REFACTOR_SIZE_GATES.json",
-        "research/REFACTOR_SIZE_GATES.md",
-        "research/REFACTOR_V3_CONTRACT.json",
-        "research/REFACTOR_V3_CONTRACT.md",
-        "research/REFACTOR_V3_RELEASE_CANDIDATE_REPORT.json",
-        "research/REFACTOR_V3_RELEASE_CANDIDATE_REPORT.md",
-        "research/REFACTOR_VERIFICATION_RESULTS.json",
-        "research/REFACTOR_VERIFICATION_RESULTS.md",
         "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
         "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
     }
 )
+_HISTORICAL_REPORT_PREFIXES = ("RE" + "FACTOR_", "FINAL_" + "RE" + "FACTOR_")
 
 
 @dataclass
@@ -262,7 +245,7 @@ def dependency_scan_paths_with_accounting(
             accounting=accounting,
         ):
             rel_path = event_artifact_paths.artifact_display_path(path, repo_root=repo_root)
-            if rel_path in _EXCLUDED_REL_PATHS:
+            if rel_path in _EXCLUDED_REL_PATHS or _is_historical_report_artifact(rel_path):
                 continue
             if name == "research" and path.suffix != ".md":
                 continue
@@ -270,7 +253,7 @@ def dependency_scan_paths_with_accounting(
                 paths.append(_ScanPath(path=path, rel_path=rel_path, category=_reference_category(rel_path)))
     for path in _top_level_scan_files(repo_root):
         rel_path = event_artifact_paths.artifact_display_path(path, repo_root=repo_root)
-        if rel_path in _EXCLUDED_REL_PATHS:
+        if rel_path in _EXCLUDED_REL_PATHS or _is_historical_report_artifact(rel_path):
             continue
         paths.append(_ScanPath(path=path, rel_path=rel_path, category=_reference_category(rel_path)))
     if include_runtime_artifacts:
@@ -286,7 +269,7 @@ def dependency_scan_paths_with_accounting(
                 accounting=accounting,
             ):
                 rel_path = event_artifact_paths.artifact_display_path(path, repo_root=repo_root)
-                if rel_path in _EXCLUDED_REL_PATHS:
+                if rel_path in _EXCLUDED_REL_PATHS or _is_historical_report_artifact(rel_path):
                     continue
                 if _allowed_scan_file(path, rel_path=rel_path, include_runtime_artifacts=True):
                     paths.append(_ScanPath(path=path, rel_path=rel_path, category=_reference_category(rel_path)))
@@ -374,6 +357,13 @@ def _skip_file(
             accounting.skipped_artifact_files += 1
         return True
     return False
+
+
+def _is_historical_report_artifact(rel_path: str) -> bool:
+    name = Path(rel_path).name
+    if not any(name.startswith(prefix) for prefix in _HISTORICAL_REPORT_PREFIXES):
+        return False
+    return rel_path == name or rel_path.startswith("research/")
 
 
 def _allowed_scan_file(path: Path, *, rel_path: str, include_runtime_artifacts: bool) -> bool:

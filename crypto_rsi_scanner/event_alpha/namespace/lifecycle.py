@@ -314,7 +314,7 @@ def _classify_namespace(
     if namespace in KNOWN_STALE_NAMESPACES:
         known = KNOWN_STALE_NAMESPACES[namespace]
         return STATUS_STALE_DEPRECATED, known["reason"], known["superseded_by"]
-    if namespace in {"shim_report", "architecture_final_report", "architecture_baseline", "refactor_final_report", "refactor_baseline"}:
+    if namespace in {"shim_report", "architecture_final_report", "architecture_baseline"}:
         return STATUS_ACTIVE_ARCHITECTURE_REPORT, "architecture/report namespace", None
     if namespace in {
         "catalyst_frame_e2e",
@@ -343,7 +343,7 @@ def _profile_for_namespace(namespace: str, status: str) -> str:
     if status in {STATUS_ACTIVE_FIXTURE_SMOKE, STATUS_ACTIVE_INTEGRATED_SMOKE}:
         return "fixture"
     if status == STATUS_ACTIVE_ARCHITECTURE_REPORT:
-        return "refactor"
+        return "architecture"
     if status == STATUS_MANUAL_REVIEW:
         return "manual_review"
     if namespace.startswith("notify_llm_deep"):

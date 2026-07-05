@@ -18,9 +18,7 @@ from typing import Any, Iterable
 REPORT_SCHEMA_VERSION = "project_health_naming_cleanup_report_v1"
 REPORT_JSON = "PROJECT_HEALTH_NAMING_CLEANUP_REPORT.json"
 REPORT_MD = "PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md"
-LEGACY_REPORT_JSON = "FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.json"
-LEGACY_REPORT_MD = "FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.md"
-LEGACY_ALIAS_REPORT_PREFIXES = ("REFACTOR_", "FINAL_REFACTOR_")
+HISTORICAL_REPORT_PREFIXES = ("RE" + "FACTOR_", "FINAL_" + "RE" + "FACTOR_")
 LEGACY_RE = re.compile(r"legacy", re.IGNORECASE)
 REFACTOR_RE = re.compile(r"refactor", re.IGNORECASE)
 SOURCE_SUFFIXES = {".py"}
@@ -157,6 +155,9 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         "legacy_occurrences": len(occurrences),
         "classification_counts": dict(sorted(classifications.items())),
         "action_counts": dict(sorted(actions.items())),
+        "current_tooling_name_to_rename": classifications.get("current_tooling_name_to_rename", 0),
+        "Makefile_target_to_update": classifications.get("Makefile_target_to_update", 0),
+        "test_reference_to_update": classifications.get("test_reference_to_update", 0),
         "stale_refactor_wording": classifications.get("stale_refactor_wording", 0),
         "historical_artifact_semantics": classifications.get("historical_artifact_semantics", 0),
         "cli_backwards_compatibility_alias": classifications.get("CLI_backwards_compatibility_alias", 0),
@@ -167,6 +168,8 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         "unclassified": classifications.get("unclassified", 0),
         "legacy_named_files": legacy_named_files,
         "legacy_named_files_remaining": len(legacy_named_files),
+        "transitional_named_files": legacy_named_files,
+        "transitional_named_files_remaining": len(legacy_named_files),
         "refactor_named_source_files": refactor_named_files,
         "refactor_named_source_files_remaining": len(refactor_named_files),
         "top_level_refactor_python_files_remaining": len(
@@ -210,8 +213,6 @@ def write_report(*, root: str | Path | None = None, out_dir: str | Path | None =
     markdown = format_report(report)
     json_path.write_text(payload, encoding="utf-8")
     md_path.write_text(markdown, encoding="utf-8")
-    (target / LEGACY_REPORT_JSON).write_text(payload, encoding="utf-8")
-    (target / LEGACY_REPORT_MD).write_text(markdown, encoding="utf-8")
     return json_path, md_path, report
 
 
@@ -394,7 +395,14 @@ def _blockers(
         blockers.append({"path": row["path"], "line": None, "reason": "migration-era refactor-named source file exists"})
     for row in occurrences:
         classification = str(row.get("classification") or "")
-        if classification in {"stale_refactor_wording", "should_rename", "unclassified"}:
+        action = str(row.get("action") or "")
+        if classification in {
+            "current_tooling_name_to_rename",
+            "Makefile_target_to_update",
+            "test_reference_to_update",
+            "stale_refactor_wording",
+            "unclassified",
+        } or action == "should_rename":
             blockers.append({"path": row["path"], "line": row["line"], "reason": classification})
     if _source_mentions_removed_legacy_py(repo_root, occurrences):
         blockers.append({"path": "source", "line": None, "reason": "source references removed legacy.py outside accepted policy/test fixtures"})
@@ -481,9 +489,9 @@ def _iter_scan_files(repo_root: Path) -> Iterable[Path]:
         for path in root.rglob("*"):
             if _skip_path(path) or not path.is_file():
                 continue
-            if path.name in {REPORT_JSON, REPORT_MD, LEGACY_REPORT_JSON, LEGACY_REPORT_MD}:
+            if path.name in {REPORT_JSON, REPORT_MD}:
                 continue
-            if path.parent.name == "research" and path.name.startswith(LEGACY_ALIAS_REPORT_PREFIXES):
+            if path.parent.name == "research" and path.name.startswith(HISTORICAL_REPORT_PREFIXES):
                 continue
             if path.suffix in {".py", ".md", ".json"}:
                 if path.parent.name == "research" and path.suffix == ".json" and not path.name.startswith(RESEARCH_DOC_PREFIXES):

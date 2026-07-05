@@ -16,15 +16,10 @@ from typing import Any, Iterable
 REPORT_SCHEMA_VERSION = "architecture_transitional_file_report_v1"
 REPORT_JSON = "ARCHITECTURE_TRANSITIONAL_FILE_REPORT.json"
 REPORT_MD = "ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md"
-LEGACY_REPORT_JSON = "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.json"
-LEGACY_REPORT_MD = "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.md"
-LEGACY_ALIAS_SCHEMA_VERSION = "final_refactor_legacy_retirement_report_v1"
-LEGACY_ALIAS_JSON = "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.json"
-LEGACY_ALIAS_MD = "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.md"
 PUBLIC_ENTRYPOINTS_JSON = "PUBLIC_COMPATIBILITY_ENTRYPOINTS.json"
 EVENT_ALPHA_PUBLIC_ENTRYPOINTS_JSON = "EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json"
-LEGACY_FILE_NAMES = {"legacy.py", "compat.py", "compatibility.py"}
-LEGACY_DIR_NAMES = {"legacy", "legacy_parts"}
+TRANSITIONAL_FILE_NAMES = {"legacy.py", "compat.py", "compatibility.py"}
+TRANSITIONAL_DIR_NAMES = {"legacy", "legacy_parts"}
 SKIP_DIR_NAMES = {
     ".git",
     ".mypy_cache",
@@ -57,7 +52,6 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
     ]
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
-        "legacy_alias_schema_version": LEGACY_ALIAS_SCHEMA_VERSION,
         "row_type": "architecture_transitional_file_report",
         "historical_row_type_alias": "final_refactor_transitional_file_report",
         "generated_at": generated,
@@ -78,11 +72,6 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         "migration_named_files_remaining": len(transitional_named_files),
         "migration_named_files_with_implementation": 0,
         "migration_named_dirs_count": len(transitional_named_dirs),
-        # Historical compatibility keys consumed by existing refactor reports.
-        "legacy_named_files_count": len(transitional_named_files),
-        "legacy_named_files_remaining": len(transitional_named_files),
-        "legacy_named_files_with_implementation": 0,
-        "legacy_named_dirs_count": len(transitional_named_dirs),
         "compatibility_named_files_remaining": 0,
         "top_level_event_modules_count": len(flat_event_modules),
         "retained_public_shims_count": len(retained_public_shims),
@@ -97,8 +86,6 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         "transitional_named_dirs": transitional_named_dirs,
         "migration_named_files": transitional_named_files,
         "migration_named_dirs": transitional_named_dirs,
-        "legacy_named_files": transitional_named_files,
-        "legacy_named_dirs": transitional_named_dirs,
         "top_level_event_modules": flat_event_modules,
         "allowed_top_level_event_modules": [
             {
@@ -133,17 +120,12 @@ def write_report(*, root: str | Path | None = None, out_dir: str | Path | None =
     markdown = format_report(report)
     json_path.write_text(payload, encoding="utf-8")
     md_path.write_text(markdown, encoding="utf-8")
-    (target / LEGACY_REPORT_JSON).write_text(payload, encoding="utf-8")
-    (target / LEGACY_REPORT_MD).write_text(markdown, encoding="utf-8")
-    # Compatibility aliases for existing dashboards and historical automation.
-    (target / LEGACY_ALIAS_JSON).write_text(payload, encoding="utf-8")
-    (target / LEGACY_ALIAS_MD).write_text(markdown, encoding="utf-8")
     return json_path, md_path, report
 
 
 def format_report(report: dict[str, Any]) -> str:
     lines = [
-        "# Final Refactor Transitional File Report",
+        "# Architecture Transitional File Report",
         "",
         "Research artifact only. This static gate checks migration-era file names and flat Event Alpha modules. It does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.",
         "",
@@ -186,7 +168,7 @@ def _transitional_named_files(repo_root: Path) -> list[dict[str, str]]:
             continue
         name = path.name
         stem = path.stem
-        if name in LEGACY_FILE_NAMES or stem.startswith("legacy_") or stem.endswith("_legacy"):
+        if name in TRANSITIONAL_FILE_NAMES or stem.startswith("legacy_") or stem.endswith("_legacy"):
             rows.append({"path": _rel(path, repo_root)})
     return rows
 
@@ -200,7 +182,7 @@ def _transitional_named_dirs(repo_root: Path) -> list[dict[str, str]]:
         for path in root.rglob("*"):
             if not path.is_dir() or _skip_path(path):
                 continue
-            if path.name in LEGACY_DIR_NAMES:
+            if path.name in TRANSITIONAL_DIR_NAMES:
                 rows.append({"path": _rel(path, repo_root)})
     return rows
 

@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-05T11:29:06.004313+00:00`
+- generated_at: `2026-07-05T13:23:21.473934+00:00`
 - public_class_count: `408`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `0`
@@ -21,21 +21,21 @@ Static source inventory only. This report does not call providers, send Telegram
 - multi_public_class_modules_count: `80`
 - accepted_model_bundles_count: `79`
 - unresolved_multi_class_modules_count: `0`
-- legacy_decomposition_gate_status: `pass`
-- legacy_classes_over_limit: `0`
-- legacy_functions_over_limit: `0`
-- legacy_modules_with_multiple_public_classes: `0`
+- api_decomposition_gate_status: `pass`
+- api_classes_over_limit: `0`
+- api_functions_over_limit: `0`
+- api_modules_with_multiple_public_classes: `0`
 
 ## Policy
 
 - Every public class over 75 lines should live in its own module unless documented as an exception.
 - Multiple tiny value objects/enums/protocol DTOs may live together only when registered as accepted model bundles.
 - Internal helper classes over 75 lines should also be split or documented.
-- Refactor v3 expects public classes to live in their own modules unless the module is a documented model bundle.
-- Refactor v3 treats documented class exceptions as accepted exceptions; unaccepted class debt remains pending or blocked.
+- Architecture policy expects public classes to live in their own modules unless the module is a documented model bundle.
+- Architecture policy treats documented class exceptions as accepted exceptions; unaccepted class debt remains pending or blocked.
 - `event_fade.py` remains outside Event Alpha; Event Alpha may produce `FADE_SHORT_REVIEW` research artifacts but must not create `TRIGGERED_FADE`.
 
-## Refactor V3 Gates
+## Architecture Gates
 
 | gate | value | severity |
 |---|---:|---|
@@ -63,7 +63,7 @@ Static source inventory only. This report does not call providers, send Telegram
 |---|---|---:|---|---|---|
 | `crypto_rsi_scanner.storage_parts.migrations` | `MigrationsMixin` | 88 | storage_mixin | DB schema behavior must not change in this cleanup pass. | Revisit only with explicit migration tests and backup/restore verification. |
 | `crypto_rsi_scanner.storage_parts.signals` | `SignalsMixin` | 129 | storage_mixin | Avoid splitting storage write paths without SQLite roundtrip parity tests. | Revisit when storage schema v2 or a repository layer is introduced. |
-| `crypto_rsi_scanner.storage_parts.watchlist` | `WatchlistMixin` | 89 | storage_mixin | No DB schema or paper/watchlist behavior changes in this refactor pass. | Revisit when watchlist storage grows new tables or migrations. |
+| `crypto_rsi_scanner.storage_parts.watchlist` | `WatchlistMixin` | 89 | storage_mixin | No DB schema or paper/watchlist behavior changes in this architecture-maintenance pass. | Revisit when watchlist storage grows new tables or migrations. |
 
 ## Provider Class Split Status
 
@@ -93,7 +93,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines | status | revisit condition |
 |---|---:|---|---|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/project_health/architecture_report.py` | 1485 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/project_health/architecture_report.py` | 1472 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1431 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
@@ -101,7 +101,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/config.py` | 1319 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 
-## Legacy Implementation Cores
+## API Implementation Cores
 
 | path | lines |
 |---|---:|

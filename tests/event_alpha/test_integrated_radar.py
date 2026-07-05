@@ -1,4 +1,4 @@
-"""Focused integrated-radar package refactor tests."""
+"""Focused integrated-radar package architecture tests."""
 
 from __future__ import annotations
 

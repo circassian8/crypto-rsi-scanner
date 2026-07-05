@@ -2,21 +2,21 @@
 
 Research-only architecture acceptance report. This report does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-05T11:39:45.265510+00:00`
+- generated_at: `2026-07-05T13:29:38.009688+00:00`
 - acceptance_status: `accepted`
 - critical_gate_status: `pass`
 - architecture_status: `accepted`
-- architecture_contract: `no legacy files, no old flat Event Alpha imports, canonical module architecture only`
+- architecture_contract: `no transitional implementation files, no old flat Event Alpha imports, canonical module architecture only`
 - public_compatibility_entrypoints_manifest: `research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json`
-- commands_passed: `17/17`
-- duration_seconds_total: `817.924`
+- commands_passed: `26/26`
+- duration_seconds_total: `None`
 
 ## Critical Gates
 
 | gate | status |
 |---|---:|
 | `all_commands_passed` | `pass` |
-| `refactor_final_has_no_blockers` | `pass` |
+| `architecture_final_has_no_blockers` | `pass` |
 | `only_event_fade_top_level_implementation` | `pass` |
 | `nonessential_shims_remaining_zero` | `pass` |
 | `old_path_internal_imports_zero` | `pass` |
@@ -30,9 +30,9 @@ Research-only architecture acceptance report. This report does not authorize liv
 | `doctor_registry_api_unregistered_zero` | `pass` |
 | `namespace_unknown_zero` | `pass` |
 | `shim_dependency_status_ok` | `pass` |
-| `legacy_file_retirement_ok` | `pass` |
-| `legacy_named_files_zero` | `pass` |
-| `legacy_named_files_with_implementation_zero` | `pass` |
+| `transitional_file_status_ok` | `pass` |
+| `transitional_named_files_zero` | `pass` |
+| `transitional_named_files_with_implementation_zero` | `pass` |
 | `compatibility_named_files_zero` | `pass` |
 | `retained_public_entrypoints_zero` | `pass` |
 | `event_fade_safety_exception_present` | `pass` |
@@ -44,9 +44,9 @@ Research-only architecture acceptance report. This report does not authorize liv
 |---|---:|
 | `production_files_over_1200_lines` | `13` |
 | `accepted_class_exceptions_count` | `3` |
-| `refactor_final_v3_gate_status` | `accepted_with_documented_exceptions` |
-| `refactor_final_v3_auto_accept_blockers` | `[]` |
-| `refactor_final_v3_blockers` | `[]` |
+| `architecture_v3_gate_status` | `accepted_with_documented_exceptions` |
+| `architecture_v3_auto_accept_blockers` | `[]` |
+| `architecture_v3_blockers` | `[]` |
 
 ## Event Module And Shim Status
 
@@ -54,8 +54,8 @@ Research-only architecture acceptance report. This report does not authorize liv
 - retained_public_shims_count: `0`
 - retained_public_entrypoints: `0`
 - deleted_shims_count: `124`
-- legacy_named_files_remaining: `0`
-- legacy_named_files_with_implementation: `0`
+- transitional_named_files_remaining: `0`
+- transitional_named_files_with_implementation: `0`
 - compatibility_named_files_remaining: `0`
 - event_fade_safety_exception_present: `True`
 - scanner_entrypoint_exception_present: `True`
@@ -85,23 +85,32 @@ Retained public shims:
 
 | # | command | status | seconds |
 |---:|---|---:|---:|
-| 1 | `python3 tests/test_indicators.py` | `pass` | `192.42` |
-| 2 | `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q` | `pass` | `197.551` |
-| 3 | `python3 -m compileall -q crypto_rsi_scanner tests` | `pass` | `0.058` |
-| 4 | `make refactor-transitional-file-check PYTHON=python3` | `pass` | `0.052` |
-| 5 | `make refactor-legacy-file-check PYTHON=python3` | `pass` | `0.049` |
-| 6 | `make refactor-legacy-terminology-check PYTHON=python3` | `pass` | `0.246` |
-| 7 | `make event-alpha-old-import-check PYTHON=python3` | `pass` | `1.459` |
-| 8 | `make event-alpha-shim-dependency-report PYTHON=python3` | `pass` | `1.459` |
-| 9 | `make refactor-size-gates PYTHON=python3` | `pass` | `1.309` |
-| 10 | `make refactor-class-ownership-report PYTHON=python3` | `pass` | `1.12` |
-| 11 | `make refactor-final-report PYTHON=python3` | `pass` | `1.626` |
-| 12 | `make event-alpha-integrated-radar-smoke PYTHON=python3` | `pass` | `6.049` |
-| 13 | `make event-alpha-integrated-radar-doctor PYTHON=python3` | `pass` | `4.95` |
-| 14 | `make event-alpha-notification-format-smoke PYTHON=python3` | `pass` | `6.509` |
-| 15 | `make event-alpha-telegram-no-send-final-check-fast PYTHON=python3` | `pass` | `7.152` |
-| 16 | `make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3` | `pass` | `6.273` |
-| 17 | `make verify PYTHON=python3` | `pass` | `389.639` |
+| 1 | `python3 tests/test_indicators.py` | `pass` | `177` |
+| 2 | `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q` | `pass` | `202` |
+| 3 | `python3 -m compileall -q crypto_rsi_scanner tests` | `pass` | `1` |
+| 4 | `make architecture-naming-check PYTHON=python3` | `pass` | `1` |
+| 5 | `make architecture-transitional-file-check PYTHON=python3` | `pass` | `1` |
+| 6 | `make architecture-size-gates PYTHON=python3` | `pass` | `3` |
+| 7 | `make architecture-class-ownership-report PYTHON=python3` | `pass` | `2` |
+| 8 | `make architecture-final-report PYTHON=python3` | `pass` | `6` |
+| 9 | `make architecture-completion-map PYTHON=python3` | `pass` | `22` |
+| 10 | `make architecture-cleanliness-check PYTHON=python3` | `pass` | `6` |
+| 11 | `make event-alpha-old-import-check PYTHON=python3` | `pass` | `2` |
+| 12 | `make event-alpha-shim-dependency-report PYTHON=python3` | `pass` | `2` |
+| 13 | `make event-alpha-integrated-radar-smoke PYTHON=python3` | `pass` | `3` |
+| 14 | `make event-alpha-integrated-radar-doctor PYTHON=python3` | `pass` | `1` |
+| 15 | `make event-alpha-notification-format-smoke PYTHON=python3` | `pass` | `3` |
+| 16 | `make event-alpha-telegram-no-send-final-check-fast PYTHON=python3` | `pass` | `4` |
+| 17 | `make event-alpha-evidence-acquisition-smoke PYTHON=python3` | `pass` | `5` |
+| 18 | `make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` | `pass` | `5` |
+| 19 | `make event-alpha-coinalyze-preflight-smoke PYTHON=python3` | `pass` | `1` |
+| 20 | `make event-alpha-coinalyze-preflight PYTHON=python3` | `pass` | `1` |
+| 21 | `make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3` | `pass` | `1` |
+| 22 | `make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | `pass` | `1` |
+| 23 | `make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | `pass` | `5` |
+| 24 | `make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3` | `pass` | `2` |
+| 25 | `make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3` | `pass` | `3` |
+| 26 | `make verify PYTHON=python3` | `pass` | `78` |
 
 ## Safety Invariants
 

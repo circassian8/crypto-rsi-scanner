@@ -57,8 +57,8 @@ move every Event Alpha module or rewrite `scanner.py` in one pass.
 - Command bodies move behind `cli/commands_*.py` one group at a time.
 - Architecture/project-health checks live under
   `crypto_rsi_scanner/project_health/` and use canonical `make architecture-*`
-  targets. Deprecated `make refactor-*` targets are hidden compatibility aliases
-  only, not the current runbook surface.
+  targets. Removed old target aliases are not part of the current runbook
+  surface.
 - `scanner.py`, `main.py`, Make targets, flags, and defaults stay compatible
   until an explicit migration says otherwise.
 

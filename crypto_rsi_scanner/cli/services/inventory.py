@@ -1,4 +1,4 @@
-"""CLI refactor inventory helpers."""
+"""CLI architecture inventory helpers."""
 
 from __future__ import annotations
 

@@ -811,63 +811,63 @@
       "new_path": "crypto_rsi_scanner.event_alpha.artifacts.context",
       "old_path": "crypto_rsi_scanner.event_alpha_artifacts",
       "removal_reason": "Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths.",
-      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make refactor-legacy-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make architecture-transitional-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
     },
     {
       "date": "2026-07-05T03:41:21+00:00",
       "new_path": "crypto_rsi_scanner.event_alpha.artifacts.paths",
       "old_path": "crypto_rsi_scanner.event_artifact_paths",
       "removal_reason": "Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths.",
-      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make refactor-legacy-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make architecture-transitional-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
     },
     {
       "date": "2026-07-05T03:41:21+00:00",
       "new_path": "crypto_rsi_scanner.event_alpha.artifacts.run_ledger",
       "old_path": "crypto_rsi_scanner.event_alpha_run_ledger",
       "removal_reason": "Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths.",
-      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make refactor-legacy-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make architecture-transitional-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
     },
     {
       "date": "2026-07-05T03:41:21+00:00",
       "new_path": "crypto_rsi_scanner.event_alpha.artifacts.retention",
       "old_path": "crypto_rsi_scanner.event_alpha_retention",
       "removal_reason": "Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths.",
-      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make refactor-legacy-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make architecture-transitional-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
     },
     {
       "date": "2026-07-05T03:41:21+00:00",
       "new_path": "crypto_rsi_scanner.event_alpha.artifacts.locks",
       "old_path": "crypto_rsi_scanner.event_alpha_run_lock",
       "removal_reason": "Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths.",
-      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make refactor-legacy-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make architecture-transitional-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
     },
     {
       "date": "2026-07-05T03:41:21+00:00",
       "new_path": "crypto_rsi_scanner.event_alpha.doctor.artifact_doctor",
       "old_path": "crypto_rsi_scanner.event_alpha_artifact_doctor",
       "removal_reason": "Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths.",
-      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make refactor-legacy-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make architecture-transitional-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
     },
     {
       "date": "2026-07-05T03:41:21+00:00",
       "new_path": "crypto_rsi_scanner.event_alpha.config.profiles",
       "old_path": "crypto_rsi_scanner.event_alpha_profiles",
       "removal_reason": "Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths.",
-      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make refactor-legacy-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make architecture-transitional-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
     },
     {
       "date": "2026-07-05T03:41:21+00:00",
       "new_path": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
       "old_path": "crypto_rsi_scanner.event_alpha_v1_readiness",
       "removal_reason": "Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths.",
-      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make refactor-legacy-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make architecture-transitional-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
     },
     {
       "date": "2026-07-05T03:41:21+00:00",
       "new_path": "crypto_rsi_scanner.event_alpha.config.preflight",
       "old_path": "crypto_rsi_scanner.event_alpha_preflight",
       "removal_reason": "Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths.",
-      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make refactor-legacy-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
+      "verification_command": "make event-alpha-old-import-check PYTHON=python3; make architecture-transitional-file-check PYTHON=python3; python3 tests/test_indicators.py; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py -q; python3 -m compileall -q crypto_rsi_scanner tests; make verify PYTHON=python3"
     }
   ],
   "generated_at": "2026-07-04T19:22:48+00:00",

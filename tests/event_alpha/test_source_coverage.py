@@ -1,4 +1,4 @@
-"""Focused source-coverage package refactor tests."""
+"""Focused source-coverage package architecture tests."""
 
 from __future__ import annotations
 

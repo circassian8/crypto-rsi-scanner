@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-05T11:29:08.586076+00:00`
+- generated_at: `2026-07-05T13:23:20.373694+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -31,25 +31,25 @@ Static source inventory only. This report does not call providers, send Telegram
 - unresolved_multi_class_modules_count: `0`
 - new_violation_count: `0`
 - moved_existing_violation_count: `0`
-- legacy_decomposition_gate_status: `pass`
-- legacy_files_over_1500_lines: `0`
-- legacy_files_over_3000_lines: `0`
-- legacy_total_lines: `0`
-- legacy_classes_over_limit: `0`
-- legacy_functions_over_limit: `0`
-- legacy_modules_with_multiple_public_classes: `0`
+- api_decomposition_gate_status: `pass`
+- api_files_over_1500_lines: `0`
+- api_files_over_3000_lines: `0`
+- api_total_lines: `0`
+- api_classes_over_limit: `0`
+- api_functions_over_limit: `0`
+- api_modules_with_multiple_public_classes: `0`
 
 ## Policy
 
 - Existing violations from `research/ARCHITECTURE_SIZE_BASELINE.json` are warnings.
 - New file/function/class/module ownership violations are blockers.
-- Refactor v3 targets production files below 1,200 lines.
+- Architecture health targets production files below 1,200 lines.
 - Production files over 1,200 lines are warnings and must either be split or documented.
-- Refactor v3 treats production files over 1,500 lines as blockers unless explicitly accepted.
+- Architecture health treats production files over 1,500 lines as blockers unless explicitly accepted.
 - Production files over 1,500 lines block architecture-complete status unless explicitly accepted.
-- Production files over 2,000 lines remain a legacy continuity threshold.
+- Production files over 2,000 lines remain a continuity threshold.
 - Production files over 3,000 lines are blockers.
-- Test file size debt is tracked separately and does not block production refactor completion.
+- Test file size debt is tracked separately and does not block architecture-complete status.
 - Transitional implementation files over 1,500 lines are warnings.
 - Transitional implementation files over 3,000 lines block architecture-complete status.
 - New production modules with multiple public classes are blockers unless registered as accepted model bundles.
@@ -60,7 +60,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | category | id | lines/count |
 |---|---|---:|
 
-## Refactor V3 Gates
+## Architecture Gates
 
 | gate | value | severity |
 |---|---:|---|
@@ -83,7 +83,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | current id | baseline id |
 |---|---|
 
-## Legacy Decomposition Gate
+## API Decomposition Gate
 
 | path | lines |
 |---|---:|
@@ -93,7 +93,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 |
-| `crypto_rsi_scanner/project_health/architecture_report.py` | 1485 |
+| `crypto_rsi_scanner/project_health/architecture_report.py` | 1472 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1431 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 |
@@ -138,11 +138,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines | reason | revisit |
 |---|---:|---|---|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 | Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged. | When identity/source/market/derivatives merge golden fixtures can be compared before and after split. |
-| `crypto_rsi_scanner/project_health/architecture_report.py` | 1485 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
+| `crypto_rsi_scanner/project_health/architecture_report.py` | 1472 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1431 | Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral. | When deleted-shim reporting can be split from old-import linting without changing gate output. |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 | Dense operator audit renderer with many cross-section helper dependencies. | When audit sections are split with golden Markdown fixture comparison. |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | Verdict scoring and live-confirmation policy share many ordered caps and guardrails. | When verdict snapshots cover each opportunity level and cap reason. |
-| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 | Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to canonical non-legacy service modules. |
+| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 | Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to focused service modules. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | Route-gate decision logic is dense and behavior-critical for no-send notification eligibility. | When route-decision/gate snapshots cover every lane and quality-gate cap. |
 | `crypto_rsi_scanner/config.py` | 1319 | Central environment/config contract; splitting risks import-time default and env-var behavior drift. | When a dedicated config-v2 migration freeze and env snapshot tests exist. |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 | Provider/cache enrichment flow is stable and below blocker threshold. | When adding a new enrichment source or cache policy. |
@@ -169,7 +169,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_source_coverage.py` | 2991 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
 | `tests/test_indicators.py` | 1779 |
-| `tests/cli/test_make_targets.py` | 1323 |
+| `tests/cli/test_make_targets.py` | 1322 |
 | `tests/event_alpha/_api_helpers.py` | 825 |
 | `tests/event_alpha/test_artifact_schema.py` | 743 |
 | `tests/rsi/test_indicators_core.py` | 694 |

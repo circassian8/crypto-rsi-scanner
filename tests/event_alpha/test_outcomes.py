@@ -1,4 +1,4 @@
-"""Focused outcomes package refactor tests."""
+"""Focused outcomes package architecture tests."""
 
 from __future__ import annotations
 

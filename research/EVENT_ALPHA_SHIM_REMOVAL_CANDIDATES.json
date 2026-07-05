@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-05T11:40:09.563229+00:00",
+  "generated_at": "2026-07-05T13:23:30.903333+00:00",
   "groups": {
     "keep_public_compatibility": [],
     "keep_safety_exception": [
@@ -15,7 +15,7 @@
         "shim_status": "intentionally_external"
       }
     ],
-    "keep_until_next_major_refactor": [],
+    "keep_until_explicit_retirement": [],
     "migrate_imports_first": [],
     "remove_now_candidates": []
   },
@@ -25,7 +25,7 @@
   "removal_candidate_counts": {
     "keep_public_compatibility": 0,
     "keep_safety_exception": 1,
-    "keep_until_next_major_refactor": 0,
+    "keep_until_explicit_retirement": 0,
     "migrate_imports_first": 0,
     "remove_now_candidates": 0
   },

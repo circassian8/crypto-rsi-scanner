@@ -27,9 +27,8 @@ rows, or create `TRIGGERED_FADE`.
   only when they clearly describe tombstoned paths or historical decisions.
 - Artifact doctor warns if a deleted shim file is reintroduced.
 - Migration-era implementation filenames are checked by
-  `make architecture-transitional-file-check`. Deprecated `make refactor-*`
-  targets are retained only as hidden aliases for operators and historical
-  automation.
+  `make architecture-transitional-file-check`. Removed old target aliases are
+  not part of current operator runbooks or automation.
 - Remaining migration-era naming is checked by
   `make architecture-naming-check`. Accepted occurrences are limited to
   historical artifact row semantics, backwards-compatible CLI aliases,

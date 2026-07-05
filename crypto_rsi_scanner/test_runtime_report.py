@@ -1,4 +1,4 @@
-"""Measured local test runtime report for refactor gates."""
+"""Measured local test runtime report for architecture gates."""
 
 from __future__ import annotations
 

@@ -9,13 +9,13 @@ This document records the pytest-compatible split of the historical
 
 | path | role |
 |---|---|
-| `tests/test_indicators.py` | Umbrella compatibility runner plus remaining legacy ops/config/storage tests. Running it directly still executes the split Event Alpha, RSI, and CLI packages. |
+| `tests/test_indicators.py` | Umbrella compatibility runner plus remaining ops/config/storage tests. Running it directly still executes the split Event Alpha, RSI, and CLI packages. |
 | `tests/rsi/test_indicators_core.py` | Pure RSI math, scanner scoring, setup/tier/regime, state features, and universe hygiene tests. |
 | `tests/rsi/test_backtest.py` | Backtest edge, state-slice, PIT/volume membership, cache, fixture-loader, and CLI-argument regressions. |
 | `tests/rsi/test_paper_risk.py` | Outcome grading, paper scoreboard, refresh-paper, and risk/rendering guard tests. |
 | `tests/cli/test_parser.py` | Parser snapshots, command classification, CLI help smoke, and dispatch smoke with patched handlers. |
-| `tests/cli/test_make_targets.py` | Makefile, export archive, CI workflow, refactor-baseline, and split-target static checks. |
-| `tests/event_alpha/` | Event Alpha artifact, radar, notification, provider readiness, source coverage, namespace lifecycle, and outcome tests split in the prior refactor pass. |
+| `tests/cli/test_make_targets.py` | Makefile, export archive, CI workflow, architecture baseline, and split-target static checks. |
+| `tests/event_alpha/` | Event Alpha artifact, radar, notification, provider readiness, source coverage, namespace lifecycle, and outcome tests split into focused package homes. |
 
 ## Commands
 
@@ -42,7 +42,7 @@ Alpha split. It is now 1,770 lines and reports these standalone counts:
 | cli_tests | 17 |
 | umbrella_tests | 44 |
 
-The refactor baseline final-phase gate for `tests/test_indicators.py` is below
+The architecture baseline final-phase gate for `tests/test_indicators.py` is below
 2,000 lines, so the umbrella runner now satisfies that size target.
 
 ## Remaining Umbrella Sections
@@ -54,7 +54,7 @@ in place for a later, narrower pass:
 - Storage, subscriber, Telegram formatting, bot command, and heartbeat tests.
 - Backup, restore drill, status, log rotation, launchd, and maintenance helper tests.
 - CoinGecko fixture-client and SQLite WAL/busy-timeout checks.
-- Legacy helper definitions that are still useful for standalone compatibility
+- Historical helper definitions that are still useful for standalone compatibility
   until the ops/storage packages receive focused pytest homes.
 
 Future splits should move these into `tests/config/`, `tests/storage/`,

@@ -1,6 +1,6 @@
 """Every relative import in the package must resolve to a real module.
 
-Regression guard for the 2026-07-03 refactor outage: moving
+Regression guard for the 2026-07-03 package import outage: moving
 ``cli/services/scanner_parts/rsi_scan.py`` one directory deeper left nine
 function-local ``from ...X import`` statements pointing at
 ``crypto_rsi_scanner.cli.X`` instead of the package root, which broke

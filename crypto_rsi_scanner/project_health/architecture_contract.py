@@ -19,8 +19,6 @@ from ..event_alpha import shims as event_alpha_shims
 CONTRACT_SCHEMA_VERSION = "architecture_contract_v1"
 CONTRACT_JSON = "ARCHITECTURE_CONTRACT.json"
 CONTRACT_MD = "ARCHITECTURE_CONTRACT.md"
-LEGACY_CONTRACT_JSON = "REFACTOR_V3_CONTRACT.json"
-LEGACY_CONTRACT_MD = "REFACTOR_V3_CONTRACT.md"
 PRODUCTION_TARGET_LINE_LIMIT = 1200
 PRODUCTION_BLOCKER_LINE_LIMIT = 1500
 FUNCTION_BLOCKER_LINE_LIMIT = 150
@@ -35,8 +33,8 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
     },
     "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py": {
-        "reason": "Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
-        "revisit_condition": "When config/report command bodies move to canonical non-legacy service modules.",
+        "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
+        "revisit_condition": "When config/report command bodies move to focused service modules.",
     },
     "crypto_rsi_scanner/config.py": {
         "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
@@ -311,8 +309,6 @@ def write_architecture_contract(
     markdown = format_architecture_contract(payload)
     json_path.write_text(data, encoding="utf-8")
     md_path.write_text(markdown, encoding="utf-8")
-    (target / LEGACY_CONTRACT_JSON).write_text(data, encoding="utf-8")
-    (target / LEGACY_CONTRACT_MD).write_text(markdown, encoding="utf-8")
     return json_path, md_path, payload
 
 
@@ -510,9 +506,6 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-build_refactor_v3_contract = build_architecture_contract
-write_refactor_v3_contract = write_architecture_contract
-format_refactor_v3_contract = format_architecture_contract
 write_architecture_v3_contract = write_architecture_contract
 build_architecture_v3_contract = build_architecture_contract
 

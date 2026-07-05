@@ -78,8 +78,8 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
 - Migration-era implementation filenames are not part of the final
   architecture. Run `make architecture-transitional-file-check`,
   `make architecture-naming-check`, `make architecture-size-gates`, and
-  `make architecture-final-report` after moving code. Older `make refactor-*`
-  targets are deprecated compatibility aliases only.
+  `make architecture-final-report` after moving code. Removed old target aliases
+  are not part of the current runbook surface.
 - Remaining `legacy` wording is allowed only for historical artifact row
   semantics, generated compatibility report fields, old CLI aliases, tombstone
   records, or historical decision/log entries. New user-facing flags should use

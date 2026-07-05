@@ -17,8 +17,6 @@ from typing import Any
 BASELINE_SCHEMA_VERSION = "architecture_baseline_v1"
 BASELINE_JSON = "ARCHITECTURE_BASELINE.json"
 BASELINE_MD = "ARCHITECTURE_BASELINE.md"
-LEGACY_BASELINE_JSON = "REFACTOR_BASELINE.json"
-LEGACY_BASELINE_MD = "REFACTOR_BASELINE.md"
 MAJOR_FILES = (
     "crypto_rsi_scanner/scanner.py",
     "tests/test_indicators.py",
@@ -461,13 +459,9 @@ def write_baseline(root: Path | None = None, out_dir: Path | None = None) -> dic
     md_path = output_dir / BASELINE_MD
     json_path.write_text(payload, encoding="utf-8")
     md_path.write_text(markdown, encoding="utf-8")
-    (output_dir / LEGACY_BASELINE_JSON).write_text(payload, encoding="utf-8")
-    (output_dir / LEGACY_BASELINE_MD).write_text(markdown, encoding="utf-8")
     return {"json": json_path, "markdown": md_path}
 
 
-build_refactor_baseline = build_baseline
-write_refactor_baseline = write_baseline
 build_architecture_baseline = build_baseline
 write_architecture_baseline = write_baseline
 

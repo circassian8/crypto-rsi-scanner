@@ -356,7 +356,7 @@ def build_shim_dependency_report(
         "migrate_imports_first": [],
         "keep_public_compatibility": [],
         "keep_safety_exception": [_event_fade_safety_exception_row()],
-        "keep_until_next_major_refactor": [],
+        "keep_until_explicit_retirement": [],
     }
     for entry in entries:
         grouped = references.get(entry.old_module, {})
@@ -1027,7 +1027,7 @@ def format_shim_removal_candidates(report: dict[str, object]) -> str:
         ("migrate_imports_first", "Migrate Imports First"),
         ("keep_public_compatibility", "Keep Public Compatibility"),
         ("keep_safety_exception", "Keep Safety Exception"),
-        ("keep_until_next_major_refactor", "Keep Until Next Major Refactor"),
+        ("keep_until_explicit_retirement", "Keep Until Explicit Retirement"),
     )
     for key, title in titles:
         lines.extend(["", f"## {title}", ""])
@@ -1225,7 +1225,7 @@ def _append_removal_group(groups: dict[str, list[dict[str, object]]], row: dict[
     elif action == "keep_public_entrypoint":
         key = "keep_public_compatibility"
     else:
-        key = "keep_until_next_major_refactor"
+        key = "keep_until_explicit_retirement"
     groups.setdefault(key, []).append(_candidate_row(row))
 
 
@@ -1278,7 +1278,7 @@ def _retention_reason(entry: ShimRegistryEntry, action: str) -> str:
     if action == "migrate_imports_then_remove":
         return "internal imports must be migrated before removal."
     if action == "keep_until_v3":
-        return "compatibility or documentation references remain until the next major refactor."
+        return "compatibility or documentation references remain until explicit retirement."
     if action == "remove_now":
         return ""
     return entry.notes

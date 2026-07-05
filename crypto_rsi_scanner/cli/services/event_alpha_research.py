@@ -2,7 +2,7 @@
 
 Behavior-preserving split from ``crypto_rsi_scanner.cli.services.event_alpha``.
 Functions bind scanner globals at runtime so historical helper/config lookups
-remain compatible during the refactor.
+remain compatible through the public API bridge.
 """
 
 from __future__ import annotations

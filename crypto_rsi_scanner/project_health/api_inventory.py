@@ -18,9 +18,9 @@ from typing import Any
 REPORT_SCHEMA_VERSION = "architecture_api_inventory_v1"
 REPORT_JSON = "ARCHITECTURE_API_INVENTORY.json"
 REPORT_MD = "ARCHITECTURE_API_INVENTORY.md"
-LEGACY_WARNING_LINE_LIMIT = 1500
-LEGACY_BLOCKING_LINE_LIMIT = 3000
-LEGACY_REQUIRED_DECOMPOSITION_PATHS = (
+API_WARNING_LINE_LIMIT = 1500
+API_BLOCKING_LINE_LIMIT = 3000
+API_REQUIRED_DECOMPOSITION_PATHS = (
     "crypto_rsi_scanner/cli/services/scanner_api.py",
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py",
     "crypto_rsi_scanner/event_alpha/notifications/pipeline_core.py",
@@ -34,16 +34,16 @@ def build_api_inventory(
     function_line_limit: int = 150,
 ) -> dict[str, Any]:
     repo_root = Path(root).expanduser()
-    legacy_files = _api_source_files(repo_root)
+    api_files = _api_source_files(repo_root)
     line_rows = [
         {
             "path": path.relative_to(repo_root).as_posix(),
             "line_count": _line_count(path),
         }
-        for path in legacy_files
+        for path in api_files
     ]
     line_rows.sort(key=lambda row: (-int(row["line_count"]), str(row["path"])))
-    classes, functions = _collect_ownership_rows(legacy_files, repo_root=repo_root)
+    classes, functions = _collect_ownership_rows(api_files, repo_root=repo_root)
     public_class_counts = Counter(row["module"] for row in classes if row["public"])
     modules_with_multiple_public_classes = [
         {
@@ -54,13 +54,13 @@ def build_api_inventory(
         for module, count in sorted(public_class_counts.items())
         if count > 1
     ]
-    files_over_1500 = [row for row in line_rows if int(row["line_count"]) > LEGACY_WARNING_LINE_LIMIT]
-    files_over_3000 = [row for row in line_rows if int(row["line_count"]) > LEGACY_BLOCKING_LINE_LIMIT]
+    files_over_1500 = [row for row in line_rows if int(row["line_count"]) > API_WARNING_LINE_LIMIT]
+    files_over_3000 = [row for row in line_rows if int(row["line_count"]) > API_BLOCKING_LINE_LIMIT]
     required_blockers = [
         row
         for row in line_rows
-        if row["path"] in LEGACY_REQUIRED_DECOMPOSITION_PATHS
-        and int(row["line_count"]) > LEGACY_BLOCKING_LINE_LIMIT
+        if row["path"] in API_REQUIRED_DECOMPOSITION_PATHS
+        and int(row["line_count"]) > API_BLOCKING_LINE_LIMIT
     ]
     classes_over_limit = [row for row in classes if int(row["line_count"]) > class_line_limit]
     functions_over_limit = [row for row in functions if int(row["line_count"]) > function_line_limit]
@@ -77,23 +77,23 @@ def build_api_inventory(
         "paper_trades_created": 0,
         "normal_rsi_signal_rows_written": 0,
         "triggered_fade_created": 0,
-        "legacy_line_warning_limit": LEGACY_WARNING_LINE_LIMIT,
-        "legacy_line_blocking_limit": LEGACY_BLOCKING_LINE_LIMIT,
-        "legacy_required_decomposition_paths": list(LEGACY_REQUIRED_DECOMPOSITION_PATHS),
-        "legacy_file_count": len(line_rows),
-        "legacy_files_over_1500_lines": len(files_over_1500),
-        "legacy_files_over_3000_lines": len(files_over_3000),
-        "legacy_total_lines": sum(int(row["line_count"]) for row in line_rows),
+        "api_line_warning_limit": API_WARNING_LINE_LIMIT,
+        "api_line_blocking_limit": API_BLOCKING_LINE_LIMIT,
+        "api_required_decomposition_paths": list(API_REQUIRED_DECOMPOSITION_PATHS),
+        "api_file_count": len(line_rows),
+        "api_files_over_1500_lines": len(files_over_1500),
+        "api_files_over_3000_lines": len(files_over_3000),
+        "api_total_lines": sum(int(row["line_count"]) for row in line_rows),
         "largest_api_files": line_rows[:20],
-        "legacy_classes_over_limit": len(classes_over_limit),
-        "legacy_functions_over_limit": len(functions_over_limit),
-        "legacy_modules_with_multiple_public_classes": len(modules_with_multiple_public_classes),
-        "legacy_classes_over_limit_rows": classes_over_limit[:120],
-        "legacy_functions_over_limit_rows": functions_over_limit[:160],
-        "legacy_modules_with_multiple_public_classes_rows": modules_with_multiple_public_classes[:120],
-        "legacy_required_decomposition_blockers": required_blockers,
-        "legacy_decomposition_gate_status": gate_status,
-        "legacy_decomposition_blockers": blocker_rows,
+        "api_classes_over_limit": len(classes_over_limit),
+        "api_functions_over_limit": len(functions_over_limit),
+        "api_modules_with_multiple_public_classes": len(modules_with_multiple_public_classes),
+        "api_classes_over_limit_rows": classes_over_limit[:120],
+        "api_functions_over_limit_rows": functions_over_limit[:160],
+        "api_modules_with_multiple_public_classes_rows": modules_with_multiple_public_classes[:120],
+        "api_required_decomposition_blockers": required_blockers,
+        "api_decomposition_gate_status": gate_status,
+        "api_decomposition_blockers": blocker_rows,
     }
 
 
@@ -116,10 +116,10 @@ def format_api_inventory(report: dict[str, Any]) -> str:
         "Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.",
         "",
         f"- generated_at: `{report.get('generated_at')}`",
-        f"- legacy_file_count: `{report.get('legacy_file_count')}`",
-        f"- legacy_decomposition_gate_status: `{report.get('legacy_decomposition_gate_status')}`",
-        f"- legacy_files_over_1500_lines: `{report.get('legacy_files_over_1500_lines')}`",
-        f"- legacy_files_over_3000_lines: `{report.get('legacy_files_over_3000_lines')}`",
+        f"- api_file_count: `{report.get('api_file_count')}`",
+        f"- api_decomposition_gate_status: `{report.get('api_decomposition_gate_status')}`",
+        f"- api_files_over_1500_lines: `{report.get('api_files_over_1500_lines')}`",
+        f"- api_files_over_3000_lines: `{report.get('api_files_over_3000_lines')}`",
     ]
     return "\n".join(lines).rstrip() + "\n"
 
@@ -131,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
     json_path, md_path, report = write_api_inventory(out_dir=args.out_dir)
     print(md_path)
     print(json_path)
-    print(f"legacy_decomposition_gate_status={report.get('legacy_decomposition_gate_status')}")
+    print(f"api_decomposition_gate_status={report.get('api_decomposition_gate_status')}")
     return 0
 
 
@@ -167,7 +167,7 @@ def _collect_ownership_rows(paths: list[Path], *, repo_root: Path) -> tuple[list
             tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"), filename=path.as_posix())
         except (OSError, SyntaxError):
             continue
-        visitor = _LegacyOwnershipVisitor(
+        visitor = _ApiOwnershipVisitor(
             module=_module_name(path, repo_root=repo_root),
             source_path=path.relative_to(repo_root).as_posix(),
         )
@@ -177,7 +177,7 @@ def _collect_ownership_rows(paths: list[Path], *, repo_root: Path) -> tuple[list
     return classes, functions
 
 
-class _LegacyOwnershipVisitor(ast.NodeVisitor):
+class _ApiOwnershipVisitor(ast.NodeVisitor):
     def __init__(self, *, module: str, source_path: str) -> None:
         self.module = module
         self.source_path = source_path

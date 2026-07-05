@@ -17,6 +17,61 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Finish architecture naming cleanup · Codex
+**Why:** The project-health tooling had been made permanent, but current source,
+tests, reports, and Makefile targets still exposed migration-era naming. The
+final cleanup needed strict canonical `architecture-*` naming without changing
+runtime behavior.
+**Changes:**
+- Removed the old `refactor-*` Make aliases and updated current docs/tests to
+  use `architecture-*` and project-health terminology.
+- Renamed current public API bridge internals from `LEGACY`/`legacy` names to
+  API-oriented names while preserving runtime and monkeypatch behavior.
+- Tightened `architecture-naming-check` so current tooling, Makefile, test, and
+  source rename items are blockers; historical DECISIONS/DEVLOG/report semantics
+  are classified separately.
+- Stopped current project-health tools from regenerating old `REFACTOR_*`
+  reports and refreshed canonical `ARCHITECTURE_*`,
+  `PROJECT_HEALTH_*`, and Event Alpha shim/old-import reports.
+- Added `research/ARCHITECTURE_VERIFICATION_RESULTS.json` so the architecture
+  completion map records this verification run and reports `accepted`.
+**Verify:** `python3 tests/test_indicators.py` (`762/762 passed`);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (`779 passed`); `python3 -m compileall
+-q crypto_rsi_scanner tests`; `make architecture-naming-check PYTHON=python3`;
+`make architecture-transitional-file-check PYTHON=python3`; `make
+architecture-size-gates PYTHON=python3`; `make
+architecture-class-ownership-report PYTHON=python3`; `make
+architecture-final-report PYTHON=python3`; `make architecture-completion-map
+PYTHON=python3`; `make architecture-cleanliness-check PYTHON=python3`; `make
+event-alpha-old-import-check PYTHON=python3`; `make
+event-alpha-shim-dependency-report PYTHON=python3`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make
+event-alpha-notification-format-smoke PYTHON=python3`; `make
+event-alpha-telegram-no-send-final-check-fast PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-preflight PYTHON=python3`; `make
+event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`; `make
+event-alpha-source-coverage-report PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1
+PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** `event-alpha-catalyst-frame-e2e-cycle` exits 0 but its embedded
+strict doctor still documents fixture-namespace review blockers; this pass did
+not alter product behavior to address them. The final naming report has
+`should_rename=0`, `current_tooling_name_to_rename=0`,
+`Makefile_target_to_update=0`, and `test_reference_to_update=0`. No live
+provider calls, live Telegram sends, trading, paper trading, normal RSI signal
+writes, or Event Alpha-created `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-05 — Make architecture health tooling permanent · Codex
 **Why:** Event Alpha refactor implementation is complete, but top-level
 `refactor_*.py` tooling and current report names still made the repository look

@@ -23,13 +23,10 @@ REPORT_SCHEMA_VERSION = "architecture_size_gate_report_v1"
 BASELINE_JSON = "ARCHITECTURE_SIZE_BASELINE.json"
 REPORT_JSON = "ARCHITECTURE_SIZE_GATES.json"
 REPORT_MD = "ARCHITECTURE_SIZE_GATES.md"
-LEGACY_BASELINE_JSON = "REFACTOR_SIZE_BASELINE.json"
-LEGACY_REPORT_JSON = "REFACTOR_SIZE_GATES.json"
-LEGACY_REPORT_MD = "REFACTOR_SIZE_GATES.md"
 DEFAULT_FILE_LINE_LIMIT = 1500
 PRODUCTION_WARNING_LINE_LIMIT = architecture_contract.PRODUCTION_TARGET_LINE_LIMIT
 PRODUCTION_BLOCKER_LINE_LIMIT = architecture_contract.PRODUCTION_BLOCKER_LINE_LIMIT
-PRODUCTION_LEGACY_BLOCKER_LINE_LIMIT = 2000
+PRODUCTION_CONTINUITY_LINE_LIMIT = 2000
 PRODUCTION_HARD_BLOCKER_LINE_LIMIT = 3000
 TEST_WARNING_LINE_LIMIT = 1500
 DEFAULT_CLASS_LINE_LIMIT = ownership.DEFAULT_CLASS_LINE_LIMIT
@@ -83,7 +80,7 @@ MOVED_VIOLATION_ALIASES = {
     "function:crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py:evaluate_signal_quality_case": "function:crypto_rsi_scanner/event_alpha/outcomes/quality.py:evaluate_signal_quality_case",
     "function:crypto_rsi_scanner/event_alpha/radar/source_coverage/builder.py:build_source_coverage_report": "function:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:build_source_coverage_report",
     "function:crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py:format_source_coverage_report": "function:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:format_source_coverage_report",
-    "function:crypto_rsi_scanner/architecture_report.py:format_refactor_final_markdown": "function:crypto_rsi_scanner/architecture_report.py:format_refactor_final_markdown",
+    "function:crypto_rsi_scanner/architecture_report.py:format_architecture_report_markdown": "function:crypto_rsi_scanner/architecture_report.py:format_architecture_report_markdown",
     "public_classes:crypto_rsi_scanner.event_alpha.artifacts.research_cards.components.models": "public_classes:crypto_rsi_scanner.event_alpha.artifacts.research_cards.api",
     "public_classes:crypto_rsi_scanner.event_alpha.notifications.pipeline_parts.delivery_models": "public_classes:crypto_rsi_scanner.event_alpha.notifications.pipeline_core",
     "public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store.models": "public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store",
@@ -119,7 +116,7 @@ def build_inventory(
         class_line_limit=class_line_limit,
         function_line_limit=function_line_limit,
     )
-    legacy_inventory = api_inventory.build_api_inventory(
+    api_inventory_data = api_inventory.build_api_inventory(
         root=repo_root,
         class_line_limit=class_line_limit,
         function_line_limit=function_line_limit,
@@ -145,7 +142,7 @@ def build_inventory(
         row for row in production_file_rows if row["line_count"] > PRODUCTION_BLOCKER_LINE_LIMIT
     ]
     production_files_over_2000 = [
-        row for row in production_file_rows if row["line_count"] > PRODUCTION_LEGACY_BLOCKER_LINE_LIMIT
+        row for row in production_file_rows if row["line_count"] > PRODUCTION_CONTINUITY_LINE_LIMIT
     ]
     production_files_over_3000 = [
         row for row in production_file_rows if row["line_count"] > PRODUCTION_HARD_BLOCKER_LINE_LIMIT
@@ -239,7 +236,7 @@ def build_inventory(
         "accepted_model_bundles": class_report.get("accepted_model_bundles", []),
         "unresolved_multi_class_modules": class_report.get("unresolved_multi_class_modules", []),
         "modules_with_multiple_public_classes": class_report.get("modules_with_multiple_public_classes", []),
-        **legacy_inventory,
+        **api_inventory_data,
         "violations": violations,
         "violation_ids": violation_ids,
     }
@@ -324,8 +321,6 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
         class_ownership_report=inventory,
     )
     baseline_path = repo_root / "research" / BASELINE_JSON
-    if not baseline_path.exists():
-        baseline_path = repo_root / "research" / LEGACY_BASELINE_JSON
     baseline = _read_json(baseline_path)
     baseline_ids = set(baseline.get("violation_ids", [])) if isinstance(baseline, dict) else set()
     current_ids = set(inventory["violation_ids"])
@@ -357,7 +352,7 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
         "no_live_provider_calls": True,
         "no_sends_trades_paper_rsi_or_triggered_fade": True,
         "gate_status": gate_status,
-        "legacy_decomposition_gate_status": inventory.get("legacy_decomposition_gate_status"),
+        "api_decomposition_gate_status": inventory.get("api_decomposition_gate_status"),
         "baseline_path": f"research/{BASELINE_JSON}",
         "baseline_present": baseline_path.exists(),
         "policy": {
@@ -367,7 +362,7 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
             "v3_production_file_over_1500_lines": "blocker unless explicitly accepted",
             "production_file_over_1200_lines": "warning",
             "production_file_over_1500_lines": "blocker unless explicitly accepted",
-            "production_file_over_2000_lines": "legacy blocker threshold retained for continuity",
+            "production_file_over_2000_lines": "continuity threshold retained for architecture health",
             "production_file_over_3000_lines": "blocker",
             "test_file_size_debt": "tracked separately from production completion",
             "baseline_update": "explicit make architecture-size-baseline-update only",
@@ -399,7 +394,6 @@ def write_baseline(*, root: str | Path | None = None, out_dir: str | Path | None
     data = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     path = target / BASELINE_JSON
     path.write_text(data, encoding="utf-8")
-    (target / LEGACY_BASELINE_JSON).write_text(data, encoding="utf-8")
     return path, payload
 
 
@@ -418,8 +412,6 @@ def write_gate_report(
     markdown = format_gate_report(payload)
     json_path.write_text(data, encoding="utf-8")
     md_path.write_text(markdown, encoding="utf-8")
-    (target / LEGACY_REPORT_JSON).write_text(data, encoding="utf-8")
-    (target / LEGACY_REPORT_MD).write_text(markdown, encoding="utf-8")
     return json_path, md_path, payload
 
 
@@ -458,25 +450,25 @@ def format_gate_report(report: dict[str, Any]) -> str:
         f"- unresolved_multi_class_modules_count: `{report.get('unresolved_multi_class_modules_count', 0)}`",
         f"- new_violation_count: `{report.get('new_violation_count', 0)}`",
         f"- moved_existing_violation_count: `{report.get('moved_existing_violation_count', 0)}`",
-        f"- legacy_decomposition_gate_status: `{report.get('legacy_decomposition_gate_status')}`",
-        f"- legacy_files_over_1500_lines: `{report.get('legacy_files_over_1500_lines', 0)}`",
-        f"- legacy_files_over_3000_lines: `{report.get('legacy_files_over_3000_lines', 0)}`",
-        f"- legacy_total_lines: `{report.get('legacy_total_lines', 0)}`",
-        f"- legacy_classes_over_limit: `{report.get('legacy_classes_over_limit', 0)}`",
-        f"- legacy_functions_over_limit: `{report.get('legacy_functions_over_limit', 0)}`",
-        f"- legacy_modules_with_multiple_public_classes: `{report.get('legacy_modules_with_multiple_public_classes', 0)}`",
+        f"- api_decomposition_gate_status: `{report.get('api_decomposition_gate_status')}`",
+        f"- api_files_over_1500_lines: `{report.get('api_files_over_1500_lines', 0)}`",
+        f"- api_files_over_3000_lines: `{report.get('api_files_over_3000_lines', 0)}`",
+        f"- api_total_lines: `{report.get('api_total_lines', 0)}`",
+        f"- api_classes_over_limit: `{report.get('api_classes_over_limit', 0)}`",
+        f"- api_functions_over_limit: `{report.get('api_functions_over_limit', 0)}`",
+        f"- api_modules_with_multiple_public_classes: `{report.get('api_modules_with_multiple_public_classes', 0)}`",
         "",
         "## Policy",
         "",
         "- Existing violations from `research/ARCHITECTURE_SIZE_BASELINE.json` are warnings.",
         "- New file/function/class/module ownership violations are blockers.",
-        "- Refactor v3 targets production files below 1,200 lines.",
+        "- Architecture health targets production files below 1,200 lines.",
         "- Production files over 1,200 lines are warnings and must either be split or documented.",
-        "- Refactor v3 treats production files over 1,500 lines as blockers unless explicitly accepted.",
+        "- Architecture health treats production files over 1,500 lines as blockers unless explicitly accepted.",
         "- Production files over 1,500 lines block architecture-complete status unless explicitly accepted.",
-        "- Production files over 2,000 lines remain a legacy continuity threshold.",
+        "- Production files over 2,000 lines remain a continuity threshold.",
         "- Production files over 3,000 lines are blockers.",
-        "- Test file size debt is tracked separately and does not block production refactor completion.",
+        "- Test file size debt is tracked separately and does not block architecture-complete status.",
         "- Transitional implementation files over 1,500 lines are warnings.",
         "- Transitional implementation files over 3,000 lines block architecture-complete status.",
         "- New production modules with multiple public classes are blockers unless registered as accepted model bundles.",
@@ -491,7 +483,7 @@ def format_gate_report(report: dict[str, Any]) -> str:
         lines.append(_violation_row(row))
     lines.extend([
         "",
-        "## Refactor V3 Gates",
+        "## Architecture Gates",
         "",
         "| gate | value | severity |",
         "|---|---:|---|",
@@ -512,7 +504,7 @@ def format_gate_report(report: dict[str, Any]) -> str:
         lines.append(f"| `{row.get('current_violation_id')}` | `{row.get('baseline_violation_id')}` |")
     lines.extend([
         "",
-        "## Legacy Decomposition Gate",
+        "## API Decomposition Gate",
         "",
         "| path | lines |",
         "|---|---:|",
@@ -634,7 +626,7 @@ def _violation_row(row: dict[str, Any]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Write static refactor size gate reports.")
+    parser = argparse.ArgumentParser(description="Write static architecture size gate reports.")
     parser.add_argument("--out-dir", default=None)
     parser.add_argument("--update-baseline", action="store_true")
     args = parser.parse_args(argv)

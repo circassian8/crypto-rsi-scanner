@@ -1,4 +1,4 @@
-"""Focused notification package refactor tests."""
+"""Focused notification package architecture tests."""
 
 from __future__ import annotations
 

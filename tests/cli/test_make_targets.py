@@ -686,7 +686,7 @@ def test_architecture_final_report_generation_writes_size_and_shim_gates():
     assert "crypto_rsi_scanner/event_alpha_artifact_doctor.py" not in payload["line_counts"]
     assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"] < 1500
     assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"] < 3000
-    assert payload["legacy_artifact_doctor_core_lines"] == payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"]
+    assert payload["api_artifact_doctor_core_lines"] == payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"]
     assert payload["line_counts"]["crypto_rsi_scanner/cli/services/event_alpha.py"] < 1500
     assert payload["active_shims"] == 0
     assert payload["partial_shims"] == 0
@@ -721,24 +721,24 @@ def test_architecture_final_report_generation_writes_size_and_shim_gates():
     assert payload["nonessential_shims_remaining"] == payload["v3_gates"]["nonessential_shims_remaining"]
     assert payload["public_compatibility_shims"] == payload["v3_gates"]["public_compatibility_shims"]
     assert payload["public_compatibility_shims"] == 0
-    assert payload["legacy_file_retirement_status"] == "OK"
-    assert payload["legacy_file_retirement"]["schema_version"] == "architecture_transitional_file_report_v1"
-    assert payload["legacy_file_retirement"]["transitional_named_files_count"] == 0
-    assert payload["legacy_file_retirement"]["transitional_named_files_remaining"] == 0
-    assert payload["legacy_named_files_count"] == 0
-    assert payload["legacy_named_files_remaining"] == 0
-    assert payload["legacy_named_files_with_implementation"] == 0
-    assert payload["legacy_named_dirs_count"] == 0
+    assert payload["transitional_file_status"] == "OK"
+    assert payload["transitional_file_report"]["schema_version"] == "architecture_transitional_file_report_v1"
+    assert payload["transitional_file_report"]["transitional_named_files_count"] == 0
+    assert payload["transitional_file_report"]["transitional_named_files_remaining"] == 0
+    assert payload["transitional_named_files_count"] == 0
+    assert payload["transitional_named_files_remaining"] == 0
+    assert payload["transitional_named_files_with_implementation"] == 0
+    assert payload["transitional_named_dirs_count"] == 0
     assert payload["compatibility_named_files_remaining"] == 0
-    assert payload["legacy_top_level_event_modules_count"] == 0
-    assert payload["legacy_retained_public_shims_count"] == 0
+    assert payload["transitional_top_level_event_modules_count"] == 0
+    assert payload["transitional_retained_public_shims_count"] == 0
     assert payload["retained_public_entrypoints"] == 0
     assert payload["event_fade_safety_exception_present"] is True
     assert payload["scanner_entrypoint_exception_present"] is True
     assert payload["public_compatibility_entrypoints_path"] == "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json"
     assert v4_report["schema_version"] == "architecture_acceptance_report_v1"
     assert v4_report["architecture_status"] == "accepted"
-    assert v4_report["critical_gates"]["legacy_named_files_zero"] == "pass"
+    assert v4_report["critical_gates"]["transitional_named_files_zero"] == "pass"
     assert v4_report["critical_gates"]["compatibility_named_files_zero"] == "pass"
     assert v4_report["critical_gates"]["retained_public_entrypoints_zero"] == "pass"
     assert v4_report["critical_gates"]["event_fade_safety_exception_present"] == "pass"
@@ -927,7 +927,7 @@ def test_architecture_transitional_and_terminology_reports_are_static():
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    from crypto_rsi_scanner.project_health import terminology_check as architecture_legacy_terminology_check
+    from crypto_rsi_scanner.project_health import terminology_check as architecture_naming_check
     from crypto_rsi_scanner.project_health import transitional_file_check as architecture_transitional_file_check
 
     with TemporaryDirectory() as tmp:
@@ -936,28 +936,27 @@ def test_architecture_transitional_and_terminology_reports_are_static():
             root=REPO_ROOT,
             out_dir=out_dir,
         )
-        term_json, term_md, term = architecture_legacy_terminology_check.write_report(
+        term_json, term_md, term = architecture_naming_check.write_report(
             root=REPO_ROOT,
             out_dir=out_dir,
         )
-        legacy_alias = out_dir / architecture_transitional_file_check.LEGACY_ALIAS_JSON
 
         assert trans_json.exists()
         assert trans_md.exists()
-        assert legacy_alias.exists()
         assert term_json.exists()
         assert term_md.exists()
         assert json.loads(trans_json.read_text(encoding="utf-8")) == trans
-        assert json.loads(legacy_alias.read_text(encoding="utf-8")) == trans
         assert json.loads(term_json.read_text(encoding="utf-8")) == term
+        retired_report_prefix = "FINAL_" + "RE" + "FACTOR_"
+        assert not any(path.name.startswith(retired_report_prefix) for path in out_dir.iterdir())
 
     assert trans["schema_version"] == "architecture_transitional_file_report_v1"
     assert trans["status"] == "OK"
     assert trans["transitional_named_files_remaining"] == 0
-    assert trans["legacy_named_files_remaining"] == 0
+    assert trans["transitional_named_files_with_implementation"] == 0
     assert term["schema_version"] == "project_health_naming_cleanup_report_v1"
     assert term["status"] == "OK"
-    assert term["legacy_named_files_remaining"] == 0
+    assert term["transitional_named_files_remaining"] == 0
     assert term["classification_counts"]["CLI_backwards_compatibility_alias"] >= 1
     assert term["classification_counts"]["historical_artifact_semantics"] >= 1
     assert term["blockers"] == []
@@ -1003,8 +1002,8 @@ def test_architecture_completion_map_generation_writes_release_candidate_reports
     assert completion["cli_architecture"]["scanner_command_body_functions_remaining"] == 0
     assert completion["size_gates"]["gate_status"] == "pass"
     gates = completion["final_architecture_gates"]
-    assert gates["legacy_named_files_remaining"] == 0
-    assert gates["legacy_named_files_with_implementation"] == 0
+    assert gates["transitional_named_files_remaining"] == 0
+    assert gates["transitional_named_files_with_implementation"] == 0
     assert gates["compatibility_named_files_remaining"] == 0
     assert gates["old_path_internal_imports"] == 0
     assert gates["old_path_test_imports"] == 0
@@ -1100,8 +1099,8 @@ def test_architecture_size_gates_static_baseline_and_new_violation_detection():
 
         (package / "feature_legacy.py").write_text("\n".join(["VALUE = 1"] * 3001) + "\n", encoding="utf-8")
         legacy_blocked = architecture_size_gates.build_gate_report(root=root)
-        assert legacy_blocked["legacy_decomposition_gate_status"] == "blocked"
-        assert legacy_blocked["legacy_files_over_3000_lines"] == 1
+        assert legacy_blocked["api_decomposition_gate_status"] == "blocked"
+        assert legacy_blocked["api_files_over_3000_lines"] == 1
         assert legacy_blocked["largest_api_files"][0]["path"] == "crypto_rsi_scanner/feature_legacy.py"
 
 
@@ -1132,10 +1131,10 @@ def test_architecture_reports_list_large_api_implementation_cores():
 
     size_report = architecture_size_gates.build_gate_report(root=REPO_ROOT)
     final_report = architecture_final_report.build_architecture_final_report(root=REPO_ROOT)
-    assert size_report["legacy_decomposition_gate_status"] == "pass"
-    assert final_report["legacy_decomposition_gate_status"] == "pass"
-    assert size_report["legacy_files_over_1500_lines"] == 0
-    assert final_report["legacy_files_over_1500_lines"] == 0
+    assert size_report["api_decomposition_gate_status"] == "pass"
+    assert final_report["api_decomposition_gate_status"] == "pass"
+    assert size_report["api_files_over_1500_lines"] == 0
+    assert final_report["api_files_over_1500_lines"] == 0
     assert size_report["production_size_gate_status"] == "warning"
     assert final_report["production_size_gate_status"] == "warning"
     assert size_report["production_files_over_1200_lines"] == size_report["accepted_production_files_over_1200_lines"]

@@ -1387,18 +1387,146 @@
     }
   ],
   "accepted_model_bundles_count": 79,
+  "accepted_production_files_over_1200_line_rows": [
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
+      "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
+      "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1472,
+      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+      "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
+      "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1431,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
+      "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1404,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+      "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
+      "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1395,
+      "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
+      "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
+      "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1392,
+      "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
+      "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
+      "revisit_condition": "When config/report command bodies move to focused service modules.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1387,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
+      "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
+      "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1319,
+      "path": "crypto_rsi_scanner/config.py",
+      "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
+      "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1275,
+      "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
+      "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
+      "revisit_condition": "When adding a new enrichment source or cache policy.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1261,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
+      "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
+      "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1239,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+      "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1233,
+      "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+      "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
+      "revisit_condition": "When outcome performance views gain new sections.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1231,
+      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+      "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+      "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+      "source_kind": "production"
+    }
+  ],
+  "accepted_production_files_over_1200_lines": 13,
   "api_classes_over_limit": 0,
   "api_classes_over_limit_rows": [],
+  "api_decomposition_blockers": [],
   "api_decomposition_gate_status": "pass",
+  "api_file_count": 0,
   "api_files_over_1500_lines": 0,
   "api_files_over_3000_lines": 0,
   "api_functions_over_limit": 0,
   "api_functions_over_limit_rows": [],
+  "api_line_blocking_limit": 3000,
+  "api_line_warning_limit": 1500,
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
+  "api_required_decomposition_blockers": [],
+  "api_required_decomposition_paths": [
+    "crypto_rsi_scanner/cli/services/scanner_api.py",
+    "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py",
+    "crypto_rsi_scanner/event_alpha/notifications/pipeline_core.py"
+  ],
   "api_total_lines": 0,
-  "class_count": 500,
-  "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
     {
@@ -1445,24 +1573,485 @@
     }
   ],
   "classes_over_limit_count": 3,
-  "exceptions": [
+  "file_count": 636,
+  "file_line_limit": 1500,
+  "files_over_limit": [
     {
-      "module": "crypto_rsi_scanner.event_fade",
-      "public_class_count": 11,
-      "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
+      "limit": 1500,
+      "line_count": 3995,
+      "path": "tests/event_alpha/test_artifact_doctor.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 16184,
+      "path": "tests/event_alpha/test_integrated_radar.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1826,
+      "path": "tests/event_alpha/test_namespace_lifecycle.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 5002,
+      "path": "tests/event_alpha/test_notifications.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 4031,
+      "path": "tests/event_alpha/test_outcomes.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 5357,
+      "path": "tests/event_alpha/test_provider_readiness.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 2991,
+      "path": "tests/event_alpha/test_source_coverage.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1779,
+      "path": "tests/test_indicators.py",
+      "source_kind": "test"
     }
   ],
-  "function_count": 5768,
+  "files_over_limit_count": 8,
   "function_line_limit": 150,
-  "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-05T13:23:21.473934+00:00",
-  "historical_row_type_alias": "refactor_class_ownership_report",
+  "generated_at": "2026-07-05T13:06:58.695928+00:00",
+  "historical_row_type_alias": "refactor_size_baseline",
   "largest_api_files": [],
+  "largest_production_files": [
+    {
+      "limit": 1500,
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1472,
+      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1431,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1404,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1395,
+      "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1392,
+      "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1387,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1319,
+      "path": "crypto_rsi_scanner/config.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1275,
+      "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1261,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1239,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1233,
+      "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1231,
+      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1181,
+      "path": "crypto_rsi_scanner/event_fade.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1155,
+      "path": "crypto_rsi_scanner/cli/services/event_alpha_research.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1145,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1136,
+      "path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1135,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_confirmation.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1123,
+      "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1103,
+      "path": "crypto_rsi_scanner/cli/services/scanner_parts/rsi_scan.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1096,
+      "path": "crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1079,
+      "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1078,
+      "path": "crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1069,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/delivery.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1059,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1047,
+      "path": "crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1044,
+      "path": "crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1035,
+      "path": "crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1033,
+      "path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1002,
+      "path": "crypto_rsi_scanner/event_alpha/radar/llm/extractor.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 995,
+      "path": "crypto_rsi_scanner/event_alpha/radar/scheduled_catalysts.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 989,
+      "path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 987,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/alerts.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 980,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 980,
+      "path": "crypto_rsi_scanner/event_alpha/radar/impact_hypothesis_store.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 976,
+      "path": "crypto_rsi_scanner/event_alpha/radar/incident_graph.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 973,
+      "path": "crypto_rsi_scanner/event_alpha/radar/core_opportunities.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 966,
+      "path": "crypto_rsi_scanner/event_alpha/radar/evidence/executor.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 961,
+      "path": "crypto_rsi_scanner/cli/services/scanner_parts/reports.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 941,
+      "path": "crypto_rsi_scanner/event_alpha/radar/identity.py",
+      "source_kind": "production"
+    }
+  ],
+  "largest_test_files": [
+    {
+      "limit": 1500,
+      "line_count": 16184,
+      "path": "tests/event_alpha/test_integrated_radar.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 5357,
+      "path": "tests/event_alpha/test_provider_readiness.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 5002,
+      "path": "tests/event_alpha/test_notifications.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 4031,
+      "path": "tests/event_alpha/test_outcomes.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 3995,
+      "path": "tests/event_alpha/test_artifact_doctor.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 2991,
+      "path": "tests/event_alpha/test_source_coverage.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1826,
+      "path": "tests/event_alpha/test_namespace_lifecycle.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1779,
+      "path": "tests/test_indicators.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1323,
+      "path": "tests/cli/test_make_targets.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 825,
+      "path": "tests/event_alpha/_api_helpers.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 743,
+      "path": "tests/event_alpha/test_artifact_schema.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 694,
+      "path": "tests/rsi/test_indicators_core.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 561,
+      "path": "tests/rsi/test_backtest.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 515,
+      "path": "tests/event_alpha/test_shim_registry.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 379,
+      "path": "tests/rsi/test_paper_risk.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 276,
+      "path": "tests/cli/test_parser.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 202,
+      "path": "tests/cli/test_event_alpha_command_registry.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 129,
+      "path": "tests/cli/test_dispatch.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 88,
+      "path": "tests/cli/test_relative_import_integrity.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 76,
+      "path": "tests/cli/test_ops_command_smoke.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 68,
+      "path": "tests/rsi/_api_helpers.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 39,
+      "path": "tests/event_alpha/test_no_old_event_alpha_imports.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 30,
+      "path": "tests/event_alpha/conftest.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 27,
+      "path": "tests/event_alpha/test_canonical_imports.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 13,
+      "path": "tests/conftest.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1,
+      "path": "tests/__init__.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1,
+      "path": "tests/cli/__init__.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1,
+      "path": "tests/event_alpha/__init__.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1,
+      "path": "tests/rsi/__init__.py",
+      "source_kind": "test"
+    }
+  ],
   "modules_with_multiple_public_classes": [],
   "modules_with_multiple_public_classes_count": 0,
-  "modules_with_multiple_public_classes_revisit_condition": "Register tiny model bundles explicitly or split behaviorful public classes before adding new multi-class production modules.",
   "modules_with_multiple_public_classes_status": "pass",
   "multi_public_class_modules": [
     {
@@ -2889,15 +3478,10 @@
       "status": "accepted_near_threshold"
     }
   ],
-  "near_threshold_file_status_floor": 1300,
   "no_live_provider_calls": true,
   "no_sends_trades_paper_rsi_or_triggered_fade": true,
-  "policy": {
-    "internal_helper_class_over_75_lines": "should be split or documented",
-    "multiple_public_classes": "blocker unless the module is registered as an accepted model bundle or module exception",
-    "new_multi_public_class_module": "fails architecture gates unless registered as a model bundle",
-    "public_class_over_75_lines": "should live in its own module unless documented here"
-  },
+  "normal_rsi_signal_rows_written": 0,
+  "paper_trades_created": 0,
   "production_classes_over_limit": 3,
   "production_classes_over_limit_rows": [
     {
@@ -2943,8 +3527,93 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
+  "production_files_over_1200_line_rows": [
+    {
+      "limit": 1500,
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1472,
+      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1431,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1404,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1395,
+      "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1392,
+      "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1387,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1319,
+      "path": "crypto_rsi_scanner/config.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1275,
+      "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1261,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1239,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1233,
+      "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1231,
+      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+      "source_kind": "production"
+    }
+  ],
+  "production_files_over_1200_lines": 13,
+  "production_files_over_1500_lines": 0,
+  "production_files_over_2000_lines": 0,
+  "production_files_over_3000_lines": 0,
   "production_functions_over_limit": 0,
   "production_functions_over_limit_rows": [],
+  "production_size_gate_status": "warning",
   "provider_class_split_status": [
     {
       "accepted_exception": false,
@@ -3067,179 +3736,11 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 408,
-  "public_classes_by_module": {
-    "crypto_rsi_scanner.alert_smoke": 1,
-    "crypto_rsi_scanner.backups": 3,
-    "crypto_rsi_scanner.cli.event_alpha_command_registry.models": 1,
-    "crypto_rsi_scanner.cli.parser": 1,
-    "crypto_rsi_scanner.cli.services.scanner_parts.config_reports": 1,
-    "crypto_rsi_scanner.client": 1,
-    "crypto_rsi_scanner.derivatives_providers.base": 1,
-    "crypto_rsi_scanner.derivatives_providers.coinalyze.core": 1,
-    "crypto_rsi_scanner.event_alpha.artifacts.alert_store.models": 4,
-    "crypto_rsi_scanner.event_alpha.artifacts.alerts": 3,
-    "crypto_rsi_scanner.event_alpha.artifacts.cache": 3,
-    "crypto_rsi_scanner.event_alpha.artifacts.context": 1,
-    "crypto_rsi_scanner.event_alpha.artifacts.daily_brief.components.models": 1,
-    "crypto_rsi_scanner.event_alpha.artifacts.locks": 3,
-    "crypto_rsi_scanner.event_alpha.artifacts.replay": 4,
-    "crypto_rsi_scanner.event_alpha.artifacts.research_cards.components.models": 2,
-    "crypto_rsi_scanner.event_alpha.artifacts.retention": 2,
-    "crypto_rsi_scanner.event_alpha.artifacts.run_ledger": 2,
-    "crypto_rsi_scanner.event_alpha.artifacts.schema.registry": 1,
-    "crypto_rsi_scanner.event_alpha.config.health_guard": 2,
-    "crypto_rsi_scanner.event_alpha.config.preflight": 1,
-    "crypto_rsi_scanner.event_alpha.config.profiles": 1,
-    "crypto_rsi_scanner.event_alpha.config.scheduler": 1,
-    "crypto_rsi_scanner.event_alpha.config.v1_readiness": 2,
-    "crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_parts.result_models": 1,
-    "crypto_rsi_scanner.event_alpha.doctor.check_registry": 1,
-    "crypto_rsi_scanner.event_alpha.doctor.consistency_doctor": 1,
-    "crypto_rsi_scanner.event_alpha.doctor.context": 1,
-    "crypto_rsi_scanner.event_alpha.doctor.counters": 1,
-    "crypto_rsi_scanner.event_alpha.doctor.environment": 2,
-    "crypto_rsi_scanner.event_alpha.doctor.issues": 1,
-    "crypto_rsi_scanner.event_alpha.doctor.namespace_doctor": 1,
-    "crypto_rsi_scanner.event_alpha.doctor.safety_doctor": 1,
-    "crypto_rsi_scanner.event_alpha.doctor.schema_doctor": 1,
-    "crypto_rsi_scanner.event_alpha.doctor.status": 1,
-    "crypto_rsi_scanner.event_alpha.namespace.lifecycle": 1,
-    "crypto_rsi_scanner.event_alpha.namespace.status": 1,
-    "crypto_rsi_scanner.event_alpha.notifications.checklist": 1,
-    "crypto_rsi_scanner.event_alpha.notifications.delivery": 3,
-    "crypto_rsi_scanner.event_alpha.notifications.final_check": 1,
-    "crypto_rsi_scanner.event_alpha.notifications.go_no_go": 1,
-    "crypto_rsi_scanner.event_alpha.notifications.inbox.models": 3,
-    "crypto_rsi_scanner.event_alpha.notifications.pack": 1,
-    "crypto_rsi_scanner.event_alpha.notifications.pause": 1,
-    "crypto_rsi_scanner.event_alpha.notifications.pipeline_parts.delivery_models": 6,
-    "crypto_rsi_scanner.event_alpha.notifications.provider_status": 2,
-    "crypto_rsi_scanner.event_alpha.notifications.readiness": 1,
-    "crypto_rsi_scanner.event_alpha.notifications.recipient_check": 2,
-    "crypto_rsi_scanner.event_alpha.notifications.router": 5,
-    "crypto_rsi_scanner.event_alpha.notifications.runs": 2,
-    "crypto_rsi_scanner.event_alpha.notifications.sender": 1,
-    "crypto_rsi_scanner.event_alpha.notifications.slo": 1,
-    "crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor": 2,
-    "crypto_rsi_scanner.event_alpha.outcomes.burn_in": 3,
-    "crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist": 1,
-    "crypto_rsi_scanner.event_alpha.outcomes.eval": 1,
-    "crypto_rsi_scanner.event_alpha.outcomes.feedback": 2,
-    "crypto_rsi_scanner.event_alpha.outcomes.feedback_labels": 4,
-    "crypto_rsi_scanner.event_alpha.outcomes.policy_simulator": 2,
-    "crypto_rsi_scanner.event_alpha.outcomes.priors": 4,
-    "crypto_rsi_scanner.event_alpha.outcomes.quality.models": 9,
-    "crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight": 3,
-    "crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight": 2,
-    "crypto_rsi_scanner.event_alpha.providers.coinalyze_preflight_ledger": 1,
-    "crypto_rsi_scanner.event_alpha.providers.cryptopanic": 1,
-    "crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness": 3,
-    "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness": 2,
-    "crypto_rsi_scanner.event_alpha.providers.official_exchange": 1,
-    "crypto_rsi_scanner.event_alpha.providers.official_exchange_activation": 2,
-    "crypto_rsi_scanner.event_alpha.providers.provider_health_core": 7,
-    "crypto_rsi_scanner.event_alpha.providers.source_packs": 1,
-    "crypto_rsi_scanner.event_alpha.providers.source_registry": 6,
-    "crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight": 2,
-    "crypto_rsi_scanner.event_alpha.radar.anomaly_scanner": 1,
-    "crypto_rsi_scanner.event_alpha.radar.anomaly_state": 3,
-    "crypto_rsi_scanner.event_alpha.radar.canonical_asset": 1,
-    "crypto_rsi_scanner.event_alpha.radar.catalyst_frame_validator": 1,
-    "crypto_rsi_scanner.event_alpha.radar.catalyst_frames": 1,
-    "crypto_rsi_scanner.event_alpha.radar.catalyst_search.models": 7,
-    "crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers": 8,
-    "crypto_rsi_scanner.event_alpha.radar.claim_semantics": 3,
-    "crypto_rsi_scanner.event_alpha.radar.core.models": 7,
-    "crypto_rsi_scanner.event_alpha.radar.core_opportunities": 2,
-    "crypto_rsi_scanner.event_alpha.radar.derivatives_crowding": 1,
-    "crypto_rsi_scanner.event_alpha.radar.discovery.models": 1,
-    "crypto_rsi_scanner.event_alpha.radar.evidence.models": 7,
-    "crypto_rsi_scanner.event_alpha.radar.evidence_quality": 3,
-    "crypto_rsi_scanner.event_alpha.radar.graph": 3,
-    "crypto_rsi_scanner.event_alpha.radar.identity": 6,
-    "crypto_rsi_scanner.event_alpha.radar.impact_hypotheses.models": 6,
-    "crypto_rsi_scanner.event_alpha.radar.impact_hypothesis_store": 3,
-    "crypto_rsi_scanner.event_alpha.radar.impact_path_validator": 4,
-    "crypto_rsi_scanner.event_alpha.radar.incident_graph": 3,
-    "crypto_rsi_scanner.event_alpha.radar.incidents.models": 4,
-    "crypto_rsi_scanner.event_alpha.radar.instrument_resolver": 1,
-    "crypto_rsi_scanner.event_alpha.radar.integrated.pipeline_parts.models": 1,
-    "crypto_rsi_scanner.event_alpha.radar.llm.analyzer": 3,
-    "crypto_rsi_scanner.event_alpha.radar.llm.budget": 3,
-    "crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames": 5,
-    "crypto_rsi_scanner.event_alpha.radar.llm.eval": 1,
-    "crypto_rsi_scanner.event_alpha.radar.llm.evidence_planner": 7,
-    "crypto_rsi_scanner.event_alpha.radar.llm.extract_eval": 1,
-    "crypto_rsi_scanner.event_alpha.radar.llm.extraction_models": 8,
-    "crypto_rsi_scanner.event_alpha.radar.llm.extractor": 4,
-    "crypto_rsi_scanner.event_alpha.radar.llm.models": 8,
-    "crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner": 2,
-    "crypto_rsi_scanner.event_alpha.radar.market_confirmation": 4,
-    "crypto_rsi_scanner.event_alpha.radar.market_enrichment": 1,
-    "crypto_rsi_scanner.event_alpha.radar.market_reaction": 5,
-    "crypto_rsi_scanner.event_alpha.radar.market_state": 1,
-    "crypto_rsi_scanner.event_alpha.radar.missed": 2,
-    "crypto_rsi_scanner.event_alpha.radar.near_miss.models": 4,
-    "crypto_rsi_scanner.event_alpha.radar.opportunity_verdict": 6,
-    "crypto_rsi_scanner.event_alpha.radar.pipeline_models": 2,
-    "crypto_rsi_scanner.event_alpha.radar.playbooks": 3,
-    "crypto_rsi_scanner.event_alpha.radar.price_history": 2,
-    "crypto_rsi_scanner.event_alpha.radar.scheduled_catalysts": 1,
-    "crypto_rsi_scanner.event_alpha.radar.source_coverage.models": 2,
-    "crypto_rsi_scanner.event_alpha.radar.source_enrichment": 9,
-    "crypto_rsi_scanner.event_alpha.radar.validation.models": 10,
-    "crypto_rsi_scanner.event_alpha.radar.watchlist.models": 5,
-    "crypto_rsi_scanner.event_alpha.radar.watchlist_enrichment": 9,
-    "crypto_rsi_scanner.event_alpha.radar.watchlist_market": 4,
-    "crypto_rsi_scanner.event_alpha.shim_scan": 1,
-    "crypto_rsi_scanner.event_alpha.shims": 2,
-    "crypto_rsi_scanner.event_core.models": 7,
-    "crypto_rsi_scanner.event_fade": 11,
-    "crypto_rsi_scanner.event_providers.base": 2,
-    "crypto_rsi_scanner.event_providers.binance_announcements.provider": 1,
-    "crypto_rsi_scanner.event_providers.bybit_announcements.provider": 1,
-    "crypto_rsi_scanner.event_providers.coingecko_universe": 1,
-    "crypto_rsi_scanner.event_providers.coinmarketcal": 1,
-    "crypto_rsi_scanner.event_providers.cryptopanic.currency_plan": 1,
-    "crypto_rsi_scanner.event_providers.cryptopanic.empty_response_error": 1,
-    "crypto_rsi_scanner.event_providers.cryptopanic.http_status_error": 1,
-    "crypto_rsi_scanner.event_providers.cryptopanic.provider": 1,
-    "crypto_rsi_scanner.event_providers.cryptopanic.usage_summary": 1,
-    "crypto_rsi_scanner.event_providers.external_ipo": 1,
-    "crypto_rsi_scanner.event_providers.gdelt": 1,
-    "crypto_rsi_scanner.event_providers.manual_json": 1,
-    "crypto_rsi_scanner.event_providers.prediction_market_events": 1,
-    "crypto_rsi_scanner.event_providers.project_blog_rss": 1,
-    "crypto_rsi_scanner.event_providers.sports_fixtures": 1,
-    "crypto_rsi_scanner.event_providers.tokenomist": 1,
-    "crypto_rsi_scanner.llm_providers.base": 5,
-    "crypto_rsi_scanner.llm_providers.fixture": 4,
-    "crypto_rsi_scanner.llm_providers.openai_extraction": 1,
-    "crypto_rsi_scanner.llm_providers.openai_relationship": 1,
-    "crypto_rsi_scanner.ops": 5,
-    "crypto_rsi_scanner.project_health.class_ownership": 2,
-    "crypto_rsi_scanner.signal_registry": 2,
-    "crypto_rsi_scanner.storage": 1,
-    "crypto_rsi_scanner.storage_parts.connection": 1,
-    "crypto_rsi_scanner.storage_parts.maintenance": 1,
-    "crypto_rsi_scanner.storage_parts.migrations": 1,
-    "crypto_rsi_scanner.storage_parts.papers": 1,
-    "crypto_rsi_scanner.storage_parts.signals": 1,
-    "crypto_rsi_scanner.storage_parts.watchlist": 1,
-    "crypto_rsi_scanner.supply_providers.arkham": 1,
-    "crypto_rsi_scanner.supply_providers.base": 1,
-    "crypto_rsi_scanner.supply_providers.dune": 1,
-    "crypto_rsi_scanner.supply_providers.etherscan": 1,
-    "crypto_rsi_scanner.supply_providers.tokenomist": 1,
-    "crypto_rsi_scanner.test_runtime_report": 1
-  },
-  "public_classes_not_in_own_module": 0,
   "remaining_class_ownership_debt": [],
   "remaining_class_ownership_debt_count": 0,
   "research_only": true,
-  "row_type": "architecture_class_ownership_report",
-  "schema_version": "architecture_class_ownership_report_v1",
+  "row_type": "architecture_size_baseline",
+  "schema_version": "architecture_size_baseline_v1",
   "storage_mixin_exception_status": [
     {
       "accepted_exception": true,
@@ -3278,372 +3779,152 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
+  "telegram_sends": 0,
+  "test_files_over_1500_lines": 8,
+  "test_files_over_2000_lines": 8,
+  "test_size_gate_status": "warning",
+  "trades_created": 0,
+  "triggered_fade_created": 0,
   "unresolved_multi_class_modules": [],
   "unresolved_multi_class_modules_count": 0,
-  "v3_accepted_exceptions": {
-    "class_exceptions_remaining": {
-      "count": 3,
-      "reason": "accepted/documented storage mixin class exceptions",
-      "rows": []
+  "unresolved_production_files_over_1200_line_rows": [],
+  "unresolved_production_files_over_1200_lines": 0,
+  "violation_ids": [
+    "class:crypto_rsi_scanner/storage_parts/migrations.py:MigrationsMixin",
+    "class:crypto_rsi_scanner/storage_parts/signals.py:SignalsMixin",
+    "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin",
+    "file:tests/event_alpha/test_artifact_doctor.py",
+    "file:tests/event_alpha/test_integrated_radar.py",
+    "file:tests/event_alpha/test_namespace_lifecycle.py",
+    "file:tests/event_alpha/test_notifications.py",
+    "file:tests/event_alpha/test_outcomes.py",
+    "file:tests/event_alpha/test_provider_readiness.py",
+    "file:tests/event_alpha/test_source_coverage.py",
+    "file:tests/test_indicators.py"
+  ],
+  "violations": [
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 3995,
+      "path": "tests/event_alpha/test_artifact_doctor.py",
+      "severity": "warning",
+      "source_kind": "test",
+      "violation_id": "file:tests/event_alpha/test_artifact_doctor.py"
     },
-    "production_files_over_1200_lines": {
-      "count": 13,
-      "reason": "accepted/documented production files over the v3 1,200-line target",
-      "rows": [
-        {
-          "accepted": true,
-          "line_count": 1498,
-          "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
-          "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
-          "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1472,
-          "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-          "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
-          "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1431,
-          "path": "crypto_rsi_scanner/event_alpha/shims.py",
-          "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
-          "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1404,
-          "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-          "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
-          "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1395,
-          "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-          "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
-          "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1392,
-          "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-          "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
-          "revisit_condition": "When config/report command bodies move to focused service modules.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1387,
-          "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-          "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
-          "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1319,
-          "path": "crypto_rsi_scanner/config.py",
-          "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
-          "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1275,
-          "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
-          "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
-          "revisit_condition": "When adding a new enrichment source or cache policy.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1261,
-          "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
-          "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
-          "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1239,
-          "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-          "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
-          "revisit_condition": "When adding a new derivatives metric family or crowding class.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1233,
-          "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
-          "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
-          "revisit_condition": "When outcome performance views gain new sections.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1231,
-          "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-          "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-          "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
-          "threshold": 1200
-        }
-      ]
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 16184,
+      "path": "tests/event_alpha/test_integrated_radar.py",
+      "severity": "warning",
+      "source_kind": "test",
+      "violation_id": "file:tests/event_alpha/test_integrated_radar.py"
+    },
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 1826,
+      "path": "tests/event_alpha/test_namespace_lifecycle.py",
+      "severity": "warning",
+      "source_kind": "test",
+      "violation_id": "file:tests/event_alpha/test_namespace_lifecycle.py"
+    },
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 5002,
+      "path": "tests/event_alpha/test_notifications.py",
+      "severity": "warning",
+      "source_kind": "test",
+      "violation_id": "file:tests/event_alpha/test_notifications.py"
+    },
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 4031,
+      "path": "tests/event_alpha/test_outcomes.py",
+      "severity": "warning",
+      "source_kind": "test",
+      "violation_id": "file:tests/event_alpha/test_outcomes.py"
+    },
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 5357,
+      "path": "tests/event_alpha/test_provider_readiness.py",
+      "severity": "warning",
+      "source_kind": "test",
+      "violation_id": "file:tests/event_alpha/test_provider_readiness.py"
+    },
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 2991,
+      "path": "tests/event_alpha/test_source_coverage.py",
+      "severity": "warning",
+      "source_kind": "test",
+      "violation_id": "file:tests/event_alpha/test_source_coverage.py"
+    },
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 1779,
+      "path": "tests/test_indicators.py",
+      "severity": "warning",
+      "source_kind": "test",
+      "violation_id": "file:tests/test_indicators.py"
+    },
+    {
+      "accepted_exception": true,
+      "category": "class_over_75_lines",
+      "class_name": "MigrationsMixin",
+      "exception_category": "storage_mixin",
+      "exception_reason": "SQLite migration ownership is intentionally centralized to avoid untested schema drift.",
+      "exception_status": "accepted_exception",
+      "line_count": 88,
+      "module": "crypto_rsi_scanner.storage_parts.migrations",
+      "owner_note": "DB schema behavior must not change in this cleanup pass.",
+      "public": true,
+      "qualname": "MigrationsMixin",
+      "revisit_condition": "Revisit only with explicit migration tests and backup/restore verification.",
+      "severity": "warning",
+      "source_path": "crypto_rsi_scanner/storage_parts/migrations.py",
+      "violation_id": "class:crypto_rsi_scanner/storage_parts/migrations.py:MigrationsMixin"
+    },
+    {
+      "accepted_exception": true,
+      "category": "class_over_75_lines",
+      "class_name": "SignalsMixin",
+      "exception_category": "storage_mixin",
+      "exception_reason": "Signal persistence methods share schema assumptions, row serialization, and outcome lookup behavior.",
+      "exception_status": "accepted_exception",
+      "line_count": 129,
+      "module": "crypto_rsi_scanner.storage_parts.signals",
+      "owner_note": "Avoid splitting storage write paths without SQLite roundtrip parity tests.",
+      "public": true,
+      "qualname": "SignalsMixin",
+      "revisit_condition": "Revisit when storage schema v2 or a repository layer is introduced.",
+      "severity": "warning",
+      "source_path": "crypto_rsi_scanner/storage_parts/signals.py",
+      "violation_id": "class:crypto_rsi_scanner/storage_parts/signals.py:SignalsMixin"
+    },
+    {
+      "accepted_exception": true,
+      "category": "class_over_75_lines",
+      "class_name": "WatchlistMixin",
+      "exception_category": "storage_mixin",
+      "exception_reason": "Watchlist persistence methods are stable DB helpers and only slightly exceed the advisory limit.",
+      "exception_status": "accepted_exception",
+      "line_count": 89,
+      "module": "crypto_rsi_scanner.storage_parts.watchlist",
+      "owner_note": "No DB schema or paper/watchlist behavior changes in this architecture-maintenance pass.",
+      "public": true,
+      "qualname": "WatchlistMixin",
+      "revisit_condition": "Revisit when watchlist storage grows new tables or migrations.",
+      "severity": "warning",
+      "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py",
+      "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
-  },
-  "v3_auto_accept_blockers": [],
-  "v3_auto_accept_ready": false,
-  "v3_blockers": [],
-  "v3_gate_snapshot": {
-    "auto_accept_blockers": [],
-    "contract_path": "research/ARCHITECTURE_CONTRACT.md",
-    "gate_severity": {
-      "class_exceptions_remaining": "accepted_exception",
-      "deleted_shims": "informational",
-      "functions_over_150_lines": "blocker",
-      "nonessential_shims_remaining": "blocker",
-      "old_path_docs_references": "blocker_unless_policy_scoped",
-      "old_path_import_allowed_exceptions": "informational",
-      "old_path_internal_imports": "blocker",
-      "old_path_test_imports": "blocker",
-      "production_files_over_1200_lines": "accepted_exception",
-      "production_files_over_1500_lines": "blocker",
-      "public_classes_not_in_own_module": "blocker",
-      "public_compatibility_shims": "informational",
-      "shim_removal_blockers": "blocker"
-    },
-    "gate_values": {
-      "class_exceptions_remaining": 3,
-      "deleted_shims": 124,
-      "functions_over_150_lines": 0,
-      "nonessential_shims_remaining": 0,
-      "old_path_docs_references": 0,
-      "old_path_import_allowed_exceptions": 0,
-      "old_path_internal_imports": 0,
-      "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 13,
-      "production_files_over_1500_lines": 0,
-      "public_classes_not_in_own_module": 0,
-      "public_compatibility_shims": 0,
-      "shim_removal_blockers": 0
-    },
-    "historical_row_type_alias": "refactor_v3_gate_snapshot",
-    "nonessential_shim_rows": [],
-    "production_files_over_1200_line_rows": [
-      {
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1472,
-        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1431,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1404,
-        "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1395,
-        "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1392,
-        "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1387,
-        "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1319,
-        "path": "crypto_rsi_scanner/config.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1275,
-        "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1261,
-        "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1239,
-        "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1233,
-        "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1231,
-        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-        "threshold": 1200
-      }
-    ],
-    "production_files_over_1500_line_rows": [],
-    "public_classes_not_in_own_module_rows": [],
-    "row_type": "architecture_gate_snapshot",
-    "schema_version": "architecture_gate_snapshot_v1",
-    "shim_removal_blocker_rows": [],
-    "status": "accepted_with_documented_exceptions",
-    "v3_accepted_exceptions": {
-      "class_exceptions_remaining": {
-        "count": 3,
-        "reason": "accepted/documented storage mixin class exceptions",
-        "rows": []
-      },
-      "production_files_over_1200_lines": {
-        "count": 13,
-        "reason": "accepted/documented production files over the v3 1,200-line target",
-        "rows": [
-          {
-            "accepted": true,
-            "line_count": 1498,
-            "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
-            "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
-            "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1472,
-            "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-            "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
-            "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1431,
-            "path": "crypto_rsi_scanner/event_alpha/shims.py",
-            "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
-            "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1404,
-            "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-            "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
-            "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1395,
-            "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-            "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
-            "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1392,
-            "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-            "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
-            "revisit_condition": "When config/report command bodies move to focused service modules.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1387,
-            "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-            "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
-            "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1319,
-            "path": "crypto_rsi_scanner/config.py",
-            "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
-            "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1275,
-            "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
-            "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
-            "revisit_condition": "When adding a new enrichment source or cache policy.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1261,
-            "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
-            "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
-            "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1239,
-            "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-            "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
-            "revisit_condition": "When adding a new derivatives metric family or crowding class.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1233,
-            "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
-            "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
-            "revisit_condition": "When outcome performance views gain new sections.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1231,
-            "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-            "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-            "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
-            "threshold": 1200
-          }
-        ]
-      }
-    },
-    "v3_auto_accept_ready": false,
-    "v3_blockers": [],
-    "v3_pending_exceptions": []
-  },
-  "v3_gate_status": "accepted_with_documented_exceptions",
-  "v3_gates": {
-    "class_exceptions_remaining": 3,
-    "deleted_shims": 124,
-    "functions_over_150_lines": 0,
-    "nonessential_shims_remaining": 0,
-    "old_path_docs_references": 0,
-    "old_path_import_allowed_exceptions": 0,
-    "old_path_internal_imports": 0,
-    "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 13,
-    "production_files_over_1500_lines": 0,
-    "public_classes_not_in_own_module": 0,
-    "public_compatibility_shims": 0,
-    "shim_removal_blockers": 0
-  },
-  "v3_pending_exceptions": []
+  ]
 }

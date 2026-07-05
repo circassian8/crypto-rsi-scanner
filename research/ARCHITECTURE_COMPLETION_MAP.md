@@ -2,8 +2,8 @@
 
 Static map of the behavior-preserving Event Alpha architecture. It records package ownership, compatibility cores, size gates, and safety boundaries.
 
-- generated_at: `2026-07-05T11:39:53+00:00`
-- status: `pending_with_blockers`
+- generated_at: `2026-07-05T13:29:59+00:00`
+- status: `accepted`
 - scanner.py lines: `90`
 - scanner command bodies remaining: `0`
 - cli service bind sites: `5`
@@ -21,10 +21,10 @@ Static map of the behavior-preserving Event Alpha architecture. It records packa
 - remaining class ownership debt: `0`
 - multiple public class module status: `pass`
 - test size gate status: `warning`
-- legacy decomposition gate status: `pass`
-- legacy files over 3000 lines: `0`
-- legacy_named_files_remaining: `0`
-- legacy_named_files_with_implementation: `0`
+- api decomposition gate status: `pass`
+- api files over 3000 lines: `0`
+- transitional_named_files_remaining: `0`
+- transitional_named_files_with_implementation: `0`
 - compatibility_named_files_remaining: `0`
 - old_path_internal_imports: `0`
 - old_path_test_imports: `0`
@@ -35,7 +35,7 @@ Static map of the behavior-preserving Event Alpha architecture. It records packa
 - canonical_import_coverage: `pass`
 - event_fade_safety_exception_present: `True`
 - scanner_entrypoint_exception_present: `True`
-- verification status: `not_run`
+- verification status: `pass`
 
 ## Transitional Compatibility Cores
 
@@ -46,7 +46,7 @@ Static map of the behavior-preserving Event Alpha architecture. It records packa
 
 ## Known Remaining Blockers
 
-- `verification_not_recorded`: release-candidate verification results were not supplied
+- none
 
 ## Class Ownership Cleanup
 
