@@ -26,7 +26,7 @@ SNAPSHOT_AVAILABLE = "available"
 SNAPSHOT_MISSING = "missing"
 SNAPSHOT_EXTERNAL_PATH = "external_path"
 SNAPSHOT_TEST_OR_FIXTURE_EXTERNAL = "test_or_fixture_external"
-SNAPSHOT_UNKNOWN_LEGACY = "unknown_legacy"
+SNAPSHOT_UNKNOWN_LEGACY = "unknown_api"
 
 
 @dataclass(frozen=True)
@@ -187,7 +187,7 @@ def filter_artifact_rows(
     profile: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
-    include_legacy_artifacts: bool = False,
+    include_api_artifacts: bool = False,
 ) -> list[dict[str, Any]]:
     """Filter local rows to one profile/namespace and exclude test/legacy rows by default."""
     profile_key = _clean_optional(profile)
@@ -199,7 +199,7 @@ def filter_artifact_rows(
         data = dict(row)
         if not include_test_artifacts and is_non_operational_row(data):
             continue
-        if not include_legacy_artifacts and is_legacy_row(data):
+        if not include_api_artifacts and is_api_row(data):
             continue
         if profile_key is not None and _clean_optional(data.get("profile")) not in (None, profile_key):
             continue
@@ -219,7 +219,7 @@ def is_non_operational_row(row: Mapping[str, Any]) -> bool:
     return bool(namespace and namespace in NON_OPERATIONAL_RUN_MODES)
 
 
-def is_legacy_row(row: Mapping[str, Any]) -> bool:
+def is_api_row(row: Mapping[str, Any]) -> bool:
     mode = _clean_optional(row.get("run_mode"))
     namespace = _clean_optional(row.get("artifact_namespace") or row.get("namespace"))
     if mode in (None, LEGACY_NAMESPACE):
@@ -235,7 +235,7 @@ def classify_snapshot_availability(
     """Classify whether a run's claimed snapshots are present in the inspected store."""
     if matching_alert_count > 0:
         return SNAPSHOT_AVAILABLE
-    if is_legacy_row(run_row) or not str(run_row.get("run_id") or "").strip():
+    if is_api_row(run_row) or not str(run_row.get("run_id") or "").strip():
         return SNAPSHOT_UNKNOWN_LEGACY
     run_mode = _clean_optional(run_row.get("run_mode"))
     external = snapshot_path_is_external(run_row, inspected_alert_store_path)

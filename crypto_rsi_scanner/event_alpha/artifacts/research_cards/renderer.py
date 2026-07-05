@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from .legacy import render_research_card, render_selected_cards
+from .api import render_research_card, render_selected_cards
 
 __all__ = ("render_research_card", "render_selected_cards")

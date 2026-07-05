@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import SCHEMAS
+from .registry import SCHEMAS
 
 OUTCOME_ROW_SCHEMA = SCHEMAS["outcome_row_v1"]
 SCHEMA_IDS = ("outcome_row_v1",)

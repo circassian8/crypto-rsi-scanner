@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .pipeline_legacy import (
+from .pipeline_core import (
     DeliveryIdentity,
     EventAlphaExploratoryDigestItem,
     EventAlphaNotificationConfig,

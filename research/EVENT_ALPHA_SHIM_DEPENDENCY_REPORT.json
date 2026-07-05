@@ -1,657 +1,40 @@
 {
   "active_shim_modules_with_implementation_logic": 0,
   "active_shim_violations": [],
-  "artifact_doc_reference_count": 9,
+  "artifact_doc_reference_count": 0,
   "cache_status": "hit",
   "deleted_shim_manifest_path": "research/EVENT_ALPHA_DELETED_SHIMS.json",
-  "deleted_shims": 115,
+  "deleted_shims": 124,
   "docs_deprecated_reference_warnings": [],
-  "docs_reference_count": 11,
+  "docs_reference_count": 0,
   "dynamic_import_reference_count": 0,
-  "entries": [
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_artifacts",
-          "line": 24,
-          "path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_artifacts` | `crypto_rsi_scanner.event_alpha.artifacts.context` | Historical artifact-context helper import path retained for external scripts, older operator snippets, and public import"
-        }
-      ],
-      "docs_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_artifacts",
-          "line": 85,
-          "path": "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_artifacts` | `crypto_rsi_scanner.event_alpha.artifacts.context` | artifacts |"
-        }
-      ],
-      "docs_references_are_policy_scoped": true,
-      "dynamic_import_references": [],
-      "internal_import_references": [],
-      "makefile_references": [],
-      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.context",
-      "old_module": "crypto_rsi_scanner.event_alpha_artifacts",
-      "recommended_action": "keep_public_entrypoint",
-      "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
-      ],
-      "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-      "safe_to_remove": false,
-      "script_references": [],
-      "shim_status": "active_shim",
-      "test_import_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_artifacts",
-          "line": 16,
-          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
-          "reference_type": "text_reference",
-          "snippet": "('crypto_rsi_scanner.event_alpha_artifacts', 'crypto_rsi_scanner.event_alpha.artifacts.context'),"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_artifacts",
-          "line": 452,
-          "path": "tests/event_alpha/test_shim_registry.py",
-          "reference_type": "text_reference",
-          "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_artifacts\"][\"recommended_status\"] == \"active_shim\""
-        }
-      ]
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_artifact_paths",
-          "line": 25,
-          "path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_artifact_paths` | `crypto_rsi_scanner.event_alpha.artifacts.paths` | Historical artifact-path helper import path retained for external scripts, older operator snippets, and public import compa"
-        }
-      ],
-      "docs_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_artifact_paths",
-          "line": 86,
-          "path": "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_artifact_paths` | `crypto_rsi_scanner.event_alpha.artifacts.paths` | artifacts |"
-        }
-      ],
-      "docs_references_are_policy_scoped": true,
-      "dynamic_import_references": [],
-      "internal_import_references": [],
-      "makefile_references": [],
-      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.paths",
-      "old_module": "crypto_rsi_scanner.event_artifact_paths",
-      "recommended_action": "keep_public_entrypoint",
-      "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
-      ],
-      "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-      "safe_to_remove": false,
-      "script_references": [],
-      "shim_status": "active_shim",
-      "test_import_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_artifact_paths",
-          "line": 17,
-          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
-          "reference_type": "text_reference",
-          "snippet": "('crypto_rsi_scanner.event_artifact_paths', 'crypto_rsi_scanner.event_alpha.artifacts.paths'),"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_artifact_paths",
-          "line": 453,
-          "path": "tests/event_alpha/test_shim_registry.py",
-          "reference_type": "text_reference",
-          "snippet": "assert rows[\"crypto_rsi_scanner.event_artifact_paths\"][\"recommended_status\"] == \"active_shim\""
-        }
-      ]
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_run_ledger",
-          "line": 26,
-          "path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_run_ledger` | `crypto_rsi_scanner.event_alpha.artifacts.run_ledger` | Historical run-ledger helper import path retained for external scripts, older operator snippets, and public import c"
-        }
-      ],
-      "docs_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_run_ledger",
-          "line": 87,
-          "path": "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_run_ledger` | `crypto_rsi_scanner.event_alpha.artifacts.run_ledger` | artifacts |"
-        }
-      ],
-      "docs_references_are_policy_scoped": true,
-      "dynamic_import_references": [],
-      "internal_import_references": [],
-      "makefile_references": [],
-      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.run_ledger",
-      "old_module": "crypto_rsi_scanner.event_alpha_run_ledger",
-      "recommended_action": "keep_public_entrypoint",
-      "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
-      ],
-      "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-      "safe_to_remove": false,
-      "script_references": [],
-      "shim_status": "active_shim",
-      "test_import_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_run_ledger",
-          "line": 18,
-          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
-          "reference_type": "text_reference",
-          "snippet": "('crypto_rsi_scanner.event_alpha_run_ledger', 'crypto_rsi_scanner.event_alpha.artifacts.run_ledger'),"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_run_ledger",
-          "line": 454,
-          "path": "tests/event_alpha/test_shim_registry.py",
-          "reference_type": "text_reference",
-          "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_run_ledger\"][\"recommended_status\"] == \"active_shim\""
-        }
-      ]
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_retention",
-          "line": 27,
-          "path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_retention` | `crypto_rsi_scanner.event_alpha.artifacts.retention` | Historical artifact-retention helper import path retained for external scripts, older operator snippets, and public im"
-        }
-      ],
-      "docs_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_retention",
-          "line": 88,
-          "path": "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_retention` | `crypto_rsi_scanner.event_alpha.artifacts.retention` | artifacts |"
-        }
-      ],
-      "docs_references_are_policy_scoped": true,
-      "dynamic_import_references": [],
-      "internal_import_references": [],
-      "makefile_references": [],
-      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.retention",
-      "old_module": "crypto_rsi_scanner.event_alpha_retention",
-      "recommended_action": "keep_public_entrypoint",
-      "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
-      ],
-      "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-      "safe_to_remove": false,
-      "script_references": [],
-      "shim_status": "active_shim",
-      "test_import_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_retention",
-          "line": 19,
-          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
-          "reference_type": "text_reference",
-          "snippet": "('crypto_rsi_scanner.event_alpha_retention', 'crypto_rsi_scanner.event_alpha.artifacts.retention'),"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_retention",
-          "line": 455,
-          "path": "tests/event_alpha/test_shim_registry.py",
-          "reference_type": "text_reference",
-          "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_retention\"][\"recommended_status\"] == \"active_shim\""
-        }
-      ]
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_run_lock",
-          "line": 28,
-          "path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_run_lock` | `crypto_rsi_scanner.event_alpha.artifacts.locks` | Historical run-lock helper import path retained for external scripts, older operator snippets, and public import compatibil"
-        }
-      ],
-      "docs_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_run_lock",
-          "line": 89,
-          "path": "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_run_lock` | `crypto_rsi_scanner.event_alpha.artifacts.locks` | artifacts |"
-        }
-      ],
-      "docs_references_are_policy_scoped": true,
-      "dynamic_import_references": [],
-      "internal_import_references": [],
-      "makefile_references": [],
-      "new_module": "crypto_rsi_scanner.event_alpha.artifacts.locks",
-      "old_module": "crypto_rsi_scanner.event_alpha_run_lock",
-      "recommended_action": "keep_public_entrypoint",
-      "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
-      ],
-      "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-      "safe_to_remove": false,
-      "script_references": [],
-      "shim_status": "active_shim",
-      "test_import_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_run_lock",
-          "line": 20,
-          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
-          "reference_type": "text_reference",
-          "snippet": "('crypto_rsi_scanner.event_alpha_run_lock', 'crypto_rsi_scanner.event_alpha.artifacts.locks'),"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_run_lock",
-          "line": 456,
-          "path": "tests/event_alpha/test_shim_registry.py",
-          "reference_type": "text_reference",
-          "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_run_lock\"][\"recommended_status\"] == \"active_shim\""
-        }
-      ]
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 29,
-          "path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_artifact_doctor` | `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` | Historical artifact-doctor import and entrypoint path retained for public compatibility while the implementat"
-        }
-      ],
-      "docs_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 2546,
-          "path": "DEVLOG.md",
-          "reference_type": "text_reference",
-          "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 45,
-          "path": "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
-          "reference_type": "text_reference",
-          "snippet": "- `crypto_rsi_scanner.event_alpha_artifact_doctor` is now an active"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 90,
-          "path": "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_artifact_doctor` | `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` | doctor |"
-        }
-      ],
-      "docs_references_are_policy_scoped": true,
-      "dynamic_import_references": [],
-      "internal_import_references": [],
-      "makefile_references": [],
-      "new_module": "crypto_rsi_scanner.event_alpha.doctor.artifact_doctor",
-      "old_module": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-      "recommended_action": "keep_public_entrypoint",
-      "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
-      ],
-      "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-      "safe_to_remove": false,
-      "script_references": [],
-      "shim_status": "active_shim",
-      "test_import_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 21,
-          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
-          "reference_type": "text_reference",
-          "snippet": "('crypto_rsi_scanner.event_alpha_artifact_doctor', 'crypto_rsi_scanner.event_alpha.doctor.artifact_doctor'),"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 21,
-          "path": "tests/event_alpha/test_shim_registry.py",
-          "reference_type": "text_reference",
-          "snippet": "row[\"old_module\"] == \"crypto_rsi_scanner.event_alpha_artifact_doctor\""
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 457,
-          "path": "tests/event_alpha/test_shim_registry.py",
-          "reference_type": "text_reference",
-          "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_artifact_doctor\"][\"recommended_status\"] == \"active_shim\""
-        }
-      ]
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_profiles",
-          "line": 30,
-          "path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_profiles` | `crypto_rsi_scanner.event_alpha.config.profiles` | Historical Event Alpha profile import path retained for external scripts, older operator snippets, and public import compat"
-        }
-      ],
-      "docs_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_profiles",
-          "line": 91,
-          "path": "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_profiles` | `crypto_rsi_scanner.event_alpha.config.profiles` | config |"
-        }
-      ],
-      "docs_references_are_policy_scoped": true,
-      "dynamic_import_references": [],
-      "internal_import_references": [],
-      "makefile_references": [],
-      "new_module": "crypto_rsi_scanner.event_alpha.config.profiles",
-      "old_module": "crypto_rsi_scanner.event_alpha_profiles",
-      "recommended_action": "keep_public_entrypoint",
-      "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
-      ],
-      "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-      "safe_to_remove": false,
-      "script_references": [],
-      "shim_status": "active_shim",
-      "test_import_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_profiles",
-          "line": 22,
-          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
-          "reference_type": "text_reference",
-          "snippet": "('crypto_rsi_scanner.event_alpha_profiles', 'crypto_rsi_scanner.event_alpha.config.profiles'),"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_profiles",
-          "line": 458,
-          "path": "tests/event_alpha/test_shim_registry.py",
-          "reference_type": "text_reference",
-          "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_profiles\"][\"recommended_status\"] == \"active_shim\""
-        }
-      ]
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_v1_readiness",
-          "line": 31,
-          "path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_v1_readiness` | `crypto_rsi_scanner.event_alpha.config.v1_readiness` | Historical Event Alpha v1-readiness import path retained for external scripts, older operator snippets, and public "
-        }
-      ],
-      "docs_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_v1_readiness",
-          "line": 92,
-          "path": "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_v1_readiness` | `crypto_rsi_scanner.event_alpha.config.v1_readiness` | config |"
-        }
-      ],
-      "docs_references_are_policy_scoped": true,
-      "dynamic_import_references": [],
-      "internal_import_references": [],
-      "makefile_references": [],
-      "new_module": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
-      "old_module": "crypto_rsi_scanner.event_alpha_v1_readiness",
-      "recommended_action": "keep_public_entrypoint",
-      "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
-      ],
-      "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-      "safe_to_remove": false,
-      "script_references": [],
-      "shim_status": "active_shim",
-      "test_import_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_v1_readiness",
-          "line": 23,
-          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
-          "reference_type": "text_reference",
-          "snippet": "('crypto_rsi_scanner.event_alpha_v1_readiness', 'crypto_rsi_scanner.event_alpha.config.v1_readiness'),"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_v1_readiness",
-          "line": 459,
-          "path": "tests/event_alpha/test_shim_registry.py",
-          "reference_type": "text_reference",
-          "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_v1_readiness\"][\"recommended_status\"] == \"active_shim\""
-        }
-      ]
-    },
-    {
-      "allowed_exports": [
-        "*"
-      ],
-      "artifact_doc_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_preflight",
-          "line": 32,
-          "path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_preflight` | `crypto_rsi_scanner.event_alpha.config.preflight` | Historical Event Alpha preflight import path retained for external scripts, older operator snippets, and public import co"
-        }
-      ],
-      "docs_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_preflight",
-          "line": 93,
-          "path": "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
-          "reference_type": "text_reference",
-          "snippet": "| `crypto_rsi_scanner.event_alpha_preflight` | `crypto_rsi_scanner.event_alpha.config.preflight` | config |"
-        }
-      ],
-      "docs_references_are_policy_scoped": true,
-      "dynamic_import_references": [],
-      "internal_import_references": [],
-      "makefile_references": [],
-      "new_module": "crypto_rsi_scanner.event_alpha.config.preflight",
-      "old_module": "crypto_rsi_scanner.event_alpha_preflight",
-      "recommended_action": "keep_public_entrypoint",
-      "removal_blockers": [
-        "test_import_references",
-        "artifact_doc_references"
-      ],
-      "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-      "safe_to_remove": false,
-      "script_references": [],
-      "shim_status": "active_shim",
-      "test_import_references": [
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_preflight",
-          "line": 24,
-          "path": "tests/event_alpha/test_legacy_import_compatibility.py",
-          "reference_type": "text_reference",
-          "snippet": "('crypto_rsi_scanner.event_alpha_preflight', 'crypto_rsi_scanner.event_alpha.config.preflight'),"
-        },
-        {
-          "detail": "crypto_rsi_scanner.event_alpha_preflight",
-          "line": 460,
-          "path": "tests/event_alpha/test_shim_registry.py",
-          "reference_type": "text_reference",
-          "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_preflight\"][\"recommended_status\"] == \"active_shim\""
-        }
-      ]
-    }
-  ],
+  "entries": [],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-05T03:23:54.336596+00:00",
+  "generated_at": "2026-07-05T04:18:25.113679+00:00",
   "include_runtime_artifacts": false,
   "internal_import_reference_count": 0,
   "makefile_reference_count": 0,
   "newer_source_mtime_paths": [],
-  "newest_source_mtime": 1783221329.45777,
+  "newest_source_mtime": 1783225094.7437623,
   "no_send_rehearsal": true,
   "nonessential_shim_rows": [],
   "normal_rsi_signal_rows_written": 0,
-  "old_path_docs_reference_total": 20,
+  "old_path_docs_reference_total": 0,
   "old_path_docs_references": 0,
-  "old_path_import_allowed_exceptions": 19,
+  "old_path_import_allowed_exceptions": 0,
   "old_path_internal_imports": 0,
   "old_path_test_imports": 0,
   "paper_trades_created": 0,
-  "registry_entry_count": 9,
+  "registry_entry_count": 0,
   "removal_candidate_counts": {
-    "keep_public_compatibility": 9,
+    "keep_public_compatibility": 0,
     "keep_safety_exception": 1,
     "keep_until_next_major_refactor": 0,
     "migrate_imports_first": 0,
     "remove_now_candidates": 0
   },
   "removal_candidates": {
-    "keep_public_compatibility": [
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.context",
-        "old_module": "crypto_rsi_scanner.event_alpha_artifacts",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.paths",
-        "old_module": "crypto_rsi_scanner.event_artifact_paths",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.run_ledger",
-        "old_module": "crypto_rsi_scanner.event_alpha_run_ledger",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.retention",
-        "old_module": "crypto_rsi_scanner.event_alpha_retention",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.locks",
-        "old_module": "crypto_rsi_scanner.event_alpha_run_lock",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.doctor.artifact_doctor",
-        "old_module": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.config.profiles",
-        "old_module": "crypto_rsi_scanner.event_alpha_profiles",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
-        "old_module": "crypto_rsi_scanner.event_alpha_v1_readiness",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.config.preflight",
-        "old_module": "crypto_rsi_scanner.event_alpha_preflight",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      }
-    ],
+    "keep_public_compatibility": [],
     "keep_safety_exception": [
       {
         "new_module": "",
@@ -669,7 +52,7 @@
     "migrate_imports_first": [],
     "remove_now_candidates": []
   },
-  "report_mtime": 1783221834.3372483,
+  "report_mtime": 1783225105.1149592,
   "research_only": true,
   "row_type": "event_alpha_shim_dependency_report",
   "safe_to_remove_count": 0,
@@ -679,27 +62,27 @@
     "include_runtime_artifacts": false,
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [],
-    "newest_source_mtime": 1783221329.45777,
-    "regex_compile_count": 9,
-    "report_mtime": 1783221834.3372483,
-    "scan_duration_seconds": 1.2318,
+    "newest_source_mtime": 1783225094.7437623,
+    "regex_compile_count": 0,
+    "report_mtime": 1783225105.1149592,
+    "scan_duration_seconds": 1.2106,
     "scanned_artifact_files": 0,
-    "scanned_doc_files": 30,
+    "scanned_doc_files": 31,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
-    "scanned_source_files": 612,
-    "scanned_test_files": 28,
+    "scanned_source_files": 604,
+    "scanned_test_files": 29,
     "skipped_artifact_files": 1285,
     "skipped_binary_files": 0,
     "skipped_dir_samples": [
       "crypto_rsi_scanner/__pycache__",
       "crypto_rsi_scanner/backtest_parts/__pycache__",
-      "crypto_rsi_scanner/backtest_parts/legacy_parts/__pycache__",
+      "crypto_rsi_scanner/backtest_parts/implementation/__pycache__",
       "crypto_rsi_scanner/cli/__pycache__",
       "crypto_rsi_scanner/cli/parser_event_alpha/__pycache__",
       "crypto_rsi_scanner/cli/event_alpha_command_registry/__pycache__",
       "crypto_rsi_scanner/cli/services/__pycache__",
-      "crypto_rsi_scanner/cli/services/legacy/__pycache__",
+      "crypto_rsi_scanner/cli/services/scanner_parts/__pycache__",
       "crypto_rsi_scanner/cli/services/event_alpha_notifications/__pycache__",
       "crypto_rsi_scanner/llm_providers/__pycache__"
     ],
@@ -708,10 +91,10 @@
     "skipped_large_files": 0,
     "skipped_suffix_files": 0
   },
-  "scan_duration_seconds": 1.2318,
-  "scanned_doc_files": 30,
-  "scanned_source_files": 612,
-  "scanned_test_files": 28,
+  "scan_duration_seconds": 1.2106,
+  "scanned_doc_files": 31,
+  "scanned_source_files": 604,
+  "scanned_test_files": 29,
   "schema_version": "event_alpha_shim_dependency_report_v1",
   "script_reference_count": 0,
   "shim_dependency_report_cache_status": "hit",
@@ -722,19 +105,19 @@
   "status": "OK",
   "strict_alerts_created": 0,
   "telegram_sends": 0,
-  "test_import_reference_count": 19,
+  "test_import_reference_count": 0,
   "trades_created": 0,
   "triggered_fade_created": 0,
   "v3_auto_accept_ready": true,
   "v3_gate_status": "pass",
   "v3_gates": {
-    "deleted_shims": 115,
+    "deleted_shims": 124,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
-    "old_path_import_allowed_exceptions": 19,
+    "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "public_compatibility_shims": 9,
+    "public_compatibility_shims": 0,
     "shim_removal_blockers": 0
   }
 }

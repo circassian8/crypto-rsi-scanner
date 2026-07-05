@@ -971,7 +971,7 @@ def event_alpha_notify_preview_from_artifacts(
     core_rows = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
         latest_run=True,
-        include_legacy=True,
+        include_api=True,
     ).rows
     watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())

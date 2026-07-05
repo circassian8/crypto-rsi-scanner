@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .core import (
     resolve_future_market_symbols,
     _keys,
     _load_rows,

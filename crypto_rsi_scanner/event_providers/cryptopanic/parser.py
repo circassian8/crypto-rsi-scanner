@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .api import (
     normalize_cryptopanic_currency_code,
     plan_cryptopanic_currency_codes,
     _decode_response_body,

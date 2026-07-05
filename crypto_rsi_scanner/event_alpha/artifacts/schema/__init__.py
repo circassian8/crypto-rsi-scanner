@@ -2,4 +2,4 @@
 
 from __future__ import annotations
 
-from .legacy import *  # noqa: F401,F403
+from .registry import *  # noqa: F401,F403

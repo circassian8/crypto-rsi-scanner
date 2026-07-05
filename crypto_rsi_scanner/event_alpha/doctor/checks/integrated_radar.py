@@ -12,7 +12,7 @@ def apply_core_card_checks(ctx: object, blockers: Messages, warnings: Messages) 
     core_store_available = bool(ctx_value(ctx, "core_store_available", False))
     card_count = int(ctx_value(ctx, "card_count", 0) or 0)
     include_test_artifacts = bool(ctx_value(ctx, "include_test_artifacts", False))
-    include_legacy_artifacts = bool(ctx_value(ctx, "include_legacy_artifacts", False))
+    include_api_artifacts = bool(ctx_value(ctx, "include_api_artifacts", False))
     acquisition_final_conflicts = ctx_mapping(ctx, "acquisition_final_conflicts")
     daily_brief_conflicts = ctx_mapping(ctx, "daily_brief_conflicts")
     live_confirmation_conflicts = ctx_mapping(ctx, "live_confirmation_conflicts")
@@ -31,7 +31,7 @@ def apply_core_card_checks(ctx: object, blockers: Messages, warnings: Messages) 
         emit(blockers, warnings, message, blocker=strict and bool(ctx_value(ctx, "fresh_visible_missing_cards", 0)))
     if ctx_value(ctx, "visible_missing_store_rows", 0):
         message = f"visible_core_opportunities_missing_store_rows={ctx_value(ctx, 'visible_missing_store_rows')}"
-        strict_core_store = strict and not include_test_artifacts and not include_legacy_artifacts
+        strict_core_store = strict and not include_test_artifacts and not include_api_artifacts
         emit(blockers, warnings, message, blocker=strict_core_store)
     if ctx_value(ctx, "duplicate_store_rows", 0):
         warnings.append(f"duplicate_core_opportunity_store_rows={ctx_value(ctx, 'duplicate_store_rows')}")
@@ -213,7 +213,7 @@ def apply_integrated_artifact_checks(ctx: object, blockers: Messages, warnings: 
         "integrated_delivery_side_effect_flag",
         "integrated_delivery_missing_skip_reasons",
         "integrated_delivery_card_path_not_rendered",
-        "integrated_legacy_preview_alerts_wording",
+        "integrated_api_preview_alerts_wording",
         "integrated_manifest_daily_brief_unavailable",
         "integrated_outcome_missing_for_candidate",
         "integrated_outcome_side_effect_flag",
@@ -223,7 +223,7 @@ def apply_integrated_artifact_checks(ctx: object, blockers: Messages, warnings: 
         "integrated_outcome_diagnostic_in_performance",
         "integrated_calibration_diagnostic_in_main_priors",
         "integrated_calibration_prior_safety_missing",
-        "integrated_calibration_legacy_alias_top_level",
+        "integrated_calibration_api_alias_top_level",
         "integrated_outcome_return_double_scaled",
         "integrated_outcome_missing_data_unlabeled",
         "integrated_outcome_thesis_move_missing",

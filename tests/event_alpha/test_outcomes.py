@@ -101,11 +101,11 @@ def test_feedback_readiness_smoke_is_research_only():
     assert "Artifact-only check; no sends, trades, paper rows, normal RSI rows, or event-fade state were changed." in text
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
-from tests.event_alpha import _legacy_helpers as _event_alpha_legacy_helpers
+from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
 
 globals().update({
     name: value
-    for name, value in vars(_event_alpha_legacy_helpers).items()
+    for name, value in vars(_event_alpha_api_helpers).items()
     if not name.startswith("__")
 })
 
@@ -1454,7 +1454,7 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
         run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": len(rows)}],
         alert_rows=rows,
         watchlist_rows=[btc, zero, digest, watch, rune, high, trigger],
-        include_legacy_artifacts=True,
+        include_api_artifacts=True,
     )
     assert doctor.alertable_route_conflicts_with_opportunity_level == 0
     assert doctor.active_watchlist_rows_quality_capped >= 1
@@ -1474,7 +1474,7 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     doctor_uncapped_watchlist = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=[{"run_id": "r1", "alertable": 0}],
         watchlist_rows=[uncapped_watchlist_conflict],
-        include_legacy_artifacts=True,
+        include_api_artifacts=True,
         strict=True,
     )
     assert doctor_uncapped_watchlist.status == "BLOCKED"
@@ -1504,7 +1504,7 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
         stale_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=[{"run_id": "r1", "alertable": 0}],
             watchlist_rows=[stale_non_hypothesis],
-            include_legacy_artifacts=True,
+            include_api_artifacts=True,
             strict=True,
         )
         assert stale_doctor.status == "BLOCKED"
@@ -1523,20 +1523,20 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     doctor_conflict = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
         alert_rows=[legacy_conflict],
-        include_legacy_artifacts=True,
+        include_api_artifacts=True,
         strict=True,
     )
     assert doctor_conflict.alertable_route_conflicts_with_opportunity_level == 1
     assert doctor_conflict.status == "WARN"
     assert "alertable_route_conflicts_with_opportunity_level=1" in event_alpha_artifact_doctor.format_artifact_doctor_report(doctor_conflict)
-    doctor_conflict_strict_legacy = event_alpha_artifact_doctor.diagnose_artifacts(
+    doctor_conflict_strict_api = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
         alert_rows=[legacy_conflict],
-        include_legacy_artifacts=True,
+        include_api_artifacts=True,
         strict=True,
-        strict_legacy=True,
+        strict_api=True,
     )
-    assert doctor_conflict_strict_legacy.status == "BLOCKED"
+    assert doctor_conflict_strict_api.status == "BLOCKED"
     legacy_review = event_alpha_quality_review.format_quality_review(
         event_alpha_quality_review.build_quality_review(profile="fixture", alert_rows=[legacy_conflict])
     )
@@ -1566,7 +1566,7 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     doctor_fresh_conflict = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
         alert_rows=[fresh_conflict],
-        include_legacy_artifacts=True,
+        include_api_artifacts=True,
         strict=True,
     )
     assert doctor_fresh_conflict.status == "BLOCKED"
@@ -1578,7 +1578,7 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     doctor_missing_final = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
         alert_rows=[fresh_missing_final],
-        include_legacy_artifacts=True,
+        include_api_artifacts=True,
         strict=True,
     )
     assert doctor_missing_final.status == "BLOCKED"
@@ -2793,7 +2793,7 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
         days=7,
         now=now,
         run_rows=[{"run_id": "legacy", "started_at": "2026-06-19T10:00:00+00:00", "success": True}],
-        include_legacy_artifacts=True,
+        include_api_artifacts=True,
     )
     assert len(legacy_counted.run_rows) == 1
 

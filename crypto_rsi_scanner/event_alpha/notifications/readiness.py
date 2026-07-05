@@ -58,7 +58,7 @@ def build_send_readiness(
     telegram_ready: bool,
     preview_path: str | Path | None = None,
     include_test_artifacts: bool = False,
-    include_legacy_artifacts: bool = False,
+    include_api_artifacts: bool = False,
 ) -> EventAlphaSendReadinessResult:
     """Return a final read-only readiness verdict for a profile namespace."""
     rows = _filtered_send_readiness_rows(
@@ -69,7 +69,7 @@ def build_send_readiness(
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
     )
     latest_run = _latest_run(rows.runs)
     latest_run_id = str(latest_run.get("run_id") or "") if latest_run else None
@@ -144,13 +144,13 @@ def _filtered_send_readiness_rows(
     profile: str | None,
     artifact_namespace: str | None,
     include_test_artifacts: bool,
-    include_legacy_artifacts: bool,
+    include_api_artifacts: bool,
 ) -> _SendReadinessRows:
     filter_kwargs = {
         "profile": profile,
         "artifact_namespace": artifact_namespace,
         "include_test_artifacts": include_test_artifacts,
-        "include_legacy_artifacts": include_legacy_artifacts,
+        "include_api_artifacts": include_api_artifacts,
     }
     return _SendReadinessRows(
         runs=event_alpha_artifacts.filter_artifact_rows(
@@ -366,7 +366,7 @@ def _filter_delivery_rows(
     profile: str | None,
     artifact_namespace: str | None,
     include_test_artifacts: bool,
-    include_legacy_artifacts: bool,
+    include_api_artifacts: bool,
 ) -> list[dict[str, Any]]:
     """Filter delivery rows without requiring run_mode on historical rows."""
     profile_key = _clean_optional(profile)
@@ -376,7 +376,7 @@ def _filter_delivery_rows(
         data = dict(row)
         if not include_test_artifacts and event_alpha_artifacts.is_non_operational_row(data):
             continue
-        if not include_legacy_artifacts and _delivery_is_legacy(data):
+        if not include_api_artifacts and _delivery_is_api(data):
             continue
         if profile_key is not None and _clean_optional(data.get("profile")) not in (None, profile_key):
             continue
@@ -388,7 +388,7 @@ def _filter_delivery_rows(
     return out
 
 
-def _delivery_is_legacy(row: Mapping[str, Any]) -> bool:
+def _delivery_is_api(row: Mapping[str, Any]) -> bool:
     namespace = _clean_optional(row.get("artifact_namespace") or row.get("namespace"))
     if namespace in (None, event_alpha_artifacts.LEGACY_NAMESPACE):
         return True

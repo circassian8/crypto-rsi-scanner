@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-from . import refactor_legacy_inventory
+from . import refactor_api_inventory
 from . import refactor_v3_contract
 
 
@@ -45,7 +45,7 @@ ACCEPTED_MODEL_BUNDLE_MODULES = {
     "crypto_rsi_scanner.event_alpha.artifacts.cache",
     "crypto_rsi_scanner.event_alpha.artifacts.locks",
     "crypto_rsi_scanner.event_alpha.artifacts.replay",
-    "crypto_rsi_scanner.event_alpha.artifacts.research_cards.legacy_parts.models",
+    "crypto_rsi_scanner.event_alpha.artifacts.research_cards.components.models",
     "crypto_rsi_scanner.event_alpha.artifacts.retention",
     "crypto_rsi_scanner.event_alpha.artifacts.run_ledger",
     "crypto_rsi_scanner.event_alpha.config.health_guard",
@@ -53,7 +53,7 @@ ACCEPTED_MODEL_BUNDLE_MODULES = {
     "crypto_rsi_scanner.event_alpha.doctor.environment",
     "crypto_rsi_scanner.event_alpha.notifications.delivery",
     "crypto_rsi_scanner.event_alpha.notifications.inbox.models",
-    "crypto_rsi_scanner.event_alpha.notifications.legacy.delivery_models",
+    "crypto_rsi_scanner.event_alpha.notifications.pipeline_parts.delivery_models",
     "crypto_rsi_scanner.event_alpha.notifications.provider_status",
     "crypto_rsi_scanner.event_alpha.notifications.recipient_check",
     "crypto_rsi_scanner.event_alpha.notifications.router",
@@ -70,7 +70,7 @@ ACCEPTED_MODEL_BUNDLE_MODULES = {
     "crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness",
     "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
     "crypto_rsi_scanner.event_alpha.providers.official_exchange_activation",
-    "crypto_rsi_scanner.event_alpha.providers.provider_health_legacy",
+    "crypto_rsi_scanner.event_alpha.providers.provider_health_core",
     "crypto_rsi_scanner.event_alpha.providers.source_registry",
     "crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight",
     "crypto_rsi_scanner.event_alpha.radar.anomaly_state",
@@ -146,7 +146,7 @@ ACCEPTED_CLASS_EXCEPTIONS: dict[str, dict[str, str]] = {
         "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
         "revisit_condition": "Revisit when watchlist market enrichment gains another provider implementation.",
     },
-    "crypto_rsi_scanner.event_providers.binance_announcements.legacy.BinanceAnnouncementProvider": {
+    "crypto_rsi_scanner.event_providers.binance_announcements.api.BinanceAnnouncementProvider": {
         "class_name": "BinanceAnnouncementProvider",
         "status": "accepted_exception",
         "category": "provider_adapter",
@@ -154,7 +154,7 @@ ACCEPTED_CLASS_EXCEPTIONS: dict[str, dict[str, str]] = {
         "owner_note": "Do not split further without signed-listener fixture parity and secret-redaction tests.",
         "revisit_condition": "Revisit when Binance public rehearsal becomes a first-class activated provider path.",
     },
-    "crypto_rsi_scanner.event_providers.bybit_announcements.legacy.BybitAnnouncementProvider": {
+    "crypto_rsi_scanner.event_providers.bybit_announcements.api.BybitAnnouncementProvider": {
         "class_name": "BybitAnnouncementProvider",
         "status": "accepted_exception",
         "category": "provider_adapter",
@@ -162,7 +162,7 @@ ACCEPTED_CLASS_EXCEPTIONS: dict[str, dict[str, str]] = {
         "owner_note": "Avoid touching Bybit request/normalization behavior outside provider-activation work.",
         "revisit_condition": "Revisit when adding another Bybit announcement endpoint or response shape.",
     },
-    "crypto_rsi_scanner.event_providers.cryptopanic.legacy.CryptoPanicProvider": {
+    "crypto_rsi_scanner.event_providers.cryptopanic.api.CryptoPanicProvider": {
         "class_name": "CryptoPanicProvider",
         "status": "accepted_exception",
         "category": "provider_adapter",
@@ -350,7 +350,7 @@ def build_report(
         }
         for module, reason in sorted(MODULE_EXCEPTIONS.items())
     ]
-    legacy_inventory = refactor_legacy_inventory.build_legacy_inventory(
+    legacy_inventory = refactor_api_inventory.build_api_inventory(
         root=repo_root,
         class_line_limit=class_line_limit,
         function_line_limit=function_line_limit,
@@ -424,7 +424,7 @@ def build_report(
         "legacy_files_over_1500_lines": legacy_inventory["legacy_files_over_1500_lines"],
         "legacy_files_over_3000_lines": legacy_inventory["legacy_files_over_3000_lines"],
         "legacy_total_lines": legacy_inventory["legacy_total_lines"],
-        "largest_legacy_files": legacy_inventory["largest_legacy_files"],
+        "largest_api_files": legacy_inventory["largest_api_files"],
         "legacy_classes_over_limit": legacy_inventory["legacy_classes_over_limit"],
         "legacy_functions_over_limit": legacy_inventory["legacy_functions_over_limit"],
         "legacy_modules_with_multiple_public_classes": legacy_inventory[
@@ -722,7 +722,7 @@ def format_report(report: dict[str, Any]) -> str:
         "| path | lines |",
         "|---|---:|",
     ])
-    for row in _limit_rows(report.get("largest_legacy_files"), 40):
+    for row in _limit_rows(report.get("largest_api_files"), 40):
         lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
     _append_multi_class_sections(lines, report)
     lines.extend([

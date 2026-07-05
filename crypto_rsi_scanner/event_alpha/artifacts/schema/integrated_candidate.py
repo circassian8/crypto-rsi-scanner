@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import SCHEMAS
+from .registry import SCHEMAS
 
 INTEGRATED_RADAR_CANDIDATE_SCHEMA = SCHEMAS["integrated_radar_candidate_v1"]
 SCHEMA_IDS = ("integrated_radar_candidate_v1",)

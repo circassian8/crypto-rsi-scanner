@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .api import (
     format_conditional,
     format_market,
     format_market_walk_forward,

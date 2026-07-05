@@ -103,7 +103,7 @@ def load_incidents(
     limit: int | None = None,
     latest_run: bool = False,
     run_id: str | None = None,
-    include_legacy: bool = True,
+    include_api: bool = True,
     include_diagnostic: bool = False,
     include_raw: bool = False,
     include_external_context: bool = False,
@@ -117,13 +117,13 @@ def load_incidents(
     all_rows.sort(key=lambda row: str(row.get("last_updated_at") or row.get("observed_at") or ""), reverse=True)
     latest_id = _latest_run_id(all_rows)
     latest_count = sum(1 for row in all_rows if _row_run_id(row) == latest_id) if latest_id else 0
-    legacy_count = sum(1 for row in all_rows if _is_legacy_row(row))
+    legacy_count = sum(1 for row in all_rows if _is_api_row(row))
     rows = _filter_rows(
         all_rows,
         latest_run=latest_run,
         latest_run_id=latest_id,
         run_id=run_id,
-        include_legacy=include_legacy,
+        include_api=include_api,
     )
     rows = [_row_with_effective_relevance(_row_with_effective_subject_quality(row)) for row in rows]
     if limit is not None and limit > 0:
@@ -140,7 +140,7 @@ def load_incidents(
         filters={
             "latest_run": bool(latest_run),
             "run_id": run_id,
-            "include_legacy": bool(include_legacy),
+            "include_api": bool(include_api),
             "include_diagnostic": bool(include_diagnostic),
             "include_raw": bool(include_raw),
             "include_external_context": bool(include_external_context),
@@ -172,12 +172,12 @@ def _filter_rows(
     latest_run: bool,
     latest_run_id: str | None,
     run_id: str | None,
-    include_legacy: bool,
+    include_api: bool,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for row in rows:
         data = dict(row)
-        if not include_legacy and _is_legacy_row(data):
+        if not include_api and _is_api_row(data):
             continue
         if run_id and _row_run_id(data) != run_id:
             continue
@@ -194,5 +194,5 @@ def _latest_run_id(rows: Iterable[Mapping[str, Any]]) -> str | None:
 def _row_run_id(row: Mapping[str, Any]) -> str | None:
     value = row.get("run_id")
     return str(value) if value not in (None, "") else None
-def _is_legacy_row(row: Mapping[str, Any]) -> bool:
+def _is_api_row(row: Mapping[str, Any]) -> bool:
     return not str(row.get("schema_version") or "").startswith("event_incident_store_")

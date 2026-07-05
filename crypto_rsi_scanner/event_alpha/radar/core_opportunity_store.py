@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from .core import legacy_store as _legacy
+from .core import store_api as _api
 
-for _name in dir(_legacy):
+for _name in dir(_api):
     if _name.startswith("__") and _name.endswith("__"):
         continue
-    globals()[_name] = getattr(_legacy, _name)
+    globals()[_name] = getattr(_api, _name)
 
 __all__ = tuple(
-    name for name in dir(_legacy) if not (name.startswith("__") and name.endswith("__"))
+    name for name in dir(_api) if not (name.startswith("__") and name.endswith("__"))
 )

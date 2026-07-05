@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .api import (
     _error_class_from_exception,
     _exception_response_diagnostics,
     _provider_health_effect,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .registry import (
     ALLOWED_DELIVERY_STATUSES,
     ALLOWED_FINAL_LEVELS,
     ALLOWED_NAMESPACE_STATUSES,

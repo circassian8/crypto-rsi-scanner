@@ -37,7 +37,7 @@ FINAL_SHIM_STATUS_MD = "EVENT_ALPHA_FINAL_SHIM_STATUS.md"
 SHIM_SCHEMA_VERSION = "event_alpha_shim_registry_v1"
 SHIM_DEPENDENCY_SCHEMA_VERSION = "event_alpha_shim_dependency_report_v1"
 OLD_IMPORT_CHECK_SCHEMA_VERSION = "event_alpha_old_import_check_v1"
-LEGACY_IMPORT_COMPATIBILITY_TEST = "tests/event_alpha/test_legacy_import_compatibility.py"
+LEGACY_IMPORT_COMPATIBILITY_TEST = "tests/event_alpha/test_no_old_event_alpha_imports.py"
 
 STATUS_ACTIVE_SHIM = "active_shim"
 STATUS_PARTIAL_SHIM = "partial_shim"
@@ -48,17 +48,7 @@ _PARTIAL_SHIMS: dict[str, str] = {}
 _DEPENDENCY_WARNING_SUMMARY_CACHE: tuple[int, int, tuple[str, ...]] | None = None
 _OLD_IMPORT_COUNTER_SUMMARY_CACHE: tuple[int, int, int, int] | None = None
 
-PUBLIC_COMPATIBILITY_SHIMS = {
-    "crypto_rsi_scanner.event_alpha_artifact_doctor",
-    "crypto_rsi_scanner.event_alpha_artifacts",
-    "crypto_rsi_scanner.event_artifact_paths",
-    "crypto_rsi_scanner.event_alpha_run_ledger",
-    "crypto_rsi_scanner.event_alpha_run_lock",
-    "crypto_rsi_scanner.event_alpha_retention",
-    "crypto_rsi_scanner.event_alpha_profiles",
-    "crypto_rsi_scanner.event_alpha_preflight",
-    "crypto_rsi_scanner.event_alpha_v1_readiness",
-}
+PUBLIC_COMPATIBILITY_SHIMS: set[str] = set()
 
 _DOC_COMPATIBILITY_FILES = {
     "AGENTS.md",

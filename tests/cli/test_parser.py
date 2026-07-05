@@ -100,7 +100,7 @@ def test_build_parser_preserves_artifact_doctor_and_notification_flags():
     assert doctor.event_alpha_artifact_doctor_strict is True
     assert doctor.event_alpha_artifact_doctor_delivery_scope == "latest_run"
     assert doctor.event_alpha_doctor_schema_only is True
-    assert doctor.event_alpha_doctor_skip_legacy_checks is True
+    assert doctor.event_alpha_doctor_skip_api_checks is True
     assert dispatch_key_from_args(doctor) == "event_alpha_artifact_doctor"
 
     preview = parser.parse_args([

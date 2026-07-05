@@ -161,11 +161,11 @@ def test_event_alpha_split_runner_and_make_target_are_wired():
     assert "$(PYTHON) -m crypto_rsi_scanner.event_alpha.doctor.check_registry" in makefile
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
-from tests.event_alpha import _legacy_helpers as _event_alpha_legacy_helpers
+from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
 
 globals().update({
     name: value
-    for name, value in vars(_event_alpha_legacy_helpers).items()
+    for name, value in vars(_event_alpha_api_helpers).items()
     if not name.startswith("__")
 })
 
@@ -241,11 +241,11 @@ def test_event_impact_hypothesis_store_reports_schema_and_promotion_diagnostics(
         assert "Why not promoted diagnostics:" in report
         assert "candidate_identity_not_validated=1" in report
         assert "Rejected validation evidence samples: 1" in report
-        latest = event_impact_hypothesis_store.load_impact_hypotheses(path, latest_run=True, include_legacy=False)
+        latest = event_impact_hypothesis_store.load_impact_hypotheses(path, latest_run=True, include_api=False)
         assert latest.rows_read == 1
         assert latest.rows[0]["hypothesis_id"] == "current"
         assert all(row["hypothesis_id"] != "legacy" for row in latest.rows)
-        by_run = event_impact_hypothesis_store.load_impact_hypotheses(path, run_id="run-old", include_legacy=True)
+        by_run = event_impact_hypothesis_store.load_impact_hypotheses(path, run_id="run-old", include_api=True)
         assert by_run.rows_read == 1
         assert by_run.rows[0]["hypothesis_id"] == "legacy"
         since = event_impact_hypothesis_store.load_impact_hypotheses(path, since="2026-06-18T00:00:00+00:00")
@@ -585,12 +585,12 @@ def test_event_alpha_schema_v1_validation_policy(tmp_path):
     assert result["errors"] == []
 
     crowding_path = tmp_path / "event_derivatives_crowding_candidates.jsonl"
-    shared_legacy_row_type = {
+    shared_api_row_type = {
         "row_type": "fade_short_review_candidate",
         "symbol": "TESTFADE",
         "crowding_class": "extreme",
     }
-    crowding_path.write_text(json.dumps(shared_legacy_row_type, sort_keys=True) + "\n", encoding="utf-8")
+    crowding_path.write_text(json.dumps(shared_api_row_type, sort_keys=True) + "\n", encoding="utf-8")
     crowding_result = schema_v1.validate_artifact_file(crowding_path)
     assert crowding_result["schema_id"] == "derivatives_crowding_candidate_v1"
     assert crowding_result["rows_validated"] == 1
@@ -714,7 +714,7 @@ def test_event_alpha_cli_package_and_make_targets_are_available():
     from crypto_rsi_scanner.cli.parser import build_parser, command_group, dispatch_key_from_args
     from crypto_rsi_scanner.cli.main import main as cli_main
 
-    root = _event_alpha_legacy_helpers.REPO_ROOT
+    root = _event_alpha_api_helpers.REPO_ROOT
     makefile = (root / "Makefile").read_text(encoding="utf-8")
     assert callable(cli_main)
     parser = build_parser()

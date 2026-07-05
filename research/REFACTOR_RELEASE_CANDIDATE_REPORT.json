@@ -14,15 +14,22 @@
     "modules_with_multiple_public_classes_status": "pass",
     "near_threshold_file_status": [
       {
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "line_count": 1437,
+        "path": "crypto_rsi_scanner/refactor_final_report.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1426,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
@@ -43,7 +50,7 @@
       },
       {
         "line_count": 1392,
-        "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+        "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
@@ -104,12 +111,12 @@
         "accepted_exception": false,
         "class_name": "CoinalyzeDerivativesProvider",
         "line_count": 54,
-        "module": "crypto_rsi_scanner.derivatives_providers.coinalyze.legacy",
+        "module": "crypto_rsi_scanner.derivatives_providers.coinalyze.core",
         "over_limit": false,
         "owner_note": "",
         "reason": "",
         "revisit_condition": "",
-        "source_path": "crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py",
+        "source_path": "crypto_rsi_scanner/derivatives_providers/coinalyze/core.py",
         "split_status": "below_threshold"
       },
       {
@@ -243,36 +250,35 @@
       "source_coverage": 1,
       "stale_artifacts": 1
     },
-    "remaining_legacy_unregistered_details": []
+    "remaining_api_unregistered_details": []
   },
-  "generated_at": "2026-07-04T22:44:13+00:00",
+  "generated_at": "2026-07-05T04:02:53+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
   "known_remaining_blockers": [],
   "line_counts": {
     "crypto_rsi_scanner/cli/commands_event_alpha.py": 14,
     "crypto_rsi_scanner/cli/parser.py": 225,
     "crypto_rsi_scanner/cli/services/event_alpha.py": 46,
-    "crypto_rsi_scanner/cli/services/scanner_legacy.py": 120,
-    "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 41,
-    "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py": 95,
-    "crypto_rsi_scanner/event_alpha_artifact_doctor.py": 19,
+    "crypto_rsi_scanner/cli/services/scanner_api.py": 120,
+    "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 36,
+    "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py": 91,
     "crypto_rsi_scanner/scanner.py": 90,
-    "tests/test_indicators.py": 1778
+    "tests/test_indicators.py": 1779
   },
   "migrated_modules": {
     "active_shim_modules_with_implementation_logic": 0,
-    "active_shims": 9,
+    "active_shims": 0,
     "classification_report": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
     "intentionally_outside_event_alpha_modules": [
       "crypto_rsi_scanner.event_fade"
     ],
     "partial_shims": 0,
-    "top_level_event_module_count": 10,
+    "top_level_event_module_count": 1,
     "unmigrated_modules": 1
   },
   "monolith_size_reductions": {
     "doctor": {
-      "legacy_doctor_core_lines": 95,
+      "legacy_doctor_core_lines": 91,
       "legacy_unregistered": 0,
       "plugin_check_counts": {
         "integrated_radar": 3,
@@ -286,8 +292,9 @@
         "source_coverage": 1,
         "stale_artifacts": 1
       },
-      "public_doctor_lines": 41,
-      "top_level_doctor_shim_lines": 19
+      "public_doctor_lines": 36,
+      "top_level_doctor_shim_lines": null,
+      "top_level_doctor_shim_status": "deleted"
     },
     "scanner_py": {
       "line_count": 90,
@@ -337,13 +344,13 @@
   "schema_version": "refactor_release_candidate_report_v2",
   "shim_summary": {
     "active_shim_modules_with_implementation_logic": 0,
-    "active_shims": 9,
+    "active_shims": 0,
     "classification_report": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
     "intentionally_outside_event_alpha_modules": [
       "crypto_rsi_scanner.event_fade"
     ],
     "partial_shims": 0,
-    "top_level_event_module_count": 10,
+    "top_level_event_module_count": 1,
     "unmigrated_modules": 1
   },
   "status": "accepted",

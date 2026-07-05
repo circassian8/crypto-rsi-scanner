@@ -67,7 +67,7 @@ def event_alpha_burn_in_readiness_report(
     core_opportunities = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
         latest_run=True,
-        include_legacy=True,
+        include_api=True,
     )
     feedback = event_feedback.load_feedback(context.feedback_path)
     feedback_rows = [record.__dict__ for record in feedback.records]
@@ -130,7 +130,7 @@ def event_alpha_burn_in_readiness_report(
             context.impact_hypothesis_store_path,
             limit=500,
             latest_run=True,
-            include_legacy=True,
+            include_api=True,
         ).rows,
         core_opportunity_rows=core_opportunities.rows,
         watchlist_rows=watchlist.entries,
@@ -138,7 +138,7 @@ def event_alpha_burn_in_readiness_report(
             context.incident_store_path,
             limit=500,
             latest_run=True,
-            include_legacy=True,
+            include_api=True,
         ).rows,
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(
             context.evidence_acquisition_path
@@ -150,14 +150,14 @@ def event_alpha_burn_in_readiness_report(
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
         include_test_artifacts=False,
-        include_legacy_artifacts=False,
+        include_api_artifacts=False,
         inspected_alert_store_path=context.alert_store_path,
         strict=True,
     )
     core_store = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
         latest_run=True,
-        include_legacy=True,
+        include_api=True,
     )
     acquisition_rows = event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path)
     readiness = event_alpha_burn_in_readiness.build_burn_in_readiness(
@@ -183,7 +183,7 @@ def _burn_in_pack_artifact_doctor(
     context: Any,
     artifact_namespace: str | None,
     include_test_artifacts: bool,
-    include_legacy_artifacts: bool,
+    include_api_artifacts: bool,
 ) -> Any:
     cards_dir = Path(config.EVENT_RESEARCH_CARDS_DIR)
     return event_alpha_artifact_doctor.diagnose_artifacts(
@@ -202,7 +202,7 @@ def _burn_in_pack_artifact_doctor(
         profile=config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE or None,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
         inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
         strict=bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT),
     )
@@ -216,7 +216,7 @@ def event_alpha_export_burn_in_pack(
     profile_name: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
-    include_legacy_artifacts: bool = False,
+    include_api_artifacts: bool = False,
 ) -> None:
     """Write a clean Event Alpha burn-in review zip."""
     _refresh_scanner_globals()
@@ -242,7 +242,7 @@ def event_alpha_export_burn_in_pack(
         outcome_rows=artifacts["outcome_rows"],
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
         days=days,
     )
     import crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist as event_alpha_burn_in_checklist
@@ -258,7 +258,7 @@ def event_alpha_export_burn_in_pack(
         outcome_rows=artifacts["outcome_rows"],
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
         days=days,
     )
     health = event_alpha_health_guard.evaluate_health_guard(
@@ -274,14 +274,14 @@ def event_alpha_export_burn_in_pack(
         ),
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
     )
     doctor = _burn_in_pack_artifact_doctor(
         artifacts=artifacts,
         context=context,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
     )
     router_result = event_alpha_router.route_watchlist(
         artifacts["watchlist"],
@@ -303,7 +303,7 @@ def event_alpha_export_burn_in_pack(
         run_ledger_path=config.EVENT_ALPHA_RUN_LEDGER_PATH,
         alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
         clock_status=_event_clock_status(),
         generated_at=_event_research_now(),
     )
@@ -349,7 +349,7 @@ def event_alpha_export_burn_in_pack(
         profile=config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE or None,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
         date_range=f"{days}d",
     )
     print(event_alpha_burn_in_pack.format_burn_in_pack_result(result))

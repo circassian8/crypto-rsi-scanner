@@ -104,11 +104,11 @@ def test_source_registry_and_source_packs_new_package_paths_classify_official_ex
     assert pack_eval["source_pack_preferred_source_present"] is True
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
-from tests.event_alpha import _legacy_helpers as _event_alpha_legacy_helpers
+from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
 
 globals().update({
     name: value
-    for name, value in vars(_event_alpha_legacy_helpers).items()
+    for name, value in vars(_event_alpha_api_helpers).items()
     if not name.startswith("__")
 })
 
@@ -209,7 +209,7 @@ def test_event_alpha_dex_onchain_readiness_artifacts_are_fixture_only_and_covere
     import crypto_rsi_scanner.event_alpha.radar.source_coverage as event_alpha_source_coverage
     import crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness as event_dex_onchain_readiness
 
-    root = _event_alpha_legacy_helpers.REPO_ROOT
+    root = _event_alpha_api_helpers.REPO_ROOT
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
         result = event_dex_onchain_readiness.run_dex_onchain_readiness(
@@ -4985,7 +4985,7 @@ def test_event_provider_health_wraps_event_and_enrichment_providers():
     assert "universe:" in report
 
 
-def test_event_provider_health_wrappers_use_injected_now_and_legacy_signatures():
+def test_event_provider_health_wrappers_use_injected_now_and_api_signatures():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path

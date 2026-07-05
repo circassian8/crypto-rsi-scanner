@@ -1,0 +1,20 @@
+# Final Refactor Legacy Retirement Report
+
+Research artifact only. This static gate does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.
+
+- generated_at: `2026-07-05T03:53:43.498785+00:00`
+- status: `OK`
+- legacy_named_files_count: `0`
+- legacy_named_dirs_count: `0`
+- top_level_event_modules_count: `0`
+- retained_public_shims_count: `0`
+- deleted_shims_count: `124`
+- nonessential_shims_remaining: `0`
+
+## Allowed Exceptions
+
+- `crypto_rsi_scanner/event_fade.py`: Intentional safety boundary: TRIGGERED_FADE remains owned only by event_fade.py plus proxy_fade.
+
+## Blockers
+
+- none

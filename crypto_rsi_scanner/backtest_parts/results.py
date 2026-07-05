@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .api import (
     build_registry_prior_export,
     summarize,
     summarize_by_conviction,

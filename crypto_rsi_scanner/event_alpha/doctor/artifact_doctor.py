@@ -1,13 +1,8 @@
-"""Public Event Alpha artifact doctor entrypoint.
-
-The compatibility-heavy implementation remains in ``legacy_artifact_doctor``
-while the public API is routed through focused doctor modules. Keep this module
-as a thin orchestrator/export surface so new logic lands in the package modules.
-"""
+"""Public Event Alpha artifact doctor entrypoint."""
 
 from __future__ import annotations
 
-from . import legacy_artifact_doctor as _legacy
+from . import artifact_doctor_core as _api
 from .execution import diagnose_artifacts
 from .report_sections.summary import format_artifact_doctor_report
 from .result import EventAlphaArtifactDoctorResult
@@ -18,12 +13,12 @@ _OVERRIDES = {
     "EventAlphaArtifactDoctorResult": EventAlphaArtifactDoctorResult,
 }
 
-for _name in dir(_legacy):
+for _name in dir(_api):
     if _name.startswith("__") and _name.endswith("__"):
         continue
     if _name in _OVERRIDES:
         continue
-    globals()[_name] = getattr(_legacy, _name)
+    globals()[_name] = getattr(_api, _name)
 
 globals().update(_OVERRIDES)
 
@@ -32,7 +27,7 @@ __all__ = tuple(
         {
             *(
                 name
-                for name in dir(_legacy)
+                for name in dir(_api)
                 if not (name.startswith("__") and name.endswith("__"))
             ),
             *_OVERRIDES,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import SCHEMAS
+from .registry import SCHEMAS
 
 CALIBRATION_PRIOR_SCHEMA = SCHEMAS["calibration_prior_v1"]
 SCHEMA_IDS = ("calibration_prior_v1",)

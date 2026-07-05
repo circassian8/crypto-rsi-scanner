@@ -28,7 +28,7 @@ warnings, and shim cache misses needed clearer diagnostics.
   release-candidate reports with explicit `pass`,
   `accepted_with_documented_exceptions`, `pending`, and `blocked` states.
 - Moved the accepted over-1,200-line production-file registry into the v3
-  contract so every report lists the same 12 accepted file warnings and 3
+  contract so every report lists the same 13 accepted file warnings and 3
   accepted storage mixin class exceptions with `v3_blockers=[]`.
 - Hardened `scripts/export_source_with_artifacts.py` to clamp future mtimes,
   honor wall-clock-safe `SOURCE_DATE_EPOCH`, validate archive entry/Makefile
@@ -37,12 +37,15 @@ warnings, and shim cache misses needed clearer diagnostics.
 - Split shim cache freshness helpers into `event_alpha/shim_cache.py` and added
   explicit `miss_due_future_mtime` diagnostics without scanning runtime
   artifacts by default.
+- Sealed the flat Event Alpha shim retirement surface: retained public shims are
+  now empty, deleted old imports are tombstoned, and canonical package imports
+  are the only supported internal paths.
 - Added regression tests for accepted-exception status rendering, hard blocker
   behavior, zip timestamp clamping/validation, fallback export clock-skew
   smoke, and shim cache hit/miss/force/runtime-artifact paths.
-**Verify:** `python3 tests/test_indicators.py` passed (`758/758`);
+**Verify:** `python3 tests/test_indicators.py` passed (`759/759`);
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
-tests/cli tests/test_indicators.py -q` passed (`773 passed`); `python3 -m
+tests/cli tests/test_indicators.py -q` passed (`774 passed`); `python3 -m
 compileall -q crypto_rsi_scanner tests` passed; `make event-alpha-old-import-check
 PYTHON=python3` passed with `old_path_internal_imports=0`; repeated `make
 event-alpha-shim-dependency-report PYTHON=python3` reached `cache_status=hit`;
@@ -209,8 +212,8 @@ research-only safety boundaries.
   `event_alpha/providers/coinalyze_preflight_report.py`, keeping the main
   preflight module at 1,123 lines and preserving no-call/no-send behavior.
 - Split legacy CLI utility command helpers into
-  `cli/services/legacy/utility_research_cards.py` and
-  `cli/services/legacy/utility_calibration_exports.py`, keeping
+  `cli/services/scanner_parts/utility_research_cards.py` and
+  `cli/services/scanner_parts/utility_calibration_exports.py`, keeping
   `utility_commands.py` at 1,096 lines while preserving scanner-level
   monkeypatch compatibility.
 - Updated `refactor-size-gates`, `refactor-final-report`, and
@@ -357,7 +360,7 @@ canonical imports were already enforced.
   test before this pass.
 - Pruned deleted rows from `crypto_rsi_scanner/event_alpha/MODULE_MAP.md` and
   `crypto_rsi_scanner/event_alpha/SHIM_REGISTRY.json`.
-- Reworked `tests/event_alpha/test_legacy_import_compatibility.py` so retained
+- Reworked `tests/event_alpha/test_api_import_compatibility.py` so retained
   old paths still resolve to canonical modules while deleted old paths now fail
   import intentionally.
 - Added `research/EVENT_ALPHA_DELETED_SHIMS.md/json` and threaded
@@ -390,7 +393,7 @@ tested, but only in one explicit place.
 **Changes:**
 - Rewrote internal test imports to canonical package paths while preserving
   local aliases, and moved old/new import equivalence checks into
-  `tests/event_alpha/test_legacy_import_compatibility.py`.
+  `tests/event_alpha/test_api_import_compatibility.py`.
 - Added `make event-alpha-old-import-check`, which writes
   `research/EVENT_ALPHA_OLD_IMPORT_CHECK.md/json` and fails on old flat Event
   Alpha imports outside compatibility tests, shim modules, `scanner.py`, and
@@ -547,12 +550,12 @@ function mixed namespace/schema setup, core/card context assembly, provider and
 integrated-artifact conflict collection, notification checks, outcome/incident
 checks, and the final 400-field result constructor.
 **Changes:**
-- Split `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py` into
+- Split `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py` into
   short context phases for loading, namespace/profile checks, core/card
   context, artifact conflicts, notification context, and quality/incident
   context. `diagnose_artifacts()` is now a 41-line public orchestrator.
 - Added
-  `crypto_rsi_scanner/event_alpha/doctor/legacy/result_fields.py`, a static
+  `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/result_fields.py`, a static
   compatibility table for the legacy doctor result fields, preserving the old
   counter expressions while keeping executable functions under the size gate.
 - Regenerated refactor class ownership, size-gate, final, completion-map,
@@ -566,8 +569,8 @@ checks, and the final 400-field result constructor.
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
 tests/event_alpha/test_artifact_doctor.py tests/event_alpha/test_namespace_lifecycle.py
 -q` reported `75 passed`; shim/make-target focused tests reported `26 passed`;
-`python3 -m compileall -q crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py
-crypto_rsi_scanner/event_alpha/doctor/legacy/result_fields.py` passed. Full
+`python3 -m compileall -q crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py
+crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/result_fields.py` passed. Full
 safe harness passed: `python3 tests/test_indicators.py`;
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
 tests/cli tests/test_indicators.py -q`; `python3 -m compileall -q
@@ -589,7 +592,7 @@ production and legacy file-size gates passed. `send_notifications()` contained
 context setup, guard handling, lane rendering, delivery-ledger writes, cooldown
 updates, heartbeat handling, and result assembly in one function.
 **Changes:**
-- Split `crypto_rsi_scanner/event_alpha/notifications/legacy/send_plan.py` so
+- Split `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/send_plan.py` so
   `send_notifications()` is now a 63-line orchestrator over private helpers for
   send context construction, disabled/paused/no-digest outcomes, digest lane
   preparation, duplicate skipping, delivery attempt recording, heartbeat
@@ -680,7 +683,7 @@ production and legacy file-size gates passed. `run_integrated_radar_cycle()` had
 clear setup/input/artifact/result phases and strong integrated radar fixture
 coverage, making it a safe behavior-preserving split target.
 **Changes:**
-- Split `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/cycle.py`
+- Split `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py`
   so `run_integrated_radar_cycle()` is now a 54-line orchestrator over private
   helpers for cycle setup, input resolution, candidate artifact writes,
   operator artifact writes, result assembly, and run-ledger append.
@@ -809,7 +812,7 @@ production and legacy size gates passed. `_merge_family()` is the integrated
 radar candidate assembler with strong fixture coverage for source merging,
 Coinalyze evidence, DEX/on-chain joins, and no-side-effect safety fields.
 **Changes:**
-- Split `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py`
+- Split `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py`
   so `_merge_family()` is now a 98-line orchestrator over a private merge
   context and focused field-group helpers for identity, source, opportunity,
   market, derivatives, sidecar events, evidence, safety, incident/source, and
@@ -1141,7 +1144,7 @@ was a pure artifact-doctor counter aggregator over integrated radar artifacts,
 cards, manifests, delivery rows, outcomes, and operator Markdown, making it a
 safe behavior-preserving split.
 **Changes:**
-- Split `crypto_rsi_scanner/event_alpha/doctor/legacy/provider_readiness_checks.py`
+- Split `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/provider_readiness_checks.py`
   so `_integrated_radar_artifact_conflicts()` is now a 38-line orchestrator over
   helpers for candidate row checks, manifest/source-coverage checks,
   daily-brief/preview/operator path checks, delivery rows, outcome rows, and
@@ -1180,7 +1183,7 @@ production and legacy size gates passed. `_notification_delivery_conflicts()`
 was a pure artifact-doctor counter aggregator, making it a safe
 behavior-preserving split.
 **Changes:**
-- Split `crypto_rsi_scanner/event_alpha/doctor/legacy/notification_delivery_checks.py`
+- Split `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/notification_delivery_checks.py`
   so `_notification_delivery_conflicts()` is now a 39-line orchestrator over
   focused helpers for scope counts, preview-body checks, research-review digest
   checks, and strict delivery/core identity checks.
@@ -1217,7 +1220,7 @@ renderer was a pure string formatter over result counters, making it a safe
 behavior-preserving ownership slice.
 **Changes:**
 - Replaced the 462-line
-  `crypto_rsi_scanner/event_alpha/doctor/legacy/reporting.py`
+  `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/reporting.py`
   `format_artifact_doctor_report()` body with counter field tables plus small
   private section helpers; the public formatter is now a 14-line orchestrator
   and no new helper exceeds the 150-line threshold.
@@ -1270,7 +1273,7 @@ production and legacy file-size gates passed. `build_daily_brief()` was the
 largest daily-brief renderer body and mixed artifact loading, core opportunity
 context, and Markdown section assembly in one function.
 **Changes:**
-- Split `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py`
+- Split `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py`
   into private helpers for row loading/filtering, core context preparation,
   header/opportunity/source sections, run health, hypothesis summaries,
   impact/quality sections, notification digest sections, watchlist/card
@@ -1307,7 +1310,7 @@ validation, or no-send/no-live safety behavior.
 **Changes:**
 - Split the initial artifact loading/filtering and run/snapshot lineage checks
   out of `diagnose_artifacts()` in
-  `crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py`, reducing
+  `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py`, reducing
   that function from `1,335` to `1,048` lines while keeping helper functions
   under the 150-line threshold.
 - Split `_execute_request()` and `_validate_raw_result()` in
@@ -1407,7 +1410,7 @@ or artifact schemas.
   `crypto_rsi_scanner/event_alpha/radar/source_coverage/builder.py` into
   focused status, provider-status, pack, and report assembly helpers.
 - Split `CryptoPanicProvider._fetch_live_events()` in
-  `crypto_rsi_scanner/event_providers/cryptopanic/legacy.py` into reset,
+  `crypto_rsi_scanner/event_providers/cryptopanic/api.py` into reset,
   missing-token, missing-currency, and unique-row append helpers while
   preserving request hygiene and token redaction.
 - Split Bybit announcement no-send rehearsal report assembly in
@@ -1447,7 +1450,7 @@ opportunity-audit wording.
   `crypto_rsi_scanner/event_alpha/notifications/inbox/builder.py`.
 - Split lane and heartbeat preview writing out of
   `write_notification_plan_preview()` in
-  `crypto_rsi_scanner/event_alpha/notifications/legacy/preview_writer.py`.
+  `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/preview_writer.py`.
 - Split provider source/enrichment rows, warnings, and next steps out of
   `build_event_discovery_provider_status()` in
   `crypto_rsi_scanner/event_alpha/notifications/provider_status.py`.
@@ -1549,10 +1552,10 @@ selection, artifact fields, or integrated radar report semantics.
 **Changes:**
 - Split the radar learning snapshot and outcome tracker Markdown sections out
   of `format_integrated_daily_brief()` in
-  `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/report.py`.
+  `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py`.
 - Extracted deterministic research-review skipped-item assembly from
   `select_research_review_candidates_with_diagnostics()` in
-  `crypto_rsi_scanner/event_alpha/notifications/legacy/research_review_selection.py`.
+  `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/research_review_selection.py`.
 - Extracted raw-event validation scanning from
   `validate_hypotheses_with_raw_events()` in
   `crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/generation.py`.
@@ -1612,7 +1615,7 @@ leaving CLI behavior, artifact schemas, provider request contracts, and no-send
 guards unchanged.
 **Changes:**
 - Split `EventIntegratedRadarResult` in
-  `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/models.py` into
+  `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/models.py` into
   private dataclass field groups while preserving the public class name,
   constructor field order, defaults, and frozen behavior.
 - Split `EventWatchlistEntry` in
@@ -1733,7 +1736,7 @@ inventory without changing doctor counters, constructor compatibility, strict/WA
 semantics, or artifact schemas.
 **Changes:**
 - Split `EventAlphaArtifactDoctorResult` in
-  `crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py` into focused
+  `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/result_models.py` into focused
   private dataclass field groups for identity, core/card coverage, structured
   artifacts, integrated radar/outcomes, provider readiness/evidence,
   notifications, quality/incidents, and namespace/schema counters.
@@ -1799,11 +1802,11 @@ Event Alpha research-only safety boundaries.
   and context provider row builders while preserving provider order and row
   fields.
 - Split research-card impact-hypothesis Markdown rendering in
-  `event_alpha/artifacts/research_cards/legacy_parts/outcomes.py` into context,
+  `event_alpha/artifacts/research_cards/components/outcomes.py` into context,
   incident, frame, candidate, market, and verdict helper functions without
   changing section text or order.
 - Split `render_research_card()` in
-  `event_alpha/artifacts/research_cards/legacy_parts/renderer.py` into artifact
+  `event_alpha/artifacts/research_cards/components/renderer.py` into artifact
   context resolution, summary/lineage rendering, evidence sections, and review
   sections while preserving card output semantics.
 - Refreshed refactor size, class ownership, final, completion-map, and release
@@ -1876,7 +1879,7 @@ gates, scoring, and Event Alpha research-only route boundaries.
   functions without changing run-ledger row fields.
 - Moved the large research-card core score component key list into a module
   constant in
-  `crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy_parts/evidence.py`,
+  `crypto_rsi_scanner/event_alpha/artifacts/research_cards/components/evidence.py`,
   reducing `_core_score_components()` while preserving output keys.
 - Reduced `CoinalyzeDerivativesProvider` by moving fixture/live fetch,
   endpoint application, optional endpoint, request, and snapshot-key mapping
@@ -1919,7 +1922,7 @@ guards, and research-only safety boundaries.
 - Moved `_DeliveryWriter` method implementations out of the class body into
   module-level helpers while keeping the compatibility class and method names.
 - Extracted backtest CLI parser and trigger-comparison handling helpers so
-  `backtest_parts/legacy_parts/cli.py::main()` is below the function-size
+  `backtest_parts/implementation/cli.py::main()` is below the function-size
   target, and split the remaining `walk_coin()` append logic into a helper.
 - Moved `NotificationDeliveryRecord.to_row()` serialization into helper
   functions while preserving the public method and row schema.
@@ -2006,8 +2009,8 @@ cores without changing CLI behavior, artifact schemas, provider-readiness
 guards, notification routes, scoring, or research-only safety boundaries.
 **Changes:**
 - Split `event_alpha/radar/impact_hypotheses/legacy.py`,
-  `validation/legacy.py`, `core/legacy_store.py`,
-  `evidence/legacy_acquisition.py`, `discovery/legacy.py`,
+  `validation/legacy.py`, `core/store_api.py`,
+  `evidence/acquisition_api.py`, `discovery/legacy.py`,
   `watchlist/legacy.py`, and `near_miss/legacy.py` into focused model,
   builder/loader/store/executor, serialization, scoring, report, and helper
   modules while keeping the old legacy modules as compatibility binders.
@@ -2053,21 +2056,21 @@ execution/order logic, no Event Alpha RSI writes, and no Event Alpha-created
 
 ## 2026-07-03 — Decompose first legacy implementation cores · Codex
 **Why:** The prior refactor made public wrappers small but still hid large
-implementation bodies in `*_legacy.py` files. This pass needed to make those
+implementation bodies in `*_api.py` files. This pass needed to make those
 legacy cores visible to gates and burn down the highest-impact ones without
 changing CLI behavior, artifact semantics, provider guards, or notification
 routes.
 **Changes:**
-- Added `crypto_rsi_scanner/refactor_legacy_inventory.py` and wired legacy
+- Added `crypto_rsi_scanner/refactor_api_inventory.py` and wired legacy
   counters into size gates, class ownership, final report, and completion-map
   artifacts. Legacy files over 1,500 lines now warn; legacy files over 3,000
   lines block refactor completion.
-- Split `cli/services/scanner_legacy.py`,
-  `event_alpha/doctor/legacy_artifact_doctor.py`, and
-  `event_alpha/notifications/pipeline_legacy.py` into focused legacy package
+- Split `cli/services/scanner_api.py`,
+  `event_alpha/doctor/artifact_doctor_core.py`, and
+  `event_alpha/notifications/pipeline_api.py` into focused legacy package
   modules while preserving old `scanner.*` monkeypatch/import compatibility.
 - Split the first artifact/radar batch for research cards, daily brief, and
-  integrated radar into focused `legacy_parts/` modules.
+  integrated radar into focused `implementation/` modules.
 - Refreshed refactor size/class/final/completion reports and tests. Current
   report state is intentionally `pending_with_blockers` because
   `event_alpha/radar/impact_hypotheses/legacy.py` is still over 3,000 lines.
@@ -2103,7 +2106,7 @@ brain, make the release gates measurable, and prove behavior compatibility with
 the full safe regression stack before provider activation work resumes.
 **Changes:**
 - Moved the historical scanner implementation to
-  `crypto_rsi_scanner/cli/services/scanner_legacy.py` and replaced
+  `crypto_rsi_scanner/cli/services/scanner_api.py` and replaced
   `crypto_rsi_scanner/scanner.py` with a 77-line compatibility facade that
   preserves old imports, `python -m crypto_rsi_scanner.scanner`, and
   monkeypatch-heavy tests.
@@ -2113,7 +2116,7 @@ the full safe regression stack before provider activation work resumes.
   `make refactor-completion-map`, `research/REFACTOR_COMPLETION_MAP.md/json`,
   and refreshed `research/REFACTOR_RELEASE_CANDIDATE_REPORT.md/json` as
   accepted with all 27 verification commands passing.
-- Updated static size gates to treat `cli/services/scanner_legacy.py` as the
+- Updated static size gates to treat `cli/services/scanner_api.py` as the
   moved existing scanner-size violation rather than a new violation, while still
   reporting it as a transitional compatibility core.
 - Updated roadmap, decisions, architecture/module-map docs, and CLI static tests
@@ -2130,8 +2133,8 @@ refactor-final-report PYTHON=python3`; `make event-alpha-shim-report
 PYTHON=python3`; `make event-alpha-namespace-lifecycle-report PYTHON=python3`;
 all requested Event Alpha smoke/preflight/doctor/report targets; and
 `make verify PYTHON=python3`.
-**Notes/risks:** This is behavior-preserving. `scanner_legacy.py` and
-`event_alpha/doctor/legacy_artifact_doctor.py` remain tracked compatibility
+**Notes/risks:** This is behavior-preserving. `scanner_api.py` and
+`event_alpha/doctor/artifact_doctor_core.py` remain tracked compatibility
 cores for future focused burn-down. No live provider calls, Telegram sends,
 trading, paper-trading behavior changes, execution/order logic, Event Alpha RSI
 writes, Event Alpha-created `TRIGGERED_FADE`, or secret exposure were added.
@@ -2167,7 +2170,7 @@ tests/event_alpha tests/test_indicators.py -q` (753 passed);
 `make event-alpha-integrated-radar-doctor PYTHON=python3`;
 `make verify PYTHON=python3`; `git diff --check`.
 **Notes/risks:** This is intentionally behavior-preserving. `backtest_parts/
-legacy.py` and `event_alpha/artifacts/schema/legacy.py` remain compatibility
+legacy.py` and `event_alpha/artifacts/schema/registry.py` remain compatibility
 cores and should be burned down only in smaller fixture-backed passes. No DB
 schema changes, paper behavior changes, live calls, Telegram sends, trading,
 execution, Event Alpha RSI writes, route-gate changes, or Event Alpha-created
@@ -2253,7 +2256,7 @@ and legacy check wiring in one large module. The refactor needed to reduce the
 public package entrypoint without changing doctor output semantics.
 **Changes:**
 - Moved the behavior-compatible implementation to
-  `crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py` and made
+  `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py` and made
   `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py` a 41-line public
   orchestrator/export surface.
 - Added focused doctor modules for context, discovery, execution, aggregation,
@@ -2810,7 +2813,7 @@ backtest, paper/risk, and CLI/Makefile tests still needed focused pytest homes.
 - Moved CLI dispatch smoke coverage into `tests/cli/test_parser.py` and
   Makefile/export/CI/refactor-baseline checks into
   `tests/cli/test_make_targets.py`.
-- Added `tests/rsi/_legacy_helpers.py` for mechanically moved legacy helper
+- Added `tests/rsi/_api_helpers.py` for mechanically moved legacy helper
   globals, kept `tests/test_indicators.py` as the standalone runner, and added
   split runner counts for Event Alpha, RSI, CLI, and remaining umbrella tests.
 - Added `make test-rsi`, `make test-cli`, `make test-pytest`, and a
@@ -2841,7 +2844,7 @@ test command.
   `tests/event_alpha/` modules for integrated radar, notifications, provider
   readiness, artifact doctor, artifact schema, outcomes, source coverage, and
   namespace lifecycle.
-- Added `tests/event_alpha/_legacy_helpers.py` for mechanically moved fixture
+- Added `tests/event_alpha/_api_helpers.py` for mechanically moved fixture
   helpers and `tests/event_alpha/conftest.py` to restore Event Alpha config
   globals between pytest tests.
 - Updated the standalone runner in `tests/test_indicators.py` to load split

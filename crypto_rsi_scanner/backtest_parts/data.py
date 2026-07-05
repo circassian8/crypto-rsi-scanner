@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .api import (
     cg_top_coins,
     cg_top_symbols,
     fetch_klines,

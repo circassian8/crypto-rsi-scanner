@@ -240,7 +240,7 @@ def _is_external_context_incident(incident: event_incident_graph.CanonicalIncide
         "exploit",
     )
     return any(term in lowered for term in external_terms) and not any(term in lowered for term in crypto_terms)
-def _legacy_external_context_text(text: str) -> bool:
+def _api_external_context_text(text: str) -> bool:
     lowered = str(text or "").casefold()
     external_terms = (
         "annexation",
@@ -327,7 +327,7 @@ def _row_with_effective_relevance(row: Mapping[str, Any]) -> dict[str, Any]:
     elif archetype in _EXTERNAL_CATALYST_ARCHETYPES or archetype in _DIRECT_CRYPTO_ARCHETYPES:
         status = RELEVANCE_INCIDENT_CANDIDATE
         reason = "legacy_recognized_research_catalyst_candidate"
-    elif archetype in _EXTERNAL_CONTEXT_ARCHETYPES or _legacy_external_context_text(source_text):
+    elif archetype in _EXTERNAL_CONTEXT_ARCHETYPES or _api_external_context_text(source_text):
         status = RELEVANCE_EXTERNAL_CONTEXT_ONLY
         reason = "legacy_external_context_without_crypto_link"
     else:
@@ -375,15 +375,15 @@ def _downgraded_relevance_for_unqualified_links(row: Mapping[str, Any]) -> tuple
         "primary_subject",
         "affected_ecosystem",
     ))
-    reason = _legacy_unqualified_reason(row)
-    if archetype in _EXTERNAL_CONTEXT_ARCHETYPES or _legacy_external_context_text(source_text):
+    reason = _api_unqualified_reason(row)
+    if archetype in _EXTERNAL_CONTEXT_ARCHETYPES or _api_external_context_text(source_text):
         return RELEVANCE_EXTERNAL_CONTEXT_ONLY, reason or "external_context_without_crypto_link"
     if archetype in _EXTERNAL_CATALYST_ARCHETYPES or archetype in _DIRECT_CRYPTO_ARCHETYPES:
         return RELEVANCE_INCIDENT_CANDIDATE, reason or "recognized_research_catalyst_candidate"
     if bool(row.get("market_reaction_observed") or row.get("market_reaction_confirmed")) or archetype == "market_dislocation_unknown":
         return RELEVANCE_CANONICAL_INCIDENT, "market_dislocation"
     return RELEVANCE_RAW_OBSERVATION, reason or "raw_observation_without_crypto_link"
-def _legacy_unqualified_reason(row: Mapping[str, Any]) -> str | None:
+def _api_unqualified_reason(row: Mapping[str, Any]) -> str | None:
     if int(row.get("quality_blocked_link_count") or 0) > 0:
         return "quality_blocked_link_only"
     if int(row.get("unknown_role_link_count") or 0) > 0:

@@ -1,17 +1,10 @@
 # Event Alpha Deleted Shims
 
-Research artifact only. Deleted shims were old flat compatibility modules with no internal imports at the time of removal. This manifest does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
+Research artifact only. Deleted old imports are allowed to fail; new code must use canonical package paths.
 
-- generated_at: 2026-07-04T19:22:48+00:00
-- deleted_shim_count: 115
+- deleted_shim_count: `124`
 
-## Selection Policy
-
-Wave 1 removed unused non-public shims referenced only by compatibility tests. Wave 2 removed remaining non-public shims after Makefile entrypoints, docs, and compatibility tests moved to canonical package paths. Public compatibility wrappers remain in MODULE_MAP and SHIM_REGISTRY.
-
-## Deleted Shims
-
-| Old path | New path | Removal reason |
+| old path | new path | removal reason |
 |---|---|---|
 | `crypto_rsi_scanner.event_integrated_radar` | `crypto_rsi_scanner.event_alpha.radar.integrated_radar` | Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass. |
 | `crypto_rsi_scanner.event_market_anomaly_scanner` | `crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner` | Non-public active shim with zero internal, Makefile, script, dynamic, and artifact-doc references; only the dedicated legacy compatibility test referenced it before this pass. |
@@ -128,3 +121,12 @@ Wave 1 removed unused non-public shims referenced only by compatibility tests. W
 | `crypto_rsi_scanner.event_alpha_reason_text` | `crypto_rsi_scanner.event_alpha.artifacts.reason_text` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
 | `crypto_rsi_scanner.event_clock` | `crypto_rsi_scanner.event_core.clock` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
 | `crypto_rsi_scanner.event_models` | `crypto_rsi_scanner.event_core.models` | Second deletion wave removed a retained non-public shim after Makefile/docs/tests moved to canonical package paths and dependency reports showed zero internal imports. |
+| `crypto_rsi_scanner.event_alpha_artifacts` | `crypto_rsi_scanner.event_alpha.artifacts.context` | Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths. |
+| `crypto_rsi_scanner.event_artifact_paths` | `crypto_rsi_scanner.event_alpha.artifacts.paths` | Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths. |
+| `crypto_rsi_scanner.event_alpha_run_ledger` | `crypto_rsi_scanner.event_alpha.artifacts.run_ledger` | Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths. |
+| `crypto_rsi_scanner.event_alpha_retention` | `crypto_rsi_scanner.event_alpha.artifacts.retention` | Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths. |
+| `crypto_rsi_scanner.event_alpha_run_lock` | `crypto_rsi_scanner.event_alpha.artifacts.locks` | Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths. |
+| `crypto_rsi_scanner.event_alpha_artifact_doctor` | `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` | Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths. |
+| `crypto_rsi_scanner.event_alpha_profiles` | `crypto_rsi_scanner.event_alpha.config.profiles` | Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths. |
+| `crypto_rsi_scanner.event_alpha_v1_readiness` | `crypto_rsi_scanner.event_alpha.config.v1_readiness` | Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths. |
+| `crypto_rsi_scanner.event_alpha_preflight` | `crypto_rsi_scanner.event_alpha.config.preflight` | Final refactor v3 retired the remaining flat Event Alpha public-compatibility shim after internal imports, Makefile targets, and tests moved to canonical package paths. |

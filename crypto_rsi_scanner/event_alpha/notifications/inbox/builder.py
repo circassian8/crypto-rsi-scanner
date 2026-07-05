@@ -81,7 +81,7 @@ def build_notification_inbox(
     notification_delivery_rows: Iterable[Mapping[str, Any]] = (),
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
     core_opportunity_rows: Iterable[Mapping[str, Any]] = (),
-    include_legacy_conflicts: bool = False,
+    include_api_conflicts: bool = False,
     include_diagnostics: bool = False,
 ) -> EventAlphaNotificationInboxResult:
     """Join notification, alert, card, and feedback artifacts into review queues."""
@@ -116,7 +116,7 @@ def build_notification_inbox(
         items=items,
         canonical_review_items=canonical_review_items,
         source=source,
-        include_legacy_conflicts=include_legacy_conflicts,
+        include_api_conflicts=include_api_conflicts,
     )
     outcomes = _read_jsonl(Path(outcomes_path).expanduser()) if outcomes_path else []
     return EventAlphaNotificationInboxResult(
@@ -196,10 +196,10 @@ def _build_inbox_review_queues(
     items: Iterable[EventAlphaNotificationInboxItem],
     canonical_review_items: tuple[EventAlphaNotificationInboxItem, ...],
     source: _InboxSourceRows,
-    include_legacy_conflicts: bool,
+    include_api_conflicts: bool,
 ) -> _InboxReviewQueues:
     item_rows = tuple(items)
-    countable = lambda item: _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
+    countable = lambda item: _countable_alertable(item, include_api_conflicts=include_api_conflicts)
     quality_gated = tuple(
         item for item in item_rows
         if not item.is_diagnostic

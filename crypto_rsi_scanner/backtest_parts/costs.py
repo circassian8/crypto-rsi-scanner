@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .api import (
     _cap_trades_per_day,
     _cost_adjusted_return,
     _cost_stats,

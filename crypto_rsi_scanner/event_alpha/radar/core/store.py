@@ -73,7 +73,7 @@ def load_core_opportunities(
     limit: int | None = None,
     latest_run: bool = False,
     run_id: str | None = None,
-    include_legacy: bool = True,
+    include_api: bool = True,
 ) -> EventCoreOpportunityStoreReadResult:
     """Load canonical core rows newest-first, tolerating old/bad rows."""
     p = Path(path).expanduser()
@@ -84,7 +84,7 @@ def load_core_opportunities(
     all_rows.sort(key=lambda row: str(row.get("generated_at") or row.get("created_at") or ""), reverse=True)
     latest_id = _latest_run_id(all_rows)
     filtered = list(all_rows)
-    if not include_legacy:
+    if not include_api:
         filtered = [row for row in filtered if str(row.get("schema_version") or "") == EVENT_CORE_OPPORTUNITY_STORE_SCHEMA_VERSION]
     if run_id:
         filtered = [row for row in filtered if str(row.get("run_id") or "") == str(run_id)]
@@ -102,7 +102,7 @@ def load_core_opportunities(
         filters={
             "latest_run": bool(latest_run),
             "run_id": run_id,
-            "include_legacy": bool(include_legacy),
+            "include_api": bool(include_api),
             "limit": limit,
         },
     )
@@ -291,7 +291,7 @@ def load_canonical_core_opportunity_view(
     feedback_path: str | Path | None = None,
     research_cards_dir: str | Path | None = None,
     latest_run: bool = True,
-    include_legacy: bool = True,
+    include_api: bool = True,
 ) -> CanonicalCoreOpportunityView:
     """Load the canonical operator-facing view for one core opportunity.
 
@@ -321,7 +321,7 @@ def load_canonical_core_opportunity_view(
     core_rows = load_core_opportunities(
         core_path,
         latest_run=latest_run,
-        include_legacy=include_legacy,
+        include_api=include_api,
     ).rows if core_path else []
     alert_rows = _load_alert_rows(alert_path)
     acquisition_rows = _load_acquisition_rows(acquisition_path)
@@ -334,28 +334,28 @@ def load_canonical_core_opportunity_view(
                 profile=resolved_profile,
                 artifact_namespace=resolved_namespace,
                 include_test_artifacts=True,
-                include_legacy_artifacts=True,
+                include_api_artifacts=True,
             )
             alert_rows = event_alpha_artifacts.filter_artifact_rows(
                 alert_rows,
                 profile=resolved_profile,
                 artifact_namespace=resolved_namespace,
                 include_test_artifacts=True,
-                include_legacy_artifacts=True,
+                include_api_artifacts=True,
             )
             acquisition_rows = event_alpha_artifacts.filter_artifact_rows(
                 acquisition_rows,
                 profile=resolved_profile,
                 artifact_namespace=resolved_namespace,
                 include_test_artifacts=True,
-                include_legacy_artifacts=True,
+                include_api_artifacts=True,
             )
             incident_rows = event_alpha_artifacts.filter_artifact_rows(
                 incident_rows,
                 profile=resolved_profile,
                 artifact_namespace=resolved_namespace,
                 include_test_artifacts=True,
-                include_legacy_artifacts=True,
+                include_api_artifacts=True,
             )
         except Exception:  # noqa: BLE001 - artifact joins should remain best-effort.
             pass
@@ -382,7 +382,7 @@ def load_core_evidence_acquisition_view(
     core_store_path: str | Path | None = None,
     evidence_acquisition_path: str | Path | None = None,
     latest_run: bool = True,
-    include_legacy: bool = True,
+    include_api: bool = True,
 ) -> CoreEvidenceAcquisitionView:
     """Load the operator-facing source-acquisition state for one core opportunity."""
     view = load_canonical_core_opportunity_view(
@@ -392,7 +392,7 @@ def load_core_evidence_acquisition_view(
         core_store_path=core_store_path,
         evidence_acquisition_path=evidence_acquisition_path,
         latest_run=latest_run,
-        include_legacy=include_legacy,
+        include_api=include_api,
     )
     if not view.found or not view.core_opportunity_id:
         return CoreEvidenceAcquisitionView(core_opportunity_id=str(core_opportunity_id or "").strip())

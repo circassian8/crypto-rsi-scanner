@@ -7,7 +7,7 @@ from ._utils import Messages, ctx_mapping, ctx_value, emit
 
 def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
     strict = bool(ctx_value(ctx, "strict", False))
-    strict_legacy = bool(ctx_value(ctx, "strict_legacy", False))
+    strict_api = bool(ctx_value(ctx, "strict_api", False))
     core_store_available = bool(ctx_value(ctx, "core_store_available", False))
     quality = ctx_mapping(ctx, "quality")
     snapshot_core_conflicts = ctx_mapping(ctx, "snapshot_core_conflicts")
@@ -63,7 +63,7 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
         blockers.append(f"fresh_quality_route_conflict_rows={ctx_value(ctx, 'fresh_route_conflicts')}")
     if ctx_value(ctx, "legacy_route_conflicts", 0):
         message = f"legacy_quality_conflict_rows={ctx_value(ctx, 'legacy_route_conflicts')}"
-        emit(blockers, warnings, message, blocker=strict and strict_legacy)
+        emit(blockers, warnings, message, blocker=strict and strict_api)
     if ctx_value(ctx, "fresh_missing_final_route", 0) and strict:
         blockers.append(f"fresh_alert_rows_missing_final_route={ctx_value(ctx, 'fresh_missing_final_route')}")
 
@@ -81,7 +81,7 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
         emit(blockers, warnings, f"fresh_watchlist_state_conflict_rows={watchlist_conflicts['fresh_uncapped']}", blocker=strict)
     if watchlist_conflicts.get("legacy", 0):
         message = f"legacy_watchlist_conflicts={watchlist_conflicts['legacy']}"
-        emit(blockers, warnings, message, blocker=strict and strict_legacy)
+        emit(blockers, warnings, message, blocker=strict and strict_api)
 
     if incident_linkage.get("hypothesis_rows_missing_incident_id", 0):
         message = f"hypothesis_rows_missing_incident_id={incident_linkage['hypothesis_rows_missing_incident_id']}"

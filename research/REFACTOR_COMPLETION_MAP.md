@@ -2,17 +2,17 @@
 
 Static map of the behavior-preserving Event Alpha refactor. It records package ownership, compatibility cores, size gates, and safety boundaries.
 
-- generated_at: `2026-07-04T22:43:40+00:00`
+- generated_at: `2026-07-05T04:02:50+00:00`
 - status: `accepted`
 - scanner.py lines: `90`
 - scanner command bodies remaining: `0`
 - cli service bind sites: `5`
-- active shims: `9`
+- active shims: `0`
 - active shim logic violations: `0`
 - size gate status: `pass`
 - production size gate status: `warning`
-- production files over 1200 lines: `12`
-- accepted production files over 1200 lines: `12`
+- production files over 1200 lines: `13`
+- accepted production files over 1200 lines: `13`
 - unresolved production files over 1200 lines: `0`
 - production files over 1500 lines: `0`
 - production files over 2000 lines: `0`
@@ -29,8 +29,8 @@ Static map of the behavior-preserving Event Alpha refactor. It records package o
 
 | path | lines | reason |
 |---|---:|---|
-| `crypto_rsi_scanner/cli/services/scanner_legacy.py` | 120 | Moved historical scanner command body; old root scanner is now a facade. |
-| `crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py` | 95 | Preserves strict/WARN artifact doctor semantics while plugin migrations continue. |
+| `crypto_rsi_scanner/cli/services/scanner_api.py` | 120 | Moved historical scanner command body; old root scanner is now a facade. |
+| `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py` | 91 | Preserves strict/WARN artifact doctor semantics while plugin migrations continue. |
 
 ## Known Remaining Blockers
 

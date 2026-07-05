@@ -30,7 +30,7 @@ _EVENT_ALPHA_DISPATCH_ATTRS = (
     "event_alpha_artifact_doctor",
     "event_alpha_artifact_doctor_delivery_scope",
     "event_alpha_artifact_doctor_strict",
-    "event_alpha_artifact_doctor_strict_legacy",
+    "event_alpha_artifact_doctor_strict_api",
     "event_alpha_artifact_namespace",
     "event_alpha_burn_in_checklist",
     "event_alpha_burn_in_days",
@@ -44,7 +44,7 @@ _EVENT_ALPHA_DISPATCH_ATTRS = (
     "event_alpha_derivatives_crowding_path",
     "event_alpha_derivatives_report",
     "event_alpha_doctor_schema_only",
-    "event_alpha_doctor_skip_legacy_checks",
+    "event_alpha_doctor_skip_api_checks",
     "event_alpha_environment_doctor",
     "event_alpha_explain_last_run",
     "event_alpha_export_burn_in_pack",
@@ -56,7 +56,7 @@ _EVENT_ALPHA_DISPATCH_ATTRS = (
     "event_alpha_fill_outcomes",
     "event_alpha_generate_launchd",
     "event_alpha_health_guard",
-    "event_alpha_include_legacy_artifacts",
+    "event_alpha_include_api_artifacts",
     "event_alpha_include_stale_artifacts",
     "event_alpha_include_test_artifacts",
     "event_alpha_integrated_radar_auto",
@@ -200,7 +200,7 @@ _EVENT_ALPHA_DISPATCH_ATTRS = (
     "ignore_provider_backoff",
     "include_diagnostic_incidents",
     "include_external_context_incidents",
-    "include_legacy",
+    "include_api",
     "include_raw_incidents",
     "json",
     "latest_run",
@@ -272,5 +272,5 @@ _PROVIDER_READINESS_COMMANDS = tuple(
     for attr in _PROVIDER_READINESS_ATTRS
 )
 EVENT_ALPHA_COMMANDS = _LOCAL_EVENT_ALPHA_COMMANDS + _PROVIDER_READINESS_COMMANDS
-def _bind_legacy_scanner_globals() -> None:
+def _bind_api_scanner_globals() -> None:
     bind_scanner_globals(globals())

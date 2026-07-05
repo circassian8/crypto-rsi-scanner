@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from tests.rsi import _legacy_helpers as _legacy
+from tests.rsi import _api_helpers as _api
 
-globals().update({name: getattr(_legacy, name) for name in dir(_legacy) if not name.startswith("__")})
+globals().update({name: getattr(_api, name) for name in dir(_api) if not name.startswith("__")})
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
 

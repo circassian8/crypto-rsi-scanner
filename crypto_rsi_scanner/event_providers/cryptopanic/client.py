@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .api import (
     DEFAULT_CRYPTOPANIC_API_BASE_URL,
     GROWTH_WEEKLY_ALLOWED_FILTERS,
     GROWTH_WEEKLY_ALLOWED_KINDS,

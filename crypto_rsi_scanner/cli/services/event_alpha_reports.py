@@ -160,7 +160,7 @@ def event_alpha_daily_brief_report(
     *,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
-    include_legacy_artifacts: bool = False,
+    include_api_artifacts: bool = False,
 ) -> None:
     """Write and print the daily Event Alpha operating brief."""
     _refresh_scanner_globals()
@@ -230,7 +230,7 @@ def event_alpha_daily_brief_report(
         missed_rows=missed_rows,
         notification_runs=event_alpha_notification_runs.load_notification_runs(context.notification_runs_path).rows,
         hypothesis_rows=hypotheses.rows,
-        incident_rows=event_incident_store.load_incidents(context.incident_store_path, limit=100, include_legacy=True).rows,
+        incident_rows=event_incident_store.load_incidents(context.incident_store_path, limit=100, include_api=True).rows,
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         market_anomaly_rows=event_market_anomaly_scanner.load_market_anomaly_rows(context.namespace_dir),
         official_exchange_candidate_rows=event_official_exchange.load_official_listing_candidates(context.namespace_dir),
@@ -248,7 +248,7 @@ def event_alpha_daily_brief_report(
         run_ledger_path=context.run_ledger_path,
         alert_store_path=context.alert_store_path,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
     )
     result = event_alpha_daily_brief.write_daily_brief(
         config.EVENT_ALPHA_DAILY_BRIEF_PATH,

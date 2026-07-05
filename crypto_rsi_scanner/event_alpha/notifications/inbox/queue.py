@@ -176,10 +176,10 @@ def _human_queue_category(category: str) -> str:
 def _countable_alertable(
     item: EventAlphaNotificationInboxItem,
     *,
-    include_legacy_conflicts: bool,
+    include_api_conflicts: bool,
 ) -> bool:
     if item.snapshot_quality_classification in _INBOX_LEGACY_CONFLICT_CLASSIFICATIONS:
-        return bool(include_legacy_conflicts and item.alertable_after_quality_gate)
+        return bool(include_api_conflicts and item.alertable_after_quality_gate)
     return bool(item.alertable_after_quality_gate)
 def _is_high_priority(item: EventAlphaNotificationInboxItem) -> bool:
     return item.tier == "HIGH_PRIORITY_WATCH" or "HIGH_PRIORITY" in item.reason.upper()

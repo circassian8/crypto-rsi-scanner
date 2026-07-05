@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import SCHEMAS
+from .registry import SCHEMAS
 
 CORE_OPPORTUNITY_SCHEMA = SCHEMAS["core_opportunity_v1"]
 SCHEMA_IDS = ("core_opportunity_v1",)

@@ -53,7 +53,7 @@ def _load_incident_rows(path: str | Path | None) -> list[dict[str, Any]]:
             for row in event_incident_store.load_incidents(
                 path,
                 latest_run=False,
-                include_legacy=True,
+                include_api=True,
                 include_diagnostic=True,
                 include_raw=True,
                 include_external_context=True,

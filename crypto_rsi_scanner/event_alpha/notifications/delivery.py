@@ -931,9 +931,9 @@ def _section(title: str, rows: list[dict[str, Any]], limit: int) -> list[str]:
     rows = sorted(rows, key=lambda row: str(row.get("attempted_at") or ""), reverse=True)[: max(0, limit)]
     for row in rows:
         stamp = row.get("delivered_at") or row.get("attempted_at") or "unknown"
-        core_ids = _row_list(row, "core_opportunity_ids") or _split_legacy_csv(row.get("core_opportunity_id"))
-        symbols = _row_list(row, "canonical_symbols") or _split_legacy_csv(row.get("canonical_symbol"))
-        coin_ids = _row_list(row, "canonical_coin_ids") or _split_legacy_csv(row.get("canonical_coin_id"))
+        core_ids = _row_list(row, "core_opportunity_ids") or _split_api_csv(row.get("core_opportunity_id"))
+        symbols = _row_list(row, "canonical_symbols") or _split_api_csv(row.get("canonical_symbol"))
+        coin_ids = _row_list(row, "canonical_coin_ids") or _split_api_csv(row.get("canonical_coin_id"))
         identity = str((core_ids[0] if core_ids else row.get("alert_id")) or "n/a")
         symbol = str((symbols[0] if symbols else (coin_ids[0] if coin_ids else "")) or "").strip()
         if symbol:
@@ -990,7 +990,7 @@ def _row_list(row: Mapping[str, Any], key: str) -> list[str]:
     return []
 
 
-def _split_legacy_csv(value: object) -> list[str]:
+def _split_api_csv(value: object) -> list[str]:
     text = str(value or "").strip()
     if not text:
         return []

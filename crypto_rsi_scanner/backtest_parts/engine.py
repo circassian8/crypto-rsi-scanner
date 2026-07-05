@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .api import (
     HORIZONS,
     PRIMARY,
     build_state_frames,

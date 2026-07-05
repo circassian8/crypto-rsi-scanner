@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import SCHEMAS
+from .registry import SCHEMAS
 
 NOTIFICATION_DELIVERY_SCHEMA = SCHEMAS["notification_delivery_v1"]
 INTEGRATED_NOTIFICATION_DELIVERY_SCHEMA = SCHEMAS["integrated_notification_delivery_v1"]

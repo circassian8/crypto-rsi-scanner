@@ -18,7 +18,7 @@ BASELINE_SCHEMA_VERSION = "refactor_baseline_v1"
 MAJOR_FILES = (
     "crypto_rsi_scanner/scanner.py",
     "tests/test_indicators.py",
-    "crypto_rsi_scanner/event_alpha_artifact_doctor.py",
+    "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py",
 )
 BEHAVIOR_FREEZE_CONTRACT = (
     "CLI flags must remain compatible.",
@@ -41,10 +41,10 @@ REFACTOR_SUCCESS_GATES = (
         "target": "<2000",
     },
     {
-        "gate": "event_alpha_artifact_doctor.py becomes compatibility wrapper below 1500 lines by final phase",
+        "gate": "event_alpha/doctor/artifact_doctor.py remains public orchestrator below 300 lines by final phase",
         "metric": "line_count",
-        "path": "crypto_rsi_scanner/event_alpha_artifact_doctor.py",
-        "target": "<1500",
+        "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py",
+        "target": "<300",
     },
     {
         "gate": "pytest-compatible test package exists",

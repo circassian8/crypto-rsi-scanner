@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import SCHEMAS
+from .registry import SCHEMAS
 
 NAMESPACE_STATUS_SCHEMA = SCHEMAS["namespace_status_v1"]
 SCHEMA_IDS = ("namespace_status_v1",)

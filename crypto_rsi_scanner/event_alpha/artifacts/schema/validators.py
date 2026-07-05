@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .registry import (
     all_schema_fields,
     collect_schema_errors,
     stamp_artifact_payload,

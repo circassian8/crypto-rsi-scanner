@@ -101,7 +101,7 @@ def load_impact_hypotheses(
     latest_run: bool = False,
     run_id: str | None = None,
     since: str | datetime | None = None,
-    include_legacy: bool = True,
+    include_api: bool = True,
 ) -> EventImpactHypothesisStoreReadResult:
     """Load stored hypothesis rows newest-first, tolerating legacy/bad rows."""
     p = Path(path).expanduser()
@@ -112,14 +112,14 @@ def load_impact_hypotheses(
     all_rows.sort(key=lambda row: str(row.get("observed_at") or row.get("created_at") or ""), reverse=True)
     latest_id = _latest_run_id(all_rows)
     latest_count = sum(1 for row in all_rows if _row_run_id(row) == latest_id) if latest_id else 0
-    legacy_count = sum(1 for row in all_rows if _is_legacy_row(row))
+    legacy_count = sum(1 for row in all_rows if _is_api_row(row))
     rows = _filter_rows(
         all_rows,
         latest_run=latest_run,
         latest_run_id=latest_id,
         run_id=run_id,
         since=since,
-        include_legacy=include_legacy,
+        include_api=include_api,
     )
     if limit is not None and limit > 0:
         rows = rows[:limit]
@@ -136,7 +136,7 @@ def load_impact_hypotheses(
             "latest_run": bool(latest_run),
             "run_id": run_id,
             "since": since.isoformat() if isinstance(since, datetime) else since,
-            "include_legacy": bool(include_legacy),
+            "include_api": bool(include_api),
             "limit": limit,
         },
     )
@@ -606,7 +606,7 @@ def _schema_audit_section(rows: list[Mapping[str, Any]]) -> list[str]:
         field: sum(1 for row in rows if field not in row)
         for field in required
     }
-    legacy = [row for row in rows if _is_legacy_row(row)]
+    legacy = [row for row in rows if _is_api_row(row)]
     return [
         "schema_audit: "
         f"versions={_format_counts(versions)} · legacy_rows={len(legacy)} · "
@@ -795,7 +795,7 @@ def _format_filter_summary(filters: Mapping[str, Any]) -> str:
     if not filters:
         return "none"
     parts = []
-    for key in ("latest_run", "run_id", "since", "include_legacy", "limit"):
+    for key in ("latest_run", "run_id", "since", "include_api", "limit"):
         value = filters.get(key)
         if value not in (None, ""):
             parts.append(f"{key}={value}")
@@ -821,7 +821,7 @@ def _filter_rows(
     latest_run_id: str | None,
     run_id: str | None,
     since: str | datetime | None,
-    include_legacy: bool,
+    include_api: bool,
 ) -> list[dict[str, Any]]:
     cutoff = _parse_datetime(since) if since is not None else None
     target_run = str(run_id or "").strip()
@@ -835,13 +835,13 @@ def _filter_rows(
             observed = _parse_datetime(row.get("observed_at") or row.get("created_at"))
             if observed is None or observed < cutoff:
                 continue
-        if not include_legacy and _is_legacy_row(row):
+        if not include_api and _is_api_row(row):
             continue
         out.append(row)
     return out
 
 
-def _is_legacy_row(row: Mapping[str, Any]) -> bool:
+def _is_api_row(row: Mapping[str, Any]) -> bool:
     required = (
         "validation_stage",
         "hypothesis_score",
@@ -860,7 +860,7 @@ def _effective_why_not_promoted(row: Mapping[str, Any]) -> tuple[str, ...]:
         raw = [values]
     else:
         raw = list(values)
-    if _is_legacy_row(row) and "validation_stage" not in row:
+    if _is_api_row(row) and "validation_stage" not in row:
         raw.append("legacy_schema_missing_stage")
     return tuple(dict.fromkeys(str(value) for value in raw if str(value or "").strip()))
 

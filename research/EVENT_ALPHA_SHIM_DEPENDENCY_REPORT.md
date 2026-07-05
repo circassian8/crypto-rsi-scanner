@@ -2,29 +2,29 @@
 
 Research artifact only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: 2026-07-05T03:23:54.336596+00:00
+- generated_at: 2026-07-05T04:18:25.113679+00:00
 - status: OK
-- registry_entry_count: 9
+- registry_entry_count: 0
 - internal_import_reference_count: 0
-- test_import_reference_count: 19
+- test_import_reference_count: 0
 - makefile_reference_count: 0
-- docs_reference_count: 11
+- docs_reference_count: 0
 - dynamic_import_reference_count: 0
 - safe_to_remove_count: 0
-- deleted_shims: 115
+- deleted_shims: 124
 - old_path_internal_imports: 0
 - old_path_test_imports: 0
 - old_path_docs_references: 0
-- old_path_import_allowed_exceptions: 19
+- old_path_import_allowed_exceptions: 0
 - active_shim_modules_with_implementation_logic: 0
 - v3_gate_status: pass
 - v3_auto_accept_ready: True
 - include_runtime_artifacts: False
 - cache_status: hit
-- scan_duration_seconds: 1.2318
-- scanned_source_files: 612
-- scanned_doc_files: 30
-- scanned_test_files: 28
+- scan_duration_seconds: 1.2106
+- scanned_source_files: 604
+- scanned_doc_files: 31
+- scanned_test_files: 29
 - skipped_artifact_files: 1285
 - skipped_large_files: 0
 - skipped_dirs: 62
@@ -43,25 +43,16 @@ Research artifact only. This report does not call providers, send Telegram messa
 | `nonessential_shims_remaining` | 0 |
 | `old_path_internal_imports` | 0 |
 | `old_path_test_imports` | 0 |
-| `public_compatibility_shims` | 9 |
+| `public_compatibility_shims` | 0 |
 | `shim_removal_blockers` | 0 |
-| `deleted_shims` | 115 |
+| `deleted_shims` | 124 |
 | `old_path_docs_references` | 0 |
-| `old_path_import_allowed_exceptions` | 19 |
+| `old_path_import_allowed_exceptions` | 0 |
 
 ## Registry Dependencies
 
 | old module | new module | status | internal | tests | make | docs | dynamic | safe | action |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---|
-| `crypto_rsi_scanner.event_alpha_artifacts` | `crypto_rsi_scanner.event_alpha.artifacts.context` | active_shim | 0 | 2 | 0 | 1 | 0 | false | keep_public_entrypoint |
-| `crypto_rsi_scanner.event_artifact_paths` | `crypto_rsi_scanner.event_alpha.artifacts.paths` | active_shim | 0 | 2 | 0 | 1 | 0 | false | keep_public_entrypoint |
-| `crypto_rsi_scanner.event_alpha_run_ledger` | `crypto_rsi_scanner.event_alpha.artifacts.run_ledger` | active_shim | 0 | 2 | 0 | 1 | 0 | false | keep_public_entrypoint |
-| `crypto_rsi_scanner.event_alpha_retention` | `crypto_rsi_scanner.event_alpha.artifacts.retention` | active_shim | 0 | 2 | 0 | 1 | 0 | false | keep_public_entrypoint |
-| `crypto_rsi_scanner.event_alpha_run_lock` | `crypto_rsi_scanner.event_alpha.artifacts.locks` | active_shim | 0 | 2 | 0 | 1 | 0 | false | keep_public_entrypoint |
-| `crypto_rsi_scanner.event_alpha_artifact_doctor` | `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` | active_shim | 0 | 3 | 0 | 3 | 0 | false | keep_public_entrypoint |
-| `crypto_rsi_scanner.event_alpha_profiles` | `crypto_rsi_scanner.event_alpha.config.profiles` | active_shim | 0 | 2 | 0 | 1 | 0 | false | keep_public_entrypoint |
-| `crypto_rsi_scanner.event_alpha_v1_readiness` | `crypto_rsi_scanner.event_alpha.config.v1_readiness` | active_shim | 0 | 2 | 0 | 1 | 0 | false | keep_public_entrypoint |
-| `crypto_rsi_scanner.event_alpha_preflight` | `crypto_rsi_scanner.event_alpha.config.preflight` | active_shim | 0 | 2 | 0 | 1 | 0 | false | keep_public_entrypoint |
 
 ## Warnings
 

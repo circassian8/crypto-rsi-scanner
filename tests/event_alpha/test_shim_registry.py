@@ -10,18 +10,13 @@ from tempfile import TemporaryDirectory
 from crypto_rsi_scanner.event_alpha import shims
 
 
-def test_known_active_shims_are_minimal_compatibility_modules():
+def test_no_active_flat_event_alpha_shims_remain():
     report = shims.audit_registry()
 
-    assert report["registry_entry_count"] >= 9
-    assert report["shim_status_counts"][shims.STATUS_ACTIVE_SHIM] >= 9
+    assert report["registry_entry_count"] == 0
+    assert report["shim_status_counts"] == {}
     assert report["active_shim_modules_with_implementation_logic"] == 0
     assert not report["active_shim_violations"]
-    assert any(
-        row["old_module"] == "crypto_rsi_scanner.event_alpha_artifact_doctor"
-        and row["shim_status"] == shims.STATUS_ACTIVE_SHIM
-        for row in report["entries"]
-    )
 
 
 def test_partial_shim_with_implementation_logic_is_not_active_shim_violation():
@@ -85,23 +80,24 @@ def test_shim_dependency_report_writer_outputs_references_and_candidates():
         assert (Path(tmp) / shims.FINAL_SHIM_STATUS_JSON).exists()
         assert (Path(tmp) / shims.FINAL_SHIM_STATUS_MD).exists()
         assert report["schema_version"] == shims.SHIM_DEPENDENCY_SCHEMA_VERSION
-        assert report["registry_entry_count"] >= 9
+        assert report["registry_entry_count"] == 0
         assert report["deleted_shims"] >= 1
         assert "internal_import_reference_count" in report
         assert "safe_to_remove_count" in report
         assert report["v3_gate_status"] == "pass"
         assert report["v3_auto_accept_ready"] is True
         assert report["v3_gates"]["nonessential_shims_remaining"] == 0
-        assert report["v3_gates"]["public_compatibility_shims"] >= 1
+        assert report["v3_gates"]["public_compatibility_shims"] == 0
         assert report["v3_gates"]["deleted_shims"] == report["deleted_shims"]
         assert report["old_path_internal_imports"] == 0
         assert report["old_path_test_imports"] == 0
         assert report["old_path_docs_references"] == 0
-        assert report["old_path_import_allowed_exceptions"] >= 1
+        assert report["old_path_import_allowed_exceptions"] == 0
+        assert report["v3_gates"]["old_path_import_allowed_exceptions"] == 0
+        assert report["v3_gates"]["deleted_shims"] == report["deleted_shims"]
         assert report["v3_gates"]["old_path_internal_imports"] == report["old_path_internal_imports"]
         assert report["v3_gates"]["old_path_test_imports"] == report["old_path_test_imports"]
         assert report["v3_gates"]["shim_removal_blockers"] == 0
-        assert report["v3_gates"]["old_path_import_allowed_exceptions"] == report["old_path_import_allowed_exceptions"]
         assert "removal_candidates" in report
         assert dep_json.exists()
         assert dep_md.exists()
@@ -121,19 +117,13 @@ def test_public_compatibility_entrypoint_artifact_documents_retained_shims():
 
     artifact = json.loads(Path("research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json").read_text(encoding="utf-8"))
     markdown = Path("research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md").read_text(encoding="utf-8")
-    retained = {old for old, _new in __import__(
-        "tests.event_alpha.test_legacy_import_compatibility",
-        fromlist=["RETAINED_OLD_SHIM_MODULES"],
-    ).RETAINED_OLD_SHIM_MODULES}
-    rows = {row["path"]: row for row in artifact["entrypoints"]}
 
-    assert artifact["retained_public_shims_count"] == len(retained) == 9
+    assert artifact["retained_public_shims_count"] == 0
+    assert artifact["entrypoints"] == []
     assert artifact["old_import_tombstone_policy"]["deleted_old_imports_allowed_to_fail"] is True
-    assert artifact["old_import_tombstone_policy"]["compatibility_tests_cover_retained_public_entrypoints_only"] is True
-    assert set(rows) == retained
-    assert all(row["expected_lifetime"] for row in rows.values())
-    assert all(row["owner_note"] for row in rows.values())
+    assert artifact["old_import_tombstone_policy"]["no_retained_public_entrypoints"] is True
     assert "Deleted old imports are allowed to fail" in markdown
+    assert "No flat Event Alpha public compatibility entrypoints remain" in markdown
 
 
 def test_old_import_check_report_allows_only_compatibility_boundaries():
@@ -147,10 +137,11 @@ def test_old_import_check_report_allows_only_compatibility_boundaries():
         assert report["old_path_internal_imports"] == 0
         assert report["old_path_test_imports"] == 0
         assert report["old_path_docs_references"] == 0
-        assert report["old_path_import_allowed_exceptions"] >= 1
+        assert report["old_path_import_allowed_exceptions"] == 0
         assert report["deleted_shim_entry_count"] >= 1
-        assert report["deleted_path_import_failure_checks"] >= 1
+        assert report["deleted_path_import_failure_checks"] == 0
         assert report["legacy_import_compatibility_test"] == shims.LEGACY_IMPORT_COMPATIBILITY_TEST
+        assert report["legacy_import_compatibility_test"] == "tests/event_alpha/test_no_old_event_alpha_imports.py"
         assert json_path.exists()
         assert md_path.exists()
         text = md_path.read_text(encoding="utf-8")
@@ -408,7 +399,7 @@ def test_artifact_doctor_warns_when_internal_code_imports_old_shim():
 
 def test_artifact_doctor_warns_when_deleted_shim_path_is_reintroduced(tmp_path):
     import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
-    from crypto_rsi_scanner.event_alpha.doctor.legacy import context_loading
+    from crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_parts import context_loading
 
     old_module = "crypto_rsi_scanner.event_deleted_fixture"
     path = tmp_path / "crypto_rsi_scanner" / "event_deleted_fixture.py"
@@ -444,20 +435,12 @@ def test_remaining_event_module_classification_documents_fade_boundary():
     rows = {row["module_name"]: row for row in report["modules"]}
 
     assert report["not_every_event_module_belongs_under_event_alpha"] is True
-    assert report["recommended_status_counts"]["active_shim"] == 9
+    assert report["recommended_status_counts"]["active_shim"] == 0
     assert report["recommended_status_counts"]["intentionally_outside_event_alpha"] == 1
     assert report["recommended_status_counts"]["not_migrated"] == 0
+    assert set(rows) == {"crypto_rsi_scanner.event_fade"}
     assert rows["crypto_rsi_scanner.event_fade"]["recommended_status"] == "intentionally_outside_event_alpha"
     assert rows["crypto_rsi_scanner.event_fade"]["must_remain_outside_event_alpha_for_safety"] is True
-    assert rows["crypto_rsi_scanner.event_alpha_artifacts"]["recommended_status"] == "active_shim"
-    assert rows["crypto_rsi_scanner.event_artifact_paths"]["recommended_status"] == "active_shim"
-    assert rows["crypto_rsi_scanner.event_alpha_run_ledger"]["recommended_status"] == "active_shim"
-    assert rows["crypto_rsi_scanner.event_alpha_retention"]["recommended_status"] == "active_shim"
-    assert rows["crypto_rsi_scanner.event_alpha_run_lock"]["recommended_status"] == "active_shim"
-    assert rows["crypto_rsi_scanner.event_alpha_artifact_doctor"]["recommended_status"] == "active_shim"
-    assert rows["crypto_rsi_scanner.event_alpha_profiles"]["recommended_status"] == "active_shim"
-    assert rows["crypto_rsi_scanner.event_alpha_v1_readiness"]["recommended_status"] == "active_shim"
-    assert rows["crypto_rsi_scanner.event_alpha_preflight"]["recommended_status"] == "active_shim"
     text = markdown_path.read_text(encoding="utf-8")
     assert "Event Alpha may produce `FADE_SHORT_REVIEW` research artifacts" in text
     assert "must not create `TRIGGERED_FADE`" in text

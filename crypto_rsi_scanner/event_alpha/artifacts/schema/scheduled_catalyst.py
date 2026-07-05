@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import SCHEMAS
+from .registry import SCHEMAS
 
 SCHEDULED_CATALYST_EVENT_SCHEMA = SCHEMAS["scheduled_catalyst_event_v1"]
 UNLOCK_EVENT_SCHEMA = SCHEMAS["unlock_event_v1"]

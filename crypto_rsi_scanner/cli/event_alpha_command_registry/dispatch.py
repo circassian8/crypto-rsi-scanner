@@ -63,7 +63,7 @@ def _dispatch_event_alpha_command_section_1(args) -> bool:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
-            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+            include_api_artifacts=getattr(args, "event_alpha_include_api_artifacts", False),
         )
         return True
     if args.event_alpha_environment_doctor:
@@ -131,7 +131,7 @@ def _dispatch_event_alpha_command_section_1(args) -> bool:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
-            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+            include_api_artifacts=args.event_alpha_include_api_artifacts,
         )
         return True
     if args.event_alpha_telegram_final_check:
@@ -140,7 +140,7 @@ def _dispatch_event_alpha_command_section_1(args) -> bool:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
-            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+            include_api_artifacts=args.event_alpha_include_api_artifacts,
         )
         return True
     if args.event_alpha_send_test:
@@ -256,7 +256,7 @@ def _dispatch_event_alpha_command_section_2(args) -> bool:
             latest_run=latest_hypothesis_run,
             run_id=args.run_id,
             since=args.since,
-            include_legacy=args.include_legacy or args.all_history,
+            include_api=args.include_api or args.all_history,
         )
         return True
     if args.event_impact_hypotheses_inbox:
@@ -278,7 +278,7 @@ def _dispatch_event_alpha_command_section_2(args) -> bool:
             artifact_namespace=args.event_alpha_artifact_namespace or None,
             latest_run=latest_incident_run,
             run_id=args.run_id,
-            include_legacy=args.include_legacy or args.all_history,
+            include_api=args.include_api or args.all_history,
             include_diagnostic=args.include_diagnostic_incidents,
             include_raw=args.include_raw_incidents,
             include_external_context=args.include_external_context_incidents,
@@ -352,7 +352,7 @@ def _dispatch_event_alpha_command_section_3(args) -> bool:
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
-            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+            include_api_artifacts=args.event_alpha_include_api_artifacts,
         )
         return True
     if args.event_alpha_policy_simulate:
@@ -409,7 +409,7 @@ def _dispatch_event_alpha_command_section_3(args) -> bool:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
-            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+            include_api_artifacts=args.event_alpha_include_api_artifacts,
         )
         return True
     if args.event_alpha_burn_in_checklist:
@@ -419,7 +419,7 @@ def _dispatch_event_alpha_command_section_3(args) -> bool:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
-            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+            include_api_artifacts=args.event_alpha_include_api_artifacts,
         )
         return True
     if args.event_alpha_burn_in_readiness:
@@ -436,7 +436,7 @@ def _dispatch_event_alpha_command_section_3(args) -> bool:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
-            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+            include_api_artifacts=args.event_alpha_include_api_artifacts,
         )
         return True
     return False
@@ -448,7 +448,7 @@ def _dispatch_event_alpha_command_section_4(args) -> bool:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
-            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+            include_api_artifacts=args.event_alpha_include_api_artifacts,
         )
         return True
     if args.event_alpha_artifact_doctor:
@@ -457,13 +457,13 @@ def _dispatch_event_alpha_command_section_4(args) -> bool:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
-            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+            include_api_artifacts=args.event_alpha_include_api_artifacts,
             strict=args.event_alpha_artifact_doctor_strict,
-            strict_legacy=args.event_alpha_artifact_doctor_strict_legacy,
+            strict_api=getattr(args, "event_alpha_artifact_doctor_strict_api", False),
             delivery_strict_scope=args.event_alpha_artifact_doctor_delivery_scope,
             include_stale_artifacts=args.event_alpha_include_stale_artifacts,
             schema_only=args.event_alpha_doctor_schema_only,
-            skip_legacy_checks=args.event_alpha_doctor_skip_legacy_checks,
+            skip_api_checks=getattr(args, "event_alpha_doctor_skip_api_checks", False),
         )
         return True
     if args.event_alpha_tuning_worksheet:
@@ -482,7 +482,7 @@ def _dispatch_event_alpha_command_section_4(args) -> bool:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
-            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+            include_api_artifacts=args.event_alpha_include_api_artifacts,
         )
         return True
     if args.event_alpha_calibration_export_priors is not None:
@@ -512,7 +512,7 @@ def _dispatch_event_alpha_command_section_4(args) -> bool:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
-            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+            include_api_artifacts=args.event_alpha_include_api_artifacts,
         )
         return True
     if args.event_alpha_daily_brief:
@@ -521,7 +521,7 @@ def _dispatch_event_alpha_command_section_4(args) -> bool:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
-            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+            include_api_artifacts=args.event_alpha_include_api_artifacts,
         )
         return True
     if args.event_alpha_integrated_radar_cycle:
@@ -842,7 +842,7 @@ def _dispatch_event_alpha_command_section_6(args) -> bool:
 
 def dispatch_event_alpha_command(args) -> bool:
     """Dispatch one Event Alpha command using the preserved branch order."""
-    _bind_legacy_scanner_globals()
+    _bind_api_scanner_globals()
     if _dispatch_event_alpha_command_section_1(args):
         return True
     if _dispatch_event_alpha_command_section_2(args):

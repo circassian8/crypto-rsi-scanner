@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from ..provider_health_legacy import HealthCheckedEventProvider
+from ..provider_health_core import HealthCheckedEventProvider
 
 __all__ = ("HealthCheckedEventProvider",)
-

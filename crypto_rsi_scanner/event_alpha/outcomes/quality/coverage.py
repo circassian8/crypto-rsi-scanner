@@ -61,7 +61,7 @@ def build_latest_run_quality_coverage(
     watchlist_rows: Iterable[Mapping[str, Any]] = (),
     alert_rows: Iterable[Mapping[str, Any]] = (),
     reference_quality_rows: Iterable[Mapping[str, Any]] = (),
-    include_legacy: bool = False,
+    include_api: bool = False,
 ) -> EventAlphaQualityCoverageResult:
     """Build a top-level quality-field coverage report for the newest run only."""
     runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
@@ -102,15 +102,15 @@ def build_latest_run_quality_coverage(
 
     hypotheses = [
         dict(row) for row in raw_hypotheses
-        if _row_in_latest_run(row, run_id=run_id, include_legacy=include_legacy)
+        if _row_in_latest_run(row, run_id=run_id, include_api=include_api)
     ]
     alerts = [
         dict(row) for row in raw_alerts
-        if _row_in_latest_run(row, run_id=run_id, include_legacy=include_legacy)
+        if _row_in_latest_run(row, run_id=run_id, include_api=include_api)
     ]
     watchlist = [
         dict(row) for row in raw_watchlist
-        if _watchlist_row_in_run_window(row, started=started, finished=finished, include_legacy=include_legacy)
+        if _watchlist_row_in_run_window(row, started=started, finished=finished, include_api=include_api)
     ]
     buckets = (
         _bucket("hypothesis", hypotheses),
@@ -198,9 +198,9 @@ def _bucket(row_type: str, rows: Iterable[Mapping[str, Any]]) -> EventAlphaQuali
         complete=len(data) - len(missing_rows),
         missing_rows=tuple(missing_rows),
     )
-def _row_in_latest_run(row: Mapping[str, Any], *, run_id: str, include_legacy: bool) -> bool:
+def _row_in_latest_run(row: Mapping[str, Any], *, run_id: str, include_api: bool) -> bool:
     data = dict(row)
-    if not include_legacy and event_alpha_artifacts.is_legacy_row(data):
+    if not include_api and event_alpha_artifacts.is_api_row(data):
         return False
     if not run_id:
         return False
@@ -210,7 +210,7 @@ def _watchlist_row_in_run_window(
     *,
     started: datetime | None,
     finished: datetime | None,
-    include_legacy: bool,
+    include_api: bool,
 ) -> bool:
     data = dict(row)
     if started is None:

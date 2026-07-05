@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import SCHEMAS
+from .registry import SCHEMAS
 
 OFFICIAL_EXCHANGE_EVENT_SCHEMA = SCHEMAS["official_exchange_event_v1"]
 SCHEMA_IDS = ("official_exchange_event_v1",)

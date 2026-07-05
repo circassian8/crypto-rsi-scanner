@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from .pipeline_legacy import _DeliveryWriter
+from .pipeline_core import _DeliveryWriter
 
 __all__ = ("_DeliveryWriter",)

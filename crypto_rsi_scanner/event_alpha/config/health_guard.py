@@ -41,7 +41,7 @@ def evaluate_health_guard(
     now: datetime | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
-    include_legacy_artifacts: bool = False,
+    include_api_artifacts: bool = False,
 ) -> EventAlphaHealthGuardResult:
     """Classify the latest Event Alpha operating state as healthy/degraded/stale/blocked."""
     guard = cfg or EventAlphaHealthGuardConfig()
@@ -52,7 +52,7 @@ def evaluate_health_guard(
             profile=guard.require_profile,
             artifact_namespace=artifact_namespace,
             include_test_artifacts=include_test_artifacts,
-            include_legacy_artifacts=include_legacy_artifacts,
+            include_api_artifacts=include_api_artifacts,
         ),
         key=lambda row: str(row.get("started_at") or row.get("finished_at") or ""),
         reverse=True,
@@ -62,7 +62,7 @@ def evaluate_health_guard(
         profile=guard.require_profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
     )
     reason_codes: list[str] = []
     warnings: list[str] = []

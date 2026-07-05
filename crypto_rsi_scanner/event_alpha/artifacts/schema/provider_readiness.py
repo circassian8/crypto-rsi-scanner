@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import SCHEMAS
+from .registry import SCHEMAS
 
 PROVIDER_READINESS_SCHEMA = SCHEMAS["provider_readiness_v1"]
 PROVIDER_PREFLIGHT_SCHEMA = SCHEMAS["provider_preflight_v1"]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import legacy_artifact_doctor as _legacy
+from . import artifact_doctor_core as _api
 from .aggregation import aggregate_doctor_results
 from .context import DoctorContext, build_doctor_context
 from .discovery import discover_namespace_artifacts, load_artifact_indexes
@@ -61,5 +61,5 @@ def diagnose_artifacts(*args: Any, **kwargs: Any) -> Any:
     context = run_source_coverage_checks(context)
     context = run_provider_readiness_checks(context)
     context = run_outcome_checks(context)
-    result = _legacy.diagnose_artifacts(*context.args, **context.kwargs)
+    result = _api.diagnose_artifacts(*context.args, **context.kwargs)
     return aggregate_doctor_results(result)

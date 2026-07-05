@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import Clock, UrlOpen, _batches, _bool_param, _safe_error, _urlopen_with_timeout
+from .core import Clock, UrlOpen, _batches, _bool_param, _safe_error, _urlopen_with_timeout
 
 __all__ = ("Clock", "UrlOpen", "_batches", "_bool_param", "_safe_error", "_urlopen_with_timeout")
 

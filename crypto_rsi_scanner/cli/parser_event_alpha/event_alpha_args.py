@@ -550,6 +550,7 @@ def _add_event_alpha_args_section_4(parser: argparse.ArgumentParser, event_alpha
     )
     parser.add_argument(
         "--event-alpha-doctor-skip-legacy-checks",
+        dest="event_alpha_doctor_skip_api_checks",
         action="store_true",
         help="Development-only: skip legacy imperative artifact-doctor checks after schema phases.",
     )
@@ -906,6 +907,7 @@ def _add_event_alpha_args_section_7(parser: argparse.ArgumentParser, event_alpha
     )
     parser.add_argument(
         "--event-alpha-include-legacy-artifacts",
+        dest="event_alpha_include_api_artifacts",
         action="store_true",
         help="Include legacy/default Event Alpha artifact rows in artifact reports for migration review.",
     )
@@ -921,6 +923,7 @@ def _add_event_alpha_args_section_7(parser: argparse.ArgumentParser, event_alpha
     )
     parser.add_argument(
         "--event-alpha-artifact-doctor-strict-legacy",
+        dest="event_alpha_artifact_doctor_strict_api",
         action="store_true",
         help="With strict artifact doctor, also escalate legacy quality-route conflicts to blockers.",
     )

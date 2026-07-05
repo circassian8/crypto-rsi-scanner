@@ -225,11 +225,11 @@ def test_final_no_send_check_blocks_when_send_guard_disabled(tmp_path):
     assert "Research-only check: no Telegram sends" in text
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
-from tests.event_alpha import _legacy_helpers as _event_alpha_legacy_helpers
+from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
 
 globals().update({
     name: value
-    for name, value in vars(_event_alpha_legacy_helpers).items()
+    for name, value in vars(_event_alpha_api_helpers).items()
     if not name.startswith("__")
 })
 
@@ -3352,7 +3352,7 @@ def test_event_alpha_notification_go_no_go_uses_send_readiness_for_final_recomme
                     {
                         "run_id": "old-run",
                         "lane": "daily_digest",
-                        "identity_reconciliation_reason": "source_alert_identity_legacy",
+                        "identity_reconciliation_reason": "source_alert_identity_api",
                     },
                     row,
                 ],
@@ -3380,7 +3380,7 @@ def test_event_alpha_notification_go_no_go_uses_send_readiness_for_final_recomme
                 {
                     "run_id": "old-run",
                     "lane": "daily_digest",
-                    "identity_reconciliation_reason": "source_alert_identity_legacy",
+                    "identity_reconciliation_reason": "source_alert_identity_api",
                 },
                 row,
             ],
@@ -3444,7 +3444,7 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
     from tempfile import TemporaryDirectory
     from pathlib import Path
 
-    root = _event_alpha_legacy_helpers.REPO_ROOT
+    root = _event_alpha_api_helpers.REPO_ROOT
     makefile = (root / "Makefile").read_text(encoding="utf-8")
     assert "Fast deterministic fixture final check with compact output" in makefile
     assert "Full real-profile no-send rehearsal" in makefile
@@ -4593,7 +4593,7 @@ def test_notification_digest_labels_fade_short_review_lane():
     assert "Research-only. Not a trade signal." in message
 
 
-def test_event_alpha_notification_delivery_status_fallback_and_legacy_preview_wording():
+def test_event_alpha_notification_delivery_status_fallback_and_api_preview_wording():
     import json
 
     import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
@@ -4672,8 +4672,8 @@ def test_event_alpha_notification_delivery_status_fallback_and_legacy_preview_wo
             include_test_artifacts=True,
             strict=True,
         )
-    assert result.notification_preview_legacy_alerts_wording == 1
-    assert any("notification_preview_legacy_alerts_wording=1" in item for item in result.blockers)
+    assert result.notification_preview_api_alerts_wording == 1
+    assert any("notification_preview_api_alerts_wording=1" in item for item in result.blockers)
 
 
 def test_event_alpha_heartbeat_uses_strict_alert_and_research_candidate_copy():

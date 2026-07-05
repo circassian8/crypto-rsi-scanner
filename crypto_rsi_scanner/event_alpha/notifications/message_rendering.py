@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .pipeline_legacy import (
+from .pipeline_core import (
     format_core_opportunity_telegram_digest,
     format_exploratory_telegram_digest,
     format_preview,

@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from .legacy import EventIntegratedRadarResult
+from .pipeline_parts import EventIntegratedRadarResult
 
 __all__ = ("EventIntegratedRadarResult",)

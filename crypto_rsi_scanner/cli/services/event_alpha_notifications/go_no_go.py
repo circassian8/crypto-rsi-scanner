@@ -13,7 +13,7 @@ def event_alpha_notify_go_no_go(
     profile_name: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
-    include_legacy_artifacts: bool = False,
+    include_api_artifacts: bool = False,
 ) -> None:
     """Print a concise day-1 notification go/no-go decision."""
     _refresh_scanner_globals()
@@ -51,7 +51,7 @@ def event_alpha_notify_go_no_go(
     core_rows = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
         latest_run=True,
-        include_legacy=True,
+        include_api=True,
     ).rows
     card_paths = [str(path) for path in _research_card_markdown_paths(context.research_cards_dir, include_index=True)]
     doctor = event_alpha_artifact_doctor.diagnose_artifacts(
@@ -73,7 +73,7 @@ def event_alpha_notify_go_no_go(
         profile=profile_name,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
         inspected_alert_store_path=context.alert_store_path,
         strict=True,
         delivery_strict_scope="latest_run",
@@ -89,7 +89,7 @@ def event_alpha_notify_go_no_go(
         send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
         telegram_ready=bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS),
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
     )
     latest_delivery_rows = [
         row for row in event_alpha_notification_delivery.latest_rows_by_delivery(delivery_rows)

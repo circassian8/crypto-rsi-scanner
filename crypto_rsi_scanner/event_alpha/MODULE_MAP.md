@@ -1,7 +1,7 @@
 # Event Alpha Module Map
 
-This map records the intended package home for retained top-level compatibility
-modules. Non-public shims removed in refactor v3 deletion passes are recorded in
+This map records retained top-level compatibility modules. Event Alpha flat
+shims removed in refactor v3 deletion passes are recorded in
 `research/EVENT_ALPHA_DELETED_SHIMS.md/json` instead of this active map.
 
 ## Shim Registry
@@ -26,37 +26,26 @@ Statuses:
 
 Current phase:
 
-- Mapped modules are retained compatibility shims. They are `active_shim` unless
-  a future row is explicitly marked as a temporary migration bridge in
-  `crypto_rsi_scanner.event_alpha.shims`.
-- The first v3 deletion pass removed non-public shims that had no internal,
-  Makefile, script, dynamic, or artifact-documentation references and were only
-  exercised by the dedicated legacy import compatibility test.
-- The second v3 deletion pass removed the remaining non-public shims after
-  Makefile entrypoints and compatibility tests were moved to canonical package
-  paths. This active map now lists only retained public compatibility wrappers.
-- Retained wrappers are public compatibility entrypoints documented in
-  `research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json` with path,
-  reason, expected lifetime, and owner note.
+- Refactor v3 finalization has no retained flat Event Alpha compatibility
+  shims in this active registry.
 - Deleted old imports are tombstoned: deleted import paths are allowed to fail,
-  docs should show the canonical package path, and compatibility tests cover
-  only retained public entrypoints. Artifact doctor warns if a deleted shim file
-  is reintroduced.
-- `crypto_rsi_scanner.event_alpha_artifact_doctor` is now an active
-  compatibility shim; the implementation lives in
-  `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor`.
+  docs should show canonical package paths, and tests verify that deleted old
+  paths stay deleted.
+- `scanner.py` remains the public CLI entrypoint wrapper, outside this Event
+  Alpha shim registry.
+- `event_fade.py` remains intentionally outside Event Alpha and must not be
+  moved into the Event Alpha package.
 - `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` is the small public
-  orchestrator/export surface. Behavior-compatible legacy internals are
-  preserved in `crypto_rsi_scanner.event_alpha.doctor.legacy_artifact_doctor`
+  orchestrator/export surface. Behavior-compatible internals are
+  preserved in `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_core`
   until individual checks are migrated into focused doctor plugins.
 - Large internal Event Alpha modules now follow the same wrapper/core pattern:
   public wrappers remain at `notifications.pipeline`,
   `artifacts.research_cards`, `artifacts.daily_brief`,
   `radar.integrated_radar`, `radar.impact_hypotheses`,
-  `radar.core_opportunity_store`, and `radar.evidence_acquisition`; behavior
-  cores are preserved as `pipeline_legacy`, `research_cards.legacy`,
-  `daily_brief.legacy`, `integrated.legacy`, `impact_hypotheses.legacy`,
-  `core.legacy_store`, and `evidence.legacy_acquisition`.
+  `radar.core_opportunity_store`, and `radar.evidence_acquisition`; their
+  behavior-compatible cores live under package-local `*_core`, `api`, or
+  focused implementation modules.
 - Medium radar and provider adapters now use package homes with compatibility
   cores: `radar.validation`, `radar.discovery`, `radar.watchlist`,
   `radar.near_miss`, `event_providers.cryptopanic`,
@@ -71,23 +60,15 @@ Current phase:
   facade over `backtest_parts/`, and `event_alpha/artifacts/schema_v1.py` owns
   compatibility exports over `event_alpha/artifacts/schema/`.
 - CLI refactor facades follow the same rule: `scanner.py` is a root
-  compatibility facade, `cli/services/scanner_legacy.py` is the measured
+  compatibility facade, `cli/services/scanner_api.py` is the measured
   transitional core for historical scanner command bodies, and new command
   logic belongs in focused `cli/services/` or `cli/commands_*.py` modules.
 
 Run `make event-alpha-shim-report PYTHON=python3` to write
 `event_alpha_shim_report.json` and `event_alpha_shim_report.md` under the
-`shim_report` Event Alpha artifact namespace. Artifact doctor warns if an
-`active_shim` module contains implementation logic.
+`shim_report` Event Alpha artifact namespace. With no active flat shims, the
+registry should report zero active entries.
 
 | Compatibility module | Implementation package path | Layer |
 |---|---|---|
-| `crypto_rsi_scanner.event_alpha_artifacts` | `crypto_rsi_scanner.event_alpha.artifacts.context` | artifacts |
-| `crypto_rsi_scanner.event_artifact_paths` | `crypto_rsi_scanner.event_alpha.artifacts.paths` | artifacts |
-| `crypto_rsi_scanner.event_alpha_run_ledger` | `crypto_rsi_scanner.event_alpha.artifacts.run_ledger` | artifacts |
-| `crypto_rsi_scanner.event_alpha_retention` | `crypto_rsi_scanner.event_alpha.artifacts.retention` | artifacts |
-| `crypto_rsi_scanner.event_alpha_run_lock` | `crypto_rsi_scanner.event_alpha.artifacts.locks` | artifacts |
-| `crypto_rsi_scanner.event_alpha_artifact_doctor` | `crypto_rsi_scanner.event_alpha.doctor.artifact_doctor` | doctor |
-| `crypto_rsi_scanner.event_alpha_profiles` | `crypto_rsi_scanner.event_alpha.config.profiles` | config |
-| `crypto_rsi_scanner.event_alpha_v1_readiness` | `crypto_rsi_scanner.event_alpha.config.v1_readiness` | config |
-| `crypto_rsi_scanner.event_alpha_preflight` | `crypto_rsi_scanner.event_alpha.config.preflight` | config |
+| none | none | none |

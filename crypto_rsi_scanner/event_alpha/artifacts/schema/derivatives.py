@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import SCHEMAS
+from .registry import SCHEMAS
 
 COINALYZE_REQUEST_LEDGER_SCHEMA = SCHEMAS["coinalyze_request_ledger_v1"]
 DERIVATIVES_STATE_SNAPSHOT_SCHEMA = SCHEMAS["derivatives_state_snapshot_v1"]

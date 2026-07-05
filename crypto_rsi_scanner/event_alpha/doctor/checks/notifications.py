@@ -99,7 +99,7 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
         "notification_preview_missing_send_guard_status",
         "notification_preview_send_guard_status_missing",
         "notification_preview_no_send_status_unclear",
-        "notification_preview_legacy_alerts_wording",
+        "notification_preview_api_alerts_wording",
     ):
         count = preview_conflicts.get(key, 0)
         if count:

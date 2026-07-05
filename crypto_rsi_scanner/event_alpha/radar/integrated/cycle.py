@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import legacy as _legacy
+from . import api as _api
 
 
 def run_integrated_radar_cycle(*args: Any, **kwargs: Any) -> Any:
-    return _legacy.run_integrated_radar_cycle(*args, **kwargs)
+    return _api.run_integrated_radar_cycle(*args, **kwargs)
 
 
 __all__ = ("run_integrated_radar_cycle",)

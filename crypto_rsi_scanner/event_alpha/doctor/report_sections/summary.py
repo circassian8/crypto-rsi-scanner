@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from .. import legacy_artifact_doctor as _legacy
+from .. import artifact_doctor_core as _api
 
 
 def render_section(result: object) -> list[str]:
-    return _legacy.format_artifact_doctor_report(result).splitlines()
+    return _api.format_artifact_doctor_report(result).splitlines()
 
 
 def format_artifact_doctor_report(result: object) -> str:

@@ -463,7 +463,7 @@ def _has_stale_pre_canonical_delivery_rows(
             continue
         reason = str(row.get("identity_reconciliation_reason") or "").strip().casefold()
         legacy = str(row.get("legacy") or "").strip().casefold() in {"1", "true", "yes"}
-        pre_canonical_reason = reason in {"legacy", "legacy_delivery", "external", "source_alert_identity_legacy"}
+        pre_canonical_reason = reason in {"legacy", "legacy_delivery", "external", "source_alert_identity_api"}
         missing_identity = not str(row.get("core_opportunity_id") or "").strip() or not str(
             row.get("feedback_target") or ""
         ).strip()

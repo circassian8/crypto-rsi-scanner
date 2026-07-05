@@ -35,7 +35,7 @@ class EventAlphaBurnInScorecard:
     llm_budget_row_count: int = 0
     artifact_namespace: str | None = None
     include_test_artifacts: bool = False
-    include_legacy_artifacts: bool = False
+    include_api_artifacts: bool = False
     legacy_rows_skipped: int = 0
     test_rows_skipped: int = 0
     coverage_warnings: tuple[str, ...] = ()
@@ -53,7 +53,7 @@ def build_burn_in_scorecard(
     profile: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
-    include_legacy_artifacts: bool = False,
+    include_api_artifacts: bool = False,
     days: int = 7,
     now: datetime | None = None,
 ) -> EventAlphaBurnInScorecard:
@@ -65,14 +65,14 @@ def build_burn_in_scorecard(
     raw_budget_data = _filter_rows(llm_budget_rows, cutoff, ("date", "updated_at"))
     raw_outcomes = _filter_rows(outcome_rows, cutoff, ("observed_at", "started_at"))
     raw_all = [*raw_run_data, *raw_alert_data, *raw_feedback_data, *raw_missed_data, *raw_budget_data, *raw_outcomes]
-    legacy_skipped = 0 if include_legacy_artifacts else sum(1 for row in raw_all if event_alpha_artifacts.is_legacy_row(row))
+    legacy_skipped = 0 if include_api_artifacts else sum(1 for row in raw_all if event_alpha_artifacts.is_api_row(row))
     test_skipped = 0 if include_test_artifacts else sum(1 for row in raw_all if event_alpha_artifacts.is_non_operational_row(row))
-    run_data = _artifact_filter(raw_run_data, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
-    alert_data = _artifact_filter(raw_alert_data, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
-    feedback_data = _artifact_filter(raw_feedback_data, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
-    missed_data = _artifact_filter(raw_missed_data, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
-    budget_data = _artifact_filter(raw_budget_data, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
-    supplied_outcomes = _artifact_filter(raw_outcomes, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
+    run_data = _artifact_filter(raw_run_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
+    alert_data = _artifact_filter(raw_alert_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
+    feedback_data = _artifact_filter(raw_feedback_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
+    missed_data = _artifact_filter(raw_missed_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
+    budget_data = _artifact_filter(raw_budget_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
+    supplied_outcomes = _artifact_filter(raw_outcomes, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
     outcome_data = supplied_outcomes or _rows_with_outcomes(alert_data)
     health_data = {str(key): dict(value) for key, value in (provider_health_rows or {}).items()}
     runs_with_alertable = sum(1 for row in run_data if _int(row.get("alertable")) > 0)
@@ -114,7 +114,7 @@ def build_burn_in_scorecard(
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
         legacy_rows_skipped=legacy_skipped,
         test_rows_skipped=test_skipped,
         runs_with_alertable=runs_with_alertable,
@@ -158,7 +158,7 @@ def format_burn_in_scorecard(scorecard: EventAlphaBurnInScorecard) -> str:
         f"window_days={scorecard.days}",
         f"profile={scorecard.profile or 'any'} namespace={scorecard.artifact_namespace or 'any'} "
         f"include_test_artifacts={str(scorecard.include_test_artifacts).lower()} "
-        f"include_legacy_artifacts={str(scorecard.include_legacy_artifacts).lower()}",
+        f"include_api_artifacts={str(scorecard.include_api_artifacts).lower()}",
         f"runs={len(runs)} successful={successful} failed={len(runs) - successful}",
         (
             "events/candidates/alertable: "
@@ -216,14 +216,14 @@ def _artifact_filter(
     profile: str | None,
     artifact_namespace: str | None,
     include_test_artifacts: bool,
-    include_legacy_artifacts: bool,
+    include_api_artifacts: bool,
 ) -> list[dict[str, Any]]:
     return event_alpha_artifacts.filter_artifact_rows(
         rows,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
     )
 
 
@@ -679,7 +679,7 @@ def export_burn_in_pack(
     profile: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
-    include_legacy_artifacts: bool = False,
+    include_api_artifacts: bool = False,
     date_range: str | None = None,
 ) -> EventAlphaBurnInPackResult:
     """Write a clean zip for Pro-model/local review without secrets or caches."""
@@ -687,18 +687,18 @@ def export_burn_in_pack(
     target.parent.mkdir(parents=True, exist_ok=True)
     warnings: list[str] = []
     files = 0
-    run_data = _filtered(run_rows, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
-    alert_data = _filtered(alert_rows, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
-    feedback_data = _filtered(feedback_rows, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
-    missed_data = _filtered(missed_rows, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
-    outcome_data = _filtered(outcome_rows, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
-    budget_data = _filtered(llm_budget_rows, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
+    run_data = _filtered(run_rows, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
+    alert_data = _filtered(alert_rows, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
+    feedback_data = _filtered(feedback_rows, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
+    missed_data = _filtered(missed_rows, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
+    outcome_data = _filtered(outcome_rows, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
+    budget_data = _filtered(llm_budget_rows, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
     manifest = {
         "profile": profile or "any",
         "artifact_namespace": artifact_namespace or "any",
         "date_range": date_range or "unspecified",
         "include_test_artifacts": bool(include_test_artifacts),
-        "include_legacy_artifacts": bool(include_legacy_artifacts),
+        "include_api_artifacts": bool(include_api_artifacts),
         "run_rows": len(run_data),
         "alert_rows": len(alert_data),
         "feedback_rows": len(feedback_data),
@@ -741,14 +741,14 @@ def _filtered(
     profile: str | None,
     artifact_namespace: str | None,
     include_test_artifacts: bool,
-    include_legacy_artifacts: bool,
+    include_api_artifacts: bool,
 ) -> list[dict[str, Any]]:
     return event_alpha_artifacts.filter_artifact_rows(
         rows,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
-        include_legacy_artifacts=include_legacy_artifacts,
+        include_api_artifacts=include_api_artifacts,
     )
 
 

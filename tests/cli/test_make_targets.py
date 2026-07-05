@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from tests.rsi import _legacy_helpers as _legacy
+from tests.rsi import _api_helpers as _api
 
-globals().update({name: getattr(_legacy, name) for name in dir(_legacy) if not name.startswith("__")})
+globals().update({name: getattr(_api, name) for name in dir(_api) if not name.startswith("__")})
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
 
@@ -599,7 +599,7 @@ def test_refactor_baseline_json_contains_file_counts_and_inventory():
     assert counts["crypto_rsi_scanner/scanner.py"] < 2000
     assert counts["tests/test_indicators.py"] == umbrella_lines
     assert counts["tests/test_indicators.py"] < 2000
-    assert counts["crypto_rsi_scanner/event_alpha_artifact_doctor.py"] < 100
+    assert counts["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"] < 300
     assert payload["top_level_event_module_count"] == len(payload["top_level_event_modules"])
     assert payload["top_level_event_module_count"] > 0
     assert "crypto_rsi_scanner/event_alpha/artifacts/schema_v1.py" in payload["event_alpha_package_files"]
@@ -651,8 +651,8 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["old_module_paths_removed"] == payload["deleted_shims"]
     assert payload["deleted_shims"] >= 1
     assert payload["removed_shims_count"] == payload["deleted_shims"]
-    assert payload["retained_public_shims_count"] >= 9
-    assert payload["retained_shims_with_reason"]
+    assert payload["retained_public_shims_count"] == 0
+    assert payload["retained_shims_with_reason"] == []
     assert payload["shim_dependency_include_runtime_artifacts"] is False
     assert payload["shim_dependency_report_cache_status"] in {
         "hit",
@@ -669,13 +669,13 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["standalone_runner_runtime_seconds"] == 56.78
     assert payload["line_counts"]["tests/test_indicators.py"] < 2000
     assert payload["line_counts"]["crypto_rsi_scanner/scanner.py"] < 2000
-    assert payload["line_counts"]["crypto_rsi_scanner/cli/services/scanner_legacy.py"] < 3000
-    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha_artifact_doctor.py"] < 100
+    assert payload["line_counts"]["crypto_rsi_scanner/cli/services/scanner_api.py"] < 3000
+    assert "crypto_rsi_scanner/event_alpha_artifact_doctor.py" not in payload["line_counts"]
     assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"] < 1500
-    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"] < 3000
-    assert payload["legacy_artifact_doctor_core_lines"] == payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"]
+    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"] < 3000
+    assert payload["legacy_artifact_doctor_core_lines"] == payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"]
     assert payload["line_counts"]["crypto_rsi_scanner/cli/services/event_alpha.py"] < 1500
-    assert payload["active_shims"] >= 9
+    assert payload["active_shims"] == 0
     assert payload["partial_shims"] == 0
     assert payload["unmigrated_modules"] >= 1
     assert payload["unmigrated_modules"] <= 15
@@ -701,12 +701,18 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
         "production_files_over_1200_lines",
         "class_exceptions_remaining",
     }
-    assert payload["v3_accepted_exceptions"]["production_files_over_1200_lines"]["count"] == 12
+    assert payload["v3_accepted_exceptions"]["production_files_over_1200_lines"]["count"] == 13
     assert payload["v3_accepted_exceptions"]["class_exceptions_remaining"]["count"] == 3
     for gate_name in refactor_v3_contract.V3_GATE_NAMES:
         assert gate_name in payload["v3_gates"]
     assert payload["nonessential_shims_remaining"] == payload["v3_gates"]["nonessential_shims_remaining"]
     assert payload["public_compatibility_shims"] == payload["v3_gates"]["public_compatibility_shims"]
+    assert payload["public_compatibility_shims"] == 0
+    assert payload["legacy_file_retirement_status"] == "OK"
+    assert payload["legacy_named_files_count"] == 0
+    assert payload["legacy_named_dirs_count"] == 0
+    assert payload["legacy_top_level_event_modules_count"] == 0
+    assert payload["legacy_retained_public_shims_count"] == 0
     assert payload["nonessential_shims_remaining"] == 0
     assert "nonessential_shims_remaining" not in payload["v3_auto_accept_blockers"]
     assert payload["remaining_implementation_modules_by_package_target"] == {}
@@ -725,17 +731,17 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     )
     assert not any(row["path"] == "crypto_rsi_scanner/event_alpha_artifact_doctor.py" for row in payload["blockers"])
     assert not any(row["path"] == "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py" for row in payload["blockers"])
-    assert not any(row["path"] == "crypto_rsi_scanner/cli/services/scanner_legacy.py" for row in payload["blockers"])
+    assert not any(row["path"] == "crypto_rsi_scanner/cli/services/scanner_api.py" for row in payload["blockers"])
     assert not any(
-        row["path"] == "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"
+        row["path"] == "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"
         for row in payload["blockers"]
     )
     assert not any(
-        row["path"] == "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
+        row["path"] == "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/api.py"
         for row in payload["blockers"]
     )
     phases = {row["phase"]: row["policy"] for row in payload["deprecation_plan"]}
-    assert "v3_public_compatibility" in phases and "retained public" in phases["v3_public_compatibility"]
+    assert "v3_public_compatibility" in phases and "No flat Event Alpha public compatibility shims remain" in phases["v3_public_compatibility"]
     assert "deleted_import_tombstones" in phases and "allowed to fail" in phases["deleted_import_tombstones"]
     assert "v4_dev_warning" in phases and "warn in development mode only" in phases["v4_dev_warning"]
     assert "v4_removal" in phases and "removed" in phases["v4_removal"]
@@ -875,7 +881,7 @@ def test_event_alpha_shim_dependency_report_make_target_is_available():
     assert "RSI_EVENT_ALERTS_ENABLED=0" in makefile
     assert policy.exists()
     policy_text = policy.read_text(encoding="utf-8")
-    assert "Only retained public old top-level Event Alpha modules remain" in policy_text
+    assert "No old top-level Event Alpha public compatibility shims remain" in policy_text
     assert "Deleted old Event Alpha imports are tombstoned" in policy_text
     assert "must not create\n`TRIGGERED_FADE`" in policy_text
     assert "event_fade.py" in policy_text
@@ -1005,7 +1011,7 @@ def test_refactor_size_gates_static_baseline_and_new_violation_detection():
         legacy_blocked = refactor_size_gates.build_gate_report(root=root)
         assert legacy_blocked["legacy_decomposition_gate_status"] == "blocked"
         assert legacy_blocked["legacy_files_over_3000_lines"] == 1
-        assert legacy_blocked["largest_legacy_files"][0]["path"] == "crypto_rsi_scanner/feature_legacy.py"
+        assert legacy_blocked["largest_api_files"][0]["path"] == "crypto_rsi_scanner/feature_legacy.py"
 
 
 def test_refactor_size_gates_make_target_is_static_and_no_live_runtime_path():
@@ -1029,7 +1035,7 @@ def test_refactor_size_gates_make_target_is_static_and_no_live_runtime_path():
         assert item not in module_text
 
 
-def test_refactor_reports_list_large_legacy_implementation_cores():
+def test_refactor_reports_list_large_api_implementation_cores():
     from crypto_rsi_scanner import refactor_final_report, refactor_size_gates
 
     size_report = refactor_size_gates.build_gate_report(root=REPO_ROOT)
@@ -1048,7 +1054,7 @@ def test_refactor_reports_list_large_legacy_implementation_cores():
     assert final_report["production_files_over_1500_lines"] == 0
     assert size_report["production_files_over_2000_lines"] == 0
     assert not any(
-        blocker["path"] == "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
+        blocker["path"] == "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/api.py"
         for blocker in final_report["blockers"]
     )
 

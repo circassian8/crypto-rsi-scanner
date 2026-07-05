@@ -60,7 +60,7 @@ def format_quality_review(result: EventAlphaQualityReviewResult) -> str:
         "=" * 76,
         f"profile: {result.profile or 'default'}",
         f"candidates: {len(primary_rows) if primary_rows else len(rows)} core_or_primary ({len(rows)} total rows)",
-        "fresh_vs_legacy: " + _fresh_legacy_summary(rows),
+        "fresh_vs_api: " + _fresh_api_summary(rows),
         "quality_coverage: " + _quality_coverage_summary(rows),
         "latest_run: " + _latest_run_summary(rows),
         "opportunity_levels: " + _format_counts(_counts(section_rows, "opportunity_level")),
@@ -139,7 +139,7 @@ def _normalize_rows(rows: Iterable[Mapping[str, Any]], *, source: str) -> list[d
         data["_components"] = components
         data["_quality_source"] = quality_source
         data["_top_level_missing_fields"] = list(top_missing)
-        data["_legacy_quality_row"] = event_alpha_artifacts.is_legacy_row(data)
+        data["_api_quality_row"] = event_alpha_artifacts.is_api_row(data)
         data["_snapshot_quality_classification"] = (
             event_alpha_alert_store.classify_alert_snapshot(data)
             if source == "alert_snapshot"
@@ -289,8 +289,8 @@ def _candidate_like_term(item: Mapping[str, Any]) -> bool:
 def _rejection_is_false_positive(item: Mapping[str, Any]) -> bool:
     text = " ".join(str(value or "") for value in item.values()).casefold()
     return any(term in text for term in ("false_positive", "source_noise", "ticker", "word_collision", "url_only", "publisher"))
-def _fresh_legacy_summary(rows: list[dict[str, Any]]) -> str:
-    fresh = sum(1 for row in rows if not row.get("_legacy_quality_row"))
+def _fresh_api_summary(rows: list[dict[str, Any]]) -> str:
+    fresh = sum(1 for row in rows if not row.get("_api_quality_row"))
     legacy = len(rows) - fresh
     return f"fresh={fresh}, legacy_or_unscoped={legacy}"
 def _quality_coverage_summary(rows: list[dict[str, Any]]) -> str:

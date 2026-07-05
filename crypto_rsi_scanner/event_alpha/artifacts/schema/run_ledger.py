@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import SCHEMAS
+from .registry import SCHEMAS
 
 RUN_LEDGER_SCHEMA = SCHEMAS["run_ledger_v1"]
 SCHEMA_IDS = ("run_ledger_v1",)

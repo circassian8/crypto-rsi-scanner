@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import CoinalyzeDerivativesProvider
+from .core import CoinalyzeDerivativesProvider
 
 __all__ = ("CoinalyzeDerivativesProvider",)
 

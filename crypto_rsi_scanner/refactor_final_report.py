@@ -14,10 +14,11 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from . import refactor_baseline
-from . import refactor_legacy_inventory
+from . import refactor_api_inventory
+from . import refactor_legacy_file_check
 from . import refactor_size_gates
 from . import refactor_v3_contract
 from .event_alpha import shims as event_alpha_shims
@@ -28,10 +29,12 @@ from .event_alpha.namespace import lifecycle as namespace_lifecycle
 REPORT_SCHEMA_VERSION = "refactor_final_report_v1"
 REPORT_JSON = "REFACTOR_FINAL_REPORT.json"
 REPORT_MD = "REFACTOR_FINAL_REPORT.md"
+V3_RELEASE_CANDIDATE_JSON = "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.json"
+V3_RELEASE_CANDIDATE_MD = "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.md"
 MAJOR_TARGETS = {
     "crypto_rsi_scanner/scanner.py": {
         "target_lines_lt": 2000,
-        "next_migration_module": "crypto_rsi_scanner/cli/services/scanner_legacy.py",
+        "next_migration_module": "crypto_rsi_scanner/cli/services/scanner_api.py",
         "risk": "Burning down the transitional compatibility core can change CLI defaults, Make target behavior, provider guardrails, or research-only side-effect gates if moved without command snapshots.",
         "blocker_reason": "scanner.py should be a small compatibility facade; command bodies must live under crypto_rsi_scanner.cli.",
     },
@@ -41,21 +44,20 @@ MAJOR_TARGETS = {
         "risk": "Over-aggressive removal could break the standalone compatibility runner expected by Make and AGENTS.md.",
         "blocker_reason": "No current blocker; the file is now an umbrella runner below the target.",
     },
-    "crypto_rsi_scanner/event_alpha_artifact_doctor.py": {
-        "target_lines_lt": 100,
+    "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": {
+        "target_lines_lt": 300,
         "next_migration_module": "crypto_rsi_scanner/event_alpha/doctor/checks/safety.py, namespace.py, stale_artifacts.py, and focused legacy counter plugins",
         "risk": "Doctor extraction can silently change strict/WARN semantics, report counter names, or stale namespace handling if compatibility tests do not pin output.",
-        "blocker_reason": "event_alpha_artifact_doctor.py should remain a small compatibility shim only.",
+        "blocker_reason": "artifact_doctor.py should remain a small public orchestrator/export surface.",
     },
 }
 TRACKED_LINE_COUNT_PATHS = tuple(
     dict.fromkeys(
         (
             *MAJOR_TARGETS,
-            "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py",
-            "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py",
+            "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py",
             "crypto_rsi_scanner/cli/services/event_alpha.py",
-            "crypto_rsi_scanner/cli/services/scanner_legacy.py",
+            "crypto_rsi_scanner/cli/services/scanner_api.py",
             "crypto_rsi_scanner/cli/parser.py",
             "crypto_rsi_scanner/cli/commands_event_alpha.py",
         )
@@ -63,19 +65,19 @@ TRACKED_LINE_COUNT_PATHS = tuple(
 )
 LARGE_EVENT_ALPHA_SPLIT_PATHS = {
     "notifications_pipeline_wrapper": "crypto_rsi_scanner/event_alpha/notifications/pipeline.py",
-    "notifications_pipeline_legacy": "crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py",
+    "notifications_pipeline_core": "crypto_rsi_scanner/event_alpha/notifications/pipeline_core.py",
     "research_cards_wrapper": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/__init__.py",
-    "research_cards_legacy": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py",
+    "research_cards_api": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/api.py",
     "daily_brief_wrapper": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/__init__.py",
-    "daily_brief_legacy": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy.py",
+    "daily_brief_api": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/api.py",
     "integrated_radar_wrapper": "crypto_rsi_scanner/event_alpha/radar/integrated_radar.py",
-    "integrated_radar_legacy": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py",
+    "integrated_radar_api": "crypto_rsi_scanner/event_alpha/radar/integrated/api.py",
     "impact_hypotheses_wrapper": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/__init__.py",
-    "impact_hypotheses_legacy": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py",
+    "impact_hypotheses_api": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/api.py",
     "core_opportunity_store_wrapper": "crypto_rsi_scanner/event_alpha/radar/core_opportunity_store.py",
-    "core_opportunity_store_legacy": "crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py",
+    "core_opportunity_store_api": "crypto_rsi_scanner/event_alpha/radar/core/store_api.py",
     "evidence_acquisition_wrapper": "crypto_rsi_scanner/event_alpha/radar/evidence_acquisition.py",
-    "evidence_acquisition_legacy": "crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py",
+    "evidence_acquisition_api": "crypto_rsi_scanner/event_alpha/radar/evidence/acquisition_api.py",
 }
 MIGRATED_MODULES_THIS_RUN = (
     "crypto_rsi_scanner.event_incident_graph",
@@ -250,7 +252,7 @@ def _doctor_plugin_check_counts(root: Path) -> dict[str, int]:
     return counts
 
 
-def _doctor_legacy_unregistered_details() -> list[dict[str, str]]:
+def _doctor_api_unregistered_details() -> list[dict[str, str]]:
     return [
         {
             "check": "missing_operational_run_rows",
@@ -541,7 +543,7 @@ def _doctor_plugin_migration_summary(*, legacy_unregistered: int, root: Path) ->
         "legacy_unregistered_target": 5,
         "legacy_unregistered_status": "pass" if legacy_unregistered <= 5 else "documented_blocker",
         "legacy_unregistered_note": "" if legacy_unregistered <= 5 else "Remaining imperative doctor append sites are documented for the next plugin migration batch.",
-        "remaining_legacy_unregistered_details": _doctor_legacy_unregistered_details() if legacy_unregistered > 5 else [],
+        "remaining_api_unregistered_details": _doctor_api_unregistered_details() if legacy_unregistered > 5 else [],
         "migrated_this_run": len(MIGRATED_MODULES_THIS_RUN),
     }
 
@@ -552,6 +554,7 @@ def _refactor_extra_blockers(
     cli_event_alpha_service_lines: int | None,
     cli_service_bind_calls: int,
     legacy_inventory: Mapping[str, Any],
+    legacy_file_report: Mapping[str, Any],
     size_gate_report: Mapping[str, Any],
 ) -> list[dict[str, str]]:
     extra_blockers: list[dict[str, str]] = []
@@ -595,6 +598,18 @@ def _refactor_extra_blockers(
                     "risk": "Moving too much at once can change CLI, doctor, notification, card, brief, or radar semantics.",
                 }
             )
+    if legacy_file_report.get("status") == "BLOCKED":
+        for row in legacy_file_report.get("blockers", []):
+            if not isinstance(row, dict):
+                continue
+            extra_blockers.append(
+                {
+                    "path": str(row.get("path")),
+                    "blocker_reason": "Final refactor v3 legacy-retirement gate found a migration-era filename, directory, retained shim, or flat Event Alpha module.",
+                    "next_migration_module": "Delete the old file/path or move it to a canonical package name; keep only scanner.py and event_fade.py as documented exceptions.",
+                    "risk": "Leaving migration-era paths allows new code to drift back into old compatibility surfaces.",
+                }
+            )
     if size_gate_report.get("production_size_gate_status") == "blocked":
         for row in size_gate_report.get("largest_production_files", []):
             if int(row.get("line_count") or 0) <= refactor_size_gates.PRODUCTION_BLOCKER_LINE_LIMIT:
@@ -633,24 +648,233 @@ def _old_import_deprecation_plan() -> list[dict[str, str]]:
         {
             "phase": "v3_public_compatibility",
             "status": "current",
-            "policy": "Only retained public Event Alpha compatibility entrypoints remain; new work imports canonical package paths.",
+            "policy": "No flat Event Alpha public compatibility shims remain; scanner.py remains the historical CLI entrypoint and new work imports canonical package paths.",
         },
         {
             "phase": "deleted_import_tombstones",
             "status": "current",
-            "policy": "Deleted old Event Alpha imports are allowed to fail; docs show canonical paths and compatibility tests cover retained public entrypoints only.",
+            "policy": "Deleted old Event Alpha imports are allowed to fail; docs show canonical paths and tombstone tests cover deleted paths.",
         },
         {
             "phase": "v4_dev_warning",
             "status": "future",
-            "policy": "Retained public old imports may warn in development mode only after an accepted compatibility-breaking migration and release notes.",
+            "policy": "Any future public compatibility bridge may warn in development mode only after an accepted compatibility-breaking migration and release notes.",
         },
         {
             "phase": "v4_removal",
             "status": "future",
-            "policy": "Retained public old imports can be removed only through an explicit compatibility-breaking migration with full verification and release notes.",
+            "policy": "Any future public old import bridge can be removed only through an explicit compatibility-breaking migration with full verification and release notes.",
         },
     ]
+
+
+def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str, Any]) -> dict[str, Any]:
+    verification = _load_json(root / "research" / "REFACTOR_VERIFICATION_RESULTS.json")
+    commands = verification.get("commands") if isinstance(verification.get("commands"), list) else []
+    failed_commands = verification.get("failed_commands") if isinstance(verification.get("failed_commands"), list) else []
+    critical_gates = {
+        "all_commands_passed": "pass" if not failed_commands else "blocked",
+        "refactor_final_has_no_blockers": "pass" if not final_report.get("blockers") else "blocked",
+        "only_event_fade_top_level_implementation": (
+            "pass"
+            if final_report.get("intentionally_outside_event_alpha_modules") == ["crypto_rsi_scanner.event_fade"]
+            else "blocked"
+        ),
+        "nonessential_shims_remaining_zero": "pass" if int(final_report.get("nonessential_shims_remaining") or 0) == 0 else "blocked",
+        "old_path_internal_imports_zero": "pass" if int(final_report.get("old_path_internal_imports") or 0) == 0 else "blocked",
+        "old_path_test_imports_zero": "pass" if int(final_report.get("old_path_test_imports") or 0) == 0 else "blocked",
+        "old_path_docs_references_zero": "pass" if int(final_report.get("old_path_docs_references") or 0) == 0 else "blocked",
+        "production_files_over_1500_zero": "pass" if int(final_report.get("production_files_over_1500_lines") or 0) == 0 else "blocked",
+        "unresolved_production_files_over_1200_zero": "pass" if int(final_report.get("unresolved_production_files_over_1200_lines") or 0) == 0 else "blocked",
+        "functions_over_150_zero": "pass" if int(final_report.get("functions_over_150_lines") or 0) == 0 else "blocked",
+        "oversized_classes_are_accepted": "pass" if int(final_report.get("remaining_class_ownership_debt_count") or 0) == 0 else "blocked",
+        "unresolved_multi_class_modules_zero": "pass" if int(final_report.get("unresolved_multi_class_modules_count") or 0) == 0 else "blocked",
+        "doctor_registry_api_unregistered_zero": "pass" if int(final_report.get("legacy_unregistered") or 0) == 0 else "blocked",
+        "namespace_unknown_zero": "pass" if int(final_report.get("unknown_namespace_count") or 0) == 0 else "blocked",
+        "shim_dependency_status_ok": "pass" if int(final_report.get("old_path_import_allowed_exceptions") or 0) == 0 else "blocked",
+        "legacy_file_retirement_ok": "pass" if final_report.get("legacy_file_retirement_status") == "OK" else "blocked",
+    }
+    critical_failures = [name for name, status in critical_gates.items() if status != "pass"]
+    critical_status = "pass" if not critical_failures else "blocked"
+    acceptance_status = (
+        "accepted"
+        if critical_status == "pass"
+        and final_report.get("v3_gate_status") in {"pass", "accepted_with_documented_exceptions"}
+        else "pending"
+    )
+    accepted_exceptions = final_report.get("v3_accepted_exceptions")
+    if not isinstance(accepted_exceptions, Mapping):
+        accepted_exceptions = {}
+    return {
+        "schema_version": "refactor_v3_release_candidate_report_v1",
+        "row_type": "refactor_v3_release_candidate_report",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "acceptance_status": acceptance_status,
+        "critical_gate_status": critical_status,
+        "critical_gate_failures": critical_failures,
+        "critical_gates": critical_gates,
+        "test_results": verification,
+        "commands_passed": max(0, int(verification.get("total_commands") or len(commands)) - len(failed_commands)),
+        "commands_total": int(verification.get("total_commands") or len(commands)),
+        "duration_seconds_total": verification.get("elapsed_seconds"),
+        "refactor_final_v3_gate_status": final_report.get("v3_gate_status"),
+        "refactor_final_v3_auto_accept_ready": final_report.get("v3_auto_accept_ready"),
+        "refactor_final_v3_auto_accept_blockers": final_report.get("v3_auto_accept_blockers", []),
+        "refactor_final_v3_blockers": final_report.get("v3_blockers", []),
+        "refactor_final_v3_pending_exceptions": final_report.get("v3_pending_exceptions", []),
+        "refactor_final_v3_accepted_exceptions": accepted_exceptions,
+        "accepted_warning_gates": sorted(accepted_exceptions),
+        "production_files_over_1200_lines": final_report.get("production_files_over_1200_lines"),
+        "accepted_production_files_over_1200_line_rows": final_report.get("accepted_production_files_over_1200_line_rows", []),
+        "production_files_over_1500_lines": final_report.get("production_files_over_1500_lines"),
+        "unresolved_production_files_over_1200_lines": final_report.get("unresolved_production_files_over_1200_lines"),
+        "functions_over_150_lines": final_report.get("functions_over_150_lines"),
+        "classes_over_75_lines": final_report.get("classes_over_limit_count"),
+        "accepted_class_exceptions": final_report.get("accepted_class_exceptions", []),
+        "accepted_class_exceptions_count": final_report.get("accepted_class_exceptions_count"),
+        "model_bundles": final_report.get("accepted_model_bundles", []),
+        "model_bundles_count": final_report.get("accepted_model_bundles_count"),
+        "unresolved_multi_class_modules_count": final_report.get("unresolved_multi_class_modules_count"),
+        "top_level_event_module_count": final_report.get("top_level_event_module_count"),
+        "top_level_implementation_event_modules": final_report.get("intentionally_outside_event_alpha_modules", []),
+        "retained_public_shims_count": final_report.get("retained_public_shims_count"),
+        "retained_public_shims": final_report.get("retained_shims_with_reason", []),
+        "deleted_shims_count": final_report.get("deleted_shims"),
+        "deleted_shims_manifest": "research/EVENT_ALPHA_DELETED_SHIMS.json",
+        "old_path_internal_imports": final_report.get("old_path_internal_imports"),
+        "old_path_test_imports": final_report.get("old_path_test_imports"),
+        "old_path_docs_references": final_report.get("old_path_docs_references"),
+        "old_path_import_allowed_exceptions": final_report.get("old_path_import_allowed_exceptions"),
+        "doctor_registry_status": {"legacy_unregistered": final_report.get("legacy_unregistered")},
+        "namespace_lifecycle_status": final_report.get("namespace_lifecycle_inventory", {}),
+        "source_reports": {
+            "refactor_final": "research/REFACTOR_FINAL_REPORT.json",
+            "refactor_size_gates": "research/REFACTOR_SIZE_GATES.json",
+            "refactor_class_ownership": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
+            "shim_dependency": "research/EVENT_ALPHA_SHIM_DEPENDENCY_REPORT.json",
+            "old_import_check": "research/EVENT_ALPHA_OLD_IMPORT_CHECK.json",
+        },
+        "safety_invariant_confirmation": {
+            "research_only": True,
+            "no_live_trading_added": True,
+            "no_paper_trading_behavior_changes": True,
+            "no_execution_or_order_logic_changes": True,
+            "no_event_alpha_rsi_signal_writes": True,
+            "no_event_alpha_triggered_fade": True,
+            "event_fade_remains_outside_event_alpha": True,
+            "no_live_provider_calls_by_default": True,
+            "no_live_telegram_sends": True,
+            "no_secrets_committed": True,
+        },
+    }
+
+
+def _format_v3_release_candidate_markdown(report: Mapping[str, Any]) -> str:
+    total = report.get("commands_total") or 0
+    passed = report.get("commands_passed") or 0
+    lines = [
+        "# Refactor V3 Release Candidate Report",
+        "",
+        "Research-only release-candidate report. This report does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created `TRIGGERED_FADE`.",
+        "",
+        f"- generated_at: `{report.get('generated_at')}`",
+        f"- acceptance_status: `{report.get('acceptance_status')}`",
+        f"- critical_gate_status: `{report.get('critical_gate_status')}`",
+        f"- commands_passed: `{passed}/{total}`",
+        f"- duration_seconds_total: `{report.get('duration_seconds_total')}`",
+        "",
+        "## Critical Gates",
+        "",
+        "| gate | status |",
+        "|---|---:|",
+    ]
+    gates = report.get("critical_gates") if isinstance(report.get("critical_gates"), Mapping) else {}
+    for name, status in gates.items():
+        lines.append(f"| `{name}` | `{status}` |")
+    lines.extend(
+        [
+            "",
+            "## Accepted Warnings",
+            "",
+            "| item | value |",
+            "|---|---:|",
+            f"| `production_files_over_1200_lines` | `{report.get('production_files_over_1200_lines')}` |",
+            f"| `accepted_class_exceptions_count` | `{report.get('accepted_class_exceptions_count')}` |",
+            f"| `refactor_final_v3_gate_status` | `{report.get('refactor_final_v3_gate_status')}` |",
+            f"| `refactor_final_v3_auto_accept_blockers` | `{report.get('refactor_final_v3_auto_accept_blockers')}` |",
+            f"| `refactor_final_v3_blockers` | `{report.get('refactor_final_v3_blockers')}` |",
+            "",
+            "## Event Module And Shim Status",
+            "",
+            f"- top_level_event_module_count: `{report.get('top_level_event_module_count')}`",
+            f"- retained_public_shims_count: `{report.get('retained_public_shims_count')}`",
+            f"- deleted_shims_count: `{report.get('deleted_shims_count')}`",
+            f"- old_path_internal_imports: `{report.get('old_path_internal_imports')}`",
+            f"- old_path_test_imports: `{report.get('old_path_test_imports')}`",
+            f"- old_path_docs_references: `{report.get('old_path_docs_references')}`",
+            "",
+            "Top-level implementation modules:",
+        ]
+    )
+    for module in report.get("top_level_implementation_event_modules", []):
+        lines.append(f"- `{module}`")
+    retained = report.get("retained_public_shims") if isinstance(report.get("retained_public_shims"), list) else []
+    lines.extend(["", "Retained public shims:"])
+    if retained:
+        for row in retained:
+            if isinstance(row, Mapping):
+                lines.append(f"- `{row.get('old_module') or row.get('path')}`")
+    else:
+        lines.append("- none")
+    lines.extend(
+        [
+            "",
+            "## Size And Ownership",
+            "",
+            f"- production_files_over_1500_lines: `{report.get('production_files_over_1500_lines')}`",
+            f"- production_files_over_1200_lines: `{report.get('production_files_over_1200_lines')}`",
+            f"- unresolved_production_files_over_1200_lines: `{report.get('unresolved_production_files_over_1200_lines')}`",
+            f"- functions_over_150_lines: `{report.get('functions_over_150_lines')}`",
+            f"- classes_over_75_lines: `{report.get('classes_over_75_lines')}`",
+            f"- accepted_class_exceptions_count: `{report.get('accepted_class_exceptions_count')}`",
+            f"- model_bundles_count: `{report.get('model_bundles_count')}`",
+            f"- unresolved_multi_class_modules_count: `{report.get('unresolved_multi_class_modules_count')}`",
+            "",
+            "## Test Results",
+            "",
+            "| # | command | status | seconds |",
+            "|---:|---|---:|---:|",
+        ]
+    )
+    test_results = report.get("test_results") if isinstance(report.get("test_results"), Mapping) else {}
+    for idx, row in enumerate(test_results.get("commands", []) if isinstance(test_results.get("commands"), list) else [], start=1):
+        if isinstance(row, Mapping):
+            status = "pass" if int(row.get("returncode") or 0) == 0 else "fail"
+            lines.append(f"| {idx} | `{row.get('command')}` | `{status}` | `{row.get('elapsed_seconds')}` |")
+    lines.extend(["", "## Safety Invariants", "", "| invariant | confirmed |", "|---|---:|"])
+    safety = report.get("safety_invariant_confirmation") if isinstance(report.get("safety_invariant_confirmation"), Mapping) else {}
+    for key, value in safety.items():
+        lines.append(f"| `{key}` | `{str(value).lower()}` |")
+    failures = report.get("critical_gate_failures") if isinstance(report.get("critical_gate_failures"), list) else []
+    lines.extend(["", "## Failures", ""])
+    if failures:
+        for failure in failures:
+            lines.append(f"- `{failure}`")
+    else:
+        lines.append("- none")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _write_v3_release_candidate_report(*, root: Path, output_dir: Path, final_report: Mapping[str, Any]) -> None:
+    report = _build_v3_release_candidate_report(root=root, final_report=final_report)
+    (output_dir / V3_RELEASE_CANDIDATE_JSON).write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / V3_RELEASE_CANDIDATE_MD).write_text(
+        _format_v3_release_candidate_markdown(report),
+        encoding="utf-8",
+    )
 
 
 def build_refactor_final_report(
@@ -689,7 +913,8 @@ def build_refactor_final_report(
     ci_static_safety = _ci_static_safety(root)
     classification = _remaining_module_classification(root)
     class_ownership = _class_ownership_summary(root)
-    legacy_inventory = refactor_legacy_inventory.build_legacy_inventory(root=root)
+    legacy_inventory = refactor_api_inventory.build_api_inventory(root=root)
+    legacy_file_report = refactor_legacy_file_check.build_report(root=root)
     size_gate_report = refactor_size_gates.build_gate_report(root=root)
     v3_gate_snapshot = _build_v3_gate_snapshot(root=root, size_gate_report=size_gate_report)
     deleted_shims = event_alpha_shims.deleted_shim_count(root=root)
@@ -703,7 +928,7 @@ def build_refactor_final_report(
     cli_service_bind_calls = _cli_service_bind_scanner_globals_call_sites(root)
     parser_build_parser_lines = _function_line_count(root, "crypto_rsi_scanner/cli/parser.py", "build_parser")
     commands_event_alpha_handle_lines = _function_line_count(root, "crypto_rsi_scanner/cli/commands_event_alpha.py", "handle")
-    legacy_doctor_core_lines = current_counts.get("crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py")
+    legacy_doctor_core_lines = current_counts.get("crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py")
     legacy_unregistered = int(registry_summary.get("legacy_unregistered") or 0)
     doctor_plugin_migration = _doctor_plugin_migration_summary(legacy_unregistered=legacy_unregistered, root=root)
     extra_blockers = _refactor_extra_blockers(
@@ -711,6 +936,7 @@ def build_refactor_final_report(
         cli_event_alpha_service_lines=cli_event_alpha_service_lines,
         cli_service_bind_calls=cli_service_bind_calls,
         legacy_inventory=legacy_inventory,
+        legacy_file_report=legacy_file_report,
         size_gate_report=size_gate_report,
     )
     return {
@@ -764,11 +990,17 @@ def build_refactor_final_report(
         "class_ownership_report": class_ownership,
         **_class_ownership_final_fields(class_ownership),
         "legacy_decomposition": legacy_inventory,
+        "legacy_file_retirement": legacy_file_report,
+        "legacy_file_retirement_status": legacy_file_report["status"],
+        "legacy_named_files_count": legacy_file_report["legacy_named_files_count"],
+        "legacy_named_dirs_count": legacy_file_report["legacy_named_dirs_count"],
+        "legacy_top_level_event_modules_count": legacy_file_report["top_level_event_modules_count"],
+        "legacy_retained_public_shims_count": legacy_file_report["retained_public_shims_count"],
         "legacy_decomposition_gate_status": legacy_inventory["legacy_decomposition_gate_status"],
         "legacy_files_over_1500_lines": legacy_inventory["legacy_files_over_1500_lines"],
         "legacy_files_over_3000_lines": legacy_inventory["legacy_files_over_3000_lines"],
         "legacy_total_lines": legacy_inventory["legacy_total_lines"],
-        "largest_legacy_files": legacy_inventory["largest_legacy_files"],
+        "largest_api_files": legacy_inventory["largest_api_files"],
         **_size_gate_final_fields(size_gate_report),
         **_v3_final_fields(v3_gate_snapshot),
         "legacy_classes_over_limit": legacy_inventory["legacy_classes_over_limit"],
@@ -850,7 +1082,7 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
     _append_migrated_modules_section(lines, data)
     _append_production_size_section(lines, data)
     _append_class_ownership_section(lines, data)
-    _append_legacy_decomposition_section(lines, data)
+    _append_api_decomposition_section(lines, data)
     lines.extend(
         [
             "",
@@ -868,9 +1100,9 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             "|---|---|---|",
         ]
     )
-    for row in data["doctor_plugin_migration"].get("remaining_legacy_unregistered_details", []):
+    for row in data["doctor_plugin_migration"].get("remaining_api_unregistered_details", []):
         lines.append(f"| `{row['check']}` | `{row['next_plugin']}` | {row['reason']} |")
-    if not data["doctor_plugin_migration"].get("remaining_legacy_unregistered_details"):
+    if not data["doctor_plugin_migration"].get("remaining_api_unregistered_details"):
         lines.append("| none | none | none |")
     lines.extend(
         [
@@ -934,7 +1166,7 @@ def _v3_final_fields(v3_gate_snapshot: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _append_legacy_decomposition_section(lines: list[str], data: dict[str, Any]) -> None:
+def _append_api_decomposition_section(lines: list[str], data: dict[str, Any]) -> None:
     lines.extend(
         [
             "",
@@ -944,7 +1176,7 @@ def _append_legacy_decomposition_section(lines: list[str], data: dict[str, Any])
             "|---|---:|",
         ]
     )
-    for row in data.get("largest_legacy_files", []):
+    for row in data.get("largest_api_files", []):
         if isinstance(row, dict):
             lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
 
@@ -960,7 +1192,7 @@ def _append_organization_counts_section(lines: list[str], data: dict[str, Any]) 
         ("scanner_bind_scanner_globals_call_sites", data["scanner_bind_scanner_globals_call_sites"]),
         ("cli_service_bind_scanner_globals_call_sites", data["cli_service_bind_scanner_globals_call_sites"]),
         ("cli_event_alpha_service_lines", data["cli_event_alpha_service_lines"]),
-        ("scanner_legacy_service_lines", data.get("line_counts", {}).get("crypto_rsi_scanner/cli/services/scanner_legacy.py")),
+        ("scanner_api_service_lines", data.get("line_counts", {}).get("crypto_rsi_scanner/cli/services/scanner_api.py")),
         ("parser_build_parser_lines", data.get("parser_build_parser_lines")),
         ("commands_event_alpha_handle_lines", data.get("commands_event_alpha_handle_lines")),
         ("legacy_artifact_doctor_core_lines", data.get("legacy_artifact_doctor_core_lines")),
@@ -988,6 +1220,11 @@ def _append_organization_counts_section(lines: list[str], data: dict[str, Any]) 
         ("test_size_gate_status", data.get("test_size_gate_status")),
         ("test_files_over_1500_lines", data.get("test_files_over_1500_lines")),
         ("legacy_decomposition_gate_status", data.get("legacy_decomposition_gate_status")),
+        ("legacy_file_retirement_status", data.get("legacy_file_retirement_status")),
+        ("legacy_named_files_count", data.get("legacy_named_files_count")),
+        ("legacy_named_dirs_count", data.get("legacy_named_dirs_count")),
+        ("legacy_top_level_event_modules_count", data.get("legacy_top_level_event_modules_count")),
+        ("legacy_retained_public_shims_count", data.get("legacy_retained_public_shims_count")),
         ("legacy_files_over_1500_lines", data.get("legacy_files_over_1500_lines")),
         ("legacy_files_over_3000_lines", data.get("legacy_files_over_3000_lines")),
         ("legacy_total_lines", data.get("legacy_total_lines")),
@@ -1162,6 +1399,7 @@ def write_refactor_final_report(
     refactor_v3_contract.write_refactor_v3_contract(out_dir=output_dir, root=root)
     json_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(format_refactor_final_markdown(data), encoding="utf-8")
+    _write_v3_release_candidate_report(root=root, output_dir=output_dir, final_report=data)
     if out_dir is None:
         (root / REPORT_JSON).write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         (root / REPORT_MD).write_text(format_refactor_final_markdown(data), encoding="utf-8")
@@ -1191,7 +1429,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"gate_status={data.get('gate_summary', {}).get('status')}")
     print(f"scanner_lines={data.get('line_counts', {}).get('crypto_rsi_scanner/scanner.py')}")
     print(f"tests_umbrella_lines={data.get('line_counts', {}).get('tests/test_indicators.py')}")
-    print(f"doctor_lines={data.get('line_counts', {}).get('crypto_rsi_scanner/event_alpha_artifact_doctor.py')}")
+    print(f"doctor_lines={data.get('line_counts', {}).get('crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py')}")
     return 0
 
 

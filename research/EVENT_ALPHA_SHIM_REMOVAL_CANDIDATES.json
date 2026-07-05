@@ -1,116 +1,7 @@
 {
-  "generated_at": "2026-07-05T03:23:54.336596+00:00",
+  "generated_at": "2026-07-05T04:18:25.113679+00:00",
   "groups": {
-    "keep_public_compatibility": [
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.context",
-        "old_module": "crypto_rsi_scanner.event_alpha_artifacts",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.paths",
-        "old_module": "crypto_rsi_scanner.event_artifact_paths",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.run_ledger",
-        "old_module": "crypto_rsi_scanner.event_alpha_run_ledger",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.retention",
-        "old_module": "crypto_rsi_scanner.event_alpha_retention",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.artifacts.locks",
-        "old_module": "crypto_rsi_scanner.event_alpha_run_lock",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.doctor.artifact_doctor",
-        "old_module": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.config.profiles",
-        "old_module": "crypto_rsi_scanner.event_alpha_profiles",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
-        "old_module": "crypto_rsi_scanner.event_alpha_v1_readiness",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      },
-      {
-        "new_module": "crypto_rsi_scanner.event_alpha.config.preflight",
-        "old_module": "crypto_rsi_scanner.event_alpha_preflight",
-        "recommended_action": "keep_public_entrypoint",
-        "removal_blockers": [
-          "test_import_references",
-          "artifact_doc_references"
-        ],
-        "retention_reason": "public CLI/Make/import compatibility retained during v1/v2.",
-        "safe_to_remove": false,
-        "shim_status": "active_shim"
-      }
-    ],
+    "keep_public_compatibility": [],
     "keep_safety_exception": [
       {
         "new_module": "",
@@ -132,7 +23,7 @@
   "normal_rsi_signal_rows_written": 0,
   "paper_trades_created": 0,
   "removal_candidate_counts": {
-    "keep_public_compatibility": 9,
+    "keep_public_compatibility": 0,
     "keep_safety_exception": 1,
     "keep_until_next_major_refactor": 0,
     "migrate_imports_first": 0,

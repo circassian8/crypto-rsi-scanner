@@ -63,11 +63,11 @@ def test_integrated_radar_fixture_lane_counts_and_core_types_stay_stable():
     assert by_symbol["TESTFADE"]["triggered_fade_created"] is False
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
-from tests.event_alpha import _legacy_helpers as _event_alpha_legacy_helpers
+from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
 
 globals().update({
     name: value
-    for name, value in vars(_event_alpha_legacy_helpers).items()
+    for name, value in vars(_event_alpha_api_helpers).items()
     if not name.startswith("__")
 })
 
@@ -10521,7 +10521,7 @@ def test_daily_brief_near_miss_and_card_groups_are_operator_friendly():
             card_paths=[core, near, local, diagnostic],
             requested_profile="fixture",
             include_test_artifacts=True,
-            include_legacy_artifacts=True,
+            include_api_artifacts=True,
         )
     near_section = brief.split("## Near-Miss Candidates", 1)[1].split("## Quality-Capped / Local-Only Candidates", 1)[0]
     assert "M/memecore" in near_section
@@ -10705,7 +10705,7 @@ def test_opportunity_audit_accepts_core_opportunity_id_and_hides_diagnostics_by_
     assert "No matching hypothesis, watchlist row, alert snapshot, or route decision found." in orphan_audit
 
 
-def test_research_cards_have_current_lineage_and_legacy_marker():
+def test_research_cards_have_current_lineage_and_api_marker():
     from dataclasses import replace
     import crypto_rsi_scanner.event_alpha.radar.core_opportunities as event_core_opportunities
     import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
@@ -13645,7 +13645,7 @@ def test_canonical_core_opportunity_view_loads_linked_artifacts():
                     "profile": "market_refresh_smoke",
                     "artifact_namespace": "market_refresh_smoke",
                     "core_opportunity_id": meme["core_opportunity_id"],
-                    "original_core_opportunity_id": "core_legacy_memecore",
+                    "original_core_opportunity_id": "core_api_memecore",
                     "hypothesis_id": "hyp-meme-core",
                     "symbol": "MEME",
                     "coin_id": "memecore",
@@ -13702,7 +13702,7 @@ def test_canonical_core_opportunity_view_loads_linked_artifacts():
         legacy = event_core_opportunity_store.load_canonical_core_opportunity_view(
             "market_refresh_smoke",
             "market_refresh_smoke",
-            "core_legacy_memecore",
+            "core_api_memecore",
             core_store_path=core_path,
             evidence_acquisition_path=acquisition_path,
         )
@@ -13724,7 +13724,7 @@ def test_canonical_core_opportunity_view_loads_linked_artifacts():
     assert view.market_refresh_rows
     assert legacy.found
     assert legacy.symbol == "MEME"
-    assert "input_target_resolved_to_canonical:core_legacy_memecore->" in ";".join(legacy.warnings)
+    assert "input_target_resolved_to_canonical:core_api_memecore->" in ";".join(legacy.warnings)
 
 
 def test_alert_snapshots_mark_source_noise_as_diagnostic_support():
@@ -14310,7 +14310,7 @@ def test_daily_brief_splits_core_market_freshness_from_support_gaps():
         requested_profile="market_refresh_smoke",
         artifact_namespace="market_refresh_smoke",
         include_test_artifacts=True,
-        include_legacy_artifacts=True,
+        include_api_artifacts=True,
     )
     freshness = brief.split("## Market Freshness Readiness", 1)[1].split("## Diagnostics Appendix", 1)[0]
     velvet_line = next(line for line in freshness.splitlines() if "VELVET/velvet" in line)
@@ -14341,7 +14341,7 @@ def test_daily_brief_evidence_plans_and_executions_are_counted_separately():
         requested_profile="market_refresh_smoke",
         artifact_namespace="market_refresh_smoke",
         include_test_artifacts=True,
-        include_legacy_artifacts=True,
+        include_api_artifacts=True,
     )
     coverage = brief.split("## Source Coverage / Evidence Acquisition", 1)[1].split("### Provider Health by Source Pack", 1)[0]
     assert "evidence_plans_created=0" in coverage
@@ -15968,7 +15968,7 @@ def test_integrated_dex_sidecars_gate_market_anomaly_confirmation():
     import crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness as event_dex_onchain_readiness
     import crypto_rsi_scanner.event_alpha.radar.integrated_radar as event_integrated_radar
 
-    root = _event_alpha_legacy_helpers.REPO_ROOT
+    root = _event_alpha_api_helpers.REPO_ROOT
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
         dex_result = event_dex_onchain_readiness.run_dex_onchain_readiness(

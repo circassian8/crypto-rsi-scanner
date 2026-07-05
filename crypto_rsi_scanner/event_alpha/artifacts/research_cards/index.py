@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .components import (
     card_group_for_opportunity_lane,
     card_index_group,
     card_index_group_map,

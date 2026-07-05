@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .api import (
     build_pit_membership,
     build_volume_membership,
     binance_usdt_pool,

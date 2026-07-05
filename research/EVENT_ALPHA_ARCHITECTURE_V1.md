@@ -45,8 +45,8 @@ layout gives new code a home while old import paths continue to work.
   `event_alpha_outcomes.py`, `event_alpha_reports.py`,
   `event_alpha_provider_preflights.py`, `event_alpha_namespace.py`,
   `event_alpha_research.py`, and `event_alpha_fade_review.py`.
-  `cli/services/scanner_legacy.py` is now a compatibility aggregator over
-  focused modules in `cli/services/legacy/`; new command logic should move into
+  `cli/services/scanner_api.py` is now a compatibility aggregator over
+  focused modules in `cli/services/scanner_parts/`; new command logic should move into
   focused `cli/services/` or `cli/commands_*.py` modules instead.
 - `crypto_rsi_scanner/storage_parts/`: shared SQLite storage mixins for
   connection setup, schema text, additive migrations, scan/signal/outcome rows,
@@ -58,19 +58,18 @@ layout gives new code a home while old import paths continue to work.
   `crypto_rsi_scanner/backtest.py` remains the historical CLI/helper facade
   over the compatibility core.
 
-`crypto_rsi_scanner/event_alpha/MODULE_MAP.md` lists retained public old
-top-level module paths and their intended package locations.
+`crypto_rsi_scanner/event_alpha/MODULE_MAP.md` records the current package map
+and the fact that no old flat Event Alpha public compatibility shims remain.
 
 ## V1 Boundary Rules
 
 These rules are the anti-sprawl contract for future Codex/Claude passes:
 
-- Only retained public old import shims remain. They are documented in
-  `research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md/json` with path,
-  reason, expected lifetime, and owner note.
-- Deleted old imports are tombstoned and are allowed to fail. Docs should show
-  canonical package paths, and compatibility tests cover retained public
-  entrypoints only.
+- No old flat Event Alpha public compatibility shims remain. Deleted old imports
+  are tombstoned and allowed to fail, with the manifest in
+  `research/EVENT_ALPHA_DELETED_SHIMS.md/json`.
+- Docs should show canonical package paths, and tombstone tests cover deleted
+  old import failure in `tests/event_alpha/test_no_old_event_alpha_imports.py`.
 - New code should import the new package paths listed in the package map.
 - Old top-level `crypto_rsi_scanner/event_*.py` shim modules should not gain
   new implementation logic. They may re-export symbols, hold compatibility
@@ -180,7 +179,7 @@ and should not grow the legacy cores:
   Models, selection, preview writing, delivery writing, message rendering,
   heartbeat wording, skip telemetry, plan building, and safety helpers have
   focused modules under `event_alpha.notifications/`. The compatibility core is
-  `event_alpha.notifications.pipeline_legacy`.
+  `event_alpha.notifications.pipeline_api`.
 - `event_alpha.artifacts.research_cards` is now a package. Models, renderer,
   index, lineage, and card section modules live under
   `event_alpha.artifacts.research_cards/`; the compatibility core is
@@ -200,11 +199,11 @@ and should not grow the legacy cores:
 - `event_alpha.radar.core_opportunity_store` is the public store wrapper.
   Core models, store operations, serialization, aggregation, merge, card links,
   and validators live under `event_alpha.radar.core/`; the compatibility core
-  is `event_alpha.radar.core.legacy_store`.
+  is `event_alpha.radar.core.store_api`.
 - `event_alpha.radar.evidence_acquisition` is the public evidence wrapper.
   Evidence models, planner, executor, validators, scoring, providers, report,
   and serialization homes live under `event_alpha.radar.evidence/`; the
-  compatibility core is `event_alpha.radar.evidence.legacy_acquisition`.
+  compatibility core is `event_alpha.radar.evidence.acquisition_api`.
 - Medium radar packages now follow the same ownership pattern:
   `event_alpha.radar.validation/` owns validation models, review, sample, and
   report helpers; `event_alpha.radar.discovery/` owns discovery models, manual
@@ -403,7 +402,7 @@ small, tested slices only.
 
 `scanner.py` is now a small compatibility facade for the package CLI entrypoint
 and old helper imports. The historical command implementation has moved to
-`crypto_rsi_scanner.cli.services.scanner_legacy` as a measured transitional
+`crypto_rsi_scanner.cli.services.scanner_api` as a measured transitional
 core, not as a new home for feature work.
 `crypto_rsi_scanner.cli.parser.build_parser()` owns argparse construction
 without calling `parse_args()` or any command branch, and
@@ -430,4 +429,4 @@ Compatibility rules for CLI refactors:
   official-exchange paths before parser changes land.
 - Dispatch tests must cover representative Event Alpha, provider readiness,
   notification preview, export, and default RSI scan routes before moving
-  command families out of `scanner_legacy.py`.
+  command families out of `scanner_api.py`.

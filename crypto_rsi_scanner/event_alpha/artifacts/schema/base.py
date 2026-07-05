@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .registry import (
     EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION,
     ROW_TYPE_TO_SCHEMA_ID,
     SCHEMAS,

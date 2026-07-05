@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from .legacy import EventImpactHypothesis
+from .api import EventImpactHypothesis
 
 __all__ = ("EventImpactHypothesis",)

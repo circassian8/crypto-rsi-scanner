@@ -62,14 +62,14 @@ def build_refactor_completion_map(
         },
         "transitional_compatibility_cores": [
             {
-                "path": "crypto_rsi_scanner/cli/services/scanner_legacy.py",
-                "line_count": line_counts.get("crypto_rsi_scanner/cli/services/scanner_legacy.py"),
+                "path": "crypto_rsi_scanner/cli/services/scanner_api.py",
+                "line_count": line_counts.get("crypto_rsi_scanner/cli/services/scanner_api.py"),
                 "reason": "Moved historical scanner command body; old root scanner is now a facade.",
-                "next_work": "Move focused command families out of scanner_legacy.py in smaller parity-tested passes.",
+                "next_work": "Move focused command families out of scanner_api.py in smaller parity-tested passes.",
             },
             {
-                "path": "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py",
-                "line_count": line_counts.get("crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"),
+                "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py",
+                "line_count": line_counts.get("crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"),
                 "reason": "Preserves strict/WARN artifact doctor semantics while plugin migrations continue.",
                 "next_work": "Move legacy checks into focused doctor plugins with counter-preserving fixtures.",
             },
@@ -93,8 +93,9 @@ def build_refactor_completion_map(
         },
         "doctor_refactor": {
             "public_doctor_lines": line_counts.get("crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"),
-            "top_level_doctor_shim_lines": line_counts.get("crypto_rsi_scanner/event_alpha_artifact_doctor.py"),
-            "legacy_doctor_core_lines": line_counts.get("crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"),
+            "top_level_doctor_shim_lines": None,
+            "top_level_doctor_shim_status": "deleted",
+            "legacy_doctor_core_lines": line_counts.get("crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"),
             "legacy_unregistered": final.get("legacy_unregistered"),
             "plugin_check_counts": final.get("plugin_check_counts", {}),
         },
@@ -142,7 +143,7 @@ def build_refactor_completion_map(
             "legacy_files_over_1500_lines": size.get("legacy_files_over_1500_lines"),
             "legacy_files_over_3000_lines": size.get("legacy_files_over_3000_lines"),
             "legacy_total_lines": size.get("legacy_total_lines"),
-            "largest_legacy_files": size.get("largest_legacy_files", []),
+            "largest_api_files": size.get("largest_api_files", []),
             "legacy_classes_over_limit": size.get("legacy_classes_over_limit"),
             "legacy_functions_over_limit": size.get("legacy_functions_over_limit"),
             "legacy_modules_with_multiple_public_classes": size.get(

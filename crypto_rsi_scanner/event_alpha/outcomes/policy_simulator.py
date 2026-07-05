@@ -92,7 +92,7 @@ def simulate_policy(
     *,
     profile: str | None = None,
     scenarios: Iterable[EventAlphaPolicyScenario] = DEFAULT_SCENARIOS,
-    include_legacy: bool = False,
+    include_api: bool = False,
     feedback_rows: Iterable[Mapping[str, Any]] = (),
     missed_rows: Iterable[Mapping[str, Any]] = (),
 ) -> EventAlphaPolicySimulationResult:
@@ -106,7 +106,7 @@ def simulate_policy(
     ]
     items = [
         row for row in raw_items
-        if include_legacy
+        if include_api
         or row.get("_snapshot_quality_classification") not in _SIMULATOR_EXCLUDED_CLASSIFICATIONS
     ]
     baseline = tuple(_key(row) for row in items if _baseline_alertable(row))
@@ -141,13 +141,13 @@ def simulate_policy(
             "known_junk_count": len(junk),
             "missed_recall_candidates": _missed_recall_candidates(missed, scenario),
             "quality_warnings": _quality_warnings(items, selected),
-            "legacy_conflicts_excluded": 0 if include_legacy else len(legacy_conflicts),
+            "legacy_conflicts_excluded": 0 if include_api else len(legacy_conflicts),
         })
     return EventAlphaPolicySimulationResult(
         profile=profile,
         baseline_alertable=baseline,
         scenarios=tuple(results),
-        legacy_conflicts_excluded=0 if include_legacy else len(legacy_conflicts),
+        legacy_conflicts_excluded=0 if include_api else len(legacy_conflicts),
     )
 
 

@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from .legacy import _validate_cli_args, main
+from .api import _validate_cli_args, main
 
 __all__ = ("_validate_cli_args", "main")

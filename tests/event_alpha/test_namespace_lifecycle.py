@@ -44,11 +44,11 @@ def test_known_refactor_and_manual_review_namespaces_are_not_unknown(tmp_path: P
     assert not [row for row in rows.values() if row["status"] == "unknown"]
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
-from tests.event_alpha import _legacy_helpers as _event_alpha_legacy_helpers
+from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
 
 globals().update({
     name: value
-    for name, value in vars(_event_alpha_legacy_helpers).items()
+    for name, value in vars(_event_alpha_api_helpers).items()
     if not name.startswith("__")
 })
 
@@ -976,7 +976,7 @@ def test_event_alpha_artifact_doctor_short_circuits_stale_namespace_marker():
             send_guard_enabled=False,
             telegram_ready=False,
             preview_path=preview,
-            include_legacy_artifacts=True,
+            include_api_artifacts=True,
         )
         assert readiness.ready is False
         assert any("stale/deprecated" in item for item in readiness.blockers)
@@ -986,7 +986,7 @@ def test_event_alpha_scheduled_make_targets_use_profile_lock_and_no_fixed_clock(
     import subprocess
     from pathlib import Path
 
-    root = _event_alpha_legacy_helpers.REPO_ROOT
+    root = _event_alpha_api_helpers.REPO_ROOT
     for target, profile in (
         ("event-alpha-notify-no-key-scheduled", "notify_no_key"),
         ("event-alpha-notify-llm-scheduled", "notify_llm"),
@@ -1784,7 +1784,7 @@ def test_event_alpha_namespace_lifecycle_doctor_policy_messages():
         )
         unknown_result = event_alpha_artifact_doctor.diagnose_artifacts(
             source_coverage_report_path=unknown / "event_alpha_source_coverage.md",
-            skip_legacy_checks=True,
+            skip_api_checks=True,
         )
         assert unknown_result.status == "WARN"
         assert any("unknown_namespace_status=unknown" in warning for warning in unknown_result.warnings)
@@ -1801,7 +1801,7 @@ def test_event_alpha_namespace_lifecycle_doctor_policy_messages():
         )
         unsafe_result = event_alpha_artifact_doctor.diagnose_artifacts(
             source_coverage_report_path=unsafe / "event_alpha_source_coverage.md",
-            skip_legacy_checks=True,
+            skip_api_checks=True,
         )
         assert unsafe_result.status == "BLOCKED"
         assert any("current_doctor_status=BLOCKED" in blocker for blocker in unsafe_result.blockers)
@@ -1820,7 +1820,7 @@ def test_event_alpha_namespace_lifecycle_doctor_policy_messages():
         )
         old_result = event_alpha_artifact_doctor.diagnose_artifacts(
             source_coverage_report_path=old_active / "event_alpha_source_coverage.md",
-            skip_legacy_checks=True,
+            skip_api_checks=True,
         )
         assert old_result.status == "WARN"
         assert any("active_namespace_older_than_retention=old_active" in warning for warning in old_result.warnings)

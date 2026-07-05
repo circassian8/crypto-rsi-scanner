@@ -19,14 +19,14 @@ for _module in _MODULES:
     _module.__dict__.update(_EXPORTS)
 
 
-def _bind_legacy_scanner_globals() -> None:
+def _bind_api_scanner_globals() -> None:
     """Preserve the old single-module scanner-global binding across split parts."""
     bind_scanner_globals(globals())
     for _module in _MODULES:
         bind_scanner_globals(_module.__dict__)
 
 
-globals()["_bind_legacy_scanner_globals"] = _bind_legacy_scanner_globals
+globals()["_bind_api_scanner_globals"] = _bind_api_scanner_globals
 for _module in _MODULES:
-    _module.__dict__["_bind_legacy_scanner_globals"] = _bind_legacy_scanner_globals
+    _module.__dict__["_bind_api_scanner_globals"] = _bind_api_scanner_globals
 __all__ = tuple(_name for _name in _EXPORTS if not _name.startswith("_"))

@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-05 - Flat Event Alpha shims are fully retired
+**Status:** accepted
+**Decision:** No old flat Event Alpha public compatibility shims remain. Deleted
+old imports are allowed to fail and are covered by
+`tests/event_alpha/test_no_old_event_alpha_imports.py`; new code and docs must
+use canonical `crypto_rsi_scanner.event_alpha.*` package paths. `scanner.py`
+remains the historical CLI entrypoint, and `event_fade.py` remains
+intentionally outside Event Alpha.
+**Why:** The final shim/old-import/legacy-retirement reports now show
+`active_shims=0`, `retained_public_shims_count=0`,
+`nonessential_shims_remaining=0`, `old_path_internal_imports=0`,
+`old_path_test_imports=0`, `old_path_docs_references=0`, and
+`old_path_import_allowed_exceptions=0`. Keeping empty public compatibility
+surface documentation avoids future agents reintroducing old shim paths.
+**Revisit when:** a compatibility-breaking release explicitly accepts a new
+temporary public bridge, or an external consumer requirement proves a deleted
+old path must be restored.
+
 ## 2026-07-05 - Accepted refactor v3 exceptions are not blockers
 **Status:** accepted
 **Decision:** Refactor v3 reports use four statuses: `pass`,
@@ -68,9 +86,9 @@ runtime-artifact audit.
 **Decision:** Event Alpha refactor v3 is accepted as the current package,
 shim, doctor, namespace, size, and test baseline. The only top-level
 implementation event module is `event_fade.py`, which remains intentionally
-outside Event Alpha. The remaining old Event Alpha paths are retained public
-compatibility entrypoints only, deleted old imports are tombstoned, and new
-code must use canonical package paths.
+outside Event Alpha. No old flat Event Alpha public compatibility shims remain;
+deleted old imports are tombstoned, and new code must use canonical package
+paths.
 **Why:** The full v3 release-candidate gauntlet passed (`26/26` commands), the
 critical RC gates passed, and `research/REFACTOR_V3_RELEASE_CANDIDATE_REPORT.md`
 records zero nonessential shims, zero old-path internal/test/docs references,
@@ -79,25 +97,18 @@ unresolved over-1,200-line production files, zero unresolved multi-class
 modules, zero unknown namespaces, and zero doctor registry legacy-unregistered
 checks. Remaining over-1,200 files and storage mixin classes are accepted
 warnings with owner notes and revisit conditions.
-**Revisit when:** a retained public shim is proposed for removal, a production
+**Revisit when:** a public compatibility bridge is proposed for restoration, a production
 file crosses a blocker threshold, a new class/model-bundle exception is needed,
 or a future provider activation pass changes Event Alpha package boundaries.
 
 ## 2026-07-05 - Retained Event Alpha shims are public entrypoints only
-**Status:** accepted
-**Decision:** The remaining old flat Event Alpha modules are retained only as
-documented public compatibility entrypoints. Deleted old import paths are
-tombstoned and allowed to fail; compatibility tests cover retained public
-entrypoints only; docs should point to canonical package paths; artifact doctor
-warns if a deleted shim file is reintroduced.
-**Why:** The dependency and old-import reports show no nonessential shim is safe
-or necessary to delete in this pass: `safe_to_remove_count=0`,
-`nonessential_shims_remaining=0`, `retained_public_shims_count=9`, and
-`removed_shims_count=115`. Keeping only documented public wrappers preserves
-external/operator compatibility without reopening internal old-path imports.
-**Revisit when:** a v4/deprecation release intentionally removes a retained
-public compatibility entrypoint, or a public consumer requirement justifies
-changing the retained entrypoint list.
+**Status:** superseded
+**Decision:** Superseded by “Flat Event Alpha shims are fully retired.” The
+retained public shim set is now empty.
+**Why:** A later pass removed the remaining public compatibility shims after
+canonical imports, tests, docs, and reports stopped depending on them.
+**Revisit when:** an external consumer requirement proves a deleted old path
+must be restored as an explicitly documented bridge.
 
 ## 2026-07-05 - Refactor v3 production size warning threshold is 1,200 lines
 **Status:** accepted
@@ -186,11 +197,11 @@ or is explicitly accepted as a permanent public compatibility entrypoint.
 
 ## 2026-07-04 - Event Alpha old flat imports are compatibility-only
 **Status:** accepted
-**Decision:** Internal project code and ordinary tests must import canonical
+**Decision:** Superseded by “Flat Event Alpha shims are fully retired.” Internal
+project code and ordinary tests must import canonical
 Event Alpha package paths under `crypto_rsi_scanner.event_alpha.*` or other new
-canonical packages. Old flat Event Alpha paths remain available only as
-compatibility shims, documented public wrappers, or explicit legacy import
-compatibility coverage in `tests/event_alpha/test_legacy_import_compatibility.py`.
+canonical packages. Old flat Event Alpha paths are now deleted/tombstoned, and
+failure coverage lives in `tests/event_alpha/test_no_old_event_alpha_imports.py`.
 `make event-alpha-old-import-check` is the lint-style gate for this boundary and
 its counters are surfaced in shim, doctor, and refactor reports.
 **Why:** The refactor v3 phase should retire internal dependence on old flat
@@ -292,7 +303,7 @@ without requiring shared legacy globals.
 ## 2026-07-03 - Legacy implementation size gates define refactor completion
 **Status:** accepted
 **Decision:** Small public wrappers and compatibility aggregators are not enough
-to mark the refactor complete. `*_legacy.py` and `legacy_*` implementation cores
+to mark the refactor complete. `*_api.py` and `legacy_*` implementation cores
 are transitional only: files over 1,500 lines are warnings, and files over
 3,000 lines block the refactor final/completion reports until they are split or
 an explicit baseline decision is made.
@@ -320,7 +331,7 @@ secret leakage. Compatibility paths remain available while the remaining large
 legacy cores are tracked by size gates and completion maps.
 **Revisit when:** a future v2/v3 compatibility break proposes warnings or
 removal for old import paths, or a focused pass moves command families out of
-`cli/services/scanner_legacy.py` and replaces the remaining service refresh
+`cli/services/scanner_api.py` and replaces the remaining service refresh
 helpers with direct imports under parity tests.
 
 ## 2026-07-03 - Shared storage, backtest, and schema modules use facades plus parts
@@ -395,7 +406,7 @@ small public artifact-doctor orchestrator/export surface. New doctor logic must
 land in focused modules such as `execution.py`, `context.py`, `discovery.py`,
 `aggregation.py`, `result.py`, `counters.py`, `issues.py`, `status.py`,
 `report_sections/`, and `checks/`. The behavior-compatible core remains in
-`crypto_rsi_scanner.event_alpha.doctor.legacy_artifact_doctor` until individual
+`crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_core` until individual
 checks are migrated behind regression fixtures.
 **Why:** This meets the public size and registry gates while preserving doctor
 output semantics, counter names, stale namespace behavior, schema counters,

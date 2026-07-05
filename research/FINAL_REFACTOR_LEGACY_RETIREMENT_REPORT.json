@@ -1,0 +1,42 @@
+{
+  "allowed_top_level_event_modules": [
+    {
+      "path": "crypto_rsi_scanner/event_fade.py",
+      "reason": "Intentional safety boundary: TRIGGERED_FADE remains owned only by event_fade.py plus proxy_fade."
+    }
+  ],
+  "blockers": [],
+  "deleted_shims_count": 124,
+  "generated_at": "2026-07-05T03:53:43.498785+00:00",
+  "legacy_named_dirs": [],
+  "legacy_named_dirs_count": 0,
+  "legacy_named_files": [],
+  "legacy_named_files_count": 0,
+  "no_send_rehearsal": true,
+  "nonessential_shims_remaining": 0,
+  "normal_rsi_signal_rows_written": 0,
+  "paper_trades_created": 0,
+  "research_only": true,
+  "retained_public_shims": [],
+  "retained_public_shims_count": 0,
+  "row_type": "final_refactor_legacy_retirement_report",
+  "safety_invariants": {
+    "no_event_alpha_rsi_writes": true,
+    "no_event_alpha_triggered_fade": true,
+    "no_execution_order_logic": true,
+    "no_live_provider_calls_by_default": true,
+    "no_live_telegram_sends": true,
+    "no_live_trading_added": true,
+    "no_paper_trading_changes": true,
+    "no_secrets": true,
+    "research_only": true
+  },
+  "schema_version": "final_refactor_legacy_retirement_report_v1",
+  "status": "OK",
+  "strict_alerts_created": 0,
+  "telegram_sends": 0,
+  "top_level_event_modules": [],
+  "top_level_event_modules_count": 0,
+  "trades_created": 0,
+  "triggered_fade_created": 0
+}

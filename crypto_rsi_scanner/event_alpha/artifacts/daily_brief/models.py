@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from .legacy import EventAlphaDailyBriefResult
+from .api import EventAlphaDailyBriefResult
 
 __all__ = ("EventAlphaDailyBriefResult",)

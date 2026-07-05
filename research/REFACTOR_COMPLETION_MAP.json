@@ -13,15 +13,22 @@
     "modules_with_multiple_public_classes_status": "pass",
     "near_threshold_file_status": [
       {
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "line_count": 1437,
+        "path": "crypto_rsi_scanner/refactor_final_report.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1426,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
@@ -42,7 +49,7 @@
       },
       {
         "line_count": 1392,
-        "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+        "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
@@ -103,12 +110,12 @@
         "accepted_exception": false,
         "class_name": "CoinalyzeDerivativesProvider",
         "line_count": 54,
-        "module": "crypto_rsi_scanner.derivatives_providers.coinalyze.legacy",
+        "module": "crypto_rsi_scanner.derivatives_providers.coinalyze.core",
         "over_limit": false,
         "owner_note": "",
         "reason": "",
         "revisit_condition": "",
-        "source_path": "crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py",
+        "source_path": "crypto_rsi_scanner/derivatives_providers/coinalyze/core.py",
         "split_status": "below_threshold"
       },
       {
@@ -233,7 +240,7 @@
     "scanner_command_body_functions_remaining": 0
   },
   "doctor_refactor": {
-    "legacy_doctor_core_lines": 95,
+    "legacy_doctor_core_lines": 91,
     "legacy_unregistered": 0,
     "plugin_check_counts": {
       "integrated_radar": 3,
@@ -247,8 +254,9 @@
       "source_coverage": 1,
       "stale_artifacts": 1
     },
-    "public_doctor_lines": 41,
-    "top_level_doctor_shim_lines": 19
+    "public_doctor_lines": 36,
+    "top_level_doctor_shim_lines": null,
+    "top_level_doctor_shim_status": "deleted"
   },
   "doctor_registry_coverage": {
     "legacy_unregistered": 0,
@@ -268,20 +276,20 @@
       "source_coverage": 1,
       "stale_artifacts": 1
     },
-    "remaining_legacy_unregistered_details": []
+    "remaining_api_unregistered_details": []
   },
   "event_alpha_module_map": {
     "active_shim_modules_with_implementation_logic": 0,
-    "active_shims": 9,
+    "active_shims": 0,
     "classification_report": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
     "intentionally_outside_event_alpha_modules": [
       "crypto_rsi_scanner.event_fade"
     ],
     "partial_shims": 0,
-    "top_level_event_module_count": 10,
+    "top_level_event_module_count": 1,
     "unmigrated_modules": 1
   },
-  "generated_at": "2026-07-04T22:43:40+00:00",
+  "generated_at": "2026-07-05T04:02:50+00:00",
   "generator": "crypto_rsi_scanner.refactor_completion_map",
   "known_remaining_blockers": [],
   "live_provider_calls_allowed": false,
@@ -335,19 +343,28 @@
       {
         "accepted": true,
         "limit": 1500,
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
-        "reason": "Static shim registry/data table; large by design and non-behavioral.",
-        "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
+        "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
+        "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
         "source_kind": "production"
       },
       {
         "accepted": true,
         "limit": 1500,
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
-        "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
-        "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
+        "line_count": 1437,
+        "path": "crypto_rsi_scanner/refactor_final_report.py",
+        "reason": "Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together.",
+        "revisit_condition": "When final-report sections can be split with byte-stable JSON/Markdown fixture comparisons.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1426,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
+        "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
         "source_kind": "production"
       },
       {
@@ -372,7 +389,7 @@
         "accepted": true,
         "limit": 1500,
         "line_count": 1392,
-        "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+        "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
         "reason": "Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
         "revisit_condition": "When config/report command bodies move to canonical non-legacy service modules.",
         "source_kind": "production"
@@ -408,7 +425,7 @@
         "accepted": true,
         "limit": 1500,
         "line_count": 1261,
-        "path": "crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py",
+        "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
         "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
         "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
         "source_kind": "production"
@@ -441,104 +458,34 @@
         "source_kind": "production"
       }
     ],
-    "accepted_production_files_over_1200_lines": 12,
+    "accepted_production_files_over_1200_lines": 13,
     "classes_over_limit_count": 3,
     "files_over_limit_count": 8,
     "functions_over_limit_count": 0,
     "gate_status": "pass",
-    "largest_legacy_files": [
+    "largest_api_files": [
       {
-        "line_count": 933,
-        "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/legacy.py"
-      },
-      {
-        "line_count": 779,
-        "path": "crypto_rsi_scanner/event_alpha/providers/provider_health_legacy.py"
-      },
-      {
-        "line_count": 629,
-        "path": "crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py"
-      },
-      {
-        "line_count": 190,
-        "path": "crypto_rsi_scanner/refactor_legacy_inventory.py"
-      },
-      {
-        "line_count": 120,
-        "path": "crypto_rsi_scanner/cli/services/scanner_legacy.py"
-      },
-      {
-        "line_count": 104,
-        "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_legacy.py"
-      },
-      {
-        "line_count": 95,
-        "path": "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py"
-      },
-      {
-        "line_count": 88,
-        "path": "crypto_rsi_scanner/event_alpha/artifacts/research_cards/legacy.py"
-      },
-      {
-        "line_count": 85,
-        "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy.py"
-      },
-      {
-        "line_count": 83,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy.py"
-      },
-      {
-        "line_count": 59,
-        "path": "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/legacy.py"
-      },
-      {
-        "line_count": 54,
-        "path": "crypto_rsi_scanner/event_alpha/radar/validation/legacy.py"
-      },
-      {
-        "line_count": 52,
-        "path": "crypto_rsi_scanner/event_alpha/radar/discovery/legacy.py"
-      },
-      {
-        "line_count": 50,
-        "path": "crypto_rsi_scanner/event_alpha/radar/core/legacy_store.py"
-      },
-      {
-        "line_count": 50,
-        "path": "crypto_rsi_scanner/event_alpha/radar/evidence/legacy_acquisition.py"
-      },
-      {
-        "line_count": 50,
-        "path": "crypto_rsi_scanner/event_alpha/radar/watchlist/legacy.py"
-      },
-      {
-        "line_count": 48,
-        "path": "crypto_rsi_scanner/event_alpha/radar/near_miss/legacy.py"
-      },
-      {
-        "line_count": 44,
-        "path": "crypto_rsi_scanner/backtest_parts/legacy.py"
-      },
-      {
-        "line_count": 16,
-        "path": "crypto_rsi_scanner/event_providers/cryptopanic/legacy.py"
-      },
-      {
-        "line_count": 12,
-        "path": "crypto_rsi_scanner/event_providers/binance_announcements/legacy.py"
+        "line_count": 231,
+        "path": "crypto_rsi_scanner/refactor_legacy_file_check.py"
       }
     ],
     "largest_production_files": [
       {
         "limit": 1500,
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
         "source_kind": "production"
       },
       {
         "limit": 1500,
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "line_count": 1437,
+        "path": "crypto_rsi_scanner/refactor_final_report.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1426,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "source_kind": "production"
       },
       {
@@ -556,7 +503,7 @@
       {
         "limit": 1500,
         "line_count": 1392,
-        "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+        "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
         "source_kind": "production"
       },
       {
@@ -580,7 +527,7 @@
       {
         "limit": 1500,
         "line_count": 1261,
-        "path": "crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py",
+        "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
         "source_kind": "production"
       },
       {
@@ -603,12 +550,6 @@
       },
       {
         "limit": 1500,
-        "line_count": 1193,
-        "path": "crypto_rsi_scanner/refactor_final_report.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
         "line_count": 1181,
         "path": "crypto_rsi_scanner/event_fade.py",
         "source_kind": "production"
@@ -622,7 +563,7 @@
       {
         "limit": 1500,
         "line_count": 1145,
-        "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py",
+        "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py",
         "source_kind": "production"
       },
       {
@@ -646,13 +587,19 @@
       {
         "limit": 1500,
         "line_count": 1103,
-        "path": "crypto_rsi_scanner/cli/services/legacy/rsi_scan.py",
+        "path": "crypto_rsi_scanner/cli/services/scanner_parts/rsi_scan.py",
         "source_kind": "production"
       },
       {
         "limit": 1500,
         "line_count": 1096,
-        "path": "crypto_rsi_scanner/cli/services/legacy/utility_commands.py",
+        "path": "crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1079,
+        "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py",
         "source_kind": "production"
       },
       {
@@ -671,12 +618,6 @@
         "limit": 1500,
         "line_count": 1059,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 1052,
-        "path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py",
         "source_kind": "production"
       },
       {
@@ -760,7 +701,7 @@
       {
         "limit": 1500,
         "line_count": 961,
-        "path": "crypto_rsi_scanner/cli/services/legacy/reports.py",
+        "path": "crypto_rsi_scanner/cli/services/scanner_parts/reports.py",
         "source_kind": "production"
       },
       {
@@ -815,20 +756,20 @@
       },
       {
         "limit": 1500,
-        "line_count": 1778,
+        "line_count": 1779,
         "path": "tests/test_indicators.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 1095,
+        "line_count": 1231,
         "path": "tests/cli/test_make_targets.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
         "line_count": 825,
-        "path": "tests/event_alpha/_legacy_helpers.py",
+        "path": "tests/event_alpha/_api_helpers.py",
         "source_kind": "test"
       },
       {
@@ -851,26 +792,20 @@
       },
       {
         "limit": 1500,
+        "line_count": 492,
+        "path": "tests/event_alpha/test_shim_registry.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
         "line_count": 379,
         "path": "tests/rsi/test_paper_risk.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 325,
-        "path": "tests/event_alpha/test_shim_registry.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
         "line_count": 243,
         "path": "tests/cli/test_parser.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 170,
-        "path": "tests/event_alpha/test_legacy_import_compatibility.py",
         "source_kind": "test"
       },
       {
@@ -887,14 +822,38 @@
       },
       {
         "limit": 1500,
+        "line_count": 88,
+        "path": "tests/cli/test_relative_import_integrity.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 76,
+        "path": "tests/cli/test_ops_command_smoke.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
         "line_count": 68,
-        "path": "tests/rsi/_legacy_helpers.py",
+        "path": "tests/rsi/_api_helpers.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 39,
+        "path": "tests/event_alpha/test_no_old_event_alpha_imports.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
         "line_count": 30,
         "path": "tests/event_alpha/conftest.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 27,
+        "path": "tests/event_alpha/test_canonical_imports.py",
         "source_kind": "test"
       },
       {
@@ -933,21 +892,28 @@
     "legacy_files_over_1500_lines": 0,
     "legacy_files_over_3000_lines": 0,
     "legacy_functions_over_limit": 0,
-    "legacy_modules_with_multiple_public_classes": 1,
-    "legacy_total_lines": 3553,
+    "legacy_modules_with_multiple_public_classes": 0,
+    "legacy_total_lines": 231,
     "modules_with_multiple_public_classes_status": "pass",
     "moved_existing_violation_count": 0,
     "near_threshold_file_status": [
       {
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "line_count": 1437,
+        "path": "crypto_rsi_scanner/refactor_final_report.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1426,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
@@ -968,7 +934,7 @@
       },
       {
         "line_count": 1392,
-        "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+        "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
@@ -990,7 +956,7 @@
     ],
     "new_violation_count": 0,
     "production_classes_over_limit": 3,
-    "production_files_over_1200_lines": 12,
+    "production_files_over_1200_lines": 13,
     "production_files_over_1500_lines": 0,
     "production_files_over_2000_lines": 0,
     "production_files_over_3000_lines": 0,
@@ -1037,12 +1003,12 @@
         "accepted_exception": false,
         "class_name": "CoinalyzeDerivativesProvider",
         "line_count": 54,
-        "module": "crypto_rsi_scanner.derivatives_providers.coinalyze.legacy",
+        "module": "crypto_rsi_scanner.derivatives_providers.coinalyze.core",
         "over_limit": false,
         "owner_note": "",
         "reason": "",
         "revisit_condition": "",
-        "source_path": "crypto_rsi_scanner/derivatives_providers/coinalyze/legacy.py",
+        "source_path": "crypto_rsi_scanner/derivatives_providers/coinalyze/core.py",
         "split_status": "below_threshold"
       },
       {
@@ -1168,14 +1134,14 @@
   "transitional_compatibility_cores": [
     {
       "line_count": 120,
-      "next_work": "Move focused command families out of scanner_legacy.py in smaller parity-tested passes.",
-      "path": "crypto_rsi_scanner/cli/services/scanner_legacy.py",
+      "next_work": "Move focused command families out of scanner_api.py in smaller parity-tested passes.",
+      "path": "crypto_rsi_scanner/cli/services/scanner_api.py",
       "reason": "Moved historical scanner command body; old root scanner is now a facade."
     },
     {
-      "line_count": 95,
+      "line_count": 91,
       "next_work": "Move legacy checks into focused doctor plugins with counter-preserving fixtures.",
-      "path": "crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py",
+      "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py",
       "reason": "Preserves strict/WARN artifact doctor semantics while plugin migrations continue."
     }
   ],

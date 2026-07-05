@@ -3,11 +3,11 @@
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
 from types import SimpleNamespace
 
-from tests.event_alpha import _legacy_helpers as _event_alpha_legacy_helpers
+from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
 
 globals().update({
     name: value
-    for name, value in vars(_event_alpha_legacy_helpers).items()
+    for name, value in vars(_event_alpha_api_helpers).items()
     if not name.startswith("__")
 })
 
@@ -134,7 +134,7 @@ def test_event_alpha_doctor_check_plugins_emit_regression_messages():
     outcomes.apply_checks(
         SimpleNamespace(
             strict=True,
-            strict_legacy=True,
+            strict_api=True,
             core_store_available=True,
             fresh_missing=1,
             route_conflicts=1,
@@ -329,7 +329,7 @@ def test_event_alpha_artifact_doctor_schema_only_catches_bad_fixture():
         assert "missing_required_fields=1" in text
 
 
-def test_event_alpha_artifact_doctor_skip_legacy_keeps_schema_phases_only():
+def test_event_alpha_artifact_doctor_skip_api_keeps_schema_phases_only():
     import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
     with TemporaryDirectory() as tmp:
@@ -339,7 +339,7 @@ def test_event_alpha_artifact_doctor_skip_legacy_keeps_schema_phases_only():
         )
         skipped = event_alpha_artifact_doctor.diagnose_artifacts(
             inspected_alert_store_path=base / "event_alpha_alerts.jsonl",
-            skip_legacy_checks=True,
+            skip_api_checks=True,
         )
         text = event_alpha_artifact_doctor.format_artifact_doctor_report(skipped)
 
@@ -582,7 +582,7 @@ def test_event_alpha_artifact_context_and_doctor_filter_modes():
         assert event_alpha_artifacts.filter_artifact_rows([{"run_id": "legacy"}]) == []
         assert event_alpha_artifacts.filter_artifact_rows(
             [{"run_id": "legacy"}],
-            include_legacy_artifacts=True,
+            include_api_artifacts=True,
         ) == [{"run_id": "legacy"}]
         assert event_alpha_artifacts.classify_snapshot_availability(
             run_rows[0],
@@ -643,14 +643,14 @@ def test_event_alpha_artifact_context_and_doctor_filter_modes():
         legacy = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=[{"run_id": "legacy", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
             alert_rows=[],
-            include_legacy_artifacts=True,
+            include_api_artifacts=True,
         )
         assert legacy.status == "WARN"
         assert "legacy_run_missing_snapshot_rows" in "; ".join(legacy.warnings)
         legacy_strict = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=[{"run_id": "legacy", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
             alert_rows=[],
-            include_legacy_artifacts=True,
+            include_api_artifacts=True,
             strict=True,
         )
         assert legacy_strict.status == "BLOCKED"
@@ -1765,7 +1765,7 @@ def test_event_alpha_artifact_doctor_blocks_research_review_body_not_using_canon
         assert clean.research_review_body_uses_hypothesis_target_when_core_exists == 0
 
 
-def test_event_alpha_quality_fields_enforced_and_doctor_reports_legacy_missing():
+def test_event_alpha_quality_fields_enforced_and_doctor_reports_api_missing():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
@@ -1863,7 +1863,7 @@ def test_event_alpha_quality_fields_enforced_and_doctor_reports_legacy_missing()
             hypothesis_rows=rows,
             watchlist_rows=[entry, legacy],
             alert_rows=alert_rows,
-            include_legacy_artifacts=True,
+            include_api_artifacts=True,
             strict=False,
         )
         assert doctor.quality_fields_missing_count >= 1
@@ -1873,7 +1873,7 @@ def test_event_alpha_quality_fields_enforced_and_doctor_reports_legacy_missing()
         strict = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=[{"run_id": "r1", "alertable": 0}],
             watchlist_rows=[legacy],
-            include_legacy_artifacts=True,
+            include_api_artifacts=True,
             strict=True,
         )
         assert strict.status in {"OK", "WARN"}
@@ -3930,7 +3930,7 @@ def test_integrated_doctor_catches_delivery_and_outcome_conflicts():
             outcome_path=outcomes,
             preview_path=preview,
         )
-    assert conflicts["integrated_legacy_preview_alerts_wording"] == 1
+    assert conflicts["integrated_api_preview_alerts_wording"] == 1
     assert conflicts["integrated_delivery_missing_disclaimer"] == 1
     assert conflicts["integrated_delivery_sent_in_no_send"] == 1
     assert conflicts["integrated_delivery_side_effect_flag"] == 1

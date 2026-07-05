@@ -28,7 +28,7 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
         "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
     },
-    "crypto_rsi_scanner/cli/services/legacy/config_reports.py": {
+    "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py": {
         "reason": "Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
         "revisit_condition": "When config/report command bodies move to canonical non-legacy service modules.",
     },
@@ -40,7 +40,7 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
         "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
     },
-    "crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py": {
+    "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py": {
         "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
         "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
     },
@@ -56,7 +56,7 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
         "revisit_condition": "When adding a new derivatives metric family or crowding class.",
     },
-    "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py": {
+    "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py": {
         "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
         "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
     },
@@ -69,8 +69,12 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "revisit_condition": "When adding a new enrichment source or cache policy.",
     },
     "crypto_rsi_scanner/event_alpha/shims.py": {
-        "reason": "Static shim registry/data table; large by design and non-behavioral.",
-        "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
+        "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
+        "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
+    },
+    "crypto_rsi_scanner/refactor_final_report.py": {
+        "reason": "Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together.",
+        "revisit_condition": "When final-report sections can be split with byte-stable JSON/Markdown fixture comparisons.",
     },
 }
 V3_GATE_NAMES = (

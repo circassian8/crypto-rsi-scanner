@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import SCHEMAS
+from .registry import SCHEMAS
 
 SOURCE_COVERAGE_SCHEMA = SCHEMAS["source_coverage_v1"]
 SCHEMA_IDS = ("source_coverage_v1",)

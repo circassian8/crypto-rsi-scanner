@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..provider_health_legacy import (
+from ..provider_health_core import (
     EventProviderHealthConfig,
     HealthCheckedProvider,
     ProviderHealthDecision,
@@ -35,4 +35,3 @@ __all__ = (
     "reset_provider_health_rows",
     "write_provider_health",
 )
-

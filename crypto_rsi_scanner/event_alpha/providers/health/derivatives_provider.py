@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from ..provider_health_legacy import HealthCheckedDerivativesProvider
+from ..provider_health_core import HealthCheckedDerivativesProvider
 
 __all__ = ("HealthCheckedDerivativesProvider",)
-

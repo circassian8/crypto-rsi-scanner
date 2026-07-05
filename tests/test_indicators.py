@@ -1670,9 +1670,10 @@ def _canonical_core_fixture_rows() -> list[dict[str, object]]:
 _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_artifact_doctor",
     "tests.event_alpha.test_artifact_schema",
+    "tests.event_alpha.test_canonical_imports",
     "tests.event_alpha.test_integrated_radar",
-    "tests.event_alpha.test_legacy_import_compatibility",
     "tests.event_alpha.test_namespace_lifecycle",
+    "tests.event_alpha.test_no_old_event_alpha_imports",
     "tests.event_alpha.test_notifications",
     "tests.event_alpha.test_outcomes",
     "tests.event_alpha.test_provider_readiness",

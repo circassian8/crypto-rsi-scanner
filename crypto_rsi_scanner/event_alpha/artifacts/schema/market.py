@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import SCHEMAS
+from .registry import SCHEMAS
 
 MARKET_STATE_SNAPSHOT_SCHEMA = SCHEMAS["market_state_snapshot_v1"]
 MARKET_ANOMALY_SCHEMA = SCHEMAS["market_anomaly_v1"]

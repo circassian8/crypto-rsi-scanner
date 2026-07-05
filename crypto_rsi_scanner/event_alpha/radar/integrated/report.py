@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .legacy import (
+from .pipeline_parts import (
     format_integrated_daily_brief,
     format_integrated_notification_preview,
     format_integrated_notification_preview_from_deliveries,

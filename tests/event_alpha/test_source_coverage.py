@@ -40,11 +40,11 @@ def test_source_coverage_links_live_provider_readiness_artifacts():
     assert f"- readiness JSON: {source_coverage.LIVE_PROVIDER_READINESS_JSON}" in text
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
-from tests.event_alpha import _legacy_helpers as _event_alpha_legacy_helpers
+from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
 
 globals().update({
     name: value
-    for name, value in vars(_event_alpha_legacy_helpers).items()
+    for name, value in vars(_event_alpha_api_helpers).items()
     if not name.startswith("__")
 })
 
@@ -813,7 +813,7 @@ def test_event_catalyst_search_skip_reasons_flow_to_ledger_and_brief():
         brief = event_alpha_daily_brief.build_daily_brief(
             run_rows=[row],
             include_test_artifacts=True,
-            include_legacy_artifacts=True,
+            include_api_artifacts=True,
         )
         assert "## Catalyst Search Skip Reasons" in brief
         assert "- provider_unavailable: 1" in brief
@@ -2662,7 +2662,7 @@ def test_evidence_acquisition_rows_reconcile_to_canonical_core_store_ids():
                 "run_id": "run-core-acquisition",
                 "profile": "market_refresh_smoke",
                 "artifact_namespace": "market_refresh_smoke",
-                "core_opportunity_id": "core_legacy_memecore",
+                "core_opportunity_id": "core_api_memecore",
                 "hypothesis_id": "hyp-meme-core",
                 "incident_id": "incident-memecore",
                 "symbol": "MEME",
@@ -2681,7 +2681,7 @@ def test_evidence_acquisition_rows_reconcile_to_canonical_core_store_ids():
     assert changed >= 1
     assert rows[0]["core_opportunity_id"] == meme_core
     assert rows[0]["core_opportunity_id_status"] == "diagnostic_support"
-    assert rows[0]["original_core_opportunity_id"] == "core_legacy_memecore"
+    assert rows[0]["original_core_opportunity_id"] == "core_api_memecore"
 
 
 def test_evidence_acquisition_caps_stale_promoted_final_fields():
