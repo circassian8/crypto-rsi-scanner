@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Scope shim dependency scans to source by default · Codex
+**Why:** The final refactor reports were walking `event_fade_cache` runtime
+artifacts by default, making shim dependency checks slow and noisy even though
+old-import gates only need source, tests, scripts, docs, Makefile, and checked-in
+research policy files.
+**Changes:**
+- Added `event_alpha/shim_scan.py` as the source-scoped shim reference scanner
+  with runtime-artifact exclusions, file-size limits, scan accounting, and
+  single-pass regex compilation.
+- Added `--include-runtime-artifacts`, `--force-rescan-shims`, and
+  `--shim-scan-max-file-bytes` to the shim report CLI while keeping Make
+  targets source-only by default.
+- Threaded cache status and scan accounting through shim dependency,
+  old-import, final shim status, doctor warnings, and refactor final reports.
+- Added focused tests for huge artifact skipping, explicit artifact opt-in,
+  cache reuse/force rescan, doctor scan-accounting warnings, and final-report
+  scan counters.
+**Verify:** Passed `python3 tests/test_indicators.py` (`757/757 passed`);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (`768 passed`); `python3 -m compileall
+-q crypto_rsi_scanner tests`; `make event-alpha-old-import-check
+PYTHON=python3`; `make event-alpha-shim-dependency-report PYTHON=python3`;
+`make refactor-final-report PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make refactor-size-gates
+PYTHON=python3`; `make refactor-class-ownership-report PYTHON=python3`; `make
+event-alpha-shim-report PYTHON=python3`; and `make verify PYTHON=python3`.
+**Notes/risks:** Runtime artifact scanning is now opt-in for shim audits. The
+default reports still count skipped runtime artifact files for visibility, but
+do not parse them.
+
 ## 2026-07-05 — Accept Event Alpha refactor v3 release candidate · Codex
 **Why:** The final v3 pass needed a complete safe verification gauntlet and a
 checked-in release-candidate report before accepting the refactor as the

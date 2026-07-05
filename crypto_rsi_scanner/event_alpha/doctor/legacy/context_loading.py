@@ -242,6 +242,33 @@ def _attach_shim_dependency_warnings(ctx: SimpleNamespace) -> None:
                 f"old_path_docs_references={ctx.old_path_docs_references}",
             )
         )
+    scan_health = event_alpha_shims.shim_scan_health_summary()
+    ctx.shim_scan_health = scan_health
+    scan_duration = float(scan_health.get("scan_duration_seconds") or 0.0)
+    scanned_artifacts = int(scan_health.get("scanned_artifact_files") or 0)
+    include_runtime_artifacts = bool(scan_health.get("include_runtime_artifacts"))
+    if (not include_runtime_artifacts and scanned_artifacts) or include_runtime_artifacts:
+        ctx.warnings.append(
+            check_registry.format_check_message(
+                "paths.shim_scan_runtime_artifacts",
+                "include_runtime_artifacts="
+                f"{include_runtime_artifacts} scanned_artifact_files={scanned_artifacts}",
+            )
+        )
+    if scan_duration > event_alpha_shims.shim_scan.SHIM_SCAN_DURATION_WARNING_SECONDS:
+        ctx.warnings.append(
+            check_registry.format_check_message(
+                "paths.shim_scan_slow",
+                f"shim_scan_duration_seconds={scan_duration:.4f}",
+            )
+        )
+    if not scan_health.get("scan_accounting_present"):
+        ctx.warnings.append(
+            check_registry.format_check_message(
+                "paths.shim_scan_incomplete_accounting",
+                "shim_dependency_report_missing_scan_accounting",
+            )
+        )
     reintroduced = _reintroduced_deleted_shim_modules()
     if reintroduced:
         modules = ", ".join(reintroduced[:5])

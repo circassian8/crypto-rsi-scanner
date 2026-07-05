@@ -693,19 +693,16 @@ def build_refactor_final_report(
     size_gate_report = refactor_size_gates.build_gate_report(root=root)
     v3_gate_snapshot = _build_v3_gate_snapshot(root=root, size_gate_report=size_gate_report)
     deleted_shims = event_alpha_shims.deleted_shim_count(root=root)
+    shim_dependency_report = event_alpha_shims.build_shim_dependency_report(root=root)
     final_shim_status = event_alpha_shims.build_final_shim_status_report(
         root=root,
-        dependency_report=event_alpha_shims.build_shim_dependency_report(root=root),
+        dependency_report=shim_dependency_report,
     )
     cli_service_line_counts = _cli_service_line_counts(root)
     cli_event_alpha_service_lines = cli_service_line_counts.get("crypto_rsi_scanner/cli/services/event_alpha.py")
     cli_service_bind_calls = _cli_service_bind_scanner_globals_call_sites(root)
     parser_build_parser_lines = _function_line_count(root, "crypto_rsi_scanner/cli/parser.py", "build_parser")
-    commands_event_alpha_handle_lines = _function_line_count(
-        root,
-        "crypto_rsi_scanner/cli/commands_event_alpha.py",
-        "handle",
-    )
+    commands_event_alpha_handle_lines = _function_line_count(root, "crypto_rsi_scanner/cli/commands_event_alpha.py", "handle")
     legacy_doctor_core_lines = current_counts.get("crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py")
     legacy_unregistered = int(registry_summary.get("legacy_unregistered") or 0)
     doctor_plugin_migration = _doctor_plugin_migration_summary(legacy_unregistered=legacy_unregistered, root=root)
@@ -730,6 +727,11 @@ def build_refactor_final_report(
         "triggered_fade_created": 0,
         "compatibility_preserved": True,
         **_shim_final_fields(deleted_shims=deleted_shims, final_shim_status=final_shim_status),
+        "shim_dependency_report_cache_status": shim_dependency_report.get("shim_dependency_report_cache_status"), "shim_dependency_scan_duration_seconds": shim_dependency_report.get("scan_duration_seconds", 0),
+        "shim_dependency_scanned_source_files": shim_dependency_report.get("scanned_source_files", 0), "shim_dependency_scanned_doc_files": shim_dependency_report.get("scanned_doc_files", 0),
+        "shim_dependency_scanned_test_files": shim_dependency_report.get("scanned_test_files", 0), "shim_dependency_skipped_artifact_files": shim_dependency_report.get("skipped_artifact_files", 0),
+        "shim_dependency_skipped_large_files": shim_dependency_report.get("skipped_large_files", 0), "shim_dependency_include_runtime_artifacts": shim_dependency_report.get("include_runtime_artifacts"),
+        "shim_dependency_scan_accounting": shim_dependency_report.get("scan_accounting", {}),
         "line_counts": current_counts,
         "large_event_alpha_split_line_counts": large_event_alpha_split_line_counts,
         "baseline_line_counts": baseline_counts,
@@ -752,10 +754,7 @@ def build_refactor_final_report(
         "parser_build_parser_lines": parser_build_parser_lines,
         "commands_event_alpha_handle_lines": commands_event_alpha_handle_lines,
         "legacy_artifact_doctor_core_lines": legacy_doctor_core_lines,
-        "legacy_artifact_doctor_core_note": (
-            "Behavior-compatible doctor implementation preserved while public "
-            "artifact_doctor.py is the small orchestrator."
-        ),
+        "legacy_artifact_doctor_core_note": "Behavior-compatible doctor implementation preserved while public artifact_doctor.py is the small orchestrator.",
         "cli_flag_snapshot_path": "research/CLI_FLAG_SNAPSHOT.json",
         "scanner_command_body_functions_remaining": len(scanner_command_bodies),
         "scanner_command_body_function_names": scanner_command_bodies,
@@ -774,9 +773,7 @@ def build_refactor_final_report(
         **_v3_final_fields(v3_gate_snapshot),
         "legacy_classes_over_limit": legacy_inventory["legacy_classes_over_limit"],
         "legacy_functions_over_limit": legacy_inventory["legacy_functions_over_limit"],
-        "legacy_modules_with_multiple_public_classes": legacy_inventory[
-            "legacy_modules_with_multiple_public_classes"
-        ],
+        "legacy_modules_with_multiple_public_classes": legacy_inventory["legacy_modules_with_multiple_public_classes"],
         "remaining_implementation_modules_by_package_target": classification["remaining_implementation_modules_by_package_target"],
         "intentionally_outside_event_alpha_modules": classification["intentionally_outside_event_alpha_modules"],
         "doctor_plugin_migration": doctor_plugin_migration,
@@ -806,6 +803,16 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
             f"- old_module_paths_removed: `{data['old_module_paths_removed']}`",
             f"- removed_shims_count: `{data.get('removed_shims_count', 0)}`",
             f"- retained_public_shims_count: `{data.get('retained_public_shims_count', 0)}`",
+            *[
+                f"- {key}: `{data.get(key, 0)}`"
+                for key in (
+                    "shim_dependency_report_cache_status",
+                    "shim_dependency_include_runtime_artifacts",
+                    "shim_dependency_scan_duration_seconds",
+                    "shim_dependency_skipped_artifact_files",
+                    "shim_dependency_skipped_large_files",
+                )
+            ],
             f"- v3_gate_status: `{data.get('v3_gate_status')}`",
             f"- v3_auto_accept_ready: `{data.get('v3_auto_accept_ready')}`",
             "",

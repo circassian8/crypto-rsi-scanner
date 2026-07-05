@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-05 - Shim dependency scans are source-scoped by default
+**Status:** accepted
+**Decision:** Event Alpha shim dependency and old-import scans inspect source,
+tests, scripts, top-level docs, Makefile, research Markdown, and selected
+checked-in JSON by default. Runtime artifact directories such as
+`event_fade_cache/` are excluded unless an operator explicitly passes
+`--include-runtime-artifacts`; scans keep file-size limits, scan accounting, and
+cache/freshness metadata in the generated reports.
+**Why:** Shim-retirement and old-import gates are source-compatibility checks.
+Parsing large runtime artifacts by default makes refactor reports slow and can
+produce irrelevant old-path references from historical research output.
+**Revisit when:** runtime artifact content becomes a required compatibility
+contract, or a future artifact-retention policy needs a separate explicit
+runtime-artifact audit.
+
 ## 2026-07-05 - Event Alpha refactor v3 accepted
 **Status:** accepted
 **Decision:** Event Alpha refactor v3 is accepted as the current package,

@@ -495,6 +495,27 @@ CHECKS: tuple[DoctorCheck, ...] = (
         (),
         "Deleted old Event Alpha shim paths must not be reintroduced.",
     ),
+    _check(
+        "paths.shim_scan_runtime_artifacts",
+        CATEGORY_PATHS,
+        "warning",
+        (),
+        "Shim dependency scans should stay source-scoped by default and avoid runtime artifact directories.",
+    ),
+    _check(
+        "paths.shim_scan_slow",
+        CATEGORY_PATHS,
+        "warning",
+        (),
+        "Shim dependency scans should use fresh cache/source scopes when scan duration crosses the warning threshold.",
+    ),
+    _check(
+        "paths.shim_scan_incomplete_accounting",
+        CATEGORY_PATHS,
+        "warning",
+        (),
+        "Shim dependency reports must include scan accounting before they can support old-import finalization gates.",
+    ),
 )
 
 CHECK_BY_ID: dict[str, DoctorCheck] = {check.check_id: check for check in CHECKS}

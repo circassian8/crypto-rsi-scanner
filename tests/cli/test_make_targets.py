@@ -643,6 +643,11 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["removed_shims_count"] == payload["deleted_shims"]
     assert payload["retained_public_shims_count"] >= 9
     assert payload["retained_shims_with_reason"]
+    assert payload["shim_dependency_include_runtime_artifacts"] is False
+    assert payload["shim_dependency_report_cache_status"] in {"hit", "miss", "force_rescan", "disabled"}
+    assert payload["shim_dependency_scanned_source_files"] >= 1
+    assert payload["shim_dependency_skipped_artifact_files"] >= 0
+    assert isinstance(payload["shim_dependency_scan_accounting"], dict)
     assert payload["dead_duplicate_code_removed"] is False
     assert payload["pytest_runtime_seconds"] == 12.34
     assert payload["standalone_runner_runtime_seconds"] == 56.78

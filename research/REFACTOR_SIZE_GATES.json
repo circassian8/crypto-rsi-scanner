@@ -1257,14 +1257,13 @@
       "accepted_model_bundle": true,
       "class_names": [
         "ShimAuditRow",
-        "ShimReference",
         "ShimRegistryEntry"
       ],
       "exception_reason": "",
       "max_class_line_count": 17,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.shims",
-      "public_class_count": 3,
+      "public_class_count": 2,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
@@ -1392,19 +1391,19 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1499,
-      "path": "crypto_rsi_scanner/event_alpha/shims.py",
-      "reason": "Static shim registry/data table; large by design and non-behavioral.",
-      "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+      "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
+      "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
       "source_kind": "production"
     },
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1498,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
-      "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
-      "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
+      "line_count": 1496,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "reason": "Static shim registry/data table; large by design and non-behavioral.",
+      "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
       "source_kind": "production"
     },
     {
@@ -1673,7 +1672,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 636,
+  "file_count": 637,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -1730,7 +1729,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-04T22:43:06.587878+00:00",
+  "generated_at": "2026-07-05T02:04:45.150233+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -1816,14 +1815,14 @@
   "largest_production_files": [
     {
       "limit": 1500,
-      "line_count": 1499,
-      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1498,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+      "line_count": 1496,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "source_kind": "production"
     },
     {
@@ -1888,7 +1887,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1193,
+      "line_count": 1200,
       "path": "crypto_rsi_scanner/refactor_final_report.py",
       "source_kind": "production"
     },
@@ -1942,6 +1941,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1079,
+      "path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1078,
       "path": "crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py",
       "source_kind": "production"
@@ -1956,12 +1961,6 @@
       "limit": 1500,
       "line_count": 1059,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1052,
-      "path": "crypto_rsi_scanner/event_alpha/doctor/legacy/context_loading.py",
       "source_kind": "production"
     },
     {
@@ -2106,7 +2105,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1095,
+      "line_count": 1100,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
@@ -2136,14 +2135,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 379,
-      "path": "tests/rsi/test_paper_risk.py",
+      "line_count": 478,
+      "path": "tests/event_alpha/test_shim_registry.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 325,
-      "path": "tests/event_alpha/test_shim_registry.py",
+      "line_count": 379,
+      "path": "tests/rsi/test_paper_risk.py",
       "source_kind": "test"
     },
     {
@@ -3457,14 +3456,13 @@
       "accepted_model_bundle": true,
       "class_names": [
         "ShimAuditRow",
-        "ShimReference",
         "ShimRegistryEntry"
       ],
       "exception_reason": "",
       "max_class_line_count": 17,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.shims",
-      "public_class_count": 3,
+      "public_class_count": 2,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
@@ -3614,15 +3612,15 @@
   "multi_public_class_modules_count": 80,
   "near_threshold_file_status": [
     {
-      "line_count": 1499,
-      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1498,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+      "line_count": 1496,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3727,14 +3725,14 @@
   "production_files_over_1200_line_rows": [
     {
       "limit": 1500,
-      "line_count": 1499,
-      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1498,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+      "line_count": 1496,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "source_kind": "production"
     },
     {
@@ -4212,13 +4210,13 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
         "threshold": 1200
       },
       {
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "line_count": 1496,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "threshold": 1200
       },
       {

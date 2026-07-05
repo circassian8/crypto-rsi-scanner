@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import ast
 import json
-import re
 import sys
 from collections import Counter
 from dataclasses import asdict, dataclass
@@ -18,7 +17,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterable
 
+from . import shim_scan
 from .artifacts import paths as event_artifact_paths
+from .shim_scan import DEFAULT_SHIM_SCAN_MAX_FILE_BYTES
 
 
 REPORT_JSON = "event_alpha_shim_report.json"
@@ -108,18 +109,6 @@ class ShimAuditRow:
         data["allowed_exports"] = list(self.allowed_exports)
         data["violations"] = list(self.violations)
         return data
-
-
-@dataclass(frozen=True)
-class ShimReference:
-    path: str
-    line: int
-    reference_type: str
-    detail: str
-    snippet: str
-
-    def to_dict(self) -> dict[str, object]:
-        return asdict(self)
 
 
 def registry_entries(module_map_path: str | Path | None = None) -> tuple[ShimRegistryEntry, ...]:
@@ -340,11 +329,31 @@ def build_shim_dependency_report(
     *,
     root: str | Path | None = None,
     generated_at: datetime | None = None,
+    include_runtime_artifacts: bool = False,
+    force_rescan_shims: bool = False,
+    use_cache: bool = True,
+    max_file_bytes: int = DEFAULT_SHIM_SCAN_MAX_FILE_BYTES,
 ) -> dict[str, object]:
     repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
+    cached = _load_fresh_report_cache(
+        repo_root=repo_root,
+        report_name=DEPENDENCY_REPORT_JSON,
+        expected_schema=SHIM_DEPENDENCY_SCHEMA_VERSION,
+        include_runtime_artifacts=include_runtime_artifacts,
+        force_rescan_shims=force_rescan_shims,
+        use_cache=use_cache,
+        max_file_bytes=max_file_bytes,
+    )
+    if cached is not None:
+        return _with_cache_status(cached, "hit")
     entries = registry_entries()
     audit = audit_entries(entries, root=repo_root, generated_at=generated_at)
-    references = _scan_dependency_references(entries, repo_root=repo_root)
+    references, scan_accounting = _scan_dependency_references_with_accounting(
+        entries,
+        repo_root=repo_root,
+        include_runtime_artifacts=include_runtime_artifacts,
+        max_file_bytes=max_file_bytes,
+    )
     rows = []
     old_import_rows = []
     removal_groups: dict[str, list[dict[str, object]]] = {
@@ -400,6 +409,25 @@ def build_shim_dependency_report(
         "paper_trades_created": 0,
         "normal_rsi_signal_rows_written": 0,
         "triggered_fade_created": 0,
+        "include_runtime_artifacts": include_runtime_artifacts,
+        "cache_status": _scan_cache_status(
+            include_runtime_artifacts=include_runtime_artifacts,
+            force_rescan_shims=force_rescan_shims,
+            use_cache=use_cache,
+        ),
+        "shim_dependency_report_cache_status": _scan_cache_status(
+            include_runtime_artifacts=include_runtime_artifacts,
+            force_rescan_shims=force_rescan_shims,
+            use_cache=use_cache,
+        ),
+        "scan_duration_seconds": scan_accounting.get("scan_duration_seconds", 0.0),
+        "scanned_source_files": scan_accounting.get("scanned_source_files", 0),
+        "scanned_doc_files": scan_accounting.get("scanned_doc_files", 0),
+        "scanned_test_files": scan_accounting.get("scanned_test_files", 0),
+        "skipped_artifact_files": scan_accounting.get("skipped_artifact_files", 0),
+        "skipped_large_files": scan_accounting.get("skipped_large_files", 0),
+        "skipped_dirs": scan_accounting.get("skipped_dirs", 0),
+        "scan_accounting": scan_accounting,
         "registry_entry_count": len(rows),
         "internal_import_reference_count": internal_import_count,
         "test_import_reference_count": sum(len(row["test_import_references"]) for row in rows),
@@ -446,11 +474,20 @@ def write_shim_dependency_report(
     out_dir: str | Path | None = None,
     root: str | Path | None = None,
     generated_at: datetime | None = None,
+    include_runtime_artifacts: bool = False,
+    force_rescan_shims: bool = False,
+    max_file_bytes: int = DEFAULT_SHIM_SCAN_MAX_FILE_BYTES,
 ) -> tuple[Path, Path, Path, Path, dict[str, object]]:
     repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
     target = Path(out_dir).expanduser() if out_dir is not None else repo_root / "research"
     target.mkdir(parents=True, exist_ok=True)
-    report = build_shim_dependency_report(root=repo_root, generated_at=generated_at)
+    report = build_shim_dependency_report(
+        root=repo_root,
+        generated_at=generated_at,
+        include_runtime_artifacts=include_runtime_artifacts,
+        force_rescan_shims=force_rescan_shims,
+        max_file_bytes=max_file_bytes,
+    )
     dep_json_path = target / DEPENDENCY_REPORT_JSON
     dep_md_path = target / DEPENDENCY_REPORT_MD
     removal_json_path = target / REMOVAL_CANDIDATES_JSON
@@ -482,15 +519,33 @@ def write_shim_dependency_report(
 
 
 def build_final_shim_status_report(
-    *, root: str | Path | None = None, dependency_report: dict[str, object] | None = None, generated_at: datetime | None = None
+    *,
+    root: str | Path | None = None,
+    dependency_report: dict[str, object] | None = None,
+    generated_at: datetime | None = None,
+    include_runtime_artifacts: bool = False,
+    force_rescan_shims: bool = False,
+    max_file_bytes: int = DEFAULT_SHIM_SCAN_MAX_FILE_BYTES,
 ) -> dict[str, object]:
     """Return the final retained/deleted old-shim inventory."""
     repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
-    report = dependency_report or build_shim_dependency_report(root=repo_root, generated_at=generated_at)
+    report = dependency_report or build_shim_dependency_report(
+        root=repo_root,
+        generated_at=generated_at,
+        include_runtime_artifacts=include_runtime_artifacts,
+        force_rescan_shims=force_rescan_shims,
+        max_file_bytes=max_file_bytes,
+    )
     retained_rows = [row for row in report.get("entries", []) if isinstance(row, dict) and row.get("recommended_action") == "keep_public_entrypoint"]
     deleted_rows = deleted_shim_manifest(root=repo_root).get("deleted_shims")
     deleted_rows = deleted_rows if isinstance(deleted_rows, list) else []
-    old_import_check = build_old_import_check_report(root=repo_root, generated_at=generated_at)
+    old_import_check = build_old_import_check_report(
+        root=repo_root,
+        generated_at=generated_at,
+        include_runtime_artifacts=include_runtime_artifacts,
+        force_rescan_shims=force_rescan_shims,
+        max_file_bytes=max_file_bytes,
+    )
     gates = report.get("v3_gates") if isinstance(report.get("v3_gates"), dict) else {}
     return {
         "schema_version": "event_alpha_final_shim_status_v1",
@@ -524,6 +579,10 @@ def build_old_import_check_report(
     *,
     root: str | Path | None = None,
     generated_at: datetime | None = None,
+    include_runtime_artifacts: bool = False,
+    force_rescan_shims: bool = False,
+    use_cache: bool = True,
+    max_file_bytes: int = DEFAULT_SHIM_SCAN_MAX_FILE_BYTES,
 ) -> dict[str, object]:
     """Return the v3 old flat-import lint report.
 
@@ -532,10 +591,26 @@ def build_old_import_check_report(
     references remain visible as counters without pretending they are imports.
     """
     repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
+    cached = _load_fresh_report_cache(
+        repo_root=repo_root,
+        report_name=OLD_IMPORT_CHECK_JSON,
+        expected_schema=OLD_IMPORT_CHECK_SCHEMA_VERSION,
+        include_runtime_artifacts=include_runtime_artifacts,
+        force_rescan_shims=force_rescan_shims,
+        use_cache=use_cache,
+        max_file_bytes=max_file_bytes,
+    )
+    if cached is not None:
+        return _with_cache_status(cached, "hit")
     entries = registry_entries()
     deleted_entries = deleted_shim_entries(root=repo_root)
     checked_entries = (*entries, *deleted_entries)
-    references = _scan_dependency_references(checked_entries, repo_root=repo_root)
+    references, scan_accounting = _scan_dependency_references_with_accounting(
+        checked_entries,
+        repo_root=repo_root,
+        include_runtime_artifacts=include_runtime_artifacts,
+        max_file_bytes=max_file_bytes,
+    )
     rows: list[dict[str, object]] = []
     for entry in checked_entries:
         rows.append(_old_import_check_row(entry, references.get(entry.old_module, {})))
@@ -567,6 +642,25 @@ def build_old_import_check_report(
         "paper_trades_created": 0,
         "normal_rsi_signal_rows_written": 0,
         "triggered_fade_created": 0,
+        "include_runtime_artifacts": include_runtime_artifacts,
+        "cache_status": _scan_cache_status(
+            include_runtime_artifacts=include_runtime_artifacts,
+            force_rescan_shims=force_rescan_shims,
+            use_cache=use_cache,
+        ),
+        "old_import_check_cache_status": _scan_cache_status(
+            include_runtime_artifacts=include_runtime_artifacts,
+            force_rescan_shims=force_rescan_shims,
+            use_cache=use_cache,
+        ),
+        "scan_duration_seconds": scan_accounting.get("scan_duration_seconds", 0.0),
+        "scanned_source_files": scan_accounting.get("scanned_source_files", 0),
+        "scanned_doc_files": scan_accounting.get("scanned_doc_files", 0),
+        "scanned_test_files": scan_accounting.get("scanned_test_files", 0),
+        "skipped_artifact_files": scan_accounting.get("skipped_artifact_files", 0),
+        "skipped_large_files": scan_accounting.get("skipped_large_files", 0),
+        "skipped_dirs": scan_accounting.get("skipped_dirs", 0),
+        "scan_accounting": scan_accounting,
         "legacy_import_compatibility_test": LEGACY_IMPORT_COMPATIBILITY_TEST,
         "allowed_public_wrapper_modules": sorted(PUBLIC_COMPATIBILITY_SHIMS),
         "registry_entry_count": len(entries),
@@ -592,16 +686,117 @@ def write_old_import_check_report(
     out_dir: str | Path | None = None,
     root: str | Path | None = None,
     generated_at: datetime | None = None,
+    include_runtime_artifacts: bool = False,
+    force_rescan_shims: bool = False,
+    max_file_bytes: int = DEFAULT_SHIM_SCAN_MAX_FILE_BYTES,
 ) -> tuple[Path, Path, dict[str, object]]:
     repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
     target = Path(out_dir).expanduser() if out_dir is not None else repo_root / "research"
     target.mkdir(parents=True, exist_ok=True)
-    report = build_old_import_check_report(root=repo_root, generated_at=generated_at)
+    report = build_old_import_check_report(
+        root=repo_root,
+        generated_at=generated_at,
+        include_runtime_artifacts=include_runtime_artifacts,
+        force_rescan_shims=force_rescan_shims,
+        max_file_bytes=max_file_bytes,
+    )
     json_path = target / OLD_IMPORT_CHECK_JSON
     md_path = target / OLD_IMPORT_CHECK_MD
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(format_old_import_check_report(report), encoding="utf-8")
     return json_path, md_path, report
+
+
+def _load_fresh_report_cache(
+    *,
+    repo_root: Path,
+    report_name: str,
+    expected_schema: str,
+    include_runtime_artifacts: bool,
+    force_rescan_shims: bool,
+    use_cache: bool,
+    max_file_bytes: int,
+) -> dict[str, object] | None:
+    if force_rescan_shims or include_runtime_artifacts or not use_cache:
+        return None
+    path = repo_root / "research" / report_name
+    try:
+        report_mtime = path.stat().st_mtime
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("schema_version") != expected_schema:
+        return None
+    if not isinstance(payload.get("scan_accounting"), dict):
+        return None
+    if bool(payload.get("include_runtime_artifacts")):
+        return None
+    newest_source_mtime = shim_scan.newest_scan_input_mtime(
+        repo_root,
+        include_runtime_artifacts=False,
+        max_file_bytes=max_file_bytes,
+    )
+    if newest_source_mtime > report_mtime:
+        return None
+    return payload
+
+
+def _with_cache_status(report: dict[str, object], status: str) -> dict[str, object]:
+    payload = dict(report)
+    accounting = dict(payload.get("scan_accounting") or {})
+    accounting["cache_status"] = status
+    payload["scan_accounting"] = accounting
+    payload["cache_status"] = status
+    if payload.get("row_type") == "event_alpha_shim_dependency_report":
+        payload["shim_dependency_report_cache_status"] = status
+    if payload.get("row_type") == "event_alpha_old_import_check":
+        payload["old_import_check_cache_status"] = status
+    return payload
+
+
+def _scan_cache_status(
+    *,
+    include_runtime_artifacts: bool,
+    force_rescan_shims: bool,
+    use_cache: bool,
+) -> str:
+    if include_runtime_artifacts:
+        return "runtime_artifacts_scan"
+    if force_rescan_shims:
+        return "force_rescan"
+    if not use_cache:
+        return "disabled"
+    return "miss"
+
+
+def _scan_dependency_references(
+    entries: Iterable[ShimRegistryEntry],
+    *,
+    repo_root: Path,
+    include_runtime_artifacts: bool = False,
+    max_file_bytes: int = DEFAULT_SHIM_SCAN_MAX_FILE_BYTES,
+) -> dict[str, dict[str, list[dict[str, object]]]]:
+    return shim_scan.scan_dependency_references(
+        entries,
+        repo_root=repo_root,
+        include_runtime_artifacts=include_runtime_artifacts,
+        max_file_bytes=max_file_bytes,
+    )
+
+
+def _scan_dependency_references_with_accounting(
+    entries: Iterable[ShimRegistryEntry],
+    *,
+    repo_root: Path,
+    include_runtime_artifacts: bool = False,
+    max_file_bytes: int = DEFAULT_SHIM_SCAN_MAX_FILE_BYTES,
+) -> tuple[dict[str, dict[str, list[dict[str, object]]]], dict[str, object]]:
+    return shim_scan.scan_dependency_references_with_accounting(
+        entries,
+        repo_root=repo_root,
+        include_runtime_artifacts=include_runtime_artifacts,
+        max_file_bytes=max_file_bytes,
+    )
 
 
 def shim_dependency_warning_summary() -> tuple[int, int, tuple[str, ...]]:
@@ -635,6 +830,22 @@ def old_import_check_counter_summary() -> tuple[int, int, int, int]:
         int(report.get("old_path_import_allowed_exceptions") or 0),
     )
     return _OLD_IMPORT_COUNTER_SUMMARY_CACHE
+
+
+def shim_scan_health_summary() -> dict[str, object]:
+    report = build_shim_dependency_report()
+    accounting = report.get("scan_accounting") if isinstance(report.get("scan_accounting"), dict) else {}
+    return {
+        "include_runtime_artifacts": bool(report.get("include_runtime_artifacts")),
+        "cache_status": report.get("cache_status") or report.get("shim_dependency_report_cache_status"),
+        "scan_duration_seconds": float(report.get("scan_duration_seconds") or accounting.get("scan_duration_seconds") or 0.0),
+        "scanned_artifact_files": int(accounting.get("scanned_artifact_files") or report.get("scanned_artifact_files") or 0),
+        "skipped_artifact_files": int(accounting.get("skipped_artifact_files") or report.get("skipped_artifact_files") or 0),
+        "skipped_large_files": int(accounting.get("skipped_large_files") or report.get("skipped_large_files") or 0),
+        "skipped_dirs": int(accounting.get("skipped_dirs") or report.get("skipped_dirs") or 0),
+        "scan_accounting_present": bool(accounting),
+        "old_path_internal_imports": int(report.get("old_path_internal_imports") or 0),
+    }
 
 
 def deleted_shim_manifest(*, root: str | Path | None = None) -> dict[str, object]:
@@ -702,6 +913,15 @@ def format_shim_dependency_report(report: dict[str, object]) -> str:
         f"- active_shim_modules_with_implementation_logic: {report.get('active_shim_modules_with_implementation_logic', 0)}",
         f"- v3_gate_status: {report.get('v3_gate_status')}",
         f"- v3_auto_accept_ready: {report.get('v3_auto_accept_ready')}",
+        f"- include_runtime_artifacts: {report.get('include_runtime_artifacts')}",
+        f"- cache_status: {report.get('cache_status')}",
+        f"- scan_duration_seconds: {report.get('scan_duration_seconds', 0)}",
+        f"- scanned_source_files: {report.get('scanned_source_files', 0)}",
+        f"- scanned_doc_files: {report.get('scanned_doc_files', 0)}",
+        f"- scanned_test_files: {report.get('scanned_test_files', 0)}",
+        f"- skipped_artifact_files: {report.get('skipped_artifact_files', 0)}",
+        f"- skipped_large_files: {report.get('skipped_large_files', 0)}",
+        f"- skipped_dirs: {report.get('skipped_dirs', 0)}",
         "",
         "## Policy",
         "",
@@ -780,6 +1000,15 @@ def format_old_import_check_report(report: dict[str, object]) -> str:
         f"- old_path_import_allowed_exceptions: {report.get('old_path_import_allowed_exceptions', 0)}",
         f"- deleted_path_import_failure_checks: {report.get('deleted_path_import_failure_checks', 0)}",
         f"- old_path_text_references: {report.get('old_path_text_references', 0)}",
+        f"- include_runtime_artifacts: {report.get('include_runtime_artifacts')}",
+        f"- cache_status: {report.get('cache_status')}",
+        f"- scan_duration_seconds: {report.get('scan_duration_seconds', 0)}",
+        f"- scanned_source_files: {report.get('scanned_source_files', 0)}",
+        f"- scanned_doc_files: {report.get('scanned_doc_files', 0)}",
+        f"- scanned_test_files: {report.get('scanned_test_files', 0)}",
+        f"- skipped_artifact_files: {report.get('skipped_artifact_files', 0)}",
+        f"- skipped_large_files: {report.get('skipped_large_files', 0)}",
+        f"- skipped_dirs: {report.get('skipped_dirs', 0)}",
         "",
         "## Policy",
         "",
@@ -891,42 +1120,6 @@ def active_shim_violation_summary() -> tuple[int, tuple[str, ...]]:
         if isinstance(row, dict) and row.get("old_module")
     )
     return int(report.get("active_shim_modules_with_implementation_logic") or 0), modules
-
-
-def _scan_dependency_references(
-    entries: Iterable[ShimRegistryEntry],
-    *,
-    repo_root: Path,
-) -> dict[str, dict[str, list[dict[str, object]]]]:
-    old_modules = {entry.old_module: entry for entry in entries}
-    old_by_leaf = {entry.old_module.rsplit(".", 1)[1]: entry.old_module for entry in entries}
-    refs: dict[str, dict[str, list[dict[str, object]]]] = {
-        old_module: {
-            "internal_import_references": [],
-            "test_import_references": [],
-            "makefile_references": [],
-            "docs_references": [],
-            "script_references": [],
-            "dynamic_import_references": [],
-            "artifact_doc_references": [],
-        }
-        for old_module in old_modules
-    }
-
-    for path in _dependency_scan_paths(repo_root):
-        rel_path = event_artifact_paths.artifact_display_path(path, repo_root=repo_root)
-        category = _reference_category(rel_path)
-        if path.suffix == ".py":
-            _scan_python_import_references(
-                path,
-                rel_path=rel_path,
-                category=category,
-                old_modules=old_modules,
-                old_by_leaf=old_by_leaf,
-                refs=refs,
-            )
-        _scan_text_references(path, rel_path=rel_path, category=category, old_modules=old_modules, refs=refs)
-    return refs
 
 
 def _old_import_check_row(
@@ -1156,236 +1349,6 @@ def _retention_reason(entry: ShimRegistryEntry, action: str) -> str:
     return entry.notes
 
 
-def _dependency_scan_paths(repo_root: Path) -> tuple[Path, ...]:
-    roots = [
-        repo_root / "crypto_rsi_scanner",
-        repo_root / "tests",
-        repo_root / "scripts",
-        repo_root / "research",
-    ]
-    top_level = [
-        repo_root / "Makefile",
-        repo_root / "AGENTS.md",
-        repo_root / "DECISIONS.md",
-        repo_root / "DEVLOG.md",
-        repo_root / "ROADMAP.md",
-        repo_root / "README.md",
-    ]
-    paths: list[Path] = []
-    for base in roots:
-        if not base.exists():
-            continue
-        for path in base.rglob("*"):
-            if not path.is_file() or _skip_dependency_path(path, repo_root=repo_root):
-                continue
-            if base.name == "research":
-                if path.suffix == ".md":
-                    paths.append(path)
-                continue
-            if path.suffix in {".py", ".md", ".json", ".txt", ".yml", ".yaml"}:
-                paths.append(path)
-    paths.extend(path for path in top_level if path.exists())
-    return tuple(sorted(set(paths)))
-
-
-def _skip_dependency_path(path: Path, *, repo_root: Path) -> bool:
-    rel = event_artifact_paths.artifact_display_path(path, repo_root=repo_root)
-    if "__pycache__" in path.parts:
-        return True
-    if rel in {
-        "crypto_rsi_scanner/event_alpha/SHIM_REGISTRY.json",
-        f"research/{DEPENDENCY_REPORT_JSON}",
-        f"research/{DEPENDENCY_REPORT_MD}",
-        f"research/{REMOVAL_CANDIDATES_JSON}",
-        f"research/{REMOVAL_CANDIDATES_MD}",
-        f"research/{OLD_IMPORT_CHECK_JSON}",
-        f"research/{OLD_IMPORT_CHECK_MD}",
-        f"research/{DELETED_SHIMS_JSON}",
-        f"research/{DELETED_SHIMS_MD}",
-        "research/REFACTOR_FINAL_REPORT.json",
-        "research/REFACTOR_FINAL_REPORT.md",
-        "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
-        "research/REMAINING_EVENT_MODULE_CLASSIFICATION.md",
-    }:
-        return True
-    return False
-
-
-def _reference_category(rel_path: str) -> str:
-    if rel_path == "Makefile":
-        return "makefile_references"
-    if rel_path.startswith("tests/"):
-        return "test_import_references"
-    if rel_path.startswith("scripts/"):
-        return "script_references"
-    if rel_path.startswith("research/"):
-        return "artifact_doc_references"
-    if rel_path.endswith(".md") or rel_path in {"AGENTS.md", "DECISIONS.md", "DEVLOG.md", "ROADMAP.md", "README.md"}:
-        return "docs_references"
-    return "internal_import_references"
-
-
-def _scan_python_import_references(
-    path: Path,
-    *,
-    rel_path: str,
-    category: str,
-    old_modules: dict[str, ShimRegistryEntry],
-    old_by_leaf: dict[str, str],
-    refs: dict[str, dict[str, list[dict[str, object]]]],
-) -> None:
-    try:
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=rel_path)
-    except SyntaxError:
-        return
-    lines = path.read_text(encoding="utf-8").splitlines()
-    import_category = category if category != "artifact_doc_references" else "artifact_doc_references"
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                old_module = _old_module_for_import_name(alias.name, old_modules)
-                if old_module:
-                    _add_ref(refs, old_module, import_category, rel_path, node.lineno, "import", alias.name, lines)
-        elif isinstance(node, ast.ImportFrom):
-            if node.level:
-                for alias in node.names:
-                    import_name = _resolve_relative_import_name(
-                        rel_path,
-                        level=node.level,
-                        module=node.module,
-                        alias_name=alias.name,
-                    )
-                    old_module = _old_module_for_import_name(import_name, old_modules)
-                    if old_module:
-                        detail = f"relative_from:{'.' * node.level}{node.module or ''}:{alias.name}"
-                        _add_ref(refs, old_module, import_category, rel_path, node.lineno, "relative_import", detail, lines)
-            else:
-                if node.module == "crypto_rsi_scanner":
-                    for alias in node.names:
-                        old_module = old_by_leaf.get(alias.name)
-                        if old_module:
-                            detail = f"from_package:{node.module}:{alias.name}"
-                            _add_ref(
-                                refs,
-                                old_module,
-                                import_category,
-                                rel_path,
-                                node.lineno,
-                                "from_package_import",
-                                detail,
-                                lines,
-                            )
-                old_module = _old_module_for_import_name(node.module or "", old_modules)
-                if old_module:
-                    _add_ref(refs, old_module, import_category, rel_path, node.lineno, "from_import", node.module or "", lines)
-
-
-def _scan_text_references(
-    path: Path,
-    *,
-    rel_path: str,
-    category: str,
-    old_modules: dict[str, ShimRegistryEntry],
-    refs: dict[str, dict[str, list[dict[str, object]]]],
-) -> None:
-    try:
-        text = path.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        return
-    if (
-        path.suffix == ".py"
-        and category != "test_import_references"
-        and "import_module" not in text
-        and "__import__" not in text
-    ):
-        return
-    lines = text.splitlines()
-    for lineno, line in enumerate(lines, start=1):
-        for old_module in old_modules:
-            if not _line_contains_module_reference(line, old_module):
-                continue
-            if path.suffix == ".py" and _line_is_static_import(line, old_module):
-                continue
-            ref_category = category
-            ref_type = "text_reference"
-            if path.suffix == ".py" and _line_looks_dynamic_import(line, old_module):
-                ref_category = "dynamic_import_references"
-                ref_type = "dynamic_import"
-            elif path.suffix == ".py" and category != "test_import_references":
-                continue
-            _add_ref(refs, old_module, ref_category, rel_path, lineno, ref_type, old_module, lines)
-
-
-def _old_module_for_import_name(name: str, old_modules: dict[str, ShimRegistryEntry]) -> str | None:
-    for old_module in old_modules:
-        if name == old_module or name.startswith(f"{old_module}."):
-            return old_module
-    return None
-
-
-def _resolve_relative_import_name(
-    rel_path: str,
-    *,
-    level: int,
-    module: str | None,
-    alias_name: str,
-) -> str:
-    current_module = rel_path[:-3].replace("/", ".") if rel_path.endswith(".py") else rel_path.replace("/", ".")
-    current_parts = current_module.split(".")
-    if current_parts and current_parts[-1] == "__init__":
-        package_parts = current_parts[:-1]
-    else:
-        package_parts = current_parts[:-1]
-    if level > 1:
-        package_parts = package_parts[: max(0, len(package_parts) - (level - 1))]
-    if module:
-        package_parts = [*package_parts, *module.split(".")]
-        return ".".join(package_parts)
-    return ".".join([*package_parts, alias_name])
-
-
-def _add_ref(
-    refs: dict[str, dict[str, list[dict[str, object]]]],
-    old_module: str,
-    category: str,
-    path: str,
-    line: int,
-    reference_type: str,
-    detail: str,
-    lines: list[str],
-) -> None:
-    if old_module not in refs or category not in refs[old_module]:
-        return
-    snippet = lines[line - 1].strip() if 0 <= line - 1 < len(lines) else ""
-    payload = ShimReference(
-        path=path,
-        line=line,
-        reference_type=reference_type,
-        detail=detail,
-        snippet=snippet[:220],
-    ).to_dict()
-    bucket = refs[old_module][category]
-    dedupe_key = (payload["path"], payload["line"], payload["reference_type"], payload["detail"])
-    if not any((row["path"], row["line"], row["reference_type"], row["detail"]) == dedupe_key for row in bucket):
-        bucket.append(payload)
-
-
-def _line_is_static_import(line: str, old_module: str) -> bool:
-    stripped = line.strip()
-    return bool(
-        re.match(rf"from\s+{re.escape(old_module)}(\s+|\.)", stripped)
-        or re.match(rf"import\s+{re.escape(old_module)}(\s|$|,|\.)", stripped)
-    )
-
-
-def _line_looks_dynamic_import(line: str, old_module: str) -> bool:
-    return old_module in line and ("import_module" in line or "__import__" in line)
-
-
-def _line_contains_module_reference(line: str, old_module: str) -> bool:
-    return bool(re.search(rf"(?<![\w.]){re.escape(old_module)}(?![\w.])", line))
-
-
 def _docs_refs_are_policy_scoped(refs: list[dict[str, object]]) -> bool:
     if not refs:
         return True
@@ -1459,9 +1422,30 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Write/fail the old flat Event Alpha import check report.",
     )
+    parser.add_argument(
+        "--include-runtime-artifacts",
+        action="store_true",
+        help="Opt into scanning runtime artifact directories such as event_fade_cache.",
+    )
+    parser.add_argument(
+        "--force-rescan-shims",
+        action="store_true",
+        help="Ignore fresh checked-in shim scan caches and rescan source files.",
+    )
+    parser.add_argument(
+        "--shim-scan-max-file-bytes",
+        type=int,
+        default=DEFAULT_SHIM_SCAN_MAX_FILE_BYTES,
+        help="Maximum non-Python file size scanned for shim references.",
+    )
     args = parser.parse_args(argv)
     if args.dependency_report:
-        dep_json, dep_md, removal_json, removal_md, report = write_shim_dependency_report(out_dir=args.out_dir)
+        dep_json, dep_md, removal_json, removal_md, report = write_shim_dependency_report(
+            out_dir=args.out_dir,
+            include_runtime_artifacts=args.include_runtime_artifacts,
+            force_rescan_shims=args.force_rescan_shims,
+            max_file_bytes=args.shim_scan_max_file_bytes,
+        )
         print(dep_json)
         print(dep_md)
         print(removal_json)
@@ -1472,9 +1456,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"registry_entry_count={report.get('registry_entry_count', 0)}")
         print(f"internal_import_reference_count={report.get('internal_import_reference_count', 0)}")
         print(f"safe_to_remove_count={report.get('safe_to_remove_count', 0)}")
+        print(f"cache_status={report.get('cache_status')}")
+        print(f"scan_duration_seconds={report.get('scan_duration_seconds', 0)}")
+        print(f"skipped_artifact_files={report.get('skipped_artifact_files', 0)}")
+        print(f"skipped_large_files={report.get('skipped_large_files', 0)}")
         return 0
     if args.old_import_check:
-        json_path, md_path, report = write_old_import_check_report(out_dir=args.out_dir)
+        json_path, md_path, report = write_old_import_check_report(
+            out_dir=args.out_dir,
+            include_runtime_artifacts=args.include_runtime_artifacts,
+            force_rescan_shims=args.force_rescan_shims,
+            max_file_bytes=args.shim_scan_max_file_bytes,
+        )
         print(json_path)
         print(md_path)
         print(f"status={report.get('status')}")
@@ -1482,6 +1475,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"old_path_test_imports={report.get('old_path_test_imports', 0)}")
         print(f"old_path_docs_references={report.get('old_path_docs_references', 0)}")
         print(f"old_path_import_allowed_exceptions={report.get('old_path_import_allowed_exceptions', 0)}")
+        print(f"cache_status={report.get('cache_status')}")
+        print(f"scan_duration_seconds={report.get('scan_duration_seconds', 0)}")
+        print(f"skipped_artifact_files={report.get('skipped_artifact_files', 0)}")
+        print(f"skipped_large_files={report.get('skipped_large_files', 0)}")
         return 0 if report.get("status") == "OK" else 1
     json_path, md_path, report = write_shim_report(out_dir=args.out_dir)
     print(json_path)

@@ -1257,14 +1257,13 @@
       "accepted_model_bundle": true,
       "class_names": [
         "ShimAuditRow",
-        "ShimReference",
         "ShimRegistryEntry"
       ],
       "exception_reason": "",
       "max_class_line_count": 17,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.shims",
-      "public_class_count": 3,
+      "public_class_count": 2,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
@@ -1388,7 +1387,7 @@
     }
   ],
   "accepted_model_bundles_count": 79,
-  "class_count": 498,
+  "class_count": 500,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1443,12 +1442,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5706,
+  "function_count": 5720,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-04T22:43:07.703397+00:00",
+  "generated_at": "2026-07-05T02:04:53.087175+00:00",
   "largest_legacy_files": [
     {
       "line_count": 933,
@@ -2764,14 +2763,13 @@
       "accepted_model_bundle": true,
       "class_names": [
         "ShimAuditRow",
-        "ShimReference",
         "ShimRegistryEntry"
       ],
       "exception_reason": "",
       "max_class_line_count": 17,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.shims",
-      "public_class_count": 3,
+      "public_class_count": 2,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
@@ -2921,15 +2919,15 @@
   "multi_public_class_modules_count": 80,
   "near_threshold_file_status": [
     {
-      "line_count": 1499,
-      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1498,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+      "line_count": 1496,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3273,7 +3271,8 @@
     "crypto_rsi_scanner.event_alpha.radar.watchlist.models": 5,
     "crypto_rsi_scanner.event_alpha.radar.watchlist_enrichment": 9,
     "crypto_rsi_scanner.event_alpha.radar.watchlist_market": 4,
-    "crypto_rsi_scanner.event_alpha.shims": 3,
+    "crypto_rsi_scanner.event_alpha.shim_scan": 1,
+    "crypto_rsi_scanner.event_alpha.shims": 2,
     "crypto_rsi_scanner.event_core.models": 7,
     "crypto_rsi_scanner.event_fade": 11,
     "crypto_rsi_scanner.event_providers.base": 2,
@@ -3400,13 +3399,13 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
         "threshold": 1200
       },
       {
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+        "line_count": 1496,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "threshold": 1200
       },
       {

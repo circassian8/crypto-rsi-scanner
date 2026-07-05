@@ -192,6 +192,159 @@ def test_shim_dependency_report_flags_internal_old_import_fixture():
     assert report["research_only"] is True
 
 
+def test_shim_scan_skips_huge_runtime_artifacts_by_default():
+    entry = shims.ShimRegistryEntry(
+        old_module="crypto_rsi_scanner.event_deleted_fixture",
+        new_module="crypto_rsi_scanner.event_alpha.deleted_fixture",
+        shim_status=shims.STATUS_ACTIVE_SHIM,
+        allowed_exports=("*",),
+    )
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "crypto_rsi_scanner").mkdir()
+        (root / "crypto_rsi_scanner" / "__init__.py").write_text("", encoding="utf-8")
+        artifact_dir = root / "event_fade_cache"
+        artifact_dir.mkdir()
+        (artifact_dir / "large.jsonl").write_text(
+            "crypto_rsi_scanner.event_deleted_fixture\n" * 40000,
+            encoding="utf-8",
+        )
+
+        refs, accounting = shims._scan_dependency_references_with_accounting((entry,), repo_root=root)  # noqa: SLF001
+
+    assert not refs["crypto_rsi_scanner.event_deleted_fixture"]["artifact_doc_references"]
+    assert accounting["include_runtime_artifacts"] is False
+    assert accounting["skipped_artifact_files"] == 1
+    assert accounting["scanned_artifact_files"] == 0
+    assert accounting["regex_compile_count"] == 1
+
+
+def test_shim_scan_detects_source_doc_and_test_references():
+    entry = shims.ShimRegistryEntry(
+        old_module="crypto_rsi_scanner.event_deleted_fixture",
+        new_module="crypto_rsi_scanner.event_alpha.deleted_fixture",
+        shim_status=shims.STATUS_ACTIVE_SHIM,
+        allowed_exports=("*",),
+    )
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        package = root / "crypto_rsi_scanner"
+        tests = root / "tests"
+        package.mkdir()
+        tests.mkdir()
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        (package / "consumer.py").write_text(
+            "import crypto_rsi_scanner.event_deleted_fixture\n",
+            encoding="utf-8",
+        )
+        (tests / "test_consumer.py").write_text(
+            "from crypto_rsi_scanner import event_deleted_fixture\n",
+            encoding="utf-8",
+        )
+        (root / "README.md").write_text(
+            "Compatibility note for crypto_rsi_scanner.event_deleted_fixture shim.\n",
+            encoding="utf-8",
+        )
+
+        refs, accounting = shims._scan_dependency_references_with_accounting((entry,), repo_root=root)  # noqa: SLF001
+
+    grouped = refs["crypto_rsi_scanner.event_deleted_fixture"]
+    assert grouped["internal_import_references"][0]["path"] == "crypto_rsi_scanner/consumer.py"
+    assert grouped["test_import_references"][0]["path"] == "tests/test_consumer.py"
+    assert grouped["docs_references"][0]["path"] == "README.md"
+    assert accounting["scanned_source_files"] >= 1
+    assert accounting["scanned_test_files"] == 1
+    assert accounting["scanned_doc_files"] >= 1
+
+
+def test_shim_scan_can_opt_into_small_runtime_artifact():
+    entry = shims.ShimRegistryEntry(
+        old_module="crypto_rsi_scanner.event_deleted_fixture",
+        new_module="crypto_rsi_scanner.event_alpha.deleted_fixture",
+        shim_status=shims.STATUS_ACTIVE_SHIM,
+        allowed_exports=("*",),
+    )
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "crypto_rsi_scanner").mkdir()
+        (root / "crypto_rsi_scanner" / "__init__.py").write_text("", encoding="utf-8")
+        artifact_dir = root / "event_fade_cache"
+        artifact_dir.mkdir()
+        (artifact_dir / "small.jsonl").write_text(
+            '{"module":"crypto_rsi_scanner.event_deleted_fixture"}\n',
+            encoding="utf-8",
+        )
+
+        refs, accounting = shims._scan_dependency_references_with_accounting(  # noqa: SLF001
+            (entry,),
+            repo_root=root,
+            include_runtime_artifacts=True,
+        )
+
+    artifact_refs = refs["crypto_rsi_scanner.event_deleted_fixture"]["artifact_doc_references"]
+    assert artifact_refs[0]["path"] == "event_fade_cache/small.jsonl"
+    assert accounting["include_runtime_artifacts"] is True
+    assert accounting["scanned_artifact_files"] == 1
+    assert accounting["skipped_artifact_files"] == 0
+
+
+def test_shim_dependency_report_cache_reuse_and_force_rescan():
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "crypto_rsi_scanner").mkdir()
+        (root / "crypto_rsi_scanner" / "__init__.py").write_text("", encoding="utf-8")
+        out_dir = root / "research"
+        _json_path, _md_path, _removal_json, _removal_md, first = shims.write_shim_dependency_report(
+            root=root,
+            out_dir=out_dir,
+            force_rescan_shims=True,
+        )
+        cached = shims.build_shim_dependency_report(root=root)
+        forced = shims.build_shim_dependency_report(root=root, force_rescan_shims=True)
+
+    assert first["cache_status"] == "force_rescan"
+    assert cached["cache_status"] == "hit"
+    assert cached["shim_dependency_report_cache_status"] == "hit"
+    assert cached["include_runtime_artifacts"] is False
+    assert forced["cache_status"] == "force_rescan"
+    assert forced["shim_dependency_report_cache_status"] == "force_rescan"
+
+
+def test_artifact_doctor_warns_when_shim_scan_accounting_is_missing():
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+
+    original = event_alpha_artifact_doctor.event_alpha_shims.shim_scan_health_summary
+    event_alpha_artifact_doctor.event_alpha_shims.shim_scan_health_summary = (
+        lambda: {"scan_accounting_present": False, "scan_duration_seconds": 0.0}
+    )
+    try:
+        result = event_alpha_artifact_doctor.diagnose_artifacts()
+    finally:
+        event_alpha_artifact_doctor.event_alpha_shims.shim_scan_health_summary = original
+
+    assert any("paths.shim_scan_incomplete_accounting" in warning for warning in result.warnings)
+
+
+def test_artifact_doctor_warns_when_shim_scan_touches_runtime_artifacts():
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+
+    original = event_alpha_artifact_doctor.event_alpha_shims.shim_scan_health_summary
+    event_alpha_artifact_doctor.event_alpha_shims.shim_scan_health_summary = (
+        lambda: {
+            "scan_accounting_present": True,
+            "include_runtime_artifacts": False,
+            "scanned_artifact_files": 2,
+            "scan_duration_seconds": 0.0,
+        }
+    )
+    try:
+        result = event_alpha_artifact_doctor.diagnose_artifacts()
+    finally:
+        event_alpha_artifact_doctor.event_alpha_shims.shim_scan_health_summary = original
+
+    assert any("paths.shim_scan_runtime_artifacts" in warning for warning in result.warnings)
+
+
 def test_artifact_doctor_warns_when_active_shim_contains_logic():
     import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 
