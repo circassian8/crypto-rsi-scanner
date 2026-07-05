@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Add faster safe test loops · Codex
+**Why:** The suite is slow because the strict release gate intentionally runs the
+standalone compatibility runner and the pytest package suite. Local iteration
+needed faster and more observable paths without weakening `make verify`.
+**Changes:**
+- Added shared pytest Make variables, `make verify-fast`, and
+  `make test-pytest-durations` for a hard-pytest local loop and slow-test
+  profiling.
+- Updated `make test-pytest-parallel` to run the safe pytest path through xdist
+  with external plugin autoload disabled, and added `pytest-xdist` to
+  `requirements.txt`.
+- Updated Makefile static tests plus test-suite/runbook docs, `CLAUDE.md`,
+  `DECISIONS.md`, and `ROADMAP.md` to distinguish local iteration from the
+  strict pre-commit/release gate.
+**Verify:** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest
+tests/cli/test_make_targets.py tests/event_alpha/test_artifact_schema.py -q`;
+`python3 -m compileall -q crypto_rsi_scanner tests`; `PYTEST_WORKERS=4 make
+test-pytest-parallel PYTHON=python3`; `make test-pytest-durations PYTHON=python3
+PYTEST_DURATIONS=10`; `make verify-fast PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** `make verify` is unchanged and remains required before commit
+or release-style handoff. Parallel pytest passed locally with four workers, but
+the target stays explicit so shared-artifact issues can be isolated if a future
+test becomes unsafe under xdist.
+
 ## 2026-07-05 — Define Event Alpha Radar North Star · Codex
 **Why:** The refactor is complete, so future Event Alpha work needs a measurable
 radar operating contract instead of more scaffolding. The contract should define

@@ -19,12 +19,24 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
 
     root = REPO_ROOT
     makefile = (root / "Makefile").read_text(encoding="utf-8")
+    requirements = (root / "requirements.txt").read_text(encoding="utf-8")
     assert "PYTHON ?= .venv/bin/python" in makefile
+    assert "PYTEST_PATHS ?= tests/event_alpha tests/rsi tests/cli tests/test_indicators.py" in makefile
+    assert "PYTEST_SAFE_ENV = PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in makefile
+    assert "PYTEST_DURATIONS ?= 50" in makefile
+    assert "PYTEST_WORKERS ?= auto" in makefile
     assert "test-rsi:" in makefile
-    assert "$(PYTHON) -m pytest tests/rsi" in makefile
+    assert "$(PYTEST_SAFE_ENV) $(PYTHON) -m pytest tests/rsi" in makefile
     assert "test-cli:" in makefile
-    assert "$(PYTHON) -m pytest tests/cli" in makefile
+    assert "$(PYTEST_SAFE_ENV) $(PYTHON) -m pytest tests/cli" in makefile
     assert "pytest-xdist is not installed; skipping parallel pytest run." in makefile
+    assert "pytest-xdist>=3.6" in requirements
+    assert "verify-fast: check-python test-full smoke-alerts backtest-fixture score" in makefile
+    assert "test-pytest-durations:" in makefile
+    assert "--durations=$(PYTEST_DURATIONS)" in makefile
+    assert "-p xdist.plugin" in makefile
+    assert "-n $(PYTEST_WORKERS)" in makefile
+    assert "--dist=$(PYTEST_XDIST_MODE)" in makefile
     assert "EVENT_FIXTURE_NOW ?= 2026-06-15T16:00:00Z" in makefile
     assert "EVENT_RESEARCH_NOW ?=" in makefile
     assert "EVENT_FIXTURE_NOW_ENV = RSI_EVENT_RESEARCH_NOW=$(EVENT_FIXTURE_NOW)" in makefile

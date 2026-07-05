@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-05 - Test optimization keeps strict verify intact
+**Status:** accepted
+**Decision:** `make verify` remains the strict pre-commit/release gate and still
+runs both the standalone compatibility runner and the hard pytest suite. Faster
+developer loops are explicit: `make verify-fast` skips only the duplicate
+standalone pass while keeping hard pytest plus runtime smokes,
+`make test-pytest-durations` profiles slow tests, and
+`make test-pytest-parallel` uses xdist with external pytest plugin autoload
+disabled.
+**Why:** The duplicated standalone-plus-pytest gate is intentionally conservative
+after the prior CLI ops regression, but it is too slow for every local edit.
+Separate fast/timing/parallel targets improve iteration without weakening the
+release gate or changing product behavior.
+**Revisit when:** pytest owns equivalent standalone-runner compatibility
+coverage, xdist proves unsafe for shared artifact tests, or the project adopts a
+different mandatory test runner.
+
 ## 2026-07-05 - Event Alpha Radar North Star governs post-refactor development
 **Status:** accepted
 **Decision:** Future Event Alpha development should align to

@@ -23,11 +23,20 @@ This document records the pytest-compatible split of the historical
 |---|---|
 | `python3 tests/test_indicators.py` | Historical standalone runner; no pytest dependency required. |
 | `python3 -m pytest tests/rsi tests/cli tests/event_alpha` | Focused pytest-compatible split suite. |
+| `make verify PYTHON=python3` | Strict pre-commit/release gate: standalone runner, hard pytest, alert smoke, backtest fixture, and score. |
+| `make verify-fast PYTHON=python3` | Faster local loop: hard pytest, alert smoke, backtest fixture, and score without the duplicate standalone runner. |
 | `make test-rsi PYTHON=python3` | Run `tests/rsi`. |
 | `make test-cli PYTHON=python3` | Run `tests/cli`. |
 | `make test-event-alpha PYTHON=python3` | Run `tests/event_alpha`. |
 | `make test-pytest PYTHON=python3` | Run the full pytest-compatible suite when pytest is installed. |
-| `make test-pytest-parallel PYTHON=python3` | Run pytest with xdist when installed; otherwise print a friendly skip message. |
+| `make test-pytest-safe PYTHON=python3` | Run the full pytest-compatible suite with external plugin autoload disabled. |
+| `make test-pytest-durations PYTHON=python3 PYTEST_DURATIONS=50` | Print the slowest safe-pytest tests for profiling. |
+| `make test-pytest-parallel PYTHON=python3 PYTEST_WORKERS=4` | Run safe pytest with xdist when installed; otherwise print a friendly skip message. |
+
+`PYTEST_PATHS` defaults to `tests/event_alpha tests/rsi tests/cli
+tests/test_indicators.py` so the standalone compatibility runner stays covered
+inside pytest while full `make verify` still runs it directly as a separate
+release guard.
 
 ## Size Gate
 

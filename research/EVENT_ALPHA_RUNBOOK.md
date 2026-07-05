@@ -75,7 +75,10 @@ live provider calls by default, secret printing, or Event Alpha-created
 Useful consolidation checks:
 
 - `make test-pytest PYTHON=python3`
-- `make test-pytest-parallel PYTHON=python3`
+- `make test-pytest-durations PYTHON=python3 PYTEST_DURATIONS=50`
+- `make test-pytest-parallel PYTHON=python3 PYTEST_WORKERS=4`
+- `make verify-fast PYTHON=python3` for local iteration; use full
+  `make verify PYTHON=python3` before commit or handoff.
 - `make event-alpha-namespace-lifecycle-report PYTHON=python3`
 - `make event-alpha-list-active-namespaces PYTHON=python3`
 - `make event-alpha-archive-stale-namespaces PYTHON=python3`

@@ -13,6 +13,7 @@ narrative history.
 
 Quick reminders (full detail in `AGENTS.md`):
 - Standard verification: `make verify`.
+- Faster local iteration: `make verify-fast`; use full `make verify` before commit/handoff.
 - Offline scanner smoke without network: `make dry-run-fixture`.
 - Tests: `make test-full` (full pytest suite; part of `make verify`) — all must pass.
 - Pending work: `ROADMAP.md`.
