@@ -2,7 +2,7 @@
 
 Research-only release-candidate report. This report does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-04T22:57:29+00:00`
+- generated_at: `2026-07-05T03:16:24+00:00`
 - acceptance_status: `accepted`
 - critical_gate_status: `pass`
 - commands_passed: `26/26`
@@ -38,8 +38,10 @@ Research-only release-candidate report. This report does not authorize live prov
 | `accepted_production_files_over_1200_lines` | `12` |
 | `classes_over_75_lines` | `3` |
 | `accepted_class_exceptions_count` | `3` |
-| `refactor_final_v3_gate_status` | `pending` |
-| `refactor_final_v3_auto_accept_blockers` | `['production_files_over_1200_lines', 'class_exceptions_remaining']` |
+| `refactor_final_v3_gate_status` | `accepted_with_documented_exceptions` |
+| `refactor_final_v3_auto_accept_blockers` | `[]` |
+| `refactor_final_v3_blockers` | `[]` |
+| `refactor_final_v3_accepted_exception_categories` | `['class_exceptions_remaining', 'production_files_over_1200_lines']` |
 
 ## Event Module And Shim Status
 

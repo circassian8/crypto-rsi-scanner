@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-05 - Accepted refactor v3 exceptions are not blockers
+**Status:** accepted
+**Decision:** Refactor v3 reports use four statuses: `pass`,
+`accepted_with_documented_exceptions`, `pending`, and `blocked`. The current
+v3 state is `accepted_with_documented_exceptions`: hard blockers are zero,
+`acceptance_status=accepted`, `critical_gate_status=pass`, and the remaining
+over-1,200-line production files plus storage mixin class exceptions are
+documented accepted exceptions, not pending work.
+**Why:** The release-candidate report already accepted the refactor with those
+documented warnings, but the final/size/class reports still surfaced the same
+warnings as auto-accept blockers. Treating accepted warnings as pending created
+contradictory operator status without identifying real refactor work.
+**Revisit when:** a new production file crosses 1,200 lines without an accepted
+exception, any production file crosses 1,500 lines, a new oversized class lacks
+an accepted owner note, or the project intentionally changes the v3
+zero-exception auto-accept definition.
+
 ## 2026-07-05 - Full pytest suite is a hard verification gate
 **Status:** accepted
 **Decision:** `make verify` must run the full pytest-compatible suite through

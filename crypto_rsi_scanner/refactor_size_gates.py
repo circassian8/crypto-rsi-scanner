@@ -31,56 +31,7 @@ PRODUCTION_HARD_BLOCKER_LINE_LIMIT = 3000
 TEST_WARNING_LINE_LIMIT = 1500
 DEFAULT_CLASS_LINE_LIMIT = ownership.DEFAULT_CLASS_LINE_LIMIT
 DEFAULT_FUNCTION_LINE_LIMIT = ownership.DEFAULT_FUNCTION_LINE_LIMIT
-ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
-    "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py": {
-        "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-        "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
-    },
-    "crypto_rsi_scanner/cli/services/legacy/config_reports.py": {
-        "reason": "Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
-        "revisit_condition": "When config/report command bodies move to canonical non-legacy service modules.",
-    },
-    "crypto_rsi_scanner/config.py": {
-        "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
-        "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
-    },
-    "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py": {
-        "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
-        "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
-    },
-    "crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py": {
-        "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
-        "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
-    },
-    "crypto_rsi_scanner/event_alpha/notifications/router.py": {
-        "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
-        "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
-    },
-    "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py": {
-        "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
-        "revisit_condition": "When outcome performance views gain new sections.",
-    },
-    "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py": {
-        "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
-        "revisit_condition": "When adding a new derivatives metric family or crowding class.",
-    },
-    "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py": {
-        "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
-        "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
-    },
-    "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py": {
-        "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
-        "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
-    },
-    "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py": {
-        "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
-        "revisit_condition": "When adding a new enrichment source or cache policy.",
-    },
-    "crypto_rsi_scanner/event_alpha/shims.py": {
-        "reason": "Static shim registry/data table; large by design and non-behavioral.",
-        "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
-    },
-}
+ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES = refactor_v3_contract.ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES
 MOVED_VIOLATION_ALIASES = {
     "file:crypto_rsi_scanner/cli/services/scanner_legacy.py": "file:crypto_rsi_scanner/scanner.py",
     "class:crypto_rsi_scanner/event_alpha/doctor/legacy/result_models.py:EventAlphaArtifactDoctorResult": "class:crypto_rsi_scanner/event_alpha/doctor/legacy_artifact_doctor.py:EventAlphaArtifactDoctorResult",
@@ -416,6 +367,10 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
         "new_violation_count": len(new_rows),
         "v3_gate_status": v3_gate_snapshot["status"],
         "v3_auto_accept_ready": v3_gate_snapshot["v3_auto_accept_ready"],
+        "v3_auto_accept_blockers": v3_gate_snapshot.get("auto_accept_blockers", []),
+        "v3_blockers": v3_gate_snapshot.get("v3_blockers", []),
+        "v3_pending_exceptions": v3_gate_snapshot.get("v3_pending_exceptions", []),
+        "v3_accepted_exceptions": v3_gate_snapshot.get("v3_accepted_exceptions", {}),
         "v3_gates": v3_gate_snapshot["gate_values"],
         "v3_gate_snapshot": v3_gate_snapshot,
         "existing_violation_count": len(existing_rows),
@@ -467,6 +422,7 @@ def format_gate_report(report: dict[str, Any]) -> str:
         f"- files_over_limit_count: `{report.get('files_over_limit_count', 0)}`",
         f"- v3_gate_status: `{report.get('v3_gate_status')}`",
         f"- v3_auto_accept_ready: `{report.get('v3_auto_accept_ready')}`",
+        f"- v3_blockers: `{json.dumps(report.get('v3_blockers', []), sort_keys=True)}`",
         f"- production_files_over_1200_lines: `{report.get('production_files_over_1200_lines', 0)}`",
         f"- accepted_production_files_over_1200_lines: `{report.get('accepted_production_files_over_1200_lines', 0)}`",
         f"- unresolved_production_files_over_1200_lines: `{report.get('unresolved_production_files_over_1200_lines', 0)}`",

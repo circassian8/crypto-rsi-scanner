@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-05T02:04:53.087175+00:00`
+- generated_at: `2026-07-05T03:24:07.837982+00:00`
 - public_class_count: `408`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `0`
@@ -10,8 +10,9 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_functions_over_limit: `0`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
-- v3_gate_status: `pending`
+- v3_gate_status: `accepted_with_documented_exceptions`
 - v3_auto_accept_ready: `False`
+- v3_blockers: `[]`
 - public_classes_not_in_own_module: `0`
 - class_exceptions_remaining: `3`
 - functions_over_150_lines: `0`
@@ -31,7 +32,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - Multiple tiny value objects/enums/protocol DTOs may live together only when registered as accepted model bundles.
 - Internal helper classes over 75 lines should also be split or documented.
 - Refactor v3 expects public classes to live in their own modules unless the module is a documented model bundle.
-- Refactor v3 keeps accepted class exceptions pending until each exception is reaccepted for the v3 removal phase.
+- Refactor v3 treats documented class exceptions as accepted exceptions; unaccepted class debt remains pending or blocked.
 - `event_fade.py` remains outside Event Alpha; Event Alpha may produce `FADE_SHORT_REVIEW` research artifacts but must not create `TRIGGERED_FADE`.
 
 ## Refactor V3 Gates
@@ -44,10 +45,10 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 9 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 115 | informational |
-| `production_files_over_1200_lines` | 12 | target_gap |
+| `production_files_over_1200_lines` | 12 | accepted_exception |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 0 | blocker |
-| `class_exceptions_remaining` | 3 | blocker_until_reaccepted_for_v3 |
+| `class_exceptions_remaining` | 3 | accepted_exception |
 | `functions_over_150_lines` | 0 | blocker |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 19 | informational |
@@ -92,7 +93,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines | status | revisit condition |
 |---|---:|---|---|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py` | 1498 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1496 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1436 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -292,15 +294,35 @@ def test_shim_dependency_report_cache_reuse_and_force_rescan():
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
         (root / "crypto_rsi_scanner").mkdir()
-        (root / "crypto_rsi_scanner" / "__init__.py").write_text("", encoding="utf-8")
+        source = root / "crypto_rsi_scanner" / "__init__.py"
+        source.write_text("", encoding="utf-8")
         out_dir = root / "research"
-        _json_path, _md_path, _removal_json, _removal_md, first = shims.write_shim_dependency_report(
+        json_path, _md_path, _removal_json, _removal_md, first = shims.write_shim_dependency_report(
             root=root,
             out_dir=out_dir,
             force_rescan_shims=True,
         )
         cached = shims.build_shim_dependency_report(root=root)
         forced = shims.build_shim_dependency_report(root=root, force_rescan_shims=True)
+        runtime = shims.build_shim_dependency_report(root=root, include_runtime_artifacts=True)
+
+        now_ts = time.time()
+        old_report_ts = now_ts - 120
+        normal_source_ts = now_ts - 10
+        os.utime(json_path, (old_report_ts, old_report_ts))
+        os.utime(source, (normal_source_ts, normal_source_ts))
+        normal_miss = shims.build_shim_dependency_report(root=root)
+
+        _json_path, _md_path, _removal_json, _removal_md, _fresh = shims.write_shim_dependency_report(
+            root=root,
+            out_dir=out_dir,
+            force_rescan_shims=True,
+        )
+        future_source_ts = time.time() + 86400
+        old_report_ts = time.time() - 120
+        os.utime(json_path, (old_report_ts, old_report_ts))
+        os.utime(source, (future_source_ts, future_source_ts))
+        future_miss = shims.build_shim_dependency_report(root=root)
 
     assert first["cache_status"] == "force_rescan"
     assert cached["cache_status"] == "hit"
@@ -308,6 +330,15 @@ def test_shim_dependency_report_cache_reuse_and_force_rescan():
     assert cached["include_runtime_artifacts"] is False
     assert forced["cache_status"] == "force_rescan"
     assert forced["shim_dependency_report_cache_status"] == "force_rescan"
+    assert runtime["cache_status"] == "runtime_artifacts_scan"
+    assert normal_miss["cache_status"] == "miss"
+    assert normal_miss["newest_source_mtime"] > normal_miss["report_mtime"]
+    assert normal_miss["future_mtime_paths"] == []
+    assert future_miss["cache_status"] == "miss_due_future_mtime"
+    assert future_miss["shim_dependency_report_cache_status"] == "miss_due_future_mtime"
+    assert future_miss["newest_source_mtime"] > future_miss["report_mtime"]
+    assert future_miss["future_mtime_paths"]
+    assert future_miss["scan_accounting"]["cache_status"] == "miss_due_future_mtime"
 
 
 def test_artifact_doctor_warns_when_shim_scan_accounting_is_missing():

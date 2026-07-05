@@ -1,11 +1,11 @@
 {
-  "auto_accept_policy": "v3 auto-accept requires all v3 gates to be clear. Any nonessential shim remaining keeps v3 pending even when refactor v2 reports pass.",
+  "auto_accept_policy": "v3 auto-accept requires all v3 gates and documented exceptions to be clear. Accepted/documented target gaps report accepted_with_documented_exceptions; nonessential shims or unaccepted exceptions keep v3 pending or blocked.",
   "class_ownership_policy": {
     "multiple_public_classes": "Modules with multiple public classes should be reduced to model bundles only, with explicit documentation.",
     "public_classes": "Public classes should live in their own modules."
   },
   "feature_policy": "Behavior-preserving refactor only; do not add product features.",
-  "generated_at": "2026-07-05T02:06:51.993419+00:00",
+  "generated_at": "2026-07-05T03:24:12.691815+00:00",
   "intentional_exceptions": [
     {
       "module": "crypto_rsi_scanner.event_fade",

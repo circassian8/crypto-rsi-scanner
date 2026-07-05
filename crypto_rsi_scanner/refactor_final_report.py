@@ -925,6 +925,9 @@ def _v3_final_fields(v3_gate_snapshot: Mapping[str, Any]) -> dict[str, Any]:
         "v3_gate_status": v3_gate_snapshot["status"],
         "v3_auto_accept_ready": v3_gate_snapshot["v3_auto_accept_ready"],
         "v3_auto_accept_blockers": v3_gate_snapshot["auto_accept_blockers"],
+        "v3_blockers": v3_gate_snapshot.get("v3_blockers", []),
+        "v3_pending_exceptions": v3_gate_snapshot.get("v3_pending_exceptions", []),
+        "v3_accepted_exceptions": v3_gate_snapshot.get("v3_accepted_exceptions", {}),
         "v3_gates": gate_values,
         "v3_gate_snapshot": v3_gate_snapshot,
         **gate_values,
@@ -1005,7 +1008,8 @@ def _append_v3_finalization_section(lines: list[str], data: dict[str, Any]) -> N
             f"- v3_contract_path: `{data.get('v3_contract_path')}`",
             f"- v3_gate_status: `{data.get('v3_gate_status')}`",
             f"- v3_auto_accept_ready: `{data.get('v3_auto_accept_ready')}`",
-            f"- v3_auto_accept_blockers: `{json.dumps(data.get('v3_auto_accept_blockers', []), sort_keys=True)}`",
+            f"- v3_blockers: `{json.dumps(data.get('v3_blockers', []), sort_keys=True)}`",
+            f"- v3_accepted_exception_categories: `{json.dumps(sorted((data.get('v3_accepted_exceptions') or {}).keys()))}`",
             "",
             "| gate | value | severity |",
             "|---|---:|---|",
@@ -1016,7 +1020,6 @@ def _append_v3_finalization_section(lines: list[str], data: dict[str, Any]) -> N
     v3_severity = v3_snapshot.get("gate_severity") if isinstance(v3_snapshot.get("gate_severity"), dict) else {}
     for name in refactor_v3_contract.V3_GATE_NAMES:
         lines.append(f"| `{name}` | {v3_values.get(name, 0)} | {v3_severity.get(name, '')} |")
-
 
 def _append_class_ownership_section(lines: list[str], data: dict[str, Any]) -> None:
     lines.extend(
@@ -1076,7 +1079,6 @@ def _append_class_ownership_section(lines: list[str], data: dict[str, Any]) -> N
                 f"{row.get('revisit_condition') or ''} |"
             )
 
-
 def _append_production_size_section(lines: list[str], data: dict[str, Any]) -> None:
     lines.extend(["", "## Production Size Gate", "", "| path | lines |", "|---|---:|"])
     for row in data.get("largest_production_files", []):
@@ -1101,7 +1103,6 @@ def _append_production_size_section(lines: list[str], data: dict[str, Any]) -> N
         if isinstance(row, dict):
             lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
 
-
 def _append_safety_snapshot_section(lines: list[str], data: dict[str, Any]) -> None:
     lines.extend(
         [
@@ -1120,11 +1121,9 @@ def _append_safety_snapshot_section(lines: list[str], data: dict[str, Any]) -> N
         ]
     )
 
-
 def _append_migrated_modules_section(lines: list[str], data: dict[str, Any]) -> None:
     for module in data.get("migrated_modules_this_run", []):
         lines.append(f"- `{module}`")
-
 
 def _append_blocker_section(lines: list[str], data: dict[str, Any]) -> None:
     if not data["blockers"]:

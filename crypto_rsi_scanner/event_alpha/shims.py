@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterable
 
-from . import shim_scan
+from . import shim_cache, shim_scan
 from .artifacts import paths as event_artifact_paths
 from .shim_scan import DEFAULT_SHIM_SCAN_MAX_FILE_BYTES
 
@@ -335,7 +335,7 @@ def build_shim_dependency_report(
     max_file_bytes: int = DEFAULT_SHIM_SCAN_MAX_FILE_BYTES,
 ) -> dict[str, object]:
     repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
-    cached = _load_fresh_report_cache(
+    cached, cache_diagnostics = shim_cache.load_fresh_report_cache(
         repo_root=repo_root,
         report_name=DEPENDENCY_REPORT_JSON,
         expected_schema=SHIM_DEPENDENCY_SCHEMA_VERSION,
@@ -345,7 +345,7 @@ def build_shim_dependency_report(
         max_file_bytes=max_file_bytes,
     )
     if cached is not None:
-        return _with_cache_status(cached, "hit")
+        return shim_cache.with_cache_status(cached, "hit", cache_diagnostics=cache_diagnostics)
     entries = registry_entries()
     audit = audit_entries(entries, root=repo_root, generated_at=generated_at)
     references, scan_accounting = _scan_dependency_references_with_accounting(
@@ -396,6 +396,14 @@ def build_shim_dependency_report(
         for row in rows
         if row["docs_references"] and not row["docs_references_are_policy_scoped"]
     ]
+    cache_status = str(cache_diagnostics.get("cache_status") or shim_cache.scan_cache_status(
+        include_runtime_artifacts=include_runtime_artifacts,
+        force_rescan_shims=force_rescan_shims,
+        use_cache=use_cache,
+    ))
+    scan_accounting = dict(scan_accounting)
+    scan_accounting.update(shim_cache.cache_accounting_fields(cache_diagnostics))
+    scan_accounting["cache_status"] = cache_status
     return {
         "schema_version": SHIM_DEPENDENCY_SCHEMA_VERSION,
         "row_type": "event_alpha_shim_dependency_report",
@@ -410,16 +418,9 @@ def build_shim_dependency_report(
         "normal_rsi_signal_rows_written": 0,
         "triggered_fade_created": 0,
         "include_runtime_artifacts": include_runtime_artifacts,
-        "cache_status": _scan_cache_status(
-            include_runtime_artifacts=include_runtime_artifacts,
-            force_rescan_shims=force_rescan_shims,
-            use_cache=use_cache,
-        ),
-        "shim_dependency_report_cache_status": _scan_cache_status(
-            include_runtime_artifacts=include_runtime_artifacts,
-            force_rescan_shims=force_rescan_shims,
-            use_cache=use_cache,
-        ),
+        "cache_status": cache_status,
+        "shim_dependency_report_cache_status": cache_status,
+        **shim_cache.cache_accounting_fields(cache_diagnostics),
         "scan_duration_seconds": scan_accounting.get("scan_duration_seconds", 0.0),
         "scanned_source_files": scan_accounting.get("scanned_source_files", 0),
         "scanned_doc_files": scan_accounting.get("scanned_doc_files", 0),
@@ -591,7 +592,7 @@ def build_old_import_check_report(
     references remain visible as counters without pretending they are imports.
     """
     repo_root = Path(root).expanduser() if root is not None else event_artifact_paths.repo_root()
-    cached = _load_fresh_report_cache(
+    cached, cache_diagnostics = shim_cache.load_fresh_report_cache(
         repo_root=repo_root,
         report_name=OLD_IMPORT_CHECK_JSON,
         expected_schema=OLD_IMPORT_CHECK_SCHEMA_VERSION,
@@ -601,7 +602,7 @@ def build_old_import_check_report(
         max_file_bytes=max_file_bytes,
     )
     if cached is not None:
-        return _with_cache_status(cached, "hit")
+        return shim_cache.with_cache_status(cached, "hit", cache_diagnostics=cache_diagnostics)
     entries = registry_entries()
     deleted_entries = deleted_shim_entries(root=repo_root)
     checked_entries = (*entries, *deleted_entries)
@@ -629,6 +630,14 @@ def build_old_import_check_report(
         row for row in rows if row.get("blocked_docs_references")
     ]
     blockers = [*blocked_internal, *blocked_tests, *blocked_dynamic, *blocked_docs]
+    cache_status = str(cache_diagnostics.get("cache_status") or shim_cache.scan_cache_status(
+        include_runtime_artifacts=include_runtime_artifacts,
+        force_rescan_shims=force_rescan_shims,
+        use_cache=use_cache,
+    ))
+    scan_accounting = dict(scan_accounting)
+    scan_accounting.update(shim_cache.cache_accounting_fields(cache_diagnostics))
+    scan_accounting["cache_status"] = cache_status
     return {
         "schema_version": OLD_IMPORT_CHECK_SCHEMA_VERSION,
         "row_type": "event_alpha_old_import_check",
@@ -643,16 +652,9 @@ def build_old_import_check_report(
         "normal_rsi_signal_rows_written": 0,
         "triggered_fade_created": 0,
         "include_runtime_artifacts": include_runtime_artifacts,
-        "cache_status": _scan_cache_status(
-            include_runtime_artifacts=include_runtime_artifacts,
-            force_rescan_shims=force_rescan_shims,
-            use_cache=use_cache,
-        ),
-        "old_import_check_cache_status": _scan_cache_status(
-            include_runtime_artifacts=include_runtime_artifacts,
-            force_rescan_shims=force_rescan_shims,
-            use_cache=use_cache,
-        ),
+        "cache_status": cache_status,
+        "old_import_check_cache_status": cache_status,
+        **shim_cache.cache_accounting_fields(cache_diagnostics),
         "scan_duration_seconds": scan_accounting.get("scan_duration_seconds", 0.0),
         "scanned_source_files": scan_accounting.get("scanned_source_files", 0),
         "scanned_doc_files": scan_accounting.get("scanned_doc_files", 0),
@@ -705,68 +707,6 @@ def write_old_import_check_report(
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(format_old_import_check_report(report), encoding="utf-8")
     return json_path, md_path, report
-
-
-def _load_fresh_report_cache(
-    *,
-    repo_root: Path,
-    report_name: str,
-    expected_schema: str,
-    include_runtime_artifacts: bool,
-    force_rescan_shims: bool,
-    use_cache: bool,
-    max_file_bytes: int,
-) -> dict[str, object] | None:
-    if force_rescan_shims or include_runtime_artifacts or not use_cache:
-        return None
-    path = repo_root / "research" / report_name
-    try:
-        report_mtime = path.stat().st_mtime
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(payload, dict) or payload.get("schema_version") != expected_schema:
-        return None
-    if not isinstance(payload.get("scan_accounting"), dict):
-        return None
-    if bool(payload.get("include_runtime_artifacts")):
-        return None
-    newest_source_mtime = shim_scan.newest_scan_input_mtime(
-        repo_root,
-        include_runtime_artifacts=False,
-        max_file_bytes=max_file_bytes,
-    )
-    if newest_source_mtime > report_mtime:
-        return None
-    return payload
-
-
-def _with_cache_status(report: dict[str, object], status: str) -> dict[str, object]:
-    payload = dict(report)
-    accounting = dict(payload.get("scan_accounting") or {})
-    accounting["cache_status"] = status
-    payload["scan_accounting"] = accounting
-    payload["cache_status"] = status
-    if payload.get("row_type") == "event_alpha_shim_dependency_report":
-        payload["shim_dependency_report_cache_status"] = status
-    if payload.get("row_type") == "event_alpha_old_import_check":
-        payload["old_import_check_cache_status"] = status
-    return payload
-
-
-def _scan_cache_status(
-    *,
-    include_runtime_artifacts: bool,
-    force_rescan_shims: bool,
-    use_cache: bool,
-) -> str:
-    if include_runtime_artifacts:
-        return "runtime_artifacts_scan"
-    if force_rescan_shims:
-        return "force_rescan"
-    if not use_cache:
-        return "disabled"
-    return "miss"
 
 
 def _scan_dependency_references(

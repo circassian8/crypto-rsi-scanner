@@ -21,6 +21,7 @@ OUT = ROOT / "crypto_rsi_scanner_source_with_artifacts.zip"
 EXCLUDE_DIRS = {
     ".git",
     ".venv",
+    ".cache",
     ".pytest_cache",
     "__pycache__",
     ".mypy_cache",
@@ -29,6 +30,7 @@ EXCLUDE_DIRS = {
     ".vscode",
     "node_modules",
     "backups",
+    "backtest_cache",
 }
 EXCLUDE_FILE_NAMES = {
     ".env",
@@ -115,6 +117,9 @@ def _validate(names: list[str]) -> list[str]:
             or "/.venv/" in lower
             or "__pycache__/" in lower
             or ".pytest_cache/" in lower
+            or ".cache/" in lower
+            or lower.startswith("backtest_cache/")
+            or "/backtest_cache/" in lower
             or lower.endswith((".db", ".db-wal", ".db-shm", ".sqlite", ".sqlite3", ".log", ".zip", ".pyc"))
         ):
             bad.append(name)
@@ -142,20 +147,22 @@ def _validate_archive_entries(zip_path: Path, *, safe_export_timestamp: float) -
 def _safe_export_timestamp(*, now_ts: float | None = None) -> float:
     """Return the latest mtime allowed in the review archive.
 
-    ``SOURCE_DATE_EPOCH`` is honored for reproducible exports. Without it, clamp
-    all archive entries to a slightly old timestamp so review machines whose
-    clocks lag the export host do not see future-dated files and emit Make clock
-    skew warnings immediately after unzip.
+    ``SOURCE_DATE_EPOCH`` is honored for reproducible exports, but never beyond
+    the conservative wall-clock-safe timestamp. Without it, clamp all archive
+    entries to a slightly old timestamp so review machines whose clocks lag the
+    export host do not see future-dated files and emit Make clock skew warnings
+    immediately after unzip.
     """
 
+    current = time.time() if now_ts is None else float(now_ts)
+    wall_clock_safe = max(current - DEFAULT_EXPORT_MTIME_SAFETY_MARGIN_SECONDS, MIN_ZIP_TIMESTAMP)
     raw_epoch = os.getenv("SOURCE_DATE_EPOCH", "").strip()
     if raw_epoch:
         try:
-            return max(float(raw_epoch), MIN_ZIP_TIMESTAMP)
+            return min(max(float(raw_epoch), MIN_ZIP_TIMESTAMP), wall_clock_safe)
         except ValueError:
             pass
-    current = time.time() if now_ts is None else float(now_ts)
-    return max(current - DEFAULT_EXPORT_MTIME_SAFETY_MARGIN_SECONDS, MIN_ZIP_TIMESTAMP)
+    return wall_clock_safe
 
 
 def _zipinfo_for_path(path: Path, arcname: str, *, now_ts: float) -> zipfile.ZipInfo:

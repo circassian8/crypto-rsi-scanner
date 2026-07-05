@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Seal refactor v3 report and export hygiene · Codex
+**Why:** The release-candidate report accepted refactor v3, but the final
+report family still described accepted over-1,200-line files and accepted
+storage mixin class exceptions as pending blockers. Review zips also needed
+stronger timestamp hygiene so extracted Makefiles do not emit clock-skew
+warnings, and shim cache misses needed clearer diagnostics.
+**Changes:**
+- Reconciled v3 gate semantics across final, size, class ownership, and
+  release-candidate reports with explicit `pass`,
+  `accepted_with_documented_exceptions`, `pending`, and `blocked` states.
+- Moved the accepted over-1,200-line production-file registry into the v3
+  contract so every report lists the same 12 accepted file warnings and 3
+  accepted storage mixin class exceptions with `v3_blockers=[]`.
+- Hardened `scripts/export_source_with_artifacts.py` to clamp future mtimes,
+  honor wall-clock-safe `SOURCE_DATE_EPOCH`, validate archive entry/Makefile
+  mtimes, and exclude cache directories while preserving the canonical review
+  zip path.
+- Split shim cache freshness helpers into `event_alpha/shim_cache.py` and added
+  explicit `miss_due_future_mtime` diagnostics without scanning runtime
+  artifacts by default.
+- Added regression tests for accepted-exception status rendering, hard blocker
+  behavior, zip timestamp clamping/validation, fallback export clock-skew
+  smoke, and shim cache hit/miss/force/runtime-artifact paths.
+**Verify:** `python3 tests/test_indicators.py` passed (`758/758`);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` passed (`773 passed`); `python3 -m
+compileall -q crypto_rsi_scanner tests` passed; `make event-alpha-old-import-check
+PYTHON=python3` passed with `old_path_internal_imports=0`; repeated `make
+event-alpha-shim-dependency-report PYTHON=python3` reached `cache_status=hit`;
+`make refactor-size-gates PYTHON=python3`, `make
+refactor-class-ownership-report PYTHON=python3`, `make refactor-final-report
+PYTHON=python3`, and `make event-alpha-integrated-radar-doctor PYTHON=python3`
+passed; `make export-src-with-artifacts-smoke PYTHON=python3` passed with
+`bad_entries=0`; `make verify PYTHON=python3` passed.
+**Notes/risks:** `v3_auto_accept_ready=false` still means “zero accepted
+exceptions,” not “refactor pending.” Current status is
+`accepted_with_documented_exceptions` / `accepted` with no v3 blockers.
+
 ## 2026-07-05 — Harden ops CLI regression coverage and full pytest gate · Codex
 **Why:** A wrong-depth relative import broke `--status`, backup, restore, and
 maintenance commands after the CLI refactor while the old verification gate

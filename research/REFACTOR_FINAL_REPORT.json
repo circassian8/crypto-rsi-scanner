@@ -1400,7 +1400,7 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1496,
+      "line_count": 1436,
       "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "reason": "Static shim registry/data table; large by design and non-behavioral.",
       "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
@@ -4285,7 +4285,7 @@
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1496,
+        "line_count": 1436,
         "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -4564,7 +4564,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-05T02:06:51+00:00",
+  "generated_at": "2026-07-05T03:24:12+00:00",
   "generator": "crypto_rsi_scanner.refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
     "crypto_rsi_scanner.event_fade"
@@ -4676,7 +4676,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1496,
+      "line_count": 1436,
       "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "source_kind": "production"
     },
@@ -4742,7 +4742,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1200,
+      "line_count": 1199,
       "path": "crypto_rsi_scanner/refactor_final_report.py",
       "source_kind": "production"
     },
@@ -4960,7 +4960,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1100,
+      "line_count": 1225,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
@@ -4990,7 +4990,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 478,
+      "line_count": 509,
       "path": "tests/event_alpha/test_shim_registry.py",
       "source_kind": "test"
     },
@@ -5022,6 +5022,18 @@
       "limit": 1500,
       "line_count": 129,
       "path": "tests/cli/test_dispatch.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 88,
+      "path": "tests/cli/test_relative_import_integrity.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 76,
+      "path": "tests/cli/test_ops_command_smoke.py",
       "source_kind": "test"
     },
     {
@@ -6663,7 +6675,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1496,
+      "line_count": 1436,
       "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -6936,16 +6948,20 @@
   "shim_dependency_report_cache_status": "hit",
   "shim_dependency_scan_accounting": {
     "cache_status": "hit",
+    "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "max_file_bytes": 1000000,
+    "newer_source_mtime_paths": [],
+    "newest_source_mtime": 1783221329.45777,
     "regex_compile_count": 9,
-    "scan_duration_seconds": 1.2528,
+    "report_mtime": 1783221839.5262368,
+    "scan_duration_seconds": 1.2318,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 30,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
-    "scanned_source_files": 611,
-    "scanned_test_files": 26,
+    "scanned_source_files": 612,
+    "scanned_test_files": 28,
     "skipped_artifact_files": 1285,
     "skipped_binary_files": 0,
     "skipped_dir_samples": [
@@ -6965,10 +6981,10 @@
     "skipped_large_files": 0,
     "skipped_suffix_files": 0
   },
-  "shim_dependency_scan_duration_seconds": 1.2528,
+  "shim_dependency_scan_duration_seconds": 1.2318,
   "shim_dependency_scanned_doc_files": 30,
-  "shim_dependency_scanned_source_files": 611,
-  "shim_dependency_scanned_test_files": 26,
+  "shim_dependency_scanned_source_files": 612,
+  "shim_dependency_scanned_test_files": 28,
   "shim_dependency_skipped_artifact_files": 1285,
   "shim_dependency_skipped_large_files": 0,
   "shim_removal_blockers": 0,
@@ -7027,20 +7043,179 @@
   "unresolved_multi_class_modules_count": 0,
   "unresolved_production_files_over_1200_line_rows": [],
   "unresolved_production_files_over_1200_lines": 0,
-  "v3_auto_accept_blockers": [
-    "production_files_over_1200_lines",
-    "class_exceptions_remaining"
-  ],
+  "v3_accepted_exceptions": {
+    "class_exceptions_remaining": {
+      "count": 3,
+      "reason": "accepted/documented storage mixin class exceptions",
+      "rows": [
+        {
+          "accepted_exception": true,
+          "class_name": "MigrationsMixin",
+          "exception_category": "storage_mixin",
+          "exception_reason": "SQLite migration ownership is intentionally centralized to avoid untested schema drift.",
+          "exception_status": "accepted_exception",
+          "line_count": 88,
+          "module": "crypto_rsi_scanner.storage_parts.migrations",
+          "owner_note": "DB schema behavior must not change in this cleanup pass.",
+          "public": true,
+          "qualname": "MigrationsMixin",
+          "revisit_condition": "Revisit only with explicit migration tests and backup/restore verification.",
+          "source_path": "crypto_rsi_scanner/storage_parts/migrations.py"
+        },
+        {
+          "accepted_exception": true,
+          "class_name": "SignalsMixin",
+          "exception_category": "storage_mixin",
+          "exception_reason": "Signal persistence methods share schema assumptions, row serialization, and outcome lookup behavior.",
+          "exception_status": "accepted_exception",
+          "line_count": 129,
+          "module": "crypto_rsi_scanner.storage_parts.signals",
+          "owner_note": "Avoid splitting storage write paths without SQLite roundtrip parity tests.",
+          "public": true,
+          "qualname": "SignalsMixin",
+          "revisit_condition": "Revisit when storage schema v2 or a repository layer is introduced.",
+          "source_path": "crypto_rsi_scanner/storage_parts/signals.py"
+        },
+        {
+          "accepted_exception": true,
+          "class_name": "WatchlistMixin",
+          "exception_category": "storage_mixin",
+          "exception_reason": "Watchlist persistence methods are stable DB helpers and only slightly exceed the advisory limit.",
+          "exception_status": "accepted_exception",
+          "line_count": 89,
+          "module": "crypto_rsi_scanner.storage_parts.watchlist",
+          "owner_note": "No DB schema or paper/watchlist behavior changes in this refactor pass.",
+          "public": true,
+          "qualname": "WatchlistMixin",
+          "revisit_condition": "Revisit when watchlist storage grows new tables or migrations.",
+          "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
+        }
+      ]
+    },
+    "production_files_over_1200_lines": {
+      "count": 12,
+      "reason": "accepted/documented production files over the v3 1,200-line target",
+      "rows": [
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1498,
+          "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+          "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
+          "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1436,
+          "path": "crypto_rsi_scanner/event_alpha/shims.py",
+          "reason": "Static shim registry/data table; large by design and non-behavioral.",
+          "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1404,
+          "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+          "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
+          "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1395,
+          "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
+          "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
+          "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1392,
+          "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+          "reason": "Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
+          "revisit_condition": "When config/report command bodies move to canonical non-legacy service modules.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1387,
+          "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
+          "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
+          "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1319,
+          "path": "crypto_rsi_scanner/config.py",
+          "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
+          "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1275,
+          "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
+          "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
+          "revisit_condition": "When adding a new enrichment source or cache policy.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1261,
+          "path": "crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py",
+          "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
+          "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1239,
+          "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+          "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+          "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1233,
+          "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+          "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
+          "revisit_condition": "When outcome performance views gain new sections.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1223,
+          "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+          "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+          "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+          "source_kind": "production"
+        }
+      ]
+    }
+  },
+  "v3_auto_accept_blockers": [],
   "v3_auto_accept_ready": false,
+  "v3_blockers": [],
   "v3_contract_path": "research/REFACTOR_V3_CONTRACT.md",
   "v3_gate_snapshot": {
-    "auto_accept_blockers": [
-      "production_files_over_1200_lines",
-      "class_exceptions_remaining"
-    ],
+    "auto_accept_blockers": [],
     "contract_path": "research/REFACTOR_V3_CONTRACT.md",
     "gate_severity": {
-      "class_exceptions_remaining": "blocker_until_reaccepted_for_v3",
+      "class_exceptions_remaining": "accepted_exception",
       "deleted_shims": "informational",
       "functions_over_150_lines": "blocker",
       "nonessential_shims_remaining": "blocker",
@@ -7048,7 +7223,7 @@
       "old_path_import_allowed_exceptions": "informational",
       "old_path_internal_imports": "blocker",
       "old_path_test_imports": "blocker",
-      "production_files_over_1200_lines": "target_gap",
+      "production_files_over_1200_lines": "accepted_exception",
       "production_files_over_1500_lines": "blocker",
       "public_classes_not_in_own_module": "blocker",
       "public_compatibility_shims": "informational",
@@ -7077,7 +7252,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1496,
+        "line_count": 1436,
         "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "threshold": 1200
       },
@@ -7137,10 +7312,176 @@
     "row_type": "refactor_v3_gate_snapshot",
     "schema_version": "refactor_v3_gate_snapshot_v1",
     "shim_removal_blocker_rows": [],
-    "status": "pending",
-    "v3_auto_accept_ready": false
+    "status": "accepted_with_documented_exceptions",
+    "v3_accepted_exceptions": {
+      "class_exceptions_remaining": {
+        "count": 3,
+        "reason": "accepted/documented storage mixin class exceptions",
+        "rows": [
+          {
+            "accepted_exception": true,
+            "class_name": "MigrationsMixin",
+            "exception_category": "storage_mixin",
+            "exception_reason": "SQLite migration ownership is intentionally centralized to avoid untested schema drift.",
+            "exception_status": "accepted_exception",
+            "line_count": 88,
+            "module": "crypto_rsi_scanner.storage_parts.migrations",
+            "owner_note": "DB schema behavior must not change in this cleanup pass.",
+            "public": true,
+            "qualname": "MigrationsMixin",
+            "revisit_condition": "Revisit only with explicit migration tests and backup/restore verification.",
+            "source_path": "crypto_rsi_scanner/storage_parts/migrations.py"
+          },
+          {
+            "accepted_exception": true,
+            "class_name": "SignalsMixin",
+            "exception_category": "storage_mixin",
+            "exception_reason": "Signal persistence methods share schema assumptions, row serialization, and outcome lookup behavior.",
+            "exception_status": "accepted_exception",
+            "line_count": 129,
+            "module": "crypto_rsi_scanner.storage_parts.signals",
+            "owner_note": "Avoid splitting storage write paths without SQLite roundtrip parity tests.",
+            "public": true,
+            "qualname": "SignalsMixin",
+            "revisit_condition": "Revisit when storage schema v2 or a repository layer is introduced.",
+            "source_path": "crypto_rsi_scanner/storage_parts/signals.py"
+          },
+          {
+            "accepted_exception": true,
+            "class_name": "WatchlistMixin",
+            "exception_category": "storage_mixin",
+            "exception_reason": "Watchlist persistence methods are stable DB helpers and only slightly exceed the advisory limit.",
+            "exception_status": "accepted_exception",
+            "line_count": 89,
+            "module": "crypto_rsi_scanner.storage_parts.watchlist",
+            "owner_note": "No DB schema or paper/watchlist behavior changes in this refactor pass.",
+            "public": true,
+            "qualname": "WatchlistMixin",
+            "revisit_condition": "Revisit when watchlist storage grows new tables or migrations.",
+            "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
+          }
+        ]
+      },
+      "production_files_over_1200_lines": {
+        "count": 12,
+        "reason": "accepted/documented production files over the v3 1,200-line target",
+        "rows": [
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1498,
+            "path": "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py",
+            "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
+            "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1436,
+            "path": "crypto_rsi_scanner/event_alpha/shims.py",
+            "reason": "Static shim registry/data table; large by design and non-behavioral.",
+            "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1404,
+            "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+            "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
+            "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1395,
+            "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
+            "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
+            "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1392,
+            "path": "crypto_rsi_scanner/cli/services/legacy/config_reports.py",
+            "reason": "Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
+            "revisit_condition": "When config/report command bodies move to canonical non-legacy service modules.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1387,
+            "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
+            "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
+            "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1319,
+            "path": "crypto_rsi_scanner/config.py",
+            "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
+            "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1275,
+            "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
+            "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
+            "revisit_condition": "When adding a new enrichment source or cache policy.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1261,
+            "path": "crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py",
+            "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
+            "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1239,
+            "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+            "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+            "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1233,
+            "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+            "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
+            "revisit_condition": "When outcome performance views gain new sections.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1223,
+            "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+            "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+            "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+            "source_kind": "production"
+          }
+        ]
+      }
+    },
+    "v3_auto_accept_ready": false,
+    "v3_blockers": [],
+    "v3_pending_exceptions": []
   },
-  "v3_gate_status": "pending",
+  "v3_gate_status": "accepted_with_documented_exceptions",
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 115,
@@ -7155,5 +7496,6 @@
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 9,
     "shim_removal_blockers": 0
-  }
+  },
+  "v3_pending_exceptions": []
 }

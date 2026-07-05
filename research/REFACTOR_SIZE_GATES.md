@@ -2,12 +2,13 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-05T02:04:45.150233+00:00`
+- generated_at: `2026-07-05T03:24:07.991319+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
-- v3_gate_status: `pending`
+- v3_gate_status: `accepted_with_documented_exceptions`
 - v3_auto_accept_ready: `False`
+- v3_blockers: `[]`
 - production_files_over_1200_lines: `12`
 - accepted_production_files_over_1200_lines: `12`
 - unresolved_production_files_over_1200_lines: `0`
@@ -69,10 +70,10 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 9 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 115 | informational |
-| `production_files_over_1200_lines` | 12 | target_gap |
+| `production_files_over_1200_lines` | 12 | accepted_exception |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 0 | blocker |
-| `class_exceptions_remaining` | 3 | blocker_until_reaccepted_for_v3 |
+| `class_exceptions_remaining` | 3 | accepted_exception |
 | `functions_over_150_lines` | 0 | blocker |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 19 | informational |
@@ -112,7 +113,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py` | 1498 |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1496 |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1436 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 |
@@ -123,7 +124,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1239 |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1223 |
-| `crypto_rsi_scanner/refactor_final_report.py` | 1200 |
+| `crypto_rsi_scanner/refactor_final_report.py` | 1199 |
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 1155 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/legacy_parts/builder.py` | 1145 |
@@ -157,7 +158,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines | reason | revisit |
 |---|---:|---|---|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py` | 1498 | Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged. | When identity/source/market/derivatives merge golden fixtures can be compared before and after split. |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1496 | Static shim registry/data table; large by design and non-behavioral. | When another shim retirement pass removes retained public compatibility entries. |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1436 | Static shim registry/data table; large by design and non-behavioral. | When another shim retirement pass removes retained public compatibility entries. |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 | Dense operator audit renderer with many cross-section helper dependencies. | When audit sections are split with golden Markdown fixture comparison. |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | Verdict scoring and live-confirmation policy share many ordered caps and guardrails. | When verdict snapshots cover each opportunity level and cap reason. |
 | `crypto_rsi_scanner/cli/services/legacy/config_reports.py` | 1392 | Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to canonical non-legacy service modules. |
@@ -187,17 +188,19 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_source_coverage.py` | 2991 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
 | `tests/test_indicators.py` | 1778 |
-| `tests/cli/test_make_targets.py` | 1100 |
+| `tests/cli/test_make_targets.py` | 1225 |
 | `tests/event_alpha/_legacy_helpers.py` | 825 |
 | `tests/event_alpha/test_artifact_schema.py` | 743 |
 | `tests/rsi/test_indicators_core.py` | 694 |
 | `tests/rsi/test_backtest.py` | 561 |
-| `tests/event_alpha/test_shim_registry.py` | 478 |
+| `tests/event_alpha/test_shim_registry.py` | 509 |
 | `tests/rsi/test_paper_risk.py` | 379 |
 | `tests/cli/test_parser.py` | 243 |
 | `tests/event_alpha/test_legacy_import_compatibility.py` | 170 |
 | `tests/cli/test_event_alpha_command_registry.py` | 163 |
 | `tests/cli/test_dispatch.py` | 129 |
+| `tests/cli/test_relative_import_integrity.py` | 88 |
+| `tests/cli/test_ops_command_smoke.py` | 76 |
 | `tests/rsi/_legacy_helpers.py` | 68 |
 | `tests/event_alpha/conftest.py` | 30 |
 | `tests/conftest.py` | 13 |

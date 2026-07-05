@@ -2,7 +2,7 @@
 
 Research-only, behavior-preserving finalization contract. This document does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created TRIGGERED_FADE.
 
-- generated_at: `2026-07-05T02:06:51.993419+00:00`
+- generated_at: `2026-07-05T03:24:12.691815+00:00`
 - schema_version: `refactor_v3_contract_v1`
 - purpose: Move from accepted refactor v2 compatibility shims to fully finished refactor v3.
 - feature_policy: Behavior-preserving refactor only; do not add product features.
@@ -52,4 +52,4 @@ Research-only, behavior-preserving finalization contract. This document does not
 
 ## Auto-Accept
 
-- v3 auto-accept requires all v3 gates to be clear. Any nonessential shim remaining keeps v3 pending even when refactor v2 reports pass.
+- v3 auto-accept requires all v3 gates and documented exceptions to be clear. Accepted/documented target gaps report accepted_with_documented_exceptions; nonessential shims or unaccepted exceptions keep v3 pending or blocked.

@@ -2,7 +2,7 @@
 
 Research artifact only. No shims are deleted by this report.
 
-- generated_at: 2026-07-05T02:06:22.807791+00:00
+- generated_at: 2026-07-05T03:23:54.336596+00:00
 - registry_entry_count: 9
 
 Event Alpha may produce `FADE_SHORT_REVIEW` research artifacts, but Event Alpha must not create `TRIGGERED_FADE`. `TRIGGERED_FADE` belongs only to `event_fade.py` plus `proxy_fade`.

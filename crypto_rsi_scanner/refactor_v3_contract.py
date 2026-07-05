@@ -23,6 +23,56 @@ PRODUCTION_TARGET_LINE_LIMIT = 1200
 PRODUCTION_BLOCKER_LINE_LIMIT = 1500
 FUNCTION_BLOCKER_LINE_LIMIT = 150
 CLASS_BLOCKER_LINE_LIMIT = 75
+ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
+    "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py": {
+        "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+        "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+    },
+    "crypto_rsi_scanner/cli/services/legacy/config_reports.py": {
+        "reason": "Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
+        "revisit_condition": "When config/report command bodies move to canonical non-legacy service modules.",
+    },
+    "crypto_rsi_scanner/config.py": {
+        "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
+        "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+    },
+    "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py": {
+        "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
+        "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
+    },
+    "crypto_rsi_scanner/event_alpha/notifications/legacy/plan_builder.py": {
+        "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
+        "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
+    },
+    "crypto_rsi_scanner/event_alpha/notifications/router.py": {
+        "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
+        "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
+    },
+    "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py": {
+        "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
+        "revisit_condition": "When outcome performance views gain new sections.",
+    },
+    "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py": {
+        "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+        "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+    },
+    "crypto_rsi_scanner/event_alpha/radar/integrated/legacy_parts/merge.py": {
+        "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
+        "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
+    },
+    "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py": {
+        "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
+        "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
+    },
+    "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py": {
+        "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
+        "revisit_condition": "When adding a new enrichment source or cache policy.",
+    },
+    "crypto_rsi_scanner/event_alpha/shims.py": {
+        "reason": "Static shim registry/data table; large by design and non-behavioral.",
+        "revisit_condition": "When another shim retirement pass removes retained public compatibility entries.",
+    },
+}
 V3_GATE_NAMES = (
     "nonessential_shims_remaining",
     "old_path_internal_imports",
@@ -37,6 +87,25 @@ V3_GATE_NAMES = (
     "functions_over_150_lines",
     "old_path_docs_references",
     "old_path_import_allowed_exceptions",
+)
+
+V3_INFORMATIONAL_GATES = frozenset(
+    {
+        "public_compatibility_shims",
+        "deleted_shims",
+        "old_path_import_allowed_exceptions",
+    }
+)
+V3_ACCEPTED_EXCEPTION_GATES = frozenset(
+    {
+        "production_files_over_1200_lines",
+        "class_exceptions_remaining",
+    }
+)
+V3_HARD_BLOCKER_GATES = frozenset(
+    name
+    for name in V3_GATE_NAMES
+    if name not in V3_INFORMATIONAL_GATES and name not in V3_ACCEPTED_EXCEPTION_GATES
 )
 
 
@@ -104,8 +173,9 @@ def build_refactor_v3_contract(*, generated_at: datetime | None = None) -> dict[
         ],
         "v3_gate_names": list(V3_GATE_NAMES),
         "auto_accept_policy": (
-            "v3 auto-accept requires all v3 gates to be clear. Any nonessential shim remaining "
-            "keeps v3 pending even when refactor v2 reports pass."
+            "v3 auto-accept requires all v3 gates and documented exceptions to be clear. "
+            "Accepted/documented target gaps report accepted_with_documented_exceptions; "
+            "nonessential shims or unaccepted exceptions keep v3 pending or blocked."
         ),
     }
 
@@ -154,18 +224,40 @@ def build_v3_gate_snapshot(
             shim_report.get("old_path_import_allowed_exceptions") or 0
         ),
     }
-    blocker_names = [
+    hard_blocker_names = [
         name
         for name in V3_GATE_NAMES
-        if name not in {"public_compatibility_shims", "deleted_shims", "old_path_import_allowed_exceptions"}
+        if name in V3_HARD_BLOCKER_GATES
         and int(gate_values.get(name) or 0) > 0
     ]
+    accepted_exception_rows = _accepted_exception_rows(
+        size_report=size_report,
+        class_report=class_report,
+        production_over_1200_rows=production_over_1200_rows,
+        gate_values=gate_values,
+    )
+    pending_exception_names = [
+        name
+        for name in V3_ACCEPTED_EXCEPTION_GATES
+        if int(gate_values.get(name) or 0) > 0 and not accepted_exception_rows.get(name)
+    ]
+    if hard_blocker_names:
+        status = "blocked"
+    elif pending_exception_names:
+        status = "pending"
+    elif any(accepted_exception_rows.values()):
+        status = "accepted_with_documented_exceptions"
+    else:
+        status = "pass"
     return {
         "schema_version": "refactor_v3_gate_snapshot_v1",
         "row_type": "refactor_v3_gate_snapshot",
-        "status": "pending" if blocker_names else "pass",
-        "v3_auto_accept_ready": not blocker_names,
-        "auto_accept_blockers": blocker_names,
+        "status": status,
+        "v3_auto_accept_ready": status == "pass",
+        "auto_accept_blockers": hard_blocker_names + pending_exception_names,
+        "v3_blockers": hard_blocker_names,
+        "v3_pending_exceptions": pending_exception_names,
+        "v3_accepted_exceptions": accepted_exception_rows,
         "gate_values": gate_values,
         "gate_severity": {
             "nonessential_shims_remaining": "blocker",
@@ -174,10 +266,10 @@ def build_v3_gate_snapshot(
             "public_compatibility_shims": "informational",
             "shim_removal_blockers": "blocker",
             "deleted_shims": "informational",
-            "production_files_over_1200_lines": "target_gap",
+            "production_files_over_1200_lines": "accepted_exception" if accepted_exception_rows.get("production_files_over_1200_lines") else "target_gap",
             "production_files_over_1500_lines": "blocker",
             "public_classes_not_in_own_module": "blocker",
-            "class_exceptions_remaining": "blocker_until_reaccepted_for_v3",
+            "class_exceptions_remaining": "accepted_exception" if accepted_exception_rows.get("class_exceptions_remaining") else "pending_exception",
             "functions_over_150_lines": "blocker",
             "old_path_docs_references": "blocker_unless_policy_scoped",
             "old_path_import_allowed_exceptions": "informational",
@@ -327,6 +419,69 @@ def _public_classes_not_in_own_module(class_report: Mapping[str, Any]) -> list[d
             }
         )
     return rows
+
+
+def _accepted_exception_rows(
+    *,
+    size_report: Mapping[str, Any],
+    class_report: Mapping[str, Any],
+    production_over_1200_rows: list[dict[str, Any]],
+    gate_values: Mapping[str, Any],
+) -> dict[str, Any]:
+    accepted: dict[str, Any] = {}
+    production_count = int(gate_values.get("production_files_over_1200_lines") or 0)
+    has_size_counts = (
+        "unresolved_production_files_over_1200_lines" in size_report
+        or "accepted_production_files_over_1200_lines" in size_report
+    )
+    if has_size_counts:
+        unresolved_production_count = int(size_report.get("unresolved_production_files_over_1200_lines") or 0)
+        accepted_production_count = int(size_report.get("accepted_production_files_over_1200_lines") or 0)
+    else:
+        accepted_production_count = sum(
+            1
+            for row in production_over_1200_rows
+            if str(row.get("path") or "") in ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES
+        )
+        unresolved_production_count = max(production_count - accepted_production_count, 0)
+    if production_count and unresolved_production_count == 0 and accepted_production_count == production_count:
+        rows = size_report.get("accepted_production_files_over_1200_line_rows")
+        if not isinstance(rows, list):
+            rows = [
+                _accepted_production_over_1200_row(row)
+                for row in production_over_1200_rows
+                if str(row.get("path") or "") in ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES
+            ]
+        accepted["production_files_over_1200_lines"] = {
+            "count": production_count,
+            "reason": "accepted/documented production files over the v3 1,200-line target",
+            "rows": rows,
+        }
+
+    class_exception_count = int(gate_values.get("class_exceptions_remaining") or 0)
+    remaining_debt = int(class_report.get("remaining_class_ownership_debt_count") or 0)
+    accepted_class_count = int(class_report.get("accepted_class_exceptions_count") or 0)
+    if class_exception_count and remaining_debt == 0 and accepted_class_count == class_exception_count:
+        rows = class_report.get("accepted_class_exceptions")
+        if not isinstance(rows, list):
+            rows = []
+        accepted["class_exceptions_remaining"] = {
+            "count": class_exception_count,
+            "reason": "accepted/documented storage mixin class exceptions",
+            "rows": rows,
+        }
+    return accepted
+
+
+def _accepted_production_over_1200_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    path = str(row.get("path") or "")
+    meta = ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES.get(path, {})
+    return {
+        **dict(row),
+        "accepted": True,
+        "reason": str(meta.get("reason") or "Accepted v3 over-1200-line warning."),
+        "revisit_condition": str(meta.get("revisit_condition") or "Revisit on the next behavior-freeze split pass."),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:

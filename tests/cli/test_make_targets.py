@@ -10,6 +10,7 @@ globals().update({name: getattr(_legacy, name) for name in dir(_legacy) if not n
 
 def test_makefile_has_clean_export_and_bootstrap_targets():
     import importlib.util
+    import os
     import subprocess
     import time
     import zipfile
@@ -349,6 +350,15 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
             else:
                 os.environ["SOURCE_DATE_EPOCH"] = original_epoch
         assert safe_ts == 315619200
+        os.environ["SOURCE_DATE_EPOCH"] = str(int(now_ts + 86400))
+        try:
+            future_epoch_safe_ts = export_module._safe_export_timestamp(now_ts=now_ts)
+        finally:
+            if original_epoch is None:
+                os.environ.pop("SOURCE_DATE_EPOCH", None)
+            else:
+                os.environ["SOURCE_DATE_EPOCH"] = original_epoch
+        assert future_epoch_safe_ts <= now_ts - export_module.DEFAULT_EXPORT_MTIME_SAFETY_MARGIN_SECONDS + 1
 
     verify_dry = subprocess.run(
         ["make", "-n", "verify", "PYTHON=python3"],
@@ -644,7 +654,13 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["retained_public_shims_count"] >= 9
     assert payload["retained_shims_with_reason"]
     assert payload["shim_dependency_include_runtime_artifacts"] is False
-    assert payload["shim_dependency_report_cache_status"] in {"hit", "miss", "force_rescan", "disabled"}
+    assert payload["shim_dependency_report_cache_status"] in {
+        "hit",
+        "miss",
+        "miss_due_future_mtime",
+        "force_rescan",
+        "disabled",
+    }
     assert payload["shim_dependency_scanned_source_files"] >= 1
     assert payload["shim_dependency_skipped_artifact_files"] >= 0
     assert isinstance(payload["shim_dependency_scan_accounting"], dict)
@@ -677,8 +693,16 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
         for row in contract["public_compatibility_entrypoints"]
     )
     assert payload["v3_contract_path"] == "research/REFACTOR_V3_CONTRACT.md"
-    assert payload["v3_gate_status"] == "pending"
+    assert payload["v3_gate_status"] == "accepted_with_documented_exceptions"
     assert payload["v3_auto_accept_ready"] is False
+    assert payload["v3_blockers"] == []
+    assert payload["v3_auto_accept_blockers"] == []
+    assert set(payload["v3_accepted_exceptions"]) == {
+        "production_files_over_1200_lines",
+        "class_exceptions_remaining",
+    }
+    assert payload["v3_accepted_exceptions"]["production_files_over_1200_lines"]["count"] == 12
+    assert payload["v3_accepted_exceptions"]["class_exceptions_remaining"]["count"] == 3
     for gate_name in refactor_v3_contract.V3_GATE_NAMES:
         assert gate_name in payload["v3_gates"]
     assert payload["nonessential_shims_remaining"] == payload["v3_gates"]["nonessential_shims_remaining"]
@@ -720,6 +744,83 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert "Newly Migrated Modules" in markdown
     assert "Blockers" in markdown
     assert "Deprecation Plan" in markdown
+    rc_payload = json.loads((REPO_ROOT / "research" / "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.json").read_text(encoding="utf-8"))
+    assert rc_payload["acceptance_status"] == "accepted"
+    assert rc_payload["critical_gate_status"] == "pass"
+    assert payload["v3_gate_status"] != "pending"
+
+
+def test_refactor_v3_gate_snapshot_statuses_for_blockers_and_exceptions():
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from crypto_rsi_scanner import refactor_v3_contract
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        package = root / "crypto_rsi_scanner"
+        package.mkdir()
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        (package / "stable.py").write_text("\n".join(["VALUE = 1"] * 1301) + "\n", encoding="utf-8")
+        accepted = refactor_v3_contract.build_v3_gate_snapshot(
+            root=root,
+            size_gate_report={
+                "production_files_over_1500_lines": 0,
+                "production_files_over_1200_lines": 1,
+                "accepted_production_files_over_1200_lines": 1,
+                "unresolved_production_files_over_1200_lines": 0,
+                "accepted_production_files_over_1200_line_rows": [
+                    {"path": "crypto_rsi_scanner/stable.py", "line_count": 1301}
+                ],
+                "accepted_class_exceptions_count": 1,
+                "remaining_class_ownership_debt_count": 0,
+                "accepted_class_exceptions": [{"class_name": "SignalsMixin", "line_count": 100}],
+            },
+            class_ownership_report={
+                "accepted_class_exceptions_count": 1,
+                "remaining_class_ownership_debt_count": 0,
+                "accepted_class_exceptions": [{"class_name": "SignalsMixin", "line_count": 100}],
+            },
+            shim_dependency_report={
+                "entries": [],
+                "old_path_internal_imports": 0,
+                "old_path_test_imports": 0,
+                "old_path_docs_references": 0,
+                "old_path_import_allowed_exceptions": 0,
+                "deleted_shims": 0,
+                "removal_candidate_counts": {"keep_public_compatibility": 0},
+            },
+        )
+    assert accepted["status"] == "accepted_with_documented_exceptions"
+    assert accepted["v3_blockers"] == []
+    assert accepted["v3_auto_accept_ready"] is False
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        package = root / "crypto_rsi_scanner"
+        package.mkdir()
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        (package / "small.py").write_text("VALUE = 1\n", encoding="utf-8")
+        unaccepted_class = refactor_v3_contract.build_v3_gate_snapshot(
+            root=root,
+            size_gate_report={"production_files_over_1500_lines": 0},
+            class_ownership_report={
+                "accepted_class_exceptions_count": 1,
+                "remaining_class_ownership_debt_count": 1,
+                "accepted_class_exceptions": [{"class_name": "Unaccepted", "line_count": 100}],
+            },
+            shim_dependency_report={
+                "entries": [],
+                "old_path_internal_imports": 0,
+                "old_path_test_imports": 0,
+                "old_path_docs_references": 0,
+                "old_path_import_allowed_exceptions": 0,
+                "deleted_shims": 0,
+                "removal_candidate_counts": {"keep_public_compatibility": 0},
+            },
+        )
+    assert unaccepted_class["status"] == "pending"
+    assert unaccepted_class["v3_pending_exceptions"] == ["class_exceptions_remaining"]
 
 
 def test_refactor_v3_contract_generation_lists_final_exceptions():
@@ -883,6 +984,8 @@ def test_refactor_size_gates_static_baseline_and_new_violation_detection():
         assert blocked["unresolved_production_files_over_1200_lines"] == 1
         assert blocked["v3_gates"]["production_files_over_1200_lines"] == 1
         assert blocked["v3_gates"]["production_files_over_1500_lines"] == 1
+        assert blocked["v3_gate_status"] == "blocked"
+        assert "production_files_over_1500_lines" in blocked["v3_blockers"]
         assert blocked["v3_auto_accept_ready"] is False
         assert json.loads(baseline_path.read_text(encoding="utf-8"))["violation_ids"] == []
 
@@ -1061,6 +1164,7 @@ def test_refactor_baseline_make_target_is_static_and_no_live_runtime_path():
 
 def test_export_source_with_artifacts_fallback_and_archive_validation():
     import importlib.util
+    import subprocess
     import time
     import zipfile
     from datetime import datetime
@@ -1076,19 +1180,40 @@ def test_export_source_with_artifacts_fallback_and_archive_validation():
     with TemporaryDirectory() as tmp:
         tree = Path(tmp) / "tree"
         tree.mkdir()
-        (tree / "Makefile").write_text("all:\n\t@true\n", encoding="utf-8")
+        makefile = tree / "Makefile"
+        makefile.write_text("verify:\n\t@true\n", encoding="utf-8")
         (tree / "crypto_rsi_scanner").mkdir()
         (tree / "crypto_rsi_scanner" / "unit.py").write_text("VALUE = 1\n", encoding="utf-8")
         (tree / ".env").write_text("SECRET=1\n", encoding="utf-8")
         (tree / "local.db").write_text("db\n", encoding="utf-8")
+        (tree / "backtest_cache").mkdir()
+        (tree / "backtest_cache" / "cached.json").write_text("{}\n", encoding="utf-8")
+        future_ts = time.time() + 86400
+        os.utime(makefile, (future_ts, future_ts))
         out = Path(tmp) / "out.zip"
         assert export_module.main(root=tree, out=out) == 0
         with zipfile.ZipFile(out) as zf:
             names = set(zf.namelist())
+            makefile_ts = datetime(*zf.getinfo("Makefile").date_time).timestamp()
         assert "Makefile" in names
         assert "crypto_rsi_scanner/unit.py" in names
         assert ".env" not in names
         assert "local.db" not in names
+        assert "backtest_cache/cached.json" not in names
+        assert makefile_ts <= time.time()
+        extract_dir = Path(tmp) / "extract"
+        with zipfile.ZipFile(out) as zf:
+            zf.extractall(extract_dir)
+        make_dry = subprocess.run(
+            ["make", "-n", "verify"],
+            cwd=extract_dir,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        make_output = make_dry.stdout + make_dry.stderr
+        assert "Clock skew detected" not in make_output
+        assert "modification time" not in make_output
 
         future_zip = Path(tmp) / "future.zip"
         now_ts = time.time()

@@ -56,7 +56,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifacts",
-          "line": 421,
+          "line": 452,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_artifacts\"][\"recommended_status\"] == \"active_shim\""
@@ -110,7 +110,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_artifact_paths",
-          "line": 422,
+          "line": 453,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_artifact_paths\"][\"recommended_status\"] == \"active_shim\""
@@ -164,7 +164,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_alpha_run_ledger",
-          "line": 423,
+          "line": 454,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_run_ledger\"][\"recommended_status\"] == \"active_shim\""
@@ -218,7 +218,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_alpha_retention",
-          "line": 424,
+          "line": 455,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_retention\"][\"recommended_status\"] == \"active_shim\""
@@ -272,7 +272,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_alpha_run_lock",
-          "line": 425,
+          "line": 456,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_run_lock\"][\"recommended_status\"] == \"active_shim\""
@@ -295,7 +295,7 @@
       "docs_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 2519,
+          "line": 2546,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -340,14 +340,14 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 19,
+          "line": 21,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "row[\"old_module\"] == \"crypto_rsi_scanner.event_alpha_artifact_doctor\""
         },
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 426,
+          "line": 457,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_artifact_doctor\"][\"recommended_status\"] == \"active_shim\""
@@ -401,7 +401,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_alpha_profiles",
-          "line": 427,
+          "line": 458,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_profiles\"][\"recommended_status\"] == \"active_shim\""
@@ -455,7 +455,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_alpha_v1_readiness",
-          "line": 428,
+          "line": 459,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_v1_readiness\"][\"recommended_status\"] == \"active_shim\""
@@ -509,7 +509,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_alpha_preflight",
-          "line": 429,
+          "line": 460,
           "path": "tests/event_alpha/test_shim_registry.py",
           "reference_type": "text_reference",
           "snippet": "assert rows[\"crypto_rsi_scanner.event_alpha_preflight\"][\"recommended_status\"] == \"active_shim\""
@@ -517,10 +517,13 @@
       ]
     }
   ],
-  "generated_at": "2026-07-05T02:06:22.807791+00:00",
+  "future_mtime_paths": [],
+  "generated_at": "2026-07-05T03:23:54.336596+00:00",
   "include_runtime_artifacts": false,
   "internal_import_reference_count": 0,
   "makefile_reference_count": 0,
+  "newer_source_mtime_paths": [],
+  "newest_source_mtime": 1783221329.45777,
   "no_send_rehearsal": true,
   "nonessential_shim_rows": [],
   "normal_rsi_signal_rows_written": 0,
@@ -666,21 +669,26 @@
     "migrate_imports_first": [],
     "remove_now_candidates": []
   },
+  "report_mtime": 1783221834.3372483,
   "research_only": true,
   "row_type": "event_alpha_shim_dependency_report",
   "safe_to_remove_count": 0,
   "scan_accounting": {
     "cache_status": "hit",
+    "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "max_file_bytes": 1000000,
+    "newer_source_mtime_paths": [],
+    "newest_source_mtime": 1783221329.45777,
     "regex_compile_count": 9,
-    "scan_duration_seconds": 1.2528,
+    "report_mtime": 1783221834.3372483,
+    "scan_duration_seconds": 1.2318,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 30,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
-    "scanned_source_files": 611,
-    "scanned_test_files": 26,
+    "scanned_source_files": 612,
+    "scanned_test_files": 28,
     "skipped_artifact_files": 1285,
     "skipped_binary_files": 0,
     "skipped_dir_samples": [
@@ -700,10 +708,10 @@
     "skipped_large_files": 0,
     "skipped_suffix_files": 0
   },
-  "scan_duration_seconds": 1.2528,
+  "scan_duration_seconds": 1.2318,
   "scanned_doc_files": 30,
-  "scanned_source_files": 611,
-  "scanned_test_files": 26,
+  "scanned_source_files": 612,
+  "scanned_test_files": 28,
   "schema_version": "event_alpha_shim_dependency_report_v1",
   "script_reference_count": 0,
   "shim_dependency_report_cache_status": "hit",
