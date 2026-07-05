@@ -119,7 +119,7 @@ def test_shim_dependency_report_writer_outputs_references_and_candidates():
         text = dep_md.read_text(encoding="utf-8")
         removal_text = removal_md.read_text(encoding="utf-8")
         assert "Event Alpha Shim Dependency Report" in text
-        assert "Refactor V3 Shim Gates" in text
+        assert "Architecture V3 Shim Gates" in text
         assert "Event Alpha Shim Removal Candidates" in removal_text
         assert "FADE_SHORT_REVIEW" in removal_text
         assert "must not create `TRIGGERED_FADE`" in removal_text
@@ -469,10 +469,10 @@ def test_remaining_event_module_classification_documents_fade_boundary():
     assert "must not create `TRIGGERED_FADE`" in text
 
 
-def test_refactor_class_ownership_report_static_inventory():
-    from crypto_rsi_scanner import refactor_class_ownership_report
+def test_architecture_class_ownership_report_static_inventory():
+    from crypto_rsi_scanner.project_health import class_ownership as architecture_class_ownership_report
 
-    report = refactor_class_ownership_report.build_report()
+    report = architecture_class_ownership_report.build_report()
 
     assert report["research_only"] is True
     assert report["no_live_provider_calls"] is True
@@ -489,8 +489,8 @@ def test_refactor_class_ownership_report_static_inventory():
     assert report["unresolved_multi_class_modules_count"] == 0
 
 
-def test_refactor_class_ownership_report_flags_unregistered_multi_class_module(tmp_path):
-    from crypto_rsi_scanner import refactor_class_ownership_report
+def test_architecture_class_ownership_report_flags_unregistered_multi_class_module(tmp_path):
+    from crypto_rsi_scanner.project_health import class_ownership as architecture_class_ownership_report
 
     package_dir = tmp_path / "crypto_rsi_scanner"
     package_dir.mkdir()
@@ -505,7 +505,7 @@ def test_refactor_class_ownership_report_flags_unregistered_multi_class_module(t
         encoding="utf-8",
     )
 
-    report = refactor_class_ownership_report.build_report(root=tmp_path)
+    report = architecture_class_ownership_report.build_report(root=tmp_path)
 
     assert report["accepted_model_bundles_count"] == 0
     assert report["modules_with_multiple_public_classes_count"] == 1

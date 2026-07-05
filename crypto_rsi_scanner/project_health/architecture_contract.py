@@ -1,4 +1,4 @@
-"""Refactor v3 finalization contract and static gate helpers.
+"""Architecture finalization contract and static gate helpers.
 
 This module is inventory-only. It reads source files and report dictionaries,
 but it does not import scanner runtime modules, call providers, send messages,
@@ -13,17 +13,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from .event_alpha import shims as event_alpha_shims
+from ..event_alpha import shims as event_alpha_shims
 
 
-CONTRACT_SCHEMA_VERSION = "refactor_v3_contract_v1"
-CONTRACT_JSON = "REFACTOR_V3_CONTRACT.json"
-CONTRACT_MD = "REFACTOR_V3_CONTRACT.md"
+CONTRACT_SCHEMA_VERSION = "architecture_contract_v1"
+CONTRACT_JSON = "ARCHITECTURE_CONTRACT.json"
+CONTRACT_MD = "ARCHITECTURE_CONTRACT.md"
+LEGACY_CONTRACT_JSON = "REFACTOR_V3_CONTRACT.json"
+LEGACY_CONTRACT_MD = "REFACTOR_V3_CONTRACT.md"
 PRODUCTION_TARGET_LINE_LIMIT = 1200
 PRODUCTION_BLOCKER_LINE_LIMIT = 1500
 FUNCTION_BLOCKER_LINE_LIMIT = 150
 CLASS_BLOCKER_LINE_LIMIT = 75
 ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
+    "crypto_rsi_scanner/project_health/architecture_report.py": {
+        "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
+        "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
+    },
     "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py": {
         "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
         "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
@@ -72,7 +78,7 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
         "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
     },
-    "crypto_rsi_scanner/refactor_final_report.py": {
+    "crypto_rsi_scanner/architecture_report.py": {
         "reason": "Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together.",
         "revisit_condition": "When final-report sections can be split with byte-stable JSON/Markdown fixture comparisons.",
     },
@@ -114,14 +120,15 @@ V3_HARD_BLOCKER_GATES = frozenset(
 
 
 def repo_root_from_module() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return Path(__file__).resolve().parents[2]
 
 
-def build_refactor_v3_contract(*, generated_at: datetime | None = None) -> dict[str, Any]:
+def build_architecture_contract(*, generated_at: datetime | None = None) -> dict[str, Any]:
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
     return {
         "schema_version": CONTRACT_SCHEMA_VERSION,
-        "row_type": "refactor_v3_finalization_contract",
+        "row_type": "architecture_contract",
+        "historical_row_type_alias": "refactor_v3_finalization_contract",
         "generated_at": generated,
         "research_only": True,
         "no_live_provider_calls": True,
@@ -254,8 +261,9 @@ def build_v3_gate_snapshot(
     else:
         status = "pass"
     return {
-        "schema_version": "refactor_v3_gate_snapshot_v1",
-        "row_type": "refactor_v3_gate_snapshot",
+        "schema_version": "architecture_gate_snapshot_v1",
+        "row_type": "architecture_gate_snapshot",
+        "historical_row_type_alias": "refactor_v3_gate_snapshot",
         "status": status,
         "v3_auto_accept_ready": status == "pass",
         "auto_accept_blockers": hard_blocker_names + pending_exception_names,
@@ -283,11 +291,11 @@ def build_v3_gate_snapshot(
         "production_files_over_1200_line_rows": production_over_1200_rows,
         "production_files_over_1500_line_rows": production_over_1500_rows,
         "public_classes_not_in_own_module_rows": public_not_own_rows[:200],
-        "contract_path": "research/REFACTOR_V3_CONTRACT.md",
+        "contract_path": "research/ARCHITECTURE_CONTRACT.md",
     }
 
 
-def write_refactor_v3_contract(
+def write_architecture_contract(
     *,
     out_dir: str | Path | None = None,
     root: str | Path | None = None,
@@ -296,17 +304,21 @@ def write_refactor_v3_contract(
     repo_root = Path(root).expanduser().resolve() if root is not None else repo_root_from_module()
     target = Path(out_dir).expanduser() if out_dir is not None else repo_root / "research"
     target.mkdir(parents=True, exist_ok=True)
-    payload = build_refactor_v3_contract(generated_at=generated_at)
+    payload = build_architecture_contract(generated_at=generated_at)
     json_path = target / CONTRACT_JSON
     md_path = target / CONTRACT_MD
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    md_path.write_text(format_refactor_v3_contract(payload), encoding="utf-8")
+    data = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    markdown = format_architecture_contract(payload)
+    json_path.write_text(data, encoding="utf-8")
+    md_path.write_text(markdown, encoding="utf-8")
+    (target / LEGACY_CONTRACT_JSON).write_text(data, encoding="utf-8")
+    (target / LEGACY_CONTRACT_MD).write_text(markdown, encoding="utf-8")
     return json_path, md_path, payload
 
 
-def format_refactor_v3_contract(contract: Mapping[str, Any]) -> str:
+def format_architecture_contract(contract: Mapping[str, Any]) -> str:
     lines = [
-        "# Refactor V3 Contract",
+        "# Architecture Contract",
         "",
         "Research-only, behavior-preserving finalization contract. This document does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created TRIGGERED_FADE.",
         "",
@@ -489,13 +501,20 @@ def _accepted_production_over_1200_row(row: Mapping[str, Any]) -> dict[str, Any]
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Write the refactor v3 finalization contract.")
+    parser = argparse.ArgumentParser(description="Write the architecture finalization contract.")
     parser.add_argument("--out-dir", default=None)
     args = parser.parse_args(argv)
-    json_path, md_path, _payload = write_refactor_v3_contract(out_dir=args.out_dir)
+    json_path, md_path, _payload = write_architecture_contract(out_dir=args.out_dir)
     print(json_path)
     print(md_path)
     return 0
+
+
+build_refactor_v3_contract = build_architecture_contract
+write_refactor_v3_contract = write_architecture_contract
+format_refactor_v3_contract = format_architecture_contract
+write_architecture_v3_contract = write_architecture_contract
+build_architecture_v3_contract = build_architecture_contract
 
 
 if __name__ == "__main__":

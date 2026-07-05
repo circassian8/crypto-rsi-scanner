@@ -1447,7 +1447,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_incident_graph",
+          "line": 117,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_incident_graph`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_incident_graph",
+          "line": 117,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_incident_graph`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1463,7 +1478,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_identity",
+          "line": 118,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_identity`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_identity",
+          "line": 118,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_identity`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1479,7 +1509,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_graph",
+          "line": 119,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_graph`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_graph",
+          "line": 119,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_graph`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1495,7 +1540,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_resolver",
+          "line": 120,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_resolver`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_resolver",
+          "line": 120,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_resolver`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1511,7 +1571,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_price_history",
+          "line": 121,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_price_history`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_price_history",
+          "line": 121,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_price_history`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1527,7 +1602,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_catalyst_frame_validator",
+          "line": 122,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_catalyst_frame_validator`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_catalyst_frame_validator",
+          "line": 122,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_catalyst_frame_validator`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1543,7 +1633,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_anomaly_state",
+          "line": 123,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_anomaly_state`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_anomaly_state",
+          "line": 123,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_anomaly_state`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1559,7 +1664,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_anomaly_scanner",
+          "line": 124,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_anomaly_scanner`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_anomaly_scanner",
+          "line": 124,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_anomaly_scanner`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1575,7 +1695,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_market_units",
+          "line": 125,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_market_units`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_market_units",
+          "line": 125,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_market_units`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1591,7 +1726,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_llm_budget",
+          "line": 126,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_llm_budget`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_llm_budget",
+          "line": 126,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_llm_budget`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1607,7 +1757,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
+          "line": 127,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_llm_catalyst_frames_eval`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_llm_catalyst_frames_eval",
+          "line": 127,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_llm_catalyst_frames_eval`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1623,7 +1788,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_source_reliability",
+          "line": 128,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_source_reliability`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_source_reliability",
+          "line": 128,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_source_reliability`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1639,7 +1819,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_cache",
+          "line": 129,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_cache`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_cache",
+          "line": 129,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_cache`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1655,7 +1850,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_explain",
+          "line": 130,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_explain`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_explain",
+          "line": 130,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_explain`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1671,7 +1881,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_quality_fields",
+          "line": 131,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_quality_fields`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_quality_fields",
+          "line": 131,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_quality_fields`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1687,7 +1912,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_outcomes",
+          "line": 132,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_outcomes`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_outcomes",
+          "line": 132,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_outcomes`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1703,7 +1943,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_eval",
+          "line": 133,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_eval`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_eval",
+          "line": 133,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_eval`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1719,7 +1974,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
+          "line": 134,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_burn_in_checklist`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_burn_in_checklist",
+          "line": 134,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_burn_in_checklist`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1735,7 +2005,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_health_guard",
+          "line": 138,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_health_guard`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_health_guard",
+          "line": 138,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_health_guard`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1751,7 +2036,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_scheduler",
+          "line": 139,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_scheduler`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_scheduler",
+          "line": 139,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_scheduler`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1767,7 +2067,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_environment_doctor",
+          "line": 140,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_environment_doctor`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_environment_doctor",
+          "line": 140,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_environment_doctor`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1783,7 +2098,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_provider_status",
+          "line": 141,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_provider_status`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_provider_status",
+          "line": 141,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_provider_status`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1799,7 +2129,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_missed",
+          "line": 142,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_missed`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_missed",
+          "line": 142,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_missed`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1815,7 +2160,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_reason_text",
+          "line": 143,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_reason_text`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_reason_text",
+          "line": 143,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_reason_text`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1834,10 +2194,24 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 462,
+          "line": 144,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_clock`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_clock",
+          "line": 477,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_clock",
+          "line": 144,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_clock`"
         }
       ]
     },
@@ -1858,10 +2232,24 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 462,
+          "line": 145,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_models`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_models",
+          "line": 477,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_models",
+          "line": 145,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_models`"
         }
       ]
     },
@@ -1962,7 +2350,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 2649,
+          "line": 2735,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -1983,7 +2371,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_profiles",
+          "line": 135,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_profiles`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_profiles",
+          "line": 135,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_profiles`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -1999,7 +2402,22 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_v1_readiness",
+          "line": 136,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_v1_readiness`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_v1_readiness",
+          "line": 136,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_v1_readiness`"
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -2015,20 +2433,36 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_preflight",
+          "line": 137,
+          "path": "ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_preflight`"
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_alpha_preflight",
+          "line": 137,
+          "path": "research/ARCHITECTURE_FINAL_REPORT.md",
+          "reference_type": "text_reference",
+          "snippet": "- `crypto_rsi_scanner.event_alpha_preflight`"
+        }
+      ]
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-05T09:57:36.083335+00:00",
+  "generated_at": "2026-07-05T11:40:08.180747+00:00",
   "include_runtime_artifacts": false,
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "research/FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.md:1783245454",
-    "research/FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.md:1783245455",
-    "research/FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.md:1783245454",
-    "research/REFACTOR_V4_FINAL_REPORT.md:1783244977"
+    "ARCHITECTURE_FINAL_REPORT.md:1783251585",
+    "DECISIONS.md:1783251103",
+    "DEVLOG.md:1783251571",
+    "crypto_rsi_scanner/event_alpha/doctor/namespace_doctor.py:1783251091",
+    "crypto_rsi_scanner/event_alpha/namespace/lifecycle.py:1783251088"
   ],
-  "newest_source_mtime": 1783245454.6276884,
+  "newest_source_mtime": 1783251606.6742446,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2037,10 +2471,10 @@
   "old_path_import_allowed_exceptions": 0,
   "old_path_internal_imports": 0,
   "old_path_test_imports": 0,
-  "old_path_text_references": 3,
+  "old_path_text_references": 61,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1783244963.6309314,
+  "report_mtime": 1783250955.6086931,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2049,20 +2483,21 @@
     "include_runtime_artifacts": false,
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "research/FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.md:1783245454",
-      "research/FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.md:1783245455",
-      "research/FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.md:1783245454",
-      "research/REFACTOR_V4_FINAL_REPORT.md:1783244977"
+      "ARCHITECTURE_FINAL_REPORT.md:1783251585",
+      "DECISIONS.md:1783251103",
+      "DEVLOG.md:1783251571",
+      "crypto_rsi_scanner/event_alpha/doctor/namespace_doctor.py:1783251091",
+      "crypto_rsi_scanner/event_alpha/namespace/lifecycle.py:1783251088"
     ],
-    "newest_source_mtime": 1783245454.6276884,
+    "newest_source_mtime": 1783251606.6742446,
     "regex_compile_count": 124,
-    "report_mtime": 1783244963.6309314,
-    "scan_duration_seconds": 1.319,
+    "report_mtime": 1783250955.6086931,
+    "scan_duration_seconds": 1.3306,
     "scanned_artifact_files": 0,
-    "scanned_doc_files": 35,
+    "scanned_doc_files": 48,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
-    "scanned_source_files": 606,
+    "scanned_source_files": 607,
     "scanned_test_files": 29,
     "skipped_artifact_files": 1285,
     "skipped_binary_files": 0,
@@ -2076,23 +2511,24 @@
       "crypto_rsi_scanner/cli/services/__pycache__",
       "crypto_rsi_scanner/cli/services/scanner_parts/__pycache__",
       "crypto_rsi_scanner/cli/services/event_alpha_notifications/__pycache__",
-      "crypto_rsi_scanner/llm_providers/__pycache__"
+      "crypto_rsi_scanner/project_health/__pycache__"
     ],
-    "skipped_dirs": 62,
+    "skipped_dirs": 63,
     "skipped_large_file_samples": [
+      "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.json",
       "research/FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.json"
     ],
-    "skipped_large_files": 1,
+    "skipped_large_files": 2,
     "skipped_suffix_files": 0
   },
-  "scan_duration_seconds": 1.319,
-  "scanned_doc_files": 35,
-  "scanned_source_files": 606,
+  "scan_duration_seconds": 1.3306,
+  "scanned_doc_files": 48,
+  "scanned_source_files": 607,
   "scanned_test_files": 29,
   "schema_version": "event_alpha_old_import_check_v1",
   "skipped_artifact_files": 1285,
-  "skipped_dirs": 62,
-  "skipped_large_files": 1,
+  "skipped_dirs": 63,
+  "skipped_large_files": 2,
   "status": "OK",
   "strict_alerts_created": 0,
   "telegram_sends": 0,

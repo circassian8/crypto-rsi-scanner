@@ -17,6 +17,58 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Make architecture health tooling permanent · Codex
+**Why:** Event Alpha refactor implementation is complete, but top-level
+`refactor_*.py` tooling and current report names still made the repository look
+like an active migration. The permanent project-health checks needed canonical
+architecture names without changing runtime behavior.
+**Changes:**
+- Moved top-level refactor-era tooling into
+  `crypto_rsi_scanner/project_health/` and added package docs for the permanent
+  architecture/project-health surface.
+- Made `architecture-*` Make targets canonical, kept old `refactor-*` targets
+  as hidden deprecated aliases, and updated GitHub Actions to use the canonical
+  architecture targets.
+- Added/updated canonical `ARCHITECTURE_*` and
+  `PROJECT_HEALTH_NAMING_CLEANUP_REPORT.*` artifacts while preserving old report
+  filenames as historical compatibility aliases.
+- Updated architecture/shim/consolidation docs, roadmap, decisions, tests, and
+  namespace status naming so current runbooks point at project-health tooling.
+**Verify:** `python3 tests/test_indicators.py` (`762/762 passed`);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (`779 passed`); `python3 -m compileall
+-q crypto_rsi_scanner tests`; `make architecture-naming-check PYTHON=python3`;
+`make architecture-size-gates PYTHON=python3`; `make
+architecture-class-ownership-report PYTHON=python3`; `make
+architecture-final-report PYTHON=python3`; `make architecture-completion-map
+PYTHON=python3`; `make architecture-cleanliness-check PYTHON=python3`; `make
+refactor-size-gates PYTHON=python3`; `make refactor-final-report
+PYTHON=python3`; `make event-alpha-old-import-check PYTHON=python3`; `make
+event-alpha-shim-dependency-report PYTHON=python3`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make
+event-alpha-notification-format-smoke PYTHON=python3`; `make
+event-alpha-telegram-no-send-final-check-fast PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-coinalyze-preflight-smoke PYTHON=python3`; `make
+event-alpha-coinalyze-preflight PYTHON=python3`; `make
+event-alpha-coinalyze-no-send-rehearsal PYTHON=python3`; `make
+event-alpha-source-coverage-report PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-notify-preview-from-artifacts PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1
+PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** `architecture-completion-map` exits 0 but reports
+`pending_with_blockers` when run without measured verification inputs. The
+profile-scoped CryptoPanic artifact doctor remains WARN-only with no blockers.
+No live provider calls, live Telegram sends, trading, paper trading, normal RSI
+signal writes, or Event Alpha-created `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-05 — Final refactor terminology cleanup · Codex
 **Why:** Refactor v3 retired the old flat Event Alpha shim surface, but some
 current code/docs still used “legacy” wording for transitional implementation

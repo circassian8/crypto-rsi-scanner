@@ -1,6 +1,6 @@
 # Event Alpha Shim Retirement Policy
 
-This is a research/refactor policy. It does not change runtime behavior, call
+This is a research/architecture policy. It does not change runtime behavior, call
 providers, send Telegram messages, trade, paper trade, write normal RSI signal
 rows, or create `TRIGGERED_FADE`.
 
@@ -27,11 +27,11 @@ rows, or create `TRIGGERED_FADE`.
   only when they clearly describe tombstoned paths or historical decisions.
 - Artifact doctor warns if a deleted shim file is reintroduced.
 - Migration-era implementation filenames are checked by
-  `make refactor-transitional-file-check`. The old
-  `make refactor-legacy-file-check` target is retained only as an alias for
-  operators and historical automation.
-- Remaining `legacy` terminology is checked by
-  `make refactor-legacy-terminology-check`. Accepted occurrences are limited to
+  `make architecture-transitional-file-check`. Deprecated `make refactor-*`
+  targets are retained only as hidden aliases for operators and historical
+  automation.
+- Remaining migration-era naming is checked by
+  `make architecture-naming-check`. Accepted occurrences are limited to
   historical artifact row semantics, backwards-compatible CLI aliases,
   tombstone/deleted-shim records, test fixtures, generated compatibility report
   fields, and historical DEVLOG/ROADMAP/DECISIONS entries.

@@ -1,4 +1,4 @@
-"""Final refactor terminology gate for intentional legacy wording.
+"""Project-health naming cleanup gate for migration-era wording.
 
 Static report writer only: it does not import scanner, providers,
 notification code, storage, or Event Alpha runtime modules.
@@ -15,10 +15,14 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-REPORT_SCHEMA_VERSION = "final_refactor_legacy_terminology_report_v1"
-REPORT_JSON = "FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.json"
-REPORT_MD = "FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.md"
+REPORT_SCHEMA_VERSION = "project_health_naming_cleanup_report_v1"
+REPORT_JSON = "PROJECT_HEALTH_NAMING_CLEANUP_REPORT.json"
+REPORT_MD = "PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md"
+LEGACY_REPORT_JSON = "FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.json"
+LEGACY_REPORT_MD = "FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.md"
+LEGACY_ALIAS_REPORT_PREFIXES = ("REFACTOR_", "FINAL_REFACTOR_")
 LEGACY_RE = re.compile(r"legacy", re.IGNORECASE)
+REFACTOR_RE = re.compile(r"refactor", re.IGNORECASE)
 SOURCE_SUFFIXES = {".py"}
 DOC_NAMES = {
     "AGENTS.md",
@@ -30,6 +34,8 @@ DOC_NAMES = {
     "ROADMAP.md",
 }
 RESEARCH_DOC_PREFIXES = (
+    "ARCHITECTURE_",
+    "PROJECT_HEALTH_",
     "EVENT_ALPHA_",
     "REFACTOR_",
     "FINAL_REFACTOR_",
@@ -116,7 +122,7 @@ HISTORICAL_DOC_TOKENS = (
 
 
 def repo_root_from_module() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return Path(__file__).resolve().parents[2]
 
 
 def build_report(*, root: str | Path | None = None, generated_at: datetime | None = None) -> dict[str, Any]:
@@ -124,13 +130,20 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
     repo_root = repo_root.resolve()
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
     legacy_named_files = _legacy_named_files(repo_root)
+    refactor_named_files = _refactor_named_source_files(repo_root)
     occurrences = _legacy_occurrences(repo_root)
     classifications = Counter(str(row["classification"]) for row in occurrences)
     actions = Counter(str(row["action"]) for row in occurrences)
-    blockers = _blockers(repo_root=repo_root, occurrences=occurrences, legacy_named_files=legacy_named_files)
+    blockers = _blockers(
+        repo_root=repo_root,
+        occurrences=occurrences,
+        legacy_named_files=legacy_named_files,
+        refactor_named_files=refactor_named_files,
+    )
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
-        "row_type": "final_refactor_legacy_terminology_report",
+        "row_type": "project_health_naming_cleanup_report",
+        "historical_row_type_alias": "final_refactor_legacy_terminology_report",
         "generated_at": generated,
         "research_only": True,
         "no_send_rehearsal": True,
@@ -154,6 +167,12 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         "unclassified": classifications.get("unclassified", 0),
         "legacy_named_files": legacy_named_files,
         "legacy_named_files_remaining": len(legacy_named_files),
+        "refactor_named_source_files": refactor_named_files,
+        "refactor_named_source_files_remaining": len(refactor_named_files),
+        "top_level_refactor_python_files_remaining": len(
+            [row for row in refactor_named_files if str(row.get("path") or "").startswith("crypto_rsi_scanner/refactor_")]
+        ),
+        "canonical_architecture_reports": _canonical_report_status(repo_root),
         "legacy_py_source_references": [
             row for row in occurrences if row["term"].casefold() == "legacy" and "legacy.py" in row["line_text"].casefold()
         ],
@@ -164,6 +183,7 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
             "cli_legacy_flags": "backwards-compatible aliases only",
             "artifact_legacy_fields": "historical artifact row semantics; preserve compatibility",
             "docs_legacy_wording": "allowed only for historical/refactor records or explicit artifact compatibility semantics",
+            "refactor_tooling_names": "not allowed for current source/import/help/runbook surfaces; allowed only as historical aliases",
         },
         "safety_invariants": {
             "research_only": True,
@@ -186,21 +206,26 @@ def write_report(*, root: str | Path | None = None, out_dir: str | Path | None =
     report = build_report(root=repo_root)
     json_path = target / REPORT_JSON
     md_path = target / REPORT_MD
-    json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    md_path.write_text(format_report(report), encoding="utf-8")
+    payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    markdown = format_report(report)
+    json_path.write_text(payload, encoding="utf-8")
+    md_path.write_text(markdown, encoding="utf-8")
+    (target / LEGACY_REPORT_JSON).write_text(payload, encoding="utf-8")
+    (target / LEGACY_REPORT_MD).write_text(markdown, encoding="utf-8")
     return json_path, md_path, report
 
 
 def format_report(report: dict[str, Any]) -> str:
     lines = [
-        "# Final Refactor Legacy Terminology Report",
+        "# Project Health Naming Cleanup Report",
         "",
-        "Research artifact only. This static gate classifies remaining uses of `legacy` and does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.",
+        "Research artifact only. This static gate classifies remaining migration-era naming and does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.",
         "",
         f"- generated_at: `{report.get('generated_at')}`",
         f"- status: `{report.get('status')}`",
         f"- legacy_occurrences: `{report.get('legacy_occurrences', 0)}`",
         f"- legacy_named_files_remaining: `{report.get('legacy_named_files_remaining', 0)}`",
+        f"- refactor_named_source_files_remaining: `{report.get('refactor_named_source_files_remaining', 0)}`",
         "",
         "## Classification Counts",
         "",
@@ -236,14 +261,31 @@ def _legacy_occurrences(repo_root: Path) -> list[dict[str, Any]]:
             continue
         rel = _rel(path, repo_root)
         for line_no, line in enumerate(text.splitlines(), start=1):
-            for match in LEGACY_RE.finditer(line):
-                classification, action, reason = _classify_occurrence(rel, line, path=path)
+            for pattern in (LEGACY_RE, REFACTOR_RE):
+                for match in pattern.finditer(line):
+                    classification, action, reason = _classify_occurrence(rel, line, path=path, term=match.group(0))
+                    rows.append(
+                        {
+                            "path": rel,
+                            "line": line_no,
+                            "column": match.start() + 1,
+                            "term": match.group(0),
+                            "line_text": line.strip(),
+                            "classification": classification,
+                            "action": action,
+                            "reason": reason,
+                        }
+                    )
+            if False:
+                # Kept to avoid a larger structural rewrite of this older loop.
+                match = None
+                classification = action = reason = ""
                 rows.append(
                     {
                         "path": rel,
                         "line": line_no,
-                        "column": match.start() + 1,
-                        "term": match.group(0),
+                        "column": 1,
+                        "term": "",
                         "line_text": line.strip(),
                         "classification": classification,
                         "action": action,
@@ -253,14 +295,17 @@ def _legacy_occurrences(repo_root: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def _classify_occurrence(rel: str, line: str, *, path: Path) -> tuple[str, str, str]:
+def _classify_occurrence(rel: str, line: str, *, path: Path, term: str) -> tuple[str, str, str]:
     lowered = line.casefold()
     rel_lower = rel.casefold()
     is_source = rel.startswith("crypto_rsi_scanner/") and path.suffix in SOURCE_SUFFIXES
     is_test = rel.startswith("tests/")
     is_doc = _is_doc_path(rel)
-    if rel == "crypto_rsi_scanner/refactor_legacy_terminology_check.py":
-        return "accepted_exception", "should_keep", "terminology gate owns the legacy-word classifier policy"
+    term_lower = term.casefold()
+    if rel == "crypto_rsi_scanner/project_health/terminology_check.py":
+        return "accepted_exception", "should_keep", "naming gate owns migration-era naming classifier policy"
+    if term_lower == "refactor":
+        return _classify_refactor_occurrence(rel, line, path=path)
     if any(token in lowered for token in CLI_ALIAS_TOKENS):
         return "CLI_backwards_compatibility_alias", "should_keep", "old CLI/Make aliases remain supported while canonical historical aliases exist"
     if is_test and ("feature_legacy.py" in lowered or "legacy_path" in lowered or "legacy_" in lowered):
@@ -270,7 +315,7 @@ def _classify_occurrence(rel: str, line: str, *, path: Path) -> tuple[str, str, 
             return "stale_refactor_wording", "should_rename", "source wording describes current implementation as legacy"
         return "accepted_exception", "should_keep", "historical refactor record"
     if "legacy.py" in lowered:
-        if rel == "crypto_rsi_scanner/refactor_transitional_file_check.py" or is_test or is_doc:
+        if rel == "crypto_rsi_scanner/project_health/transitional_file_check.py" or is_test or is_doc:
             return "accepted_exception", "should_keep", "explicit migration-era filename policy or historical record"
         return "stale_refactor_wording", "should_rename", "source references a removed migration-era module file"
     if any(token in lowered for token in ARTIFACT_SEMANTIC_TOKENS):
@@ -294,21 +339,67 @@ def _classify_occurrence(rel: str, line: str, *, path: Path) -> tuple[str, str, 
     return "unclassified", "should_rename", "no classifier matched this legacy occurrence"
 
 
+def _classify_refactor_occurrence(rel: str, line: str, *, path: Path) -> tuple[str, str, str]:
+    lowered = line.casefold()
+    is_source = rel.startswith("crypto_rsi_scanner/") and path.suffix in SOURCE_SUFFIXES
+    is_test = rel.startswith("tests/")
+    is_doc = _is_doc_path(rel)
+    if rel == "crypto_rsi_scanner/project_health/terminology_check.py":
+        return "accepted_exception", "should_keep", "naming gate owns refactor-word classifier policy"
+    if rel in {"DECISIONS.md", "DEVLOG.md"}:
+        return "historical_reference_keep", "should_keep", "durable historical record"
+    if rel == "ROADMAP.md" and line.lstrip().startswith("| done |"):
+        return "historical_reference_keep", "should_keep", "completed roadmap history"
+    if rel.startswith("research/") and (Path(rel).name.startswith("REFACTOR_") or Path(rel).name.startswith("FINAL_REFACTOR_")):
+        return "report_artifact_to_rename", "should_keep", "legacy report alias retained for compatibility"
+    if rel == "Makefile":
+        if "@echo" in line and "refactor-" in lowered:
+            return "Makefile_target_to_update", "should_rename", "primary help must show architecture targets"
+        if "refactor-" in lowered:
+            return "backwards_compatibility_alias", "should_keep", "deprecated Make alias hidden from primary help"
+    if rel.startswith(".github/") and "refactor-" in lowered:
+        return "Makefile_target_to_update", "should_rename", "CI must use architecture targets"
+    if "crypto_rsi_scanner.refactor_" in lowered or "crypto_rsi_scanner/refactor_" in lowered:
+        if rel.startswith("crypto_rsi_scanner/project_health/"):
+            return "backwards_compatibility_alias", "should_keep", "legacy artifact alias or historical reference inside project-health tooling"
+        if is_test:
+            return "test_reference_to_update", "should_rename", "tests should use project_health imports unless testing public compatibility"
+        return "current_tooling_name_to_rename", "should_rename", "old top-level refactor module reference"
+    if is_source and rel.startswith("crypto_rsi_scanner/project_health/"):
+        return "backwards_compatibility_alias", "should_keep", "compatibility field or historical alias inside project-health tooling"
+    if is_doc:
+        if "make refactor-" in lowered:
+            if any(token in lowered for token in ("deprecated", "alias", "older", "old ")):
+                return "backwards_compatibility_alias", "should_keep", "deprecated Make alias is explicitly documented"
+            return "Makefile_target_to_update", "should_rename", "current runbooks should use architecture targets"
+        return "historical_reference_keep", "should_keep", "historical documentation or compatibility context"
+    if is_test:
+        return "test_reference_to_update", "should_rename", "tests should use project_health terminology"
+    if is_source:
+        return "current_tooling_name_to_rename", "should_rename", "source should not carry current refactor terminology"
+    return "historical_reference_keep", "should_keep", "non-source historical reference"
+
+
 def _blockers(
     *,
     repo_root: Path,
     occurrences: list[dict[str, Any]],
     legacy_named_files: list[dict[str, str]],
+    refactor_named_files: list[dict[str, str]],
 ) -> list[dict[str, Any]]:
     blockers: list[dict[str, Any]] = []
     for row in legacy_named_files:
         blockers.append({"path": row["path"], "line": None, "reason": "migration-era legacy-named file exists"})
+    for row in refactor_named_files:
+        blockers.append({"path": row["path"], "line": None, "reason": "migration-era refactor-named source file exists"})
     for row in occurrences:
         classification = str(row.get("classification") or "")
         if classification in {"stale_refactor_wording", "should_rename", "unclassified"}:
             blockers.append({"path": row["path"], "line": row["line"], "reason": classification})
     if _source_mentions_removed_legacy_py(repo_root, occurrences):
         blockers.append({"path": "source", "line": None, "reason": "source references removed legacy.py outside accepted policy/test fixtures"})
+    for row in _missing_canonical_report_rows(repo_root):
+        blockers.append({"path": row["path"], "line": None, "reason": row["reason"]})
     return blockers
 
 
@@ -321,8 +412,8 @@ def _source_mentions_removed_legacy_py(repo_root: Path, occurrences: list[dict[s
         if "legacy.py" not in line:
             continue
         if rel in {
-            "crypto_rsi_scanner/refactor_transitional_file_check.py",
-            "crypto_rsi_scanner/refactor_legacy_terminology_check.py",
+            "crypto_rsi_scanner/project_health/terminology_check.py",
+            "crypto_rsi_scanner/project_health/transitional_file_check.py",
         } or rel.startswith("tests/") or _is_doc_path(rel):
             continue
         return True
@@ -346,6 +437,41 @@ def _legacy_named_files(repo_root: Path) -> list[dict[str, str]]:
     return rows
 
 
+def _refactor_named_source_files(repo_root: Path) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    root = repo_root / "crypto_rsi_scanner"
+    if not root.exists():
+        return rows
+    for path in root.rglob("*.py"):
+        if _skip_path(path):
+            continue
+        rel = _rel(path, repo_root)
+        if path.name.startswith("refactor_") or "_refactor" in path.name or "refactor_" in path.name:
+            rows.append({"path": rel})
+    return rows
+
+
+def _canonical_report_status(repo_root: Path) -> dict[str, bool]:
+    expected = {
+        "ARCHITECTURE_BASELINE.json": repo_root / "research" / "ARCHITECTURE_BASELINE.json",
+        "ARCHITECTURE_SIZE_GATES.json": repo_root / "research" / "ARCHITECTURE_SIZE_GATES.json",
+        "ARCHITECTURE_CLASS_OWNERSHIP_REPORT.json": repo_root / "research" / "ARCHITECTURE_CLASS_OWNERSHIP_REPORT.json",
+        "ARCHITECTURE_FINAL_REPORT.json": repo_root / "research" / "ARCHITECTURE_FINAL_REPORT.json",
+        "ARCHITECTURE_COMPLETION_MAP.json": repo_root / "research" / "ARCHITECTURE_COMPLETION_MAP.json",
+        "ARCHITECTURE_CONTRACT.json": repo_root / "research" / "ARCHITECTURE_CONTRACT.json",
+        "ARCHITECTURE_TRANSITIONAL_FILE_REPORT.json": repo_root / "research" / "ARCHITECTURE_TRANSITIONAL_FILE_REPORT.json",
+    }
+    return {name: path.exists() for name, path in expected.items()}
+
+
+def _missing_canonical_report_rows(repo_root: Path) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for name, present in _canonical_report_status(repo_root).items():
+        if not present:
+            rows.append({"path": f"research/{name}", "reason": "canonical architecture report missing"})
+    return rows
+
+
 def _iter_scan_files(repo_root: Path) -> Iterable[Path]:
     yielded: set[Path] = set()
     roots = [repo_root / "crypto_rsi_scanner", repo_root / "tests", repo_root / "research"]
@@ -355,7 +481,9 @@ def _iter_scan_files(repo_root: Path) -> Iterable[Path]:
         for path in root.rglob("*"):
             if _skip_path(path) or not path.is_file():
                 continue
-            if path.name in {REPORT_JSON, REPORT_MD}:
+            if path.name in {REPORT_JSON, REPORT_MD, LEGACY_REPORT_JSON, LEGACY_REPORT_MD}:
+                continue
+            if path.parent.name == "research" and path.name.startswith(LEGACY_ALIAS_REPORT_PREFIXES):
                 continue
             if path.suffix in {".py", ".md", ".json"}:
                 if path.parent.name == "research" and path.suffix == ".json" and not path.name.startswith(RESEARCH_DOC_PREFIXES):

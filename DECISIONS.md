@@ -16,15 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
-## 2026-07-05 - Final refactor terminology uses historical/transitional wording
+## 2026-07-05 - Architecture health tooling uses permanent project_health names
 **Status:** accepted
-**Decision:** New refactor code and docs use transitional-file and historical
-artifact wording instead of describing current implementation as legacy. The
-canonical static checker is `make refactor-transitional-file-check`; the old
-`make refactor-legacy-file-check` target remains only as an operator-compatible
-alias. Canonical CLI flags now include historical-artifact aliases while old
-`legacy` flags and report fields remain supported for backwards compatibility
-and historical artifact row semantics.
+**Decision:** Refactor-era static tooling is no longer a top-level implementation
+surface. Permanent architecture/project-health tooling lives under
+`crypto_rsi_scanner.project_health.*`, canonical operator targets use
+`make architecture-*`, and canonical checked-in reports use `ARCHITECTURE_*` or
+`PROJECT_HEALTH_*` names. Old `make refactor-*` targets and `REFACTOR_*` report
+filenames may remain only as explicitly deprecated compatibility aliases.
+**Why:** The Event Alpha refactor is accepted, so current source and runbooks
+should no longer make the project look like it is in a temporary migration
+state. Permanent naming makes future maintenance ownership clearer while
+preserving old local automation during the transition.
+**Revisit when:** a future compatibility-breaking release removes the
+deprecated alias targets and historical report filenames.
+
+## 2026-07-05 - Final refactor terminology uses historical/transitional wording
+**Status:** superseded by `2026-07-05 - Architecture health tooling uses
+permanent project_health names`
+**Decision:** The historical/transitional wording policy remains, but the
+canonical static checker is now `make architecture-transitional-file-check`.
+Old `make refactor-*` targets remain only as hidden operator-compatible aliases
+when explicitly documented. Canonical CLI flags continue to include
+historical-artifact aliases while old `legacy` flags and report fields remain
+supported for backwards compatibility and historical artifact row semantics.
 **Why:** Refactor v3 is accepted with old flat Event Alpha shims retired, so
 continuing to call current modules “legacy” makes future ownership ambiguous.
 The terminology report makes remaining `legacy` occurrences explicit and gates

@@ -1,4 +1,4 @@
-"""Makefile, export, CI, and refactor-baseline static tests."""
+"""Makefile, export, CI, and architecture-baseline static tests."""
 
 from __future__ import annotations
 
@@ -454,13 +454,22 @@ def test_github_actions_are_safe_fixture_verification_only():
     assert 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in smoke_text
 
     verify_runs = [line.split("run:", 1)[1].strip() for line in verify_text.splitlines() if line.strip().startswith("run:")]
-    assert verify_runs == [
+    assert verify_runs[:4] == [
         "python3 -m pip install --disable-pip-version-check -r requirements.txt pytest",
         "python3 tests/test_indicators.py",
         "python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py",
         "python3 -m compileall -q crypto_rsi_scanner tests",
-        "make verify PYTHON=python3",
     ]
+    assert verify_runs[-1] == "make verify PYTHON=python3"
+    for command in [
+        "make architecture-baseline PYTHON=python3",
+        "make architecture-size-gates PYTHON=python3",
+        "make architecture-class-ownership-report PYTHON=python3",
+        "make architecture-final-report PYTHON=python3",
+        "make architecture-completion-map PYTHON=python3",
+        "make architecture-naming-check PYTHON=python3",
+    ]:
+        assert command in verify_text
     smoke_runs = [line.split("run:", 1)[1].strip() for line in smoke_text.splitlines() if line.strip().startswith("run:")]
     assert smoke_runs == [
         "python3 -m pip install --disable-pip-version-check -r requirements.txt pytest",
@@ -564,19 +573,19 @@ def test_event_alpha_architecture_docs_capture_v1_guardrails():
         assert item in normalized, item
 
 
-def test_refactor_baseline_generation_writes_reports_without_behavior_invocation():
-    from crypto_rsi_scanner import refactor_baseline
+def test_architecture_baseline_generation_writes_reports_without_behavior_invocation():
+    from crypto_rsi_scanner.project_health import baseline as architecture_baseline
 
     root = REPO_ROOT
     with TemporaryDirectory() as tmp:
         out_dir = Path(tmp) / "research"
-        paths = refactor_baseline.write_refactor_baseline(root=root, out_dir=out_dir)
+        paths = architecture_baseline.write_architecture_baseline(root=root, out_dir=out_dir)
         assert paths["json"].exists()
         assert paths["markdown"].exists()
         payload = json.loads(paths["json"].read_text(encoding="utf-8"))
         markdown = paths["markdown"].read_text(encoding="utf-8")
 
-    assert payload["schema_version"] == "refactor_baseline_v1"
+    assert payload["schema_version"] == "architecture_baseline_v1"
     assert payload["static_inventory_only"] is True
     assert payload["behavior_changing_code_invoked"] is False
     assert payload["live_provider_calls_allowed"] is False
@@ -586,14 +595,14 @@ def test_refactor_baseline_generation_writes_reports_without_behavior_invocation
     assert payload["normal_rsi_signal_rows_written"] == 0
     assert payload["triggered_fade_created"] == 0
     assert "Behavior Freeze Contract" in markdown
-    assert "Refactor Success Gates" in markdown
+    assert "Architecture Success Gates" in markdown
 
 
-def test_refactor_baseline_json_contains_file_counts_and_inventory():
-    from crypto_rsi_scanner import refactor_baseline
+def test_architecture_baseline_json_contains_file_counts_and_inventory():
+    from crypto_rsi_scanner.project_health import baseline as architecture_baseline
 
     root = REPO_ROOT
-    payload = refactor_baseline.build_refactor_baseline(root=root)
+    payload = architecture_baseline.build_architecture_baseline(root=root)
     counts = payload["line_counts"]
     umbrella_lines = len((root / "tests" / "test_indicators.py").read_text(encoding="utf-8").splitlines())
     assert counts["crypto_rsi_scanner/scanner.py"] < 2000
@@ -615,18 +624,18 @@ def test_refactor_baseline_json_contains_file_counts_and_inventory():
     assert payload["namespace_inventory"]["base_dir"] == "event_fade_cache"
 
 
-def test_refactor_final_report_generation_writes_size_and_shim_gates():
+def test_architecture_final_report_generation_writes_size_and_shim_gates():
     import json
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    from crypto_rsi_scanner import refactor_final_report
-    from crypto_rsi_scanner import refactor_v3_contract
+    from crypto_rsi_scanner.project_health import architecture_report as architecture_final_report
+    from crypto_rsi_scanner.project_health import architecture_contract as architecture_v3_contract
 
     root = REPO_ROOT
     with TemporaryDirectory() as tmp:
         out_dir = Path(tmp)
-        paths = refactor_final_report.write_refactor_final_report(
+        paths = architecture_final_report.write_architecture_final_report(
             root=root,
             out_dir=out_dir,
             pytest_runtime_seconds=12.34,
@@ -634,17 +643,17 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
         )
         assert paths["json"].exists()
         assert paths["markdown"].exists()
-        assert (out_dir / refactor_v3_contract.CONTRACT_JSON).exists()
-        assert (out_dir / refactor_v3_contract.CONTRACT_MD).exists()
-        assert (out_dir / refactor_final_report.V3_RELEASE_CANDIDATE_JSON).exists()
-        assert (out_dir / refactor_final_report.V4_FINAL_JSON).exists()
-        assert (out_dir / refactor_final_report.V4_FINAL_MD).exists()
+        assert (out_dir / architecture_v3_contract.CONTRACT_JSON).exists()
+        assert (out_dir / architecture_v3_contract.CONTRACT_MD).exists()
+        assert (out_dir / architecture_final_report.V3_RELEASE_CANDIDATE_JSON).exists()
+        assert (out_dir / architecture_final_report.V4_FINAL_JSON).exists()
+        assert (out_dir / architecture_final_report.V4_FINAL_MD).exists()
         payload = json.loads(paths["json"].read_text(encoding="utf-8"))
-        contract = json.loads((out_dir / refactor_v3_contract.CONTRACT_JSON).read_text(encoding="utf-8"))
-        v4_report = json.loads((out_dir / refactor_final_report.V4_FINAL_JSON).read_text(encoding="utf-8"))
+        contract = json.loads((out_dir / architecture_v3_contract.CONTRACT_JSON).read_text(encoding="utf-8"))
+        v4_report = json.loads((out_dir / architecture_final_report.V4_FINAL_JSON).read_text(encoding="utf-8"))
         markdown = paths["markdown"].read_text(encoding="utf-8")
 
-    assert payload["schema_version"] == "refactor_final_report_v1"
+    assert payload["schema_version"] == "architecture_final_report_v1"
     assert payload["research_only"] is True
     assert payload["live_provider_calls_allowed"] is False
     assert payload["telegram_sends"] == 0
@@ -687,7 +696,7 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["cli_event_alpha_service_lines"] == payload["line_counts"]["crypto_rsi_scanner/cli/services/event_alpha.py"]
     assert payload["cli_service_bind_scanner_globals_call_sites"] >= 1
     assert "crypto_rsi_scanner.event_fade" in payload["intentionally_outside_event_alpha_modules"]
-    assert contract["schema_version"] == "refactor_v3_contract_v1"
+    assert contract["schema_version"] == "architecture_contract_v1"
     assert any(
         row["path"] == "crypto_rsi_scanner/event_fade.py"
         for row in contract["intentional_exceptions"]
@@ -696,7 +705,7 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
         row["path"] == "crypto_rsi_scanner/scanner.py"
         for row in contract["public_compatibility_entrypoints"]
     )
-    assert payload["v3_contract_path"] == "research/REFACTOR_V3_CONTRACT.md"
+    assert payload["v3_contract_path"] == "research/ARCHITECTURE_CONTRACT.md"
     assert payload["v3_gate_status"] == "accepted_with_documented_exceptions"
     assert payload["v3_auto_accept_ready"] is False
     assert payload["v3_blockers"] == []
@@ -707,13 +716,13 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     }
     assert payload["v3_accepted_exceptions"]["production_files_over_1200_lines"]["count"] == 13
     assert payload["v3_accepted_exceptions"]["class_exceptions_remaining"]["count"] == 3
-    for gate_name in refactor_v3_contract.V3_GATE_NAMES:
+    for gate_name in architecture_v3_contract.V3_GATE_NAMES:
         assert gate_name in payload["v3_gates"]
     assert payload["nonessential_shims_remaining"] == payload["v3_gates"]["nonessential_shims_remaining"]
     assert payload["public_compatibility_shims"] == payload["v3_gates"]["public_compatibility_shims"]
     assert payload["public_compatibility_shims"] == 0
     assert payload["legacy_file_retirement_status"] == "OK"
-    assert payload["legacy_file_retirement"]["schema_version"] == "final_refactor_transitional_file_report_v1"
+    assert payload["legacy_file_retirement"]["schema_version"] == "architecture_transitional_file_report_v1"
     assert payload["legacy_file_retirement"]["transitional_named_files_count"] == 0
     assert payload["legacy_file_retirement"]["transitional_named_files_remaining"] == 0
     assert payload["legacy_named_files_count"] == 0
@@ -727,8 +736,8 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert payload["event_fade_safety_exception_present"] is True
     assert payload["scanner_entrypoint_exception_present"] is True
     assert payload["public_compatibility_entrypoints_path"] == "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json"
-    assert v4_report["schema_version"] == "refactor_v4_final_report_v1"
-    assert v4_report["final_refactor_status"] == "accepted"
+    assert v4_report["schema_version"] == "architecture_acceptance_report_v1"
+    assert v4_report["architecture_status"] == "accepted"
     assert v4_report["critical_gates"]["legacy_named_files_zero"] == "pass"
     assert v4_report["critical_gates"]["compatibility_named_files_zero"] == "pass"
     assert v4_report["critical_gates"]["retained_public_entrypoints_zero"] == "pass"
@@ -739,7 +748,7 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert "nonessential_shims_remaining" not in payload["v3_auto_accept_blockers"]
     assert payload["remaining_implementation_modules_by_package_target"] == {}
     assert payload["remaining_module_classification"]["path"] == "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json"
-    assert payload["class_ownership_report"]["path"] == "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json"
+    assert payload["class_ownership_report"]["path"] == "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.json"
     assert not any(row["path"] == "crypto_rsi_scanner/scanner.py" for row in payload["blockers"])
     assert not any(
         row["path"] == "crypto_rsi_scanner/cli/services/event_alpha.py"
@@ -767,22 +776,22 @@ def test_refactor_final_report_generation_writes_size_and_shim_gates():
     assert "deleted_import_tombstones" in phases and "allowed to fail" in phases["deleted_import_tombstones"]
     assert "v4_dev_warning" in phases and "warn in development mode only" in phases["v4_dev_warning"]
     assert "v4_removal" in phases and "removed" in phases["v4_removal"]
-    assert "Refactor Final Report" in markdown
-    assert "Refactor V3 Finalization Gates" in markdown
+    assert "Architecture Final Report" in markdown
+    assert "Architecture V3 Finalization Gates" in markdown
     assert "Newly Migrated Modules" in markdown
     assert "Blockers" in markdown
     assert "Deprecation Plan" in markdown
-    rc_payload = json.loads((REPO_ROOT / "research" / "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.json").read_text(encoding="utf-8"))
+    rc_payload = json.loads((REPO_ROOT / "research" / "ARCHITECTURE_RELEASE_REPORT.json").read_text(encoding="utf-8"))
     assert rc_payload["acceptance_status"] == "accepted"
     assert rc_payload["critical_gate_status"] == "pass"
     assert payload["v3_gate_status"] != "pending"
 
 
-def test_refactor_v3_gate_snapshot_statuses_for_blockers_and_exceptions():
+def test_architecture_v3_gate_snapshot_statuses_for_blockers_and_exceptions():
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    from crypto_rsi_scanner import refactor_v3_contract
+    from crypto_rsi_scanner.project_health import architecture_contract as architecture_v3_contract
 
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -790,7 +799,7 @@ def test_refactor_v3_gate_snapshot_statuses_for_blockers_and_exceptions():
         package.mkdir()
         (package / "__init__.py").write_text("", encoding="utf-8")
         (package / "stable.py").write_text("\n".join(["VALUE = 1"] * 1301) + "\n", encoding="utf-8")
-        accepted = refactor_v3_contract.build_v3_gate_snapshot(
+        accepted = architecture_v3_contract.build_v3_gate_snapshot(
             root=root,
             size_gate_report={
                 "production_files_over_1500_lines": 0,
@@ -829,7 +838,7 @@ def test_refactor_v3_gate_snapshot_statuses_for_blockers_and_exceptions():
         package.mkdir()
         (package / "__init__.py").write_text("", encoding="utf-8")
         (package / "small.py").write_text("VALUE = 1\n", encoding="utf-8")
-        unaccepted_class = refactor_v3_contract.build_v3_gate_snapshot(
+        unaccepted_class = architecture_v3_contract.build_v3_gate_snapshot(
             root=root,
             size_gate_report={"production_files_over_1500_lines": 0},
             class_ownership_report={
@@ -851,43 +860,42 @@ def test_refactor_v3_gate_snapshot_statuses_for_blockers_and_exceptions():
     assert unaccepted_class["v3_pending_exceptions"] == ["class_exceptions_remaining"]
 
 
-def test_refactor_v3_contract_generation_lists_final_exceptions():
+def test_architecture_v3_contract_generation_lists_final_exceptions():
     import json
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    from crypto_rsi_scanner import refactor_v3_contract
+    from crypto_rsi_scanner.project_health import architecture_contract as architecture_v3_contract
 
     with TemporaryDirectory() as tmp:
-        json_path, md_path, contract = refactor_v3_contract.write_refactor_v3_contract(out_dir=tmp)
+        json_path, md_path, contract = architecture_v3_contract.write_architecture_v3_contract(out_dir=tmp)
         payload = json.loads(Path(json_path).read_text(encoding="utf-8"))
         markdown = Path(md_path).read_text(encoding="utf-8")
 
     assert payload == contract
-    assert payload["schema_version"] == refactor_v3_contract.CONTRACT_SCHEMA_VERSION
+    assert payload["schema_version"] == architecture_v3_contract.CONTRACT_SCHEMA_VERSION
     assert payload["research_only"] is True
     assert payload["no_live_provider_calls"] is True
     assert payload["no_sends_trades_paper_rsi_or_triggered_fade"] is True
-    assert set(refactor_v3_contract.V3_GATE_NAMES).issubset(set(payload["v3_gate_names"]))
+    assert set(architecture_v3_contract.V3_GATE_NAMES).issubset(set(payload["v3_gate_names"]))
     assert any(row["path"] == "crypto_rsi_scanner/event_fade.py" for row in payload["intentional_exceptions"])
     assert any(row["path"] == "crypto_rsi_scanner/scanner.py" for row in payload["public_compatibility_entrypoints"])
     assert "old Event Alpha shim paths are temporary" in markdown or "Temporary compatibility paths" in markdown
 
 
-def test_refactor_final_report_make_target_is_available():
+def test_architecture_final_report_make_target_is_available():
     root = REPO_ROOT
     makefile = (root / "Makefile").read_text(encoding="utf-8")
-    module_text = (root / "crypto_rsi_scanner" / "refactor_final_report.py").read_text(encoding="utf-8").casefold()
+    module_text = (root / "crypto_rsi_scanner" / "project_health" / "architecture_report.py").read_text(encoding="utf-8").casefold()
 
-    assert "refactor-final-report:" in makefile
-    assert "refactor-transitional-file-check:" in makefile
-    assert "refactor-legacy-file-check: refactor-transitional-file-check" in makefile
-    assert "refactor-legacy-terminology-check:" in makefile
-    assert "refactor-class-ownership-report:" in makefile
-    assert "$(python) -m crypto_rsi_scanner.refactor_class_ownership_report" in makefile.casefold()
-    assert "$(python) -m crypto_rsi_scanner.refactor_transitional_file_check" in makefile.casefold()
-    assert "$(python) -m crypto_rsi_scanner.refactor_legacy_terminology_check" in makefile.casefold()
-    assert "$(python) -m crypto_rsi_scanner.refactor_final_report" in makefile.casefold()
+    assert "architecture-final-report:" in makefile
+    assert "architecture-transitional-file-check:" in makefile
+    assert "architecture-naming-check:" in makefile or "architecture-terminology-check architecture-naming-check:" in makefile
+    assert "architecture-class-ownership-report:" in makefile
+    assert "$(python) -m crypto_rsi_scanner.project_health.class_ownership" in makefile.casefold()
+    assert "$(python) -m crypto_rsi_scanner.project_health.transitional_file_check" in makefile.casefold()
+    assert "$(python) -m crypto_rsi_scanner.project_health.terminology_check" in makefile.casefold()
+    assert "$(python) -m crypto_rsi_scanner.project_health.architecture_report" in makefile.casefold()
     assert "PYTEST_RUNTIME_SECONDS" in makefile
     assert "STANDALONE_RUNTIME_SECONDS" in makefile
     assert "event_alpha import shims" in module_text
@@ -914,25 +922,25 @@ def test_event_alpha_shim_dependency_report_make_target_is_available():
     assert "event_fade.py" in policy_text
 
 
-def test_refactor_transitional_and_terminology_reports_are_static():
+def test_architecture_transitional_and_terminology_reports_are_static():
     import json
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    from crypto_rsi_scanner import refactor_legacy_terminology_check
-    from crypto_rsi_scanner import refactor_transitional_file_check
+    from crypto_rsi_scanner.project_health import terminology_check as architecture_legacy_terminology_check
+    from crypto_rsi_scanner.project_health import transitional_file_check as architecture_transitional_file_check
 
     with TemporaryDirectory() as tmp:
         out_dir = Path(tmp)
-        trans_json, trans_md, trans = refactor_transitional_file_check.write_report(
+        trans_json, trans_md, trans = architecture_transitional_file_check.write_report(
             root=REPO_ROOT,
             out_dir=out_dir,
         )
-        term_json, term_md, term = refactor_legacy_terminology_check.write_report(
+        term_json, term_md, term = architecture_legacy_terminology_check.write_report(
             root=REPO_ROOT,
             out_dir=out_dir,
         )
-        legacy_alias = out_dir / refactor_transitional_file_check.LEGACY_ALIAS_JSON
+        legacy_alias = out_dir / architecture_transitional_file_check.LEGACY_ALIAS_JSON
 
         assert trans_json.exists()
         assert trans_md.exists()
@@ -943,11 +951,11 @@ def test_refactor_transitional_and_terminology_reports_are_static():
         assert json.loads(legacy_alias.read_text(encoding="utf-8")) == trans
         assert json.loads(term_json.read_text(encoding="utf-8")) == term
 
-    assert trans["schema_version"] == "final_refactor_transitional_file_report_v1"
+    assert trans["schema_version"] == "architecture_transitional_file_report_v1"
     assert trans["status"] == "OK"
     assert trans["transitional_named_files_remaining"] == 0
     assert trans["legacy_named_files_remaining"] == 0
-    assert term["schema_version"] == "final_refactor_legacy_terminology_report_v1"
+    assert term["schema_version"] == "project_health_naming_cleanup_report_v1"
     assert term["status"] == "OK"
     assert term["legacy_named_files_remaining"] == 0
     assert term["classification_counts"]["CLI_backwards_compatibility_alias"] >= 1
@@ -955,12 +963,12 @@ def test_refactor_transitional_and_terminology_reports_are_static():
     assert term["blockers"] == []
 
 
-def test_refactor_completion_map_generation_writes_release_candidate_reports():
+def test_architecture_completion_map_generation_writes_release_candidate_reports():
     import json
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    from crypto_rsi_scanner import refactor_completion_map
+    from crypto_rsi_scanner.project_health import completion_map as architecture_completion_map
 
     verification = {
         "commands": [
@@ -974,7 +982,7 @@ def test_refactor_completion_map_generation_writes_release_candidate_reports():
         "total_elapsed_seconds": 1.0,
     }
     with TemporaryDirectory() as tmp:
-        paths = refactor_completion_map.write_refactor_completion_map(
+        paths = architecture_completion_map.write_architecture_completion_map(
             root=REPO_ROOT,
             out_dir=Path(tmp),
             verification_results=verification,
@@ -983,7 +991,7 @@ def test_refactor_completion_map_generation_writes_release_candidate_reports():
         release = json.loads(paths["release_json"].read_text(encoding="utf-8"))
         markdown = paths["completion_markdown"].read_text(encoding="utf-8")
 
-    assert completion["schema_version"] == "refactor_completion_map_v1"
+    assert completion["schema_version"] == "architecture_completion_map_v1"
     assert completion["research_only"] is True
     assert completion["live_provider_calls_allowed"] is False
     assert completion["telegram_sends"] == 0
@@ -992,9 +1000,9 @@ def test_refactor_completion_map_generation_writes_release_candidate_reports():
     assert completion["normal_rsi_signal_rows_written"] == 0
     assert completion["triggered_fade_created"] == 0
     assert completion["scanner_facade"]["line_count"] < 2000
-    assert completion["cli_refactor"]["scanner_command_body_functions_remaining"] == 0
+    assert completion["cli_architecture"]["scanner_command_body_functions_remaining"] == 0
     assert completion["size_gates"]["gate_status"] == "pass"
-    gates = completion["final_refactor_gates"]
+    gates = completion["final_architecture_gates"]
     assert gates["legacy_named_files_remaining"] == 0
     assert gates["legacy_named_files_with_implementation"] == 0
     assert gates["compatibility_named_files_remaining"] == 0
@@ -1009,18 +1017,18 @@ def test_refactor_completion_map_generation_writes_release_candidate_reports():
     assert gates["event_fade_safety_exception_present"] is True
     assert gates["scanner_entrypoint_exception_present"] is True
     assert completion["verification"]["status"] == "pass"
-    assert release["schema_version"] == "refactor_release_candidate_report_v2"
-    assert release["status"] in {"accepted", "pending_with_documented_refactor_blockers"}
-    assert "Refactor Completion Map" in markdown
+    assert release["schema_version"] == "architecture_release_candidate_report_v1"
+    assert release["status"] in {"accepted", "pending_with_documented_architecture_blockers"}
+    assert "Architecture Completion Map" in markdown
     assert "canonical_import_coverage" in markdown
 
 
-def test_refactor_completion_map_make_target_is_static_and_no_live_runtime_path():
+def test_architecture_completion_map_make_target_is_static_and_no_live_runtime_path():
     root = REPO_ROOT
     makefile = (root / "Makefile").read_text(encoding="utf-8")
-    module_text = (root / "crypto_rsi_scanner" / "refactor_completion_map.py").read_text(encoding="utf-8").casefold()
-    assert "refactor-completion-map:" in makefile
-    assert "$(python) -m crypto_rsi_scanner.refactor_completion_map" in makefile.casefold()
+    module_text = (root / "crypto_rsi_scanner" / "project_health" / "completion_map.py").read_text(encoding="utf-8").casefold()
+    assert "architecture-completion-map:" in makefile
+    assert "$(python) -m crypto_rsi_scanner.project_health.completion_map" in makefile.casefold()
     forbidden = (
         "subprocess",
         "urlopen",
@@ -1035,12 +1043,12 @@ def test_refactor_completion_map_make_target_is_static_and_no_live_runtime_path(
         assert item not in module_text
 
 
-def test_refactor_size_gates_static_baseline_and_new_violation_detection():
+def test_architecture_size_gates_static_baseline_and_new_violation_detection():
     import json
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    from crypto_rsi_scanner import refactor_size_gates
+    from crypto_rsi_scanner.project_health import size_gates as architecture_size_gates
 
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -1052,19 +1060,19 @@ def test_refactor_size_gates_static_baseline_and_new_violation_detection():
         (package / "small.py").write_text("def ok():\n    return 1\n", encoding="utf-8")
         (tests_dir / "test_small.py").write_text("def test_ok():\n    assert True\n", encoding="utf-8")
 
-        baseline_path, baseline = refactor_size_gates.write_baseline(root=root)
-        assert baseline_path.name == "REFACTOR_SIZE_BASELINE.json"
-        assert baseline["schema_version"] == "refactor_size_baseline_v1"
+        baseline_path, baseline = architecture_size_gates.write_baseline(root=root)
+        assert baseline_path.name == "ARCHITECTURE_SIZE_BASELINE.json"
+        assert baseline["schema_version"] == "architecture_size_baseline_v1"
         assert baseline["violation_ids"] == []
 
-        report_path, markdown_path, report = refactor_size_gates.write_gate_report(root=root)
-        assert report_path.name == "REFACTOR_SIZE_GATES.json"
-        assert markdown_path.name == "REFACTOR_SIZE_GATES.md"
+        report_path, markdown_path, report = architecture_size_gates.write_gate_report(root=root)
+        assert report_path.name == "ARCHITECTURE_SIZE_GATES.json"
+        assert markdown_path.name == "ARCHITECTURE_SIZE_GATES.md"
         assert report["gate_status"] == "pass"
         assert report["new_violation_count"] == 0
 
         (package / "new_large.py").write_text("\n".join(["VALUE = 1"] * 1502) + "\n", encoding="utf-8")
-        blocked = refactor_size_gates.build_gate_report(root=root)
+        blocked = architecture_size_gates.build_gate_report(root=root)
         assert blocked["gate_status"] == "blocked"
         assert any(row["category"] == "file_over_1500_lines" for row in blocked["new_violations"])
         assert blocked["production_size_gate_status"] == "blocked"
@@ -1079,32 +1087,32 @@ def test_refactor_size_gates_static_baseline_and_new_violation_detection():
         assert json.loads(baseline_path.read_text(encoding="utf-8"))["violation_ids"] == []
 
         (package / "giant_production.py").write_text("\n".join(["VALUE = 1"] * 2002) + "\n", encoding="utf-8")
-        production_blocked = refactor_size_gates.build_gate_report(root=root)
+        production_blocked = architecture_size_gates.build_gate_report(root=root)
         assert production_blocked["production_size_gate_status"] == "blocked"
         assert production_blocked["production_files_over_2000_lines"] == 1
         assert any(row["path"] == "crypto_rsi_scanner/giant_production.py" for row in production_blocked["largest_production_files"])
 
         (tests_dir / "test_giant.py").write_text("\n".join(["VALUE = 1"] * 2002) + "\n", encoding="utf-8")
-        test_tracked = refactor_size_gates.build_gate_report(root=root)
+        test_tracked = architecture_size_gates.build_gate_report(root=root)
         assert test_tracked["test_size_gate_status"] == "warning"
         assert test_tracked["test_files_over_1500_lines"] == 1
         assert any(row["path"] == "tests/test_giant.py" for row in test_tracked["largest_test_files"])
 
         (package / "feature_legacy.py").write_text("\n".join(["VALUE = 1"] * 3001) + "\n", encoding="utf-8")
-        legacy_blocked = refactor_size_gates.build_gate_report(root=root)
+        legacy_blocked = architecture_size_gates.build_gate_report(root=root)
         assert legacy_blocked["legacy_decomposition_gate_status"] == "blocked"
         assert legacy_blocked["legacy_files_over_3000_lines"] == 1
         assert legacy_blocked["largest_api_files"][0]["path"] == "crypto_rsi_scanner/feature_legacy.py"
 
 
-def test_refactor_size_gates_make_target_is_static_and_no_live_runtime_path():
+def test_architecture_size_gates_make_target_is_static_and_no_live_runtime_path():
     root = REPO_ROOT
     makefile = (root / "Makefile").read_text(encoding="utf-8")
-    module_text = (root / "crypto_rsi_scanner" / "refactor_size_gates.py").read_text(encoding="utf-8").casefold()
-    assert "refactor-size-baseline-update:" in makefile
-    assert "refactor-size-gates:" in makefile
-    assert "$(python) -m crypto_rsi_scanner.refactor_size_gates --update-baseline" in makefile.casefold()
-    assert "$(python) -m crypto_rsi_scanner.refactor_size_gates" in makefile.casefold()
+    module_text = (root / "crypto_rsi_scanner" / "project_health" / "size_gates.py").read_text(encoding="utf-8").casefold()
+    assert "architecture-size-baseline-update:" in makefile
+    assert "architecture-size-gates:" in makefile
+    assert "$(python) -m crypto_rsi_scanner.project_health.size_gates --update-baseline" in makefile.casefold()
+    assert "$(python) -m crypto_rsi_scanner.project_health.size_gates" in makefile.casefold()
     forbidden = (
         "urlopen",
         "requests.",
@@ -1118,11 +1126,12 @@ def test_refactor_size_gates_make_target_is_static_and_no_live_runtime_path():
         assert item not in module_text
 
 
-def test_refactor_reports_list_large_api_implementation_cores():
-    from crypto_rsi_scanner import refactor_final_report, refactor_size_gates
+def test_architecture_reports_list_large_api_implementation_cores():
+    from crypto_rsi_scanner.project_health import architecture_report as architecture_final_report
+    from crypto_rsi_scanner.project_health import size_gates as architecture_size_gates
 
-    size_report = refactor_size_gates.build_gate_report(root=REPO_ROOT)
-    final_report = refactor_final_report.build_refactor_final_report(root=REPO_ROOT)
+    size_report = architecture_size_gates.build_gate_report(root=REPO_ROOT)
+    final_report = architecture_final_report.build_architecture_final_report(root=REPO_ROOT)
     assert size_report["legacy_decomposition_gate_status"] == "pass"
     assert final_report["legacy_decomposition_gate_status"] == "pass"
     assert size_report["legacy_files_over_1500_lines"] == 0
@@ -1142,7 +1151,7 @@ def test_refactor_reports_list_large_api_implementation_cores():
     )
 
 
-def test_shared_refactor_facades_preserve_import_paths():
+def test_shared_architecture_facades_preserve_import_paths():
     from crypto_rsi_scanner.storage import Storage
     from crypto_rsi_scanner.storage_parts.signals import SignalsMixin
     from crypto_rsi_scanner import backtest
@@ -1232,12 +1241,12 @@ def test_split_rsi_cli_runner_and_make_targets_are_wired():
     assert "$(PYTHON) -m pytest tests/cli" in makefile
 
 
-def test_refactor_baseline_make_target_is_static_and_no_live_runtime_path():
+def test_architecture_baseline_make_target_is_static_and_no_live_runtime_path():
     root = REPO_ROOT
     makefile = (root / "Makefile").read_text(encoding="utf-8")
-    module_text = (root / "crypto_rsi_scanner" / "refactor_baseline.py").read_text(encoding="utf-8").casefold()
-    assert "refactor-baseline:" in makefile
-    assert "$(python) -m crypto_rsi_scanner.refactor_baseline" in makefile.casefold()
+    module_text = (root / "crypto_rsi_scanner" / "project_health" / "baseline.py").read_text(encoding="utf-8").casefold()
+    assert "architecture-baseline:" in makefile
+    assert "$(python) -m crypto_rsi_scanner.project_health.baseline" in makefile.casefold()
     forbidden = (
         "urlopen",
         "requests.",

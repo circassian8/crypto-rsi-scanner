@@ -15,7 +15,7 @@ def test_known_stale_namespace_classifies_without_marker(tmp_path: Path):
     assert rows["notify_llm_deep"]["safe_for_send_readiness"] is False
 
 
-def test_known_refactor_and_manual_review_namespaces_are_not_unknown(tmp_path: Path):
+def test_known_architecture_and_manual_review_namespaces_are_not_unknown(tmp_path: Path):
     for namespace in (
         "catalyst_frame_e2e",
         "catalyst_frame_validation",
@@ -30,7 +30,7 @@ def test_known_refactor_and_manual_review_namespaces_are_not_unknown(tmp_path: P
     registry = lifecycle.build_namespace_registry(tmp_path)
     rows = {row["namespace"]: row for row in registry["namespaces"]}
 
-    assert rows["shim_report"]["status"] == "active_refactor_report"
+    assert rows["shim_report"]["status"] == "active_architecture_report"
     assert rows["tmp_nonexistent_cli_test"]["status"] == "quarantine"
     for namespace in (
         "catalyst_frame_e2e",

@@ -1,4 +1,4 @@
-"""Refactor completion and release-candidate reports.
+"""Architecture completion and release-candidate reports.
 
 Static report writer only: this module reads source/report artifacts and never
 calls providers, sends notifications, writes trading state, or imports scanner.
@@ -12,20 +12,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from . import refactor_final_report
-from . import refactor_size_gates
+from . import architecture_report
+from . import size_gates
 
 
-COMPLETION_SCHEMA_VERSION = "refactor_completion_map_v1"
-RELEASE_SCHEMA_VERSION = "refactor_release_candidate_report_v2"
-COMPLETION_JSON = "REFACTOR_COMPLETION_MAP.json"
-COMPLETION_MD = "REFACTOR_COMPLETION_MAP.md"
-RELEASE_JSON = "REFACTOR_RELEASE_CANDIDATE_REPORT.json"
-RELEASE_MD = "REFACTOR_RELEASE_CANDIDATE_REPORT.md"
+COMPLETION_SCHEMA_VERSION = "architecture_completion_map_v1"
+RELEASE_SCHEMA_VERSION = "architecture_release_candidate_report_v1"
+COMPLETION_JSON = "ARCHITECTURE_COMPLETION_MAP.json"
+COMPLETION_MD = "ARCHITECTURE_COMPLETION_MAP.md"
+RELEASE_JSON = "ARCHITECTURE_RELEASE_CANDIDATE_REPORT.json"
+RELEASE_MD = "ARCHITECTURE_RELEASE_CANDIDATE_REPORT.md"
+LEGACY_COMPLETION_JSON = "REFACTOR_COMPLETION_MAP.json"
+LEGACY_COMPLETION_MD = "REFACTOR_COMPLETION_MAP.md"
+LEGACY_RELEASE_JSON = "REFACTOR_RELEASE_CANDIDATE_REPORT.json"
+LEGACY_RELEASE_MD = "REFACTOR_RELEASE_CANDIDATE_REPORT.md"
 
 
 def repo_root_from_module() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return Path(__file__).resolve().parents[2]
 
 
 def build_refactor_completion_map(
@@ -34,17 +38,27 @@ def build_refactor_completion_map(
     verification_results: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     root = (root or repo_root_from_module()).resolve()
-    final = refactor_final_report.build_refactor_final_report(root=root)
-    size = refactor_size_gates.build_gate_report(root=root)
+    final = architecture_report.build_architecture_report(root=root)
+    size = size_gates.build_gate_report(root=root)
     verification = _normalize_verification_results(verification_results)
     critical_blockers = _critical_blockers(final, size, verification)
     status = "accepted" if not critical_blockers else "pending_with_blockers"
     line_counts = final.get("line_counts", {})
     final_refactor_gates = _final_refactor_gate_summary(final, root=root)
+    cli_summary = {
+        "cli_event_alpha_service_lines": final.get("cli_event_alpha_service_lines"),
+        "scanner_command_body_functions_remaining": final.get("scanner_command_body_functions_remaining"),
+        "scanner_bind_scanner_globals_call_sites": final.get("scanner_bind_scanner_globals_call_sites"),
+        "cli_service_bind_scanner_globals_call_sites": final.get("cli_service_bind_scanner_globals_call_sites"),
+        "parser_build_parser_lines": final.get("parser_build_parser_lines"),
+        "commands_event_alpha_handle_lines": final.get("commands_event_alpha_handle_lines"),
+    }
     return {
         "schema_version": COMPLETION_SCHEMA_VERSION,
         "generated_at": _now(),
-        "generator": "crypto_rsi_scanner.refactor_completion_map",
+        "row_type": "architecture_completion_map",
+        "historical_row_type_alias": "refactor_completion_map",
+        "generator": "crypto_rsi_scanner.project_health.completion_map",
         "research_only": True,
         "live_provider_calls_allowed": False,
         "telegram_sends": 0,
@@ -53,8 +67,8 @@ def build_refactor_completion_map(
         "normal_rsi_signal_rows_written": 0,
         "triggered_fade_created": 0,
         "status": status,
-        "canonical_final_report": "research/REFACTOR_FINAL_REPORT.json",
-        "size_gate_report": "research/REFACTOR_SIZE_GATES.json",
+        "canonical_final_report": "research/ARCHITECTURE_FINAL_REPORT.json",
+        "size_gate_report": "research/ARCHITECTURE_SIZE_GATES.json",
         "scanner_facade": {
             "path": "crypto_rsi_scanner/scanner.py",
             "line_count": line_counts.get("crypto_rsi_scanner/scanner.py"),
@@ -85,14 +99,9 @@ def build_refactor_completion_map(
             "classification_report": "research/REMAINING_EVENT_MODULE_CLASSIFICATION.json",
         },
         "final_refactor_gates": final_refactor_gates,
-        "cli_refactor": {
-            "cli_event_alpha_service_lines": final.get("cli_event_alpha_service_lines"),
-            "scanner_command_body_functions_remaining": final.get("scanner_command_body_functions_remaining"),
-            "scanner_bind_scanner_globals_call_sites": final.get("scanner_bind_scanner_globals_call_sites"),
-            "cli_service_bind_scanner_globals_call_sites": final.get("cli_service_bind_scanner_globals_call_sites"),
-            "parser_build_parser_lines": final.get("parser_build_parser_lines"),
-            "commands_event_alpha_handle_lines": final.get("commands_event_alpha_handle_lines"),
-        },
+        "final_architecture_gates": final_refactor_gates,
+        "cli_refactor": cli_summary,
+        "cli_architecture": cli_summary,
         "doctor_refactor": {
             "public_doctor_lines": line_counts.get("crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"),
             "top_level_doctor_shim_lines": None,
@@ -178,7 +187,7 @@ def build_release_candidate_report(
     verification_results: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     completion = build_refactor_completion_map(root=root, verification_results=verification_results)
-    status = "accepted" if completion["status"] == "accepted" else "pending_with_documented_refactor_blockers"
+    status = "accepted" if completion["status"] == "accepted" else "pending_with_documented_architecture_blockers"
     verdict = (
         "Event Alpha refactor v2 accepted: critical behavior, safety, shim, size, scanner-facade, and regression checks passed."
         if status == "accepted"
@@ -187,12 +196,14 @@ def build_release_candidate_report(
     return {
         "schema_version": RELEASE_SCHEMA_VERSION,
         "generated_at": completion["generated_at"],
-        "generator": "crypto_rsi_scanner.refactor_completion_map",
+        "row_type": "architecture_release_candidate_report",
+        "historical_row_type_alias": "refactor_release_candidate_report",
+        "generator": "crypto_rsi_scanner.project_health.completion_map",
         "status": status,
         "rc_verdict": verdict,
         "canonical_completion_map": f"research/{COMPLETION_JSON}",
         "canonical_final_report": completion["canonical_final_report"],
-        "line_counts": refactor_final_report.build_refactor_final_report(
+        "line_counts": architecture_report.build_architecture_report(
             root=(root or repo_root_from_module()).resolve()
         ).get("line_counts", {}),
         "monolith_size_reductions": _monolith_reductions(completion),
@@ -226,19 +237,27 @@ def write_refactor_completion_map(
         "release_json": output_dir / RELEASE_JSON,
         "release_markdown": output_dir / RELEASE_MD,
     }
-    paths["completion_json"].write_text(json.dumps(completion, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    paths["completion_markdown"].write_text(format_completion_markdown(completion), encoding="utf-8")
-    paths["release_json"].write_text(json.dumps(release, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    paths["release_markdown"].write_text(format_release_markdown(release), encoding="utf-8")
+    completion_payload = json.dumps(completion, indent=2, sort_keys=True) + "\n"
+    completion_markdown = format_completion_markdown(completion)
+    release_payload = json.dumps(release, indent=2, sort_keys=True) + "\n"
+    release_markdown = format_release_markdown(release)
+    paths["completion_json"].write_text(completion_payload, encoding="utf-8")
+    paths["completion_markdown"].write_text(completion_markdown, encoding="utf-8")
+    paths["release_json"].write_text(release_payload, encoding="utf-8")
+    paths["release_markdown"].write_text(release_markdown, encoding="utf-8")
+    (output_dir / LEGACY_COMPLETION_JSON).write_text(completion_payload, encoding="utf-8")
+    (output_dir / LEGACY_COMPLETION_MD).write_text(completion_markdown, encoding="utf-8")
+    (output_dir / LEGACY_RELEASE_JSON).write_text(release_payload, encoding="utf-8")
+    (output_dir / LEGACY_RELEASE_MD).write_text(release_markdown, encoding="utf-8")
     return paths
 
 
 def format_completion_markdown(data: dict[str, Any]) -> str:
     final_gates = data.get("final_refactor_gates", {})
     lines = [
-        "# Refactor Completion Map",
+        "# Architecture Completion Map",
         "",
-        "Static map of the behavior-preserving Event Alpha refactor. It records package ownership, compatibility cores, size gates, and safety boundaries.",
+        "Static map of the behavior-preserving Event Alpha architecture. It records package ownership, compatibility cores, size gates, and safety boundaries.",
         "",
         f"- generated_at: `{data['generated_at']}`",
         f"- status: `{data['status']}`",
@@ -356,9 +375,9 @@ def _critical_blockers(
 ) -> list[dict[str, str]]:
     blockers: list[dict[str, str]] = []
     if final.get("gate_summary", {}).get("status") != "pass":
-        blockers.append({"id": "refactor_final_gate", "reason": "refactor final report has blocking line or organization gates"})
+        blockers.append({"id": "architecture_final_gate", "reason": "architecture final report has blocking line or organization gates"})
     if size.get("gate_status") != "pass":
-        blockers.append({"id": "refactor_size_gate", "reason": "refactor size gate has new violations compared to baseline"})
+        blockers.append({"id": "architecture_size_gate", "reason": "architecture size gate has new violations compared to baseline"})
     if size.get("production_size_gate_status") == "blocked":
         blockers.append({"id": "production_size_gate", "reason": "production source files over 1,500 lines remain without accepted exceptions"})
     if size.get("legacy_decomposition_gate_status") == "blocked":
@@ -375,7 +394,9 @@ def _critical_blockers(
 
 
 def _final_refactor_gate_summary(final: dict[str, Any], *, root: Path) -> dict[str, Any]:
-    legacy_retirement = _read_json(root / "research" / "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.json")
+    legacy_retirement = _read_json(root / "research" / "ARCHITECTURE_TRANSITIONAL_FILE_REPORT.json")
+    if not legacy_retirement:
+        legacy_retirement = _read_json(root / "research" / "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.json")
     if not legacy_retirement:
         legacy_retirement = _read_json(root / "research" / "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.json")
     final_shim_status = _read_json(root / "research" / "EVENT_ALPHA_FINAL_SHIM_STATUS.json")
@@ -499,7 +520,7 @@ def _load_verification(path: str | None) -> dict[str, Any] | None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Write refactor completion and release-candidate reports.")
+    parser = argparse.ArgumentParser(description="Write architecture completion and release-candidate reports.")
     parser.add_argument("--out-dir", default=None)
     parser.add_argument("--verification-results", default=None)
     args = parser.parse_args(argv)
@@ -515,6 +536,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"status={completion.get('status')}")
     print(f"scanner_lines={completion.get('scanner_facade', {}).get('line_count')}")
     return 0 if completion.get("status") in {"accepted", "pending_with_blockers"} else 1
+
+
+build_architecture_completion_map = build_refactor_completion_map
+write_architecture_completion_map = write_refactor_completion_map
 
 
 if __name__ == "__main__":

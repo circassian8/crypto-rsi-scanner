@@ -29,5 +29,13 @@ jobs:
         run: python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py
       - name: Compile
         run: python3 -m compileall -q crypto_rsi_scanner tests
+      - name: Architecture health
+        run: |
+          make architecture-baseline PYTHON=python3
+          make architecture-size-gates PYTHON=python3
+          make architecture-class-ownership-report PYTHON=python3
+          make architecture-final-report PYTHON=python3
+          make architecture-completion-map PYTHON=python3
+          make architecture-naming-check PYTHON=python3
       - name: Make verify
         run: make verify PYTHON=python3

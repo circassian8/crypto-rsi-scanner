@@ -7,11 +7,17 @@ provider, notification, storage, or Event Alpha runtime modules.
 from __future__ import annotations
 
 import ast
+import argparse
+import json
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 
+REPORT_SCHEMA_VERSION = "architecture_api_inventory_v1"
+REPORT_JSON = "ARCHITECTURE_API_INVENTORY.json"
+REPORT_MD = "ARCHITECTURE_API_INVENTORY.md"
 LEGACY_WARNING_LINE_LIMIT = 1500
 LEGACY_BLOCKING_LINE_LIMIT = 3000
 LEGACY_REQUIRED_DECOMPOSITION_PATHS = (
@@ -61,6 +67,16 @@ def build_api_inventory(
     blocker_rows = files_over_3000
     gate_status = "blocked" if blocker_rows else "warning" if files_over_1500 else "pass"
     return {
+        "schema_version": REPORT_SCHEMA_VERSION,
+        "row_type": "architecture_api_inventory",
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "research_only": True,
+        "no_live_provider_calls": True,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "paper_trades_created": 0,
+        "normal_rsi_signal_rows_written": 0,
+        "triggered_fade_created": 0,
         "legacy_line_warning_limit": LEGACY_WARNING_LINE_LIMIT,
         "legacy_line_blocking_limit": LEGACY_BLOCKING_LINE_LIMIT,
         "legacy_required_decomposition_paths": list(LEGACY_REQUIRED_DECOMPOSITION_PATHS),
@@ -79,6 +95,44 @@ def build_api_inventory(
         "legacy_decomposition_gate_status": gate_status,
         "legacy_decomposition_blockers": blocker_rows,
     }
+
+
+def write_api_inventory(*, root: str | Path | None = None, out_dir: str | Path | None = None) -> tuple[Path, Path, dict[str, Any]]:
+    repo_root = Path(root).expanduser() if root is not None else Path(__file__).resolve().parents[2]
+    target = Path(out_dir).expanduser() if out_dir is not None else repo_root / "research"
+    target.mkdir(parents=True, exist_ok=True)
+    report = build_api_inventory(root=repo_root)
+    json_path = target / REPORT_JSON
+    md_path = target / REPORT_MD
+    json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    md_path.write_text(format_api_inventory(report), encoding="utf-8")
+    return json_path, md_path, report
+
+
+def format_api_inventory(report: dict[str, Any]) -> str:
+    lines = [
+        "# Architecture API Inventory",
+        "",
+        "Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.",
+        "",
+        f"- generated_at: `{report.get('generated_at')}`",
+        f"- legacy_file_count: `{report.get('legacy_file_count')}`",
+        f"- legacy_decomposition_gate_status: `{report.get('legacy_decomposition_gate_status')}`",
+        f"- legacy_files_over_1500_lines: `{report.get('legacy_files_over_1500_lines')}`",
+        f"- legacy_files_over_3000_lines: `{report.get('legacy_files_over_3000_lines')}`",
+    ]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Write the static architecture API inventory.")
+    parser.add_argument("--out-dir", default=None)
+    args = parser.parse_args(argv)
+    json_path, md_path, report = write_api_inventory(out_dir=args.out_dir)
+    print(md_path)
+    print(json_path)
+    print(f"legacy_decomposition_gate_status={report.get('legacy_decomposition_gate_status')}")
+    return 0
 
 
 def _api_source_files(repo_root: Path) -> list[Path]:
@@ -188,3 +242,7 @@ def _module_name(path: Path, *, repo_root: Path) -> str:
 
 def _module_to_source_path(module: str) -> str:
     return f"{module.replace('.', '/')}.py"
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

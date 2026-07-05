@@ -1,4 +1,4 @@
-"""Final refactor gate report.
+"""Architecture health gate report.
 
 This report is deliberately inventory-first. It measures the current file sizes
 and shim organization after the v1 migration work, records measured test
@@ -16,24 +16,27 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from . import refactor_baseline
-from . import refactor_api_inventory
-from . import refactor_final_v4_report
-from . import refactor_transitional_file_check
-from . import refactor_size_gates
-from . import refactor_v3_contract
-from .event_alpha import shims as event_alpha_shims
-from .event_alpha.doctor import check_registry
-from .event_alpha.namespace import lifecycle as namespace_lifecycle
+from . import baseline
+from . import api_inventory
+from . import release_report
+from . import transitional_file_check
+from . import size_gates
+from . import architecture_contract
+from ..event_alpha import shims as event_alpha_shims
+from ..event_alpha.doctor import check_registry
+from ..event_alpha.namespace import lifecycle as namespace_lifecycle
 
-
-REPORT_SCHEMA_VERSION = "refactor_final_report_v1"
-REPORT_JSON = "REFACTOR_FINAL_REPORT.json"
-REPORT_MD = "REFACTOR_FINAL_REPORT.md"
-V3_RELEASE_CANDIDATE_JSON = "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.json"
-V3_RELEASE_CANDIDATE_MD = "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.md"
-V4_FINAL_JSON = refactor_final_v4_report.V4_FINAL_JSON
-V4_FINAL_MD = refactor_final_v4_report.V4_FINAL_MD
+REPORT_SCHEMA_VERSION = "architecture_final_report_v1"
+REPORT_JSON = "ARCHITECTURE_FINAL_REPORT.json"
+REPORT_MD = "ARCHITECTURE_FINAL_REPORT.md"
+LEGACY_REPORT_JSON = "REFACTOR_FINAL_REPORT.json"
+LEGACY_REPORT_MD = "REFACTOR_FINAL_REPORT.md"
+V3_RELEASE_CANDIDATE_JSON = "ARCHITECTURE_RELEASE_REPORT.json"
+V3_RELEASE_CANDIDATE_MD = "ARCHITECTURE_RELEASE_REPORT.md"
+LEGACY_V3_RELEASE_CANDIDATE_JSON = "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.json"
+LEGACY_V3_RELEASE_CANDIDATE_MD = "REFACTOR_V3_RELEASE_CANDIDATE_REPORT.md"
+V4_FINAL_JSON = release_report.V4_FINAL_JSON
+V4_FINAL_MD = release_report.V4_FINAL_MD
 MAJOR_TARGETS = {
     "crypto_rsi_scanner/scanner.py": {
         "target_lines_lt": 2000,
@@ -114,17 +117,14 @@ MIGRATED_MODULES_THIS_RUN = (
     "crypto_rsi_scanner.event_models",
 )
 
-
 def repo_root_from_module() -> Path:
-    return Path(__file__).resolve().parents[1]
-
+    return Path(__file__).resolve().parents[2]
 
 def _line_count(path: Path) -> int | None:
     if not path.exists():
         return None
     with path.open("r", encoding="utf-8", errors="replace") as handle:
         return sum(1 for _ in handle)
-
 
 def _load_json(path: Path) -> dict[str, Any]:
     try:
@@ -133,9 +133,10 @@ def _load_json(path: Path) -> dict[str, Any]:
         return {}
     return value if isinstance(value, dict) else {}
 
-
 def _baseline_line_counts(root: Path) -> dict[str, int | None]:
-    data = _load_json(root / "research" / "REFACTOR_BASELINE.json")
+    data = _load_json(root / "research" / "ARCHITECTURE_BASELINE.json")
+    if not data:
+        data = _load_json(root / "research" / "REFACTOR_BASELINE.json")
     counts = data.get("line_counts")
     if isinstance(counts, dict):
         return {
@@ -143,7 +144,6 @@ def _baseline_line_counts(root: Path) -> dict[str, int | None]:
             for path, value in counts.items()
         }
     return {}
-
 
 def _runtime_report(root: Path) -> dict[str, Any]:
     for path in (root / "research" / "test_runtime_report.json", root / "test_runtime_report.json"):
@@ -153,7 +153,6 @@ def _runtime_report(root: Path) -> dict[str, Any]:
             return data
     return {}
 
-
 def _top_level_event_modules(root: Path) -> list[str]:
     package = root / "crypto_rsi_scanner"
     return [
@@ -161,7 +160,6 @@ def _top_level_event_modules(root: Path) -> list[str]:
         for path in sorted(package.glob("event_*.py"))
         if path.is_file()
     ]
-
 
 def _scanner_bind_scanner_globals_call_sites(root: Path) -> int:
     total = 0
@@ -171,7 +169,6 @@ def _scanner_bind_scanner_globals_call_sites(root: Path) -> int:
         text = path.read_text(encoding="utf-8", errors="replace")
         total += len(re.findall(r"\bbind_scanner_globals\(", text))
     return total
-
 
 def _cli_service_bind_scanner_globals_call_sites(root: Path) -> int:
     service_dir = root / "crypto_rsi_scanner" / "cli" / "services"
@@ -186,7 +183,6 @@ def _cli_service_bind_scanner_globals_call_sites(root: Path) -> int:
             total += len(re.findall(r"\bbind_scanner_globals\(", line))
     return total
 
-
 def _cli_service_line_counts(root: Path) -> dict[str, int]:
     service_dir = root / "crypto_rsi_scanner" / "cli" / "services"
     if not service_dir.exists():
@@ -195,7 +191,6 @@ def _cli_service_line_counts(root: Path) -> dict[str, int]:
         path.relative_to(root).as_posix(): int(_line_count(path) or 0)
         for path in sorted(service_dir.glob("*.py"))
     }
-
 
 def _scanner_command_body_functions(root: Path) -> list[str]:
     path = root / "crypto_rsi_scanner" / "scanner.py"
@@ -215,7 +210,6 @@ def _scanner_command_body_functions(root: Path) -> list[str]:
     ]
     return sorted(names)
 
-
 def _scanner_function_is_service_wrapper(node: ast.FunctionDef) -> bool:
     return any(
         isinstance(child, ast.ImportFrom)
@@ -223,7 +217,6 @@ def _scanner_function_is_service_wrapper(node: ast.FunctionDef) -> bool:
         and child.module.endswith("cli.services")
         for child in node.body
     )
-
 
 def _function_line_count(root: Path, relative_path: str, function_name: str) -> int | None:
     path = root / relative_path
@@ -237,7 +230,6 @@ def _function_line_count(root: Path, relative_path: str, function_name: str) -> 
         if isinstance(node, ast.FunctionDef) and node.name == function_name and node.end_lineno:
             return int(node.end_lineno - node.lineno + 1)
     return None
-
 
 def _doctor_plugin_check_counts(root: Path) -> dict[str, int]:
     checks_dir = root / "crypto_rsi_scanner" / "event_alpha" / "doctor" / "checks"
@@ -253,7 +245,6 @@ def _doctor_plugin_check_counts(root: Path) -> dict[str, int]:
         generic_apply = len(re.findall(r"(?m)^def apply_checks\(", text))
         counts[path.stem] = max(registry_messages, exported_apply_functions + generic_apply)
     return counts
-
 
 def _doctor_api_unregistered_details() -> list[dict[str, str]]:
     return [
@@ -334,7 +325,6 @@ def _doctor_api_unregistered_details() -> list[dict[str, str]]:
         },
     ]
 
-
 def _namespace_inventory(root: Path) -> dict[str, Any]:
     registry = namespace_lifecycle.build_namespace_registry(root / "event_fade_cache")
     rows = registry.get("namespaces") if isinstance(registry, dict) else []
@@ -347,7 +337,6 @@ def _namespace_inventory(root: Path) -> dict[str, Any]:
         "unknown_namespace_count": len(unknown),
         "unknown_namespaces": [str(row.get("namespace")) for row in unknown if isinstance(row, dict)],
     }
-
 
 def _ci_static_safety(root: Path) -> dict[str, Any]:
     workflow_dir = root / ".github" / "workflows"
@@ -373,7 +362,6 @@ def _ci_static_safety(root: Path) -> dict[str, Any]:
         "workflow_files": [path.relative_to(root).as_posix() for path in sorted(workflow_dir.glob("*.yml")) + sorted(workflow_dir.glob("*.yaml"))],
         "findings": findings,
     }
-
 
 def _remaining_module_classification(root: Path) -> dict[str, Any]:
     data = _load_json(root / "research" / "REMAINING_EVENT_MODULE_CLASSIFICATION.json")
@@ -401,17 +389,18 @@ def _remaining_module_classification(root: Path) -> dict[str, Any]:
         "intentionally_outside_event_alpha_modules": intentionally_outside,
     }
 
-
 def _class_ownership_summary(root: Path) -> dict[str, Any]:
-    path = root / "research" / "REFACTOR_CLASS_OWNERSHIP_REPORT.json"
+    path = root / "research" / "ARCHITECTURE_CLASS_OWNERSHIP_REPORT.json"
+    if not path.exists():
+        path = root / "research" / "REFACTOR_CLASS_OWNERSHIP_REPORT.json"
     data = _load_json(path)
     if not data:
         return {
-            "path": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
+            "path": "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.json",
             "present": False,
         }
     return {
-        "path": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
+        "path": path.relative_to(root).as_posix(),
         "present": True,
         "public_class_count": int(data.get("public_class_count") or 0),
         "classes_over_limit_count": int(data.get("classes_over_limit_count") or 0),
@@ -436,7 +425,6 @@ def _class_ownership_summary(root: Path) -> dict[str, Any]:
         ),
     }
 
-
 def _class_ownership_final_fields(class_ownership: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "accepted_class_exceptions": class_ownership.get("accepted_class_exceptions", []),
@@ -457,7 +445,6 @@ def _class_ownership_final_fields(class_ownership: Mapping[str, Any]) -> dict[st
             "modules_with_multiple_public_classes_revisit_condition"
         ),
     }
-
 
 def _size_gate_final_fields(size_gate_report: Mapping[str, Any]) -> dict[str, Any]:
     return {
@@ -488,7 +475,6 @@ def _size_gate_final_fields(size_gate_report: Mapping[str, Any]) -> dict[str, An
         "largest_test_files": size_gate_report.get("largest_test_files", []),
     }
 
-
 def _shim_final_fields(*, deleted_shims: int, final_shim_status: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "old_module_paths_removed": deleted_shims,
@@ -502,7 +488,6 @@ def _shim_final_fields(*, deleted_shims: int, final_shim_status: Mapping[str, An
             "dependency and old-import reports proved they were unused internally."
         ),
     }
-
 
 def _legacy_file_final_fields(report: Mapping[str, Any]) -> dict[str, Any]:
     return {
@@ -520,7 +505,6 @@ def _legacy_file_final_fields(report: Mapping[str, Any]) -> dict[str, Any]:
         "scanner_entrypoint_exception_present": report.get("scanner_entrypoint_exception_present", False),
         "public_compatibility_entrypoints_path": report.get("public_compatibility_entrypoints_path"),
     }
-
 
 def _line_gate_rows(
     *,
@@ -556,7 +540,6 @@ def _line_gate_rows(
         )
     return rows
 
-
 def _doctor_plugin_migration_summary(*, legacy_unregistered: int, root: Path) -> dict[str, Any]:
     return {
         "plugin_check_counts": _doctor_plugin_check_counts(root),
@@ -567,7 +550,6 @@ def _doctor_plugin_migration_summary(*, legacy_unregistered: int, root: Path) ->
         "remaining_api_unregistered_details": _doctor_api_unregistered_details() if legacy_unregistered > 5 else [],
         "migrated_this_run": len(MIGRATED_MODULES_THIS_RUN),
     }
-
 
 def _refactor_extra_blockers(
     *,
@@ -633,7 +615,7 @@ def _refactor_extra_blockers(
             )
     if size_gate_report.get("production_size_gate_status") == "blocked":
         for row in size_gate_report.get("largest_production_files", []):
-            if int(row.get("line_count") or 0) <= refactor_size_gates.PRODUCTION_BLOCKER_LINE_LIMIT:
+            if int(row.get("line_count") or 0) <= size_gates.PRODUCTION_BLOCKER_LINE_LIMIT:
                 continue
             extra_blockers.append(
                 {
@@ -648,7 +630,6 @@ def _refactor_extra_blockers(
             )
     return extra_blockers
 
-
 def _report_blocker_rows(
     blocked: Iterable[Mapping[str, Any]],
     extra_blockers: Iterable[Mapping[str, str]],
@@ -662,7 +643,6 @@ def _report_blocker_rows(
         }
         for row in blocked
     ] + [dict(row) for row in extra_blockers]
-
 
 def _old_import_deprecation_plan() -> list[dict[str, str]]:
     return [
@@ -688,9 +668,10 @@ def _old_import_deprecation_plan() -> list[dict[str, str]]:
         },
     ]
 
-
 def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str, Any]) -> dict[str, Any]:
-    verification = _load_json(root / "research" / "REFACTOR_VERIFICATION_RESULTS.json")
+    verification = _load_json(root / "research" / "ARCHITECTURE_VERIFICATION_RESULTS.json")
+    if not verification:
+        verification = _load_json(root / "research" / "REFACTOR_VERIFICATION_RESULTS.json")
     commands = verification.get("commands") if isinstance(verification.get("commands"), list) else []
     failed_commands = verification.get("failed_commands") if isinstance(verification.get("failed_commands"), list) else []
     critical_gates = {
@@ -733,8 +714,9 @@ def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str,
     if not isinstance(accepted_exceptions, Mapping):
         accepted_exceptions = {}
     return {
-        "schema_version": "refactor_v3_release_candidate_report_v1",
-        "row_type": "refactor_v3_release_candidate_report",
+        "schema_version": "architecture_release_report_v1",
+        "row_type": "architecture_release_report",
+        "historical_row_type_alias": "refactor_v3_release_candidate_report",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "acceptance_status": acceptance_status,
         "critical_gate_status": critical_status,
@@ -782,9 +764,14 @@ def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str,
         "doctor_registry_status": {"legacy_unregistered": final_report.get("legacy_unregistered")},
         "namespace_lifecycle_status": final_report.get("namespace_lifecycle_inventory", {}),
         "source_reports": {
-            "refactor_final": "research/REFACTOR_FINAL_REPORT.json",
-            "refactor_size_gates": "research/REFACTOR_SIZE_GATES.json",
-            "refactor_class_ownership": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
+            "architecture_final": "research/ARCHITECTURE_FINAL_REPORT.json",
+            "architecture_size_gates": "research/ARCHITECTURE_SIZE_GATES.json",
+            "architecture_class_ownership": "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.json",
+            "legacy_aliases": {
+                "refactor_final": "research/REFACTOR_FINAL_REPORT.json",
+                "refactor_size_gates": "research/REFACTOR_SIZE_GATES.json",
+                "refactor_class_ownership": "research/REFACTOR_CLASS_OWNERSHIP_REPORT.json",
+            },
             "shim_dependency": "research/EVENT_ALPHA_SHIM_DEPENDENCY_REPORT.json",
             "old_import_check": "research/EVENT_ALPHA_OLD_IMPORT_CHECK.json",
         },
@@ -801,7 +788,6 @@ def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str,
             "no_secrets_committed": True,
         },
     }
-
 
 def _format_v3_release_candidate_markdown(report: Mapping[str, Any]) -> str:
     total = report.get("commands_total") or 0
@@ -905,7 +891,6 @@ def _format_v3_release_candidate_markdown(report: Mapping[str, Any]) -> str:
         lines.append("- none")
     return "\n".join(lines).rstrip() + "\n"
 
-
 def _write_v3_release_candidate_report(*, root: Path, output_dir: Path, final_report: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
     report = _build_v3_release_candidate_report(root=root, final_report=final_report)
     markdown = _format_v3_release_candidate_markdown(report)
@@ -917,10 +902,17 @@ def _write_v3_release_candidate_report(*, root: Path, output_dir: Path, final_re
         markdown,
         encoding="utf-8",
     )
+    (output_dir / LEGACY_V3_RELEASE_CANDIDATE_JSON).write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / LEGACY_V3_RELEASE_CANDIDATE_MD).write_text(
+        markdown,
+        encoding="utf-8",
+    )
     return report, markdown
 
-
-def build_refactor_final_report(
+def build_architecture_report(
     *,
     root: Path | None = None,
     pytest_runtime_seconds: float | None = None,
@@ -956,9 +948,9 @@ def build_refactor_final_report(
     ci_static_safety = _ci_static_safety(root)
     classification = _remaining_module_classification(root)
     class_ownership = _class_ownership_summary(root)
-    legacy_inventory = refactor_api_inventory.build_api_inventory(root=root)
-    legacy_file_report = refactor_transitional_file_check.build_report(root=root)
-    size_gate_report = refactor_size_gates.build_gate_report(root=root)
+    legacy_inventory = api_inventory.build_api_inventory(root=root)
+    legacy_file_report = transitional_file_check.build_report(root=root)
+    size_gate_report = size_gates.build_gate_report(root=root)
     v3_gate_snapshot = _build_v3_gate_snapshot(root=root, size_gate_report=size_gate_report)
     deleted_shims = event_alpha_shims.deleted_shim_count(root=root)
     shim_dependency_report = event_alpha_shims.build_shim_dependency_report(root=root)
@@ -984,8 +976,10 @@ def build_refactor_final_report(
     )
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
+        "row_type": "architecture_final_report",
+        "historical_row_type_alias": "refactor_final_report",
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "generator": "crypto_rsi_scanner.refactor_final_report",
+        "generator": "crypto_rsi_scanner.project_health.architecture_report",
         "research_only": True,
         "no_send_rehearsal": True,
         "live_provider_calls_allowed": False,
@@ -1060,12 +1054,11 @@ def build_refactor_final_report(
         "deprecation_plan": _old_import_deprecation_plan(),
     }
 
-
 def format_refactor_final_markdown(data: dict[str, Any]) -> str:
     lines = [
-        "# Refactor Final Report",
+        "# Architecture Final Report",
         "",
-        "Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.",
+        "Research-only architecture gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.",
         "",
         f"- generated_at: `{data['generated_at']}`",
         f"- gate_status: `{data['gate_summary']['status']}`",
@@ -1175,23 +1168,21 @@ def format_refactor_final_markdown(data: dict[str, Any]) -> str:
     _append_safety_snapshot_section(lines, data)
     return "\n".join(lines)
 
-
 def _build_v3_gate_snapshot(*, root: Path, size_gate_report: Mapping[str, Any]) -> dict[str, Any]:
     existing = size_gate_report.get("v3_gate_snapshot")
     if isinstance(existing, dict):
         return dict(existing)
-    return refactor_v3_contract.build_v3_gate_snapshot(
+    return architecture_contract.build_v3_gate_snapshot(
         root=root,
         shim_dependency_report=event_alpha_shims.build_shim_dependency_report(root=root),
         size_gate_report=size_gate_report,
         class_ownership_report=size_gate_report,
     )
 
-
 def _v3_final_fields(v3_gate_snapshot: Mapping[str, Any]) -> dict[str, Any]:
     gate_values = dict(v3_gate_snapshot["gate_values"])
     return {
-        "v3_contract_path": "research/REFACTOR_V3_CONTRACT.md",
+        "v3_contract_path": "research/ARCHITECTURE_CONTRACT.md",
         "v3_gate_status": v3_gate_snapshot["status"],
         "v3_auto_accept_ready": v3_gate_snapshot["v3_auto_accept_ready"],
         "v3_auto_accept_blockers": v3_gate_snapshot["auto_accept_blockers"],
@@ -1202,7 +1193,6 @@ def _v3_final_fields(v3_gate_snapshot: Mapping[str, Any]) -> dict[str, Any]:
         "v3_gate_snapshot": v3_gate_snapshot,
         **gate_values,
     }
-
 
 def _append_api_decomposition_section(lines: list[str], data: dict[str, Any]) -> None:
     lines.extend(
@@ -1217,7 +1207,6 @@ def _append_api_decomposition_section(lines: list[str], data: dict[str, Any]) ->
     for row in data.get("largest_api_files", []):
         if isinstance(row, dict):
             lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
-
 
 def _append_organization_counts_section(lines: list[str], data: dict[str, Any]) -> None:
     rows = [
@@ -1280,12 +1269,11 @@ def _append_organization_counts_section(lines: list[str], data: dict[str, Any]) 
     lines.extend(["", "## Organization Counts", ""])
     lines.extend(f"- {key}: `{value}`" for key, value in rows)
 
-
 def _append_v3_finalization_section(lines: list[str], data: dict[str, Any]) -> None:
     lines.extend(
         [
             "",
-            "## Refactor V3 Finalization Gates",
+            "## Architecture V3 Finalization Gates",
             "",
             f"- v3_contract_path: `{data.get('v3_contract_path')}`",
             f"- v3_gate_status: `{data.get('v3_gate_status')}`",
@@ -1300,7 +1288,7 @@ def _append_v3_finalization_section(lines: list[str], data: dict[str, Any]) -> N
     v3_snapshot = data.get("v3_gate_snapshot") if isinstance(data.get("v3_gate_snapshot"), dict) else {}
     v3_values = v3_snapshot.get("gate_values") if isinstance(v3_snapshot.get("gate_values"), dict) else {}
     v3_severity = v3_snapshot.get("gate_severity") if isinstance(v3_snapshot.get("gate_severity"), dict) else {}
-    for name in refactor_v3_contract.V3_GATE_NAMES:
+    for name in architecture_contract.V3_GATE_NAMES:
         lines.append(f"| `{name}` | {v3_values.get(name, 0)} | {v3_severity.get(name, '')} |")
 
 def _append_class_ownership_section(lines: list[str], data: dict[str, Any]) -> None:
@@ -1423,8 +1411,7 @@ def _append_blocker_section(lines: list[str], data: dict[str, Any]) -> None:
             ]
         )
 
-
-def write_refactor_final_report(
+def write_architecture_report(
     *,
     root: Path | None = None,
     out_dir: Path | None = None,
@@ -1432,7 +1419,7 @@ def write_refactor_final_report(
     standalone_runner_runtime_seconds: float | None = None,
 ) -> dict[str, Path]:
     root = (root or repo_root_from_module()).resolve()
-    data = build_refactor_final_report(
+    data = build_architecture_report(
         root=root,
         pytest_runtime_seconds=pytest_runtime_seconds,
         standalone_runner_runtime_seconds=standalone_runner_runtime_seconds,
@@ -1441,27 +1428,38 @@ def write_refactor_final_report(
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / REPORT_JSON
     md_path = output_dir / REPORT_MD
-    refactor_v3_contract.write_refactor_v3_contract(out_dir=output_dir, root=root)
-    json_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    md_path.write_text(format_refactor_final_markdown(data), encoding="utf-8")
+    architecture_contract.write_architecture_contract(out_dir=output_dir, root=root)
+    transitional_file_check.write_report(root=root, out_dir=output_dir)
+    payload = json.dumps(data, indent=2, sort_keys=True) + "\n"
+    markdown = format_refactor_final_markdown(data)
+    json_path.write_text(payload, encoding="utf-8")
+    md_path.write_text(markdown, encoding="utf-8")
+    (output_dir / LEGACY_REPORT_JSON).write_text(payload, encoding="utf-8")
+    (output_dir / LEGACY_REPORT_MD).write_text(markdown, encoding="utf-8")
     v3_report, v3_markdown = _write_v3_release_candidate_report(root=root, output_dir=output_dir, final_report=data)
-    refactor_final_v4_report.write_v4_final_report(
+    release_report.write_v4_final_report(
         output_dir=output_dir,
         v3_report=v3_report,
         v3_markdown=v3_markdown,
         final_report=data,
     )
     if out_dir is None:
-        (root / REPORT_JSON).write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        (root / REPORT_MD).write_text(format_refactor_final_markdown(data), encoding="utf-8")
+        (root / REPORT_JSON).write_text(payload, encoding="utf-8")
+        (root / REPORT_MD).write_text(markdown, encoding="utf-8")
+        (root / LEGACY_REPORT_JSON).write_text(payload, encoding="utf-8")
+        (root / LEGACY_REPORT_MD).write_text(markdown, encoding="utf-8")
     return {"json": json_path, "markdown": md_path}
 
+build_refactor_final_report = build_architecture_report
+write_refactor_final_report = write_architecture_report
+build_architecture_final_report = build_architecture_report
+write_architecture_final_report = write_architecture_report
+format_architecture_markdown = format_refactor_final_markdown
 
 def _optional_float(value: str | None) -> float | None:
     if value in (None, ""):
         return None
     return float(value)
-
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Write refactor final gate report artifacts.")
@@ -1469,7 +1467,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pytest-runtime-seconds", default=None)
     parser.add_argument("--standalone-runtime-seconds", default=None)
     args = parser.parse_args(argv)
-    paths = write_refactor_final_report(
+    paths = write_architecture_report(
         out_dir=Path(args.out_dir).expanduser() if args.out_dir else None,
         pytest_runtime_seconds=_optional_float(args.pytest_runtime_seconds),
         standalone_runner_runtime_seconds=_optional_float(args.standalone_runtime_seconds),
@@ -1482,7 +1480,6 @@ def main(argv: list[str] | None = None) -> int:
     print(f"tests_umbrella_lines={data.get('line_counts', {}).get('tests/test_indicators.py')}")
     print(f"doctor_lines={data.get('line_counts', {}).get('crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py')}")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

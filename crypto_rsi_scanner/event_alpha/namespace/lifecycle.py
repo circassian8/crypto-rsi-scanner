@@ -25,7 +25,7 @@ STATUS_ACTIVE_FIXTURE_SMOKE = "active_fixture_smoke"
 STATUS_ACTIVE_PROVIDER_PREFLIGHT = "active_provider_preflight"
 STATUS_ACTIVE_PROVIDER_REHEARSAL = "active_provider_rehearsal"
 STATUS_ACTIVE_INTEGRATED_SMOKE = "active_integrated_smoke"
-STATUS_ACTIVE_REFACTOR_REPORT = "active_refactor_report"
+STATUS_ACTIVE_ARCHITECTURE_REPORT = "active_architecture_report"
 STATUS_MANUAL_REVIEW = "manual_review"
 STATUS_STALE_DEPRECATED = "stale_deprecated"
 STATUS_ARCHIVED = "archived"
@@ -304,7 +304,7 @@ def _classify_namespace(
         STATUS_ACTIVE_PROVIDER_PREFLIGHT,
         STATUS_ACTIVE_PROVIDER_REHEARSAL,
         STATUS_ACTIVE_INTEGRATED_SMOKE,
-        STATUS_ACTIVE_REFACTOR_REPORT,
+        STATUS_ACTIVE_ARCHITECTURE_REPORT,
         STATUS_MANUAL_REVIEW,
         STATUS_STALE_DEPRECATED,
         STATUS_ARCHIVED,
@@ -314,8 +314,8 @@ def _classify_namespace(
     if namespace in KNOWN_STALE_NAMESPACES:
         known = KNOWN_STALE_NAMESPACES[namespace]
         return STATUS_STALE_DEPRECATED, known["reason"], known["superseded_by"]
-    if namespace in {"shim_report", "refactor_final_report", "refactor_baseline"}:
-        return STATUS_ACTIVE_REFACTOR_REPORT, "refactor/report namespace", None
+    if namespace in {"shim_report", "architecture_final_report", "architecture_baseline", "refactor_final_report", "refactor_baseline"}:
+        return STATUS_ACTIVE_ARCHITECTURE_REPORT, "architecture/report namespace", None
     if namespace in {
         "catalyst_frame_e2e",
         "catalyst_frame_validation",
@@ -342,7 +342,7 @@ def _classify_namespace(
 def _profile_for_namespace(namespace: str, status: str) -> str:
     if status in {STATUS_ACTIVE_FIXTURE_SMOKE, STATUS_ACTIVE_INTEGRATED_SMOKE}:
         return "fixture"
-    if status == STATUS_ACTIVE_REFACTOR_REPORT:
+    if status == STATUS_ACTIVE_ARCHITECTURE_REPORT:
         return "refactor"
     if status == STATUS_MANUAL_REVIEW:
         return "manual_review"
@@ -382,8 +382,8 @@ def _retention_policy(status: str) -> str:
         return "audit_then_archive"
     if status in {STATUS_ACTIVE_FIXTURE_SMOKE, STATUS_ACTIVE_INTEGRATED_SMOKE}:
         return "keep_latest_fixture_artifacts"
-    if status == STATUS_ACTIVE_REFACTOR_REPORT:
-        return "keep_latest_refactor_reports"
+    if status == STATUS_ACTIVE_ARCHITECTURE_REPORT:
+        return "keep_latest_architecture_reports"
     if status == STATUS_MANUAL_REVIEW:
         return "manual_review"
     if status in {STATUS_ACTIVE_PROVIDER_PREFLIGHT, STATUS_ACTIVE_PROVIDER_REHEARSAL}:
@@ -414,7 +414,7 @@ def _key_artifacts_for_status(namespace: str, status: str) -> tuple[str, ...]:
         return ()
     if status == STATUS_STALE_DEPRECATED:
         return (event_alpha_namespace_status.NAMESPACE_STATUS_FILENAME,)
-    if status == STATUS_ACTIVE_REFACTOR_REPORT:
+    if status == STATUS_ACTIVE_ARCHITECTURE_REPORT:
         return ()
     if status == STATUS_MANUAL_REVIEW:
         return ()

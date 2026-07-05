@@ -76,11 +76,10 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
   compatibility decision. Temporary glue, re-export-only modules, and old-path
   comments belong in tombstone reports, not in production packages.
 - Migration-era implementation filenames are not part of the final
-  architecture. Run `make refactor-transitional-file-check`,
-  `make refactor-legacy-terminology-check`, `make refactor-size-gates`, and
-  `make refactor-final-report` after moving code. The older
-  `make refactor-legacy-file-check` target remains a backwards-compatible alias
-  for the transitional-file check only.
+  architecture. Run `make architecture-transitional-file-check`,
+  `make architecture-naming-check`, `make architecture-size-gates`, and
+  `make architecture-final-report` after moving code. Older `make refactor-*`
+  targets are deprecated compatibility aliases only.
 - Remaining `legacy` wording is allowed only for historical artifact row
   semantics, generated compatibility report fields, old CLI aliases, tombstone
   records, or historical decision/log entries. New user-facing flags should use
@@ -115,8 +114,8 @@ These rules are the anti-sprawl contract for future Codex/Claude passes:
   `backtest.py` facades import-compatible. New implementation should land under
   `storage_parts/` or `backtest_parts/` unless a later behavior-freeze pass
   explicitly changes those contracts.
-- Progressive size gates are static-only: `make refactor-size-gates` warns for
-  violations already in `research/REFACTOR_SIZE_BASELINE.json` and blocks newly
+- Progressive size gates are static-only: `make architecture-size-gates` warns for
+  violations already in `research/ARCHITECTURE_SIZE_BASELINE.json` and blocks newly
   introduced file/function/class/module ownership violations.
 
 ## Safety Invariants

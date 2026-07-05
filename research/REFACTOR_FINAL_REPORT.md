@@ -1,8 +1,8 @@
-# Refactor Final Report
+# Architecture Final Report
 
-Research-only refactor gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
+Research-only architecture gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-05T10:04:58+00:00`
+- generated_at: `2026-07-05T11:39:45+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `124`
@@ -10,9 +10,9 @@ Research-only refactor gate report. This report does not call providers, send Te
 - retained_public_shims_count: `0`
 - shim_dependency_report_cache_status: `miss`
 - shim_dependency_include_runtime_artifacts: `False`
-- shim_dependency_scan_duration_seconds: `1.272`
+- shim_dependency_scan_duration_seconds: `1.2502`
 - shim_dependency_skipped_artifact_files: `1285`
-- shim_dependency_skipped_large_files: `1`
+- shim_dependency_skipped_large_files: `2`
 - v3_gate_status: `accepted_with_documented_exceptions`
 - v3_auto_accept_ready: `False`
 
@@ -26,9 +26,9 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 | file | baseline lines | current lines | reduced by | reduction | target | status |
 |---|---:|---:|---:|---:|---:|---|
-| `crypto_rsi_scanner/scanner.py` | 13373 | 90 | 13283 | 99.33% | <2000 | `pass` |
-| `tests/test_indicators.py` | 42498 | 1779 | 40719 | 95.81% | <2000 | `pass` |
-| `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py` | None | 36 | None | None% | <300 | `pass` |
+| `crypto_rsi_scanner/scanner.py` | 90 | 90 | 0 | 0.0% | <2000 | `pass` |
+| `tests/test_indicators.py` | 1779 | 1779 | 0 | 0.0% | <2000 | `pass` |
+| `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py` | 36 | 36 | 0 | 0.0% | <300 | `pass` |
 
 ## Organization Counts
 
@@ -51,7 +51,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 - scanner_command_body_functions_remaining: `0`
 - remaining_implementation_modules_by_package_target: `{}`
 - intentionally_outside_event_alpha_modules: `["crypto_rsi_scanner.event_fade"]`
-- class_ownership_report: `research/REFACTOR_CLASS_OWNERSHIP_REPORT.json`
+- class_ownership_report: `research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.json`
 - class_ownership_classes_over_limit: `3`
 - class_ownership_functions_over_limit: `0`
 - accepted_class_exceptions_count: `3`
@@ -83,14 +83,14 @@ Research-only refactor gate report. This report does not call providers, send Te
 - public_compatibility_entrypoints_path: `research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json`
 - legacy_files_over_1500_lines: `0`
 - legacy_files_over_3000_lines: `0`
-- legacy_total_lines: `399`
+- legacy_total_lines: `0`
 - legacy_classes_over_limit: `0`
 - legacy_functions_over_limit: `0`
 - legacy_modules_with_multiple_public_classes: `0`
 
-## Refactor V3 Finalization Gates
+## Architecture V3 Finalization Gates
 
-- v3_contract_path: `research/REFACTOR_V3_CONTRACT.md`
+- v3_contract_path: `research/ARCHITECTURE_CONTRACT.md`
 - v3_gate_status: `accepted_with_documented_exceptions`
 - v3_auto_accept_ready: `False`
 - v3_blockers: `[]`
@@ -149,8 +149,8 @@ Research-only refactor gate report. This report does not call providers, send Te
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 |
-| `crypto_rsi_scanner/refactor_final_report.py` | 1488 |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1426 |
+| `crypto_rsi_scanner/project_health/architecture_report.py` | 1485 |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1431 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 |
@@ -194,8 +194,8 @@ Research-only refactor gate report. This report does not call providers, send Te
 | path | lines | reason | revisit |
 |---|---:|---|---|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 | Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged. | When identity/source/market/derivatives merge golden fixtures can be compared before and after split. |
-| `crypto_rsi_scanner/refactor_final_report.py` | 1488 | Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together. | When final-report sections can be split with byte-stable JSON/Markdown fixture comparisons. |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1426 | Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral. | When deleted-shim reporting can be split from old-import linting without changing gate output. |
+| `crypto_rsi_scanner/project_health/architecture_report.py` | 1485 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1431 | Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral. | When deleted-shim reporting can be split from old-import linting without changing gate output. |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 | Dense operator audit renderer with many cross-section helper dependencies. | When audit sections are split with golden Markdown fixture comparison. |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | Verdict scoring and live-confirmation policy share many ordered caps and guardrails. | When verdict snapshots cover each opportunity level and cap reason. |
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 | Legacy CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to canonical non-legacy service modules. |
@@ -225,7 +225,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 | `tests/event_alpha/test_source_coverage.py` | 2991 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
 | `tests/test_indicators.py` | 1779 |
-| `tests/cli/test_make_targets.py` | 1314 |
+| `tests/cli/test_make_targets.py` | 1323 |
 | `tests/event_alpha/_api_helpers.py` | 825 |
 | `tests/event_alpha/test_artifact_schema.py` | 743 |
 | `tests/rsi/test_indicators_core.py` | 694 |
@@ -285,8 +285,8 @@ Research-only refactor gate report. This report does not call providers, send Te
 | path | lines | status | revisit condition |
 |---|---:|---|---|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/refactor_final_report.py` | 1488 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1426 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/project_health/architecture_report.py` | 1485 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1431 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
@@ -297,7 +297,6 @@ Research-only refactor gate report. This report does not call providers, send Te
 
 | path | lines |
 |---|---:|
-| `crypto_rsi_scanner/refactor_legacy_terminology_check.py` | 399 |
 
 ## Doctor Plugin Migration
 
@@ -316,7 +315,7 @@ Research-only refactor gate report. This report does not call providers, send Te
 ## Namespace And CI
 
 - unknown_namespace_count: `0`
-- namespace_status_counts: `{"active_fixture_smoke": 18, "active_integrated_smoke": 1, "active_live_rehearsal": 9, "active_provider_preflight": 5, "active_provider_rehearsal": 5, "active_refactor_report": 1, "manual_review": 5, "quarantine": 1, "stale_deprecated": 1}`
+- namespace_status_counts: `{"active_architecture_report": 1, "active_fixture_smoke": 18, "active_integrated_smoke": 1, "active_live_rehearsal": 9, "active_provider_preflight": 5, "active_provider_rehearsal": 5, "manual_review": 5, "quarantine": 1, "stale_deprecated": 1}`
 - ci_static_safety: `pass`
 - test_runtime_report_path: `research/test_runtime_report.json`
 

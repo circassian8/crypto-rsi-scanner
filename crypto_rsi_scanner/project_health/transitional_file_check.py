@@ -1,4 +1,4 @@
-"""Final refactor v3 transitional-file gate.
+"""Architecture transitional-file gate.
 
 This module performs static filesystem checks only. It does not import scanner,
 providers, notification code, storage, or Event Alpha runtime modules.
@@ -13,9 +13,11 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-REPORT_SCHEMA_VERSION = "final_refactor_transitional_file_report_v1"
-REPORT_JSON = "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.json"
-REPORT_MD = "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.md"
+REPORT_SCHEMA_VERSION = "architecture_transitional_file_report_v1"
+REPORT_JSON = "ARCHITECTURE_TRANSITIONAL_FILE_REPORT.json"
+REPORT_MD = "ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md"
+LEGACY_REPORT_JSON = "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.json"
+LEGACY_REPORT_MD = "FINAL_REFACTOR_TRANSITIONAL_FILE_REPORT.md"
 LEGACY_ALIAS_SCHEMA_VERSION = "final_refactor_legacy_retirement_report_v1"
 LEGACY_ALIAS_JSON = "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.json"
 LEGACY_ALIAS_MD = "FINAL_REFACTOR_LEGACY_RETIREMENT_REPORT.md"
@@ -38,7 +40,7 @@ SKIP_DIR_NAMES = {
 
 
 def build_report(*, root: str | Path | None = None, generated_at: datetime | None = None) -> dict[str, Any]:
-    repo_root = Path(root).expanduser() if root is not None else Path(__file__).resolve().parents[1]
+    repo_root = Path(root).expanduser() if root is not None else Path(__file__).resolve().parents[2]
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
     transitional_named_files = _transitional_named_files(repo_root)
     transitional_named_dirs = _transitional_named_dirs(repo_root)
@@ -56,7 +58,8 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
         "legacy_alias_schema_version": LEGACY_ALIAS_SCHEMA_VERSION,
-        "row_type": "final_refactor_transitional_file_report",
+        "row_type": "architecture_transitional_file_report",
+        "historical_row_type_alias": "final_refactor_transitional_file_report",
         "generated_at": generated,
         "research_only": True,
         "no_send_rehearsal": True,
@@ -120,7 +123,7 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
 
 
 def write_report(*, root: str | Path | None = None, out_dir: str | Path | None = None) -> tuple[Path, Path, dict[str, Any]]:
-    repo_root = Path(root).expanduser() if root is not None else Path(__file__).resolve().parents[1]
+    repo_root = Path(root).expanduser() if root is not None else Path(__file__).resolve().parents[2]
     target = Path(out_dir).expanduser() if out_dir is not None else repo_root / "research"
     target.mkdir(parents=True, exist_ok=True)
     report = build_report(root=repo_root)
@@ -130,6 +133,8 @@ def write_report(*, root: str | Path | None = None, out_dir: str | Path | None =
     markdown = format_report(report)
     json_path.write_text(payload, encoding="utf-8")
     md_path.write_text(markdown, encoding="utf-8")
+    (target / LEGACY_REPORT_JSON).write_text(payload, encoding="utf-8")
+    (target / LEGACY_REPORT_MD).write_text(markdown, encoding="utf-8")
     # Compatibility aliases for existing dashboards and historical automation.
     (target / LEGACY_ALIAS_JSON).write_text(payload, encoding="utf-8")
     (target / LEGACY_ALIAS_MD).write_text(markdown, encoding="utf-8")

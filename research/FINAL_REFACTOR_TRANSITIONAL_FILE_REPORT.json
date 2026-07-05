@@ -10,7 +10,8 @@
   "deleted_shims_count": 124,
   "event_alpha_public_compatibility_entrypoints_path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
   "event_fade_safety_exception_present": true,
-  "generated_at": "2026-07-05T09:57:34.361899+00:00",
+  "generated_at": "2026-07-05T11:39:45.242072+00:00",
+  "historical_row_type_alias": "final_refactor_transitional_file_report",
   "legacy_alias_schema_version": "final_refactor_legacy_retirement_report_v1",
   "legacy_named_dirs": [],
   "legacy_named_dirs_count": 0,
@@ -33,7 +34,7 @@
   "retained_public_entrypoints": 0,
   "retained_public_shims": [],
   "retained_public_shims_count": 0,
-  "row_type": "final_refactor_transitional_file_report",
+  "row_type": "architecture_transitional_file_report",
   "safety_invariants": {
     "no_event_alpha_rsi_writes": true,
     "no_event_alpha_triggered_fade": true,
@@ -46,7 +47,7 @@
     "research_only": true
   },
   "scanner_entrypoint_exception_present": true,
-  "schema_version": "final_refactor_transitional_file_report_v1",
+  "schema_version": "architecture_transitional_file_report_v1",
   "status": "OK",
   "strict_alerts_created": 0,
   "telegram_sends": 0,

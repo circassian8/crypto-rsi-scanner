@@ -323,6 +323,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `paper.py` | paper-trade scoreboard (virtual P&L) |
 | `backtest.py` | offline research; **reuses the pure functions** so it matches live logic |
 | `tests/test_indicators.py` | every test (pure, no network) |
+| `project_health/` | permanent static architecture/project-health checks, including baseline, size gates, class ownership, naming cleanup, completion, and final architecture reports |
 
 ### Event Alpha v1 package boundaries
 

@@ -59,6 +59,11 @@ _DOC_COMPATIBILITY_FILES = {
     "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
     "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.md",
     "research/EVENT_ALPHA_RUNBOOK.md",
+    "ARCHITECTURE_FINAL_REPORT.md",
+    "research/ARCHITECTURE_FINAL_REPORT.md",
+    "research/ARCHITECTURE_RELEASE_REPORT.md",
+    "research/ARCHITECTURE_COMPLETION_MAP.md",
+    "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md",
     "crypto_rsi_scanner/event_alpha/MODULE_MAP.md",
 }
 
@@ -860,7 +865,7 @@ def format_shim_dependency_report(report: dict[str, object]) -> str:
         "- `scanner.py` may remain a compatibility CLI entrypoint.",
         "- `event_fade.py` remains intentionally outside Event Alpha; Event Alpha may write `FADE_SHORT_REVIEW` research but must not create `TRIGGERED_FADE`.",
         "",
-        "## Refactor V3 Shim Gates",
+        "## Architecture V3 Shim Gates",
         "",
         "| gate | value |",
         "|---|---:|",

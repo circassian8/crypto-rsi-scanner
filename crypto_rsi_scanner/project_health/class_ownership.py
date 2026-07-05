@@ -1,4 +1,4 @@
-"""Class/function ownership inventory for refactor gates.
+"""Class/function ownership inventory for architecture gates.
 
 This module performs static source analysis only. It does not import provider,
 notification, scanner, or Event Alpha runtime modules.
@@ -16,13 +16,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-from . import refactor_api_inventory
-from . import refactor_v3_contract
+from . import api_inventory
+from . import architecture_contract
 
 
-REPORT_SCHEMA_VERSION = "refactor_class_ownership_report_v1"
-REPORT_JSON = "REFACTOR_CLASS_OWNERSHIP_REPORT.json"
-REPORT_MD = "REFACTOR_CLASS_OWNERSHIP_REPORT.md"
+REPORT_SCHEMA_VERSION = "architecture_class_ownership_report_v1"
+REPORT_JSON = "ARCHITECTURE_CLASS_OWNERSHIP_REPORT.json"
+REPORT_MD = "ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md"
+LEGACY_REPORT_JSON = "REFACTOR_CLASS_OWNERSHIP_REPORT.json"
+LEGACY_REPORT_MD = "REFACTOR_CLASS_OWNERSHIP_REPORT.md"
 DEFAULT_CLASS_LINE_LIMIT = 75
 DEFAULT_FUNCTION_LINE_LIMIT = 150
 
@@ -117,7 +119,7 @@ ACCEPTED_MODEL_BUNDLE_MODULES = {
     "crypto_rsi_scanner.llm_providers.base",
     "crypto_rsi_scanner.llm_providers.fixture",
     "crypto_rsi_scanner.ops",
-    "crypto_rsi_scanner.refactor_class_ownership_report",
+    "crypto_rsi_scanner.project_health.class_ownership",
     "crypto_rsi_scanner.signal_registry",
 }
 
@@ -281,7 +283,7 @@ class FunctionOwnershipRow:
 
 
 def repo_root_from_module() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return Path(__file__).resolve().parents[2]
 
 
 def _class_exception_key(row: ClassOwnershipRow | Mapping[str, Any]) -> str:
@@ -350,12 +352,12 @@ def build_report(
         }
         for module, reason in sorted(MODULE_EXCEPTIONS.items())
     ]
-    legacy_inventory = refactor_api_inventory.build_api_inventory(
+    legacy_inventory = api_inventory.build_api_inventory(
         root=repo_root,
         class_line_limit=class_line_limit,
         function_line_limit=function_line_limit,
     )
-    v3_gate_snapshot = refactor_v3_contract.build_v3_gate_snapshot(
+    v3_gate_snapshot = architecture_contract.build_v3_gate_snapshot(
         root=repo_root,
         shim_dependency_report=_shim_dependency_report_snapshot(repo_root),
         class_ownership_report={
@@ -368,7 +370,8 @@ def build_report(
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
-        "row_type": "refactor_class_ownership_report",
+        "row_type": "architecture_class_ownership_report",
+        "historical_row_type_alias": "refactor_class_ownership_report",
         "generated_at": generated,
         "research_only": True,
         "no_live_provider_calls": True,
@@ -606,14 +609,18 @@ def write_report(
     report = build_report(root=repo_root, generated_at=generated_at)
     json_path = target / REPORT_JSON
     md_path = target / REPORT_MD
-    json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    md_path.write_text(format_report(report), encoding="utf-8")
+    payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    markdown = format_report(report)
+    json_path.write_text(payload, encoding="utf-8")
+    md_path.write_text(markdown, encoding="utf-8")
+    (target / LEGACY_REPORT_JSON).write_text(payload, encoding="utf-8")
+    (target / LEGACY_REPORT_MD).write_text(markdown, encoding="utf-8")
     return json_path, md_path, report
 
 
 def format_report(report: dict[str, Any]) -> str:
     lines = [
-        "# Refactor Class Ownership Report",
+        "# Architecture Class Ownership Report",
         "",
         "Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.",
         "",
@@ -810,7 +817,7 @@ def _append_v3_class_gate_section(lines: list[str], report: dict[str, Any]) -> N
     v3_snapshot = report.get("v3_gate_snapshot") if isinstance(report.get("v3_gate_snapshot"), dict) else {}
     v3_values = v3_snapshot.get("gate_values") if isinstance(v3_snapshot.get("gate_values"), dict) else {}
     v3_severity = v3_snapshot.get("gate_severity") if isinstance(v3_snapshot.get("gate_severity"), dict) else {}
-    for name in refactor_v3_contract.V3_GATE_NAMES:
+    for name in architecture_contract.V3_GATE_NAMES:
         lines.append(f"| `{name}` | {v3_values.get(name, 0)} | {v3_severity.get(name, '')} |")
     lines.append("")
 

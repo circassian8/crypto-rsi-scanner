@@ -2,7 +2,7 @@
 
 Research artifact only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: 2026-07-05T09:57:37.449834+00:00
+- generated_at: 2026-07-05T11:40:09.563229+00:00
 - status: OK
 - registry_entry_count: 0
 - internal_import_reference_count: 0
@@ -21,13 +21,13 @@ Research artifact only. This report does not call providers, send Telegram messa
 - v3_auto_accept_ready: True
 - include_runtime_artifacts: False
 - cache_status: miss
-- scan_duration_seconds: 1.2267
-- scanned_source_files: 606
-- scanned_doc_files: 35
+- scan_duration_seconds: 1.2425
+- scanned_source_files: 607
+- scanned_doc_files: 48
 - scanned_test_files: 29
 - skipped_artifact_files: 1285
-- skipped_large_files: 1
-- skipped_dirs: 62
+- skipped_large_files: 2
+- skipped_dirs: 63
 
 ## Policy
 
@@ -36,7 +36,7 @@ Research artifact only. This report does not call providers, send Telegram messa
 - `scanner.py` may remain a compatibility CLI entrypoint.
 - `event_fade.py` remains intentionally outside Event Alpha; Event Alpha may write `FADE_SHORT_REVIEW` research but must not create `TRIGGERED_FADE`.
 
-## Refactor V3 Shim Gates
+## Architecture V3 Shim Gates
 
 | gate | value |
 |---|---:|

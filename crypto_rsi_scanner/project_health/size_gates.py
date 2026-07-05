@@ -1,4 +1,4 @@
-"""Progressive static size gates for refactor work.
+"""Progressive static size gates for architecture health.
 
 This module only reads source files and ASTs. It does not import scanner,
 provider, notification, storage, or backtest runtime modules.
@@ -13,25 +13,28 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from . import refactor_class_ownership_report as ownership
-from . import refactor_api_inventory
-from . import refactor_v3_contract
+from . import class_ownership as ownership
+from . import api_inventory
+from . import architecture_contract
 
 
-BASELINE_SCHEMA_VERSION = "refactor_size_baseline_v1"
-REPORT_SCHEMA_VERSION = "refactor_size_gate_report_v1"
-BASELINE_JSON = "REFACTOR_SIZE_BASELINE.json"
-REPORT_JSON = "REFACTOR_SIZE_GATES.json"
-REPORT_MD = "REFACTOR_SIZE_GATES.md"
+BASELINE_SCHEMA_VERSION = "architecture_size_baseline_v1"
+REPORT_SCHEMA_VERSION = "architecture_size_gate_report_v1"
+BASELINE_JSON = "ARCHITECTURE_SIZE_BASELINE.json"
+REPORT_JSON = "ARCHITECTURE_SIZE_GATES.json"
+REPORT_MD = "ARCHITECTURE_SIZE_GATES.md"
+LEGACY_BASELINE_JSON = "REFACTOR_SIZE_BASELINE.json"
+LEGACY_REPORT_JSON = "REFACTOR_SIZE_GATES.json"
+LEGACY_REPORT_MD = "REFACTOR_SIZE_GATES.md"
 DEFAULT_FILE_LINE_LIMIT = 1500
-PRODUCTION_WARNING_LINE_LIMIT = refactor_v3_contract.PRODUCTION_TARGET_LINE_LIMIT
-PRODUCTION_BLOCKER_LINE_LIMIT = refactor_v3_contract.PRODUCTION_BLOCKER_LINE_LIMIT
+PRODUCTION_WARNING_LINE_LIMIT = architecture_contract.PRODUCTION_TARGET_LINE_LIMIT
+PRODUCTION_BLOCKER_LINE_LIMIT = architecture_contract.PRODUCTION_BLOCKER_LINE_LIMIT
 PRODUCTION_LEGACY_BLOCKER_LINE_LIMIT = 2000
 PRODUCTION_HARD_BLOCKER_LINE_LIMIT = 3000
 TEST_WARNING_LINE_LIMIT = 1500
 DEFAULT_CLASS_LINE_LIMIT = ownership.DEFAULT_CLASS_LINE_LIMIT
 DEFAULT_FUNCTION_LINE_LIMIT = ownership.DEFAULT_FUNCTION_LINE_LIMIT
-ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES = refactor_v3_contract.ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES
+ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES = architecture_contract.ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES
 MOVED_VIOLATION_ALIASES = {
     "file:crypto_rsi_scanner/cli/services/scanner_api.py": "file:crypto_rsi_scanner/scanner.py",
     "class:crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/result_models.py:EventAlphaArtifactDoctorResult": "class:crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py:EventAlphaArtifactDoctorResult",
@@ -80,7 +83,7 @@ MOVED_VIOLATION_ALIASES = {
     "function:crypto_rsi_scanner/event_alpha/outcomes/quality/case_eval.py:evaluate_signal_quality_case": "function:crypto_rsi_scanner/event_alpha/outcomes/quality.py:evaluate_signal_quality_case",
     "function:crypto_rsi_scanner/event_alpha/radar/source_coverage/builder.py:build_source_coverage_report": "function:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:build_source_coverage_report",
     "function:crypto_rsi_scanner/event_alpha/radar/source_coverage/provider_status.py:format_source_coverage_report": "function:crypto_rsi_scanner/event_alpha/radar/source_coverage.py:format_source_coverage_report",
-    "function:crypto_rsi_scanner/refactor_final_report.py:format_refactor_final_markdown": "function:crypto_rsi_scanner/refactor_final_report.py:format_refactor_final_markdown",
+    "function:crypto_rsi_scanner/architecture_report.py:format_refactor_final_markdown": "function:crypto_rsi_scanner/architecture_report.py:format_refactor_final_markdown",
     "public_classes:crypto_rsi_scanner.event_alpha.artifacts.research_cards.components.models": "public_classes:crypto_rsi_scanner.event_alpha.artifacts.research_cards.api",
     "public_classes:crypto_rsi_scanner.event_alpha.notifications.pipeline_parts.delivery_models": "public_classes:crypto_rsi_scanner.event_alpha.notifications.pipeline_core",
     "public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store.models": "public_classes:crypto_rsi_scanner.event_alpha.artifacts.alert_store",
@@ -100,7 +103,7 @@ MOVED_VIOLATION_ALIASES = {
 
 
 def repo_root_from_module() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return Path(__file__).resolve().parents[2]
 
 
 def build_inventory(
@@ -116,7 +119,7 @@ def build_inventory(
         class_line_limit=class_line_limit,
         function_line_limit=function_line_limit,
     )
-    legacy_inventory = refactor_api_inventory.build_api_inventory(
+    legacy_inventory = api_inventory.build_api_inventory(
         root=repo_root,
         class_line_limit=class_line_limit,
         function_line_limit=function_line_limit,
@@ -126,7 +129,7 @@ def build_inventory(
     production_file_rows = [row for row in file_rows if row.get("source_kind") == "production"]
     test_file_rows = [row for row in file_rows if row.get("source_kind") == "test"]
     production_files_over_1200 = [
-        row for row in production_file_rows if row["line_count"] > refactor_v3_contract.PRODUCTION_TARGET_LINE_LIMIT
+        row for row in production_file_rows if row["line_count"] > architecture_contract.PRODUCTION_TARGET_LINE_LIMIT
     ]
     accepted_production_files_over_1200 = [
         _accepted_over_1200_row(row)
@@ -301,25 +304,28 @@ def _accepted_over_1200_row(row: Mapping[str, Any]) -> dict[str, Any]:
 def build_baseline(*, root: str | Path | None = None) -> dict[str, Any]:
     inventory = build_inventory(root=root)
     return {
+        **inventory,
         "schema_version": BASELINE_SCHEMA_VERSION,
-        "row_type": "refactor_size_baseline",
+        "row_type": "architecture_size_baseline",
+        "historical_row_type_alias": "refactor_size_baseline",
         "generated_at": _generated_at(),
         "research_only": True,
         "no_live_provider_calls": True,
         "no_sends_trades_paper_rsi_or_triggered_fade": True,
-        **inventory,
     }
 
 
 def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
     repo_root = Path(root).expanduser() if root is not None else repo_root_from_module()
     inventory = build_inventory(root=repo_root)
-    v3_gate_snapshot = refactor_v3_contract.build_v3_gate_snapshot(
+    v3_gate_snapshot = architecture_contract.build_v3_gate_snapshot(
         root=repo_root,
         size_gate_report=inventory,
         class_ownership_report=inventory,
     )
     baseline_path = repo_root / "research" / BASELINE_JSON
+    if not baseline_path.exists():
+        baseline_path = repo_root / "research" / LEGACY_BASELINE_JSON
     baseline = _read_json(baseline_path)
     baseline_ids = set(baseline.get("violation_ids", [])) if isinstance(baseline, dict) else set()
     current_ids = set(inventory["violation_ids"])
@@ -342,8 +348,10 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
     ]
     gate_status = "pass" if not new_rows else "blocked"
     return {
+        **inventory,
         "schema_version": REPORT_SCHEMA_VERSION,
-        "row_type": "refactor_size_gate_report",
+        "row_type": "architecture_size_gate_report",
+        "historical_row_type_alias": "refactor_size_gate_report",
         "generated_at": _generated_at(),
         "research_only": True,
         "no_live_provider_calls": True,
@@ -362,7 +370,7 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
             "production_file_over_2000_lines": "legacy blocker threshold retained for continuity",
             "production_file_over_3000_lines": "blocker",
             "test_file_size_debt": "tracked separately from production completion",
-            "baseline_update": "explicit make refactor-size-baseline-update only",
+            "baseline_update": "explicit make architecture-size-baseline-update only",
         },
         "new_violation_count": len(new_rows),
         "v3_gate_status": v3_gate_snapshot["status"],
@@ -380,7 +388,6 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
         "new_violations": new_rows,
         "resolved_violation_ids": resolved_ids,
         "existing_violations": existing_rows,
-        **inventory,
     }
 
 
@@ -389,8 +396,10 @@ def write_baseline(*, root: str | Path | None = None, out_dir: str | Path | None
     target = Path(out_dir).expanduser() if out_dir is not None else repo_root / "research"
     target.mkdir(parents=True, exist_ok=True)
     payload = build_baseline(root=repo_root)
+    data = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     path = target / BASELINE_JSON
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(data, encoding="utf-8")
+    (target / LEGACY_BASELINE_JSON).write_text(data, encoding="utf-8")
     return path, payload
 
 
@@ -405,14 +414,18 @@ def write_gate_report(
     payload = build_gate_report(root=repo_root)
     json_path = target / REPORT_JSON
     md_path = target / REPORT_MD
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    md_path.write_text(format_gate_report(payload), encoding="utf-8")
+    data = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    markdown = format_gate_report(payload)
+    json_path.write_text(data, encoding="utf-8")
+    md_path.write_text(markdown, encoding="utf-8")
+    (target / LEGACY_REPORT_JSON).write_text(data, encoding="utf-8")
+    (target / LEGACY_REPORT_MD).write_text(markdown, encoding="utf-8")
     return json_path, md_path, payload
 
 
 def format_gate_report(report: dict[str, Any]) -> str:
     lines = [
-        "# Refactor Size Gates",
+        "# Architecture Size Gates",
         "",
         "Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.",
         "",
@@ -455,19 +468,19 @@ def format_gate_report(report: dict[str, Any]) -> str:
         "",
         "## Policy",
         "",
-        "- Existing violations from `research/REFACTOR_SIZE_BASELINE.json` are warnings.",
+        "- Existing violations from `research/ARCHITECTURE_SIZE_BASELINE.json` are warnings.",
         "- New file/function/class/module ownership violations are blockers.",
         "- Refactor v3 targets production files below 1,200 lines.",
         "- Production files over 1,200 lines are warnings and must either be split or documented.",
         "- Refactor v3 treats production files over 1,500 lines as blockers unless explicitly accepted.",
-        "- Production files over 1,500 lines block refactor-complete status unless explicitly accepted.",
+        "- Production files over 1,500 lines block architecture-complete status unless explicitly accepted.",
         "- Production files over 2,000 lines remain a legacy continuity threshold.",
         "- Production files over 3,000 lines are blockers.",
         "- Test file size debt is tracked separately and does not block production refactor completion.",
         "- Transitional implementation files over 1,500 lines are warnings.",
-        "- Transitional implementation files over 3,000 lines block refactor-complete status.",
+        "- Transitional implementation files over 3,000 lines block architecture-complete status.",
         "- New production modules with multiple public classes are blockers unless registered as accepted model bundles.",
-        "- Baseline updates require the explicit `make refactor-size-baseline-update` target.",
+        "- Baseline updates require the explicit `make architecture-size-baseline-update` target.",
         "",
         "## New Violations",
         "",
@@ -486,7 +499,7 @@ def format_gate_report(report: dict[str, Any]) -> str:
     v3_snapshot = report.get("v3_gate_snapshot") if isinstance(report.get("v3_gate_snapshot"), dict) else {}
     v3_values = v3_snapshot.get("gate_values") if isinstance(v3_snapshot.get("gate_values"), dict) else {}
     v3_severity = v3_snapshot.get("gate_severity") if isinstance(v3_snapshot.get("gate_severity"), dict) else {}
-    for name in refactor_v3_contract.V3_GATE_NAMES:
+    for name in architecture_contract.V3_GATE_NAMES:
         lines.append(f"| `{name}` | {v3_values.get(name, 0)} | {v3_severity.get(name, '')} |")
     lines.extend([
         "",

@@ -1,7 +1,7 @@
-"""Static refactor-baseline inventory.
+"""Static architecture-baseline inventory.
 
 This module intentionally avoids importing scanner/provider/runtime modules. It
-only reads repository files and writes baseline artifacts for refactor planning.
+only reads repository files and writes baseline artifacts for architecture planning.
 """
 
 from __future__ import annotations
@@ -14,7 +14,11 @@ from pathlib import Path
 from typing import Any
 
 
-BASELINE_SCHEMA_VERSION = "refactor_baseline_v1"
+BASELINE_SCHEMA_VERSION = "architecture_baseline_v1"
+BASELINE_JSON = "ARCHITECTURE_BASELINE.json"
+BASELINE_MD = "ARCHITECTURE_BASELINE.md"
+LEGACY_BASELINE_JSON = "REFACTOR_BASELINE.json"
+LEGACY_BASELINE_MD = "REFACTOR_BASELINE.md"
 MAJOR_FILES = (
     "crypto_rsi_scanner/scanner.py",
     "tests/test_indicators.py",
@@ -27,7 +31,7 @@ BEHAVIOR_FREEZE_CONTRACT = (
     "Artifact schema changes must be additive unless a migration is explicit.",
     "Doctor strict/WARN semantics must remain compatible.",
 )
-REFACTOR_SUCCESS_GATES = (
+ARCHITECTURE_SUCCESS_GATES = (
     {
         "gate": "scanner.py reduced below 2000 lines by final phase",
         "metric": "line_count",
@@ -80,7 +84,7 @@ REFACTOR_SUCCESS_GATES = (
 
 
 def repo_root_from_module() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return Path(__file__).resolve().parents[2]
 
 
 def _relative(path: Path, root: Path) -> str:
@@ -265,7 +269,7 @@ def _workflow_safety(root: Path, workflows: list[str]) -> dict[str, Any]:
 
 def _success_gate_status(root: Path, line_counts: dict[str, int | None], workflow_safety: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for gate in REFACTOR_SUCCESS_GATES:
+    for gate in ARCHITECTURE_SUCCESS_GATES:
         row = dict(gate)
         path = str(row.get("path", ""))
         if row["metric"] == "line_count":
@@ -284,7 +288,7 @@ def _success_gate_status(root: Path, line_counts: dict[str, int | None], workflo
     return rows
 
 
-def build_refactor_baseline(root: Path | None = None) -> dict[str, Any]:
+def build_baseline(root: Path | None = None) -> dict[str, Any]:
     root = (root or repo_root_from_module()).resolve()
     line_counts = {
         rel: _line_count(root / rel)
@@ -296,7 +300,7 @@ def build_refactor_baseline(root: Path | None = None) -> dict[str, Any]:
     return {
         "schema_version": BASELINE_SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "generator": "crypto_rsi_scanner.refactor_baseline",
+        "generator": "crypto_rsi_scanner.project_health.baseline",
         "static_inventory_only": True,
         "behavior_changing_code_invoked": False,
         "live_provider_calls_allowed": False,
@@ -323,6 +327,7 @@ def build_refactor_baseline(root: Path | None = None) -> dict[str, Any]:
             "schema_changes": "additive_only_unless_explicit_migration",
         },
         "behavior_freeze_contract": list(BEHAVIOR_FREEZE_CONTRACT),
+        "architecture_success_gates": _success_gate_status(root, line_counts, workflow_safety),
         "refactor_success_gates": _success_gate_status(root, line_counts, workflow_safety),
     }
 
@@ -332,9 +337,9 @@ def format_baseline_markdown(data: dict[str, Any]) -> str:
     namespace_inventory = data["namespace_inventory"]
     status_counts = namespace_inventory["status_counts"]
     lines = [
-        "# Refactor Baseline",
+        "# Architecture Baseline",
         "",
-        "Static inventory and behavior-freeze contract for the Event Alpha/refactor baseline.",
+        "Static inventory and behavior-freeze contract for the Event Alpha architecture baseline.",
         "",
         "This pass records current behavior and architecture before significant code movement. The generator reads repository files only; it does not invoke scanner/provider/runtime behavior.",
         "",
@@ -416,12 +421,12 @@ def format_baseline_markdown(data: dict[str, Any]) -> str:
         f"- Doctor check registry module: `{data['artifact_contract']['doctor_check_registry_module']}`",
         f"- Schema changes: `{data['artifact_contract']['schema_changes']}`",
         "",
-        "## Refactor Success Gates",
+        "## Architecture Success Gates",
         "",
         "| gate | target | current | status |",
         "|---|---|---:|---|",
     ])
-    for row in data["refactor_success_gates"]:
+    for row in data["architecture_success_gates"]:
         current = row["current_value"]
         if isinstance(current, bool):
             current_text = str(current).lower()
@@ -439,26 +444,36 @@ def format_baseline_markdown(data: dict[str, Any]) -> str:
         "",
         "## Machine-Readable Artifact",
         "",
-        "- `research/REFACTOR_BASELINE.json` is the machine-readable companion for this report.",
+        f"- `research/{BASELINE_JSON}` is the machine-readable companion for this report.",
         "",
     ])
     return "\n".join(lines)
 
 
-def write_refactor_baseline(root: Path | None = None, out_dir: Path | None = None) -> dict[str, Path]:
+def write_baseline(root: Path | None = None, out_dir: Path | None = None) -> dict[str, Path]:
     root = (root or repo_root_from_module()).resolve()
-    data = build_refactor_baseline(root)
+    data = build_baseline(root)
     output_dir = out_dir or (root / "research")
     output_dir.mkdir(parents=True, exist_ok=True)
-    json_path = output_dir / "REFACTOR_BASELINE.json"
-    md_path = output_dir / "REFACTOR_BASELINE.md"
-    json_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    md_path.write_text(format_baseline_markdown(data), encoding="utf-8")
+    payload = json.dumps(data, indent=2, sort_keys=True) + "\n"
+    markdown = format_baseline_markdown(data)
+    json_path = output_dir / BASELINE_JSON
+    md_path = output_dir / BASELINE_MD
+    json_path.write_text(payload, encoding="utf-8")
+    md_path.write_text(markdown, encoding="utf-8")
+    (output_dir / LEGACY_BASELINE_JSON).write_text(payload, encoding="utf-8")
+    (output_dir / LEGACY_BASELINE_MD).write_text(markdown, encoding="utf-8")
     return {"json": json_path, "markdown": md_path}
 
 
+build_refactor_baseline = build_baseline
+write_refactor_baseline = write_baseline
+build_architecture_baseline = build_baseline
+write_architecture_baseline = write_baseline
+
+
 def main() -> int:
-    paths = write_refactor_baseline()
+    paths = write_baseline()
     data = _load_json(paths["json"])
     print(f"Wrote {paths['markdown']}")
     print(f"Wrote {paths['json']}")

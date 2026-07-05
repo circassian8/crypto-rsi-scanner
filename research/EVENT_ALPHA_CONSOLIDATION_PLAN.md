@@ -34,6 +34,9 @@ move every Event Alpha module or rewrite `scanner.py` in one pass.
   registry, plugin checks, reports, and compatibility doctor orchestration.
 - `event_alpha/namespace`: namespace status and lifecycle reporting.
 - `cli/`: parser, dispatch, and command-group modules.
+- `project_health/`: permanent architecture and project-health tooling for
+  baseline inventories, size gates, class ownership, API inventory,
+  completion maps, transition/naming checks, and final architecture reports.
 
 ## Import And CLI Rules
 
@@ -52,6 +55,10 @@ move every Event Alpha module or rewrite `scanner.py` in one pass.
 - Parser construction belongs in `cli/parser.py`.
 - Dispatch belongs in `cli/dispatch.py`.
 - Command bodies move behind `cli/commands_*.py` one group at a time.
+- Architecture/project-health checks live under
+  `crypto_rsi_scanner/project_health/` and use canonical `make architecture-*`
+  targets. Deprecated `make refactor-*` targets are hidden compatibility aliases
+  only, not the current runbook surface.
 - `scanner.py`, `main.py`, Make targets, flags, and defaults stay compatible
   until an explicit migration says otherwise.
 
