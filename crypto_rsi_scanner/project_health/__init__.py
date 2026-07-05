@@ -14,6 +14,7 @@ __all__ = [
     "baseline",
     "class_ownership",
     "completion_map",
+    "radar_north_star",
     "release_report",
     "size_gates",
     "terminology_check",

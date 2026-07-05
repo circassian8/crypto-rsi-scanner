@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Define Event Alpha Radar North Star · Codex
+**Why:** The refactor is complete, so future Event Alpha work needs a measurable
+radar operating contract instead of more scaffolding. The contract should define
+lanes, burn-in expectations, source activation order, and human-labeling
+boundaries without changing runtime behavior.
+**Changes:**
+- Added `research/EVENT_ALPHA_RADAR_NORTH_STAR.md` and
+  `research/EVENT_ALPHA_RADAR_NORTH_STAR.json` with the radar architecture,
+  six opportunity lanes, 30-day no-send burn-in contract, source activation
+  order, and safety invariants.
+- Added `crypto_rsi_scanner/project_health/radar_north_star.py` and
+  `make event-alpha-radar-north-star` as a static artifact writer.
+- Extended `architecture-naming-check` / project-health naming output with
+  North Star presence warnings and an `auto_apply_thresholds=true` blocker.
+- Added tests for generation, lane coverage, burn-in minimums,
+  `auto_apply_thresholds=false`, project-health visibility, and the blocker
+  path.
+- Recorded the accepted North Star decision in `DECISIONS.md`, current roadmap
+  status in `ROADMAP.md`, and a short future-agent pointer in `AGENTS.md`.
+**Verify:** `python3 tests/test_indicators.py`; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py
+-q`; `python3 -m compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-radar-north-star PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** This is documentation/static project-health enforcement only.
+It does not activate providers, sends, trades, paper trades, normal RSI rows, or
+Event Alpha-created `TRIGGERED_FADE`.
+
 ## 2026-07-05 — Archive refactor history and hide legacy aliases · Codex
 **Why:** The architecture refactor is complete, but historical `REFACTOR_*`
 reports and visible legacy-named CLI/Make affordances still made the repo look

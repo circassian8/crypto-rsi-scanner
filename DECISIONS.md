@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-05 - Event Alpha Radar North Star governs post-refactor development
+**Status:** accepted
+**Decision:** Future Event Alpha development should align to
+`research/EVENT_ALPHA_RADAR_NORTH_STAR.md` and
+`research/EVENT_ALPHA_RADAR_NORTH_STAR.json`. The North Star defines the radar
+architecture, six opportunity lanes, bounded human-labeling role, 30-day
+no-send burn-in contract, and source activation order. Suggestions and priors
+remain recommendations-only with `auto_apply_thresholds=false`; any automatic
+threshold application would require a separate explicit decision.
+**Why:** The refactor is complete, so the next durable constraint is product
+focus: a measurable crypto market radar with burn-in evidence, not more
+scaffolding. The contract preserves research-only, no-trading, no-paper,
+no-execution, no-send-by-default, no-live-provider-by-default, and
+no-Event-Alpha-created `TRIGGERED_FADE` boundaries.
+**Revisit when:** the 30-day burn-in minimums are met and reviewed, a lane needs
+schema-changing semantics, or a future activation pass proposes auto-applied
+thresholds.
+
 ## 2026-07-05 - Architecture health tooling uses permanent project_health names
 **Status:** accepted
 **Decision:** Refactor-era static tooling is no longer a top-level implementation

@@ -57,6 +57,10 @@ Current architecture and project-health reports use `ARCHITECTURE_*` and
 `PROJECT_HEALTH_*` names. Historical refactor-period reports live only under
 `research/archive/refactor_history/` for auditability; do not add new current
 tooling, docs, or tests that depend on refactor-era report names.
+Event Alpha product work should now align with
+`research/EVENT_ALPHA_RADAR_NORTH_STAR.md` / `.json`: the measurable radar
+architecture, lane definitions, source activation order, and 30-day no-send
+burn-in contract.
 
 Before starting substantial work, read `ROADMAP.md` and `DECISIONS.md` after this
 file. When a change completes or changes priority/status, update `ROADMAP.md`.

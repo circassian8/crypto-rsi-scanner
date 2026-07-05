@@ -2,12 +2,15 @@
 
 Research artifact only. This static gate classifies remaining migration-era naming and does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-05T14:28:10.640706+00:00`
+- generated_at: `2026-07-05T18:42:06.766385+00:00`
 - status: `OK`
-- legacy_occurrences: `1855`
+- legacy_occurrences: `1858`
 - legacy_named_files_remaining: `0`
 - refactor_named_source_files_remaining: `0`
 - active_refactor_reports_remaining: `0`
+- north_star_document_present: `True`
+- north_star_burn_in_contract_present: `True`
+- north_star_auto_apply_thresholds: `False`
 
 ## Classification Counts
 
@@ -15,12 +18,12 @@ Research artifact only. This static gate classifies remaining migration-era nami
 - accepted_exception: `638`
 - backwards_compatibility_alias: `15`
 - historical_artifact_semantics: `429`
-- historical_reference_keep: `548`
+- historical_reference_keep: `551`
 - test_fixture_name: `177`
 
 ## Action Counts
 
-- should_keep: `1855`
+- should_keep: `1858`
 
 ## Policy
 
@@ -30,6 +33,11 @@ Research artifact only. This static gate classifies remaining migration-era nami
 - docs_legacy_wording: `allowed only for historical/refactor records or explicit artifact compatibility semantics`
 - refactor_tooling_names: `not allowed for current source/import/help/runbook surfaces; allowed only as historical aliases`
 - refactor_report_files: `active root/research refactor-era reports are not allowed; archived copies under research/archive/refactor_history are historical records`
+- event_alpha_radar_north_star: `missing North Star docs or burn-in contract are warnings; auto_apply_thresholds=true is a blocker`
+
+## Warnings
+
+- none
 
 ## Blockers
 

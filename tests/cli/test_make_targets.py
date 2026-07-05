@@ -883,6 +883,68 @@ def test_architecture_v3_contract_generation_lists_final_exceptions():
     assert "old Event Alpha shim paths are temporary" in markdown or "Temporary compatibility paths" in markdown
 
 
+def test_event_alpha_radar_north_star_generation_writes_contract():
+    import json
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from crypto_rsi_scanner.project_health import radar_north_star
+
+    with TemporaryDirectory() as tmp:
+        json_path, md_path, payload = radar_north_star.write_north_star(out_dir=tmp)
+        disk_payload = json.loads(Path(json_path).read_text(encoding="utf-8"))
+        markdown = Path(md_path).read_text(encoding="utf-8")
+
+    assert disk_payload == payload
+    assert payload["schema_version"] == radar_north_star.REPORT_SCHEMA_VERSION
+    assert set(payload["opportunity_lanes"]) == set(radar_north_star.LANE_NAMES)
+    assert payload["burn_in_contract"]["min_live_no_send_cycles"] == 20
+    assert payload["burn_in_contract"]["min_real_candidates"] == 300
+    assert payload["burn_in_contract"]["min_human_labels"] == 150
+    assert payload["burn_in_contract"]["min_labeled_near_misses"] == 50
+    assert payload["burn_in_contract"]["min_outcome_rows"] == 100
+    assert payload["burn_in_contract"]["auto_apply_thresholds"] is False
+    assert payload["burn_in_contract"]["no_auto_threshold_changes"] is True
+    assert payload["source_activation_order"] == list(radar_north_star.SOURCE_ACTIVATION_ORDER)
+    assert payload["telegram_sends"] == 0
+    assert payload["trades_created"] == 0
+    assert payload["paper_trades_created"] == 0
+    assert payload["normal_rsi_signal_rows_written"] == 0
+    assert payload["triggered_fade_created"] == 0
+    assert "Event Alpha Radar North Star" in markdown
+    assert "30-Day Burn-In Contract" in markdown
+    assert "auto_apply_thresholds: `False`" in markdown
+
+
+def test_event_alpha_radar_north_star_project_health_status_and_blocker(tmp_path):
+    import json
+
+    from crypto_rsi_scanner.project_health import radar_north_star
+    from crypto_rsi_scanner.project_health import terminology_check
+
+    status = radar_north_star.north_star_status(root=REPO_ROOT)
+    assert status["document_present"] is True
+    assert status["burn_in_contract_present"] is True
+    assert status["all_lanes_present"] is True
+    assert status["auto_apply_thresholds"] is False
+    report = terminology_check.build_report(root=REPO_ROOT)
+    assert report["north_star_document_present"] is True
+    assert report["north_star_burn_in_contract_present"] is True
+    assert report["north_star_auto_apply_thresholds"] is False
+    assert not any(row.get("check") == "north_star_document_missing" for row in report["warnings"])
+
+    research = tmp_path / "research"
+    research.mkdir()
+    payload = radar_north_star.build_north_star()
+    payload["burn_in_contract"]["auto_apply_thresholds"] = True
+    (research / radar_north_star.REPORT_JSON).write_text(json.dumps(payload), encoding="utf-8")
+    (research / radar_north_star.REPORT_MD).write_text("# North Star\n", encoding="utf-8")
+    blocked = radar_north_star.north_star_status(root=tmp_path)
+    assert blocked["blockers"] == [
+        {"check": "auto_apply_thresholds_true", "path": "research/EVENT_ALPHA_RADAR_NORTH_STAR.json"}
+    ]
+
+
 def test_architecture_final_report_make_target_is_available():
     root = REPO_ROOT
     makefile = (root / "Makefile").read_text(encoding="utf-8")
@@ -892,6 +954,8 @@ def test_architecture_final_report_make_target_is_available():
     assert "architecture-transitional-file-check:" in makefile
     assert "architecture-naming-check:" in makefile or "architecture-terminology-check architecture-naming-check:" in makefile
     assert "architecture-class-ownership-report:" in makefile
+    assert "event-alpha-radar-north-star:" in makefile
+    assert "$(PYTHON) -m crypto_rsi_scanner.project_health.radar_north_star" in makefile
     assert "INCLUDE_HISTORICAL ?= $(INCLUDE_LEGACY)" in makefile
     assert "STRICT_HISTORICAL ?= $(STRICT_LEGACY)" in makefile
     assert "EVENT_ALPHA_INCLUDE_HISTORICAL_ARG" in makefile

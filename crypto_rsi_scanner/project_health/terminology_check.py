@@ -12,7 +12,9 @@ import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
+
+from . import radar_north_star
 
 
 REPORT_SCHEMA_VERSION = "project_health_naming_cleanup_report_v1"
@@ -133,6 +135,7 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
     legacy_named_files = _legacy_named_files(repo_root)
     refactor_named_files = _refactor_named_source_files(repo_root)
     active_refactor_reports = _active_refactor_report_files(repo_root)
+    north_star = radar_north_star.north_star_status(root=repo_root)
     occurrences = _legacy_occurrences(repo_root)
     classifications = Counter(str(row["classification"]) for row in occurrences)
     actions = Counter(str(row["action"]) for row in occurrences)
@@ -142,7 +145,9 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         legacy_named_files=legacy_named_files,
         refactor_named_files=refactor_named_files,
         active_refactor_reports=active_refactor_reports,
+        north_star_status=north_star,
     )
+    warnings = list(north_star.get("warnings", []))
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
         "row_type": "project_health_naming_cleanup_report",
@@ -157,6 +162,8 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         "normal_rsi_signal_rows_written": 0,
         "triggered_fade_created": 0,
         "status": "BLOCKED" if blockers else "OK",
+        "warnings": warnings,
+        "warning_count": len(warnings),
         "legacy_occurrences": len(occurrences),
         "classification_counts": dict(sorted(classifications.items())),
         "action_counts": dict(sorted(actions.items())),
@@ -183,6 +190,10 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
             [row for row in refactor_named_files if str(row.get("path") or "").startswith("crypto_rsi_scanner/refactor_")]
         ),
         "canonical_architecture_reports": _canonical_report_status(repo_root),
+        "north_star_status": north_star,
+        "north_star_document_present": bool(north_star.get("document_present")),
+        "north_star_burn_in_contract_present": bool(north_star.get("burn_in_contract_present")),
+        "north_star_auto_apply_thresholds": north_star.get("auto_apply_thresholds"),
         "legacy_py_source_references": [
             row for row in occurrences if row["term"].casefold() == "legacy" and "legacy.py" in row["line_text"].casefold()
         ],
@@ -195,6 +206,7 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
             "docs_legacy_wording": "allowed only for historical/refactor records or explicit artifact compatibility semantics",
             "refactor_tooling_names": "not allowed for current source/import/help/runbook surfaces; allowed only as historical aliases",
             "refactor_report_files": "active root/research refactor-era reports are not allowed; archived copies under research/archive/refactor_history are historical records",
+            "event_alpha_radar_north_star": "missing North Star docs or burn-in contract are warnings; auto_apply_thresholds=true is a blocker",
         },
         "safety_invariants": {
             "research_only": True,
@@ -236,6 +248,9 @@ def format_report(report: dict[str, Any]) -> str:
         f"- legacy_named_files_remaining: `{report.get('legacy_named_files_remaining', 0)}`",
         f"- refactor_named_source_files_remaining: `{report.get('refactor_named_source_files_remaining', 0)}`",
         f"- active_refactor_reports_remaining: `{report.get('active_refactor_reports_remaining', 0)}`",
+        f"- north_star_document_present: `{report.get('north_star_document_present')}`",
+        f"- north_star_burn_in_contract_present: `{report.get('north_star_burn_in_contract_present')}`",
+        f"- north_star_auto_apply_thresholds: `{report.get('north_star_auto_apply_thresholds')}`",
         "",
         "## Classification Counts",
         "",
@@ -252,6 +267,14 @@ def format_report(report: dict[str, Any]) -> str:
     for key, value in policy.items():
         lines.append(f"- {key}: `{value}`")
     blockers = report.get("blockers") if isinstance(report.get("blockers"), list) else []
+    warnings = report.get("warnings") if isinstance(report.get("warnings"), list) else []
+    lines.extend(["", "## Warnings", ""])
+    if warnings:
+        for row in warnings:
+            if isinstance(row, dict):
+                lines.append(f"- `{row.get('check')}` {row.get('path', '')}")
+    else:
+        lines.append("- none")
     lines.extend(["", "## Blockers", ""])
     if blockers:
         for row in blockers:
@@ -405,6 +428,7 @@ def _blockers(
     legacy_named_files: list[dict[str, str]],
     refactor_named_files: list[dict[str, str]],
     active_refactor_reports: list[dict[str, str]],
+    north_star_status: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     blockers: list[dict[str, Any]] = []
     for row in legacy_named_files:
@@ -413,6 +437,15 @@ def _blockers(
         blockers.append({"path": row["path"], "line": None, "reason": "migration-era refactor-named source file exists"})
     for row in active_refactor_reports:
         blockers.append({"path": row["path"], "line": None, "reason": "active refactor-era report must be archived under research/archive/refactor_history"})
+    for row in north_star_status.get("blockers", []):
+        if isinstance(row, dict):
+            blockers.append(
+                {
+                    "path": row.get("path") or "research/EVENT_ALPHA_RADAR_NORTH_STAR.json",
+                    "line": None,
+                    "reason": row.get("check") or "north_star_blocker",
+                }
+            )
     for row in occurrences:
         classification = str(row.get("classification") or "")
         action = str(row.get("action") or "")
@@ -572,6 +605,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"status={report['status']}")
     print(f"legacy_occurrences={report['legacy_occurrences']}")
     print(f"legacy_named_files_remaining={report['legacy_named_files_remaining']}")
+    print(f"north_star_document_present={report['north_star_document_present']}")
+    print(f"north_star_burn_in_contract_present={report['north_star_burn_in_contract_present']}")
     for key, value in report.get("classification_counts", {}).items():
         print(f"{key}={value}")
     return 0 if report["status"] == "OK" else 1
