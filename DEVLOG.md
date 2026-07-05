@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-05 — Harden ops CLI regression coverage and full pytest gate · Codex
+**Why:** A wrong-depth relative import broke `--status`, backup, restore, and
+maintenance commands after the CLI refactor while the old verification gate
+still passed. The ops command family needs direct regression coverage, and
+`make verify` must fail if the full pytest suite cannot run.
+**Changes:**
+- Fixed function-local imports in the legacy RSI CLI service so `--status`,
+  `--backup-db`, `--verify-restore`, `--rotate-logs`, and maintenance helpers
+  resolve root package modules correctly from the deeper CLI package.
+- Added CLI smokes for the ops command family and a static relative-import
+  integrity test to catch future wrong-depth package imports before deployment.
+- Added `pytest` to `requirements.txt`, introduced a hard-failing
+  `make test-full` target, and wired it into `make verify`.
+- Updated agent docs to state that pytest is now required for the standard
+  verification path.
+**Verify:** `python3 main.py --status` passed; `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+python3 -m pytest tests/cli/test_ops_command_smoke.py
+tests/cli/test_relative_import_integrity.py -q` passed (`4 passed`);
+`make test-full PYTHON=python3` passed (`772 passed`); `git diff --check`
+passed; `python3 -m compileall -q crypto_rsi_scanner tests` passed; `make
+status PYTHON=python3` passed; `make verify PYTHON=python3` passed (standalone
+`757/757`, embedded pytest `772 passed`, alert smoke, fixture backtest, and
+paper score).
+**Notes/risks:** `make verify` now requires pytest instead of silently skipping
+the pytest-compatible package suite. Use `python3 -m pip install -r
+requirements.txt` if a checkout lacks pytest.
+
 ## 2026-07-05 — Scope shim dependency scans to source by default · Codex
 **Why:** The final refactor reports were walking `event_fade_cache` runtime
 artifacts by default, making shim dependency checks slow and noisy even though

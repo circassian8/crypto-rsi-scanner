@@ -937,7 +937,7 @@ def status() -> None:
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
     storage = Storage(config.DB_PATH)
     try:
-        from ...status_report import format_status
+        from ....status_report import format_status
         print(format_status(storage))
     finally:
         storage.close()
@@ -945,7 +945,7 @@ def status() -> None:
 def backup_db() -> None:
     """Create and verify a safe SQLite backup, then prune old backups."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
-    from ...backups import backup_database, format_backup_result
+    from ....backups import backup_database, format_backup_result
 
     result = backup_database(config.DB_PATH, config.BACKUP_DIR, keep=config.BACKUP_KEEP)
     print(format_backup_result(result))
@@ -953,7 +953,7 @@ def backup_db() -> None:
 def verify_restore(backup_path: str | None = None) -> None:
     """Restore-check a backup, defaulting to the newest retained DB backup."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
-    from ...backups import format_restore_result, latest_backup_status, verify_restore as _verify_restore
+    from ....backups import format_restore_result, latest_backup_status, verify_restore as _verify_restore
 
     path = Path(backup_path).expanduser() if backup_path else None
     if path is None:
@@ -967,7 +967,7 @@ def verify_restore(backup_path: str | None = None) -> None:
 def rotate_logs() -> None:
     """Rotate oversized local launchd logs."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
-    from ...ops import format_log_rotation, rotate_logs as _rotate_logs
+    from ....ops import format_log_rotation, rotate_logs as _rotate_logs
 
     results = _rotate_logs(
         config.LOG_FILES,
@@ -979,13 +979,13 @@ def rotate_logs() -> None:
 def maintenance() -> None:
     """Run the daily local maintenance bundle: backup, restore drill, log rotation."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
-    from ...backups import (
+    from ....backups import (
         backup_database,
         format_backup_result,
         format_restore_result,
         verify_restore as _verify_restore,
     )
-    from ...ops import format_log_rotation, rotate_logs as _rotate_logs
+    from ....ops import format_log_rotation, rotate_logs as _rotate_logs
 
     backup = backup_database(config.DB_PATH, config.BACKUP_DIR, keep=config.BACKUP_KEEP)
     restore = _verify_restore(backup.path, expected_tables=config.RESTORE_EXPECTED_TABLES)
@@ -1003,7 +1003,7 @@ def maintenance() -> None:
 def launchd_status() -> None:
     """Print launchd status for the scan and bot agents."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
-    from ...ops import format_launchd_status, launchd_status as _launchd_status
+    from ....ops import format_launchd_status, launchd_status as _launchd_status
 
     statuses = _launchd_status((
         config.LAUNCHD_SCAN_LABEL,
@@ -1015,7 +1015,7 @@ def launchd_status() -> None:
 def restart_listener() -> None:
     """Restart the always-on Telegram bot listener launchd agent."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
-    from ...ops import format_launchd_command, restart_launchd_service
+    from ....ops import format_launchd_command, restart_launchd_service
 
     result = restart_launchd_service(config.LAUNCHD_BOT_LABEL)
     print(format_launchd_command(result))
@@ -1023,7 +1023,7 @@ def restart_listener() -> None:
 def install_maintenance_agent() -> None:
     """Install/load the daily launchd maintenance agent for this checkout."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
-    from ...ops import format_maintenance_agent_install, install_maintenance_agent as _install
+    from ....ops import format_maintenance_agent_install, install_maintenance_agent as _install
 
     result = _install(
         label=config.MAINTENANCE_LABEL,

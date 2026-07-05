@@ -74,8 +74,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 
 ## Run / test / deploy
 
-- **Python:** `.venv/bin/python` (3.13). Deps in `requirements.txt`. (Note: `pytest`
-  is NOT installed — use the standalone runner below.) `make bootstrap` creates
+- **Python:** `.venv/bin/python` (3.13). Deps in `requirements.txt` (including
+  `pytest`, required since 2026-07-05 — `make verify` runs the full pytest suite
+  via `test-full` and hard-fails if pytest is missing). `make bootstrap` creates
   `.venv`; `make verify PYTHON=python3` is acceptable for source-archive review.
 - **Clean source export:** `make export-src` writes
   `crypto-rsi-scanner-source.zip` via `git archive` so ignored local artifacts

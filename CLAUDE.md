@@ -14,7 +14,7 @@ narrative history.
 Quick reminders (full detail in `AGENTS.md`):
 - Standard verification: `make verify`.
 - Offline scanner smoke without network: `make dry-run-fixture`.
-- Tests: `.venv/bin/python tests/test_indicators.py` — all must pass.
+- Tests: `make test-full` (full pytest suite; part of `make verify`) — all must pass.
 - Pending work: `ROADMAP.md`.
 - Durable choices/rejections: `DECISIONS.md`.
 - Backtest signal-logic changes before shipping live.

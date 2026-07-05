@@ -1,4 +1,5 @@
 aiohttp>=3.9
 numpy>=1.24
 pandas>=2.0
+pytest>=8.0
 requests>=2.28

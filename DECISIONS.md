@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-05 - Full pytest suite is a hard verification gate
+**Status:** accepted
+**Decision:** `make verify` must run the full pytest-compatible suite through
+`make test-full`, with `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`, and fail if pytest
+is unavailable. `pytest` is a declared dependency in `requirements.txt`.
+**Why:** The CLI refactor introduced wrong-depth function-local imports that
+broke production ops commands such as `--status`, `--backup-db`,
+`--verify-restore`, and `--maintenance` while the previous verification path
+still passed. The package pytest suite now contains direct ops command smokes
+and a static relative-import integrity guard, so skipping pytest would recreate
+that blind spot.
+**Revisit when:** the standalone runner fully owns equivalent CLI dispatch and
+import-integrity coverage, or the project adopts a different mandatory test
+runner with the same ops-command guarantees.
+
 ## 2026-07-05 - Shim dependency scans are source-scoped by default
 **Status:** accepted
 **Decision:** Event Alpha shim dependency and old-import scans inspect source,
