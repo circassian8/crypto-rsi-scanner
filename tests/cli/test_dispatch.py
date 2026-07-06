@@ -15,6 +15,7 @@ from crypto_rsi_scanner.cli.services import (
     event_alpha_provider_preflights,
     event_alpha_reports,
 )
+from crypto_rsi_scanner.event_alpha.operations import review_inbox as burn_in_review_inbox
 
 
 def _args(argv: list[str]):
@@ -105,6 +106,45 @@ def test_dispatch_notify_preview(monkeypatch):
     )
     dispatch_args(_args(["--event-alpha-notify-preview", "--event-alpha-profile", "notify_no_key"]))
     assert calls == [{"verbose": False, "profile_name": "notify_no_key"}]
+
+
+def test_dispatch_standalone_burn_in_review_is_artifact_only(monkeypatch, capsys):
+    calls: list[dict[str, object]] = []
+
+    def fake_review_inbox(**kwargs):
+        calls.append(kwargs)
+        return {
+            "namespace_dir": "event_fade_cache/notify_llm_deep_cryptopanic_rehearsal",
+            "items_count": 0,
+            "blockers": [],
+        }
+
+    monkeypatch.setattr(burn_in_review_inbox, "build_review_inbox", fake_review_inbox)
+    monkeypatch.setattr(
+        scanner,
+        "run",
+        lambda **kwargs: pytest.fail("--event-alpha-burn-in-review must not fall through to default RSI scan"),
+    )
+    dispatch_args(
+        _args(
+            [
+                "--event-alpha-burn-in-review",
+                "--event-alpha-profile",
+                "notify_llm_deep",
+                "--event-alpha-artifact-namespace",
+                "notify_llm_deep_cryptopanic_rehearsal",
+            ]
+        )
+    )
+    assert calls == [
+        {
+            "profile": "notify_llm_deep",
+            "artifact_namespace": "notify_llm_deep_cryptopanic_rehearsal",
+        }
+    ]
+    out = capsys.readouterr().out
+    assert "event_alpha_daily_review_inbox:" in out
+    assert "Feedback labels append only" in out
 
 
 def test_dispatch_normal_rsi_dry_run(monkeypatch):

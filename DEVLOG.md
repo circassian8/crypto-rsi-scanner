@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-06 — Fix burn-in review dispatch and validation-loop health gates · Codex
+**Why:** The standalone `--event-alpha-burn-in-review` flag still fell through
+to the default RSI scan and attempted CoinGecko calls, and the new validation
+loop needed static project-health coverage for missing modules or unsafe target
+wiring.
+**Changes:**
+- Made bare `--event-alpha-burn-in-review` dispatch to the artifact-only daily
+  review inbox writer instead of the default scan path.
+- Added regression coverage proving the review flag cannot fall through to
+  `scanner.run`.
+- Added validation-loop project-health checks for missing Make target modules,
+  missing no-send guards, unsafe send references, artifact output markers, and
+  the standalone burn-in review dispatch branch.
+- Tightened burn-in archive secret scanning so uppercase env-var names such as
+  `COINALYZE_API_KEY` remain archivable metadata while actual `api_key` fields
+  are still excluded.
+**Verify:** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha
+tests/rsi tests/cli tests/test_indicators.py -q` (795 passed); `python3
+tests/test_indicators.py` (770/770 passed); `python3 -m compileall -q
+crypto_rsi_scanner tests`; validation-loop Make targets including
+`event-alpha-burn-in-scorecard`, `event-alpha-daily-review-inbox`,
+`event-alpha-feedback-progress`, `event-alpha-burn-in-weekly-measurement`,
+`event-alpha-source-yield-report`, `conviction-priors-shadow-report`,
+`paper-risk-research`, and `event-alpha-archive-burn-in-evidence`;
+`make architecture-cleanliness-check PYTHON=python3`;
+`make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`
+(WARN/no blockers); `make verify PYTHON=python3`.
+**Notes/risks:** Generated local burn-in archives remain ignored runtime
+artifacts. The CryptoPanic rehearsal doctor status is still WARN-only due
+existing quality/incident warnings, with no blockers.
+
 ## 2026-07-05 — Operationalize Event Alpha burn-in loop · Codex
 **Why:** The Radar North Star defined the architecture and 30-day burn-in goals,
 but operators still needed a repeatable no-send loop, review inbox, feedback

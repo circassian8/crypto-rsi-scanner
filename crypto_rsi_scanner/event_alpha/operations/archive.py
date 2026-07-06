@@ -40,7 +40,7 @@ def build_burn_in_archive(
             except OSError:
                 continue
             if path.suffix.lower() in {".json", ".jsonl", ".md", ".txt", ".csv"}:
-                hits = common.secret_hits_in_text(data.decode("utf-8", errors="ignore"))
+                hits = _archive_secret_hits(data.decode("utf-8", errors="ignore"))
                 if hits:
                     secret_hits[rel] = hits
                     continue
@@ -94,6 +94,12 @@ def _excluded(path: Path) -> bool:
     if path.name in {".env", ".DS_Store"}:
         return True
     return path.suffix.lower() in _excluded_suffixes()
+
+
+def _archive_secret_hits(text: str) -> list[str]:
+    hits = common.secret_hits_in_text(text)
+    allowed_env_var_names = {"API_KEY", "AUTH_TOKEN", "X-API-KEY", "TELEGRAM_BOT_TOKEN"}
+    return [hit for hit in hits if hit not in allowed_env_var_names]
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -2,7 +2,7 @@
 
 Research artifact only. This static gate classifies remaining migration-era naming and does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-05T18:42:06.766385+00:00`
+- generated_at: `2026-07-06T12:50:39.329752+00:00`
 - status: `OK`
 - legacy_occurrences: `1858`
 - legacy_named_files_remaining: `0`
@@ -11,6 +11,9 @@ Research artifact only. This static gate classifies remaining migration-era nami
 - north_star_document_present: `True`
 - north_star_burn_in_contract_present: `True`
 - north_star_auto_apply_thresholds: `False`
+- validation_loop_status: `pass`
+- validation_loop_missing_module_count: `0`
+- validation_loop_review_dispatch_artifact_only: `True`
 
 ## Classification Counts
 
@@ -34,6 +37,7 @@ Research artifact only. This static gate classifies remaining migration-era nami
 - refactor_tooling_names: `not allowed for current source/import/help/runbook surfaces; allowed only as historical aliases`
 - refactor_report_files: `active root/research refactor-era reports are not allowed; archived copies under research/archive/refactor_history are historical records`
 - event_alpha_radar_north_star: `missing North Star docs or burn-in contract are warnings; auto_apply_thresholds=true is a blocker`
+- event_alpha_validation_loop: `burn-in operating Make targets must point at real artifact-only modules, keep alerts disabled by default, and standalone review dispatch must not fall through to the default scan`
 
 ## Warnings
 

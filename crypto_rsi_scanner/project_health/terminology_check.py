@@ -53,6 +53,36 @@ SKIP_DIR_NAMES = {
     "htmlcov",
     "node_modules",
 }
+VALIDATION_LOOP_MODULE_TARGETS = {
+    "event-alpha-daily-live-no-send-burn-in": "crypto_rsi_scanner.event_alpha.operations.daily_burn_in",
+    "event-alpha-daily-review-inbox": "crypto_rsi_scanner.event_alpha.operations.review_inbox",
+    "event-alpha-burn-in-scorecard": "crypto_rsi_scanner.event_alpha.operations.scorecard",
+    "event-alpha-feedback-progress": "crypto_rsi_scanner.event_alpha.operations.feedback_progress",
+    "event-alpha-burn-in-weekly-measurement": "crypto_rsi_scanner.event_alpha.operations.measurement",
+    "event-alpha-source-yield-report": "crypto_rsi_scanner.event_alpha.operations.source_yield",
+    "event-alpha-archive-burn-in-evidence": "crypto_rsi_scanner.event_alpha.operations.archive",
+    "conviction-priors-shadow-report": "crypto_rsi_scanner.conviction_priors_shadow",
+    "paper-risk-research": "crypto_rsi_scanner.paper_risk_research",
+}
+VALIDATION_LOOP_NO_SEND_TARGETS = {
+    "event-alpha-daily-live-no-send-burn-in",
+    "event-alpha-daily-review-inbox",
+    "event-alpha-burn-in-scorecard",
+    "event-alpha-feedback-progress",
+    "event-alpha-burn-in-weekly-measurement",
+    "event-alpha-source-yield-report",
+    "event-alpha-archive-burn-in-evidence",
+}
+VALIDATION_LOOP_ARTIFACT_MARKERS = {
+    "crypto_rsi_scanner/event_alpha/operations/review_inbox.py": ("INBOX_JSON", "INBOX_MD"),
+    "crypto_rsi_scanner/event_alpha/operations/scorecard.py": ("SCORECARD_JSON", "SCORECARD_MD"),
+    "crypto_rsi_scanner/event_alpha/operations/feedback_progress.py": ("PROGRESS_JSON", "PROGRESS_MD"),
+    "crypto_rsi_scanner/event_alpha/operations/measurement.py": ("DASHBOARD_JSON", "DASHBOARD_MD"),
+    "crypto_rsi_scanner/event_alpha/operations/source_yield.py": ("SOURCE_YIELD_JSON", "SOURCE_YIELD_MD"),
+    "crypto_rsi_scanner/event_alpha/operations/archive.py": ("MANIFEST_JSON", "ARCHIVE_NAME"),
+    "crypto_rsi_scanner/paper_risk_research.py": ("REPORT_JSON", "REPORT_MD"),
+    "crypto_rsi_scanner/conviction_priors_shadow.py": ("REPORT_JSON", "REPORT_MD"),
+}
 STALE_SOURCE_PATTERNS = (
     "legacy.py after import",
     "focused legacy",
@@ -136,6 +166,7 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
     refactor_named_files = _refactor_named_source_files(repo_root)
     active_refactor_reports = _active_refactor_report_files(repo_root)
     north_star = radar_north_star.north_star_status(root=repo_root)
+    validation_loop = _validation_loop_status(repo_root)
     occurrences = _legacy_occurrences(repo_root)
     classifications = Counter(str(row["classification"]) for row in occurrences)
     actions = Counter(str(row["action"]) for row in occurrences)
@@ -146,8 +177,9 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         refactor_named_files=refactor_named_files,
         active_refactor_reports=active_refactor_reports,
         north_star_status=north_star,
+        validation_loop_status=validation_loop,
     )
-    warnings = list(north_star.get("warnings", []))
+    warnings = [*list(north_star.get("warnings", [])), *validation_loop["warnings"]]
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
         "row_type": "project_health_naming_cleanup_report",
@@ -194,6 +226,12 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
         "north_star_document_present": bool(north_star.get("document_present")),
         "north_star_burn_in_contract_present": bool(north_star.get("burn_in_contract_present")),
         "north_star_auto_apply_thresholds": north_star.get("auto_apply_thresholds"),
+        "validation_loop_status": validation_loop,
+        "validation_loop_blocker_count": len(validation_loop["blockers"]),
+        "validation_loop_warning_count": len(validation_loop["warnings"]),
+        "validation_loop_missing_module_count": len(validation_loop["missing_modules"]),
+        "validation_loop_missing_make_target_count": len(validation_loop["missing_make_targets"]),
+        "validation_loop_review_dispatch_artifact_only": validation_loop["review_dispatch_artifact_only"],
         "legacy_py_source_references": [
             row for row in occurrences if row["term"].casefold() == "legacy" and "legacy.py" in row["line_text"].casefold()
         ],
@@ -207,6 +245,7 @@ def build_report(*, root: str | Path | None = None, generated_at: datetime | Non
             "refactor_tooling_names": "not allowed for current source/import/help/runbook surfaces; allowed only as historical aliases",
             "refactor_report_files": "active root/research refactor-era reports are not allowed; archived copies under research/archive/refactor_history are historical records",
             "event_alpha_radar_north_star": "missing North Star docs or burn-in contract are warnings; auto_apply_thresholds=true is a blocker",
+            "event_alpha_validation_loop": "burn-in operating Make targets must point at real artifact-only modules, keep alerts disabled by default, and standalone review dispatch must not fall through to the default scan",
         },
         "safety_invariants": {
             "research_only": True,
@@ -236,6 +275,105 @@ def write_report(*, root: str | Path | None = None, out_dir: str | Path | None =
     return json_path, md_path, report
 
 
+def _validation_loop_status(repo_root: Path) -> dict[str, Any]:
+    makefile_path = repo_root / "Makefile"
+    if not makefile_path.exists():
+        return {
+            "status": "pass",
+            "blockers": [],
+            "warnings": [],
+            "missing_modules": [],
+            "missing_make_targets": [],
+            "unsafe_make_targets": [],
+            "artifact_marker_warnings": [],
+            "review_dispatch_artifact_only": None,
+            "validated_make_targets": [],
+            "skipped_reason": "makefile_missing",
+        }
+    makefile_text = makefile_path.read_text(encoding="utf-8", errors="replace")
+    blockers: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
+    missing_modules: list[dict[str, str]] = []
+    missing_targets: list[dict[str, str]] = []
+    unsafe_targets: list[dict[str, str]] = []
+    artifact_marker_warnings: list[dict[str, str]] = []
+
+    for target, module_name in VALIDATION_LOOP_MODULE_TARGETS.items():
+        rel_module = _module_rel_path(module_name)
+        module_path = repo_root / rel_module
+        if not module_path.exists():
+            row = {"target": target, "module": module_name, "path": rel_module}
+            missing_modules.append(row)
+            blockers.append({"check": "validation_loop_make_target_missing_module", **row})
+        body = _make_target_body(makefile_text, target)
+        if body is None:
+            row = {"target": target, "module": module_name}
+            missing_targets.append(row)
+            blockers.append({"check": "validation_loop_make_target_missing", **row})
+            continue
+        if module_name not in body:
+            row = {"target": target, "module": module_name}
+            unsafe_targets.append(row)
+            blockers.append({"check": "validation_loop_make_target_wrong_module", **row})
+        if target in VALIDATION_LOOP_NO_SEND_TARGETS and "RSI_EVENT_ALERTS_ENABLED=0" not in body:
+            row = {"target": target, "reason": "missing_RSI_EVENT_ALERTS_ENABLED_0"}
+            unsafe_targets.append(row)
+            blockers.append({"check": "validation_loop_target_not_no_send", **row})
+        if "RSI_EVENT_ALERTS_ENABLED=1" in body or "event-alpha-telegram-send-one-cycle" in body:
+            row = {"target": target, "reason": "live_send_reference_in_validation_loop_target"}
+            unsafe_targets.append(row)
+            blockers.append({"check": "validation_loop_target_can_send", **row})
+
+    for rel_path, markers in VALIDATION_LOOP_ARTIFACT_MARKERS.items():
+        path = repo_root / rel_path
+        text = path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
+        missing = [marker for marker in markers if marker not in text]
+        if missing:
+            row = {"path": rel_path, "missing_markers": ",".join(missing)}
+            artifact_marker_warnings.append(row)
+            warnings.append({"check": "validation_loop_artifact_output_marker_missing", **row})
+
+    dispatch_path = repo_root / "crypto_rsi_scanner" / "cli" / "event_alpha_command_registry" / "dispatch.py"
+    dispatch_text = dispatch_path.read_text(encoding="utf-8", errors="replace") if dispatch_path.exists() else ""
+    review_dispatch_artifact_only = (
+        "if args.event_alpha_burn_in_review:" in dispatch_text
+        and "_operations_review_inbox.build_review_inbox" in dispatch_text
+    )
+    if not review_dispatch_artifact_only:
+        blockers.append(
+            {
+                "check": "validation_loop_burn_in_review_can_fall_through_to_scan",
+                "path": dispatch_path.relative_to(repo_root).as_posix(),
+            }
+        )
+
+    return {
+        "status": "blocked" if blockers else "pass",
+        "blockers": blockers,
+        "warnings": warnings,
+        "missing_modules": missing_modules,
+        "missing_make_targets": missing_targets,
+        "unsafe_make_targets": unsafe_targets,
+        "artifact_marker_warnings": artifact_marker_warnings,
+        "review_dispatch_artifact_only": review_dispatch_artifact_only,
+        "validated_make_targets": sorted(VALIDATION_LOOP_MODULE_TARGETS),
+    }
+
+
+def _module_rel_path(module_name: str) -> str:
+    return f"{module_name.replace('.', '/')}.py"
+
+
+def _make_target_body(makefile_text: str, target: str) -> str | None:
+    pattern = re.compile(
+        rf"(?ms)^{re.escape(target)}:(?:[^\n]*)\n(?P<body>.*?)(?=^[A-Za-z0-9_.%/-]+:|\Z)"
+    )
+    match = pattern.search(makefile_text)
+    if not match:
+        return None
+    return str(match.group("body"))
+
+
 def format_report(report: dict[str, Any]) -> str:
     lines = [
         "# Project Health Naming Cleanup Report",
@@ -251,6 +389,9 @@ def format_report(report: dict[str, Any]) -> str:
         f"- north_star_document_present: `{report.get('north_star_document_present')}`",
         f"- north_star_burn_in_contract_present: `{report.get('north_star_burn_in_contract_present')}`",
         f"- north_star_auto_apply_thresholds: `{report.get('north_star_auto_apply_thresholds')}`",
+        f"- validation_loop_status: `{(report.get('validation_loop_status') or {}).get('status')}`",
+        f"- validation_loop_missing_module_count: `{report.get('validation_loop_missing_module_count')}`",
+        f"- validation_loop_review_dispatch_artifact_only: `{report.get('validation_loop_review_dispatch_artifact_only')}`",
         "",
         "## Classification Counts",
         "",
@@ -429,6 +570,7 @@ def _blockers(
     refactor_named_files: list[dict[str, str]],
     active_refactor_reports: list[dict[str, str]],
     north_star_status: Mapping[str, Any],
+    validation_loop_status: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     blockers: list[dict[str, Any]] = []
     for row in legacy_named_files:
@@ -444,6 +586,15 @@ def _blockers(
                     "path": row.get("path") or "research/EVENT_ALPHA_RADAR_NORTH_STAR.json",
                     "line": None,
                     "reason": row.get("check") or "north_star_blocker",
+                }
+            )
+    for row in validation_loop_status.get("blockers", []):
+        if isinstance(row, dict):
+            blockers.append(
+                {
+                    "path": row.get("path") or row.get("target") or "Makefile",
+                    "line": None,
+                    "reason": row.get("check") or "validation_loop_blocker",
                 }
             )
     for row in occurrences:

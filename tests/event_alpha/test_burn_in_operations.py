@@ -148,16 +148,22 @@ def test_burn_in_archive_excludes_secrets_and_db_files(tmp_path):
     ns = tmp_path / "event_fade_cache" / "live_burn_in_20260705"
     ns.mkdir(parents=True)
     (ns / "event_alpha_daily_brief.md").write_text("brief\n", encoding="utf-8")
+    (ns / "readiness.md").write_text("configured with COINALYZE_API_KEY name only\n", encoding="utf-8")
     (ns / "local.db").write_text("db\n", encoding="utf-8")
     (ns / "bad.json").write_text('{"api_key":"should-not-archive"}\n', encoding="utf-8")
     payload = archive.build_burn_in_archive(base_dir=tmp_path / "event_fade_cache", out_dir=tmp_path / "out")
-    assert payload["files_considered"] == 2
-    assert payload["files_archived"] == 1
+    assert payload["files_considered"] == 3
+    assert payload["files_archived"] == 2
     assert payload["secret_hit_count"] == 1
     with zipfile.ZipFile(tmp_path / "out" / archive.ARCHIVE_NAME) as zf:
-        assert zf.namelist() == ["live_burn_in_20260705/event_alpha_daily_brief.md"]
+        assert zf.namelist() == [
+            "live_burn_in_20260705/event_alpha_daily_brief.md",
+            "live_burn_in_20260705/readiness.md",
+        ]
 
 
 def test_secret_scanner_ignores_natural_language_sk_phrase_but_catches_keys():
     assert common.secret_hits_in_text("a sk-fragmenting-global-financial-system narrative") == []
+    assert common.secret_hits_in_text('"no_api_keys_in_tests": true') == []
+    assert common.secret_hits_in_text('{"api_key":"should-not-archive"}') == ["api_key"]
     assert common.secret_hits_in_text("token sk-ABC1234567890defghijk") == ["sk-ABC1234567890defghijk"]

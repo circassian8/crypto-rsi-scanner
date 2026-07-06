@@ -13,8 +13,8 @@ from ..artifacts import context as artifact_context
 
 
 SECRET_RE = re.compile(
-    r"(api[_-]?key|auth[_-]?token|bearer\s+[a-z0-9._-]{12,}|sk-[a-z0-9_-]{12,}|"
-    r"x-api-key|telegram[_-]?bot[_-]?token|provider[_-]?token)",
+    r"(api[_-]?key\b|auth[_-]?token\b|bearer\s+[a-z0-9._-]{12,}|sk-[a-z0-9_-]{12,}|"
+    r"x-api-key\b|telegram[_-]?bot[_-]?token\b|provider[_-]?token\b)",
     re.IGNORECASE,
 )
 SAFETY_FIELDS: dict[str, Any] = {

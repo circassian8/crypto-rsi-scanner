@@ -943,6 +943,10 @@ def test_event_alpha_radar_north_star_project_health_status_and_blocker(tmp_path
     assert report["north_star_document_present"] is True
     assert report["north_star_burn_in_contract_present"] is True
     assert report["north_star_auto_apply_thresholds"] is False
+    assert report["validation_loop_status"]["status"] == "pass"
+    assert report["validation_loop_missing_module_count"] == 0
+    assert report["validation_loop_missing_make_target_count"] == 0
+    assert report["validation_loop_review_dispatch_artifact_only"] is True
     assert not any(row.get("check") == "north_star_document_missing" for row in report["warnings"])
 
     research = tmp_path / "research"
@@ -955,6 +959,31 @@ def test_event_alpha_radar_north_star_project_health_status_and_blocker(tmp_path
     assert blocked["blockers"] == [
         {"check": "auto_apply_thresholds_true", "path": "research/EVENT_ALPHA_RADAR_NORTH_STAR.json"}
     ]
+
+
+def test_project_health_validation_loop_blocks_missing_modules_and_review_fallthrough(tmp_path):
+    from crypto_rsi_scanner.project_health import terminology_check
+
+    (tmp_path / "Makefile").write_text(
+        "\n".join(
+            [
+                "event-alpha-burn-in-scorecard:",
+                "\tRSI_EVENT_ALERTS_ENABLED=0 \\",
+                "\tpython3 -m crypto_rsi_scanner.event_alpha.operations.scorecard",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    dispatch = tmp_path / "crypto_rsi_scanner" / "cli" / "event_alpha_command_registry" / "dispatch.py"
+    dispatch.parent.mkdir(parents=True)
+    dispatch.write_text("def dispatch_event_alpha_command(args):\n    return False\n", encoding="utf-8")
+
+    status = terminology_check._validation_loop_status(tmp_path)
+    checks = {row["check"] for row in status["blockers"]}
+    assert "validation_loop_make_target_missing_module" in checks
+    assert "validation_loop_make_target_missing" in checks
+    assert "validation_loop_burn_in_review_can_fall_through_to_scan" in checks
+    assert status["review_dispatch_artifact_only"] is False
 
 
 def test_architecture_final_report_make_target_is_available():

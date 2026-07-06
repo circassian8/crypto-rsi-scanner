@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-05T14:14:09.449747+00:00`
+- generated_at: `2026-07-06T12:50:43.738114+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -100,8 +100,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 |
 | `crypto_rsi_scanner/config.py` | 1319 |
+| `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
-| `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1268 |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1239 |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 |
@@ -145,8 +145,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 | Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to focused service modules. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | Route-gate decision logic is dense and behavior-critical for no-send notification eligibility. | When route-decision/gate snapshots cover every lane and quality-gate cap. |
 | `crypto_rsi_scanner/config.py` | 1319 | Central environment/config contract; splitting risks import-time default and env-var behavior drift. | When a dedicated config-v2 migration freeze and env snapshot tests exist. |
+| `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 | Stable argparse flag bundle; splitting individual flag groups risks CLI default drift. | Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule. |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 | Provider/cache enrichment flow is stable and below blocker threshold. | When adding a new enrichment source or cache policy. |
-| `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1268 | Stable argparse flag bundle; splitting individual flag groups risks CLI default drift. | Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule. |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 | Legacy notification-plan compatibility core; no-send semantics are more important than churn. | When notification plan rows are covered by schema-level golden fixtures. |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1239 | Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage. | When adding a new derivatives metric family or crowding class. |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 | Outcome maturation/report code is stable and below the blocker threshold. | When outcome performance views gain new sections. |
@@ -169,19 +169,21 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_source_coverage.py` | 2991 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
 | `tests/test_indicators.py` | 1779 |
-| `tests/cli/test_make_targets.py` | 1371 |
+| `tests/cli/test_make_targets.py` | 1476 |
 | `tests/event_alpha/_api_helpers.py` | 825 |
-| `tests/event_alpha/test_artifact_schema.py` | 743 |
-| `tests/rsi/test_indicators_core.py` | 694 |
+| `tests/event_alpha/test_artifact_schema.py` | 746 |
+| `tests/rsi/test_indicators_core.py` | 727 |
 | `tests/rsi/test_backtest.py` | 561 |
 | `tests/event_alpha/test_shim_registry.py` | 515 |
-| `tests/rsi/test_paper_risk.py` | 379 |
+| `tests/rsi/test_paper_risk.py` | 412 |
 | `tests/cli/test_parser.py` | 308 |
 | `tests/cli/test_event_alpha_command_registry.py` | 202 |
-| `tests/cli/test_dispatch.py` | 129 |
+| `tests/cli/test_dispatch.py` | 169 |
+| `tests/event_alpha/test_burn_in_operations.py` | 169 |
 | `tests/cli/test_relative_import_integrity.py` | 88 |
 | `tests/cli/test_ops_command_smoke.py` | 76 |
 | `tests/rsi/_api_helpers.py` | 68 |
+| `tests/cli/test_burn_in_make_targets.py` | 66 |
 | `tests/event_alpha/test_no_old_event_alpha_imports.py` | 39 |
 | `tests/event_alpha/conftest.py` | 30 |
 | `tests/event_alpha/test_canonical_imports.py` | 27 |

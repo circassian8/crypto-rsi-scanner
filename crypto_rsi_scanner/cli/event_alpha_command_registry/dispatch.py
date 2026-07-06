@@ -14,6 +14,7 @@ from ..services import (
     event_alpha_reports as _service_reports,
     event_alpha_research as _service_research,
 )
+from ...event_alpha.operations import review_inbox as _operations_review_inbox
 from .models import *  # noqa: F403
 from .metadata import *  # noqa: F403
 
@@ -200,6 +201,15 @@ def _dispatch_event_alpha_command_section_2(args) -> bool:
             include_diagnostics=args.event_opportunity_audit_include_diagnostics,
             burn_in_review=args.event_alpha_burn_in_review,
         )
+        return True
+    if args.event_alpha_burn_in_review:
+        payload = _operations_review_inbox.build_review_inbox(
+            profile=args.event_alpha_profile or "notify_llm_deep",
+            artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "notify_llm_deep_cryptopanic_rehearsal",
+        )
+        print(f"event_alpha_daily_review_inbox: {payload['namespace_dir']}/{_operations_review_inbox.INBOX_MD}")
+        print(f"items={payload['items_count']} blockers={len(payload.get('blockers') or [])}")
+        print("Feedback labels append only; no candidate/core rows were mutated.")
         return True
     if args.event_alpha_notification_deliveries_report:
         event_alpha_notification_deliveries_report(
