@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-06T15:39:09.280761+00:00`
+- generated_at: `2026-07-06T16:48:53.253707+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
@@ -173,14 +173,14 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/_api_helpers.py` | 825 |
 | `tests/event_alpha/test_artifact_schema.py` | 746 |
 | `tests/rsi/test_indicators_core.py` | 727 |
-| `tests/event_alpha/test_burn_in_operations.py` | 607 |
+| `tests/event_alpha/test_burn_in_operations.py` | 719 |
 | `tests/rsi/test_backtest.py` | 561 |
 | `tests/event_alpha/test_shim_registry.py` | 515 |
 | `tests/rsi/test_paper_risk.py` | 412 |
 | `tests/cli/test_parser.py` | 308 |
 | `tests/cli/test_event_alpha_command_registry.py` | 202 |
 | `tests/cli/test_dispatch.py` | 169 |
-| `tests/cli/test_burn_in_make_targets.py` | 120 |
+| `tests/cli/test_burn_in_make_targets.py` | 122 |
 | `tests/cli/test_relative_import_integrity.py` | 88 |
 | `tests/cli/test_ops_command_smoke.py` | 76 |
 | `tests/rsi/_api_helpers.py` | 68 |

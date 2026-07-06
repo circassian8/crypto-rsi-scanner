@@ -26,6 +26,7 @@ def build_source_yield_report(
     include_provider_rehearsals: bool = False,
     include_fixture_namespaces: bool = False,
     include_stale_namespaces: bool = False,
+    include_live_rehearsals_without_burn_in_run: bool = False,
     include_namespaces: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     context = common.context_for(profile=profile, artifact_namespace=artifact_namespace or profile, base_dir=base_dir)
@@ -40,6 +41,7 @@ def build_source_yield_report(
         include_provider_rehearsals=include_provider_rehearsals,
         include_fixture_namespaces=include_fixture_namespaces,
         include_stale_namespaces=include_stale_namespaces,
+        include_live_rehearsals_without_burn_in_run=include_live_rehearsals_without_burn_in_run,
         include_namespaces=((artifact_namespace,) if artifact_namespace else include_namespaces),
     )
     included_namespaces = namespace_policy.included_namespace_names(policy)
@@ -49,13 +51,22 @@ def build_source_yield_report(
     outcomes = _rows(base, "event_integrated_radar_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces) + _rows(base, "event_alpha_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces)
     daily_runs = [common.read_json(base / namespace / RUN_JSON) for namespace in included_namespaces]
     daily_runs = [row for row in daily_runs if row]
-    evidence_scope = _evidence_scope(artifact_namespace, policy)
+    explicit_scope = bool(artifact_namespace) or _has_explicit_policy_flags(policy.get("explicit_inclusion_flags") or {})
+    contract_countable = not explicit_scope
+    real_burn_in_candidate_count = len(candidates) if contract_countable else 0
+    non_burn_in_candidate_count = max(0, len(candidates) - real_burn_in_candidate_count)
+    evidence_scope = _evidence_scope(
+        explicit_scope=explicit_scope,
+        contract_countable=contract_countable,
+        included_namespaces=included_namespaces,
+        candidate_count=len(candidates),
+        policy=policy,
+    )
     explicit_scope_warning = (
         "explicit namespace diagnostic; not counted as burn-in contract aggregate"
-        if artifact_namespace
+        if explicit_scope
         else ""
     )
-    contract_countable = not bool(artifact_namespace)
     enough_data_reasons = _enough_data_reasons(included_namespaces=included_namespaces if contract_countable else [], feedback=feedback, outcomes=outcomes, daily_runs=daily_runs)
     if explicit_scope_warning:
         enough_data_reasons = ["explicit_namespace_not_counted_for_burn_in_contract", *enough_data_reasons]
@@ -93,7 +104,7 @@ def build_source_yield_report(
             },
             "namespace_policy_version": policy.get("namespace_policy_version"),
             "evidence_scope": evidence_scope,
-            "burn_in_contract_scope": "explicit_single_namespace_diagnostic" if artifact_namespace else "active_burn_in_namespaces",
+            "burn_in_contract_scope": "explicit_single_namespace_diagnostic" if explicit_scope else "active_burn_in_namespaces",
             "candidate_source_scope": "single_namespace" if artifact_namespace else "active_burn_in_namespaces",
             "explicit_scope_warning": explicit_scope_warning,
             "included_namespaces": included_namespaces,
@@ -112,8 +123,14 @@ def build_source_yield_report(
             "providers": provider_rows,
             "source_packs": source_pack_rows,
             "candidate_count": len(candidates),
-            "real_burn_in_candidate_count": len(candidates) if contract_countable else 0,
-            "non_burn_in_candidate_count": 0 if contract_countable else len(candidates),
+            "real_burn_in_candidate_count": real_burn_in_candidate_count,
+            "non_burn_in_candidate_count": non_burn_in_candidate_count,
+            "contract_counted_candidate_count": real_burn_in_candidate_count,
+            "notification_rehearsal_candidate_count": _category_candidate_count(base, policy, "notification_rehearsal", cutoff=cutoff),
+            "provider_rehearsal_candidate_count": _category_candidate_count(base, policy, "provider_rehearsal", cutoff=cutoff),
+            "fixture_candidate_count": _category_candidate_count(base, policy, "fixture", cutoff=cutoff),
+            "stale_candidate_count": _category_candidate_count(base, policy, "stale", cutoff=cutoff),
+            "no_key_candidate_count": _category_candidate_count(base, policy, "no_key", cutoff=cutoff),
             "core_opportunity_count": len(cores),
             "feedback_count": len(feedback),
             "outcome_count": len(outcomes),
@@ -147,6 +164,7 @@ def format_source_yield_report(payload: Mapping[str, Any]) -> str:
         f"- explicit_scope_warning: `{payload.get('explicit_scope_warning') or 'none'}`",
         f"- included_namespaces: `{', '.join(payload.get('included_namespaces') or []) or 'none'}`",
         f"- real_burn_in_candidate_count: `{payload.get('real_burn_in_candidate_count')}`",
+        f"- contract_counted_candidate_count: `{payload.get('contract_counted_candidate_count')}`",
         f"- non_burn_in_candidate_count: `{payload.get('non_burn_in_candidate_count')}`",
         f"- recommendations_only: `{payload.get('recommendations_only')}`",
         f"- auto_apply: `{payload.get('auto_apply')}`",
@@ -186,25 +204,54 @@ def _rows(base: Path, filename: str, *, cutoff, namespaces: list[str] | tuple[st
     return out
 
 
-def _evidence_scope(artifact_namespace: str | None, policy: Mapping[str, Any]) -> str:
-    if not artifact_namespace:
-        return "real_burn_in_evidence" if policy.get("included_namespaces") else "no_active_burn_in_namespaces"
-    details = [
-        row
-        for section in ("included_namespace_details", "excluded_namespace_details")
-        for row in (policy.get(section) or [])
-        if isinstance(row, Mapping) and row.get("namespace") == artifact_namespace
-    ]
-    categories = {str(item) for row in details for item in (row.get("categories") or [])}
-    if "fixture" in categories:
-        return "fixture"
-    if "no_key" in categories:
-        return "no_key_diagnostic"
-    if "stale" in categories:
-        return "stale_historical_diagnostic"
-    if "notification_rehearsal" in categories:
+def _evidence_scope(
+    *,
+    explicit_scope: bool,
+    contract_countable: bool,
+    included_namespaces: list[str],
+    candidate_count: int,
+    policy: Mapping[str, Any],
+) -> str:
+    if explicit_scope and not contract_countable:
         return "explicit_single_namespace_diagnostic"
-    return "explicit_single_namespace_diagnostic"
+    if not included_namespaces:
+        return "no_active_burn_in_namespaces"
+    if candidate_count <= 0:
+        return "active_burn_in_no_candidates"
+    if _mixed_non_burn_in_categories(policy):
+        return "mixed_explicit_diagnostic"
+    return "real_burn_in_evidence"
+
+
+def _has_explicit_policy_flags(flags: Mapping[str, Any]) -> bool:
+    for key, value in flags.items():
+        if key == "include_namespace":
+            if value:
+                return True
+        elif bool(value):
+            return True
+    return False
+
+
+def _mixed_non_burn_in_categories(policy: Mapping[str, Any]) -> bool:
+    for row in policy.get("included_namespace_details") or []:
+        if not isinstance(row, Mapping):
+            continue
+        categories = {str(item) for item in row.get("categories") or []}
+        if categories & {"notification_rehearsal", "provider_rehearsal", "fixture", "stale", "no_key", "active_live_rehearsal"}:
+            return True
+    return False
+
+
+def _category_candidate_count(base: Path, policy: Mapping[str, Any], category: str, *, cutoff) -> int:
+    namespaces: list[str] = []
+    for section in ("included_namespace_details", "excluded_namespace_details"):
+        for row in policy.get(section) or []:
+            if isinstance(row, Mapping) and category in {str(item) for item in row.get("categories") or []}:
+                name = str(row.get("namespace") or "")
+                if name:
+                    namespaces.append(name)
+    return len(_rows(base, "event_integrated_radar_candidates.jsonl", cutoff=cutoff, namespaces=sorted(dict.fromkeys(namespaces))))
 
 
 def _provider(row: Mapping[str, Any]) -> str:
@@ -315,6 +362,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--include-provider-rehearsals", action="store_true")
     parser.add_argument("--include-fixture-namespaces", action="store_true")
     parser.add_argument("--include-stale-namespaces", action="store_true")
+    parser.add_argument("--include-live-rehearsals-without-burn-in-run", action="store_true")
     parser.add_argument("--include-namespace", action="append", default=[])
     args = parser.parse_args(argv)
     payload = build_source_yield_report(
@@ -327,6 +375,7 @@ def main(argv: list[str] | None = None) -> int:
         include_provider_rehearsals=args.include_provider_rehearsals,
         include_fixture_namespaces=args.include_fixture_namespaces,
         include_stale_namespaces=args.include_stale_namespaces,
+        include_live_rehearsals_without_burn_in_run=args.include_live_rehearsals_without_burn_in_run,
         include_namespaces=tuple(args.include_namespace),
     )
     print(f"event_alpha_source_yield_report: {payload['namespace_dir']}/{SOURCE_YIELD_MD}")

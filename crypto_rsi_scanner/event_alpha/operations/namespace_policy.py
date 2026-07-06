@@ -14,7 +14,7 @@ from .daily_burn_in import RUN_JSON
 
 POLICY_JSON = "event_alpha_burn_in_namespace_policy.json"
 POLICY_MD = "event_alpha_burn_in_namespace_policy.md"
-POLICY_VERSION = "burn_in_namespace_policy_v2"
+POLICY_VERSION = "burn_in_namespace_policy_v3"
 
 ACTIVE_BURN_IN_STATUSES = {
     "active_burn_in",
@@ -64,6 +64,7 @@ def build_namespace_policy(
     include_provider_rehearsals: bool = False,
     include_fixture_namespaces: bool = False,
     include_stale_namespaces: bool = False,
+    include_live_rehearsals_without_burn_in_run: bool = False,
     include_namespaces: Iterable[str] = (),
     write: bool = True,
 ) -> dict[str, Any]:
@@ -78,6 +79,7 @@ def build_namespace_policy(
         include_provider_rehearsals=include_provider_rehearsals,
         include_fixture_namespaces=include_fixture_namespaces,
         include_stale_namespaces=include_stale_namespaces,
+        include_live_rehearsals_without_burn_in_run=include_live_rehearsals_without_burn_in_run,
         include_namespaces=include_namespaces,
     )
     included = [item for item in selections if item.include]
@@ -101,12 +103,14 @@ def build_namespace_policy(
             "include_provider_rehearsals": bool(include_provider_rehearsals),
             "include_fixture_namespaces": bool(include_fixture_namespaces),
             "include_stale_namespaces": bool(include_stale_namespaces),
+            "include_live_rehearsals_without_burn_in_run": bool(include_live_rehearsals_without_burn_in_run),
             "explicit_inclusion_flags": {
                 "include_notification_rehearsals": bool(include_notification_rehearsals),
                 "include_no_key_namespaces": bool(include_no_key_namespaces),
                 "include_provider_rehearsals": bool(include_provider_rehearsals),
                 "include_fixture_namespaces": bool(include_fixture_namespaces),
                 "include_stale_namespaces": bool(include_stale_namespaces),
+                "include_live_rehearsals_without_burn_in_run": bool(include_live_rehearsals_without_burn_in_run),
                 "include_namespace": sorted(str(item) for item in include_namespaces if str(item).strip()),
             },
             "explicit_include_namespaces": sorted(str(item) for item in include_namespaces if str(item).strip()),
@@ -127,6 +131,9 @@ def build_namespace_policy(
             "no_key_excluded_count": _excluded_count(excluded, "no_key"),
             "fixture_excluded_count": _excluded_count(excluded, "fixture"),
             "provider_rehearsal_excluded_count": _excluded_count(excluded, "provider_rehearsal"),
+            "included_without_burn_in_run_count": sum(
+                1 for item in included if not _has_daily_burn_in_run(item.artifact_counts)
+            ),
             "fixture_live_mix_blocker": bool(fixture_included and live_included),
             "fixture_namespaces_included": fixture_included,
             "live_namespaces_included": live_included,
@@ -146,6 +153,7 @@ def select_namespaces(
     include_provider_rehearsals: bool = False,
     include_fixture_namespaces: bool = False,
     include_stale_namespaces: bool = False,
+    include_live_rehearsals_without_burn_in_run: bool = False,
     include_namespaces: Iterable[str] = (),
 ) -> list[NamespaceSelection]:
     base = Path(base_dir).expanduser()
@@ -167,6 +175,7 @@ def select_namespaces(
             include_provider_rehearsals=include_provider_rehearsals,
             include_fixture_namespaces=include_fixture_namespaces,
             include_stale_namespaces=include_stale_namespaces,
+            include_live_rehearsals_without_burn_in_run=include_live_rehearsals_without_burn_in_run,
         )
         for namespace, path in sorted(namespace_paths.items())
     ]
@@ -194,6 +203,8 @@ def format_namespace_policy(payload: Mapping[str, Any]) -> str:
         f"- include_provider_rehearsals: `{payload.get('include_provider_rehearsals')}`",
         f"- include_fixture_namespaces: `{payload.get('include_fixture_namespaces')}`",
         f"- include_stale_namespaces: `{payload.get('include_stale_namespaces')}`",
+        f"- include_live_rehearsals_without_burn_in_run: `{payload.get('include_live_rehearsals_without_burn_in_run')}`",
+        f"- included_without_burn_in_run_count: `{payload.get('included_without_burn_in_run_count')}`",
         f"- active_live_rehearsal_excluded_count: `{payload.get('active_live_rehearsal_excluded_count')}`",
         f"- no_key_excluded_count: `{payload.get('no_key_excluded_count')}`",
         f"- fixture_excluded_count: `{payload.get('fixture_excluded_count')}`",
@@ -232,6 +243,7 @@ def _selection_for(
     include_provider_rehearsals: bool,
     include_fixture_namespaces: bool,
     include_stale_namespaces: bool,
+    include_live_rehearsals_without_burn_in_run: bool,
 ) -> NamespaceSelection:
     marker = namespace_status.load_namespace_status(path)
     status = _status_for(namespace, path, marker)
@@ -239,8 +251,7 @@ def _selection_for(
     latest_run_id = _latest_run_id(path, marker)
     latest_doctor_status = (marker.current_doctor_status if marker else None) or "unknown"
     has_daily_burn_in_artifact = counts.get(RUN_JSON, 0) > 0
-    has_run_ledger = counts.get("event_alpha_runs.jsonl", 0) > 0
-    has_burn_in_evidence = has_daily_burn_in_artifact or has_run_ledger
+    has_burn_in_evidence = has_daily_burn_in_artifact
     categories = _namespace_categories(namespace, status, path, has_burn_in_evidence)
     reasons: list[str] = []
     include = False
@@ -259,6 +270,7 @@ def _selection_for(
         include_provider_rehearsals=include_provider_rehearsals,
         include_fixture_namespaces=include_fixture_namespaces,
         include_stale_namespaces=include_stale_namespaces,
+        include_live_rehearsals_without_burn_in_run=include_live_rehearsals_without_burn_in_run,
     ):
         include = True
         include_reason = _category_include_reason(
@@ -268,6 +280,7 @@ def _selection_for(
             include_provider_rehearsals=include_provider_rehearsals,
             include_fixture_namespaces=include_fixture_namespaces,
             include_stale_namespaces=include_stale_namespaces,
+            include_live_rehearsals_without_burn_in_run=include_live_rehearsals_without_burn_in_run,
         )
     elif _blocked_default_categories(
         categories,
@@ -276,17 +289,16 @@ def _selection_for(
         include_provider_rehearsals=include_provider_rehearsals,
         include_fixture_namespaces=include_fixture_namespaces,
         include_stale_namespaces=include_stale_namespaces,
+        include_live_rehearsals_without_burn_in_run=include_live_rehearsals_without_burn_in_run,
     ):
         reasons.extend(_default_exclusion_reasons(namespace, status, path, has_burn_in_evidence, categories))
     elif has_daily_burn_in_artifact:
         include = True
         include_reason = "daily_burn_in_run_artifact"
     elif status in ACTIVE_BURN_IN_STATUSES:
-        include = True
-        include_reason = f"status:{status}"
-    elif namespace.startswith("live_burn_in_") and has_burn_in_evidence:
-        include = True
-        include_reason = "live_burn_in_namespace_with_run_evidence"
+        reasons.append("active_burn_in_status_without_daily_burn_in_run_artifact")
+    elif namespace.startswith("live_burn_in_"):
+        reasons.append("live_burn_in_namespace_without_daily_burn_in_run_artifact")
 
     if not include:
         reasons.extend(_default_exclusion_reasons(namespace, status, path, has_burn_in_evidence, categories))
@@ -350,7 +362,7 @@ def _status_for(namespace: str, path: Path, marker: namespace_status.EventAlphaN
         return namespace_status.STATUS_ACTIVE_PROVIDER_PREFLIGHT
     if "provider_rehearsal" in lowered or "no_send_rehearsal" in lowered or lowered.endswith("_rehearsal"):
         return namespace_status.STATUS_ACTIVE_PROVIDER_REHEARSAL
-    if namespace.startswith("live_burn_in_") and ((path / RUN_JSON).exists() or (path / "event_alpha_runs.jsonl").exists()):
+    if namespace.startswith("live_burn_in_") and (path / RUN_JSON).exists():
         return "active_no_send_burn_in"
     if namespace == "no_key_live":
         return "no_key_live"
@@ -403,7 +415,9 @@ def _default_exclusion_reasons(namespace: str, status: str, path: Path, has_burn
     if status in {namespace_status.STATUS_ARCHIVED, namespace_status.STATUS_QUARANTINE}:
         reasons.append(f"inactive_namespace_status:{status}")
     if namespace.startswith("live_burn_in_") and not has_burn_in_evidence:
-        reasons.append("live_burn_in_namespace_without_run_evidence")
+        reasons.append("live_burn_in_namespace_without_daily_burn_in_run_artifact")
+    if status in ACTIVE_BURN_IN_STATUSES and not has_burn_in_evidence:
+        reasons.append("active_burn_in_status_without_daily_burn_in_run_artifact")
     if not reasons and path.exists():
         reasons.append(f"status_not_in_burn_in_policy:{status}")
     if not path.exists():
@@ -429,8 +443,12 @@ def _namespace_categories(namespace: str, status: str, path: Path, has_burn_in_e
     return categories
 
 
+def _has_daily_burn_in_run(counts: Mapping[str, int]) -> bool:
+    return int(counts.get(RUN_JSON, 0) or 0) > 0
+
+
 def _has_burn_in_evidence(counts: Mapping[str, int]) -> bool:
-    return int(counts.get(RUN_JSON, 0) or 0) > 0 or int(counts.get("event_alpha_runs.jsonl", 0) or 0) > 0
+    return _has_daily_burn_in_run(counts)
 
 
 def _blocked_default_categories(
@@ -441,6 +459,7 @@ def _blocked_default_categories(
     include_provider_rehearsals: bool,
     include_fixture_namespaces: bool,
     include_stale_namespaces: bool,
+    include_live_rehearsals_without_burn_in_run: bool,
 ) -> set[str]:
     blocked: set[str] = set()
     if "notification_rehearsal" in categories and not include_notification_rehearsals:
@@ -453,7 +472,7 @@ def _blocked_default_categories(
         blocked.add("fixture")
     if "stale" in categories and not include_stale_namespaces:
         blocked.add("stale")
-    if "active_live_rehearsal" in categories:
+    if "active_live_rehearsal" in categories and not include_live_rehearsals_without_burn_in_run:
         blocked.add("active_live_rehearsal")
     return blocked
 
@@ -466,6 +485,7 @@ def _category_allowed_by_explicit_flag(
     include_provider_rehearsals: bool,
     include_fixture_namespaces: bool,
     include_stale_namespaces: bool,
+    include_live_rehearsals_without_burn_in_run: bool,
 ) -> bool:
     return bool(
         ("notification_rehearsal" in categories and include_notification_rehearsals)
@@ -473,6 +493,7 @@ def _category_allowed_by_explicit_flag(
         or ("provider_rehearsal" in categories and include_provider_rehearsals)
         or ("fixture" in categories and include_fixture_namespaces)
         or ("stale" in categories and include_stale_namespaces)
+        or ("active_live_rehearsal" in categories and include_live_rehearsals_without_burn_in_run)
     )
 
 
@@ -484,6 +505,7 @@ def _category_include_reason(
     include_provider_rehearsals: bool,
     include_fixture_namespaces: bool,
     include_stale_namespaces: bool,
+    include_live_rehearsals_without_burn_in_run: bool,
 ) -> str:
     if "notification_rehearsal" in categories and include_notification_rehearsals:
         return "explicit_flag:include_notification_rehearsals"
@@ -495,6 +517,8 @@ def _category_include_reason(
         return "explicit_flag:include_fixture_namespaces"
     if "stale" in categories and include_stale_namespaces:
         return "explicit_flag:include_stale_namespaces"
+    if "active_live_rehearsal" in categories and include_live_rehearsals_without_burn_in_run:
+        return "explicit_flag:include_live_rehearsals_without_burn_in_run"
     return "explicit_flag:include_namespace"
 
 
@@ -526,6 +550,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--include-provider-rehearsals", action="store_true")
     parser.add_argument("--include-fixture-namespaces", action="store_true")
     parser.add_argument("--include-stale-namespaces", action="store_true")
+    parser.add_argument("--include-live-rehearsals-without-burn-in-run", action="store_true")
     parser.add_argument("--include-namespace", action="append", default=[])
     args = parser.parse_args(argv)
     payload = build_namespace_policy(
@@ -537,6 +562,7 @@ def main(argv: list[str] | None = None) -> int:
         include_provider_rehearsals=args.include_provider_rehearsals,
         include_fixture_namespaces=args.include_fixture_namespaces,
         include_stale_namespaces=args.include_stale_namespaces,
+        include_live_rehearsals_without_burn_in_run=args.include_live_rehearsals_without_burn_in_run,
         include_namespaces=args.include_namespace,
     )
     print(f"event_alpha_burn_in_namespace_policy: {payload['namespace_dir']}/{POLICY_MD}")

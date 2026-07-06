@@ -78,6 +78,7 @@ def test_event_alpha_burn_in_operating_targets_are_no_send_and_artifact_only():
             "INCLUDE_PROVIDER_REHEARSALS=1",
             "INCLUDE_FIXTURE_NAMESPACES=1",
             "INCLUDE_STALE_NAMESPACES=1",
+            "INCLUDE_LIVE_REHEARSALS_WITHOUT_BURN_IN_RUN=1",
             "COUNT_EXPLICIT_NAMESPACE_FOR_BURN_IN=1",
             "PYTHON=python3",
         ],
@@ -89,6 +90,7 @@ def test_event_alpha_burn_in_operating_targets_are_no_send_and_artifact_only():
     assert "--include-provider-rehearsals" in scorecard_dry
     assert "--include-fixture-namespaces" in scorecard_dry
     assert "--include-stale-namespaces" in scorecard_dry
+    assert "--include-live-rehearsals-without-burn-in-run" in scorecard_dry
     assert "--count-explicit-namespace-for-burn-in" in scorecard_dry
     explicit_scorecard_dry = subprocess.check_output(
         [

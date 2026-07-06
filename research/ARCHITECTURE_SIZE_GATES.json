@@ -1758,7 +1758,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-06T15:39:09.280761+00:00",
+  "generated_at": "2026-07-06T16:48:53.253707+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2078,7 +2078,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 607,
+      "line_count": 719,
       "path": "tests/event_alpha/test_burn_in_operations.py",
       "source_kind": "test"
     },
@@ -2120,7 +2120,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 120,
+      "line_count": 122,
       "path": "tests/cli/test_burn_in_make_targets.py",
       "source_kind": "test"
     },

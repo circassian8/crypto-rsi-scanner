@@ -14,17 +14,34 @@ from . import common
 
 INBOX_JSON = "event_alpha_daily_review_inbox.json"
 INBOX_MD = "event_alpha_daily_review_inbox.md"
+SECONDARY_VISIBLE_FAMILY_MIN_SCORE = 80
+HIGH_VALUE_SECONDARY_BUCKETS = {
+    "accepted_evidence_no_market_confirmation",
+    "near_gate",
+    "market_anomaly_missing_catalyst",
+    "official_structured_missing_market",
+    "high_value_skipped_family",
+    "provider_confirmation_gap",
+    "source_pack_high_priority",
+    "fresh_candidate",
+}
 
 
 @dataclass(frozen=True)
 class ReviewItem:
     family: str
     visible_family_key: str
+    primary_visible_family_key: str
+    secondary_visible_family_key: str
     candidate_family_id: str
     core_family_ids: tuple[str, ...]
     duplicate_visible_family_count: int
+    symbol_duplicate_count: int
+    collapsed_symbol_family_count: int
     visible_family_rank: int
+    symbol_family_rank: int
     selection_bucket: str
+    allowed_second_family_reason: str
     collapsed_family_representative_reason: str
     symbol: str
     coin_id: str
@@ -43,9 +60,12 @@ class ReviewItem:
     provider_gap: str | None = None
     review_value_score: int = 0
     review_value_reasons: tuple[str, ...] = ()
+    review_value_reason_codes: tuple[str, ...] = ()
+    downrank_reason_codes: tuple[str, ...] = ()
     family_rank: int = 0
     diversity_bucket: str = "general"
     selection_reason: str = ""
+    selected_representative_reason: str = ""
 
 
 def build_review_inbox(
@@ -80,6 +100,7 @@ def build_review_inbox(
             "items_count": len(items),
             "items": [item.__dict__ for item in items],
             "family_summaries": _family_summaries(all_items),
+            "collapsed_family_summary": _symbol_family_summaries(all_items),
             "stale_path_warnings": stale_paths,
             "blockers": [
                 f"stale_or_missing_review_path:{path}"
@@ -122,6 +143,16 @@ def format_review_inbox(payload: Mapping[str, Any]) -> str:
                     f"representative=`{row.get('feedback_target')}` reason=`{row.get('collapsed_family_representative_reason')}`"
                 )
         lines.append("")
+    collapsed = payload.get("collapsed_family_summary") or []
+    if collapsed:
+        lines.extend(["## Collapsed Symbol Family Summary", ""])
+        for row in collapsed:
+            if isinstance(row, Mapping):
+                lines.append(
+                    f"- {row.get('primary_visible_family_key')}: {row.get('collapsed_symbol_family_count')} visible families; "
+                    f"selected=`{row.get('selected_feedback_targets')}`"
+                )
+        lines.append("")
     lines.extend(["## Review Items", ""])
     for index, row in enumerate(payload.get("items", []) or [], start=1):
         if not isinstance(row, Mapping):
@@ -131,13 +162,21 @@ def format_review_inbox(payload: Mapping[str, Any]) -> str:
                 f"### {index}. {row.get('symbol') or 'UNKNOWN'} / {row.get('coin_id') or 'unknown'}",
                 f"- family: `{row.get('family')}`",
                 f"- visible_family_key: `{row.get('visible_family_key')}`",
+                f"- primary_visible_family_key: `{row.get('primary_visible_family_key')}`",
+                f"- secondary_visible_family_key: `{row.get('secondary_visible_family_key')}`",
                 f"- duplicate_visible_family_count: `{row.get('duplicate_visible_family_count')}`",
+                f"- symbol_duplicate_count: `{row.get('symbol_duplicate_count')}`",
+                f"- collapsed_symbol_family_count: `{row.get('collapsed_symbol_family_count')}`",
                 f"- visible_family_rank: `{row.get('visible_family_rank')}`",
+                f"- symbol_family_rank: `{row.get('symbol_family_rank')}`",
                 f"- selection_bucket: `{row.get('selection_bucket')}`",
+                f"- allowed_second_family_reason: `{row.get('allowed_second_family_reason') or 'none'}`",
                 f"- opportunity_type: `{row.get('opportunity_type')}`",
                 f"- score: `{row.get('score')}`",
-                f"- Review value: `{row.get('review_value_score')}` ({', '.join(row.get('review_value_reasons') or []) or 'general review'})",
+                f"- Review value: `{row.get('review_value_score')}` ({', '.join(row.get('review_value_reason_codes') or []) or 'general review'})",
+                f"- downrank_reason_codes: `{', '.join(row.get('downrank_reason_codes') or []) or 'none'}`",
                 f"- selection_reason: `{row.get('selection_reason')}`",
+                f"- selected_representative_reason: `{row.get('selected_representative_reason') or row.get('collapsed_family_representative_reason')}`",
                 f"- diversity_bucket: `{row.get('diversity_bucket')}`",
                 f"- source_origin/source_pack: `{row.get('source_origin')}` / `{row.get('source_pack')}`",
                 f"- evidence_status: `{row.get('evidence_status')}`",
@@ -217,6 +256,16 @@ def _visible_family_key(row: Mapping[str, Any]) -> str:
     return f"{symbol}:{coin_id}:{_broad_family(row)}"
 
 
+def _primary_visible_family_key(row: Mapping[str, Any]) -> str:
+    symbol = str(row.get("symbol") or row.get("asset_symbol") or row.get("base_symbol") or "").strip().upper() or "UNKNOWN"
+    coin_id = str(row.get("coin_id") or row.get("asset_coin_id") or "").strip().casefold() or "unknown"
+    return f"{symbol}:{coin_id}"
+
+
+def _secondary_visible_family_key(row: Mapping[str, Any], opportunity_type: str, bucket: str) -> str:
+    return f"{_primary_visible_family_key(row)}:{opportunity_type.casefold()}:{bucket}"
+
+
 def _canonical_asset_id_reliable(value: str) -> bool:
     lowered = value.casefold()
     return bool(value and lowered not in {"unknown", "none", "null"} and not lowered.startswith(("core:", "ea:", "candidate:")))
@@ -274,12 +323,38 @@ def _family_summaries(items: Iterable[ReviewItem]) -> list[dict[str, Any]]:
         rows.append(
             {
                 "visible_family_key": item.visible_family_key,
+                "primary_visible_family_key": item.primary_visible_family_key,
+                "secondary_visible_family_key": item.secondary_visible_family_key,
                 "symbol": item.symbol,
                 "coin_id": item.coin_id,
                 "duplicate_visible_family_count": item.duplicate_visible_family_count,
+                "symbol_duplicate_count": item.symbol_duplicate_count,
+                "collapsed_symbol_family_count": item.collapsed_symbol_family_count,
                 "feedback_target": item.feedback_target,
                 "core_family_ids": list(item.core_family_ids),
                 "collapsed_family_representative_reason": item.collapsed_family_representative_reason,
+            }
+        )
+    return rows
+
+
+def _symbol_family_summaries(items: Iterable[ReviewItem]) -> list[dict[str, Any]]:
+    groups: dict[str, list[ReviewItem]] = {}
+    for item in items:
+        groups.setdefault(item.primary_visible_family_key, []).append(item)
+    rows: list[dict[str, Any]] = []
+    for primary, values in sorted(groups.items(), key=lambda pair: (-sum(item.duplicate_visible_family_count for item in pair[1]), pair[0])):
+        selected_targets = [
+            item.feedback_target
+            for item in sorted(values, key=lambda value: (-value.review_value_score, value.secondary_visible_family_key))
+            if item.feedback_target
+        ][:3]
+        rows.append(
+            {
+                "primary_visible_family_key": primary,
+                "collapsed_symbol_family_count": len(values),
+                "symbol_duplicate_count": sum(item.duplicate_visible_family_count for item in values),
+                "selected_feedback_targets": ", ".join(selected_targets),
             }
         )
     return rows
@@ -309,15 +384,23 @@ def _item_from_group(
     confirms = str(best.get("what_confirms") or best.get("confirm_if") or _default_confirm(opportunity_type))
     invalidates = str(best.get("what_invalidates") or best.get("invalidate_if") or _default_invalidate(opportunity_type))
     card_path = common.rel_path(card) if card else ""
-    value_score, value_reasons, bucket = _review_value(best, opportunity_type, score, source_origin, source_pack, evidence_status, market_state, why, has_card=bool(card_path))
+    value_score, value_reasons, downrank_reasons, bucket = _review_value(best, opportunity_type, score, source_origin, source_pack, evidence_status, market_state, why, has_card=bool(card_path))
+    primary_key = _primary_visible_family_key(best)
+    secondary_key = _secondary_visible_family_key(best, opportunity_type, bucket)
     return ReviewItem(
         family=family,
         visible_family_key=family,
+        primary_visible_family_key=primary_key,
+        secondary_visible_family_key=secondary_key,
         candidate_family_id=candidate_family_id,
         core_family_ids=core_family_ids,
         duplicate_visible_family_count=len(rows),
+        symbol_duplicate_count=len(rows),
+        collapsed_symbol_family_count=1,
         visible_family_rank=0,
+        symbol_family_rank=0,
         selection_bucket=bucket,
+        allowed_second_family_reason="",
         collapsed_family_representative_reason=_representative_reason(best, rows),
         symbol=symbol,
         coin_id=coin_id,
@@ -335,7 +418,9 @@ def _item_from_group(
         suggested_feedback_commands=_feedback_commands(profile, target),
         provider_gap=_provider_gap(best),
         review_value_score=value_score,
-        review_value_reasons=tuple(value_reasons),
+        review_value_reasons=tuple([*value_reasons, *downrank_reasons]),
+        review_value_reason_codes=tuple(value_reasons),
+        downrank_reason_codes=tuple(downrank_reasons),
         diversity_bucket=bucket,
     )
 
@@ -422,37 +507,96 @@ def _feedback_commands(profile: str, target: str) -> tuple[str, ...]:
 
 
 def _select_review_items(items: list[ReviewItem], *, limit: int) -> list[ReviewItem]:
-    ranked = sorted(items, key=lambda item: (-_priority(item), -item.score, item.visible_family_key))
+    ranked = sorted(items, key=lambda item: (-_priority(item), -item.score, item.secondary_visible_family_key))
+    by_primary: dict[str, list[ReviewItem]] = {}
+    for item in ranked:
+        by_primary.setdefault(item.primary_visible_family_key, []).append(item)
+    best_by_primary = [values[0] for values in by_primary.values()]
+    secondaries = [
+        replace(
+            item,
+            allowed_second_family_reason=f"high_value_secondary:{item.diversity_bucket}",
+        )
+        for values in by_primary.values()
+        for item in values[1:]
+        if _allowed_second_family(item, values[0])
+    ]
+    ranked = sorted(best_by_primary, key=lambda item: (-_priority(item), -item.score, item.secondary_visible_family_key))
     selected: list[ReviewItem] = []
-    selected_families: set[str] = set()
+    selected_keys: set[str] = set()
     desired_buckets = (
         "accepted_evidence_no_market_confirmation",
+        "near_gate",
         "market_anomaly_missing_catalyst",
+        "official_structured_missing_market",
+        "high_value_skipped_family",
+        "provider_confirmation_gap",
         "source_only_narrative",
     )
     for bucket in desired_buckets:
-        candidate = next((item for item in ranked if item.diversity_bucket == bucket and item.visible_family_key not in selected_families), None)
+        candidate = next((item for item in ranked if item.diversity_bucket == bucket and item.primary_visible_family_key not in selected_keys), None)
         if candidate and len(selected) < limit:
             selected.append(candidate)
-            selected_families.add(candidate.visible_family_key)
+            selected_keys.add(candidate.primary_visible_family_key)
     for item in ranked:
         if len(selected) >= limit:
             break
-        if item.visible_family_key in selected_families:
+        if item.primary_visible_family_key in selected_keys:
             continue
         selected.append(item)
-        selected_families.add(item.visible_family_key)
+        selected_keys.add(item.primary_visible_family_key)
+    for item in sorted(secondaries, key=lambda value: (-_priority(value), -value.score, value.secondary_visible_family_key)):
+        if len(selected) >= limit:
+            break
+        if item.secondary_visible_family_key in {selected_item.secondary_visible_family_key for selected_item in selected}:
+            continue
+        selected.append(item)
     ordered = sorted(selected, key=lambda item: (-_priority(item), -item.score, item.visible_family_key))
+    primary_counts = {
+        primary: sum(item.duplicate_visible_family_count for item in values)
+        for primary, values in by_primary.items()
+    }
+    family_counts = {primary: len(values) for primary, values in by_primary.items()}
+    primary_seen: dict[str, int] = {}
     return [
-        replace(
-            item,
-            family_rank=index,
-            visible_family_rank=index,
-            selection_bucket=item.diversity_bucket,
-            selection_reason=_selection_reason(item, index),
-        )
+        _ranked_item(item, index, primary_seen, primary_counts, family_counts)
         for index, item in enumerate(ordered, start=1)
     ]
+
+
+def _allowed_second_family(item: ReviewItem, primary_best: ReviewItem) -> bool:
+    if item.diversity_bucket == primary_best.diversity_bucket:
+        return False
+    if item.diversity_bucket not in HIGH_VALUE_SECONDARY_BUCKETS:
+        return False
+    if item.review_value_score < SECONDARY_VISIBLE_FAMILY_MIN_SCORE:
+        return False
+    if "generic_context_source_downranked" in item.downrank_reason_codes:
+        return False
+    return True
+
+
+def _ranked_item(
+    item: ReviewItem,
+    index: int,
+    primary_seen: dict[str, int],
+    primary_counts: Mapping[str, int],
+    family_counts: Mapping[str, int],
+) -> ReviewItem:
+    primary_seen[item.primary_visible_family_key] = primary_seen.get(item.primary_visible_family_key, 0) + 1
+    symbol_rank = primary_seen[item.primary_visible_family_key]
+    return replace(
+        item,
+        family_rank=index,
+        visible_family_rank=index,
+        symbol_family_rank=symbol_rank,
+        duplicate_visible_family_count=item.duplicate_visible_family_count,
+        symbol_duplicate_count=primary_counts.get(item.primary_visible_family_key, item.duplicate_visible_family_count),
+        collapsed_symbol_family_count=family_counts.get(item.primary_visible_family_key, 1),
+        selection_bucket=item.diversity_bucket,
+        selection_reason=_selection_reason(item, index),
+        selected_representative_reason=item.collapsed_family_representative_reason,
+    )
 
 
 def _priority(item: ReviewItem) -> int:
@@ -521,16 +665,22 @@ def _review_value(
     why: str,
     *,
     has_card: bool,
-) -> tuple[int, list[str], str]:
+) -> tuple[int, list[str], list[str], str]:
     value = _legacy_priority(
         ReviewItem(
             family="",
             visible_family_key="",
+            primary_visible_family_key="",
+            secondary_visible_family_key="",
             candidate_family_id="",
             core_family_ids=(),
             duplicate_visible_family_count=1,
+            symbol_duplicate_count=1,
+            collapsed_symbol_family_count=1,
             visible_family_rank=0,
+            symbol_family_rank=0,
             selection_bucket="general",
+            allowed_second_family_reason="",
             collapsed_family_representative_reason="",
             symbol="",
             coin_id="",
@@ -549,19 +699,21 @@ def _review_value(
         )
     )
     reasons: list[str] = []
+    downrank_reasons: list[str] = []
     bucket = "general"
     source_text = f"{source_origin} {source_pack}".casefold()
     market_text = f"{market_state} {why}".casefold()
     evidence_text = evidence_status.casefold()
     lane_text = opportunity_type.casefold()
     source_strength = max(common.int_value(row.get("source_strength")), common.int_value(row.get("source_strength_score")))
+    symbol = str(row.get("symbol") or row.get("asset_symbol") or "").strip().upper()
     if any(token in source_text for token in ("cryptopanic", "rss", "gdelt", "news", "context")) and "official" not in source_text:
-        value += 8
+        value += 4
         reasons.append("source_only_narrative")
         bucket = "source_only_narrative"
-        if any(token in source_text for token in ("project_blog_rss", "rss", "gdelt")):
-            value -= 12
-            reasons.append("generic_context_source_downranked")
+        if any(token in source_text for token in ("project_blog_rss", "rss", "gdelt")) or symbol in {"BTC", "ETH"}:
+            value -= 25 if symbol in {"BTC", "ETH"} else 15
+            downrank_reasons.append("generic_context_source_downranked")
     if row.get("_source_file") == "event_market_anomalies.jsonl" or "anomaly" in market_text:
         value += 55
         reasons.append("market_anomaly_missing_catalyst")
@@ -574,38 +726,73 @@ def _review_value(
         bucket = "accepted_evidence_no_market_confirmation"
     if any(token in source_text for token in ("official", "bybit", "binance", "unlock", "calendar")) and no_market:
         value += 50
-        reasons.append("official_structured_missing_market_confirmation")
+        reasons.append("official_structured_missing_market")
+        if bucket != "accepted_evidence_no_market_confirmation":
+            bucket = "official_structured_missing_market"
     if source_strength >= 70 and ("blocked" in market_text or no_market):
         value += 45
-        reasons.append("high_source_strength_blocked_by_market")
+        reasons.append("source_pack_high_priority")
+        bucket = "source_pack_high_priority"
     if "near" in why.casefold():
         value += 45
         reasons.append("near_gate")
+        bucket = "near_gate"
     if "quality" in why.casefold() or "cap" in why.casefold():
         value += 10
         reasons.append("quality_capped")
     if row.get("skipped") is True or row.get("skip_reason") or "skip" in why.casefold():
         value += 40
-        reasons.append("high_value_skipped_research_review")
+        reasons.append("high_value_skipped_family")
+        bucket = "high_value_skipped_family"
     gap = _provider_gap(row)
     if gap and any(token in gap.casefold() for token in ("coinalyze", "official", "unlock", "exchange", "provider", "confirmation")):
         value += 35
-        reasons.append("actionable_provider_source_gap")
+        reasons.append("provider_confirmation_gap")
+        bucket = "provider_confirmation_gap"
+    if _is_fresh_candidate(row):
+        value += 10
+        reasons.append("fresh_candidate")
     if opportunity_type == "FADE_SHORT_REVIEW":
         value += 20
         reasons.append("fade_review")
     if "diagnostic" in lane_text:
         value -= 35
-        reasons.append("diagnostic_downranked")
+        downrank_reasons.append("diagnostic_hidden")
     if not has_card:
         value -= 5
-        reasons.append("no_card_downranked")
+        downrank_reasons.append("no_card_path_downranked")
+    if _is_stale_candidate(row, market_state, why):
+        value -= 20
+        downrank_reasons.append("stale_candidate_downranked")
     if "unsupported" in why.casefold() or "insufficient" in why.casefold():
         value -= 25
-        reasons.append("unsupported_mechanism_downranked")
+        downrank_reasons.append("unsupported_mechanism_downranked")
     if not reasons:
         reasons.append("highest_remaining_review_value")
-    return max(0, value), reasons, bucket
+    return max(0, value), reasons, downrank_reasons, bucket
+
+
+def _is_fresh_candidate(row: Mapping[str, Any]) -> bool:
+    text = " ".join(str(row.get(field) or "") for field in ("freshness_status", "market_context_freshness_status", "source_freshness_status", "market_state_class")).casefold()
+    if "fresh" in text or "current" in text:
+        return True
+    timestamp = common.timestamp_for_row(row)
+    if timestamp is None:
+        return False
+    return (common.utc_now() - timestamp).total_seconds() <= 3 * 24 * 3600
+
+
+def _is_stale_candidate(row: Mapping[str, Any], market_state: str, why: str) -> bool:
+    text = " ".join(
+        [
+            str(market_state or ""),
+            str(why or ""),
+            str(row.get("freshness_status") or ""),
+            str(row.get("market_context_freshness_status") or ""),
+            str(row.get("source_freshness_status") or ""),
+        ]
+    ).casefold()
+    return "stale" in text or "expired" in text
 
 
 def _selection_reason(item: ReviewItem, rank: int) -> str:
@@ -613,6 +800,12 @@ def _selection_reason(item: ReviewItem, rank: int) -> str:
         "source_only_narrative",
         "market_anomaly_missing_catalyst",
         "accepted_evidence_no_market_confirmation",
+        "near_gate",
+        "official_structured_missing_market",
+        "high_value_skipped_family",
+        "provider_confirmation_gap",
+        "source_pack_high_priority",
+        "fresh_candidate",
     }:
         return f"diversity_bucket:{item.diversity_bucket}"
     if rank == 1:

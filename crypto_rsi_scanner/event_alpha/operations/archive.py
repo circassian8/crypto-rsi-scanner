@@ -29,6 +29,7 @@ def build_burn_in_archive(
     include_provider_rehearsals: bool = False,
     include_fixture_namespaces: bool = False,
     include_stale_namespaces: bool = False,
+    include_live_rehearsals_without_burn_in_run: bool = False,
     include_namespaces: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     base = Path(base_dir).expanduser()
@@ -46,6 +47,7 @@ def build_burn_in_archive(
         include_provider_rehearsals=include_provider_rehearsals,
         include_fixture_namespaces=include_fixture_namespaces,
         include_stale_namespaces=include_stale_namespaces,
+        include_live_rehearsals_without_burn_in_run=include_live_rehearsals_without_burn_in_run,
         include_namespaces=include_namespaces,
     )
     namespaces = namespace_policy.included_namespace_names(policy)
@@ -77,6 +79,10 @@ def build_burn_in_archive(
             for rel, data in safe_payloads:
                 zf.writestr(rel, data)
     archive_checksum = hashlib.sha256(archive_path.read_bytes()).hexdigest() if archive_path.exists() and not dry_run else ""
+    explicit_flags = policy.get("explicit_inclusion_flags") if isinstance(policy.get("explicit_inclusion_flags"), dict) else {}
+    explicit_scope = bool(include_namespaces) or any(
+        bool(value) for key, value in explicit_flags.items() if key != "include_namespace"
+    )
     payload = common.with_safety(
         {
             "schema_version": "event_alpha_burn_in_archive_manifest_v1",
@@ -88,7 +94,7 @@ def build_burn_in_archive(
             "checksums_path": common.rel_path(checksums_path),
             "dry_run": bool(dry_run),
             "archive_created": bool(not dry_run and archive_path.exists()),
-            "archive_scope": "explicit_namespace_diagnostic" if include_namespaces else "active_burn_in_namespaces",
+            "archive_scope": "explicit_namespace_diagnostic" if explicit_scope else "active_burn_in_namespaces",
             "namespace_policy_version": policy.get("namespace_policy_version"),
             "explicit_include_flags": policy.get("explicit_inclusion_flags") or {},
             "no_active_burn_in_namespaces": not bool(namespaces),
@@ -110,6 +116,12 @@ def build_burn_in_archive(
             "excluded_namespaces": policy.get("excluded_namespaces") or [],
             "exclusion_reasons": policy.get("exclusion_reasons") or {},
             "excluded_reasons": policy.get("excluded_reasons") or policy.get("exclusion_reasons") or {},
+            "included_without_burn_in_run_count": policy.get("included_without_burn_in_run_count", 0),
+            "active_live_rehearsal_excluded_count": policy.get("active_live_rehearsal_excluded_count", 0),
+            "no_key_excluded_count": policy.get("no_key_excluded_count", 0),
+            "notification_rehearsal_excluded_count": policy.get("notification_rehearsal_excluded_count", 0),
+            "provider_rehearsal_excluded_count": policy.get("provider_rehearsal_excluded_count", 0),
+            "fixture_excluded_count": policy.get("fixture_excluded_count", 0),
             "namespace_status": policy.get("namespace_status") or {},
             "latest_doctor_status": policy.get("latest_doctor_status") or {},
             "latest_run_id": policy.get("latest_run_id") or {},
@@ -184,6 +196,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--include-provider-rehearsals", action="store_true")
     parser.add_argument("--include-fixture-namespaces", action="store_true")
     parser.add_argument("--include-stale-namespaces", action="store_true")
+    parser.add_argument("--include-live-rehearsals-without-burn-in-run", action="store_true")
     parser.add_argument("--include-namespace", action="append", default=[])
     args = parser.parse_args(argv)
     explicit_namespaces = tuple([*(args.include_namespace or []), *([args.artifact_namespace] if args.artifact_namespace else [])])
@@ -197,6 +210,7 @@ def main(argv: list[str] | None = None) -> int:
         include_provider_rehearsals=args.include_provider_rehearsals,
         include_fixture_namespaces=args.include_fixture_namespaces,
         include_stale_namespaces=args.include_stale_namespaces,
+        include_live_rehearsals_without_burn_in_run=args.include_live_rehearsals_without_burn_in_run,
         include_namespaces=explicit_namespaces,
     )
     print(f"event_alpha_burn_in_archive: {payload['archive_path']}")

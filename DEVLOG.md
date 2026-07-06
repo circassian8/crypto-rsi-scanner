@@ -25,14 +25,15 @@ review inbox also needed to collapse duplicate visible families so generic
 source-only rows do not crowd out higher-value review work.
 **Changes:**
 - Added explicit namespace policy flags for notification rehearsals, no-key
-  namespaces, provider rehearsals, fixtures, and stale namespaces, plus policy
-  version/scope counters across burn-in scorecard, weekly measurement,
-  source-yield, and archive manifests.
+  namespaces, provider rehearsals, fixtures, stale namespaces, and live
+  rehearsals without daily burn-in runs, plus policy version/scope counters
+  across burn-in scorecard, weekly measurement, source-yield, and archive
+  manifests.
 - Made default burn-in scorecard/measurement/source-yield/archive scopes count
-  only active burn-in namespaces; explicit single namespace runs are diagnostic
-  unless the operator opts in to counting them.
-- Added a dry-run daily burn-in plan target that prints the no-live-provider and
-  Coinalyze-skip guardrails without writing artifacts.
+  only daily-run-backed burn-in namespaces; explicit single namespace runs are
+  diagnostic unless the operator opts in to counting them.
+- Confirmed the dry-run daily burn-in plan target prints the no-live-provider
+  and Coinalyze-skip guardrails without writing artifacts.
 - Grouped daily review-inbox items by visible asset family and added family
   summary, representative reason, selection bucket, and review-value scoring so
   high-value source/market gaps rank ahead of generic RSS/GDELT-style noise.
@@ -41,7 +42,7 @@ source-only rows do not crowd out higher-value review work.
   scope metadata, and the no-send dry-run plan.
 **Verify:** `python3 tests/test_indicators.py` (770/770 passed);
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
-tests/cli tests/test_indicators.py -q` (808 passed); `python3 -m compileall -q
+tests/cli tests/test_indicators.py -q` (811 passed); `python3 -m compileall -q
 crypto_rsi_scanner tests`; `make event-alpha-daily-live-no-send-burn-in-smoke
 PYTHON=python3`; `make event-alpha-daily-live-no-send-burn-in-plan
 PYTHON=python3`; burn-in scorecard/review-inbox/feedback-progress/measurement/

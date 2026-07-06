@@ -26,6 +26,7 @@ def build_scorecard(
     include_provider_rehearsals: bool = False,
     include_fixture_namespaces: bool = False,
     include_stale_namespaces: bool = False,
+    include_live_rehearsals_without_burn_in_run: bool = False,
     include_namespaces: tuple[str, ...] = (),
     count_explicit_namespace_for_burn_in: bool = False,
 ) -> dict[str, Any]:
@@ -42,6 +43,7 @@ def build_scorecard(
         include_provider_rehearsals=include_provider_rehearsals,
         include_fixture_namespaces=include_fixture_namespaces,
         include_stale_namespaces=include_stale_namespaces,
+        include_live_rehearsals_without_burn_in_run=include_live_rehearsals_without_burn_in_run,
         include_namespaces=((artifact_namespace,) if artifact_namespace else include_namespaces),
     )
     included_namespaces = namespace_policy.included_namespace_names(policy)
@@ -97,37 +99,20 @@ def build_scorecard(
             "namespace_dir": common.rel_path(context.namespace_dir),
             "window_days": days,
             "namespace_scope": "single_namespace" if artifact_namespace else "policy",
+            "evidence_scope": scope["evidence_scope"],
             "burn_in_contract_scope": scope["burn_in_contract_scope"],
             "count_explicit_namespace_for_burn_in": bool(count_explicit_namespace_for_burn_in),
             "include_reason": "explicit_user_namespace" if artifact_namespace else "burn_in_namespace_policy",
-            "namespace_policy": {
-                "namespace_policy_version": policy.get("namespace_policy_version"),
-                "included_namespaces": policy.get("included_namespaces") or [],
-                "excluded_namespaces": policy.get("excluded_namespaces") or [],
-                "exclusion_reasons": policy.get("exclusion_reasons") or {},
-                "excluded_reasons": policy.get("excluded_reasons") or policy.get("exclusion_reasons") or {},
-                "explicit_inclusion_flags": policy.get("explicit_inclusion_flags") or {},
-                "namespace_status": policy.get("namespace_status") or {},
-                "latest_doctor_status": policy.get("latest_doctor_status") or {},
-                "latest_run_id": policy.get("latest_run_id") or {},
-                "artifact_counts": policy.get("artifact_counts") or {},
-            },
-            "namespace_policy_version": policy.get("namespace_policy_version"),
-            "explicit_inclusion_flags": policy.get("explicit_inclusion_flags") or {},
-            "included_namespaces": included_namespaces,
-            "excluded_namespaces": policy.get("excluded_namespaces") or [],
-            "exclusion_reasons": policy.get("exclusion_reasons") or {},
-            "excluded_reasons": policy.get("excluded_reasons") or policy.get("exclusion_reasons") or {},
-            "namespace_status": policy.get("namespace_status") or {},
-            "latest_doctor_status": policy.get("latest_doctor_status") or {},
-            "latest_run_id": policy.get("latest_run_id") or {},
-            "artifact_counts": policy.get("artifact_counts") or {},
+            "namespace_policy": _policy_summary(policy),
+            **_policy_flat_fields(policy, included_namespaces),
             "contract": contract,
             "live_no_send_cycles_completed": len(daily_runs),
             "real_candidates_seen": len(candidate_rows),
             "real_burn_in_candidate_count": len(contract_candidate_rows),
             "non_burn_in_candidate_count": max(0, len(candidate_rows) - len(contract_candidate_rows)),
+            "contract_counted_candidate_count": len(contract_candidate_rows),
             "notification_rehearsal_candidate_count": scope["notification_rehearsal_candidate_count"],
+            "provider_rehearsal_candidate_count": scope["provider_rehearsal_candidate_count"],
             "fixture_candidate_count": scope["fixture_candidate_count"],
             "stale_candidate_count": scope["stale_candidate_count"],
             "no_key_candidate_count": scope["no_key_candidate_count"],
@@ -175,10 +160,13 @@ def format_scorecard(payload: Mapping[str, Any]) -> str:
         f"- profile: `{payload.get('profile')}`",
         f"- artifact_namespace: `{payload.get('artifact_namespace')}`",
         f"- namespace_scope: `{payload.get('namespace_scope')}`",
+        f"- evidence_scope: `{payload.get('evidence_scope')}`",
         f"- burn_in_contract_scope: `{payload.get('burn_in_contract_scope')}`",
         f"- included_namespaces: `{', '.join(payload.get('included_namespaces') or []) or 'none'}`",
         f"- real_burn_in_candidate_count: `{payload.get('real_burn_in_candidate_count')}`",
+        f"- contract_counted_candidate_count: `{payload.get('contract_counted_candidate_count')}`",
         f"- notification_rehearsal_candidate_count: `{payload.get('notification_rehearsal_candidate_count')}`",
+        f"- provider_rehearsal_candidate_count: `{payload.get('provider_rehearsal_candidate_count')}`",
         f"- no_key_candidate_count: `{payload.get('no_key_candidate_count')}`",
         f"- fixture_candidate_count: `{payload.get('fixture_candidate_count')}`",
         f"- stale_candidate_count: `{payload.get('stale_candidate_count')}`",
@@ -238,6 +226,37 @@ def _all_rows(base: Path, filename: str, *, cutoff, namespaces: list[str] | tupl
     return rows
 
 
+def _policy_summary(policy: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "namespace_policy_version": policy.get("namespace_policy_version"),
+        "included_namespaces": policy.get("included_namespaces") or [],
+        "excluded_namespaces": policy.get("excluded_namespaces") or [],
+        "exclusion_reasons": policy.get("exclusion_reasons") or {},
+        "excluded_reasons": policy.get("excluded_reasons") or policy.get("exclusion_reasons") or {},
+        "explicit_inclusion_flags": policy.get("explicit_inclusion_flags") or {},
+        "namespace_status": policy.get("namespace_status") or {},
+        "latest_doctor_status": policy.get("latest_doctor_status") or {},
+        "latest_run_id": policy.get("latest_run_id") or {},
+        "artifact_counts": policy.get("artifact_counts") or {},
+    }
+
+
+def _policy_flat_fields(policy: Mapping[str, Any], included_namespaces: list[str]) -> dict[str, Any]:
+    summary = _policy_summary(policy)
+    return {
+        "namespace_policy_version": summary["namespace_policy_version"],
+        "explicit_inclusion_flags": summary["explicit_inclusion_flags"],
+        "included_namespaces": included_namespaces,
+        "excluded_namespaces": summary["excluded_namespaces"],
+        "exclusion_reasons": summary["exclusion_reasons"],
+        "excluded_reasons": summary["excluded_reasons"],
+        "namespace_status": summary["namespace_status"],
+        "latest_doctor_status": summary["latest_doctor_status"],
+        "latest_run_id": summary["latest_run_id"],
+        "artifact_counts": summary["artifact_counts"],
+    }
+
+
 def _scope_counts(
     *,
     base: Path,
@@ -251,7 +270,8 @@ def _scope_counts(
     feedback_rows: list[dict[str, Any]],
     outcome_rows: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    explicit_scope = bool(artifact_namespace)
+    explicit_flags = policy.get("explicit_inclusion_flags") if isinstance(policy.get("explicit_inclusion_flags"), Mapping) else {}
+    explicit_scope = bool(artifact_namespace) or _has_explicit_policy_flags(explicit_flags)
     contract_countable = (not explicit_scope) or bool(count_explicit_namespace_for_burn_in)
     contract_scope = (
         "explicit_single_namespace_counted"
@@ -260,14 +280,22 @@ def _scope_counts(
         if explicit_scope
         else "active_burn_in_namespaces"
     )
-    category_names = {category: _category_names(policy, category) for category in ("notification_rehearsal", "no_key", "fixture", "stale")}
+    category_names = {category: _category_names(policy, category) for category in ("notification_rehearsal", "provider_rehearsal", "no_key", "fixture", "stale")}
     category_counts = {
         f"{category}_candidate_count": len(_all_rows(base, "event_integrated_radar_candidates.jsonl", cutoff=cutoff, namespaces=namespaces))
         for category, namespaces in category_names.items()
     }
+    evidence_scope = _evidence_scope(
+        explicit_scope=explicit_scope,
+        contract_countable=contract_countable,
+        contract_namespaces=included_namespaces if contract_countable else [],
+        contract_candidate_count=len(candidate_rows) if contract_countable else 0,
+        policy=policy,
+    )
     return {
         "explicit_scope": explicit_scope,
         "contract_countable": contract_countable,
+        "evidence_scope": evidence_scope,
         "burn_in_contract_scope": contract_scope,
         "contract_namespaces": included_namespaces if contract_countable else [],
         "contract_candidate_rows": candidate_rows if contract_countable else [],
@@ -275,10 +303,50 @@ def _scope_counts(
         "contract_feedback_rows": feedback_rows if contract_countable else [],
         "contract_outcome_rows": outcome_rows if contract_countable else [],
         "notification_rehearsal_candidate_count": category_counts["notification_rehearsal_candidate_count"],
+        "provider_rehearsal_candidate_count": category_counts["provider_rehearsal_candidate_count"],
         "no_key_candidate_count": category_counts["no_key_candidate_count"],
         "fixture_candidate_count": category_counts["fixture_candidate_count"],
         "stale_candidate_count": category_counts["stale_candidate_count"],
     }
+
+
+def _has_explicit_policy_flags(flags: Mapping[str, Any]) -> bool:
+    for key, value in flags.items():
+        if key == "include_namespace":
+            if value:
+                return True
+        elif bool(value):
+            return True
+    return False
+
+
+def _evidence_scope(
+    *,
+    explicit_scope: bool,
+    contract_countable: bool,
+    contract_namespaces: list[str],
+    contract_candidate_count: int,
+    policy: Mapping[str, Any],
+) -> str:
+    if explicit_scope and not contract_countable:
+        return "explicit_single_namespace_diagnostic"
+    if not contract_namespaces:
+        return "no_active_burn_in_namespaces"
+    if contract_candidate_count <= 0:
+        return "active_burn_in_no_candidates"
+    if _mixed_non_burn_in_categories(policy):
+        return "mixed_explicit_diagnostic"
+    return "real_burn_in_evidence"
+
+
+def _mixed_non_burn_in_categories(policy: Mapping[str, Any]) -> bool:
+    for row in policy.get("included_namespace_details") or []:
+        if not isinstance(row, Mapping):
+            continue
+        categories = {str(item) for item in row.get("categories") or []}
+        if categories & {"notification_rehearsal", "provider_rehearsal", "fixture", "stale", "no_key", "active_live_rehearsal"}:
+            return True
+    return False
 
 
 def _category_names(policy: Mapping[str, Any], category: str) -> list[str]:
@@ -406,6 +474,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--include-provider-rehearsals", action="store_true")
     parser.add_argument("--include-fixture-namespaces", action="store_true")
     parser.add_argument("--include-stale-namespaces", action="store_true")
+    parser.add_argument("--include-live-rehearsals-without-burn-in-run", action="store_true")
     parser.add_argument("--include-namespace", action="append", default=[])
     parser.add_argument("--count-explicit-namespace-for-burn-in", action="store_true")
     args = parser.parse_args(argv)
@@ -419,6 +488,7 @@ def main(argv: list[str] | None = None) -> int:
         include_provider_rehearsals=args.include_provider_rehearsals,
         include_fixture_namespaces=args.include_fixture_namespaces,
         include_stale_namespaces=args.include_stale_namespaces,
+        include_live_rehearsals_without_burn_in_run=args.include_live_rehearsals_without_burn_in_run,
         include_namespaces=tuple(args.include_namespace),
         count_explicit_namespace_for_burn_in=args.count_explicit_namespace_for_burn_in,
     )

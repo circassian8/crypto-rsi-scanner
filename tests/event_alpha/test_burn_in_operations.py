@@ -70,7 +70,10 @@ def test_daily_review_inbox_groups_candidates_and_uses_stable_feedback_commands(
     assert payload["family_grouped"] is True
     assert payload["visible_family_grouped"] is True
     assert payload["items"][0]["visible_family_key"] == "asset:test"
+    assert payload["items"][0]["primary_visible_family_key"] == "TEST:test"
+    assert payload["items"][0]["secondary_visible_family_key"].startswith("TEST:test:")
     assert payload["items"][0]["duplicate_visible_family_count"] == 2
+    assert payload["items"][0]["symbol_duplicate_count"] == 2
     assert payload["blockers"] == []
     commands = payload["items"][0]["suggested_feedback_commands"]
     assert any("event-feedback-source-noise" in command for command in commands)
@@ -135,7 +138,7 @@ def test_daily_review_inbox_ranks_by_review_value_and_diversifies(tmp_path):
     buckets = {row["diversity_bucket"] for row in payload["items"]}
     assert "source_only_narrative" in buckets
     assert "market_anomaly_missing_catalyst" in buckets
-    assert any("generic_context_source_downranked" in row["review_value_reasons"] for row in payload["items"])
+    assert any("generic_context_source_downranked" in row["downrank_reason_codes"] for row in payload["items"])
     assert "Review value" in (ns / review_inbox.INBOX_MD).read_text(encoding="utf-8")
 
 
@@ -226,12 +229,73 @@ def test_daily_review_inbox_collapses_visible_families_and_prioritizes_useful_re
     assert symbols.index("CHZ") < symbols.index("BTC")
     btc_item = next(row for row in payload["items"] if row["symbol"] == "BTC")
     assert btc_item["duplicate_visible_family_count"] == 6
-    assert "generic_context_source_downranked" in btc_item["review_value_reasons"]
+    assert btc_item["symbol_duplicate_count"] == 6
+    assert "generic_context_source_downranked" in btc_item["downrank_reason_codes"]
     velvet_item = next(row for row in payload["items"] if row["symbol"] == "VELVET")
-    assert "actionable_provider_source_gap" in velvet_item["review_value_reasons"]
+    assert "high_value_skipped_family" in velvet_item["review_value_reason_codes"]
+    assert "provider_confirmation_gap" in velvet_item["review_value_reason_codes"]
     buckets = {row["diversity_bucket"] for row in payload["items"]}
     assert {"source_only_narrative", "market_anomaly_missing_catalyst", "accepted_evidence_no_market_confirmation"}.issubset(buckets)
     assert any(row["visible_family_key"] == "BTC:bitcoin:unconfirmed_research:context" for row in payload["family_summaries"])
+    assert any(row["primary_visible_family_key"] == "BTC:bitcoin" for row in payload["collapsed_family_summary"])
+    assert all(row["symbol_family_rank"] == 1 for row in payload["items"])
+
+
+def test_daily_review_inbox_allows_second_same_symbol_only_for_high_value_bucket(tmp_path):
+    ns = tmp_path / "burn"
+    _write_jsonl(
+        ns / "event_integrated_radar_candidates.jsonl",
+        [
+            {
+                "symbol": "CHZ",
+                "coin_id": "chiliz",
+                "opportunity_type": "UNCONFIRMED_RESEARCH",
+                "opportunity_score": 40,
+                "source_pack": "official_exchange",
+                "source_provider": "bybit",
+                "accepted_evidence_count": 1,
+                "market_state_class": "unknown",
+            },
+            {
+                "symbol": "CHZ",
+                "coin_id": "chiliz",
+                "opportunity_type": "UNCONFIRMED_RESEARCH",
+                "opportunity_score": 35,
+                "source_pack": "cryptopanic_context",
+                "source_provider": "cryptopanic",
+                "provider_gap": "needs Coinalyze confirmation",
+                "skip_reason": "research review skipped pending confirmation",
+            },
+            {
+                "symbol": "BTC",
+                "coin_id": "bitcoin",
+                "opportunity_type": "UNCONFIRMED_RESEARCH",
+                "opportunity_score": 10,
+                "source_pack": "gdelt_context",
+                "source_provider": "gdelt",
+            },
+            {
+                "symbol": "BTC",
+                "coin_id": "bitcoin",
+                "opportunity_type": "UNCONFIRMED_RESEARCH",
+                "opportunity_score": 9,
+                "source_pack": "project_blog_rss",
+                "source_provider": "rss",
+            },
+        ],
+    )
+    payload = review_inbox.build_review_inbox(
+        profile="live_burn_in_no_send",
+        artifact_namespace="burn",
+        base_dir=tmp_path,
+        limit=10,
+        now=datetime(2026, 7, 5, tzinfo=timezone.utc),
+    )
+    symbols = [row["symbol"] for row in payload["items"]]
+    assert symbols.count("CHZ") == 2
+    assert symbols.count("BTC") == 1
+    second_chz = [row for row in payload["items"] if row["symbol"] == "CHZ" and row["symbol_family_rank"] == 2][0]
+    assert second_chz["allowed_second_family_reason"].startswith("high_value_secondary:")
 
 
 def test_daily_burn_in_timeout_writes_artifact_and_progress(tmp_path, capsys, monkeypatch):
@@ -286,6 +350,7 @@ def test_daily_burn_in_plan_prints_without_writing_artifacts(tmp_path, capsys):
 def test_namespace_policy_includes_only_active_burn_in_by_default(tmp_path):
     live = tmp_path / "live_burn_in_20260705"
     active = tmp_path / "active_no_send"
+    no_run = tmp_path / "live_burn_in_no_send"
     live_rehearsal = tmp_path / "full_llm_live"
     notify = tmp_path / "notify_llm"
     notify_no_key = tmp_path / "notify_no_key"
@@ -295,6 +360,7 @@ def test_namespace_policy_includes_only_active_burn_in_by_default(tmp_path):
     provider = tmp_path / "coinalyze_no_send_rehearsal"
     live.mkdir()
     active.mkdir()
+    no_run.mkdir()
     live_rehearsal.mkdir()
     notify.mkdir()
     notify_no_key.mkdir()
@@ -312,6 +378,7 @@ def test_namespace_policy_includes_only_active_burn_in_by_default(tmp_path):
         {"namespace": "full_llm_live", "status": namespace_policy.namespace_status.STATUS_ACTIVE_LIVE_REHEARSAL},
     )
     _write_jsonl(no_key / "event_integrated_radar_candidates.jsonl", [{"candidate_id": "no-key"}])
+    _write_jsonl(no_run / "event_integrated_radar_candidates.jsonl", [{"candidate_id": "no-run"}])
     _write_jsonl(fixture / "event_integrated_radar_candidates.jsonl", [{"candidate_id": "fixture"}])
     payload = namespace_policy.build_namespace_policy(
         profile="live_burn_in_no_send",
@@ -319,9 +386,12 @@ def test_namespace_policy_includes_only_active_burn_in_by_default(tmp_path):
         base_dir=tmp_path,
         write=False,
     )
-    assert payload["included_namespaces"] == ["active_no_send", "live_burn_in_20260705"]
-    for namespace in ("notify_llm", "notify_no_key", "no_key_live", "fixture_smoke", "integrated_radar_smoke", "coinalyze_no_send_rehearsal", "full_llm_live"):
+    assert payload["namespace_policy_version"] == "burn_in_namespace_policy_v3"
+    assert payload["included_namespaces"] == ["live_burn_in_20260705"]
+    for namespace in ("active_no_send", "live_burn_in_no_send", "notify_llm", "notify_no_key", "no_key_live", "fixture_smoke", "integrated_radar_smoke", "coinalyze_no_send_rehearsal", "full_llm_live"):
         assert namespace in payload["excluded_namespaces"]
+    assert "active_burn_in_status_without_daily_burn_in_run_artifact" in payload["exclusion_reasons"]["active_no_send"]
+    assert "live_burn_in_namespace_without_daily_burn_in_run_artifact" in payload["exclusion_reasons"]["live_burn_in_no_send"]
     assert "notification_rehearsal_excluded_from_default_burn_in_measurement" in payload["exclusion_reasons"]["notify_llm"]
     assert "no_key_live_excluded_from_default_burn_in_measurement" in payload["exclusion_reasons"]["no_key_live"]
     assert "fixture_or_smoke_namespace_excluded_by_default" in payload["exclusion_reasons"]["integrated_radar_smoke"]
@@ -331,6 +401,7 @@ def test_namespace_policy_includes_only_active_burn_in_by_default(tmp_path):
     assert payload["no_key_excluded_count"] >= 2
     assert payload["fixture_excluded_count"] >= 2
     assert payload["provider_rehearsal_excluded_count"] >= 1
+    assert payload["included_without_burn_in_run_count"] == 0
 
 
 def test_namespace_policy_explicit_flags_include_excluded_namespaces_and_stale_requires_flag(tmp_path):
@@ -354,6 +425,7 @@ def test_namespace_policy_explicit_flags_include_excluded_namespaces_and_stale_r
     )
     assert "notify_llm" in with_notify["included_namespaces"]
     assert with_notify["include_reasons"]["notify_llm"] == "explicit_flag:include_notification_rehearsals"
+    assert with_notify["included_without_burn_in_run_count"] == 1
     blocked_stale = namespace_policy.build_namespace_policy(
         profile="live_burn_in_no_send",
         artifact_namespace="policy",
@@ -423,8 +495,10 @@ def test_scorecard_default_policy_excludes_no_key_live_candidates(tmp_path, monk
     payload = scorecard.build_scorecard(profile="live_burn_in_no_send", base_dir=tmp_path)
     assert payload["namespace_scope"] == "policy"
     assert payload["included_namespaces"] == ["live_burn_in_20260705"]
+    assert payload["evidence_scope"] == "real_burn_in_evidence"
     assert payload["real_candidates_seen"] == 1
     assert payload["real_burn_in_candidate_count"] == 1
+    assert payload["contract_counted_candidate_count"] == 1
     assert payload["no_key_candidate_count"] == 1
     assert "no_key_live" in payload["excluded_namespaces"]
 
@@ -448,16 +522,21 @@ def test_scorecard_explicit_notification_namespace_is_diagnostic_not_contract(tm
     assert payload["namespace_scope"] == "single_namespace"
     assert payload["include_reason"] == "explicit_user_namespace"
     assert payload["burn_in_contract_scope"] == "explicit_single_namespace_diagnostic"
+    assert payload["evidence_scope"] == "explicit_single_namespace_diagnostic"
     assert payload["included_namespaces"] == ["notify_llm_deep_cryptopanic_rehearsal"]
     assert payload["real_candidates_seen"] == 1
     assert payload["real_burn_in_candidate_count"] == 0
     assert payload["notification_rehearsal_candidate_count"] == 1
+    assert payload["contract_counted_candidate_count"] == 0
     assert payload["enough_data"] is False
     assert "explicit_namespace_not_counted_for_burn_in_contract" in payload["enough_data_reasons"]
 
 
 def test_scorecard_no_active_burn_in_namespaces_points_to_next_command(tmp_path, monkeypatch):
     (tmp_path / "notify_llm").mkdir()
+    no_run = tmp_path / "live_burn_in_no_send"
+    no_run.mkdir()
+    _write_jsonl(no_run / "event_integrated_radar_candidates.jsonl", [{"candidate_id": "no-run"}])
     monkeypatch.setattr(
         scorecard.common,
         "load_contract",
@@ -465,9 +544,25 @@ def test_scorecard_no_active_burn_in_namespaces_points_to_next_command(tmp_path,
     )
     payload = scorecard.build_scorecard(profile="live_burn_in_no_send", base_dir=tmp_path)
     assert payload["included_namespaces"] == []
+    assert payload["evidence_scope"] == "no_active_burn_in_namespaces"
     assert payload["enough_data"] is False
     assert "no_active_burn_in_namespaces" in payload["enough_data_reasons"]
     assert payload["next_command"]
+
+
+def test_scorecard_active_burn_in_without_candidates_has_no_candidate_scope(tmp_path, monkeypatch):
+    live = tmp_path / "live_burn_in_20260705"
+    live.mkdir()
+    (live / daily_burn_in.RUN_JSON).write_text('{"generated_at":"2026-07-05T00:00:00+00:00"}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        scorecard.common,
+        "load_contract",
+        lambda: radar_north_star.build_burn_in_contract(generated_at=datetime(2026, 7, 5, tzinfo=timezone.utc)),
+    )
+    payload = scorecard.build_scorecard(profile="live_burn_in_no_send", base_dir=tmp_path)
+    assert payload["included_namespaces"] == ["live_burn_in_20260705"]
+    assert payload["evidence_scope"] == "active_burn_in_no_candidates"
+    assert payload["real_burn_in_candidate_count"] == 0
 
 
 def test_weekly_measurement_and_source_yield_are_recommendations_only(tmp_path):
@@ -525,7 +620,7 @@ def test_fixture_only_source_yield_reports_fixture_scope(tmp_path):
         artifact_namespace="fixture_smoke",
         base_dir=tmp_path,
     )
-    assert payload["evidence_scope"] == "fixture"
+    assert payload["evidence_scope"] == "explicit_single_namespace_diagnostic"
     assert payload["burn_in_contract_scope"] == "explicit_single_namespace_diagnostic"
     assert payload["enough_data"] is False
     assert payload["real_burn_in_candidate_count"] == 0
@@ -571,7 +666,8 @@ def test_burn_in_archive_default_excludes_notification_and_no_key_namespaces(tmp
     live = base / "live_burn_in_20260705"
     notify = base / "notify_llm"
     no_key = base / "no_key_live"
-    for ns in (live, notify, no_key):
+    no_run = base / "live_burn_in_no_send"
+    for ns in (live, notify, no_key, no_run):
         ns.mkdir(parents=True)
         (ns / "event_alpha_daily_brief.md").write_text(f"{ns.name}\n", encoding="utf-8")
     (live / daily_burn_in.RUN_JSON).write_text('{"generated_at":"2026-07-05T00:00:00+00:00"}\n', encoding="utf-8")
@@ -581,6 +677,7 @@ def test_burn_in_archive_default_excludes_notification_and_no_key_namespaces(tmp
     assert payload["included_namespaces"] == ["live_burn_in_20260705"]
     assert "notify_llm" in payload["excluded_namespaces"]
     assert "no_key_live" in payload["excluded_namespaces"]
+    assert "live_burn_in_no_send" in payload["excluded_namespaces"]
     assert payload["file_count_by_namespace"] == {"live_burn_in_20260705": 2}
     assert payload["checksum_manifest"]["file_count"] == 2
 
@@ -598,6 +695,21 @@ def test_burn_in_archive_explicit_no_key_flag_includes_no_key_namespace(tmp_path
     )
     assert payload["included_namespaces"] == ["no_key_live"]
     assert payload["explicit_include_flags"]["include_no_key_namespaces"] is True
+    assert payload["archive_scope"] == "explicit_namespace_diagnostic"
+    assert payload["included_without_burn_in_run_count"] == 1
+
+
+def test_burn_in_archive_dry_run_with_no_active_burn_in_archives_no_history(tmp_path):
+    base = tmp_path / "event_fade_cache"
+    for name in ("live_burn_in_no_send", "notify_llm", "integrated_radar_smoke"):
+        ns = base / name
+        ns.mkdir(parents=True)
+        (ns / "event_alpha_daily_brief.md").write_text(name, encoding="utf-8")
+    payload = archive.build_burn_in_archive(base_dir=base, out_dir=tmp_path / "out", dry_run=True)
+    assert payload["included_namespaces"] == []
+    assert payload["no_active_burn_in_namespaces"] is True
+    assert payload["files_archived"] == 0
+    assert payload["file_count_by_namespace"] == {}
 
 
 def test_secret_scanner_ignores_natural_language_sk_phrase_but_catches_keys():
