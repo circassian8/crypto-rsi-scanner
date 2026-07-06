@@ -196,6 +196,38 @@ def test_daily_review_inbox_ranks_by_review_value_and_diversifies(tmp_path):
     assert "Review value" in (ns / review_inbox.INBOX_MD).read_text(encoding="utf-8")
 
 
+def test_daily_review_inbox_uses_specific_fallback_reason_codes(tmp_path):
+    ns = tmp_path / "burn"
+    _write_jsonl(
+        ns / "event_integrated_radar_candidates.jsonl",
+        [
+            {
+                "canonical_asset_id": "asset:plain",
+                "symbol": "PLAIN",
+                "coin_id": "plain",
+                "opportunity_type": "UNCONFIRMED_RESEARCH",
+                "opportunity_score": 3,
+                "source_pack": "manual_context",
+                "source_provider": "manual",
+                "market_state_class": "unknown",
+                "evidence_status": "needs_review",
+            }
+        ],
+    )
+    payload = review_inbox.build_review_inbox(
+        profile="live_burn_in_no_send",
+        artifact_namespace="burn",
+        base_dir=tmp_path,
+        limit=1,
+        now=datetime(2026, 7, 5, tzinfo=timezone.utc),
+    )
+    reasons = payload["items"][0]["review_value_reason_codes"]
+    assert "highest_remaining_review_value" not in reasons
+    assert "source_only_context_review" in reasons
+    assert "missing_strong_source_review" in reasons
+    assert "missing_market_confirmation_review" in reasons
+
+
 def test_daily_review_inbox_collapses_visible_families_and_prioritizes_useful_review(tmp_path):
     ns = tmp_path / "burn"
     btc_rows = [
@@ -843,6 +875,42 @@ def test_burn_in_doctor_operations_check_blocks_bad_candidate_semantics():
     assert any("source_yield_counts_readiness_or_preflight_as_candidate_yield" in blocker for blocker in blockers)
     assert any("review_inbox_selected_items_missing_provenance=1" in blocker for blocker in blockers)
     assert any("review_inbox_selected_diagnostic_or_preflight_only=1" in blocker for blocker in blockers)
+
+
+def test_burn_in_doctor_operations_checks_daily_run_and_archive_scope():
+    blockers: list[str] = []
+    warnings: list[str] = []
+    ctx = SimpleNamespace(
+        profile="live_burn_in_no_send",
+        artifact_namespace="live_burn_in_20260705",
+        namespace_status=None,
+        daily_burn_in_run={},
+        burn_in_scorecard={},
+        source_yield_report={},
+        daily_review_inbox={},
+        burn_in_archive_manifest={},
+        integrated_conflicts={},
+    )
+    doctor_operations_checks.apply_checks(ctx, blockers, warnings)
+    assert any("daily_burn_in_run_missing" in blocker for blocker in blockers)
+
+    blockers.clear()
+    ctx.daily_burn_in_run = {
+        "row_type": "event_alpha_daily_burn_in_run",
+        "steps": [{"name": "doctor"}, {"name": "brief", "status": "passed"}],
+        "normal_rsi_signal_rows_written": 1,
+    }
+    ctx.integrated_conflicts = {"integrated_preview_lane_mismatch": 1}
+    ctx.burn_in_archive_manifest = {
+        "archive_scope": "active_burn_in_namespaces",
+        "included_without_burn_in_run_count": 1,
+    }
+    doctor_operations_checks.apply_checks(ctx, blockers, warnings)
+    assert any("daily_burn_in_run_step_missing_status=1" in warning for warning in warnings)
+    assert any("daily_burn_in_run_step_missing_timeout=2" in warning for warning in warnings)
+    assert any("daily_burn_in_run_forbidden_side_effect_claim=1" in blocker for blocker in blockers)
+    assert any("daily_burn_in_integrated_preview_mismatch" in blocker for blocker in blockers)
+    assert any("daily_burn_in_archive_includes_non_burn_in_by_default" in blocker for blocker in blockers)
 
 
 def test_burn_in_doctor_operations_ignores_legacy_source_yield_without_semantic_fields():

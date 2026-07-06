@@ -759,7 +759,7 @@ event-alpha-integrated-radar-smoke:
 	test -s event_fade_cache/$(PROFILE)/event_alpha_source_coverage.json
 	test -s event_fade_cache/$(PROFILE)/event_core_opportunities.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_integrated_radar_notification_deliveries.jsonl
-	test -s event_fade_cache/$(PROFILE)/event_alpha_notification_preview.md
+	test -s event_fade_cache/$(PROFILE)/event_integrated_radar_notification_preview.md
 	test -s event_fade_cache/$(PROFILE)/event_alpha_daily_brief.md
 	grep -q "EARLY_LONG_RESEARCH" event_fade_cache/$(PROFILE)/event_integrated_radar_candidates.jsonl
 	grep -q "CONFIRMED_LONG_RESEARCH" event_fade_cache/$(PROFILE)/event_integrated_radar_candidates.jsonl
@@ -769,7 +769,7 @@ event-alpha-integrated-radar-smoke:
 	grep -q "DIAGNOSTIC" event_fade_cache/$(PROFILE)/event_integrated_radar_candidates.jsonl
 	grep -q "DEX / On-Chain Liquidity" event_fade_cache/$(PROFILE)/event_alpha_daily_brief.md
 	grep -q "Protocol Fundamentals" event_fade_cache/$(PROFILE)/event_alpha_daily_brief.md
-	grep -q "Research-only" event_fade_cache/$(PROFILE)/event_alpha_notification_preview.md
+	grep -q "Research-only" event_fade_cache/$(PROFILE)/event_integrated_radar_notification_preview.md
 	grep -q "would_send_but_guard_disabled" event_fade_cache/$(PROFILE)/event_integrated_radar_notification_deliveries.jsonl
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict
 	@echo "Integrated-radar smoke artifacts under event_fade_cache/$(PROFILE)/."

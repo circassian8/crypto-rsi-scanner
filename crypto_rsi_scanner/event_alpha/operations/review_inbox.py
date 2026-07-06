@@ -26,6 +26,12 @@ HIGH_VALUE_SECONDARY_BUCKETS = {
     "source_pack_high_priority",
     "fresh_candidate",
 }
+HIGH_VALUE_REASON_CODES = HIGH_VALUE_SECONDARY_BUCKETS | {
+    "accepted_evidence_found",
+    "quality_capped",
+    "fade_review",
+    "lane_critical_provider_gap",
+}
 
 
 @dataclass(frozen=True)
@@ -771,7 +777,7 @@ def _review_value(
         bucket = "accepted_evidence_no_market_confirmation" if bucket == "general" else bucket
     if any(token in source_text for token in ("cryptopanic", "rss", "gdelt", "news", "context")) and "official" not in source_text:
         value += 4
-        reasons.append("source_only_narrative")
+        reasons.append("source_only_context_review")
         bucket = "source_only_narrative"
         if any(token in source_text for token in ("project_blog_rss", "rss", "gdelt")) or symbol in {"BTC", "ETH"}:
             value -= 25 if symbol in {"BTC", "ETH"} else 15
@@ -838,9 +844,37 @@ def _review_value(
     if "unsupported" in why.casefold() or "insufficient" in why.casefold():
         value -= 25
         downrank_reasons.append("unsupported_mechanism_downranked")
-    if not reasons and not downrank_reasons:
-        reasons.append("highest_remaining_review_value")
+    if not reasons or not any(reason in HIGH_VALUE_REASON_CODES for reason in reasons):
+        for reason in _fallback_review_reason_codes(
+            opportunity_type=opportunity_type,
+            source_text=source_text,
+            market_text=market_text,
+            evidence_text=evidence_text,
+            source_strength=source_strength,
+        ):
+            if reason not in reasons:
+                reasons.append(reason)
     return max(0, value), reasons, downrank_reasons, bucket
+
+
+def _fallback_review_reason_codes(
+    *,
+    opportunity_type: str,
+    source_text: str,
+    market_text: str,
+    evidence_text: str,
+    source_strength: int,
+) -> list[str]:
+    reasons: list[str] = []
+    if any(token in source_text for token in ("cryptopanic", "rss", "gdelt", "project_blog", "news", "context")):
+        reasons.append("source_only_context_review")
+    if "accepted" not in evidence_text and source_strength < 70:
+        reasons.append("missing_strong_source_review")
+    if any(token in market_text for token in ("unknown", "missing", "unconfirmed", "needs confirmation", "no market")):
+        reasons.append("missing_market_confirmation_review")
+    if not reasons and opportunity_type == "UNCONFIRMED_RESEARCH":
+        reasons.append("general_unconfirmed_research_review")
+    return reasons or ["general_unconfirmed_research_review"]
 
 
 def _is_fresh_candidate(row: Mapping[str, Any]) -> bool:

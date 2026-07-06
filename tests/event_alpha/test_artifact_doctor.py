@@ -3950,6 +3950,63 @@ def test_integrated_doctor_catches_delivery_and_outcome_conflicts():
     assert conflicts["integrated_outcome_missing_data_unlabeled"] == 1
 
 
+def test_integrated_delivery_preview_check_allows_zero_candidate_legacy_burn_in():
+    from crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_parts.outcome_checks import (
+        _integrated_delivery_conflicts,
+    )
+
+    rows = [
+        {
+            "row_type": "event_integrated_radar_notification_delivery",
+            "lane": "early_long_research",
+            "lane_title": "Early Long Research",
+            "message_text": "Research-only. Not a trade signal.",
+            "sent": False,
+            "no_send_rehearsal": True,
+            "rendered_item_count": 0,
+            "eligible_item_count": 0,
+            "skipped_item_count": 0,
+        },
+        {
+            "row_type": "event_integrated_radar_notification_delivery",
+            "lane": "source_provider_health",
+            "lane_title": "Source / Provider Health",
+            "message_text": "Research-only. Not a trade signal.",
+            "status": "would_send_but_guard_disabled",
+            "would_send": True,
+            "sent": False,
+            "no_send_rehearsal": True,
+            "rendered_item_count": 0,
+            "eligible_item_count": 0,
+            "skipped_item_count": 0,
+        },
+    ]
+    conflicts = _integrated_delivery_conflicts(rows, preview_path=None)
+    assert conflicts["integrated_preview_lane_mismatch"] == 0
+
+
+def test_integrated_delivery_preview_check_blocks_rendered_rows_without_preview():
+    from crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_parts.outcome_checks import (
+        _integrated_delivery_conflicts,
+    )
+
+    rows = [
+        {
+            "row_type": "event_integrated_radar_notification_delivery",
+            "lane": "early_long_research",
+            "lane_title": "Early Long Research",
+            "message_text": "Research-only. Not a trade signal.",
+            "sent": False,
+            "no_send_rehearsal": True,
+            "rendered_item_count": 1,
+            "eligible_item_count": 1,
+            "skipped_item_count": 0,
+        }
+    ]
+    conflicts = _integrated_delivery_conflicts(rows, preview_path=Path("missing_integrated_preview.md"))
+    assert conflicts["integrated_preview_lane_mismatch"] == 1
+
+
 def test_integrated_doctor_requires_thesis_interpretation_for_fade_and_risk_outcomes():
     import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 

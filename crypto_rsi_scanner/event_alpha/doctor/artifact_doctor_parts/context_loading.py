@@ -90,6 +90,9 @@ def _load_doctor_context_inputs(options: Mapping[str, Any]) -> SimpleNamespace:
     ctx.burn_in_scorecard = loaded.burn_in_scorecard
     ctx.source_yield_report = loaded.source_yield_report
     ctx.daily_review_inbox = loaded.daily_review_inbox
+    ctx.daily_burn_in_run = loaded.daily_burn_in_run
+    ctx.burn_in_namespace_policy = loaded.burn_in_namespace_policy
+    ctx.burn_in_archive_manifest = loaded.burn_in_archive_manifest
     ctx.dex_pool_state = loaded.dex_pool_state
     ctx.dex_pool_anomalies = loaded.dex_pool_anomalies
     ctx.protocol_fundamentals = loaded.protocol_fundamentals
@@ -473,15 +476,25 @@ def _attach_artifact_conflict_context(ctx: SimpleNamespace) -> None:
     official_exchange_conflicts = _official_exchange_artifact_conflicts(official_exchange_candidates)
     scheduled_conflicts = _scheduled_catalyst_artifact_conflicts((*scheduled_catalysts, *unlock_candidates))
     derivatives_conflicts = _derivatives_crowding_artifact_conflicts((*derivatives_state, *fade_review_candidates))
-    preview_path = (
-        Path(ctx.inspected_alert_store_path).parent / "event_alpha_notification_preview.md"
+    operator_dir = (
+        Path(ctx.inspected_alert_store_path).parent
         if ctx.inspected_alert_store_path is not None
-        else (
-            Path(source_coverage_report_path).parent / "event_alpha_notification_preview.md"
-            if source_coverage_report_path is not None
-            else None
-        )
+        else (Path(source_coverage_report_path).parent if source_coverage_report_path is not None else None)
     )
+    preview_path = (
+        operator_dir / event_integrated_radar.NOTIFICATION_PREVIEW_FILENAME
+        if operator_dir is not None
+        else None
+    )
+    if preview_path is not None and not preview_path.exists():
+        legacy_preview = operator_dir / "event_alpha_notification_preview.md" if operator_dir is not None else None
+        if legacy_preview is not None and legacy_preview.exists():
+            try:
+                legacy_preview_text = legacy_preview.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                legacy_preview_text = ""
+            if "Integrated Radar Preview" in legacy_preview_text:
+                preview_path = legacy_preview
     integrated_conflicts = _integrated_radar_artifact_conflicts(
         integrated_candidates,
         core_rows=core_rows,
@@ -758,6 +771,9 @@ def _load_raw_doctor_artifacts(options: Mapping[str, Any]) -> SimpleNamespace:
         raw_burn_in_scorecard=_read_json(default_dir / "event_alpha_burn_in_scorecard.json" if default_dir is not None else None),
         raw_source_yield_report=_read_json(default_dir / "event_alpha_source_yield_report.json" if default_dir is not None else None),
         raw_daily_review_inbox=_read_json(default_dir / "event_alpha_daily_review_inbox.json" if default_dir is not None else None),
+        raw_daily_burn_in_run=_read_json(default_dir / "event_alpha_daily_burn_in_run.json" if default_dir is not None else None),
+        raw_burn_in_namespace_policy=_read_json(default_dir / "event_alpha_burn_in_namespace_policy.json" if default_dir is not None else None),
+        raw_burn_in_archive_manifest=_read_json(default_dir / "event_alpha_burn_in_archive_manifest.json" if default_dir is not None else None),
         integrated_manifest_path=(
             integrated_dir / "event_integrated_radar_input_manifest.json"
             if integrated_dir is not None
@@ -821,6 +837,9 @@ def _filter_doctor_artifacts(raw: SimpleNamespace, options: Mapping[str, Any]) -
         burn_in_scorecard=raw.raw_burn_in_scorecard,
         source_yield_report=raw.raw_source_yield_report,
         daily_review_inbox=raw.raw_daily_review_inbox,
+        daily_burn_in_run=raw.raw_daily_burn_in_run,
+        burn_in_namespace_policy=raw.raw_burn_in_namespace_policy,
+        burn_in_archive_manifest=raw.raw_burn_in_archive_manifest,
     )
 
 

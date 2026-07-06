@@ -531,6 +531,13 @@ def test_event_alpha_consolidation_import_shims_and_schema_registry():
         "calibration_prior_v1",
         "namespace_status_v1",
         "run_ledger_v1",
+        "event_alpha_daily_burn_in_run_v1",
+        "event_alpha_daily_review_inbox_v1",
+        "event_alpha_burn_in_scorecard_v1",
+        "event_alpha_burn_in_measurement_dashboard_v1",
+        "event_alpha_source_yield_report_v1",
+        "event_alpha_burn_in_archive_manifest_v1",
+        "event_alpha_burn_in_namespace_policy_v1",
     }
     assert required.issubset(schema_v1.SCHEMAS)
     assert schema_v1.EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION == "event_alpha_schema_v1"
@@ -612,6 +619,94 @@ def test_event_alpha_schema_v1_validation_policy(tmp_path):
     )
     assert core_stamped["schema_id"] == "core_opportunity_v1"
     assert core_stamped["schema_version"] == "event_core_opportunity_store_v1"
+
+
+def test_event_alpha_burn_in_operation_schemas_validate(tmp_path):
+    from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+
+    safety = {
+        "research_only": True,
+        "no_send_rehearsal": True,
+        "strict_alerts_created": 0,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "paper_trades_created": 0,
+        "normal_rsi_signal_rows_written": 0,
+        "triggered_fade_created": 0,
+    }
+    payloads = {
+        "event_alpha_daily_burn_in_run.json": {
+            "row_type": "event_alpha_daily_burn_in_run",
+            "profile": "live_burn_in_no_send",
+            "artifact_namespace": "burn",
+            "completed": True,
+            "steps": [{"name": "doctor", "status": "passed", "timeout_seconds": 60}],
+            **safety,
+        },
+        "event_alpha_daily_review_inbox.json": {
+            "row_type": "event_alpha_daily_review_inbox",
+            "profile": "live_burn_in_no_send",
+            "artifact_namespace": "burn",
+            "items": [],
+            **safety,
+        },
+        "event_alpha_burn_in_scorecard.json": {
+            "row_type": "event_alpha_burn_in_scorecard",
+            "profile": "live_burn_in_no_send",
+            "artifact_namespace": "burn",
+            "evidence_scope": "active_burn_in_no_candidate_evidence",
+            "auto_apply": False,
+            **safety,
+        },
+        "event_alpha_burn_in_measurement_dashboard.json": {
+            "row_type": "event_alpha_burn_in_measurement_dashboard",
+            "profile": "live_burn_in_no_send",
+            "artifact_namespace": "burn",
+            "evidence_scope": "active_burn_in_no_candidate_evidence",
+            "auto_apply_thresholds": False,
+            **safety,
+        },
+        "event_alpha_source_yield_report.json": {
+            "row_type": "event_alpha_source_yield_report",
+            "profile": "live_burn_in_no_send",
+            "artifact_namespace": "burn",
+            "evidence_scope": "active_burn_in_no_candidate_evidence",
+            "auto_apply": False,
+            **safety,
+        },
+        "event_alpha_burn_in_archive_manifest.json": {
+            "row_type": "event_alpha_burn_in_archive_manifest",
+            "dry_run": True,
+            "archive_scope": "active_burn_in_namespaces",
+            "archive_path": "research/archive.zip",
+            **safety,
+        },
+        "event_alpha_burn_in_namespace_policy.json": {
+            "row_type": "event_alpha_burn_in_namespace_policy",
+            "profile": "live_burn_in_no_send",
+            "artifact_namespace": "burn",
+            "namespace_policy_version": "burn_in_namespace_policy_v3",
+            **safety,
+        },
+    }
+    for filename, payload in payloads.items():
+        path = tmp_path / filename
+        path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+        result = schema_v1.validate_artifact_file(path)
+        assert result["rows_validated"] == 1
+        assert result["errors"] == []
+
+    bad = dict(payloads["event_alpha_burn_in_archive_manifest.json"], archive_path="/tmp/archive.zip")
+    bad_path = tmp_path / "event_alpha_burn_in_archive_manifest.json"
+    bad_path.write_text(json.dumps(bad, sort_keys=True) + "\n", encoding="utf-8")
+    result = schema_v1.validate_artifact_file(bad_path)
+    assert any(error["error"] == "absolute_non_debug_path:archive_path" for error in result["errors"])
+
+    unsafe = dict(payloads["event_alpha_burn_in_scorecard.json"], normal_rsi_signal_rows_written=1)
+    unsafe_path = tmp_path / "event_alpha_burn_in_scorecard.json"
+    unsafe_path.write_text(json.dumps(unsafe, sort_keys=True) + "\n", encoding="utf-8")
+    result = schema_v1.validate_artifact_file(unsafe_path)
+    assert any(error["error"] == "unsafe_side_effect_count:normal_rsi_signal_rows_written" for error in result["errors"])
 
 
 def test_medium_event_alpha_and_provider_packages_preserve_imports_and_hygiene():

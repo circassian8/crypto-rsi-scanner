@@ -15926,6 +15926,7 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert result.protocol_fundamental_rows == 2
 
         preview = result.notification_preview_path.read_text(encoding="utf-8")
+        assert result.notification_preview_path.name == "event_integrated_radar_notification_preview.md"
         assert "Early Long Research" in preview
         assert "Confirmed Long Research" in preview
         assert "Fade / Short-Review" in preview

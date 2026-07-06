@@ -300,11 +300,15 @@ def format_integrated_notification_preview_from_deliveries(
         f"- Preview skipped items: {skipped}",
         f"- Delivery lanes due/sent/blocked: {due}/0/{due}",
         f"- Skip reasons: {_format_counts(skip_reasons) if skip_reasons else 'none'}",
-        "",
     ]
+    if not rows:
+        lines.append("- Zero candidate lanes: candidate lanes are not_due / skipped_empty.")
+    lines.append("")
     for row in deliveries:
         lines.append(f"## Lane: {row.get('lane_title') or row.get('lane')}")
         lines.append(f"- status: {row.get('status')}")
+        if row.get("status_detail"):
+            lines.append(f"- status_detail: {row.get('status_detail')}")
         lines.append(f"- would_send: {str(bool(row.get('would_send'))).lower()}")
         lines.append(f"- rendered_items: {row.get('rendered_item_count')}")
         lines.append(f"- skipped_items: {row.get('skipped_item_count')}")
@@ -403,6 +407,7 @@ def _integrated_delivery_row(
         if would_send and not send_guard_enabled
         else ("sent" if would_send and send_guard_enabled else "not_due")
     )
+    status_detail = "skipped_empty" if not rendered and not skipped and lane != "source_provider_health" else None
     card_paths = tuple(dict.fromkeys(path for row in rendered for path in (_row_card_path(row, core_by_id=core_by_id),) if path))
     skipped_items = tuple(
         {
@@ -426,6 +431,7 @@ def _integrated_delivery_row(
         "lane_title": lane_title,
         "route": "INTEGRATED_RADAR_RESEARCH_PREVIEW",
         "status": status,
+        "status_detail": status_detail,
         "would_send": would_send,
         "sent": False,
         "send_guard_enabled": bool(send_guard_enabled),

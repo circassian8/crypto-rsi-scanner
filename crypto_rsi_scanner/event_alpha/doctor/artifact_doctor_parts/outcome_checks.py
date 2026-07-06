@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .runtime import *
+from .integrated_radar_checks import _structured_operator_path_conflict_count
 
 def _integrated_delivery_conflicts(
     rows: Iterable[Mapping[str, Any]],
@@ -27,6 +28,7 @@ def _integrated_delivery_conflicts(
             preview_text = Path(preview_path).read_text(encoding="utf-8", errors="replace")
         except OSError:
             preview_text = ""
+    preview_missing = preview_path is not None and not preview_text
     for row in materialized:
         message = str(row.get("message_text") or "")
         if "Research-only" not in message or "Not a trade signal" not in message:
@@ -50,9 +52,35 @@ def _integrated_delivery_conflicts(
             out["integrated_operator_markdown_absolute_path"] += 1
         out["operator_structured_path_absolute"] += _structured_operator_path_conflicts((row,))
         lane_title = str(row.get("lane_title") or "")
+        rendered_items = _int(row.get("rendered_item_count"))
+        if preview_missing and rendered_items > 0:
+            out["integrated_preview_lane_mismatch"] += 1
+            continue
         if preview_text and lane_title and lane_title not in preview_text:
             out["integrated_preview_lane_mismatch"] += 1
     return out
+
+def _int(value: object) -> int:
+    try:
+        return int(float(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+def _truthy(value: object) -> bool:
+    if isinstance(value, str):
+        return value.strip().casefold() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
+
+def _tuple_value(value: object) -> tuple[object, ...]:
+    if value in (None, ""):
+        return ()
+    if isinstance(value, tuple):
+        return value
+    if isinstance(value, list):
+        return tuple(value)
+    if isinstance(value, set):
+        return tuple(sorted(value, key=str))
+    return (value,)
 
 def _integrated_outcome_conflicts(
     candidates: Iterable[Mapping[str, Any]],

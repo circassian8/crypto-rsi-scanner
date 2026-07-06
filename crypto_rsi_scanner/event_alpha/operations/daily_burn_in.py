@@ -403,13 +403,15 @@ def _tail(text: str, *, limit: int = 1200) -> str:
 
 
 def _ledger_row(payload: Mapping[str, Any]) -> dict[str, Any]:
+    started_at = payload.get("generated_at")
     return {
         "schema_version": "event_alpha_daily_burn_in_ledger_v1",
         "row_type": "daily_burn_in",
+        "run_id": str(payload.get("run_id") or f"{started_at}|daily_burn_in|{payload.get('artifact_namespace') or payload.get('profile') or 'unknown'}"),
         "run_mode": "burn_in",
         "profile": payload.get("profile"),
         "artifact_namespace": payload.get("artifact_namespace"),
-        "started_at": payload.get("generated_at"),
+        "started_at": started_at,
         "success": not payload.get("required_failed") and int(payload.get("steps_failed") or 0) == 0,
         "steps_total": payload.get("steps_total"),
         "steps_passed": payload.get("steps_passed"),

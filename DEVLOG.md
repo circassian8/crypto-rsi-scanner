@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-07 — Fix burn-in doctor preview and schema correctness · Codex
+**Why:** The real `live_burn_in_20260705` namespace was blocked by an integrated
+preview/delivery mismatch and a burn-in operation schema warning even though it
+had zero integrated candidates and a separate normal heartbeat preview.
+**Changes:**
+- Split integrated radar notification previews onto
+  `event_integrated_radar_notification_preview.md`, added explicit zero-candidate
+  lane status details, and made doctor compare integrated delivery rows only to
+  integrated previews.
+- Added schema v1 coverage for daily burn-in, review inbox, scorecard,
+  measurement, source-yield, archive, and namespace-policy operation artifacts
+  with safety/path validation and legacy row compatibility.
+- Added burn-in operation doctor checks for missing run artifacts, missing step
+  metadata, forbidden side-effect claims, scorecard fixture leakage, archive
+  scope leakage, and integrated preview mismatches.
+- Improved review-inbox fallback reason codes so low-priority rows explain
+  source-only context, missing strong source, or missing market confirmation
+  instead of only reporting the generic highest remaining value bucket.
+**Verify:** `python3 tests/test_indicators.py` (773/773 passed);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (822 passed); `python3 -m compileall -q
+crypto_rsi_scanner tests`; burn-in smoke/plan, scorecard, review inbox,
+feedback progress, weekly measurement, source-yield, archive dry-run,
+integrated radar smoke/doctor, notification format smoke, Telegram no-send final
+check, strict live burn-in doctor (WARN/no blockers), strict CryptoPanic
+rehearsal doctor (WARN/no blockers), and `make verify PYTHON=python3`.
+**Notes/risks:** The live burn-in namespace still warns for low-maturity/source
+coverage conditions (`source_coverage_provider_status_unknown` and missing
+legacy step timeouts), but blockers are gone and schema validation is clean.
+
 ## 2026-07-06 — Make burn-in evidence semantics exact · Codex
 **Why:** Active burn-in namespaces could complete a run with only fixture,
 preflight, readiness, source-coverage, or diagnostic rows and still look too

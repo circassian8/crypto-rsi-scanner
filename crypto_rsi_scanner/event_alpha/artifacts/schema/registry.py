@@ -123,6 +123,21 @@ COMMON_SAFETY = (
     "trade_created",
     "paper_trade_created",
 )
+OPERATION_SAFETY = tuple(
+    dict.fromkeys(
+        (
+            "research_only",
+            "no_send_rehearsal",
+            "strict_alerts_created",
+            "telegram_sends",
+            "trades_created",
+            "paper_trades_created",
+            "normal_rsi_signal_rows_written",
+            "triggered_fade_created",
+            *COMMON_SAFETY,
+        )
+    )
+)
 COMMON_PATHS = (
     "path",
     "artifact_path",
@@ -275,8 +290,8 @@ SCHEMAS: dict[str, ArtifactSchema] = {
         required=("row_type", "lane", "sent", "no_send_rehearsal"),
         optional=(
             "schema_id", "schema_version", "status", "lane_title", "route",
-            "would_send", "send_guard_enabled", "message_text", "message_html",
-            "card_paths", "skipped_items", "candidate_ids",
+            "status_detail", "would_send", "send_guard_enabled", "message_text",
+            "message_html", "card_paths", "skipped_items", "candidate_ids",
             "core_opportunity_ids", "canonical_symbols", "content_hash",
             "rendered_item_count", "eligible_item_count", "skipped_item_count",
             *COMMON_SAFETY,
@@ -286,6 +301,120 @@ SCHEMAS: dict[str, ArtifactSchema] = {
         paths=("card_path", "notification_preview_path"),
         timestamps=("generated_at",),
         lineage=COMMON_LINEAGE,
+    ),
+    "event_alpha_daily_burn_in_run_v1": _schema(
+        "event_alpha_daily_burn_in_run_v1",
+        required=("row_type", "profile", "artifact_namespace", "steps", "research_only", "no_send_rehearsal"),
+        optional=(
+            "schema_id", "schema_version", "generated_at", "last_updated_at",
+            "namespace_dir", "completed", "smoke", "steps_total", "steps_passed",
+            "steps_skipped", "steps_failed", "steps_timeout", "required_failed",
+            "status", "timeout_seconds", "coinalyze_rehearsal_allowed",
+            "safe_environment", *OPERATION_SAFETY,
+        ),
+        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", "completed": "bool"},
+        safety=OPERATION_SAFETY,
+        timestamps=("generated_at", "last_updated_at"),
+        lineage=("profile", "artifact_namespace"),
+    ),
+    "event_alpha_daily_review_inbox_v1": _schema(
+        "event_alpha_daily_review_inbox_v1",
+        required=("row_type", "profile", "artifact_namespace", "items", "research_only", "no_send_rehearsal"),
+        optional=(
+            "schema_id", "schema_version", "generated_at", "namespace_dir",
+            "review_time_budget_minutes", "family_grouped", "visible_family_grouped",
+            "items_count", "selected_primary_family_count", "collapsed_primary_family_count",
+            "second_family_items_count", "rejected_second_family_items_count",
+            "family_summaries", "collapsed_family_summary", "stale_path_warnings",
+            "blockers", *OPERATION_SAFETY,
+        ),
+        types={"row_type": "str", "profile": "str", "artifact_namespace": "str"},
+        safety=OPERATION_SAFETY,
+        timestamps=("generated_at",),
+        lineage=("profile", "artifact_namespace"),
+    ),
+    "event_alpha_burn_in_scorecard_v1": _schema(
+        "event_alpha_burn_in_scorecard_v1",
+        required=("row_type", "profile", "artifact_namespace", "research_only", "no_send_rehearsal"),
+        optional=(
+            "schema_id", "schema_version", "generated_at", "namespace_dir",
+            "window_days", "evidence_scope", "namespace_scope", "burn_in_contract_scope",
+            "count_explicit_namespace_for_burn_in", "include_reason",
+            "namespace_policy", "contract", "enough_data",
+            "enough_data_reasons", "auto_apply", "auto_apply_thresholds",
+            "fixture_candidate_count", "contract_counted_candidate_count",
+            "real_burn_in_candidate_count",
+            "warnings", *OPERATION_SAFETY,
+        ),
+        types={"row_type": "str", "profile": "str", "artifact_namespace": "str"},
+        safety=OPERATION_SAFETY + ("auto_apply",),
+        timestamps=("generated_at",),
+        lineage=("profile", "artifact_namespace"),
+    ),
+    "event_alpha_burn_in_measurement_dashboard_v1": _schema(
+        "event_alpha_burn_in_measurement_dashboard_v1",
+        required=("row_type", "profile", "artifact_namespace", "evidence_scope", "auto_apply_thresholds", "research_only", "no_send_rehearsal"),
+        optional=(
+            "schema_id", "schema_version", "generated_at", "namespace_dir",
+            "window_days", "namespace_policy", "burn_in_contract_scope",
+            "candidate_source_scope", "explicit_scope_warning", "enough_data",
+            "enough_data_reasons", "low_sample_warning", "min_sample_warning",
+            "source_yield_confidence", *OPERATION_SAFETY,
+        ),
+        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", "auto_apply_thresholds": "bool"},
+        safety=OPERATION_SAFETY + ("auto_apply_thresholds",),
+        timestamps=("generated_at",),
+        lineage=("profile", "artifact_namespace"),
+    ),
+    "event_alpha_source_yield_report_v1": _schema(
+        "event_alpha_source_yield_report_v1",
+        required=("row_type", "profile", "artifact_namespace", "evidence_scope", "auto_apply", "research_only", "no_send_rehearsal"),
+        optional=(
+            "schema_id", "schema_version", "generated_at", "namespace_dir",
+            "window_days", "namespace_policy", "burn_in_contract_scope",
+            "candidate_source_scope", "providers", "source_packs",
+            "source_yield_confidence", "recommendations_only",
+            "auto_apply_thresholds", *OPERATION_SAFETY,
+        ),
+        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", "auto_apply": "bool"},
+        safety=OPERATION_SAFETY + ("auto_apply", "auto_apply_thresholds"),
+        timestamps=("generated_at",),
+        lineage=("profile", "artifact_namespace"),
+    ),
+    "event_alpha_burn_in_archive_manifest_v1": _schema(
+        "event_alpha_burn_in_archive_manifest_v1",
+        required=("row_type", "dry_run", "archive_scope", "research_only", "no_send_rehearsal"),
+        optional=(
+            "schema_id", "schema_version", "generated_at", "base_dir",
+            "archive_path", "manifest_path", "checksums_path",
+            "archive_created", "namespace_policy_version", "namespace_policy",
+            "included_namespaces", "excluded_namespaces", "enough_data",
+            "enough_data_reasons", "secret_hits", "secret_hit_count",
+            "secret_scan_summary", "checksum_manifest", *OPERATION_SAFETY,
+        ),
+        types={"row_type": "str", "dry_run": "bool"},
+        safety=OPERATION_SAFETY,
+        paths=("archive_path", "manifest_path", "checksums_path"),
+        timestamps=("generated_at",),
+        lineage=("profile", "artifact_namespace"),
+    ),
+    "event_alpha_burn_in_namespace_policy_v1": _schema(
+        "event_alpha_burn_in_namespace_policy_v1",
+        required=("row_type", "profile", "artifact_namespace", "namespace_policy_version", "research_only", "no_send_rehearsal"),
+        optional=(
+            "schema_id", "schema_version", "generated_at", "namespace_dir",
+            "base_dir", "default_include_statuses", "default_exclude_statuses",
+            "explicit_inclusion_flags", "explicit_include_namespaces",
+            "included_namespaces", "excluded_namespaces", "exclusion_reasons",
+            "excluded_reasons", "include_reasons", "namespace_status",
+            "latest_doctor_status", "latest_run_id", "artifact_counts",
+            "included_without_burn_in_run_count", "fixture_live_mix_blocker",
+            *OPERATION_SAFETY,
+        ),
+        types={"row_type": "str", "profile": "str", "artifact_namespace": "str"},
+        safety=OPERATION_SAFETY,
+        timestamps=("generated_at",),
+        lineage=("profile", "artifact_namespace"),
     ),
     "source_coverage_v1": _schema(
         "source_coverage_v1",
@@ -572,6 +701,13 @@ ROW_TYPE_TO_SCHEMA_ID = {
     "event_radar_provider_performance": "calibration_prior_v1",
     "event_alpha_namespace_status": "namespace_status_v1",
     "event_alpha_run": "run_ledger_v1",
+    "event_alpha_daily_burn_in_run": "event_alpha_daily_burn_in_run_v1",
+    "event_alpha_daily_review_inbox": "event_alpha_daily_review_inbox_v1",
+    "event_alpha_burn_in_scorecard": "event_alpha_burn_in_scorecard_v1",
+    "event_alpha_burn_in_measurement_dashboard": "event_alpha_burn_in_measurement_dashboard_v1",
+    "event_alpha_source_yield_report": "event_alpha_source_yield_report_v1",
+    "event_alpha_burn_in_archive_manifest": "event_alpha_burn_in_archive_manifest_v1",
+    "event_alpha_burn_in_namespace_policy": "event_alpha_burn_in_namespace_policy_v1",
 }
 
 FILENAME_TO_SCHEMA_ID = {
@@ -605,6 +741,13 @@ FILENAME_TO_SCHEMA_ID = {
     "event_radar_provider_performance.json": "calibration_prior_v1",
     "event_alpha_namespace_status.json": "namespace_status_v1",
     "event_alpha_runs.jsonl": "run_ledger_v1",
+    "event_alpha_daily_burn_in_run.json": "event_alpha_daily_burn_in_run_v1",
+    "event_alpha_daily_review_inbox.json": "event_alpha_daily_review_inbox_v1",
+    "event_alpha_burn_in_scorecard.json": "event_alpha_burn_in_scorecard_v1",
+    "event_alpha_burn_in_measurement_dashboard.json": "event_alpha_burn_in_measurement_dashboard_v1",
+    "event_alpha_source_yield_report.json": "event_alpha_source_yield_report_v1",
+    "event_alpha_burn_in_archive_manifest.json": "event_alpha_burn_in_archive_manifest_v1",
+    "event_alpha_burn_in_namespace_policy.json": "event_alpha_burn_in_namespace_policy_v1",
 }
 
 
@@ -695,13 +838,20 @@ def validate_safety_fields(row: Mapping[str, Any], schema: ArtifactSchema) -> li
             out.append("unsafe_research_only:false")
         if field_name in {"normal_rsi_signal_written", "triggered_fade_created", "trade_created", "paper_trade_created"} and _truthy(value):
             out.append(f"unsafe_side_effect_flag:{field_name}")
-        if field_name in {"trades_created", "paper_trades_created", "strict_alerts_created", "telegram_sends"}:
+        if field_name in {
+            "trades_created",
+            "paper_trades_created",
+            "strict_alerts_created",
+            "telegram_sends",
+            "normal_rsi_signal_rows_written",
+            "triggered_fade_created",
+        }:
             try:
                 if int(value or 0) != 0:
                     out.append(f"unsafe_side_effect_count:{field_name}")
             except (TypeError, ValueError):
                 out.append(f"invalid_safety_count:{field_name}")
-        if field_name == "auto_apply" and _truthy(value):
+        if field_name in {"auto_apply", "auto_apply_thresholds"} and _truthy(value):
             out.append("unsafe_auto_apply:true")
     return out
 
@@ -862,6 +1012,10 @@ def _candidate_path_fields(row: Mapping[str, Any], schema: ArtifactSchema) -> tu
 
 def _required_field_present(row: Mapping[str, Any], field_name: str) -> bool:
     value = row.get(field_name)
+    if field_name in {"items", "steps"}:
+        return field_name in row and value is not None
+    if field_name == "run_id" and str(row.get("row_type") or "") == "daily_burn_in" and value in (None, "", [], {}):
+        value = row.get("started_at") or row.get("generated_at")
     if field_name == "provider" and value in (None, "", [], {}):
         value = row.get("provider_name")
     return value not in (None, "", [], {})
