@@ -24,6 +24,9 @@ def build_burn_in_archive(
     out_dir: str | Path = "research",
     pattern: str | None = None,
     dry_run: bool = False,
+    include_notification_rehearsals: bool = False,
+    include_no_key_namespaces: bool = False,
+    include_provider_rehearsals: bool = False,
     include_fixture_namespaces: bool = False,
     include_stale_namespaces: bool = False,
     include_namespaces: tuple[str, ...] = (),
@@ -38,6 +41,9 @@ def build_burn_in_archive(
         profile="live_burn_in_no_send",
         artifact_namespace="live_burn_in_no_send",
         base_dir=base,
+        include_notification_rehearsals=include_notification_rehearsals,
+        include_no_key_namespaces=include_no_key_namespaces,
+        include_provider_rehearsals=include_provider_rehearsals,
         include_fixture_namespaces=include_fixture_namespaces,
         include_stale_namespaces=include_stale_namespaces,
         include_namespaces=include_namespaces,
@@ -46,6 +52,10 @@ def build_burn_in_archive(
     if pattern:
         namespaces = [name for name in namespaces if (base / name).match(pattern) or name.startswith(pattern.rstrip("*"))]
     files = _collect_files(base, namespaces)
+    file_count_by_namespace = {
+        namespace: sum(1 for path in files if path.relative_to(base).parts[:1] == (namespace,))
+        for namespace in namespaces
+    }
     secret_hits: dict[str, list[str]] = {}
     checksums: dict[str, str] = {}
     safe_payloads: list[tuple[str, bytes]] = []
@@ -78,10 +88,19 @@ def build_burn_in_archive(
             "checksums_path": common.rel_path(checksums_path),
             "dry_run": bool(dry_run),
             "archive_created": bool(not dry_run and archive_path.exists()),
+            "archive_scope": "explicit_namespace_diagnostic" if include_namespaces else "active_burn_in_namespaces",
+            "namespace_policy_version": policy.get("namespace_policy_version"),
+            "explicit_include_flags": policy.get("explicit_inclusion_flags") or {},
+            "no_active_burn_in_namespaces": not bool(namespaces),
+            "enough_data": bool(namespaces),
+            "enough_data_reasons": [] if namespaces else ["no_active_burn_in_namespaces"],
             "namespace_policy": {
+                "namespace_policy_version": policy.get("namespace_policy_version"),
                 "included_namespaces": policy.get("included_namespaces") or [],
                 "excluded_namespaces": policy.get("excluded_namespaces") or [],
                 "exclusion_reasons": policy.get("exclusion_reasons") or {},
+                "excluded_reasons": policy.get("excluded_reasons") or policy.get("exclusion_reasons") or {},
+                "explicit_inclusion_flags": policy.get("explicit_inclusion_flags") or {},
                 "namespace_status": policy.get("namespace_status") or {},
                 "latest_doctor_status": policy.get("latest_doctor_status") or {},
                 "latest_run_id": policy.get("latest_run_id") or {},
@@ -90,12 +109,14 @@ def build_burn_in_archive(
             "included_namespaces": namespaces,
             "excluded_namespaces": policy.get("excluded_namespaces") or [],
             "exclusion_reasons": policy.get("exclusion_reasons") or {},
+            "excluded_reasons": policy.get("excluded_reasons") or policy.get("exclusion_reasons") or {},
             "namespace_status": policy.get("namespace_status") or {},
             "latest_doctor_status": policy.get("latest_doctor_status") or {},
             "latest_run_id": policy.get("latest_run_id") or {},
             "artifact_counts": policy.get("artifact_counts") or {},
             "files_considered": len(files),
             "files_archived": len(checksums),
+            "file_count_by_namespace": file_count_by_namespace,
             "secret_hits": secret_hits,
             "secret_hit_count": sum(len(values) for values in secret_hits.values()),
             "secret_scan_summary": {
@@ -104,6 +125,11 @@ def build_burn_in_archive(
                 "secret_hit_count": sum(len(values) for values in secret_hits.values()),
             },
             "archive_sha256": archive_checksum,
+            "checksum_manifest": {
+                "path": common.rel_path(checksums_path),
+                "file_count": len(checksums),
+                "archive_sha256": archive_checksum,
+            },
             "include_patterns": [pattern] if pattern else [],
             "excluded_suffixes": sorted(_excluded_suffixes()),
         }
@@ -150,20 +176,28 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Archive burn-in evidence artifacts without secrets.")
     parser.add_argument("--base-dir", default="event_fade_cache")
     parser.add_argument("--out-dir", default="research")
+    parser.add_argument("--artifact-namespace", default=None)
     parser.add_argument("--pattern", default=None)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--include-notification-rehearsals", action="store_true")
+    parser.add_argument("--include-no-key-namespaces", action="store_true")
+    parser.add_argument("--include-provider-rehearsals", action="store_true")
     parser.add_argument("--include-fixture-namespaces", action="store_true")
     parser.add_argument("--include-stale-namespaces", action="store_true")
     parser.add_argument("--include-namespace", action="append", default=[])
     args = parser.parse_args(argv)
+    explicit_namespaces = tuple([*(args.include_namespace or []), *([args.artifact_namespace] if args.artifact_namespace else [])])
     payload = build_burn_in_archive(
         base_dir=args.base_dir,
         out_dir=args.out_dir,
         pattern=args.pattern,
         dry_run=args.dry_run,
+        include_notification_rehearsals=args.include_notification_rehearsals,
+        include_no_key_namespaces=args.include_no_key_namespaces,
+        include_provider_rehearsals=args.include_provider_rehearsals,
         include_fixture_namespaces=args.include_fixture_namespaces,
         include_stale_namespaces=args.include_stale_namespaces,
-        include_namespaces=tuple(args.include_namespace),
+        include_namespaces=explicit_namespaces,
     )
     print(f"event_alpha_burn_in_archive: {payload['archive_path']}")
     print(f"dry_run={payload['dry_run']} files_archived={payload['files_archived']} secret_hit_count={payload['secret_hit_count']}")

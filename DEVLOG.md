@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-06 — Tighten burn-in scope and review-inbox grouping · Codex
+**Why:** Burn-in measurement needed to stop treating notification rehearsals,
+no-key diagnostic namespaces, provider rehearsals, fixtures, and explicitly
+selected single namespaces as real 30-day burn-in evidence by default. The daily
+review inbox also needed to collapse duplicate visible families so generic
+source-only rows do not crowd out higher-value review work.
+**Changes:**
+- Added explicit namespace policy flags for notification rehearsals, no-key
+  namespaces, provider rehearsals, fixtures, and stale namespaces, plus policy
+  version/scope counters across burn-in scorecard, weekly measurement,
+  source-yield, and archive manifests.
+- Made default burn-in scorecard/measurement/source-yield/archive scopes count
+  only active burn-in namespaces; explicit single namespace runs are diagnostic
+  unless the operator opts in to counting them.
+- Added a dry-run daily burn-in plan target that prints the no-live-provider and
+  Coinalyze-skip guardrails without writing artifacts.
+- Grouped daily review-inbox items by visible asset family and added family
+  summary, representative reason, selection bucket, and review-value scoring so
+  high-value source/market gaps rank ahead of generic RSS/GDELT-style noise.
+- Expanded focused tests and Make target checks for policy flags, default
+  exclusions, explicit namespace diagnostics, review-inbox grouping, archive
+  scope metadata, and the no-send dry-run plan.
+**Verify:** `python3 tests/test_indicators.py` (770/770 passed);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (808 passed); `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make event-alpha-daily-live-no-send-burn-in-smoke
+PYTHON=python3`; `make event-alpha-daily-live-no-send-burn-in-plan
+PYTHON=python3`; burn-in scorecard/review-inbox/feedback-progress/measurement/
+source-yield/archive dry-run targets; `make architecture-size-gates PYTHON=python3`;
+`make event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make
+event-alpha-notification-format-smoke PYTHON=python3`; `make
+event-alpha-telegram-no-send-final-check-fast PYTHON=python3`; `make
+event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1
+PYTHON=python3` (WARN/no blockers); `make verify PYTHON=python3`.
+**Notes/risks:** Default burn-in reports may now show `enough_data=False` until
+real active burn-in namespaces accumulate enough evidence. Rehearsal namespaces
+remain available for diagnostic single-namespace inspection.
+
 ## 2026-07-06 — Harden daily burn-in validation loop · Codex
 **Why:** The daily no-send burn-in loop needed to be operationally safe for real
 use: bounded command execution, partial artifacts on failure, namespace-safe

@@ -148,11 +148,58 @@ def run_daily_burn_in(
     return payload
 
 
+def format_daily_burn_in_plan(
+    *,
+    profile: str,
+    namespace: str,
+    python: str,
+    include_coinalyze_rehearsal: bool,
+    smoke: bool = False,
+    readiness_timeout_seconds: float = 60.0,
+    integrated_timeout_seconds: float = 180.0,
+    report_timeout_seconds: float = 60.0,
+    doctor_timeout_seconds: float = 120.0,
+) -> str:
+    steps = build_steps(
+        python=python,
+        profile=profile,
+        namespace=namespace,
+        include_coinalyze_rehearsal=include_coinalyze_rehearsal,
+        smoke=smoke,
+        readiness_timeout_seconds=readiness_timeout_seconds,
+        integrated_timeout_seconds=integrated_timeout_seconds,
+        report_timeout_seconds=report_timeout_seconds,
+        doctor_timeout_seconds=doctor_timeout_seconds,
+    )
+    lines = [
+        "# Event Alpha Daily Live No-Send Burn-In Plan",
+        "",
+        f"- profile: `{profile}`",
+        f"- artifact_namespace: `{namespace}`",
+        f"- dry_run_plan: `True`",
+        "- No live providers were run by default.",
+        "- Coinalyze rehearsal skipped unless explicit allow flags are set.",
+        "- No Telegram sends, trades, paper trades, normal RSI rows, or Event Alpha-created `TRIGGERED_FADE` are authorized.",
+        "",
+        "## Planned Steps",
+        "",
+    ]
+    for step in steps:
+        if isinstance(step, Mapping):
+            lines.append(f"- {step.get('name')}: skipped by default ({step.get('skip_reason')})")
+        else:
+            lines.append(f"- {step.name}: timeout={step.timeout_seconds}s command=`{' '.join(step.command)}`")
+    return "\n".join(lines).rstrip()
+
+
 def format_daily_burn_in_report(payload: Mapping[str, Any]) -> str:
     lines = [
         "# Event Alpha Daily Live No-Send Burn-In",
         "",
         "Research-only daily operating loop. No Telegram sends, trades, paper trades, normal RSI rows, live provider calls by default, or Event Alpha-created `TRIGGERED_FADE` are authorized by this report.",
+        "",
+        "No live providers were run by default.",
+        "Coinalyze rehearsal skipped unless explicit allow flags are set.",
         "",
         f"- generated_at: `{payload.get('generated_at')}`",
         f"- profile: `{payload.get('profile')}`",
@@ -381,11 +428,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stop-on-required-failure", action="store_true")
     parser.add_argument("--include-coinalyze-rehearsal", action="store_true")
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--dry-run-plan", action="store_true")
     parser.add_argument("--readiness-timeout-seconds", type=float, default=60.0)
     parser.add_argument("--integrated-timeout-seconds", type=float, default=180.0)
     parser.add_argument("--report-timeout-seconds", type=float, default=60.0)
     parser.add_argument("--doctor-timeout-seconds", type=float, default=120.0)
     args = parser.parse_args(argv)
+    if args.dry_run_plan:
+        namespace = args.artifact_namespace or default_namespace()
+        print(
+            format_daily_burn_in_plan(
+                profile=args.profile,
+                namespace=namespace,
+                python=args.python,
+                include_coinalyze_rehearsal=args.include_coinalyze_rehearsal,
+                smoke=args.smoke,
+                readiness_timeout_seconds=args.readiness_timeout_seconds,
+                integrated_timeout_seconds=args.integrated_timeout_seconds,
+                report_timeout_seconds=args.report_timeout_seconds,
+                doctor_timeout_seconds=args.doctor_timeout_seconds,
+            )
+        )
+        return 0
     payload = run_daily_burn_in(
         profile=args.profile,
         artifact_namespace=args.artifact_namespace,

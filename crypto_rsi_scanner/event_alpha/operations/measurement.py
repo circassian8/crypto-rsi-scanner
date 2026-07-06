@@ -21,6 +21,9 @@ def build_measurement_dashboard(
     artifact_namespace: str | None = None,
     base_dir: str | Path | None = None,
     days: int = 30,
+    include_notification_rehearsals: bool = False,
+    include_no_key_namespaces: bool = False,
+    include_provider_rehearsals: bool = False,
     include_fixture_namespaces: bool = False,
     include_stale_namespaces: bool = False,
     include_namespaces: tuple[str, ...] = (),
@@ -32,6 +35,9 @@ def build_measurement_dashboard(
         profile=profile,
         artifact_namespace=context.artifact_namespace,
         base_dir=base,
+        include_notification_rehearsals=include_notification_rehearsals,
+        include_no_key_namespaces=include_no_key_namespaces,
+        include_provider_rehearsals=include_provider_rehearsals,
         include_fixture_namespaces=include_fixture_namespaces,
         include_stale_namespaces=include_stale_namespaces,
         include_namespaces=((artifact_namespace,) if artifact_namespace else include_namespaces),
@@ -57,13 +63,24 @@ def build_measurement_dashboard(
     main_candidates = [row for row in candidates if common.row_lane(row) != "DIAGNOSTIC"]
     labels_by_lane = common.count_by(feedback, "lane", "opportunity_type")
     label_coverage = _label_coverage(feedback, candidates + cores)
-    low_sample_warning = len(feedback) < 150 or len(outcomes) < 100 or not included_namespaces
+    evidence_scope = _evidence_scope(artifact_namespace, policy)
+    explicit_scope_warning = (
+        "explicit namespace diagnostic; not counted as burn-in contract aggregate"
+        if artifact_namespace
+        else ""
+    )
+    contract_countable = not bool(artifact_namespace)
+    real_burn_in_candidate_count = len(candidates) if contract_countable else 0
+    non_burn_in_candidate_count = 0 if contract_countable else len(candidates)
+    low_sample_warning = len(feedback) < 150 or len(outcomes) < 100 or not included_namespaces or bool(explicit_scope_warning)
     enough_data_reasons = _enough_data_reasons(
-        included_namespaces=included_namespaces,
+        included_namespaces=included_namespaces if contract_countable else [],
         feedback=feedback,
         outcomes=outcomes,
         daily_runs=daily_runs,
     )
+    if explicit_scope_warning:
+        enough_data_reasons = ["explicit_namespace_not_counted_for_burn_in_contract", *enough_data_reasons]
     payload = common.with_safety(
         {
             "schema_version": "event_alpha_burn_in_measurement_dashboard_v1",
@@ -74,19 +91,28 @@ def build_measurement_dashboard(
             "namespace_dir": common.rel_path(context.namespace_dir),
             "window_days": days,
             "namespace_policy": {
+                "namespace_policy_version": policy.get("namespace_policy_version"),
                 "included_namespaces": policy.get("included_namespaces") or [],
                 "excluded_namespaces": policy.get("excluded_namespaces") or [],
                 "exclusion_reasons": policy.get("exclusion_reasons") or {},
+                "excluded_reasons": policy.get("excluded_reasons") or policy.get("exclusion_reasons") or {},
+                "explicit_inclusion_flags": policy.get("explicit_inclusion_flags") or {},
                 "namespace_status": policy.get("namespace_status") or {},
                 "latest_doctor_status": policy.get("latest_doctor_status") or {},
                 "latest_run_id": policy.get("latest_run_id") or {},
                 "artifact_counts": policy.get("artifact_counts") or {},
             },
-            "evidence_scope": "single_namespace" if artifact_namespace else "policy",
+            "namespace_policy_version": policy.get("namespace_policy_version"),
+            "evidence_scope": evidence_scope,
+            "burn_in_contract_scope": "explicit_single_namespace_diagnostic" if artifact_namespace else "active_burn_in_namespaces",
             "candidate_source_scope": "single_namespace" if artifact_namespace else "active_burn_in_namespaces",
+            "explicit_scope_warning": explicit_scope_warning,
             "included_namespaces": included_namespaces,
             "excluded_namespaces": policy.get("excluded_namespaces") or [],
             "exclusion_reasons": policy.get("exclusion_reasons") or {},
+            "excluded_reasons": policy.get("excluded_reasons") or policy.get("exclusion_reasons") or {},
+            "included_namespace_count": len(included_namespaces),
+            "excluded_namespace_count": len(policy.get("excluded_namespaces") or []),
             "namespace_status": policy.get("namespace_status") or {},
             "latest_doctor_status": policy.get("latest_doctor_status") or {},
             "latest_run_id": policy.get("latest_run_id") or {},
@@ -94,6 +120,8 @@ def build_measurement_dashboard(
             "live_cycles": len(daily_runs),
             "fixture_cycles": len(fixture_cycles),
             "stale_cycles": len(stale_cycles),
+            "real_burn_in_candidate_count": real_burn_in_candidate_count,
+            "non_burn_in_candidate_count": non_burn_in_candidate_count,
             "candidates_by_opportunity_type": common.count_by(main_candidates, "opportunity_type", "lane"),
             "rendered_vs_skipped_counts": {
                 "rendered": sum(1 for row in deliveries if str(row.get("state") or "").casefold() in {"sent", "would_send", "rendered"}),
@@ -148,7 +176,11 @@ def format_measurement_dashboard(payload: Mapping[str, Any]) -> str:
         f"- profile: `{payload.get('profile')}`",
         f"- artifact_namespace: `{payload.get('artifact_namespace')}`",
         f"- evidence_scope: `{payload.get('evidence_scope')}`",
+        f"- burn_in_contract_scope: `{payload.get('burn_in_contract_scope')}`",
         f"- included_namespaces: `{', '.join(payload.get('included_namespaces') or []) or 'none'}`",
+        f"- explicit_scope_warning: `{payload.get('explicit_scope_warning') or 'none'}`",
+        f"- real_burn_in_candidate_count: `{payload.get('real_burn_in_candidate_count')}`",
+        f"- non_burn_in_candidate_count: `{payload.get('non_burn_in_candidate_count')}`",
         f"- low_sample_warning: `{payload.get('low_sample_warning')}`",
         f"- enough_data: `{payload.get('enough_data')}`",
         f"- enough_data_reasons: `{', '.join(payload.get('enough_data_reasons') or []) or 'none'}`",
@@ -192,6 +224,27 @@ def _rows(base: Path, filename: str, *, cutoff, namespaces: list[str] | tuple[st
 
 def _json_docs(base: Path, filename: str, *, namespaces: list[str] | tuple[str, ...]) -> list[dict[str, Any]]:
     return [row for namespace in namespaces if (row := common.read_json(base / namespace / filename))]
+
+
+def _evidence_scope(artifact_namespace: str | None, policy: Mapping[str, Any]) -> str:
+    if not artifact_namespace:
+        return "real_burn_in_evidence" if policy.get("included_namespaces") else "no_active_burn_in_namespaces"
+    details = [
+        row
+        for section in ("included_namespace_details", "excluded_namespace_details")
+        for row in (policy.get(section) or [])
+        if isinstance(row, Mapping) and row.get("namespace") == artifact_namespace
+    ]
+    categories = {str(item) for row in details for item in (row.get("categories") or [])}
+    if "fixture" in categories:
+        return "fixture"
+    if "no_key" in categories:
+        return "no_key_diagnostic"
+    if "stale" in categories:
+        return "stale_historical_diagnostic"
+    if "notification_rehearsal" in categories:
+        return "explicit_single_namespace_diagnostic"
+    return "explicit_single_namespace_diagnostic"
 
 
 def _mentions(row: Mapping[str, Any], needle: str) -> bool:
@@ -281,6 +334,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--artifact-namespace", default=None)
     parser.add_argument("--base-dir", default=None)
     parser.add_argument("--days", type=int, default=30)
+    parser.add_argument("--include-notification-rehearsals", action="store_true")
+    parser.add_argument("--include-no-key-namespaces", action="store_true")
+    parser.add_argument("--include-provider-rehearsals", action="store_true")
     parser.add_argument("--include-fixture-namespaces", action="store_true")
     parser.add_argument("--include-stale-namespaces", action="store_true")
     parser.add_argument("--include-namespace", action="append", default=[])
@@ -290,6 +346,9 @@ def main(argv: list[str] | None = None) -> int:
         artifact_namespace=args.artifact_namespace,
         base_dir=args.base_dir,
         days=args.days,
+        include_notification_rehearsals=args.include_notification_rehearsals,
+        include_no_key_namespaces=args.include_no_key_namespaces,
+        include_provider_rehearsals=args.include_provider_rehearsals,
         include_fixture_namespaces=args.include_fixture_namespaces,
         include_stale_namespaces=args.include_stale_namespaces,
         include_namespaces=tuple(args.include_namespace),
