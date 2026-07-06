@@ -563,14 +563,14 @@ def _pack_coverage_status(
     if not configured_set:
         return "not_configured"
     if unknown_set and not healthy_set and not degraded_set:
-        return "unknown"
+        return "skipped_live_calls_disabled"
     if degraded_set and not healthy_set:
         return "degraded"
     if healthy_set and not missing_set and not degraded_set and not provider_unavailable_count:
         return "partial" if unknown_set else "complete"
     if healthy_set:
         return "partial"
-    return "unknown" if unknown_set else "unavailable"
+    return "skipped_live_calls_disabled" if unknown_set else "unavailable"
 def _coverage_gap_reason(
     *,
     coverage_status: str,
@@ -583,7 +583,7 @@ def _coverage_gap_reason(
     provider_unavailable: int,
 ) -> str | None:
     reasons: list[str] = []
-    if coverage_status in {"not_configured", "degraded", "unavailable", "partial", "unknown"}:
+    if coverage_status in {"not_configured", "degraded", "unavailable", "partial", "unknown", "skipped_live_calls_disabled"}:
         reasons.append(f"source_pack_coverage_{coverage_status}")
     missing_values = _sorted_tuple(missing)
     unknown_values = _sorted_tuple(unknown)

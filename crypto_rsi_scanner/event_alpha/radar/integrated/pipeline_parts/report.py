@@ -205,10 +205,12 @@ def build_integrated_notification_delivery_rows(
     run_id: str | None = None,
     generated_at: datetime | str | None = None,
     send_guard_enabled: bool = False,
+    preview_path: str | Path | None = None,
 ) -> tuple[dict[str, Any], ...]:
     rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
     core_by_id = {str(row.get("core_opportunity_id") or ""): dict(row) for row in core_rows if isinstance(row, Mapping)}
     observed = _as_utc(_parse_time(generated_at) or datetime.now(timezone.utc)).isoformat()
+    zero_candidate_preview = not rows
     lane_specs = (
         ("early_long_research", "Early Long Research", event_market_reaction.EventOpportunityType.EARLY_LONG_RESEARCH.value),
         ("confirmed_long_research", "Confirmed Long Research", event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value),
@@ -237,6 +239,8 @@ def build_integrated_notification_delivery_rows(
             run_id=run_id,
             observed=observed,
             send_guard_enabled=send_guard_enabled,
+            preview_path=preview_path,
+            zero_candidate_preview=zero_candidate_preview,
         ))
     diagnostics = [row for row in rows if row.get("opportunity_type") == event_market_reaction.EventOpportunityType.DIAGNOSTIC.value]
     health_message = _integrated_lane_message(
@@ -260,6 +264,8 @@ def build_integrated_notification_delivery_rows(
         run_id=run_id,
         observed=observed,
         send_guard_enabled=send_guard_enabled,
+        preview_path=preview_path,
+        zero_candidate_preview=zero_candidate_preview,
     ))
     return tuple(out)
 
@@ -338,6 +344,7 @@ def format_integrated_notification_preview(
         run_id=None,
         generated_at=datetime.now(timezone.utc),
         send_guard_enabled=False,
+        preview_path=context.namespace_dir / "event_integrated_radar_notification_preview.md" if context else None,
     )
     return format_integrated_notification_preview_from_deliveries(
         delivery_rows,
@@ -398,6 +405,8 @@ def _integrated_delivery_row(
     run_id: str | None,
     observed: str,
     send_guard_enabled: bool,
+    preview_path: str | Path | None,
+    zero_candidate_preview: bool,
 ) -> dict[str, Any]:
     rendered = [dict(row) for row in rendered_rows if isinstance(row, Mapping)]
     skipped = [dict(row) for row in skipped_rows if isinstance(row, Mapping)]
@@ -420,6 +429,7 @@ def _integrated_delivery_row(
         for row in skipped
     )
     safe_text = event_artifact_paths.scrub_absolute_paths_from_markdown(message_text)
+    preview_label = event_artifact_paths.artifact_display_path(preview_path) if preview_path else None
     return {
         "schema_version": 1,
         "row_type": "event_integrated_radar_notification_delivery",
@@ -432,6 +442,9 @@ def _integrated_delivery_row(
         "route": "INTEGRATED_RADAR_RESEARCH_PREVIEW",
         "status": status,
         "status_detail": status_detail,
+        "preview_path": preview_label,
+        "preview_kind": "integrated_radar",
+        "zero_candidate_preview": bool(zero_candidate_preview),
         "would_send": would_send,
         "sent": False,
         "send_guard_enabled": bool(send_guard_enabled),

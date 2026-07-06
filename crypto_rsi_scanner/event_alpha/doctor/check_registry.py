@@ -475,6 +475,20 @@ CHECKS: tuple[DoctorCheck, ...] = (
         "Every daily burn-in run step must record its timeout.",
     ),
     _check(
+        "outcomes.daily_burn_in_run_step_required",
+        CATEGORY_OUTCOMES,
+        "warning",
+        ("steps", "required"),
+        "Every daily burn-in run step must explicitly declare whether it is required.",
+    ),
+    _check(
+        "outcomes.daily_burn_in_run_step_skip_reason",
+        CATEGORY_OUTCOMES,
+        "warning",
+        ("steps", "skip_reason"),
+        "Skipped daily burn-in run steps must record a skip reason.",
+    ),
+    _check(
         "outcomes.daily_burn_in_run_side_effects",
         CATEGORY_OUTCOMES,
         "blocker",

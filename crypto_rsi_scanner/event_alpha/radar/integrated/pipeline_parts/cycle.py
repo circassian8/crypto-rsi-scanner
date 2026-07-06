@@ -309,6 +309,7 @@ def _write_integrated_operator_artifacts(
         ),
     )
     delivery_path = start.namespace_dir / INTEGRATED_DELIVERIES_FILENAME
+    preview_path = start.namespace_dir / NOTIFICATION_PREVIEW_FILENAME
     delivery_rows = build_integrated_notification_delivery_rows(
         candidates,
         core_rows=core_rows,
@@ -316,6 +317,7 @@ def _write_integrated_operator_artifacts(
         run_id=start.run_id,
         generated_at=start.research_observed_at,
         send_guard_enabled=False,
+        preview_path=preview_path,
     )
     _write_jsonl(delivery_path, delivery_rows)
     daily_brief_path = start.namespace_dir / DAILY_BRIEF_FILENAME
@@ -330,7 +332,6 @@ def _write_integrated_operator_artifacts(
         ),
         encoding="utf-8",
     )
-    preview_path = start.namespace_dir / NOTIFICATION_PREVIEW_FILENAME
     preview_path.write_text(
         format_integrated_notification_preview_from_deliveries(
             delivery_rows,

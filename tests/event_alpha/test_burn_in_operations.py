@@ -228,6 +228,51 @@ def test_daily_review_inbox_uses_specific_fallback_reason_codes(tmp_path):
     assert "missing_market_confirmation_review" in reasons
 
 
+def test_daily_review_inbox_derives_specific_reasons_from_alertability_gaps(tmp_path):
+    ns = tmp_path / "burn"
+    _write_jsonl(
+        ns / "event_integrated_radar_candidates.jsonl",
+        [
+            {
+                "canonical_asset_id": "asset:sourcegap",
+                "symbol": "SRCGAP",
+                "coin_id": "sourcegap",
+                "opportunity_type": "UNCONFIRMED_RESEARCH",
+                "opportunity_score": 30,
+                "source_pack": "official_exchange_listing_pack",
+                "market_state_class": "unknown",
+                "why_not_alertable": ["strong_source_missing", "market_reaction_missing"],
+                "evidence_status": "needs_review",
+            },
+            {
+                "canonical_asset_id": "asset:anomgap",
+                "symbol": "ANOMGAP",
+                "coin_id": "anomgap",
+                "opportunity_type": "UNCONFIRMED_RESEARCH",
+                "opportunity_score": 25,
+                "source_pack": "market_anomaly_pack",
+                "market_state_class": "confirmed_breakout",
+                "why_not_alertable": "catalyst missing",
+                "evidence_status": "needs_review",
+            },
+        ],
+    )
+    payload = review_inbox.build_review_inbox(
+        profile="live_burn_in_no_send",
+        artifact_namespace="burn",
+        base_dir=tmp_path,
+        limit=2,
+        now=datetime(2026, 7, 5, tzinfo=timezone.utc),
+    )
+    by_symbol = {row["symbol"]: row for row in payload["items"]}
+    source_reasons = by_symbol["SRCGAP"]["review_value_reason_codes"]
+    assert "missing_strong_source_review" in source_reasons
+    assert "missing_market_confirmation_review" in source_reasons
+    assert "accepted_evidence_found" not in source_reasons
+    anomaly_reasons = by_symbol["ANOMGAP"]["review_value_reason_codes"]
+    assert "market_anomaly_missing_catalyst" in anomaly_reasons
+
+
 def test_daily_review_inbox_collapses_visible_families_and_prioritizes_useful_review(tmp_path):
     ns = tmp_path / "burn"
     btc_rows = [
@@ -409,6 +454,34 @@ def test_daily_burn_in_timeout_writes_artifact_and_progress(tmp_path, capsys, mo
     assert saved["completed"] is True
     assert saved["steps"][0]["status"] == "timeout"
     assert saved["steps"][0]["timeout_seconds"] == 0.05
+    assert saved["steps"][0]["required"] is True
+    assert saved["steps"][0]["command"]
+    assert saved["steps"][0]["started_at"]
+    assert saved["steps"][0]["finished_at"]
+
+
+def test_daily_burn_in_skipped_step_records_skip_metadata(tmp_path, monkeypatch):
+    skipped = {
+        "name": "coinalyze_no_send_rehearsal",
+        "status": "skipped",
+        "timeout_seconds": 7,
+        "skip_reason": "explicitly disabled for fixture",
+    }
+    monkeypatch.setattr(daily_burn_in, "build_steps", lambda **kwargs: (skipped,))
+    payload = daily_burn_in.run_daily_burn_in(
+        profile="fixture",
+        artifact_namespace="burn_skipped",
+        base_dir=tmp_path,
+        python=sys.executable,
+        smoke=True,
+    )
+    row = payload["steps"][0]
+    assert row["status"] == "skipped"
+    assert row["required"] is False
+    assert row["timeout_seconds"] == 7
+    assert row["skip_reason"] == "explicitly disabled for fixture"
+    assert row["started_at"]
+    assert row["finished_at"]
 
 
 def test_daily_burn_in_plan_prints_without_writing_artifacts(tmp_path, capsys):
@@ -897,7 +970,11 @@ def test_burn_in_doctor_operations_checks_daily_run_and_archive_scope():
     blockers.clear()
     ctx.daily_burn_in_run = {
         "row_type": "event_alpha_daily_burn_in_run",
-        "steps": [{"name": "doctor"}, {"name": "brief", "status": "passed"}],
+        "steps": [
+            {"name": "doctor"},
+            {"name": "brief", "status": "passed", "required": False, "command": "python main.py --brief"},
+            {"name": "skipped", "status": "skipped", "required": False},
+        ],
         "normal_rsi_signal_rows_written": 1,
     }
     ctx.integrated_conflicts = {"integrated_preview_lane_mismatch": 1}
@@ -907,7 +984,9 @@ def test_burn_in_doctor_operations_checks_daily_run_and_archive_scope():
     }
     doctor_operations_checks.apply_checks(ctx, blockers, warnings)
     assert any("daily_burn_in_run_step_missing_status=1" in warning for warning in warnings)
-    assert any("daily_burn_in_run_step_missing_timeout=2" in warning for warning in warnings)
+    assert any("daily_burn_in_run_step_missing_required=1" in warning for warning in warnings)
+    assert any("daily_burn_in_run_step_missing_timeout=1" in warning for warning in warnings)
+    assert any("daily_burn_in_run_step_skipped_missing_reason=1" in warning for warning in warnings)
     assert any("daily_burn_in_run_forbidden_side_effect_claim=1" in blocker for blocker in blockers)
     assert any("daily_burn_in_integrated_preview_mismatch" in blocker for blocker in blockers)
     assert any("daily_burn_in_archive_includes_non_burn_in_by_default" in blocker for blocker in blockers)

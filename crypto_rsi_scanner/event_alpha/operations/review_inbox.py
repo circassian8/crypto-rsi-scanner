@@ -31,6 +31,8 @@ HIGH_VALUE_REASON_CODES = HIGH_VALUE_SECONDARY_BUCKETS | {
     "quality_capped",
     "fade_review",
     "lane_critical_provider_gap",
+    "missing_strong_source_review",
+    "missing_market_confirmation_review",
 }
 
 
@@ -721,47 +723,7 @@ def _review_value(
     *,
     has_card: bool,
 ) -> tuple[int, list[str], list[str], str]:
-    value = _legacy_priority(
-        ReviewItem(
-            family="",
-            visible_family_key="",
-            primary_visible_family_key="",
-            secondary_visible_family_key="",
-            candidate_family_id="",
-            core_family_ids=(),
-            duplicate_visible_family_count=1,
-            symbol_duplicate_count=1,
-            collapsed_symbol_family_count=1,
-            visible_family_rank=0,
-            symbol_family_rank=0,
-            selection_bucket="general",
-            allowed_second_family_reason="",
-            collapsed_family_representative_reason="",
-            symbol="",
-            coin_id="",
-            opportunity_type=opportunity_type,
-            score=score,
-            source_origin=source_origin,
-            source_pack=source_pack,
-            evidence_status=evidence_status,
-            market_state=market_state,
-            why_not_alertable=why,
-            what_confirms="",
-            what_invalidates="",
-            card_path="",
-            feedback_target="",
-            suggested_feedback_commands=(),
-            candidate_record_type="candidate",
-            candidate_provenance="candidate",
-            contract_counted_candidate=False,
-            source_artifact="",
-            source_artifact_row_type="candidate",
-            real_candidate_evidence=False,
-            diagnostic_only=False,
-            fixture_only=False,
-            preflight_only=False,
-        )
-    )
+    value = _legacy_priority(_legacy_review_item_for_value(opportunity_type, score, source_origin, source_pack, evidence_status, market_state, why))
     reasons: list[str] = []
     downrank_reasons: list[str] = []
     bucket = "general"
@@ -769,6 +731,7 @@ def _review_value(
     market_text = f"{market_state} {why}".casefold()
     evidence_text = evidence_status.casefold()
     lane_text = opportunity_type.casefold()
+    why_text = why.casefold()
     source_strength = max(common.int_value(row.get("source_strength")), common.int_value(row.get("source_strength_score")))
     symbol = str(row.get("symbol") or row.get("asset_symbol") or "").strip().upper()
     if str(row.get("evidence_acquisition_status") or "").casefold() == "accepted_evidence_found":
@@ -782,8 +745,12 @@ def _review_value(
         if any(token in source_text for token in ("project_blog_rss", "rss", "gdelt")) or symbol in {"BTC", "ETH"}:
             value -= 25 if symbol in {"BTC", "ETH"} else 15
             downrank_reasons.append("generic_context_source_downranked")
-    if row.get("_source_file") == "event_market_anomalies.jsonl" or "anomaly" in market_text:
+    if row.get("_source_file") == "event_market_anomalies.jsonl" or "anomaly" in market_text or source_pack == "market_anomaly_pack":
         value += 55
+        reasons.append("market_anomaly_missing_catalyst")
+        bucket = "market_anomaly_missing_catalyst"
+    elif market_state.casefold() in {"late_momentum", "confirmed_breakout"} and "catalyst" in why_text:
+        value += 35
         reasons.append("market_anomaly_missing_catalyst")
         bucket = "market_anomaly_missing_catalyst"
     accepted = bool(row.get("accepted_evidence")) or common.int_value(row.get("accepted_evidence_count")) > 0 or "accepted" in evidence_text
@@ -801,14 +768,20 @@ def _review_value(
         value += 45
         reasons.append("source_pack_high_priority")
         bucket = "source_pack_high_priority"
-    if "near" in why.casefold():
+    gap_value, gap_reasons, gap_bucket = _specific_alertability_gap_reasons(why_text, accepted=accepted)
+    if gap_reasons:
+        value += gap_value
+        reasons.extend(gap_reasons)
+        if bucket == "general":
+            bucket = gap_bucket
+    if "near" in why_text:
         value += 45
         reasons.append("near_gate")
         bucket = "near_gate"
-    if "quality" in why.casefold() or "cap" in why.casefold():
+    if "quality" in why_text or "cap" in why_text:
         value += 10
         reasons.append("quality_capped")
-    if row.get("skipped") is True or row.get("skip_reason") or "skip" in why.casefold():
+    if row.get("skipped") is True or row.get("skip_reason") or "skip" in why_text:
         value += 40
         reasons.append("high_value_skipped_family")
         bucket = "high_value_skipped_family"
@@ -841,7 +814,7 @@ def _review_value(
     if _is_stale_candidate(row, market_state, why):
         value -= 20
         downrank_reasons.append("stale_candidate_downranked")
-    if "unsupported" in why.casefold() or "insufficient" in why.casefold():
+    if "unsupported" in why_text or "insufficient" in why_text:
         value -= 25
         downrank_reasons.append("unsupported_mechanism_downranked")
     if not reasons or not any(reason in HIGH_VALUE_REASON_CODES for reason in reasons):
@@ -855,6 +828,70 @@ def _review_value(
             if reason not in reasons:
                 reasons.append(reason)
     return max(0, value), reasons, downrank_reasons, bucket
+
+
+def _legacy_review_item_for_value(
+    opportunity_type: str,
+    score: int,
+    source_origin: str,
+    source_pack: str,
+    evidence_status: str,
+    market_state: str,
+    why: str,
+) -> ReviewItem:
+    return ReviewItem(
+        family="",
+        visible_family_key="",
+        primary_visible_family_key="",
+        secondary_visible_family_key="",
+        candidate_family_id="",
+        core_family_ids=(),
+        duplicate_visible_family_count=1,
+        symbol_duplicate_count=1,
+        collapsed_symbol_family_count=1,
+        visible_family_rank=0,
+        symbol_family_rank=0,
+        selection_bucket="general",
+        allowed_second_family_reason="",
+        collapsed_family_representative_reason="",
+        symbol="",
+        coin_id="",
+        opportunity_type=opportunity_type,
+        score=score,
+        source_origin=source_origin,
+        source_pack=source_pack,
+        evidence_status=evidence_status,
+        market_state=market_state,
+        why_not_alertable=why,
+        what_confirms="",
+        what_invalidates="",
+        card_path="",
+        feedback_target="",
+        suggested_feedback_commands=(),
+        candidate_record_type="candidate",
+        candidate_provenance="candidate",
+        contract_counted_candidate=False,
+        source_artifact="",
+        source_artifact_row_type="candidate",
+        real_candidate_evidence=False,
+        diagnostic_only=False,
+        fixture_only=False,
+        preflight_only=False,
+    )
+
+
+def _specific_alertability_gap_reasons(why_text: str, *, accepted: bool) -> tuple[int, list[str], str]:
+    value = 0
+    reasons: list[str] = []
+    bucket = "source_pack_high_priority"
+    if "strong_source_missing" in why_text or "strong source missing" in why_text:
+        value += 25
+        reasons.append("missing_strong_source_review")
+    if "market_reaction_missing" in why_text or "market reaction missing" in why_text:
+        value += 25
+        reasons.append("missing_market_confirmation_review")
+        bucket = "accepted_evidence_no_market_confirmation" if accepted else "source_pack_high_priority"
+    return value, reasons, bucket
 
 
 def _fallback_review_reason_codes(

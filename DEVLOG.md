@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-07 — Polish daily burn-in traceability and skip statuses · Codex
+**Why:** The final daily burn-in loop needed to be doctor-clean for
+`live_burn_in_20260705` before routine no-send use: executable steps needed
+persisted timeouts, skipped steps needed explicit reasons, source coverage had
+to stop reporting generic unknown provider status, and zero-candidate integrated
+deliveries needed their own preview trace.
+**Changes:**
+- Persisted `required`, `started_at`, `finished_at`, `duration_seconds`,
+  `timeout_seconds`, command metadata, and skipped-step reasons in daily
+  burn-in run artifacts, with doctor warnings for missing required/timeout/skip
+  metadata.
+- Normalized source coverage for configured-but-unobserved live providers to
+  explicit `skipped_live_calls_disabled` operator status instead of generic
+  `unknown`.
+- Added integrated-radar preview traceability fields to delivery rows
+  (`preview_path`, `preview_kind`, `zero_candidate_preview`) and covered the
+  zero-candidate burn-in preview path.
+- Added more specific daily review-inbox reason codes for strong-source,
+  market-confirmation, and market-anomaly catalyst gaps.
+**Verify:** `python3 tests/test_indicators.py` (774/774 passed);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (825 passed); `python3 -m compileall -q
+crypto_rsi_scanner tests`; daily burn-in smoke/plan, full
+`live_burn_in_20260705` no-send burn-in, scorecard, review inbox, feedback
+progress, weekly measurement, source-yield, archive dry-run, integrated radar
+smoke/doctor, notification format smoke, Telegram no-send final check, strict
+live burn-in doctor (OK/no warnings), strict CryptoPanic rehearsal doctor
+(WARN/no blockers), and `make verify PYTHON=python3`.
+**Notes/risks:** The Coinalyze rehearsal remains skipped by default unless the
+operator sets the explicit daily-burn-in/provider allow flags. No live sends,
+trades, paper trades, normal RSI rows, or Event Alpha-created `TRIGGERED_FADE`
+were created.
+
 ## 2026-07-07 — Fix burn-in doctor preview and schema correctness · Codex
 **Why:** The real `live_burn_in_20260705` namespace was blocked by an integrated
 preview/delivery mismatch and a burn-in operation schema warning even though it

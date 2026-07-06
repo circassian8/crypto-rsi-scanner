@@ -42,12 +42,34 @@ def _check_daily_run(ctx: object, daily_run: Mapping[str, Any], blockers: Messag
                 f"daily_burn_in_run_step_missing_status={missing_status}",
             )
         )
-    missing_timeout = sum(1 for row in steps if row.get("timeout_seconds") in (None, ""))
+    missing_required = sum(1 for row in steps if row.get("required") is None)
+    if missing_required:
+        warnings.append(
+            check_registry.format_check_message(
+                "outcomes.daily_burn_in_run_step_required",
+                f"daily_burn_in_run_step_missing_required={missing_required}",
+            )
+        )
+    executable_steps = [row for row in steps if str(row.get("status") or "").strip() != "skipped" and row.get("command")]
+    missing_timeout = sum(1 for row in executable_steps if row.get("timeout_seconds") in (None, ""))
     if missing_timeout:
         warnings.append(
             check_registry.format_check_message(
                 "outcomes.daily_burn_in_run_step_timeout",
                 f"daily_burn_in_run_step_missing_timeout={missing_timeout}",
+            )
+        )
+    skipped_without_reason = sum(
+        1
+        for row in steps
+        if str(row.get("status") or "").strip() == "skipped"
+        and not str(row.get("skip_reason") or "").strip()
+    )
+    if skipped_without_reason:
+        warnings.append(
+            check_registry.format_check_message(
+                "outcomes.daily_burn_in_run_step_skip_reason",
+                f"daily_burn_in_run_step_skipped_missing_reason={skipped_without_reason}",
             )
         )
     side_effects = sum(1 for key in _FORBIDDEN_SIDE_EFFECT_FIELDS if _int(daily_run.get(key)) != 0)

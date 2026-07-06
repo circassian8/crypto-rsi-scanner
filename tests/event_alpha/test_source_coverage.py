@@ -286,12 +286,12 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert "gdelt" in unobserved_proxy.unknown_or_unobserved_providers
     assert "project_blog_rss" in unobserved_proxy.unknown_or_unobserved_providers
     assert "gdelt" not in unobserved_proxy.healthy_providers
-    assert unobserved_proxy.provider_coverage_status == "unknown"
-    assert "gdelt:not_observed=unknown" in unobserved_proxy.provider_role_statuses
+    assert unobserved_proxy.provider_coverage_status == "skipped_live_calls_disabled"
+    assert "gdelt:not_observed=skipped_live_calls_disabled" in unobserved_proxy.provider_role_statuses
     unobserved_text = event_alpha_source_coverage.format_source_coverage_report(unobserved)
-    assert "configured providers with no health row are unknown/not observed" in unobserved_text
-    assert "unknown/not observed providers: gdelt, project_blog_rss" in unobserved_text
-    assert "provider coverage status: unknown" in unobserved_text
+    assert "configured providers with no health row are skipped/not observed" in unobserved_text
+    assert "skipped/not observed providers: gdelt, project_blog_rss" in unobserved_text
+    assert "provider coverage status: skipped_live_calls_disabled" in unobserved_text
 
     with tempfile.TemporaryDirectory() as tmp:
         ledger_path = Path(tmp) / "cryptopanic_request_ledger.jsonl"
@@ -443,7 +443,7 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
             strict=True,
         )
         assert source_report_doctor.source_coverage_report_missing == 0
-        assert source_report_doctor.source_coverage_provider_status_unknown > 0
+        assert source_report_doctor.source_coverage_provider_status_unknown == 0
         assert source_report_doctor.source_coverage_provider_marked_healthy_without_observation == 0
         assert source_report_doctor.source_coverage_readiness_link_missing == 0
         bad_rank_path = Path(tmp) / "bad_rank_source_coverage.md"

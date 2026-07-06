@@ -83,14 +83,18 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
             (line for line in block.splitlines() if line.strip().startswith("healthy providers:")),
             "",
         )
-        unknown_line = next(
-            (line for line in block.splitlines() if line.strip().startswith("unknown/not observed providers:")),
+        not_observed_line = next(
+            (
+                line
+                for line in block.splitlines()
+                if line.strip().startswith(("unknown/not observed providers:", "skipped/not observed providers:"))
+            ),
             "",
         )
         healthy = set(_split_provider_line(healthy_line))
-        unknown = set(_split_provider_line(unknown_line))
-        if healthy & unknown:
-            out["source_coverage_provider_marked_healthy_without_observation"] += len(healthy & unknown)
+        not_observed = set(_split_provider_line(not_observed_line))
+        if healthy & not_observed:
+            out["source_coverage_provider_marked_healthy_without_observation"] += len(healthy & not_observed)
     if "Most useful next data source categories:" not in text:
         out["source_coverage_category_priority_missing"] = 1
     for artifact_name in (

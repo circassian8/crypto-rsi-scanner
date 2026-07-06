@@ -218,6 +218,7 @@ def format_daily_burn_in_report(payload: Mapping[str, Any]) -> str:
             continue
         lines.append(f"### {row.get('name')}")
         lines.append(f"- status: `{row.get('status')}`")
+        lines.append(f"- required: `{bool(row.get('required'))}`")
         if row.get("skip_reason"):
             lines.append(f"- skip_reason: {row.get('skip_reason')}")
         if row.get("provider_category_impact"):
@@ -228,6 +229,10 @@ def format_daily_burn_in_report(payload: Mapping[str, Any]) -> str:
             lines.append(f"- duration_seconds: `{row.get('duration_seconds')}`")
         if row.get("timeout_seconds") is not None:
             lines.append(f"- timeout_seconds: `{row.get('timeout_seconds')}`")
+        if row.get("started_at"):
+            lines.append(f"- started_at: `{row.get('started_at')}`")
+        if row.get("finished_at"):
+            lines.append(f"- finished_at: `{row.get('finished_at')}`")
         if row.get("step_started_at"):
             lines.append(f"- step_started_at: `{row.get('step_started_at')}`")
         if row.get("step_finished_at"):
@@ -319,6 +324,7 @@ def _run_step(step: BurnInStep, *, env: Mapping[str, str], cwd: Path) -> dict[st
         "status": status,
         "required": step.required,
         "started_at": started.isoformat(),
+        "finished_at": finished.isoformat(),
         "step_started_at": started.isoformat(),
         "step_finished_at": finished.isoformat(),
         "duration_seconds": duration,
@@ -332,13 +338,19 @@ def _run_step(step: BurnInStep, *, env: Mapping[str, str], cwd: Path) -> dict[st
 
 def _skipped_step_row(step: Mapping[str, Any]) -> dict[str, Any]:
     now = common.utc_now().isoformat()
+    row = dict(step)
     return {
+        **row,
+        "name": row.get("name"),
+        "status": "skipped",
         "required": False,
+        "started_at": now,
+        "finished_at": now,
         "step_started_at": now,
         "step_finished_at": now,
         "duration_seconds": 0.0,
-        "timeout_seconds": step.get("timeout_seconds"),
-        **dict(step),
+        "timeout_seconds": row.get("timeout_seconds"),
+        "skip_reason": row.get("skip_reason") or "skipped_by_plan",
     }
 
 
@@ -354,6 +366,7 @@ def _write_run_artifacts(
     completed: bool,
     smoke: bool,
 ) -> dict[str, Any]:
+    normalized_steps = [_normalize_step_row(row) for row in step_rows]
     payload = common.with_safety(
         {
             "schema_version": "event_alpha_daily_burn_in_run_v1",
@@ -365,15 +378,15 @@ def _write_run_artifacts(
             "namespace_dir": common.rel_path(context.namespace_dir),
             "completed": bool(completed),
             "smoke": bool(smoke),
-            "steps": step_rows,
-            "steps_total": len(step_rows),
-            "steps_passed": sum(1 for row in step_rows if row.get("status") == "passed"),
-            "steps_skipped": sum(1 for row in step_rows if row.get("status") == "skipped"),
-            "steps_failed": sum(1 for row in step_rows if row.get("status") == "failed"),
-            "steps_timeout": sum(1 for row in step_rows if row.get("status") == "timeout"),
+            "steps": normalized_steps,
+            "steps_total": len(normalized_steps),
+            "steps_passed": sum(1 for row in normalized_steps if row.get("status") == "passed"),
+            "steps_skipped": sum(1 for row in normalized_steps if row.get("status") == "skipped"),
+            "steps_failed": sum(1 for row in normalized_steps if row.get("status") == "failed"),
+            "steps_timeout": sum(1 for row in normalized_steps if row.get("status") == "timeout"),
             "required_failed": [
                 row.get("name")
-                for row in step_rows
+                for row in normalized_steps
                 if row.get("required") and row.get("status") != "passed"
             ],
             "coinalyze_rehearsal_allowed": allow_rehearsal,
@@ -387,6 +400,24 @@ def _write_run_artifacts(
     common.write_json(context.namespace_dir / RUN_JSON, payload)
     common.write_text(context.namespace_dir / RUN_MD, format_daily_burn_in_report(payload))
     return payload
+
+
+def _normalize_step_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    out = dict(row)
+    status = str(out.get("status") or "").strip()
+    if out.get("required") is None:
+        out["required"] = False
+    if status == "skipped" and not out.get("skip_reason"):
+        out["skip_reason"] = "skipped_by_plan"
+    started = out.get("started_at") or out.get("step_started_at")
+    finished = out.get("finished_at") or out.get("step_finished_at") or started
+    if started:
+        out["started_at"] = started
+        out.setdefault("step_started_at", started)
+    if finished:
+        out["finished_at"] = finished
+        out.setdefault("step_finished_at", finished)
+    return out
 
 
 def _decode_timeout_stream(value: Any) -> str:

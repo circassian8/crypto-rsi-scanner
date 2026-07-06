@@ -15943,6 +15943,10 @@ def test_integrated_radar_fixture_lanes_and_merge():
         lanes = {row["lane"]: row for row in deliveries}
         assert {"early_long_research", "confirmed_long_research", "fade_short_review", "risk_only", "unconfirmed_research", "source_provider_health"} <= set(lanes)
         assert lanes["early_long_research"]["status"] == "would_send_but_guard_disabled"
+        assert lanes["early_long_research"]["preview_kind"] == "integrated_radar"
+        assert lanes["early_long_research"]["preview_path"].endswith("event_integrated_radar_notification_preview.md")
+        assert not event_artifact_paths.has_operator_absolute_path(lanes["early_long_research"]["preview_path"])
+        assert lanes["early_long_research"]["zero_candidate_preview"] is False
         assert lanes["source_provider_health"]["skipped_item_count"] >= 2
         assert {
             item["reason"] for item in lanes["source_provider_health"]["skipped_items"]
@@ -15961,6 +15965,51 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert run_row["source_coverage_md_path_rel"].endswith("event_alpha_source_coverage.md")
         assert "event_alpha_source_coverage.md" in daily
         assert "/Users/" not in daily
+
+
+def test_integrated_zero_candidate_preview_delivery_traceability(tmp_path):
+    import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+    from crypto_rsi_scanner.event_alpha.artifacts import paths as event_artifact_paths
+    from crypto_rsi_scanner.event_alpha.radar.integrated.pipeline_parts.report import (
+        build_integrated_notification_delivery_rows,
+        format_integrated_notification_preview_from_deliveries,
+    )
+    from crypto_rsi_scanner.event_alpha.radar.integrated.pipeline_parts.runtime import (
+        NOTIFICATION_PREVIEW_FILENAME,
+    )
+
+    context = event_alpha_artifacts.context_from_profile(
+        "live_burn_in_no_send",
+        run_mode="burn_in",
+        base_dir=tmp_path,
+        artifact_namespace="zero_preview",
+    )
+    preview_path = context.namespace_dir / NOTIFICATION_PREVIEW_FILENAME
+    rows = build_integrated_notification_delivery_rows(
+        (),
+        core_rows=(),
+        context=context,
+        run_id="zero-candidate-run",
+        generated_at="2026-07-05T00:00:00+00:00",
+        send_guard_enabled=False,
+        preview_path=preview_path,
+    )
+    preview_text = format_integrated_notification_preview_from_deliveries(
+        rows,
+        candidates=(),
+        core_rows=(),
+        context=context,
+    )
+    assert "Event Alpha Integrated Radar Preview" in preview_text
+    assert "Zero candidate lanes" in preview_text
+    assert "Strict alerts: 0" in preview_text
+    assert all(row["preview_kind"] == "integrated_radar" for row in rows)
+    assert all(row["zero_candidate_preview"] is True for row in rows)
+    assert all(row["preview_path"].endswith(NOTIFICATION_PREVIEW_FILENAME) for row in rows)
+    assert all(not event_artifact_paths.has_operator_absolute_path(row["preview_path"]) for row in rows)
+    candidate_lanes = [row for row in rows if row["lane"] != "source_provider_health"]
+    assert all(row["status"] == "not_due" for row in candidate_lanes)
+    assert all(row["status_detail"] == "skipped_empty" for row in candidate_lanes)
 
 
 def test_integrated_dex_sidecars_gate_market_anomaly_confirmation():

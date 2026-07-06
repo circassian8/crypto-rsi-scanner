@@ -43,7 +43,7 @@ def _source_coverage_header_lines(report: EventAlphaSourceCoverageReport) -> lis
         f"provider_health_rows: {report.provider_health_rows}",
         f"evidence_acquisition_rows: {report.acquisition_rows}",
         f"core_opportunity_rows: {report.core_rows}",
-        "note: configured providers with no health row are unknown/not observed; do not infer they are healthy.",
+        "note: configured providers with no health row are skipped/not observed until a guarded run records health; do not infer they are healthy.",
         "",
         "CryptoPanic:",
         f"- configured: {str(report.cryptopanic_configured).lower()}",
@@ -77,7 +77,7 @@ def _source_pack_coverage_lines(packs: Iterable[EventAlphaSourcePackCoverage]) -
                 f"  configured providers: {_join(pack.configured_providers)}",
                 f"  missing providers: {_join(pack.missing_providers)}",
                 f"  healthy providers: {_join(pack.healthy_providers)}",
-                f"  unknown/not observed providers: {_join(pack.unknown_or_unobserved_providers)}",
+                f"  skipped/not observed providers: {_join(pack.unknown_or_unobserved_providers)}",
                 f"  degraded/backoff providers: {_join(pack.degraded_or_backoff_providers)}",
                 f"  provider coverage status: {pack.provider_coverage_status}",
                 f"  provider role health: {_join(pack.provider_role_statuses)}",
@@ -315,7 +315,7 @@ def _provider_role_statuses_for_pack(
         status = overrides.get(alias) or event_provider_health.provider_health_status(row, now=now)
         out.append(f"{alias}:{role}={status}")
     for alias in sorted(set(unknown) & preferred_set):
-        out.append(f"{alias}:not_observed=unknown")
+        out.append(f"{alias}:not_observed=skipped_live_calls_disabled")
     return tuple(dict.fromkeys(out))
 def _cryptopanic_stats(
     *,
