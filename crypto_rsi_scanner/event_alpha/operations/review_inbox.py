@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -34,6 +34,11 @@ class ReviewItem:
     feedback_target: str
     suggested_feedback_commands: tuple[str, ...]
     provider_gap: str | None = None
+    review_value_score: int = 0
+    review_value_reasons: tuple[str, ...] = ()
+    family_rank: int = 0
+    diversity_bucket: str = "general"
+    selection_reason: str = ""
 
 
 def build_review_inbox(
@@ -52,7 +57,7 @@ def build_review_inbox(
         _item_from_group(family, family_rows, card_index=card_index, profile=profile)
         for family, family_rows in grouped
     ]
-    items = sorted(items, key=lambda item: (-_priority(item), item.family))[: max(1, int(limit or 10))]
+    items = _select_review_items(items, limit=max(1, int(limit or 10)))
     stale_paths = _stale_path_warnings(items)
     payload = common.with_safety(
         {
@@ -107,6 +112,9 @@ def format_review_inbox(payload: Mapping[str, Any]) -> str:
                 f"- family: `{row.get('family')}`",
                 f"- opportunity_type: `{row.get('opportunity_type')}`",
                 f"- score: `{row.get('score')}`",
+                f"- Review value: `{row.get('review_value_score')}` ({', '.join(row.get('review_value_reasons') or []) or 'general review'})",
+                f"- selection_reason: `{row.get('selection_reason')}`",
+                f"- diversity_bucket: `{row.get('diversity_bucket')}`",
                 f"- source_origin/source_pack: `{row.get('source_origin')}` / `{row.get('source_pack')}`",
                 f"- evidence_status: `{row.get('evidence_status')}`",
                 f"- market_state: `{row.get('market_state')}`",
@@ -198,6 +206,7 @@ def _item_from_group(
     confirms = str(best.get("what_confirms") or best.get("confirm_if") or _default_confirm(opportunity_type))
     invalidates = str(best.get("what_invalidates") or best.get("invalidate_if") or _default_invalidate(opportunity_type))
     card_path = common.rel_path(card) if card else ""
+    value_score, value_reasons, bucket = _review_value(best, opportunity_type, score, source_origin, source_pack, evidence_status, market_state, why)
     return ReviewItem(
         family=family,
         symbol=symbol,
@@ -215,6 +224,9 @@ def _item_from_group(
         feedback_target=target,
         suggested_feedback_commands=_feedback_commands(profile, target),
         provider_gap=_provider_gap(best),
+        review_value_score=value_score,
+        review_value_reasons=tuple(value_reasons),
+        diversity_bucket=bucket,
     )
 
 
@@ -299,7 +311,38 @@ def _feedback_commands(profile: str, target: str) -> tuple[str, ...]:
     )
 
 
+def _select_review_items(items: list[ReviewItem], *, limit: int) -> list[ReviewItem]:
+    ranked = sorted(items, key=lambda item: (-_priority(item), -item.score, item.family))
+    selected: list[ReviewItem] = []
+    selected_families: set[str] = set()
+    desired_buckets = (
+        "source_only_narrative",
+        "market_anomaly_missing_catalyst",
+        "accepted_evidence_no_market_confirmation",
+    )
+    for bucket in desired_buckets:
+        candidate = next((item for item in ranked if item.diversity_bucket == bucket and item.family not in selected_families), None)
+        if candidate and len(selected) < limit:
+            selected.append(candidate)
+            selected_families.add(candidate.family)
+    for item in ranked:
+        if len(selected) >= limit:
+            break
+        if item.family in selected_families:
+            continue
+        selected.append(item)
+        selected_families.add(item.family)
+    return [
+        replace(item, family_rank=index, selection_reason=_selection_reason(item, index))
+        for index, item in enumerate(selected, start=1)
+    ]
+
+
 def _priority(item: ReviewItem) -> int:
+    return item.review_value_score
+
+
+def _legacy_priority(item: ReviewItem) -> int:
     base = item.score
     lane_bonus = {
         "FADE_SHORT_REVIEW": 30,
@@ -314,6 +357,80 @@ def _priority(item: ReviewItem) -> int:
     if "quality" in why or "cap" in why:
         lane_bonus += 10
     return base + lane_bonus
+
+
+def _review_value(
+    row: Mapping[str, Any],
+    opportunity_type: str,
+    score: int,
+    source_origin: str,
+    source_pack: str,
+    evidence_status: str,
+    market_state: str,
+    why: str,
+) -> tuple[int, list[str], str]:
+    value = _legacy_priority(
+        ReviewItem(
+            family="",
+            symbol="",
+            coin_id="",
+            opportunity_type=opportunity_type,
+            score=score,
+            source_origin=source_origin,
+            source_pack=source_pack,
+            evidence_status=evidence_status,
+            market_state=market_state,
+            why_not_alertable=why,
+            what_confirms="",
+            what_invalidates="",
+            card_path="",
+            feedback_target="",
+            suggested_feedback_commands=(),
+        )
+    )
+    reasons: list[str] = []
+    bucket = "general"
+    source_text = f"{source_origin} {source_pack}".casefold()
+    market_text = f"{market_state} {why}".casefold()
+    evidence_text = evidence_status.casefold()
+    if any(token in source_text for token in ("cryptopanic", "rss", "gdelt", "news", "context")) and "official" not in source_text:
+        value += 28
+        reasons.append("source_only_narrative")
+        bucket = "source_only_narrative"
+    if row.get("_source_file") == "event_market_anomalies.jsonl" or "anomaly" in market_text:
+        value += 35
+        reasons.append("market_anomaly_missing_catalyst")
+        bucket = "market_anomaly_missing_catalyst"
+    accepted = bool(row.get("accepted_evidence")) or common.int_value(row.get("accepted_evidence_count")) > 0 or "accepted" in evidence_text
+    no_market = market_state.casefold() in {"unknown", "none", "missing", "unconfirmed"} or "no market" in market_text or "missing market" in market_text
+    if accepted and no_market:
+        value += 32
+        reasons.append("accepted_evidence_no_market_confirmation")
+        bucket = "accepted_evidence_no_market_confirmation"
+    if "near" in why.casefold():
+        value += 12
+        reasons.append("near_miss")
+    if "quality" in why.casefold() or "cap" in why.casefold():
+        value += 10
+        reasons.append("quality_capped")
+    if opportunity_type == "FADE_SHORT_REVIEW":
+        value += 20
+        reasons.append("fade_review")
+    if not reasons:
+        reasons.append("highest_remaining_review_value")
+    return value, reasons, bucket
+
+
+def _selection_reason(item: ReviewItem, rank: int) -> str:
+    if item.diversity_bucket in {
+        "source_only_narrative",
+        "market_anomaly_missing_catalyst",
+        "accepted_evidence_no_market_confirmation",
+    }:
+        return f"diversity_bucket:{item.diversity_bucket}"
+    if rank == 1:
+        return "top_review_value"
+    return "next_highest_review_value"
 
 
 def _stale_path_warnings(items: Iterable[ReviewItem]) -> list[str]:

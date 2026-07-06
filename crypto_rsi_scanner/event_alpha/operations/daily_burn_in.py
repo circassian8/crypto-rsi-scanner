@@ -24,6 +24,7 @@ class BurnInStep:
     name: str
     command: tuple[str, ...]
     required: bool = False
+    timeout_seconds: float = 60.0
 
 
 def default_namespace(now: datetime | None = None) -> str:
@@ -31,24 +32,43 @@ def default_namespace(now: datetime | None = None) -> str:
     return f"live_burn_in_{stamp}"
 
 
-def build_steps(*, python: str, profile: str, namespace: str, include_coinalyze_rehearsal: bool) -> tuple[BurnInStep | dict[str, Any], ...]:
+def build_steps(
+    *,
+    python: str,
+    profile: str,
+    namespace: str,
+    include_coinalyze_rehearsal: bool,
+    smoke: bool = False,
+    readiness_timeout_seconds: float = 60.0,
+    integrated_timeout_seconds: float = 180.0,
+    report_timeout_seconds: float = 60.0,
+    doctor_timeout_seconds: float = 120.0,
+) -> tuple[BurnInStep | dict[str, Any], ...]:
     base = ("--event-alpha-profile", profile, "--event-alpha-artifact-namespace", namespace)
+    if smoke:
+        return (
+            BurnInStep("burn_in_contract", (python, "-m", "crypto_rsi_scanner.project_health.radar_north_star", "--burn-in-contract-only"), timeout_seconds=report_timeout_seconds),
+            BurnInStep("burn_in_smoke_fixture_step", (python, "-c", "print('burn_in_smoke_fixture_step: safe fixture-only runner check')"), required=True, timeout_seconds=report_timeout_seconds),
+            BurnInStep("burn_in_scorecard", (python, "-m", "crypto_rsi_scanner.event_alpha.operations.scorecard", "--profile", profile, "--artifact-namespace", namespace), timeout_seconds=report_timeout_seconds),
+        )
     steps: list[BurnInStep | dict[str, Any]] = [
-        BurnInStep("burn_in_contract", (python, "-m", "crypto_rsi_scanner.project_health.radar_north_star", "--burn-in-contract-only")),
-        BurnInStep("live_provider_readiness", (python, "main.py", "--event-alpha-live-provider-readiness", *base)),
-        BurnInStep("cryptopanic_preflight", (python, "main.py", "--event-alpha-cryptopanic-preflight", *base)),
-        BurnInStep("coinalyze_preflight", (python, "main.py", "--event-alpha-coinalyze-preflight", *base)),
+        BurnInStep("burn_in_contract", (python, "-m", "crypto_rsi_scanner.project_health.radar_north_star", "--burn-in-contract-only"), timeout_seconds=report_timeout_seconds),
+        BurnInStep("live_provider_readiness", (python, "main.py", "--event-alpha-live-provider-readiness", *base), timeout_seconds=readiness_timeout_seconds),
+        BurnInStep("cryptopanic_preflight", (python, "main.py", "--event-alpha-cryptopanic-preflight", *base), timeout_seconds=readiness_timeout_seconds),
+        BurnInStep("coinalyze_preflight", (python, "main.py", "--event-alpha-coinalyze-preflight", *base), timeout_seconds=readiness_timeout_seconds),
         (
-            BurnInStep("coinalyze_no_send_rehearsal", (python, "main.py", "--event-alpha-coinalyze-no-send-rehearsal", *base))
+            BurnInStep("coinalyze_no_send_rehearsal", (python, "main.py", "--event-alpha-coinalyze-no-send-rehearsal", *base), timeout_seconds=readiness_timeout_seconds)
             if include_coinalyze_rehearsal
             else {
                 "name": "coinalyze_no_send_rehearsal",
                 "status": "skipped",
+                "required": False,
+                "timeout_seconds": readiness_timeout_seconds,
                 "skip_reason": "requires RSI_EVENT_ALPHA_DAILY_BURN_IN_ALLOW_COINALYZE_REHEARSAL=1 and provider allow flags",
                 "provider_category_impact": "derivatives/OI/funding live rehearsal not sampled in this run",
             }
         ),
-        BurnInStep("bybit_announcements_preflight", (python, "main.py", "--event-alpha-bybit-announcements-preflight", *base)),
+        BurnInStep("bybit_announcements_preflight", (python, "main.py", "--event-alpha-bybit-announcements-preflight", *base), timeout_seconds=readiness_timeout_seconds),
         BurnInStep(
             "integrated_radar_cycle",
             (
@@ -59,13 +79,14 @@ def build_steps(*, python: str, profile: str, namespace: str, include_coinalyze_
                 *base,
             ),
             required=True,
+            timeout_seconds=integrated_timeout_seconds,
         ),
-        BurnInStep("source_coverage", (python, "main.py", "--event-alpha-source-coverage-report", *base)),
-        BurnInStep("notification_preview", (python, "main.py", "--event-alpha-notify-preview-from-artifacts", *base)),
-        BurnInStep("daily_brief", (python, "main.py", "--event-alpha-daily-brief", *base)),
-        BurnInStep("review_inbox", (python, "-m", "crypto_rsi_scanner.event_alpha.operations.review_inbox", "--profile", profile, "--artifact-namespace", namespace)),
-        BurnInStep("artifact_doctor", (python, "main.py", "--event-alpha-artifact-doctor", *base)),
-        BurnInStep("burn_in_scorecard", (python, "-m", "crypto_rsi_scanner.event_alpha.operations.scorecard", "--profile", profile, "--artifact-namespace", namespace)),
+        BurnInStep("source_coverage", (python, "main.py", "--event-alpha-source-coverage-report", *base), timeout_seconds=report_timeout_seconds),
+        BurnInStep("notification_preview", (python, "main.py", "--event-alpha-notify-preview-from-artifacts", *base), timeout_seconds=report_timeout_seconds),
+        BurnInStep("daily_brief", (python, "main.py", "--event-alpha-daily-brief", *base), timeout_seconds=report_timeout_seconds),
+        BurnInStep("review_inbox", (python, "-m", "crypto_rsi_scanner.event_alpha.operations.review_inbox", "--profile", profile, "--artifact-namespace", namespace), timeout_seconds=report_timeout_seconds),
+        BurnInStep("artifact_doctor", (python, "main.py", "--event-alpha-artifact-doctor", *base), timeout_seconds=doctor_timeout_seconds),
+        BurnInStep("burn_in_scorecard", (python, "-m", "crypto_rsi_scanner.event_alpha.operations.scorecard", "--profile", profile, "--artifact-namespace", namespace), timeout_seconds=report_timeout_seconds),
     ]
     return tuple(steps)
 
@@ -79,6 +100,11 @@ def run_daily_burn_in(
     now: datetime | None = None,
     continue_on_error: bool = True,
     include_coinalyze_rehearsal: bool | None = None,
+    smoke: bool = False,
+    readiness_timeout_seconds: float = 60.0,
+    integrated_timeout_seconds: float = 180.0,
+    report_timeout_seconds: float = 60.0,
+    doctor_timeout_seconds: float = 120.0,
 ) -> dict[str, Any]:
     generated = (now or common.utc_now()).astimezone(timezone.utc)
     namespace = artifact_namespace or default_namespace(generated)
@@ -91,44 +117,33 @@ def run_daily_burn_in(
         else str(os.getenv("RSI_EVENT_ALPHA_DAILY_BURN_IN_ALLOW_COINALYZE_REHEARSAL") or "").lower() in {"1", "true", "yes"}
     )
     env = _safe_env(context, profile=profile, namespace=namespace)
-    steps = build_steps(python=py, profile=profile, namespace=namespace, include_coinalyze_rehearsal=allow_rehearsal)
+    steps = build_steps(
+        python=py,
+        profile=profile,
+        namespace=namespace,
+        include_coinalyze_rehearsal=allow_rehearsal,
+        smoke=smoke,
+        readiness_timeout_seconds=readiness_timeout_seconds,
+        integrated_timeout_seconds=integrated_timeout_seconds,
+        report_timeout_seconds=report_timeout_seconds,
+        doctor_timeout_seconds=doctor_timeout_seconds,
+    )
     step_rows: list[dict[str, Any]] = []
     for step in steps:
         if isinstance(step, Mapping):
-            step_rows.append(dict(step))
+            row = _skipped_step_row(step)
+            step_rows.append(row)
+            print(f"[burn-in] skipped {row.get('name')}: {row.get('skip_reason')}", flush=True)
+            _write_run_artifacts(context=context, generated=generated, profile=profile, namespace=namespace, step_rows=step_rows, allow_rehearsal=allow_rehearsal, env=env, completed=False, smoke=smoke)
             continue
+        print(f"[burn-in] starting {step.name} timeout={step.timeout_seconds}s", flush=True)
         row = _run_step(step, env=env, cwd=common.repo_root_from_module())
         step_rows.append(row)
+        print(f"[burn-in] finished {step.name} status={row.get('status')} duration={row.get('duration_seconds')}s", flush=True)
+        _write_run_artifacts(context=context, generated=generated, profile=profile, namespace=namespace, step_rows=step_rows, allow_rehearsal=allow_rehearsal, env=env, completed=False, smoke=smoke)
         if step.required and row["status"] != "passed" and not continue_on_error:
             break
-    payload = common.with_safety(
-        {
-            "schema_version": "event_alpha_daily_burn_in_run_v1",
-            "row_type": "event_alpha_daily_burn_in_run",
-            "generated_at": generated.isoformat(),
-            "profile": profile,
-            "artifact_namespace": namespace,
-            "namespace_dir": common.rel_path(context.namespace_dir),
-            "steps": step_rows,
-            "steps_total": len(step_rows),
-            "steps_passed": sum(1 for row in step_rows if row.get("status") == "passed"),
-            "steps_skipped": sum(1 for row in step_rows if row.get("status") == "skipped"),
-            "steps_failed": sum(1 for row in step_rows if row.get("status") == "failed"),
-            "required_failed": [
-                row.get("name")
-                for row in step_rows
-                if row.get("required") and row.get("status") != "passed"
-            ],
-            "coinalyze_rehearsal_allowed": allow_rehearsal,
-            "safe_environment": {
-                "RSI_EVENT_ALERTS_ENABLED": env.get("RSI_EVENT_ALERTS_ENABLED"),
-                "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE": env.get("RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE"),
-                "RSI_EVENT_ALPHA_RUN_MODE": env.get("RSI_EVENT_ALPHA_RUN_MODE"),
-            },
-        }
-    )
-    common.write_json(context.namespace_dir / RUN_JSON, payload)
-    common.write_text(context.namespace_dir / RUN_MD, format_daily_burn_in_report(payload))
+    payload = _write_run_artifacts(context=context, generated=generated, profile=profile, namespace=namespace, step_rows=step_rows, allow_rehearsal=allow_rehearsal, env=env, completed=True, smoke=smoke)
     common.append_jsonl(context.run_ledger_path, _ledger_row(payload))
     return payload
 
@@ -143,7 +158,9 @@ def format_daily_burn_in_report(payload: Mapping[str, Any]) -> str:
         f"- profile: `{payload.get('profile')}`",
         f"- artifact_namespace: `{payload.get('artifact_namespace')}`",
         f"- namespace_dir: `{payload.get('namespace_dir')}`",
+        f"- completed: `{payload.get('completed')}`",
         f"- steps: `{payload.get('steps_passed')}` passed, `{payload.get('steps_skipped')}` skipped, `{payload.get('steps_failed')}` failed",
+        f"- steps_timeout: `{payload.get('steps_timeout')}`",
         f"- required_failed: `{', '.join(payload.get('required_failed') or []) or 'none'}`",
         "",
         "## Steps",
@@ -162,6 +179,12 @@ def format_daily_burn_in_report(payload: Mapping[str, Any]) -> str:
             lines.append(f"- command: `{row.get('command')}`")
         if row.get("duration_seconds") is not None:
             lines.append(f"- duration_seconds: `{row.get('duration_seconds')}`")
+        if row.get("timeout_seconds") is not None:
+            lines.append(f"- timeout_seconds: `{row.get('timeout_seconds')}`")
+        if row.get("step_started_at"):
+            lines.append(f"- step_started_at: `{row.get('step_started_at')}`")
+        if row.get("step_finished_at"):
+            lines.append(f"- step_finished_at: `{row.get('step_finished_at')}`")
         if row.get("stdout_tail"):
             lines.append("- stdout_tail:")
             lines.append("```")
@@ -222,27 +245,107 @@ def _safe_env(context: Any, *, profile: str, namespace: str) -> dict[str, str]:
 def _run_step(step: BurnInStep, *, env: Mapping[str, str], cwd: Path) -> dict[str, Any]:
     started = common.utc_now()
     before = time.monotonic()
-    proc = subprocess.run(
-        list(step.command),
-        cwd=cwd,
-        env=dict(env),
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
+    try:
+        proc = subprocess.run(
+            list(step.command),
+            cwd=cwd,
+            env=dict(env),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=step.timeout_seconds,
+        )
+        status = "passed" if proc.returncode == 0 else "failed"
+        returncode: int | None = proc.returncode
+        stdout = proc.stdout
+        stderr = proc.stderr
+    except subprocess.TimeoutExpired as exc:
+        status = "timeout"
+        returncode = None
+        stdout = _decode_timeout_stream(exc.stdout)
+        stderr = _decode_timeout_stream(exc.stderr)
     duration = round(time.monotonic() - before, 3)
+    finished = common.utc_now()
     return {
         "name": step.name,
-        "status": "passed" if proc.returncode == 0 else "failed",
+        "status": status,
         "required": step.required,
         "started_at": started.isoformat(),
+        "step_started_at": started.isoformat(),
+        "step_finished_at": finished.isoformat(),
         "duration_seconds": duration,
-        "returncode": proc.returncode,
+        "timeout_seconds": step.timeout_seconds,
+        "returncode": returncode,
         "command": " ".join(step.command),
-        "stdout_tail": _tail(proc.stdout),
-        "stderr_tail": _tail(proc.stderr),
+        "stdout_tail": _tail(stdout),
+        "stderr_tail": _tail(stderr),
     }
+
+
+def _skipped_step_row(step: Mapping[str, Any]) -> dict[str, Any]:
+    now = common.utc_now().isoformat()
+    return {
+        "required": False,
+        "step_started_at": now,
+        "step_finished_at": now,
+        "duration_seconds": 0.0,
+        "timeout_seconds": step.get("timeout_seconds"),
+        **dict(step),
+    }
+
+
+def _write_run_artifacts(
+    *,
+    context: Any,
+    generated: datetime,
+    profile: str,
+    namespace: str,
+    step_rows: list[dict[str, Any]],
+    allow_rehearsal: bool,
+    env: Mapping[str, str],
+    completed: bool,
+    smoke: bool,
+) -> dict[str, Any]:
+    payload = common.with_safety(
+        {
+            "schema_version": "event_alpha_daily_burn_in_run_v1",
+            "row_type": "event_alpha_daily_burn_in_run",
+            "generated_at": generated.isoformat(),
+            "last_updated_at": common.utc_now().isoformat(),
+            "profile": profile,
+            "artifact_namespace": namespace,
+            "namespace_dir": common.rel_path(context.namespace_dir),
+            "completed": bool(completed),
+            "smoke": bool(smoke),
+            "steps": step_rows,
+            "steps_total": len(step_rows),
+            "steps_passed": sum(1 for row in step_rows if row.get("status") == "passed"),
+            "steps_skipped": sum(1 for row in step_rows if row.get("status") == "skipped"),
+            "steps_failed": sum(1 for row in step_rows if row.get("status") == "failed"),
+            "steps_timeout": sum(1 for row in step_rows if row.get("status") == "timeout"),
+            "required_failed": [
+                row.get("name")
+                for row in step_rows
+                if row.get("required") and row.get("status") != "passed"
+            ],
+            "coinalyze_rehearsal_allowed": allow_rehearsal,
+            "safe_environment": {
+                "RSI_EVENT_ALERTS_ENABLED": env.get("RSI_EVENT_ALERTS_ENABLED"),
+                "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE": env.get("RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE"),
+                "RSI_EVENT_ALPHA_RUN_MODE": env.get("RSI_EVENT_ALPHA_RUN_MODE"),
+            },
+        }
+    )
+    common.write_json(context.namespace_dir / RUN_JSON, payload)
+    common.write_text(context.namespace_dir / RUN_MD, format_daily_burn_in_report(payload))
+    return payload
+
+
+def _decode_timeout_stream(value: Any) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="ignore")
+    return str(value or "")
 
 
 def _tail(text: str, *, limit: int = 1200) -> str:
@@ -277,6 +380,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--stop-on-required-failure", action="store_true")
     parser.add_argument("--include-coinalyze-rehearsal", action="store_true")
+    parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--readiness-timeout-seconds", type=float, default=60.0)
+    parser.add_argument("--integrated-timeout-seconds", type=float, default=180.0)
+    parser.add_argument("--report-timeout-seconds", type=float, default=60.0)
+    parser.add_argument("--doctor-timeout-seconds", type=float, default=120.0)
     args = parser.parse_args(argv)
     payload = run_daily_burn_in(
         profile=args.profile,
@@ -285,6 +393,11 @@ def main(argv: list[str] | None = None) -> int:
         base_dir=args.base_dir,
         continue_on_error=not args.stop_on_required_failure,
         include_coinalyze_rehearsal=args.include_coinalyze_rehearsal,
+        smoke=args.smoke,
+        readiness_timeout_seconds=args.readiness_timeout_seconds,
+        integrated_timeout_seconds=args.integrated_timeout_seconds,
+        report_timeout_seconds=args.report_timeout_seconds,
+        doctor_timeout_seconds=args.doctor_timeout_seconds,
     )
     namespace_dir = payload.get("namespace_dir")
     print(f"event_alpha_daily_burn_in_run: {namespace_dir}/{RUN_JSON}")

@@ -221,7 +221,14 @@ def _natural_language_sk_phrase(token: str) -> bool:
     if not token.lower().startswith("sk-"):
         return False
     rest = token[3:]
-    return bool(rest) and rest == rest.lower() and any(char == "-" for char in rest) and not any(char.isdigit() or char == "_" for char in rest)
+    slug_part = rest.split("_", 1)[0]
+    if "_" in rest and slug_part.count("-") >= 3 and slug_part == slug_part.lower() and all(char.isalnum() or char == "-" for char in slug_part):
+        return True
+    if not rest or rest != rest.lower() or "_" in rest or not any(char == "-" for char in rest):
+        return False
+    if not any(char.isdigit() for char in rest):
+        return True
+    return rest.count("-") >= 3 and all(char.isalnum() or char == "-" for char in rest)
 
 
 def load_contract(root: str | Path | None = None) -> dict[str, Any]:

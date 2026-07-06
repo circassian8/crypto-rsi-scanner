@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-06 — Harden daily burn-in validation loop · Codex
+**Why:** The daily no-send burn-in loop needed to be operationally safe for real
+use: bounded command execution, partial artifacts on failure, namespace-safe
+measurement, and useful review/labeling prioritization.
+**Changes:**
+- Added timeout/progress/partial-artifact handling to the daily burn-in runner
+  plus a quick fixture-only smoke target.
+- Added a burn-in namespace policy artifact and routed scorecard, measurement,
+  source-yield, and archive scopes through it so default reports exclude
+  `no_key_live`, fixture/smoke, stale, archived, and quarantined namespaces.
+- Added dry-run archive support with policy scope, checksum manifest, and
+  secret-scan summary; refined slug handling so source IDs are not mistaken for
+  provider keys.
+- Added review-inbox `review_value_score`, reason codes, diversity bucket,
+  family rank, and selection reason fields.
+- Added focused tests for timeout artifacts, namespace policy, scorecard scope,
+  review ranking, archive dry-run, and Make target wiring.
+**Verify:** `python3 tests/test_indicators.py` (770/770 passed);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (800 passed); `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make event-alpha-daily-live-no-send-burn-in-smoke
+PYTHON=python3`; burn-in scorecard/review-inbox/feedback-progress/measurement/
+source-yield/archive dry-run and archive targets; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; `make
+event-alpha-integrated-radar-doctor PYTHON=python3`; `make
+event-alpha-notification-format-smoke PYTHON=python3`; `make
+event-alpha-telegram-no-send-final-check-fast PYTHON=python3`; `make
+event-alpha-artifact-doctor PROFILE=notify_llm_deep
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1
+PYTHON=python3` (WARN/no blockers); `make verify PYTHON=python3`.
+**Notes/risks:** The policy still honors explicit namespace selection for
+single-namespace analysis. CryptoPanic rehearsal doctor remains WARN-only due
+existing quality/incident warnings, with no blockers.
+
 ## 2026-07-06 — Fix burn-in review dispatch and validation-loop health gates · Codex
 **Why:** The standalone `--event-alpha-burn-in-review` flag still fell through
 to the default RSI scan and attempted CoinGecko calls, and the new validation

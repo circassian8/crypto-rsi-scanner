@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from . import common
+from . import namespace_policy
+from .daily_burn_in import RUN_JSON
 
 
 SOURCE_YIELD_JSON = "event_alpha_source_yield_report.json"
@@ -19,14 +21,29 @@ def build_source_yield_report(
     artifact_namespace: str | None = None,
     base_dir: str | Path | None = None,
     days: int = 30,
+    include_fixture_namespaces: bool = False,
+    include_stale_namespaces: bool = False,
+    include_namespaces: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     context = common.context_for(profile=profile, artifact_namespace=artifact_namespace or profile, base_dir=base_dir)
     base = context.base_dir
     cutoff = common.date_window(days)
-    candidates = _rows(base, "event_integrated_radar_candidates.jsonl", cutoff=cutoff)
-    cores = _rows(base, "event_core_opportunities.jsonl", cutoff=cutoff)
-    feedback = _rows(base, "event_alpha_feedback.jsonl", cutoff=cutoff)
-    outcomes = _rows(base, "event_integrated_radar_outcomes.jsonl", cutoff=cutoff) + _rows(base, "event_alpha_outcomes.jsonl", cutoff=cutoff)
+    policy = namespace_policy.build_namespace_policy(
+        profile=profile,
+        artifact_namespace=context.artifact_namespace,
+        base_dir=base,
+        include_fixture_namespaces=include_fixture_namespaces,
+        include_stale_namespaces=include_stale_namespaces,
+        include_namespaces=((artifact_namespace,) if artifact_namespace else include_namespaces),
+    )
+    included_namespaces = namespace_policy.included_namespace_names(policy)
+    candidates = _rows(base, "event_integrated_radar_candidates.jsonl", cutoff=cutoff, namespaces=included_namespaces)
+    cores = _rows(base, "event_core_opportunities.jsonl", cutoff=cutoff, namespaces=included_namespaces)
+    feedback = _rows(base, "event_alpha_feedback.jsonl", cutoff=cutoff, namespaces=included_namespaces)
+    outcomes = _rows(base, "event_integrated_radar_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces) + _rows(base, "event_alpha_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces)
+    daily_runs = [common.read_json(base / namespace / RUN_JSON) for namespace in included_namespaces]
+    daily_runs = [row for row in daily_runs if row]
+    enough_data_reasons = _enough_data_reasons(included_namespaces=included_namespaces, feedback=feedback, outcomes=outcomes, daily_runs=daily_runs)
     rows = [*candidates, *cores]
     providers = sorted({_provider(row) for row in [*rows, *feedback]})
     source_packs = sorted({_source_pack(row) for row in [*rows, *feedback]})
@@ -47,6 +64,27 @@ def build_source_yield_report(
             "artifact_namespace": context.artifact_namespace,
             "namespace_dir": common.rel_path(context.namespace_dir),
             "window_days": days,
+            "namespace_policy": {
+                "included_namespaces": policy.get("included_namespaces") or [],
+                "excluded_namespaces": policy.get("excluded_namespaces") or [],
+                "exclusion_reasons": policy.get("exclusion_reasons") or {},
+                "namespace_status": policy.get("namespace_status") or {},
+                "latest_doctor_status": policy.get("latest_doctor_status") or {},
+                "latest_run_id": policy.get("latest_run_id") or {},
+                "artifact_counts": policy.get("artifact_counts") or {},
+            },
+            "evidence_scope": "single_namespace" if artifact_namespace else "policy",
+            "candidate_source_scope": "single_namespace" if artifact_namespace else "active_burn_in_namespaces",
+            "included_namespaces": included_namespaces,
+            "excluded_namespaces": policy.get("excluded_namespaces") or [],
+            "exclusion_reasons": policy.get("exclusion_reasons") or {},
+            "namespace_status": policy.get("namespace_status") or {},
+            "latest_doctor_status": policy.get("latest_doctor_status") or {},
+            "latest_run_id": policy.get("latest_run_id") or {},
+            "artifact_counts": policy.get("artifact_counts") or {},
+            "live_cycles": len(daily_runs),
+            "fixture_cycles": sum(1 for name, status in (policy.get("namespace_status") or {}).items() if name not in included_namespaces and ("fixture" in str(name).casefold() or "smoke" in str(name).casefold() or status == "active_fixture_smoke")),
+            "stale_cycles": sum(1 for name, status in (policy.get("namespace_status") or {}).items() if name not in included_namespaces and status in {"stale_deprecated", "archived", "quarantine"}),
             "providers": provider_rows,
             "source_packs": source_pack_rows,
             "candidate_count": len(candidates),
@@ -56,6 +94,11 @@ def build_source_yield_report(
             "recommendations_only": True,
             "auto_apply": False,
             "auto_apply_thresholds": False,
+            "label_coverage": _label_coverage(feedback, rows),
+            "enough_data": not enough_data_reasons,
+            "enough_data_reasons": enough_data_reasons,
+            "min_sample_warning": bool(enough_data_reasons),
+            "source_yield_confidence": "low" if enough_data_reasons else "measured",
             "warnings": _warnings(provider_rows, source_pack_rows),
         }
     )
@@ -73,8 +116,12 @@ def format_source_yield_report(payload: Mapping[str, Any]) -> str:
         f"- generated_at: `{payload.get('generated_at')}`",
         f"- profile: `{payload.get('profile')}`",
         f"- artifact_namespace: `{payload.get('artifact_namespace')}`",
+        f"- evidence_scope: `{payload.get('evidence_scope')}`",
+        f"- included_namespaces: `{', '.join(payload.get('included_namespaces') or []) or 'none'}`",
         f"- recommendations_only: `{payload.get('recommendations_only')}`",
         f"- auto_apply: `{payload.get('auto_apply')}`",
+        f"- enough_data: `{payload.get('enough_data')}`",
+        f"- enough_data_reasons: `{', '.join(payload.get('enough_data_reasons') or []) or 'none'}`",
         "",
         "## Providers",
         "",
@@ -99,9 +146,10 @@ def format_source_yield_report(payload: Mapping[str, Any]) -> str:
     return "\n".join(lines).rstrip()
 
 
-def _rows(base: Path, filename: str, *, cutoff) -> list[dict[str, Any]]:
+def _rows(base: Path, filename: str, *, cutoff, namespaces: list[str] | tuple[str, ...]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    for path in base.glob("*/" + filename):
+    for namespace in namespaces:
+        path = base / namespace / filename
         for row in common.read_jsonl(path):
             if (common.timestamp_for_row(row) or common.utc_now()) >= cutoff:
                 out.append(row)
@@ -157,6 +205,8 @@ def _recommend_action(
     lowered = name.casefold()
     if "coinalyze" in lowered and not label_rows:
         return "activate_next"
+    if label_rows and len(label_rows) < 10:
+        return "needs_more_labels"
     if any(token in lowered for token in ("gdelt", "rss")) and label_rows and len(noisy) >= max(2, len(useful) * 2):
         return "context_only_or_quarantine"
     if label_rows and len(useful) > len(noisy):
@@ -164,6 +214,33 @@ def _recommend_action(
     if candidate_rows and not label_rows:
         return "needs_labels"
     return "hold_no_threshold_change"
+
+
+def _label_coverage(feedback: list[dict[str, Any]], candidates: list[dict[str, Any]]) -> float:
+    if not candidates:
+        return 0.0
+    targets = {common.item_family(row) for row in candidates}
+    labels = {common.item_family(row) for row in feedback}
+    return round(100.0 * len(targets & labels) / len(targets), 2)
+
+
+def _enough_data_reasons(
+    *,
+    included_namespaces: list[str],
+    feedback: list[dict[str, Any]],
+    outcomes: list[dict[str, Any]],
+    daily_runs: list[dict[str, Any]],
+) -> list[str]:
+    reasons: list[str] = []
+    if not included_namespaces:
+        reasons.append("no_active_burn_in_namespaces")
+    if not daily_runs:
+        reasons.append("no_live_no_send_cycles")
+    if len(feedback) < 150:
+        reasons.append(f"min_human_labels:{len(feedback)}/150")
+    if len(outcomes) < 100:
+        reasons.append(f"min_outcome_rows:{len(outcomes)}/100")
+    return reasons
 
 
 def _warnings(provider_rows: Mapping[str, Mapping[str, Any]], source_pack_rows: Mapping[str, Mapping[str, Any]]) -> list[str]:
@@ -182,8 +259,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--artifact-namespace", default=None)
     parser.add_argument("--base-dir", default=None)
     parser.add_argument("--days", type=int, default=30)
+    parser.add_argument("--include-fixture-namespaces", action="store_true")
+    parser.add_argument("--include-stale-namespaces", action="store_true")
+    parser.add_argument("--include-namespace", action="append", default=[])
     args = parser.parse_args(argv)
-    payload = build_source_yield_report(profile=args.profile, artifact_namespace=args.artifact_namespace, base_dir=args.base_dir, days=args.days)
+    payload = build_source_yield_report(
+        profile=args.profile,
+        artifact_namespace=args.artifact_namespace,
+        base_dir=args.base_dir,
+        days=args.days,
+        include_fixture_namespaces=args.include_fixture_namespaces,
+        include_stale_namespaces=args.include_stale_namespaces,
+        include_namespaces=tuple(args.include_namespace),
+    )
     print(f"event_alpha_source_yield_report: {payload['namespace_dir']}/{SOURCE_YIELD_MD}")
     print(f"providers={len(payload['providers'])} source_packs={len(payload['source_packs'])} auto_apply={payload['auto_apply']}")
     return 0

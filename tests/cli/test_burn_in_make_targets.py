@@ -15,6 +15,7 @@ def test_event_alpha_burn_in_operating_targets_are_no_send_and_artifact_only():
     for target in (
         "event-alpha-burn-in-contract",
         "event-alpha-daily-live-no-send-burn-in",
+        "event-alpha-daily-live-no-send-burn-in-smoke",
         "event-alpha-daily-review-inbox",
         "event-alpha-feedback-progress",
         "event-alpha-burn-in-weekly-measurement",
@@ -36,6 +37,14 @@ def test_event_alpha_burn_in_operating_targets_are_no_send_and_artifact_only():
     assert "operations.daily_burn_in" in daily_dry
     assert "event-alpha-telegram-send-one-cycle" not in daily_dry
     assert "RSI_EVENT_ALERTS_ENABLED=1" not in daily_dry
+    smoke_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-daily-live-no-send-burn-in-smoke", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "operations.daily_burn_in" in smoke_dry
+    assert "--smoke" in smoke_dry
+    assert "RSI_EVENT_ALERTS_ENABLED=1" not in smoke_dry
     progress_dry = subprocess.check_output(
         [
             "make",
