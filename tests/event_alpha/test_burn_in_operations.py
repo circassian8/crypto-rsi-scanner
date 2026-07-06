@@ -7,7 +7,9 @@ import sys
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
+from crypto_rsi_scanner.event_alpha.doctor.checks import operations as doctor_operations_checks
 from crypto_rsi_scanner.event_alpha.operations import archive, common, daily_burn_in, feedback_progress, measurement, namespace_policy, review_inbox, scorecard, source_yield
 from crypto_rsi_scanner.project_health import radar_north_star
 
@@ -74,6 +76,11 @@ def test_daily_review_inbox_groups_candidates_and_uses_stable_feedback_commands(
     assert payload["items"][0]["secondary_visible_family_key"].startswith("TEST:test:")
     assert payload["items"][0]["duplicate_visible_family_count"] == 2
     assert payload["items"][0]["symbol_duplicate_count"] == 2
+    assert payload["items"][0]["candidate_provenance"] == "integrated_candidate"
+    assert payload["items"][0]["source_artifact"] == "event_integrated_radar_candidates.jsonl"
+    assert payload["items"][0]["source_artifact_row_type"] == "integrated_candidate"
+    assert payload["items"][0]["real_candidate_evidence"] is True
+    assert payload["items"][0]["contract_counted_candidate"] is True
     assert payload["blockers"] == []
     commands = payload["items"][0]["suggested_feedback_commands"]
     assert any("event-feedback-source-noise" in command for command in commands)
@@ -81,6 +88,52 @@ def test_daily_review_inbox_groups_candidates_and_uses_stable_feedback_commands(
     assert all("/tmp/" not in str(item.get("card_path")) for item in payload["items"])
     assert (ns / review_inbox.INBOX_JSON).exists()
     assert (ns / review_inbox.INBOX_MD).exists()
+    md = (ns / review_inbox.INBOX_MD).read_text(encoding="utf-8")
+    assert "Provenance" in md
+    assert "Counts toward burn-in candidate evidence" in md
+
+
+def test_daily_review_inbox_records_core_and_skipped_notification_provenance(tmp_path):
+    ns = tmp_path / "burn"
+    _write_jsonl(
+        ns / "event_core_opportunities.jsonl",
+        [
+            {
+                "core_opportunity_id": "core:1",
+                "symbol": "CORE",
+                "coin_id": "core",
+                "opportunity_type": "UNCONFIRMED_RESEARCH",
+                "opportunity_score": 34,
+                "why_not_alertable": "needs evidence review",
+            }
+        ],
+    )
+    _write_jsonl(
+        ns / "event_alpha_alerts.jsonl",
+        [
+            {
+                "alert_key": "alert:1",
+                "symbol": "SKIP",
+                "coin_id": "skip",
+                "opportunity_type": "UNCONFIRMED_RESEARCH",
+                "opportunity_score": 21,
+                "skipped": True,
+                "skip_reason": "research review skipped pending confirmation",
+            }
+        ],
+    )
+    payload = review_inbox.build_review_inbox(
+        profile="live_burn_in_no_send",
+        artifact_namespace="burn",
+        base_dir=tmp_path,
+        limit=10,
+        now=datetime(2026, 7, 5, tzinfo=timezone.utc),
+    )
+    by_symbol = {row["symbol"]: row for row in payload["items"]}
+    assert by_symbol["CORE"]["candidate_provenance"] == "core_opportunity"
+    assert by_symbol["CORE"]["contract_counted_candidate"] is False
+    assert by_symbol["SKIP"]["candidate_provenance"] == "notification_skipped_candidate"
+    assert by_symbol["SKIP"]["source_artifact"] == "event_alpha_alerts.jsonl"
 
 
 def test_daily_review_inbox_ranks_by_review_value_and_diversifies(tmp_path):
@@ -138,6 +191,7 @@ def test_daily_review_inbox_ranks_by_review_value_and_diversifies(tmp_path):
     buckets = {row["diversity_bucket"] for row in payload["items"]}
     assert "source_only_narrative" in buckets
     assert "market_anomaly_missing_catalyst" in buckets
+    assert all(row["opportunity_type"] != "DIAGNOSTIC" for row in payload["items"])
     assert any("generic_context_source_downranked" in row["downrank_reason_codes"] for row in payload["items"])
     assert "Review value" in (ns / review_inbox.INBOX_MD).read_text(encoding="utf-8")
 
@@ -496,6 +550,7 @@ def test_scorecard_default_policy_excludes_no_key_live_candidates(tmp_path, monk
     assert payload["namespace_scope"] == "policy"
     assert payload["included_namespaces"] == ["live_burn_in_20260705"]
     assert payload["evidence_scope"] == "real_burn_in_evidence"
+    assert payload["candidate_rows_seen"] == 1
     assert payload["real_candidates_seen"] == 1
     assert payload["real_burn_in_candidate_count"] == 1
     assert payload["contract_counted_candidate_count"] == 1
@@ -524,7 +579,8 @@ def test_scorecard_explicit_notification_namespace_is_diagnostic_not_contract(tm
     assert payload["burn_in_contract_scope"] == "explicit_single_namespace_diagnostic"
     assert payload["evidence_scope"] == "explicit_single_namespace_diagnostic"
     assert payload["included_namespaces"] == ["notify_llm_deep_cryptopanic_rehearsal"]
-    assert payload["real_candidates_seen"] == 1
+    assert payload["candidate_rows_seen"] == 1
+    assert payload["real_candidates_seen"] == 0
     assert payload["real_burn_in_candidate_count"] == 0
     assert payload["notification_rehearsal_candidate_count"] == 1
     assert payload["contract_counted_candidate_count"] == 0
@@ -561,8 +617,28 @@ def test_scorecard_active_burn_in_without_candidates_has_no_candidate_scope(tmp_
     )
     payload = scorecard.build_scorecard(profile="live_burn_in_no_send", base_dir=tmp_path)
     assert payload["included_namespaces"] == ["live_burn_in_20260705"]
-    assert payload["evidence_scope"] == "active_burn_in_no_candidates"
+    assert payload["evidence_scope"] == "active_burn_in_no_candidate_evidence"
     assert payload["real_burn_in_candidate_count"] == 0
+    assert payload["candidate_evidence_explanation"] == "burn-in run completed but no real candidate artifacts were produced"
+
+
+def test_scorecard_active_burn_in_preflight_only_scope_is_explicit(tmp_path, monkeypatch):
+    live = tmp_path / "live_burn_in_20260705"
+    live.mkdir()
+    (live / daily_burn_in.RUN_JSON).write_text('{"generated_at":"2026-07-05T00:00:00+00:00"}\n', encoding="utf-8")
+    (live / "event_alpha_live_provider_readiness.json").write_text('{"generated_at":"2026-07-05T00:00:00+00:00"}\n', encoding="utf-8")
+    (live / "event_alpha_source_coverage.json").write_text('{"generated_at":"2026-07-05T00:00:00+00:00"}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        scorecard.common,
+        "load_contract",
+        lambda: radar_north_star.build_burn_in_contract(generated_at=datetime(2026, 7, 5, tzinfo=timezone.utc)),
+    )
+    payload = scorecard.build_scorecard(profile="live_burn_in_no_send", base_dir=tmp_path)
+    assert payload["evidence_scope"] == "active_burn_in_preflight_only"
+    assert payload["contract_counted_candidate_count"] == 0
+    assert payload["readiness_rows"] == 1
+    assert payload["source_coverage_rows"] == 1
+    assert payload["namespaces_with_only_preflight_rows"] == ["live_burn_in_20260705"]
 
 
 def test_weekly_measurement_and_source_yield_are_recommendations_only(tmp_path):
@@ -606,7 +682,22 @@ def test_weekly_measurement_and_source_yield_are_recommendations_only(tmp_path):
     assert yield_report["non_burn_in_candidate_count"] == 3
     assert yield_report["recommendations_only"] is True
     assert yield_report["auto_apply"] is False
-    assert yield_report["providers"]["coinalyze"]["recommended_action"] == "activate_next"
+    assert yield_report["real_candidate_rows"] == 0
+    assert yield_report["source_yield_confidence"] == "insufficient_labels"
+    assert "coinalyze" not in yield_report["providers"]
+
+
+def test_source_yield_readiness_only_has_no_candidate_yield(tmp_path):
+    ns = tmp_path / "live_burn_in_20260705"
+    ns.mkdir()
+    (ns / daily_burn_in.RUN_JSON).write_text('{"generated_at":"2026-07-05T00:00:00+00:00"}\n', encoding="utf-8")
+    (ns / "event_alpha_live_provider_readiness.json").write_text('{"generated_at":"2026-07-05T00:00:00+00:00"}\n', encoding="utf-8")
+    payload = source_yield.build_source_yield_report(profile="live_burn_in_no_send", base_dir=tmp_path)
+    assert payload["evidence_scope"] == "active_burn_in_preflight_only"
+    assert payload["real_candidate_rows"] == 0
+    assert payload["provider_readiness_rows"] == 1
+    assert payload["candidate_count"] == 0
+    assert payload["providers"] == {}
 
 
 def test_fixture_only_source_yield_reports_fixture_scope(tmp_path):
@@ -640,6 +731,10 @@ def test_burn_in_archive_excludes_secrets_and_db_files(tmp_path):
     assert payload["files_archived"] == 3
     assert payload["secret_hit_count"] == 1
     assert payload["included_namespaces"] == ["live_burn_in_20260705"]
+    assert payload["burn_in_run_artifacts"] == 1
+    assert payload["readiness_artifacts"] == 1
+    assert payload["candidate_artifacts"] == 0
+    assert payload["support_artifacts"]["readiness_artifacts"] == 1
     with zipfile.ZipFile(tmp_path / "out" / archive.ARCHIVE_NAME) as zf:
         assert zf.namelist() == [
             "live_burn_in_20260705/event_alpha_daily_brief.md",
@@ -653,10 +748,13 @@ def test_burn_in_archive_dry_run_writes_manifest_without_zip(tmp_path):
     ns.mkdir(parents=True)
     (ns / daily_burn_in.RUN_JSON).write_text('{"generated_at":"2026-07-05T00:00:00+00:00"}\n', encoding="utf-8")
     (ns / "event_alpha_daily_brief.md").write_text("brief\n", encoding="utf-8")
+    _write_jsonl(ns / "event_integrated_radar_candidates.jsonl", [{"candidate_id": "candidate-1"}])
     payload = archive.build_burn_in_archive(base_dir=tmp_path / "event_fade_cache", out_dir=tmp_path / "out", dry_run=True)
     assert payload["dry_run"] is True
     assert payload["archive_created"] is False
-    assert payload["files_archived"] == 2
+    assert payload["files_archived"] == 3
+    assert payload["candidate_artifacts"] == 1
+    assert payload["candidate_evidence_artifacts"] == 1
     assert not (tmp_path / "out" / archive.ARCHIVE_NAME).exists()
     assert (tmp_path / "out" / archive.MANIFEST_JSON).exists()
 
@@ -710,6 +808,84 @@ def test_burn_in_archive_dry_run_with_no_active_burn_in_archives_no_history(tmp_
     assert payload["no_active_burn_in_namespaces"] is True
     assert payload["files_archived"] == 0
     assert payload["file_count_by_namespace"] == {}
+
+
+def test_burn_in_doctor_operations_check_blocks_bad_candidate_semantics():
+    blockers: list[str] = []
+    warnings: list[str] = []
+    ctx = SimpleNamespace(
+        burn_in_scorecard={
+            "evidence_scope": "real_burn_in_evidence",
+            "contract_counted_candidate_count": 1,
+            "real_burn_in_candidate_count": 0,
+            "readiness_rows": 1,
+        },
+        source_yield_report={
+            "real_candidate_rows": 0,
+            "provider_readiness_rows": 1,
+            "providers": {"coinalyze": {"candidate_count": 1}},
+        },
+        daily_review_inbox={
+            "items": [
+                {
+                    "symbol": "READY",
+                    "candidate_provenance": "",
+                    "source_artifact": "",
+                    "preflight_only": True,
+                    "diagnostic_only": False,
+                }
+            ],
+        },
+    )
+    doctor_operations_checks.apply_checks(ctx, blockers, warnings)
+    assert any("burn_in_scorecard_contract_count_exceeds_real_candidates" in blocker for blocker in blockers)
+    assert any("source_yield_counts_non_real_rows_as_candidate_yield" in blocker for blocker in blockers)
+    assert any("source_yield_counts_readiness_or_preflight_as_candidate_yield" in blocker for blocker in blockers)
+    assert any("review_inbox_selected_items_missing_provenance=1" in blocker for blocker in blockers)
+    assert any("review_inbox_selected_diagnostic_or_preflight_only=1" in blocker for blocker in blockers)
+
+
+def test_burn_in_doctor_operations_ignores_legacy_source_yield_without_semantic_fields():
+    blockers: list[str] = []
+    warnings: list[str] = []
+    ctx = SimpleNamespace(
+        burn_in_scorecard={},
+        source_yield_report={
+            "schema_version": "event_alpha_source_yield_report_v1",
+            "candidate_count": 11,
+            "providers": {"legacy": {"candidate_count": 11}},
+        },
+        daily_review_inbox={},
+    )
+    doctor_operations_checks.apply_checks(ctx, blockers, warnings)
+    assert blockers == []
+    assert warnings == []
+
+
+def test_burn_in_doctor_operations_warns_when_generic_context_outranks_accepted_evidence():
+    blockers: list[str] = []
+    warnings: list[str] = []
+    ctx = SimpleNamespace(
+        burn_in_scorecard={},
+        source_yield_report={},
+        daily_review_inbox={
+            "items": [
+                {
+                    "candidate_provenance": "integrated_candidate",
+                    "source_artifact": "event_integrated_radar_candidates.jsonl",
+                    "downrank_reason_codes": ["generic_context_source_downranked"],
+                },
+                {
+                    "candidate_provenance": "integrated_candidate",
+                    "source_artifact": "event_integrated_radar_candidates.jsonl",
+                    "review_value_reason_codes": ["accepted_evidence_found"],
+                },
+            ],
+        },
+    )
+    doctor_operations_checks.apply_checks(ctx, blockers, warnings)
+    assert blockers == []
+    assert any("review_inbox_generic_context_outranks_accepted_evidence" in warning for warning in warnings)
 
 
 def test_secret_scanner_ignores_natural_language_sk_phrase_but_catches_keys():

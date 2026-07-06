@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from . import common
+from . import evidence_semantics
 from . import namespace_policy
 
 
@@ -61,6 +62,14 @@ def build_burn_in_archive(
     secret_hits: dict[str, list[str]] = {}
     checksums: dict[str, str] = {}
     safe_payloads: list[tuple[str, bytes]] = []
+    artifact_category_counts: dict[str, int] = {
+        "burn_in_run_artifacts": 0,
+        "candidate_artifacts": 0,
+        "readiness_artifacts": 0,
+        "source_coverage_artifacts": 0,
+        "review_inbox_artifacts": 0,
+        "feedback_artifacts": 0,
+    }
     for path in files:
         rel = path.relative_to(base).as_posix()
         try:
@@ -73,6 +82,9 @@ def build_burn_in_archive(
                 secret_hits[rel] = hits
                 continue
         checksums[rel] = hashlib.sha256(data).hexdigest()
+        for category, matched in evidence_semantics.archive_artifact_categories(rel).items():
+            if matched:
+                artifact_category_counts[category] += 1
         safe_payloads.append((rel, data))
     if not dry_run:
         with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -129,6 +141,14 @@ def build_burn_in_archive(
             "files_considered": len(files),
             "files_archived": len(checksums),
             "file_count_by_namespace": file_count_by_namespace,
+            **artifact_category_counts,
+            "support_artifacts": {
+                "readiness_artifacts": artifact_category_counts["readiness_artifacts"],
+                "source_coverage_artifacts": artifact_category_counts["source_coverage_artifacts"],
+                "review_inbox_artifacts": artifact_category_counts["review_inbox_artifacts"],
+                "feedback_artifacts": artifact_category_counts["feedback_artifacts"],
+            },
+            "candidate_evidence_artifacts": artifact_category_counts["candidate_artifacts"],
             "secret_hits": secret_hits,
             "secret_hit_count": sum(len(values) for values in secret_hits.values()),
             "secret_scan_summary": {

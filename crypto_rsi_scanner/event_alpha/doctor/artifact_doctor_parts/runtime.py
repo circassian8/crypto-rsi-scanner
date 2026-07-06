@@ -45,6 +45,7 @@ from .. import (
 from ..checks import (
     integrated_radar as doctor_integrated_radar_checks,
     notifications as doctor_notification_checks,
+    operations as doctor_operations_checks,
     outcomes as doctor_outcome_checks,
     paths as doctor_path_checks,
     provider_readiness as doctor_provider_readiness_checks,

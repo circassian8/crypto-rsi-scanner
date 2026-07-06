@@ -87,6 +87,9 @@ def _load_doctor_context_inputs(options: Mapping[str, Any]) -> SimpleNamespace:
     ctx.unlock_candidates = loaded.unlock_candidates
     ctx.derivatives_state = loaded.derivatives_state
     ctx.fade_review_candidates = loaded.fade_review_candidates
+    ctx.burn_in_scorecard = loaded.burn_in_scorecard
+    ctx.source_yield_report = loaded.source_yield_report
+    ctx.daily_review_inbox = loaded.daily_review_inbox
     ctx.dex_pool_state = loaded.dex_pool_state
     ctx.dex_pool_anomalies = loaded.dex_pool_anomalies
     ctx.protocol_fundamentals = loaded.protocol_fundamentals
@@ -610,6 +613,7 @@ def _attach_notification_context(ctx: SimpleNamespace) -> None:
     doctor_source_coverage_checks.apply_checks(doctor_check_context, ctx.blockers, ctx.warnings)
     doctor_provider_readiness_checks.apply_preflight_checks(doctor_check_context, ctx.blockers, ctx.warnings)
     doctor_integrated_radar_checks.apply_identity_checks(doctor_check_context, ctx.blockers, ctx.warnings)
+    doctor_operations_checks.apply_checks(doctor_check_context, ctx.blockers, ctx.warnings)
     research_review_enabled_but_lane_missing = 0
     research_review_candidates_without_delivery = 0
     if latest_run:
@@ -751,6 +755,9 @@ def _load_raw_doctor_artifacts(options: Mapping[str, Any]) -> SimpleNamespace:
         raw_dex_pool_anomalies=list(event_dex_onchain_readiness.load_dex_pool_anomalies(default_dir)),
         raw_protocol_fundamentals=list(event_dex_onchain_readiness.load_protocol_fundamentals(default_dir)),
         raw_integrated_candidates=_read_jsonl(integrated_path) if integrated_path is not None else [],
+        raw_burn_in_scorecard=_read_json(default_dir / "event_alpha_burn_in_scorecard.json" if default_dir is not None else None),
+        raw_source_yield_report=_read_json(default_dir / "event_alpha_source_yield_report.json" if default_dir is not None else None),
+        raw_daily_review_inbox=_read_json(default_dir / "event_alpha_daily_review_inbox.json" if default_dir is not None else None),
         integrated_manifest_path=(
             integrated_dir / "event_integrated_radar_input_manifest.json"
             if integrated_dir is not None
@@ -811,6 +818,9 @@ def _filter_doctor_artifacts(raw: SimpleNamespace, options: Mapping[str, Any]) -
         dex_pool_anomalies=_filter_doctor_rows(raw.raw_dex_pool_anomalies, options),
         protocol_fundamentals=_filter_doctor_rows(raw.raw_protocol_fundamentals, options),
         integrated_candidates=_filter_doctor_rows(raw.raw_integrated_candidates, options),
+        burn_in_scorecard=raw.raw_burn_in_scorecard,
+        source_yield_report=raw.raw_source_yield_report,
+        daily_review_inbox=raw.raw_daily_review_inbox,
     )
 
 
@@ -1071,9 +1081,23 @@ def _read_jsonl(path: str | Path | None) -> list[dict[str, Any]]:
         return []
     return rows
 
+
+def _read_json(path: str | Path | None) -> dict[str, Any]:
+    if path is None:
+        return {}
+    source = Path(path)
+    if not source.exists():
+        return {}
+    try:
+        loaded = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return dict(loaded) if isinstance(loaded, Mapping) else {}
+
 __all__ = (
     'diagnose_artifacts',
     '_phase_only_doctor_result',
     '_row',
+    '_read_json',
     '_read_jsonl',
 )

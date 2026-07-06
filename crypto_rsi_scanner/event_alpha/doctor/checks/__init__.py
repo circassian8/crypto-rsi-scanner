@@ -6,6 +6,7 @@ __all__ = [
     "integrated_radar",
     "namespace",
     "notifications",
+    "operations",
     "outcomes",
     "paths",
     "provider_readiness",

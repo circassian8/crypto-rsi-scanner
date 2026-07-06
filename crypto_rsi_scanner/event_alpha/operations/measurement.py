@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from . import common
+from . import evidence_semantics
 from . import namespace_policy
 from .daily_burn_in import RUN_JSON
 
@@ -53,6 +54,8 @@ def build_measurement_dashboard(
     coverage_docs = [common.read_json(base / namespace / "event_alpha_source_coverage.json") for namespace in included_namespaces]
     provider_health = [common.read_json(base / namespace / "event_provider_health.json") for namespace in included_namespaces]
     daily_runs = _json_docs(base, RUN_JSON, namespaces=included_namespaces)
+    evidence_summaries = evidence_semantics.namespace_summaries(base, included_namespaces, cutoff=cutoff, policy=policy)
+    evidence_aggregate = evidence_semantics.aggregate_namespace_summaries(evidence_summaries)
     fixture_cycles = [
         name for name, status in (policy.get("namespace_status") or {}).items()
         if name not in included_namespaces and ("fixture" in str(name).casefold() or "smoke" in str(name).casefold() or status == "active_fixture_smoke")
@@ -67,13 +70,13 @@ def build_measurement_dashboard(
     label_coverage = _label_coverage(feedback, candidates + cores)
     explicit_scope = bool(artifact_namespace) or _has_explicit_policy_flags(policy.get("explicit_inclusion_flags") or {})
     contract_countable = not explicit_scope
-    real_burn_in_candidate_count = len(candidates) if contract_countable else 0
+    real_burn_in_candidate_count = len(evidence_aggregate["real_candidate_rows"]) if contract_countable else 0
     non_burn_in_candidate_count = max(0, len(candidates) - real_burn_in_candidate_count)
-    evidence_scope = _evidence_scope(
+    evidence_scope, candidate_evidence_explanation = _evidence_scope(
         explicit_scope=explicit_scope,
         contract_countable=contract_countable,
         included_namespaces=included_namespaces,
-        candidate_count=len(candidates),
+        candidate_evidence=evidence_aggregate,
         policy=policy,
     )
     explicit_scope_warning = (
@@ -113,6 +116,8 @@ def build_measurement_dashboard(
             "real_burn_in_candidate_count": real_burn_in_candidate_count,
             "non_burn_in_candidate_count": non_burn_in_candidate_count,
             "contract_counted_candidate_count": real_burn_in_candidate_count,
+            "candidate_evidence_explanation": candidate_evidence_explanation,
+            **evidence_semantics.payload_fields(evidence_aggregate),
             "notification_rehearsal_candidate_count": _category_candidate_count(base, policy, "notification_rehearsal", cutoff=cutoff),
             "provider_rehearsal_candidate_count": _category_candidate_count(base, policy, "provider_rehearsal", cutoff=cutoff),
             "fixture_candidate_count": _category_candidate_count(base, policy, "fixture", cutoff=cutoff),
@@ -177,6 +182,7 @@ def format_measurement_dashboard(payload: Mapping[str, Any]) -> str:
         f"- explicit_scope_warning: `{payload.get('explicit_scope_warning') or 'none'}`",
         f"- real_burn_in_candidate_count: `{payload.get('real_burn_in_candidate_count')}`",
         f"- contract_counted_candidate_count: `{payload.get('contract_counted_candidate_count')}`",
+        f"- candidate_evidence_explanation: `{payload.get('candidate_evidence_explanation')}`",
         f"- non_burn_in_candidate_count: `{payload.get('non_burn_in_candidate_count')}`",
         f"- low_sample_warning: `{payload.get('low_sample_warning')}`",
         f"- enough_data: `{payload.get('enough_data')}`",
@@ -259,18 +265,19 @@ def _evidence_scope(
     explicit_scope: bool,
     contract_countable: bool,
     included_namespaces: list[str],
-    candidate_count: int,
+    candidate_evidence: Mapping[str, Any],
     policy: Mapping[str, Any],
-) -> str:
+) -> tuple[str, str]:
     if explicit_scope and not contract_countable:
-        return "explicit_single_namespace_diagnostic"
-    if not included_namespaces:
-        return "no_active_burn_in_namespaces"
-    if candidate_count <= 0:
-        return "active_burn_in_no_candidates"
+        return "explicit_single_namespace_diagnostic", "explicit namespace is diagnostic unless counted intentionally"
     if _mixed_non_burn_in_categories(policy):
-        return "mixed_explicit_diagnostic"
-    return "real_burn_in_evidence"
+        return "mixed_explicit_diagnostic", "explicit non-burn-in namespace categories are mixed into the selection"
+    return evidence_semantics.evidence_scope_from_summary(
+        explicit_scope=explicit_scope,
+        contract_countable=contract_countable,
+        included_namespaces=included_namespaces,
+        aggregate=candidate_evidence,
+    )
 
 
 def _has_explicit_policy_flags(flags: Mapping[str, Any]) -> bool:

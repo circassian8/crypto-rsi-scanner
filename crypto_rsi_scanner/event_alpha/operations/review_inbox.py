@@ -10,6 +10,7 @@ from typing import Any, Iterable, Mapping
 
 from ..artifacts import research_cards
 from . import common
+from . import evidence_semantics
 
 
 INBOX_JSON = "event_alpha_daily_review_inbox.json"
@@ -57,6 +58,15 @@ class ReviewItem:
     card_path: str
     feedback_target: str
     suggested_feedback_commands: tuple[str, ...]
+    candidate_record_type: str
+    candidate_provenance: str
+    contract_counted_candidate: bool
+    source_artifact: str
+    source_artifact_row_type: str
+    real_candidate_evidence: bool
+    diagnostic_only: bool
+    fixture_only: bool
+    preflight_only: bool
     provider_gap: str | None = None
     review_value_score: int = 0
     review_value_reasons: tuple[str, ...] = ()
@@ -86,6 +96,8 @@ def build_review_inbox(
     ]
     items = _select_review_items(all_items, limit=max(1, int(limit or 10)))
     stale_paths = _stale_path_warnings(items)
+    selected_primary = {item.primary_visible_family_key for item in items}
+    second_family_count = sum(1 for item in items if item.symbol_family_rank > 1)
     payload = common.with_safety(
         {
             "schema_version": "event_alpha_daily_review_inbox_v1",
@@ -98,6 +110,10 @@ def build_review_inbox(
             "family_grouped": True,
             "visible_family_grouped": True,
             "items_count": len(items),
+            "selected_primary_family_count": len(selected_primary),
+            "collapsed_primary_family_count": max(0, len({item.primary_visible_family_key for item in all_items}) - len(selected_primary)),
+            "second_family_items_count": second_family_count,
+            "rejected_second_family_items_count": _rejected_second_family_count(all_items, items),
             "items": [item.__dict__ for item in items],
             "family_summaries": _family_summaries(all_items),
             "collapsed_family_summary": _symbol_family_summaries(all_items),
@@ -171,11 +187,14 @@ def format_review_inbox(payload: Mapping[str, Any]) -> str:
                 f"- symbol_family_rank: `{row.get('symbol_family_rank')}`",
                 f"- selection_bucket: `{row.get('selection_bucket')}`",
                 f"- allowed_second_family_reason: `{row.get('allowed_second_family_reason') or 'none'}`",
+                f"- Provenance: `{row.get('candidate_provenance')}` from `{row.get('source_artifact')}` row_type=`{row.get('source_artifact_row_type')}`",
+                f"- Counts toward burn-in candidate evidence: `{row.get('contract_counted_candidate')}`",
                 f"- opportunity_type: `{row.get('opportunity_type')}`",
                 f"- score: `{row.get('score')}`",
                 f"- Review value: `{row.get('review_value_score')}` ({', '.join(row.get('review_value_reason_codes') or []) or 'general review'})",
                 f"- downrank_reason_codes: `{', '.join(row.get('downrank_reason_codes') or []) or 'none'}`",
                 f"- selection_reason: `{row.get('selection_reason')}`",
+                f"- Why this needs human review: {row.get('why_not_alertable')}",
                 f"- selected_representative_reason: `{row.get('selected_representative_reason') or row.get('collapsed_family_representative_reason')}`",
                 f"- diversity_bucket: `{row.get('diversity_bucket')}`",
                 f"- source_origin/source_pack: `{row.get('source_origin')}` / `{row.get('source_pack')}`",
@@ -220,6 +239,10 @@ def _candidate_rows(context: Any) -> list[dict[str, Any]]:
     for filename in filenames:
         for row in common.read_jsonl(context.namespace_dir / filename):
             row.setdefault("_source_file", filename)
+            provenance = evidence_semantics.row_provenance(row)
+            row.update(provenance)
+            if provenance["diagnostic_only"] or provenance["preflight_only"]:
+                continue
             rows.append(row)
     return rows
 
@@ -416,6 +439,15 @@ def _item_from_group(
         card_path=card_path,
         feedback_target=target,
         suggested_feedback_commands=_feedback_commands(profile, target),
+        candidate_record_type=str(best.get("candidate_record_type") or "candidate"),
+        candidate_provenance=str(best.get("candidate_provenance") or "candidate"),
+        contract_counted_candidate=bool(best.get("contract_counted_candidate")),
+        source_artifact=str(best.get("source_artifact") or best.get("_source_file") or ""),
+        source_artifact_row_type=str(best.get("source_artifact_row_type") or best.get("row_type") or ""),
+        real_candidate_evidence=bool(best.get("real_candidate_evidence")),
+        diagnostic_only=bool(best.get("diagnostic_only")),
+        fixture_only=bool(best.get("fixture_only")),
+        preflight_only=bool(best.get("preflight_only")),
         provider_gap=_provider_gap(best),
         review_value_score=value_score,
         review_value_reasons=tuple([*value_reasons, *downrank_reasons]),
@@ -564,6 +596,23 @@ def _select_review_items(items: list[ReviewItem], *, limit: int) -> list[ReviewI
     ]
 
 
+def _rejected_second_family_count(all_items: list[ReviewItem], selected: list[ReviewItem]) -> int:
+    selected_secondaries = {item.secondary_visible_family_key for item in selected}
+    by_primary: dict[str, list[ReviewItem]] = {}
+    for item in sorted(all_items, key=lambda value: (-_priority(value), value.secondary_visible_family_key)):
+        by_primary.setdefault(item.primary_visible_family_key, []).append(item)
+    rejected = 0
+    for values in by_primary.values():
+        if not values:
+            continue
+        rejected += sum(
+            1
+            for item in values[1:]
+            if item.secondary_visible_family_key not in selected_secondaries and not _allowed_second_family(item, values[0])
+        )
+    return rejected
+
+
 def _allowed_second_family(item: ReviewItem, primary_best: ReviewItem) -> bool:
     if item.diversity_bucket == primary_best.diversity_bucket:
         return False
@@ -696,6 +745,15 @@ def _review_value(
             card_path="",
             feedback_target="",
             suggested_feedback_commands=(),
+            candidate_record_type="candidate",
+            candidate_provenance="candidate",
+            contract_counted_candidate=False,
+            source_artifact="",
+            source_artifact_row_type="candidate",
+            real_candidate_evidence=False,
+            diagnostic_only=False,
+            fixture_only=False,
+            preflight_only=False,
         )
     )
     reasons: list[str] = []
@@ -707,6 +765,10 @@ def _review_value(
     lane_text = opportunity_type.casefold()
     source_strength = max(common.int_value(row.get("source_strength")), common.int_value(row.get("source_strength_score")))
     symbol = str(row.get("symbol") or row.get("asset_symbol") or "").strip().upper()
+    if str(row.get("evidence_acquisition_status") or "").casefold() == "accepted_evidence_found":
+        value += 58
+        reasons.append("accepted_evidence_found")
+        bucket = "accepted_evidence_no_market_confirmation" if bucket == "general" else bucket
     if any(token in source_text for token in ("cryptopanic", "rss", "gdelt", "news", "context")) and "official" not in source_text:
         value += 4
         reasons.append("source_only_narrative")
@@ -749,6 +811,9 @@ def _review_value(
         value += 35
         reasons.append("provider_confirmation_gap")
         bucket = "provider_confirmation_gap"
+        if any(token in gap.casefold() for token in ("coinalyze", "official", "unlock", "exchange")):
+            value += 15
+            reasons.append("lane_critical_provider_gap")
     if _is_fresh_candidate(row):
         value += 10
         reasons.append("fresh_candidate")
@@ -758,6 +823,12 @@ def _review_value(
     if "diagnostic" in lane_text:
         value -= 35
         downrank_reasons.append("diagnostic_hidden")
+    if row.get("preflight_only") is True:
+        value -= 40
+        downrank_reasons.append("preflight_only_hidden")
+    if row.get("fixture_only") is True:
+        value -= 25
+        downrank_reasons.append("fixture_only_hidden")
     if not has_card:
         value -= 5
         downrank_reasons.append("no_card_path_downranked")
@@ -767,7 +838,7 @@ def _review_value(
     if "unsupported" in why.casefold() or "insufficient" in why.casefold():
         value -= 25
         downrank_reasons.append("unsupported_mechanism_downranked")
-    if not reasons:
+    if not reasons and not downrank_reasons:
         reasons.append("highest_remaining_review_value")
     return max(0, value), reasons, downrank_reasons, bucket
 

@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-06 — Make burn-in evidence semantics exact · Codex
+**Why:** Active burn-in namespaces could complete a run with only fixture,
+preflight, readiness, source-coverage, or diagnostic rows and still look too
+similar to namespaces with real burn-in candidate evidence. The review inbox
+also needed explicit row provenance so human labels target useful candidates,
+not support artifacts.
+**Changes:**
+- Added shared burn-in evidence classification for run namespaces, real
+  candidate rows, fixture/preflight/readiness/source-coverage support rows,
+  notification previews, stale/no-key rows, and archive artifact categories.
+- Updated burn-in scorecard, weekly measurement, source-yield, and archive
+  manifests to expose explicit evidence categories and to keep contract-counted
+  candidate evidence limited to real candidate rows from true burn-in runs.
+- Added review-inbox provenance fields, Markdown provenance copy, hidden
+  diagnostic/preflight defaults, lane-critical provider-gap scoring, and
+  diversity counters for selected/collapsed/second-family review items.
+- Added doctor checks for invalid burn-in/source-yield/review-inbox evidence
+  semantics while keeping older source-yield artifacts compatible when they
+  predate the new fields.
+- Expanded burn-in operation tests for no-candidate/preflight-only scopes,
+  source-yield readiness-only reports, archive support-vs-candidate counts,
+  review provenance, and doctor semantic blockers/warnings.
+**Verify:** `python3 tests/test_indicators.py` (770/770 passed);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (816 passed); `python3 -m compileall -q
+crypto_rsi_scanner tests`; focused burn-in/doctor pytest (73 passed);
+daily burn-in smoke/plan, scorecard, review inbox, feedback progress, weekly
+measurement, source-yield, archive dry-run, integrated radar smoke/doctor,
+notification format smoke, Telegram no-send final check, and strict
+CryptoPanic rehearsal doctor (WARN/no blockers). Final `make verify` also
+passed before commit.
+**Notes/risks:** Existing source-yield reports without the new evidence fields
+are not retroactively blocked by the new doctor check; regenerated reports use
+the stricter semantics.
+
 ## 2026-07-06 — Tighten burn-in scope and review-inbox grouping · Codex
 **Why:** Burn-in measurement needed to stop treating notification rehearsals,
 no-key diagnostic namespaces, provider rehearsals, fixtures, and explicitly

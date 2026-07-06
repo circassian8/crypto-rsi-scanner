@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from . import common
+from . import evidence_semantics
 from . import namespace_policy
 from .daily_burn_in import RUN_JSON
 
@@ -51,15 +52,17 @@ def build_source_yield_report(
     outcomes = _rows(base, "event_integrated_radar_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces) + _rows(base, "event_alpha_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces)
     daily_runs = [common.read_json(base / namespace / RUN_JSON) for namespace in included_namespaces]
     daily_runs = [row for row in daily_runs if row]
+    evidence_summaries = evidence_semantics.namespace_summaries(base, included_namespaces, cutoff=cutoff, policy=policy)
+    evidence_aggregate = evidence_semantics.aggregate_namespace_summaries(evidence_summaries)
     explicit_scope = bool(artifact_namespace) or _has_explicit_policy_flags(policy.get("explicit_inclusion_flags") or {})
     contract_countable = not explicit_scope
-    real_burn_in_candidate_count = len(candidates) if contract_countable else 0
+    real_burn_in_candidate_count = len(evidence_aggregate["real_candidate_rows"]) if contract_countable else 0
     non_burn_in_candidate_count = max(0, len(candidates) - real_burn_in_candidate_count)
-    evidence_scope = _evidence_scope(
+    evidence_scope, candidate_evidence_explanation = _evidence_scope(
         explicit_scope=explicit_scope,
         contract_countable=contract_countable,
         included_namespaces=included_namespaces,
-        candidate_count=len(candidates),
+        candidate_evidence=evidence_aggregate,
         policy=policy,
     )
     explicit_scope_warning = (
@@ -70,7 +73,8 @@ def build_source_yield_report(
     enough_data_reasons = _enough_data_reasons(included_namespaces=included_namespaces if contract_countable else [], feedback=feedback, outcomes=outcomes, daily_runs=daily_runs)
     if explicit_scope_warning:
         enough_data_reasons = ["explicit_namespace_not_counted_for_burn_in_contract", *enough_data_reasons]
-    rows = [*candidates, *cores]
+    real_candidate_rows = list(evidence_aggregate["real_candidate_rows"]) if contract_countable else []
+    rows = real_candidate_rows
     providers = sorted({_provider(row) for row in [*rows, *feedback]})
     source_packs = sorted({_source_pack(row) for row in [*rows, *feedback]})
     provider_rows = {
@@ -123,9 +127,15 @@ def build_source_yield_report(
             "providers": provider_rows,
             "source_packs": source_pack_rows,
             "candidate_count": len(candidates),
+            "real_candidate_rows": len(real_candidate_rows),
+            "accepted_evidence_rows": sum(1 for row in rows if row.get("accepted_evidence") or common.int_value(row.get("accepted_evidence_count")) > 0),
+            "provider_readiness_rows": evidence_aggregate.get("readiness_rows", 0),
+            "source_coverage_rows": evidence_aggregate.get("source_coverage_rows", 0),
             "real_burn_in_candidate_count": real_burn_in_candidate_count,
             "non_burn_in_candidate_count": non_burn_in_candidate_count,
             "contract_counted_candidate_count": real_burn_in_candidate_count,
+            "candidate_evidence_explanation": candidate_evidence_explanation,
+            **evidence_semantics.payload_fields(evidence_aggregate),
             "notification_rehearsal_candidate_count": _category_candidate_count(base, policy, "notification_rehearsal", cutoff=cutoff),
             "provider_rehearsal_candidate_count": _category_candidate_count(base, policy, "provider_rehearsal", cutoff=cutoff),
             "fixture_candidate_count": _category_candidate_count(base, policy, "fixture", cutoff=cutoff),
@@ -141,7 +151,7 @@ def build_source_yield_report(
             "enough_data": not enough_data_reasons,
             "enough_data_reasons": enough_data_reasons,
             "min_sample_warning": bool(enough_data_reasons),
-            "source_yield_confidence": "low" if enough_data_reasons else "measured",
+            "source_yield_confidence": "insufficient_labels" if not feedback or not outcomes else ("low" if enough_data_reasons else "measured"),
             "warnings": _warnings(provider_rows, source_pack_rows),
         }
     )
@@ -165,6 +175,10 @@ def format_source_yield_report(payload: Mapping[str, Any]) -> str:
         f"- included_namespaces: `{', '.join(payload.get('included_namespaces') or []) or 'none'}`",
         f"- real_burn_in_candidate_count: `{payload.get('real_burn_in_candidate_count')}`",
         f"- contract_counted_candidate_count: `{payload.get('contract_counted_candidate_count')}`",
+        f"- candidate_evidence_explanation: `{payload.get('candidate_evidence_explanation')}`",
+        f"- real_candidate_rows: `{payload.get('real_candidate_rows')}`",
+        f"- provider_readiness_rows: `{payload.get('provider_readiness_rows')}`",
+        f"- source_coverage_rows: `{payload.get('source_coverage_rows')}`",
         f"- non_burn_in_candidate_count: `{payload.get('non_burn_in_candidate_count')}`",
         f"- recommendations_only: `{payload.get('recommendations_only')}`",
         f"- auto_apply: `{payload.get('auto_apply')}`",
@@ -209,18 +223,19 @@ def _evidence_scope(
     explicit_scope: bool,
     contract_countable: bool,
     included_namespaces: list[str],
-    candidate_count: int,
+    candidate_evidence: Mapping[str, Any],
     policy: Mapping[str, Any],
-) -> str:
+) -> tuple[str, str]:
     if explicit_scope and not contract_countable:
-        return "explicit_single_namespace_diagnostic"
-    if not included_namespaces:
-        return "no_active_burn_in_namespaces"
-    if candidate_count <= 0:
-        return "active_burn_in_no_candidates"
+        return "explicit_single_namespace_diagnostic", "explicit namespace is diagnostic unless counted intentionally"
     if _mixed_non_burn_in_categories(policy):
-        return "mixed_explicit_diagnostic"
-    return "real_burn_in_evidence"
+        return "mixed_explicit_diagnostic", "explicit non-burn-in namespace categories are mixed into the selection"
+    return evidence_semantics.evidence_scope_from_summary(
+        explicit_scope=explicit_scope,
+        contract_countable=contract_countable,
+        included_namespaces=included_namespaces,
+        aggregate=candidate_evidence,
+    )
 
 
 def _has_explicit_policy_flags(flags: Mapping[str, Any]) -> bool:
