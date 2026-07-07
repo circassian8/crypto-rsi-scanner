@@ -120,6 +120,10 @@ def test_daily_burn_in_build_steps_uses_scoped_doctor_by_default():
     doctor = next(step for step in steps if isinstance(step, daily_burn_in.BurnInStep) and step.name == "artifact_doctor")
     assert "--scoped-doctor" in doctor.command
     assert "--event-alpha-artifact-doctor" not in doctor.command
+    skipped = [step for step in steps if isinstance(step, dict) and step.get("status") == "skipped"]
+    assert skipped
+    assert all(step.get("command") for step in skipped)
+    assert any("--event-alpha-coinalyze-no-send-rehearsal" in step["command"] for step in skipped)
     full = daily_burn_in.build_steps(
         python=sys.executable,
         profile="live_burn_in_no_send",

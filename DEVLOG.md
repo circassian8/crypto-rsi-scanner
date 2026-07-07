@@ -17,6 +17,22 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-07 — Complete burn-in step metadata contract · Codex
+**Why:** A post-commit audit against the persisted goal found skipped provider
+steps had `skip_reason` and safety metadata but did not include the required
+`command` field in the final daily burn-in run artifact.
+**Changes:**
+- Added command metadata to skipped Coinalyze/Bybit candidate-mode rehearsal
+  steps and rendered those commands in the dry-run plan.
+- Added regression coverage so skipped provider rows keep command metadata.
+**Verify:** `make event-alpha-daily-live-no-send-burn-in CANDIDATE_MODE=1
+PYTHON=python3` completed as `passed_no_candidates`, direct artifact inspection
+found no missing per-step fields, and focused burn-in/schema tests passed
+(`56 passed`).
+**Notes/risks:** This does not execute skipped provider commands; it only records
+the guarded command that would have run if the provider had been configured and
+explicitly allowed.
+
 ## 2026-07-07 — Harden candidate-mode burn-in daily operations · Codex
 **Why:** Candidate-mode daily no-send burn-in could produce useful partial
 artifacts but still stall in artifact-heavy namespaces when it reached the broad

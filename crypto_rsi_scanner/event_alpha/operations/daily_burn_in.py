@@ -526,7 +526,9 @@ def format_daily_burn_in_plan(
     ]
     for step in steps:
         if isinstance(step, Mapping):
-            lines.append(f"- {step.get('name')}: skipped by default ({step.get('skip_reason')})")
+            command = str(step.get("command") or "").strip()
+            suffix = f" command=`{command}`" if command else ""
+            lines.append(f"- {step.get('name')}: skipped by default ({step.get('skip_reason')}){suffix}")
         else:
             lines.append(f"- {step.name}: timeout={step.timeout_seconds}s command=`{' '.join(step.command)}`")
     return "\n".join(lines).rstrip()
@@ -707,6 +709,7 @@ def _skipped_step_row(step: Mapping[str, Any]) -> dict[str, Any]:
         "step_finished_at": now,
         "duration_seconds": 0.0,
         "timeout_seconds": row.get("timeout_seconds"),
+        "command": str(row.get("command") or ""),
         "skip_reason": row.get("skip_reason") or "skipped_by_plan",
     }
 
@@ -1000,10 +1003,14 @@ def _provider_step(
 ) -> BurnInStep | dict[str, Any]:
     if enabled:
         return run_step
+    command = " ".join(run_step.command)
     status = dict((provider_status or {}).get(provider_key) or {})
     if not status:
-        return dict(default_skip)
+        row = dict(default_skip)
+        row.setdefault("command", command)
+        return row
     row = dict(default_skip)
+    row.setdefault("command", command)
     row["skip_reason"] = status.get("skip_reason") or status.get("status") or row.get("skip_reason")
     row["provider_status"] = status.get("status")
     row["provider"] = provider_key
