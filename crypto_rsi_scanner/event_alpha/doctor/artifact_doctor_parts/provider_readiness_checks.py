@@ -18,6 +18,8 @@ def _opportunity_lane_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
         "market_state_lane_possible_double_scaled": 0,
     }
     for row in rows:
+        if _fixture_support_row(row):
+            continue
         lane = str(row.get("opportunity_type") or "").strip()
         if not lane:
             continue
@@ -358,6 +360,7 @@ def _integrated_radar_artifact_conflicts(
 ) -> dict[str, int]:
     out = _empty_integrated_radar_artifact_conflicts()
     materialized_rows = [dict(row) for row in rows if isinstance(row, Mapping)]
+    production_rows = [row for row in materialized_rows if not _fixture_support_row(row)]
     materialized_core_rows = tuple(core_rows)
     core_by_id = {
         str(row.get("core_opportunity_id") or ""): dict(row)
@@ -366,13 +369,13 @@ def _integrated_radar_artifact_conflicts(
     }
     card_text_by_core = _card_text_by_core(research_card_paths)
     row_count = 0
-    for row in materialized_rows:
+    for row in production_rows:
         row_count += 1
         _add_integrated_candidate_conflicts(row, core_by_id, card_text_by_core, out)
 
-    _add_integrated_manifest_conflicts(out, row_count, manifest_path, materialized_rows)
+    _add_integrated_manifest_conflicts(out, row_count, manifest_path, production_rows)
     _add_integrated_source_coverage_conflicts(out, row_count, source_coverage_json_path)
-    _add_integrated_daily_brief_conflicts(out, row_count, daily_brief_path, manifest_path, materialized_rows)
+    _add_integrated_daily_brief_conflicts(out, row_count, daily_brief_path, manifest_path, production_rows)
     _add_integrated_preview_conflicts(out, row_count, preview_path)
     _add_integrated_operator_path_conflicts(out, research_card_paths, daily_brief_path=daily_brief_path, preview_path=preview_path)
     delivery_rows = _integrated_delivery_rows(out, row_count, delivery_path, preview_path=preview_path)
@@ -470,6 +473,8 @@ def _add_integrated_candidate_conflicts(
     card_text_by_core: Mapping[str, str],
     out: dict[str, int],
 ) -> None:
+    if _fixture_support_row(row):
+        return
     lane = str(row.get("opportunity_type") or "").strip().upper()
     if not lane:
         out["integrated_candidate_missing_opportunity_type"] += 1
@@ -526,6 +531,18 @@ def _integrated_source_sets(row: Mapping[str, Any]) -> tuple[set[str], set[str]]
         if source_pack:
             source_packs.add(source_pack)
     return source_origins, source_packs
+
+
+def _fixture_support_row(row: Mapping[str, Any]) -> bool:
+    source_mode = str(row.get("candidate_source_mode") or "").strip().casefold()
+    if source_mode in {"mocked_fixture", "fixture"}:
+        return True
+    if row.get("fixture_only") is True or row.get("test_fixture") is True:
+        return True
+    if row.get("contract_counted_candidate") is False and source_mode in {"mocked_fixture", "fixture", "fixture_smoke"}:
+        return True
+    run_mode = str(row.get("run_mode") or "").strip().casefold()
+    return run_mode == "fixture" and source_mode in {"mocked_fixture", "fixture", ""}
 
 def _add_integrated_dex_and_side_effect_conflicts(
     row: Mapping[str, Any],

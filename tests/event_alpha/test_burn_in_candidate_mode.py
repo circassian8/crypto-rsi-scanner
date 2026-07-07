@@ -283,14 +283,20 @@ def test_daily_burn_in_candidate_mode_fixture_smoke_produces_lanes_without_contr
     assert all(row["research_only"] is True and row["no_send_rehearsal"] is True for row in rows)
     manifest = common.read_json(ns / daily_burn_in.CANDIDATE_MODE_MANIFEST_JSON)
     score = common.read_json(ns / scorecard.SCORECARD_JSON)
+    inbox = common.read_json(ns / review_inbox.INBOX_JSON)
     inbox_md = (ns / review_inbox.INBOX_MD).read_text(encoding="utf-8")
+    cards = sorted((ns / "research_cards").glob("*.md"))
     assert payload["status"] == "passed"
     assert manifest["status"] == "completed_fixture_candidates_only"
     assert manifest["fixture_candidate_count"] >= 5
     assert manifest["contract_counted_candidate_count"] == 0
+    assert manifest["research_cards_written"] >= 5
     assert score["evidence_scope"] == "fixture_candidate_mode_smoke"
     assert score["contract_counted_candidate_count"] == 0
     assert score["enough_data"] is False
+    assert cards
+    assert all(row.get("card_path") and row.get("card_path") != "none" for row in inbox["items"] if row.get("candidate_provenance") == "core_opportunity")
+    assert all(row.get("feedback_target") for row in inbox["items"])
     assert "## Contract-Counted Burn-In Candidates" in inbox_md
     assert "No contract-counted burn-in candidates yet." in inbox_md
     assert "## High-Value Review Candidates Not Contract-Counted" in inbox_md

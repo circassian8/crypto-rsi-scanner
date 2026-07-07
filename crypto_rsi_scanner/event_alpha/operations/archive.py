@@ -55,11 +55,41 @@ def build_burn_in_archive(
     if pattern:
         namespaces = [name for name in namespaces if (base / name).match(pattern) or name.startswith(pattern.rstrip("*"))]
     files = _collect_files(base, namespaces)
-    file_count_by_namespace = {
-        namespace: sum(1 for path in files if path.relative_to(base).parts[:1] == (namespace,))
-        for namespace in namespaces
-    }
+    scan = _scan_archive_files(base, files)
+    if not dry_run:
+        with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for rel, data in scan["safe_payloads"]:
+                zf.writestr(rel, data)
+    archive_checksum = hashlib.sha256(archive_path.read_bytes()).hexdigest() if archive_path.exists() and not dry_run else ""
+    explicit_flags = policy.get("explicit_inclusion_flags") if isinstance(policy.get("explicit_inclusion_flags"), dict) else {}
+    explicit_scope = bool(include_namespaces) or any(
+        bool(value) for key, value in explicit_flags.items() if key != "include_namespace"
+    )
+    payload = _build_archive_manifest_payload(
+        base=base,
+        archive_path=archive_path,
+        manifest_path=manifest_path,
+        checksums_path=checksums_path,
+        dry_run=dry_run,
+        explicit_scope=explicit_scope,
+        namespaces=namespaces,
+        files=files,
+        policy=policy,
+        scan=scan,
+        pattern=pattern,
+        archive_checksum=archive_checksum,
+    )
+    common.write_json(manifest_path, payload)
+    common.write_json(checksums_path, {"archive_sha256": archive_checksum, "files": scan["checksums"]})
+    return payload
+
+
+def _scan_archive_files(base: Path, files: list[Path]) -> dict[str, Any]:
     secret_hits: dict[str, list[str]] = {}
+    secret_hit_details: list[dict[str, Any]] = []
+    secret_allowed_status_count = 0
+    secret_false_positive_count = 0
+    secret_blocker_count = 0
     checksums: dict[str, str] = {}
     safe_payloads: list[tuple[str, bytes]] = []
     artifact_category_counts: dict[str, int] = {
@@ -77,25 +107,59 @@ def build_burn_in_archive(
         except OSError:
             continue
         if path.suffix.lower() in {".json", ".jsonl", ".md", ".txt", ".csv"}:
-            hits = _archive_secret_hits(data.decode("utf-8", errors="ignore"))
-            if hits:
-                secret_hits[rel] = hits
+            details = _archive_secret_hit_details(data.decode("utf-8", errors="ignore"), rel)
+            blocker_details = [detail for detail in details if detail.get("status") == "blocker"]
+            allowed_details = [detail for detail in details if detail.get("status") == "allowed_status"]
+            false_positive_details = [detail for detail in details if detail.get("status") == "false_positive"]
+            secret_hit_details.extend(details)
+            secret_allowed_status_count += len(allowed_details)
+            secret_false_positive_count += len(false_positive_details)
+            secret_blocker_count += len(blocker_details)
+            if blocker_details:
+                secret_hits[rel] = [
+                    str(detail.get("token") or detail.get("reason") or "secret_like_value")
+                    for detail in blocker_details
+                ]
                 continue
         checksums[rel] = hashlib.sha256(data).hexdigest()
         for category, matched in evidence_semantics.archive_artifact_categories(rel).items():
             if matched:
                 artifact_category_counts[category] += 1
         safe_payloads.append((rel, data))
-    if not dry_run:
-        with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for rel, data in safe_payloads:
-                zf.writestr(rel, data)
-    archive_checksum = hashlib.sha256(archive_path.read_bytes()).hexdigest() if archive_path.exists() and not dry_run else ""
-    explicit_flags = policy.get("explicit_inclusion_flags") if isinstance(policy.get("explicit_inclusion_flags"), dict) else {}
-    explicit_scope = bool(include_namespaces) or any(
-        bool(value) for key, value in explicit_flags.items() if key != "include_namespace"
-    )
-    payload = common.with_safety(
+    return {
+        "secret_hits": secret_hits,
+        "secret_hit_details": secret_hit_details,
+        "secret_allowed_status_count": secret_allowed_status_count,
+        "secret_false_positive_count": secret_false_positive_count,
+        "secret_blocker_count": secret_blocker_count,
+        "checksums": checksums,
+        "safe_payloads": safe_payloads,
+        "artifact_category_counts": artifact_category_counts,
+    }
+
+
+def _build_archive_manifest_payload(
+    *,
+    base: Path,
+    archive_path: Path,
+    manifest_path: Path,
+    checksums_path: Path,
+    dry_run: bool,
+    explicit_scope: bool,
+    namespaces: list[str],
+    files: list[Path],
+    policy: dict[str, Any],
+    scan: dict[str, Any],
+    pattern: str | None,
+    archive_checksum: str,
+) -> dict[str, Any]:
+    checksums = scan["checksums"]
+    artifact_category_counts = scan["artifact_category_counts"]
+    file_count_by_namespace = {
+        namespace: sum(1 for path in files if path.relative_to(base).parts[:1] == (namespace,))
+        for namespace in namespaces
+    }
+    return common.with_safety(
         {
             "schema_version": "event_alpha_burn_in_archive_manifest_v1",
             "row_type": "event_alpha_burn_in_archive_manifest",
@@ -149,12 +213,19 @@ def build_burn_in_archive(
                 "feedback_artifacts": artifact_category_counts["feedback_artifacts"],
             },
             "candidate_evidence_artifacts": artifact_category_counts["candidate_artifacts"],
-            "secret_hits": secret_hits,
-            "secret_hit_count": sum(len(values) for values in secret_hits.values()),
+            "secret_hits": scan["secret_hits"],
+            "secret_hit_count": scan["secret_blocker_count"],
+            "secret_false_positive_count": scan["secret_false_positive_count"],
+            "secret_allowed_status_count": scan["secret_allowed_status_count"],
+            "secret_blocker_count": scan["secret_blocker_count"],
+            "secret_hit_details": scan["secret_hit_details"],
             "secret_scan_summary": {
                 "files_scanned": len(files),
-                "files_with_hits": len(secret_hits),
-                "secret_hit_count": sum(len(values) for values in secret_hits.values()),
+                "files_with_hits": len(scan["secret_hits"]),
+                "secret_hit_count": scan["secret_blocker_count"],
+                "secret_false_positive_count": scan["secret_false_positive_count"],
+                "secret_allowed_status_count": scan["secret_allowed_status_count"],
+                "secret_blocker_count": scan["secret_blocker_count"],
             },
             "archive_sha256": archive_checksum,
             "checksum_manifest": {
@@ -166,9 +237,6 @@ def build_burn_in_archive(
             "excluded_suffixes": sorted(_excluded_suffixes()),
         }
     )
-    common.write_json(manifest_path, payload)
-    common.write_json(checksums_path, {"archive_sha256": archive_checksum, "files": checksums})
-    return payload
 
 
 def _collect_files(base: Path, namespaces: list[str] | tuple[str, ...]) -> list[Path]:
@@ -199,9 +267,17 @@ def _excluded(path: Path) -> bool:
 
 
 def _archive_secret_hits(text: str) -> list[str]:
-    hits = common.secret_hits_in_text(text)
-    allowed_env_var_names = {"API_KEY", "AUTH_TOKEN", "X-API-KEY", "TELEGRAM_BOT_TOKEN"}
-    return [hit for hit in hits if hit not in allowed_env_var_names]
+    return [str(detail.get("token") or detail.get("reason")) for detail in _archive_secret_hit_details(text, "") if detail.get("status") == "blocker"]
+
+
+def _archive_secret_hit_details(text: str, rel_path: str) -> list[dict[str, Any]]:
+    details: list[dict[str, Any]] = []
+    for detail in common.classify_secret_hits_in_text(text):
+        row = dict(detail)
+        if rel_path:
+            row["path"] = rel_path
+        details.append(row)
+    return details
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -234,8 +310,11 @@ def main(argv: list[str] | None = None) -> int:
         include_namespaces=explicit_namespaces,
     )
     print(f"event_alpha_burn_in_archive: {payload['archive_path']}")
-    print(f"dry_run={payload['dry_run']} files_archived={payload['files_archived']} secret_hit_count={payload['secret_hit_count']}")
-    return 1 if payload.get("secret_hit_count") else 0
+    print(
+        f"dry_run={payload['dry_run']} files_archived={payload['files_archived']} "
+        f"secret_hit_count={payload['secret_hit_count']} secret_allowed_status_count={payload.get('secret_allowed_status_count', 0)}"
+    )
+    return 1 if payload.get("secret_blocker_count") else 0
 
 
 if __name__ == "__main__":

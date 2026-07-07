@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-07 — Harden burn-in candidate artifact hygiene · Codex
+**Why:** Candidate-mode burn-in artifacts needed to be safe for unattended
+archive and doctor review: safe missing/redacted credential text was being
+counted as secret leakage, stdout/stderr tails could preserve local absolute
+paths, and the fixture candidate smoke did not fully exercise cards/review
+surfaces.
+**Changes:**
+- Split archive secret scanning into allowed safe-status text vs blocker
+  secret-like values, with manifest counters for allowed statuses, false
+  positives, blockers, and classified details.
+- Scrub daily burn-in stdout/stderr tails before persistence, including local
+  artifact paths and token/header-looking values, and added doctor checks for
+  unsanitized tails and archive secret blockers.
+- Expanded candidate-mode fixture smoke to write support readiness/source
+  coverage/preview artifacts, research cards, feedback targets, review inbox
+  paths, safety counters, and a strict smoke-doctor Make target.
+- Added regression tests for archive false positives, actual secret blockers,
+  tail scrubbing, doctor blockers, candidate cards, and contract-counted
+  fixture safety.
+**Verify:** `python3 tests/test_indicators.py` (`774/774`), safe pytest
+(`840 passed`), compileall, daily burn-in smoke/plan/candidate mode,
+candidate-mode smoke + strict smoke doctor, scorecard, review inbox,
+source-yield, archive dry-run (`secret_hit_count=0`), strict artifact doctors,
+integrated radar smoke/doctor, notification format smoke, Telegram no-send
+final check, and `make verify PYTHON=python3`.
+**Notes/risks:** Notification format smoke still reports its existing
+non-strict fixture schema-safety warnings; no blockers were introduced. No live
+provider calls, live sends, trades, paper trades, normal RSI rows, or Event
+Alpha-created `TRIGGERED_FADE` were produced.
+
 ## 2026-07-07 — Complete burn-in step metadata contract · Codex
 **Why:** A post-commit audit against the persisted goal found skipped provider
 steps had `skip_reason` and safety metadata but did not include the required

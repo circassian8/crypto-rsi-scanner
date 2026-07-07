@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
 from .. import check_registry
 from ._utils import Messages, ctx_mapping, ctx_value
+from ...operations import common
 
 
 def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
@@ -90,6 +92,7 @@ def _check_daily_run(ctx: object, daily_run: Mapping[str, Any], blockers: Messag
                 "daily_burn_in_integrated_preview_mismatch",
             )
         )
+    _check_step_tails(steps, blockers, warnings)
 
 
 def _check_candidate_mode(ctx: object, daily_run: Mapping[str, Any], candidate_mode_manifest: Mapping[str, Any], blockers: Messages, warnings: Messages) -> None:
@@ -146,6 +149,8 @@ def _check_candidate_mode(ctx: object, daily_run: Mapping[str, Any], candidate_m
                 f"daily_burn_in_preflight_row_counted_as_candidate={preflight_counted}",
             )
         )
+    _check_candidate_mode_fixture_cards(ctx, candidate_rows, candidate_mode_manifest, blockers)
+    _check_candidate_mode_safety_counters(candidate_mode_manifest, blockers)
 
 
 def _check_scorecard(scorecard: Mapping[str, Any], blockers: Messages) -> None:
@@ -255,6 +260,16 @@ def _check_review_inbox(review_inbox: Mapping[str, Any], blockers: Messages, war
 def _check_archive_manifest(archive_manifest: Mapping[str, Any], blockers: Messages) -> None:
     if not archive_manifest:
         return
+    secret_blockers = _int(archive_manifest.get("secret_blocker_count"))
+    if not secret_blockers and "secret_blocker_count" not in archive_manifest:
+        secret_blockers = _int(archive_manifest.get("secret_hit_count"))
+    if secret_blockers:
+        blockers.append(
+            check_registry.format_check_message(
+                "secrets.daily_burn_in_archive_secret_blocker",
+                f"daily_burn_in_archive_secret_blocker_count={secret_blockers}",
+            )
+        )
     if str(archive_manifest.get("archive_scope") or "") != "active_burn_in_namespaces":
         return
     non_burn_in = (
@@ -271,6 +286,107 @@ def _check_archive_manifest(archive_manifest: Mapping[str, Any], blockers: Messa
                 "daily_burn_in_archive_includes_non_burn_in_by_default",
             )
         )
+
+
+def _check_step_tails(steps: list[Mapping[str, Any]], blockers: Messages, warnings: Messages) -> None:
+    missing_scrub_flags = 0
+    unsanitized_paths = 0
+    unsanitized_secrets = 0
+    for row in steps:
+        for field, scrubbed_field in (("stdout_tail", "stdout_tail_scrubbed"), ("stderr_tail", "stderr_tail_scrubbed")):
+            text = str(row.get(field) or "")
+            if text and row.get(scrubbed_field) is not True:
+                missing_scrub_flags += 1
+            if _contains_unsanitized_absolute_path(text):
+                unsanitized_paths += 1
+            if any(detail.get("status") == "blocker" for detail in common.classify_secret_hits_in_text(text)):
+                unsanitized_secrets += 1
+    if missing_scrub_flags:
+        warnings.append(
+            check_registry.format_check_message(
+                "outcomes.daily_burn_in_tail_scrub_flags",
+                f"daily_burn_in_step_tail_missing_scrub_flags={missing_scrub_flags}",
+            )
+        )
+    if unsanitized_paths:
+        blockers.append(
+            check_registry.format_check_message(
+                "paths.daily_burn_in_unsanitized_tail_path",
+                f"daily_burn_in_step_tail_unsanitized_absolute_paths={unsanitized_paths}",
+            )
+        )
+    if unsanitized_secrets:
+        blockers.append(
+            check_registry.format_check_message(
+                "secrets.daily_burn_in_unsanitized_tail_secret",
+                f"daily_burn_in_step_tail_unsanitized_secret_values={unsanitized_secrets}",
+            )
+        )
+
+
+def _check_candidate_mode_fixture_cards(
+    ctx: object,
+    candidate_rows: list[Mapping[str, Any]],
+    candidate_mode_manifest: Mapping[str, Any],
+    blockers: Messages,
+) -> None:
+    fixture_count = _int(candidate_mode_manifest.get("fixture_candidate_count")) or sum(1 for row in candidate_rows if _is_fixture_candidate(row))
+    if fixture_count <= 0:
+        return
+    review_inbox = ctx_mapping(ctx, "daily_review_inbox")
+    review_items = [row for row in review_inbox.get("items") or [] if isinstance(row, Mapping)]
+    core_rows = [row for row in ctx_value(ctx, "core_rows", []) or [] if isinstance(row, Mapping)]
+    cards_from_inbox = sum(1 for row in review_items if str(row.get("card_path") or "").strip() and str(row.get("card_path") or "").strip().lower() != "none")
+    cards_from_core = sum(1 for row in core_rows if str(row.get("card_path") or row.get("research_card_path") or "").strip())
+    cards_from_manifest = _int(candidate_mode_manifest.get("research_cards_written"))
+    if max(cards_from_inbox, cards_from_core, cards_from_manifest) <= 0:
+        blockers.append(
+            check_registry.format_check_message(
+                "outcomes.daily_burn_in_candidate_mode_fixture_cards",
+                "daily_burn_in_candidate_mode_fixture_candidates_without_cards",
+            )
+        )
+    missing_feedback_targets = sum(1 for row in review_items if not str(row.get("feedback_target") or "").strip())
+    if review_items and missing_feedback_targets:
+        blockers.append(
+            check_registry.format_check_message(
+                "outcomes.daily_burn_in_candidate_mode_fixture_cards",
+                f"daily_burn_in_candidate_mode_review_items_missing_feedback_target={missing_feedback_targets}",
+            )
+        )
+
+
+def _check_candidate_mode_safety_counters(candidate_mode_manifest: Mapping[str, Any], blockers: Messages) -> None:
+    if not candidate_mode_manifest:
+        return
+    missing = [key for key in common.SAFETY_FIELDS if key not in candidate_mode_manifest]
+    nonzero = [
+        key
+        for key, value in common.SAFETY_FIELDS.items()
+        if isinstance(value, int)
+        and not isinstance(value, bool)
+        and _int(candidate_mode_manifest.get(key)) != 0
+    ]
+    if missing or nonzero:
+        blockers.append(
+            check_registry.format_check_message(
+                "outcomes.daily_burn_in_candidate_mode_safety",
+                f"daily_burn_in_candidate_mode_safety_counters_missing={len(missing)} nonzero={len(nonzero)}",
+            )
+        )
+
+
+def _contains_unsanitized_absolute_path(text: str) -> bool:
+    if not text:
+        return False
+    return bool(
+        re.search(r"(/Users/[^\s`'\"<>]+/|/mnt/data/[^\s`'\"<>]+|/tmp/[^\s`'\"<>]*event_fade_cache/|/private/tmp/[^\s`'\"<>]*event_fade_cache/)", text)
+    )
+
+
+def _is_fixture_candidate(row: Mapping[str, Any]) -> bool:
+    text = " ".join(str(row.get(field) or "") for field in ("run_mode", "profile", "artifact_namespace", "source_origin", "source_pack", "candidate_source_mode")).casefold()
+    return bool(row.get("fixture_only") is True or row.get("test_fixture") is True or "fixture" in text or "smoke" in text or "mocked_fixture" in text)
 
 
 def _is_burn_in_namespace(ctx: object) -> bool:

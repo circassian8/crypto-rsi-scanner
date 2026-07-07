@@ -17,6 +17,34 @@ SECRET_RE = re.compile(
     r"x-api-key\b|telegram[_-]?bot[_-]?token\b|provider[_-]?token\b)",
     re.IGNORECASE,
 )
+SAFE_SECRET_STATUS_PHRASES = (
+    "missing_api_key",
+    "missing_config",
+    "api_key_missing",
+    "token configured: no",
+    "token configured: no (redacted)",
+    "api key configured: no",
+    "api key values are never printed",
+    "no api token value is printed",
+    "redacted",
+    "[redacted]",
+    "configured=false",
+    "configured: false",
+)
+SECRET_ENV_VAR_NAMES = {"API_KEY", "AUTH_TOKEN", "X-API-KEY", "TELEGRAM_BOT_TOKEN"}
+SECRET_VALUE_RE = re.compile(
+    r"(?P<label>\b(?:api[_-]?key|api\s+key|auth[_-]?token|api[_-]?token|telegram[_-]?bot[_-]?token|"
+    r"provider[_-]?token)\b)\s*[\"']?\s*[:=]\s*[\"']?(?P<value>[^\"'\s,}]+)",
+    re.IGNORECASE,
+)
+AUTH_BEARER_RE = re.compile(r"\bAuthorization\s*:\s*Bearer\s+(?P<value>[A-Za-z0-9._-]+)", re.IGNORECASE)
+X_API_KEY_RE = re.compile(r"\bX-API-Key\s*:\s*(?P<value>[A-Za-z0-9._-]+)", re.IGNORECASE)
+OPENAI_KEY_RE = re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{12,}\b")
+PROVIDER_TOKEN_VALUE_RE = re.compile(r"\b(?:ghp|gho|ghu|github_pat|xoxb|xoxp)_[A-Za-z0-9_]{16,}\b", re.IGNORECASE)
+ABSOLUTE_ARTIFACT_PATH_RE = re.compile(
+    r"(?P<prefix>(?:/mnt/data|/tmp|/private/tmp)/[^\s`'\"<>]*|/Users/[^\s`'\"<>]+/[^\s`'\"<>]*)"
+    r"(?P<artifact>event_fade_cache/[^\s`'\"<>]*)"
+)
 SAFETY_FIELDS: dict[str, Any] = {
     "research_only": True,
     "no_send_rehearsal": True,
@@ -217,6 +245,118 @@ def secret_hits_in_text(text: str) -> list[str]:
     return hits
 
 
+def classify_secret_hits_in_text(text: str) -> Iterable[dict[str, Any]]:
+    """Classify secret-like text without treating safe operator status as leakage."""
+
+    details: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for line_no, line in enumerate((text or "").splitlines() or [text or ""], start=1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        line_lower = stripped.casefold()
+        safe_status = _safe_secret_status_line(stripped)
+        for label, value, match_text in _secret_value_matches(stripped):
+            status = "allowed_status" if _safe_secret_value(value) else "blocker"
+            reason = "redacted_or_missing_value" if status == "allowed_status" else "secret_value"
+            details.append(
+                _secret_detail(
+                    status=status,
+                    reason=reason,
+                    line_no=line_no,
+                    token=label,
+                    excerpt=_redacted_secret_excerpt(match_text),
+                )
+            )
+        if any(detail["line_number"] == line_no and detail["status"] == "blocker" for detail in details):
+            continue
+        if safe_status:
+            hits = secret_hits_in_text(stripped)
+            if hits or any(phrase in line_lower for phrase in SAFE_SECRET_STATUS_PHRASES):
+                details.append(
+                    _secret_detail(
+                        status="allowed_status",
+                        reason="safe_status_phrase",
+                        line_no=line_no,
+                        token=hits[0] if hits else "status_phrase",
+                        excerpt=stripped[:160],
+                    )
+                )
+            continue
+        for token in secret_hits_in_text(stripped):
+            if token in SECRET_ENV_VAR_NAMES:
+                details.append(
+                    _secret_detail(
+                        status="false_positive",
+                        reason="env_var_name_only",
+                        line_no=line_no,
+                        token=token,
+                        excerpt=stripped[:160],
+                    )
+                )
+            else:
+                details.append(
+                    _secret_detail(
+                        status="blocker",
+                        reason="secret_like_token",
+                        line_no=line_no,
+                        token=token,
+                        excerpt=_redacted_secret_excerpt(stripped[:160]),
+                    )
+                )
+    for detail in details:
+        key = (str(detail.get("status")), str(detail.get("reason")), str(detail.get("line_number")) + str(detail.get("token")))
+        if key in seen:
+            continue
+        seen.add(key)
+        yield_detail = detail
+        yield_detail["token"] = str(yield_detail.get("token") or "")[:80]
+        yield_detail["excerpt"] = str(yield_detail.get("excerpt") or "")[:200]
+        yield yield_detail
+
+
+def scrub_operator_text(text: str, *, root: str | Path | None = None) -> tuple[str, int]:
+    """Redact operator-captured stdout/stderr text before persisting artifacts."""
+
+    clean = str(text or "")
+    redactions = 0
+
+    repo_root = Path(root).expanduser() if root is not None else repo_root_from_module()
+    try:
+        repo_root_text = repo_root.resolve().as_posix()
+    except OSError:
+        repo_root_text = repo_root.as_posix()
+    if repo_root_text and repo_root_text in clean:
+        clean, count = re.subn(re.escape(repo_root_text) + r"/?", "", clean)
+        redactions += count
+
+    def _artifact_path_repl(match: re.Match[str]) -> str:
+        return match.group("artifact")
+
+    clean, count = ABSOLUTE_ARTIFACT_PATH_RE.subn(_artifact_path_repl, clean)
+    redactions += count
+
+    def _secret_value_repl(match: re.Match[str]) -> str:
+        nonlocal redactions
+        label = match.group("label")
+        value = match.group("value")
+        if _safe_secret_value(value):
+            return match.group(0)
+        redactions += 1
+        return f"{label}=<redacted>"
+
+    clean = SECRET_VALUE_RE.sub(_secret_value_repl, clean)
+    for pattern, repl in (
+        (AUTH_BEARER_RE, "Authorization: Bearer <redacted>"),
+        (X_API_KEY_RE, "X-API-Key: <redacted>"),
+        (OPENAI_KEY_RE, "sk-<redacted>"),
+        (PROVIDER_TOKEN_VALUE_RE, "<redacted-provider-token>"),
+    ):
+        clean, count = pattern.subn(repl, clean)
+        redactions += count
+    return clean, redactions
+
+
 def _natural_language_sk_phrase(token: str) -> bool:
     if not token.lower().startswith("sk-"):
         return False
@@ -229,6 +369,54 @@ def _natural_language_sk_phrase(token: str) -> bool:
     if not any(char.isdigit() for char in rest):
         return True
     return rest.count("-") >= 3 and all(char.isalnum() or char == "-" for char in rest)
+
+
+def _safe_secret_status_line(line: str) -> bool:
+    lower = line.casefold()
+    return any(phrase in lower for phrase in SAFE_SECRET_STATUS_PHRASES)
+
+
+def _safe_secret_value(value: str) -> bool:
+    clean = str(value or "").strip().strip("\"'").casefold()
+    return clean in {"", "no", "none", "false", "0", "missing", "missing_config", "missing_api_key", "api_key_missing", "redacted", "[redacted]", "***", "<redacted>"}
+
+
+def _secret_value_matches(line: str) -> list[tuple[str, str, str]]:
+    matches: list[tuple[str, str, str]] = []
+    for pattern in (SECRET_VALUE_RE, AUTH_BEARER_RE, X_API_KEY_RE):
+        for match in pattern.finditer(line):
+            if pattern is SECRET_VALUE_RE and match.start() > 0 and line[match.start() - 1] == "-":
+                continue
+            label = match.groupdict().get("label") or ("authorization" if pattern is AUTH_BEARER_RE else "x-api-key")
+            value = match.groupdict().get("value") or ""
+            matches.append((label, value, match.group(0)))
+    for pattern, label in ((OPENAI_KEY_RE, "openai_key"), (PROVIDER_TOKEN_VALUE_RE, "provider_token")):
+        for match in pattern.finditer(line):
+            token = match.group(0)
+            if _natural_language_sk_phrase(token):
+                continue
+            matches.append((label, token, token))
+    return matches
+
+
+def _secret_detail(*, status: str, reason: str, line_no: int, token: str, excerpt: str) -> dict[str, Any]:
+    return {
+        "status": status,
+        "classification": status,
+        "reason": reason,
+        "line_number": line_no,
+        "token": token,
+        "excerpt": excerpt,
+    }
+
+
+def _redacted_secret_excerpt(text: str) -> str:
+    clean = SECRET_VALUE_RE.sub(lambda match: f"{match.group('label')}=<redacted>", str(text or ""))
+    clean = AUTH_BEARER_RE.sub("Authorization: Bearer <redacted>", clean)
+    clean = X_API_KEY_RE.sub("X-API-Key: <redacted>", clean)
+    clean = OPENAI_KEY_RE.sub("sk-<redacted>", clean)
+    clean = PROVIDER_TOKEN_VALUE_RE.sub("<redacted-provider-token>", clean)
+    return clean
 
 
 def load_contract(root: str | Path | None = None) -> dict[str, Any]:

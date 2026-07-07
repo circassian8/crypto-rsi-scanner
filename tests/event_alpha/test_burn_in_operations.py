@@ -991,6 +991,48 @@ def test_burn_in_archive_excludes_secrets_and_db_files(tmp_path):
         ]
 
 
+def test_burn_in_archive_allows_redacted_status_phrases(tmp_path):
+    ns = tmp_path / "event_fade_cache" / "live_burn_in_20260705"
+    ns.mkdir(parents=True)
+    (ns / daily_burn_in.RUN_JSON).write_text('{"generated_at":"2026-07-05T00:00:00+00:00"}\n', encoding="utf-8")
+    (ns / "readiness.md").write_text(
+        "\n".join(
+            [
+                "missing_api_key",
+                "missing_config",
+                "token configured: no (redacted)",
+                "api key configured: no",
+                "API key values are never printed",
+                "No API token value is printed",
+                "configured=false",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    payload = archive.build_burn_in_archive(base_dir=tmp_path / "event_fade_cache", out_dir=tmp_path / "out", dry_run=True)
+    assert payload["secret_hit_count"] == 0
+    assert payload["secret_blocker_count"] == 0
+    assert payload["secret_allowed_status_count"] >= 6
+    assert all(detail["status"] != "blocker" for detail in payload["secret_hit_details"])
+
+
+def test_burn_in_archive_blocks_actual_secret_values_and_redacts_details(tmp_path):
+    ns = tmp_path / "event_fade_cache" / "live_burn_in_20260705"
+    ns.mkdir(parents=True)
+    (ns / daily_burn_in.RUN_JSON).write_text('{"generated_at":"2026-07-05T00:00:00+00:00"}\n', encoding="utf-8")
+    (ns / "bad.md").write_text(
+        "Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456\nX-API-Key: live-secret-value-1234567890\n",
+        encoding="utf-8",
+    )
+    payload = archive.build_burn_in_archive(base_dir=tmp_path / "event_fade_cache", out_dir=tmp_path / "out", dry_run=True)
+    assert payload["secret_hit_count"] == 2
+    assert payload["secret_blocker_count"] == 2
+    blocker_details = [detail for detail in payload["secret_hit_details"] if detail["status"] == "blocker"]
+    assert len(blocker_details) == 2
+    assert all("<redacted>" in detail["excerpt"] for detail in blocker_details)
+    assert "abcdefghijklmnopqrstuvwxyz123456" not in json.dumps(payload["secret_hit_details"])
+
+
 def test_burn_in_archive_dry_run_writes_manifest_without_zip(tmp_path):
     ns = tmp_path / "event_fade_cache" / "live_burn_in_20260705"
     ns.mkdir(parents=True)
@@ -1185,6 +1227,75 @@ def test_burn_in_doctor_operations_checks_daily_run_and_archive_scope():
     assert any("daily_burn_in_archive_includes_non_burn_in_by_default" in blocker for blocker in blockers)
 
 
+def test_daily_burn_in_step_tails_are_scrubbed_before_persisting(tmp_path, monkeypatch):
+    repo_path = Path.cwd() / "event_fade_cache" / "burn_tail" / "event_alpha_daily_brief.md"
+    step = daily_burn_in.BurnInStep("tail_fixture", (sys.executable, "-c", "print('fixture')"), required=True, timeout_seconds=5)
+    monkeypatch.setattr(daily_burn_in, "build_steps", lambda **kwargs: (step,))
+
+    def fake_run_step(step, *, env, cwd):
+        return {
+            "name": step.name,
+            "status": "passed",
+            "required": step.required,
+            "timeout_seconds": step.timeout_seconds,
+            "duration_seconds": 0.01,
+            "command": " ".join(step.command),
+            "stdout_tail": f"wrote {repo_path}",
+            "stderr_tail": "Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456",
+        }
+
+    monkeypatch.setattr(daily_burn_in, "_run_step", fake_run_step)
+    payload = daily_burn_in.run_daily_burn_in(
+        profile="fixture",
+        artifact_namespace="burn_tail",
+        base_dir=tmp_path,
+        python=sys.executable,
+        smoke=True,
+    )
+    row = payload["steps"][0]
+    assert row["stdout_tail_scrubbed"] is True
+    assert row["stderr_tail_scrubbed"] is True
+    assert row["stdout_tail_redaction_count"] >= 1
+    assert row["stderr_tail_redaction_count"] >= 1
+    assert "/Users/" not in row["stdout_tail"]
+    assert "Authorization: Bearer <redacted>" in row["stderr_tail"]
+
+
+def test_burn_in_doctor_blocks_unsanitized_tails_and_secret_blockers():
+    blockers: list[str] = []
+    warnings: list[str] = []
+    ctx = SimpleNamespace(
+        profile="live_burn_in_no_send",
+        artifact_namespace="live_burn_in_20260705",
+        namespace_status=None,
+        daily_burn_in_run={
+            "row_type": "event_alpha_daily_burn_in_run",
+            "steps": [
+                {
+                    "name": "bad_tail",
+                    "status": "passed",
+                    "required": False,
+                    "timeout_seconds": 1,
+                    "stdout_tail": "/Users/nasrenkaraf/crypto-rsi-scanner/event_fade_cache/live/file.md",
+                    "stderr_tail": "X-API-Key: live-secret-value-1234567890",
+                }
+            ],
+        },
+        candidate_mode_manifest={},
+        burn_in_scorecard={},
+        source_yield_report={},
+        daily_review_inbox={},
+        burn_in_archive_manifest={"archive_scope": "active_burn_in_namespaces", "secret_blocker_count": 1},
+        integrated_conflicts={},
+        integrated_candidates=[],
+    )
+    doctor_operations_checks.apply_checks(ctx, blockers, warnings)
+    assert any("daily_burn_in_step_tail_unsanitized_absolute_paths=1" in blocker for blocker in blockers)
+    assert any("daily_burn_in_step_tail_unsanitized_secret_values=1" in blocker for blocker in blockers)
+    assert any("daily_burn_in_archive_secret_blocker_count=1" in blocker for blocker in blockers)
+    assert any("daily_burn_in_step_tail_missing_scrub_flags=2" in warning for warning in warnings)
+
+
 def test_burn_in_doctor_operations_ignores_legacy_source_yield_without_semantic_fields():
     blockers: list[str] = []
     warnings: list[str] = []
@@ -1233,3 +1344,6 @@ def test_secret_scanner_ignores_natural_language_sk_phrase_but_catches_keys():
     assert common.secret_hits_in_text('"no_api_keys_in_tests": true') == []
     assert common.secret_hits_in_text('{"api_key":"should-not-archive"}') == ["api_key"]
     assert common.secret_hits_in_text("token sk-ABC1234567890defghijk") == ["sk-ABC1234567890defghijk"]
+    details = list(common.classify_secret_hits_in_text("token configured: no (redacted)\napi_key=actual-secret-value-1234567890"))
+    assert any(detail["status"] == "allowed_status" for detail in details)
+    assert any(detail["status"] == "blocker" for detail in details)

@@ -797,6 +797,14 @@ def _write_run_artifacts(
 def _normalize_step_row(row: Mapping[str, Any]) -> dict[str, Any]:
     out = dict(row)
     status = str(out.get("status") or "").strip()
+    stdout_tail, stdout_redactions = common.scrub_operator_text(str(out.get("stdout_tail") or ""))
+    stderr_tail, stderr_redactions = common.scrub_operator_text(str(out.get("stderr_tail") or ""))
+    out["stdout_tail"] = stdout_tail
+    out["stderr_tail"] = stderr_tail
+    out["stdout_tail_scrubbed"] = True
+    out["stderr_tail_scrubbed"] = True
+    out["stdout_tail_redaction_count"] = int(out.get("stdout_tail_redaction_count") or 0) + stdout_redactions
+    out["stderr_tail_redaction_count"] = int(out.get("stderr_tail_redaction_count") or 0) + stderr_redactions
     if out.get("required") is None:
         out["required"] = False
     if status == "skipped" and not out.get("skip_reason"):
@@ -962,6 +970,8 @@ def _write_step_doctor_status(*, context: Any, row: Mapping[str, Any], doctor_mo
     if doctor_mode != "scoped_burn_in":
         return
     if row.get("status") == "timeout":
+        stdout_tail, stdout_redactions = common.scrub_operator_text(str(row.get("stdout_tail") or ""))
+        stderr_tail, stderr_redactions = common.scrub_operator_text(str(row.get("stderr_tail") or ""))
         payload = common.with_safety(
             {
                 "schema_version": "event_alpha_daily_burn_in_doctor_status_v1",
@@ -975,8 +985,12 @@ def _write_step_doctor_status(*, context: Any, row: Mapping[str, Any], doctor_mo
                 "timeout_seconds": row.get("timeout_seconds"),
                 "blockers": ["scoped_doctor_timeout"],
                 "warnings": [],
-                "stdout_tail": row.get("stdout_tail") or "",
-                "stderr_tail": row.get("stderr_tail") or "",
+                "stdout_tail": stdout_tail,
+                "stderr_tail": stderr_tail,
+                "stdout_tail_scrubbed": True,
+                "stderr_tail_scrubbed": True,
+                "stdout_tail_redaction_count": stdout_redactions,
+                "stderr_tail_redaction_count": stderr_redactions,
                 "scoped_to_current_namespace": True,
             }
         )
@@ -1232,6 +1246,10 @@ def _candidate_mode_counts(context: Any, provider_status: Mapping[str, Mapping[s
         "request_ledgers": sorted(existing_ledgers),
         "source_artifacts": source_artifacts,
         "candidate_artifacts": candidate_artifacts,
+        "research_cards_written": len([path for path in context.research_cards_dir.glob("*.md") if path.name != "index.md"]) if context.research_cards_dir.exists() else 0,
+        "source_coverage_marker_written": bool((context.namespace_dir / "event_alpha_source_coverage.json").exists() or (context.namespace_dir / "event_alpha_source_coverage.md").exists()),
+        "readiness_marker_written": bool((context.namespace_dir / "event_live_provider_activation_readiness.json").exists() or (context.namespace_dir / "event_live_provider_activation_readiness.md").exists()),
+        "notification_preview_marker_written": bool((context.namespace_dir / "event_alpha_notification_preview.md").exists()),
         "review_inbox_path": common.rel_path(context.namespace_dir / "event_alpha_daily_review_inbox.json") if (context.namespace_dir / "event_alpha_daily_review_inbox.json").exists() else "",
         "scorecard_path": common.rel_path(context.namespace_dir / "event_alpha_burn_in_scorecard.json") if (context.namespace_dir / "event_alpha_burn_in_scorecard.json").exists() else "",
         "providers_with_candidates": sorted(
@@ -1364,7 +1382,8 @@ def _ledger_row(payload: Mapping[str, Any]) -> dict[str, Any]:
     started_at = payload.get("generated_at")
     return {
         "schema_version": "event_alpha_daily_burn_in_ledger_v1",
-        "row_type": "daily_burn_in",
+        "row_type": "event_alpha_run",
+        "daily_burn_in_row_type": "daily_burn_in",
         "run_id": str(payload.get("run_id") or f"{started_at}|daily_burn_in|{payload.get('artifact_namespace') or payload.get('profile') or 'unknown'}"),
         "run_mode": "burn_in",
         "profile": payload.get("profile"),
