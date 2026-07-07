@@ -149,6 +149,7 @@ def test_daily_burn_in_readiness_no_key_and_mock_allow_paths(tmp_path, monkeypat
     assert no_key["expected_live_calls_default"] == 0
     assert no_key["can_run_candidate_mode"] is False
     assert no_key["candidate_mode_status"] == "missing_config"
+    assert no_key["candidate_mode_ready_status"] == "blocked_by_missing_config"
     assert "coinalyze" in no_key["missing_config"]
     assert no_key["telegram_sends"] == 0
 
@@ -159,6 +160,7 @@ def test_daily_burn_in_readiness_no_key_and_mock_allow_paths(tmp_path, monkeypat
         base_dir=tmp_path,
     )
     assert blocked["candidate_mode_status"] == "blocked_by_default"
+    assert blocked["candidate_mode_ready_status"] == "config_ready_no_live"
     assert blocked["can_run_candidate_mode"] is False
 
     monkeypatch.setenv("RSI_EVENT_ALPHA_COINALYZE_ALLOW_LIVE_PREFLIGHT", "1")
@@ -170,6 +172,7 @@ def test_daily_burn_in_readiness_no_key_and_mock_allow_paths(tmp_path, monkeypat
         base_dir=tmp_path,
     )
     assert ready["candidate_mode_status"] == "ready_for_mocked_candidate_mode"
+    assert ready["candidate_mode_ready_status"] == "ready_for_bounded_no_send_rehearsal"
     assert ready["can_run_candidate_mode"] is True
     assert ready["expected_live_calls_default"] == 0
     assert ready["telegram_sends"] == 0
@@ -235,6 +238,12 @@ def test_daily_burn_in_candidate_mode_mocked_live_candidate_counts_with_ledger(t
     assert rows[0]["normal_rsi_signal_rows_written"] == 0
     assert rows[0]["triggered_fade_created"] == 0
     assert manifest["contract_counted_candidate_count"] == 1
+    guardrails = {row["provider"]: row for row in payload["live_provider_guardrails"]}
+    assert guardrails["coinalyze"]["no_send"] is True
+    assert guardrails["coinalyze"]["allow_flag_set"] is True
+    assert guardrails["coinalyze"]["request_ledger_present"] is True
+    assert guardrails["coinalyze"]["requests_used"] == 1
+    assert "## Live Provider Guardrails" in (namespace_dir / daily_burn_in.RUN_MD).read_text(encoding="utf-8")
     score = scorecard.build_scorecard(
         profile="live_burn_in_no_send",
         artifact_namespace="live_burn_in_20260705",
@@ -286,6 +295,7 @@ def test_daily_burn_in_candidate_mode_fixture_smoke_produces_lanes_without_contr
     inbox = common.read_json(ns / review_inbox.INBOX_JSON)
     inbox_md = (ns / review_inbox.INBOX_MD).read_text(encoding="utf-8")
     cards = sorted((ns / "research_cards").glob("*.md"))
+    rows_by_symbol = {row["symbol"]: row for row in rows}
     assert payload["status"] == "passed"
     assert manifest["status"] == "completed_fixture_candidates_only"
     assert manifest["fixture_candidate_count"] >= 5
@@ -295,6 +305,17 @@ def test_daily_burn_in_candidate_mode_fixture_smoke_produces_lanes_without_contr
     assert score["contract_counted_candidate_count"] == 0
     assert score["enough_data"] is False
     assert cards
+    assert rows_by_symbol["TESTFADE"]["card_path"]
+    assert rows_by_symbol["TESTPERP"]["card_path"]
+    fade_card = (tmp_path / rows_by_symbol["TESTFADE"]["card_path"]).read_text(encoding="utf-8")
+    perp_card = (tmp_path / rows_by_symbol["TESTPERP"]["card_path"]).read_text(encoding="utf-8")
+    assert "FADE_SHORT_REVIEW" in fade_card
+    assert "Derivatives crowding class: extreme" in fade_card
+    assert "Research-only / unvalidated. Not a trade signal." in fade_card
+    assert "CONFIRMED_LONG_RESEARCH" in perp_card
+    assert "Market confirmation: breakout_confirmed" in perp_card
+    assert "Research-only / unvalidated. Not a trade signal." in perp_card
+    assert all(row.get("card_path") or row.get("card_not_available_reason") for row in inbox["items"])
     assert all(row.get("card_path") and row.get("card_path") != "none" for row in inbox["items"] if row.get("candidate_provenance") == "core_opportunity")
     assert all(row.get("feedback_target") for row in inbox["items"])
     assert "## Contract-Counted Burn-In Candidates" in inbox_md

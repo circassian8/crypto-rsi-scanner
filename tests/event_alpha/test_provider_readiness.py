@@ -5338,7 +5338,7 @@ def test_event_alpha_bybit_announcements_preflight_fixture_and_default_no_networ
             assert report.live_call_allowed is False
             assert report.fixture_parser_status == "pass"
             assert report.fixture_rows_observed >= 1
-            assert rehearsal.status == "live_call_blocked_by_default"
+            assert rehearsal.status == "skipped_live_calls_disabled"
             assert rehearsal.requests_used == 0
             assert rehearsal.telegram_sends == 0
             assert rehearsal.trades_created == 0

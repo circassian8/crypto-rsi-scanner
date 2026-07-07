@@ -16,6 +16,7 @@ from typing import Any, Mapping
 from ... import config
 from . import common
 from .daily_burn_in_doctor import SCOPED_DOCTOR_JSON
+from .daily_burn_in_guardrails import format_live_provider_guardrails_markdown, live_provider_guardrails
 from .daily_burn_in_readiness import READINESS_JSON
 
 
@@ -25,7 +26,6 @@ CANDIDATE_MODE_MANIFEST_JSON = "event_alpha_candidate_mode_manifest.json"
 COINALYZE_REQUEST_LEDGER = "event_coinalyze_request_ledger.jsonl"
 BYBIT_REQUEST_LEDGER = "event_bybit_announcements_request_ledger.jsonl"
 _TRUTHY = {"1", "true", "yes", "on"}
-
 
 @dataclass(frozen=True)
 class BurnInStep:
@@ -612,6 +612,7 @@ def format_daily_burn_in_report(payload: Mapping[str, Any]) -> str:
         lines.append(f"- skipped_missing_config: `{', '.join(payload.get('skipped_missing_config') or []) or 'none'}`")
         lines.append(f"- skipped_live_calls_disabled: `{', '.join(payload.get('skipped_live_calls_disabled') or []) or 'none'}`")
         lines.append(f"- next_steps: `{'; '.join(payload.get('next_steps') or []) or 'none'}`")
+    lines.extend(format_live_provider_guardrails_markdown(payload.get("live_provider_guardrails") or []))
     return "\n".join(lines).rstrip()
 
 
@@ -766,6 +767,7 @@ def _write_run_artifacts(
             "live_provider_calls_allowed": live_allowed,
             "candidate_mode_manifest_path": common.rel_path(context.namespace_dir / CANDIDATE_MODE_MANIFEST_JSON) if candidate_mode else "",
             "provider_activation_status": provider_status,
+            "live_provider_guardrails": live_provider_guardrails(context, provider_status),
             "skipped_missing_config": _providers_with_status(provider_status, "skipped_missing_config"),
             "skipped_live_calls_disabled": _providers_with_status(provider_status, "skipped_live_calls_disabled", "live_call_blocked_by_default"),
             "next_steps": _candidate_mode_next_steps(provider_status) if candidate_mode else [],

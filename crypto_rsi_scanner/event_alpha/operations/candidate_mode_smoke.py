@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from . import common
 
@@ -32,8 +32,8 @@ def write_candidate_mode_fixture_artifacts(
         row["artifact_namespace"] = artifact_namespace
         row["run_id"] = run_id
         row["run_mode"] = "fixture"
-    _write_jsonl(context.namespace_dir / "event_integrated_radar_candidates.jsonl", candidates)
     card_rows = _write_research_cards(context=context, candidates=candidates, generated=generated, profile=profile, artifact_namespace=artifact_namespace, run_id=run_id)
+    _write_jsonl(context.namespace_dir / "event_integrated_radar_candidates.jsonl", candidates)
     _write_jsonl(
         context.namespace_dir / "event_core_opportunities.jsonl",
         [
@@ -215,15 +215,44 @@ def _write_research_cards(
             f"- Feedback command watch: make event-feedback-watch PROFILE={profile} FEEDBACK_TARGET='{feedback_target}'",
             f"- Cluster ID: {row['symbol'].lower()}:candidate-mode-fixture",
         ]
+        lines.extend(_card_evidence_lines(row))
         common.write_text(path, "\n".join(lines))
         grouped_links["Unconfirmed Research Cards"].append(f"- [{filename}]({filename})")
         card_rows.append({"core_opportunity_id": core_id, "card_path": rel, "feedback_target": feedback_target})
+        row["core_opportunity_id"] = core_id
+        row["card_path"] = rel
+        row["research_card_path"] = rel
+        row["feedback_target"] = feedback_target
+        row["feedback_target_type"] = "core_opportunity_id"
     for group, links in grouped_links.items():
         index_lines.extend([f"## {group}", ""])
         index_lines.extend(links or ["- none"])
         index_lines.append("")
     common.write_text(cards_dir / "index.md", "\n".join(index_lines))
     return card_rows
+
+
+def _card_evidence_lines(row: Mapping[str, Any]) -> list[str]:
+    lines = ["", "## Candidate Evidence", ""]
+    market_state = str(row.get("market_state_class") or "")
+    crowding_class = str(row.get("crowding_class") or "")
+    lane = str(row.get("opportunity_type") or "")
+    if market_state:
+        lines.append(f"- Market confirmation: {market_state}")
+    if crowding_class:
+        lines.append(f"- Derivatives crowding class: {crowding_class}")
+    if lane == "FADE_SHORT_REVIEW":
+        lines.extend(
+            [
+                "- Fade review evidence: completed move with derivatives crowding evidence.",
+                "- Route: research review only; this does not create TRIGGERED_FADE.",
+            ]
+        )
+    if lane == "CONFIRMED_LONG_RESEARCH":
+        lines.append("- Market confirmation: official/market fixture confirmation is present.")
+        if crowding_class:
+            lines.append("- Crowding warning: derivatives crowding evidence should be reviewed before any interpretation.")
+    return lines
 
 
 def _write_support_artifacts(*, context: Any, generated: str, profile: str, artifact_namespace: str) -> None:

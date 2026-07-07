@@ -944,7 +944,8 @@ def test_source_yield_candidate_mode_missing_config_is_activation_not_yield_fail
     assert payload["real_candidate_rows"] == 0
     assert payload["providers"]["coinalyze"]["activation_status"] == "skipped_missing_config"
     assert payload["providers"]["coinalyze"]["candidate_count"] == 0
-    assert payload["providers"]["coinalyze"]["recommended_action"] == "activate_next_missing_config"
+    assert payload["providers"]["coinalyze"]["recommended_action"] == "activate_next/missing_config"
+    assert payload["providers"]["coinalyze"]["candidate_production_status"] == "missing_config"
     assert payload["providers"]["coinalyze"]["source_yield_confidence"] == "activation_pending"
 
 

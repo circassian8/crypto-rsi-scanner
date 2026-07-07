@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-07 — Prepare provider-backed burn-in candidate path · Codex
+**Why:** Candidate-mode burn-in needed a complete operator path before real
+provider-backed no-send candidates are enabled: selected smoke candidates needed
+cards, provider skips needed clearer readiness/yield semantics, and live-capable
+daily runs needed explicit guardrails around ledgers, budgets, allow flags, and
+no-send status.
+**Changes:**
+- Candidate-mode fixture smoke now writes core-backed research cards for
+  selected `TESTFADE` / `TESTPERP` items and stores relative card paths,
+  feedback targets, and explicit fallback reasons for review-inbox rows without
+  cards.
+- Daily burn-in readiness now exposes `candidate_mode_ready_status`,
+  configured/missing provider details, allow-flag and ledger checks, and safe
+  next commands without making live calls.
+- Daily candidate-mode runs now persist a Live Provider Guardrails section with
+  per-provider request budgets, ledger paths, allow status, requests used, rows
+  written, no-send state, and provider health.
+- Source-yield and Bybit no-live defaults now distinguish missing config and
+  config-ready/no-live states from true provider yield failures.
+**Verify:** `python3 tests/test_indicators.py` (`774/774`),
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (`840 passed`), compileall, daily
+burn-in smoke, candidate-mode smoke + strict smoke doctor, daily readiness,
+candidate-mode no-send run (`passed_no_candidates`), burn-in scorecard, review
+inbox, source-yield, archive dry-run (`secret_hit_count=0`), Coinalyze
+preflight/rehearsal safe paths, official exchange smoke, integrated radar
+smoke/doctor, notification format smoke, Telegram no-send final check, strict
+doctor for `live_burn_in_20260707`, and `make verify PYTHON=python3`.
+**Notes/risks:** Coinalyze and Bybit remain no-live by default; the current live
+candidate-mode namespace has zero contract-counted candidates because required
+config/allow flags are absent. No live sends, trades, paper trades, normal RSI
+rows, or Event Alpha-created `TRIGGERED_FADE` were produced.
+
 ## 2026-07-07 — Harden burn-in candidate artifact hygiene · Codex
 **Why:** Candidate-mode burn-in artifacts needed to be safe for unattended
 archive and doctor review: safe missing/redacted credential text was being

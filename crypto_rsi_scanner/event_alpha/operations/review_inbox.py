@@ -64,6 +64,7 @@ class ReviewItem:
     what_confirms: str
     what_invalidates: str
     card_path: str
+    card_not_available_reason: str
     feedback_target: str
     suggested_feedback_commands: tuple[str, ...]
     candidate_record_type: str
@@ -262,6 +263,7 @@ def _append_review_item_lines(lines: list[str], index: int, row: Mapping[str, An
             f"- what_confirms: {row.get('what_confirms')}",
             f"- what_invalidates: {row.get('what_invalidates')}",
             f"- card_path: `{row.get('card_path') or 'none'}`",
+            f"- card_not_available_reason: `{row.get('card_not_available_reason') or 'none'}`",
             f"- feedback_target: `{row.get('feedback_target')}`",
             "- suggested_feedback_commands:",
         ]
@@ -453,6 +455,7 @@ def _item_from_group(
     confirms = str(best.get("what_confirms") or best.get("confirm_if") or _default_confirm(opportunity_type))
     invalidates = str(best.get("what_invalidates") or best.get("invalidate_if") or _default_invalidate(opportunity_type))
     card_path = common.rel_path(card) if card else ""
+    card_not_available_reason = "" if card_path else _card_not_available_reason(best)
     value_score, value_reasons, downrank_reasons, bucket = _review_value(best, opportunity_type, score, source_origin, source_pack, evidence_status, market_state, why, has_card=bool(card_path))
     primary_key = _primary_visible_family_key(best)
     secondary_key = _secondary_visible_family_key(best, opportunity_type, bucket)
@@ -483,6 +486,7 @@ def _item_from_group(
         what_confirms=confirms,
         what_invalidates=invalidates,
         card_path=card_path,
+        card_not_available_reason=card_not_available_reason,
         feedback_target=target,
         suggested_feedback_commands=_feedback_commands(profile, target),
         candidate_record_type=str(best.get("candidate_record_type") or "candidate"),
@@ -529,6 +533,20 @@ def _card_for(row: Mapping[str, Any], target: str, card_index: Mapping[str, Path
         path = Path(str(raw)).expanduser()
         return path
     return None
+
+
+def _card_not_available_reason(row: Mapping[str, Any]) -> str:
+    if row.get("preflight_only") is True:
+        return "preflight_rows_do_not_generate_research_cards"
+    if row.get("diagnostic_only") is True or common.row_lane(row).upper() == "DIAGNOSTIC":
+        return "diagnostic_rows_do_not_generate_research_cards"
+    if str(row.get("candidate_record_type") or "") in {"market_anomaly", "fade_review_candidate"}:
+        return "source_candidate_has_no_core_card"
+    if str(row.get("candidate_provenance") or "") in {"market_anomaly", "fade_review_candidate"}:
+        return "source_candidate_has_no_core_card"
+    if not (row.get("core_opportunity_id") or row.get("candidate_id") or row.get("feedback_target")):
+        return "missing_card_identity"
+    return "card_artifact_not_found"
 
 
 def _why_not_alertable(row: Mapping[str, Any], lane: str) -> str:
@@ -912,6 +930,7 @@ def _legacy_review_item_for_value(
         what_confirms="",
         what_invalidates="",
         card_path="",
+        card_not_available_reason="no_candidate_card_artifact",
         feedback_target="",
         suggested_feedback_commands=(),
         candidate_record_type="candidate",

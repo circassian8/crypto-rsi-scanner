@@ -383,8 +383,12 @@ def _merge_activation_rows(provider_rows: dict[str, dict[str, Any]], manifests: 
 def _candidate_production_status(row: Mapping[str, Any], activation_status: str) -> str:
     if common.int_value(row.get("candidate_count")) > 0:
         return "produced_candidates"
-    if activation_status in {"skipped_missing_config", "skipped_live_calls_disabled", "live_call_blocked_by_default", "request_budget_not_small"}:
-        return activation_status
+    if activation_status == "skipped_missing_config":
+        return "missing_config"
+    if activation_status in {"skipped_live_calls_disabled", "live_call_blocked_by_default"}:
+        return "config_ready_no_live"
+    if activation_status == "request_budget_not_small":
+        return "request_budget_not_small"
     return "active_burn_in_candidate_mode_no_candidates"
 
 
@@ -398,9 +402,9 @@ def _activation_confidence(row: Mapping[str, Any], activation_status: str) -> st
 
 def _activation_recommendation(activation_status: str) -> str:
     if activation_status == "skipped_missing_config":
-        return "activate_next_missing_config"
+        return "activate_next/missing_config"
     if activation_status in {"skipped_live_calls_disabled", "live_call_blocked_by_default"}:
-        return "activate_next_allow_flag_required"
+        return "config_ready_no_live"
     if activation_status == "request_budget_not_small":
         return "set_small_request_budget"
     if activation_status == "ready_live_no_send":

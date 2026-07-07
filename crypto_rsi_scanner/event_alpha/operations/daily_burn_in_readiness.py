@@ -28,12 +28,15 @@ def build_readiness_report(
     allow_flags = {key: bool(row.get("allow_flag_set")) for key, row in provider_status.items()}
     live_allowed = sorted(key for key, row in provider_status.items() if row.get("live_call_allowed"))
     request_ledgers_writable = _request_ledgers_writable(context, provider_status)
-    if live_allowed and all(request_ledgers_writable.values()):
-        candidate_status = "ready_for_mocked_candidate_mode" if daily_burn_in._env_truthy("RSI_EVENT_ALPHA_DAILY_BURN_IN_MOCK_PROVIDER_FIXTURES") else "ready_for_guarded_candidate_mode"
-    elif missing:
-        candidate_status = "missing_config"
-    else:
-        candidate_status = "blocked_by_default"
+    doctor_status = daily_burn_in._doctor_status_payload(context).get("status") or "not_run"
+    ready_status = _candidate_mode_ready_status(
+        provider_status=provider_status,
+        missing=missing,
+        live_allowed=live_allowed,
+        request_ledgers_writable=request_ledgers_writable,
+        doctor_status=str(doctor_status),
+    )
+    candidate_status = _legacy_candidate_status(ready_status, mocked=daily_burn_in._env_truthy("RSI_EVENT_ALPHA_DAILY_BURN_IN_MOCK_PROVIDER_FIXTURES"))
     payload = common.with_safety(
         {
             "schema_version": "event_alpha_daily_burn_in_readiness_v1",
@@ -43,8 +46,9 @@ def build_readiness_report(
             "artifact_namespace": namespace,
             "namespace_dir": common.rel_path(context.namespace_dir),
             "can_run_default_preflight_mode": True,
-            "can_run_candidate_mode": bool(live_allowed and all(request_ledgers_writable.values())),
+            "can_run_candidate_mode": ready_status == "ready_for_bounded_no_send_rehearsal",
             "candidate_mode_status": candidate_status,
+            "candidate_mode_ready_status": ready_status,
             "configured_providers": configured,
             "missing_config": missing,
             "allow_flags_set": allow_flags,
@@ -53,9 +57,9 @@ def build_readiness_report(
             "expected_live_calls_candidate_mode": {key: int(row.get("request_budget") or 0) for key, row in provider_status.items() if row.get("live_call_allowed")},
             "no_send_guard_status": "enabled_no_send",
             "telegram_send_guard_status": "disabled_by_RSI_EVENT_ALERTS_ENABLED_0",
-            "artifact_doctor_recent_status": daily_burn_in._doctor_status_payload(context).get("status") or "not_run",
+            "artifact_doctor_recent_status": doctor_status,
             "provider_activation_status": provider_status,
-            "next_safe_command": _readiness_next_command(candidate_status),
+            "next_safe_command": _readiness_next_command(ready_status),
             "next_steps": daily_burn_in._candidate_mode_next_steps(provider_status),
         }
     )
@@ -73,8 +77,11 @@ def format_readiness_report(payload: Mapping[str, Any]) -> str:
         f"- can_run_default_preflight_mode: `{payload.get('can_run_default_preflight_mode')}`",
         f"- can_run_candidate_mode: `{payload.get('can_run_candidate_mode')}`",
         f"- candidate_mode_status: `{payload.get('candidate_mode_status')}`",
+        f"- candidate_mode_ready_status: `{payload.get('candidate_mode_ready_status')}`",
         f"- configured_providers: `{', '.join(payload.get('configured_providers') or []) or 'none'}`",
         f"- missing_config: `{', '.join(payload.get('missing_config') or []) or 'none'}`",
+        f"- allow_flags_set: `{payload.get('allow_flags_set')}`",
+        f"- request_ledgers_writable: `{payload.get('request_ledgers_writable')}`",
         f"- expected_live_calls_default: `{payload.get('expected_live_calls_default')}`",
         f"- expected_live_calls_candidate_mode: `{payload.get('expected_live_calls_candidate_mode')}`",
         f"- no_send_guard_status: `{payload.get('no_send_guard_status')}`",
@@ -99,9 +106,41 @@ def _request_ledgers_writable(context: Any, provider_status: Mapping[str, Mappin
     return result
 
 
+def _candidate_mode_ready_status(
+    *,
+    provider_status: Mapping[str, Mapping[str, Any]],
+    missing: list[str],
+    live_allowed: list[str],
+    request_ledgers_writable: Mapping[str, bool],
+    doctor_status: str,
+) -> str:
+    if doctor_status in {"blocked", "failed", "strict_blockers"}:
+        return "blocked_by_doctor"
+    if missing:
+        return "blocked_by_missing_config"
+    if not provider_status:
+        return "no_candidate_providers_configured"
+    if live_allowed and all(request_ledgers_writable.get(key) for key in live_allowed):
+        return "ready_for_bounded_no_send_rehearsal"
+    configured_without_live = [key for key, row in provider_status.items() if row.get("configured") and not row.get("live_call_allowed")]
+    if configured_without_live:
+        return "config_ready_no_live"
+    return "no_candidate_providers_configured"
+
+
+def _legacy_candidate_status(status: str, *, mocked: bool) -> str:
+    if status == "ready_for_bounded_no_send_rehearsal":
+        return "ready_for_mocked_candidate_mode" if mocked else "ready_for_guarded_candidate_mode"
+    if status == "blocked_by_missing_config":
+        return "missing_config"
+    if status == "config_ready_no_live":
+        return "blocked_by_default"
+    return status
+
+
 def _readiness_next_command(status: str) -> str:
-    if status == "ready_for_mocked_candidate_mode":
-        return "make event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke PYTHON=python3"
-    if status == "ready_for_guarded_candidate_mode":
+    if status == "ready_for_bounded_no_send_rehearsal":
         return "make event-alpha-daily-live-no-send-burn-in CANDIDATE_MODE=1 PYTHON=python3"
+    if status == "blocked_by_missing_config":
+        return "make event-alpha-daily-burn-in-readiness PYTHON=python3"
     return "make event-alpha-daily-live-no-send-burn-in-plan CANDIDATE_MODE=1 PYTHON=python3"

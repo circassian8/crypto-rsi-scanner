@@ -282,7 +282,7 @@ def run_no_send_rehearsal(
     candidates_path = base / event_official_exchange.OFFICIAL_LISTING_CANDIDATES_FILENAME
     official_report_path = base / event_official_exchange.OFFICIAL_EXCHANGE_REPORT_FILENAME
     warnings: list[str] = []
-    status = "live_call_blocked_by_default"
+    status = "skipped_live_calls_disabled"
     error_class: str | None = None
     error_message_safe: str | None = None
     items: tuple[Mapping[str, Any], ...] = ()
@@ -293,7 +293,7 @@ def run_no_send_rehearsal(
     limit = _limit()
 
     if not allow_live:
-        status = "live_call_blocked_by_default"
+        status = "skipped_live_calls_disabled"
     elif not no_send_rehearsal:
         status = "live_call_blocked_no_send_missing"
     elif max_pages <= 0 or max_pages > 3 or limit <= 0 or limit > 50:
@@ -541,7 +541,7 @@ def format_rehearsal_report(report: BybitAnnouncementsRehearsalReport) -> str:
     if report.warnings:
         lines.extend(["", "Warnings:"])
         lines.extend(f"- {warning}" for warning in report.warnings)
-    if report.status == "live_call_blocked_by_default":
+    if report.status == "skipped_live_calls_disabled":
         lines.append(f"next_step: rerun only with --event-alpha-bybit-announcements-allow-live-preflight or {ENV_ALLOW_LIVE_PREFLIGHT}=1 after review")
     elif report.status == "blocked_request_budget":
         lines.append(f"next_step: keep {ENV_PREFLIGHT_MAX_PAGES} <= 3 and {ENV_PREFLIGHT_LIMIT} <= 50")
