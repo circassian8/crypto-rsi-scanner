@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-07 — Harden candidate-mode burn-in daily operations · Codex
+**Why:** Candidate-mode daily no-send burn-in could produce useful partial
+artifacts but still stall in artifact-heavy namespaces when it reached the broad
+artifact doctor. The operator needed bounded scoped validation, final status
+artifacts, and a deterministic candidate-producing smoke path without enabling
+live providers by default.
+**Changes:**
+- Added scoped daily-burn-in doctor/readiness helpers, bounded doctor mode
+  plumbing, final/partial run status writing, richer per-step telemetry, and
+  explicit terminal statuses for skipped providers, no-candidate runs,
+  non-required timeouts, required failures, and interrupts.
+- Added a fixture-only candidate-mode smoke that writes all major radar lanes,
+  integrated/core artifacts, scorecard evidence scope, and review-inbox
+  diagnostic sections while keeping every candidate out of burn-in contract
+  counts.
+- Expanded candidate-mode manifest v2 accounting, schema metadata, review inbox
+  grouping, scorecard/evidence semantics, Make targets, and architecture size
+  gate exceptions for the now-bounded burn-in orchestrator.
+**Verify:** focused burn-in/schema tests (56 passed), architecture size gates,
+standalone runner (774/774 passed), safe pytest sweep (836 passed), compileall,
+daily burn-in plan/readiness/candidate-mode smoke/candidate-mode no-send run,
+strict live burn-in doctor, burn-in scorecard/review inbox/feedback/weekly
+measurement/source-yield/archive dry-run, Coinalyze preflight/rehearsal safe
+paths, official exchange smoke, integrated radar smoke/doctor, notification
+format smoke, Telegram no-send final check, live-provider readiness smoke,
+source coverage/daily brief/notify preview from artifacts, and
+`make verify PYTHON=python3`.
+**Notes/risks:** Candidate mode remains no-call by default. Missing Coinalyze
+credentials and absent Bybit allow flags are explicit skips, not failures; no
+live sends, trades, paper trades, normal RSI rows, or Event Alpha-created
+`TRIGGERED_FADE` are produced.
+
 ## 2026-07-07 — Add explicit burn-in candidate mode · Codex
 **Why:** Daily live no-send burn-in needed a deliberate candidate-producing mode
 so normal preflight/safety runs do not get confused with contract-counted burn-in

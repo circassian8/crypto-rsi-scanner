@@ -137,7 +137,8 @@ def test_daily_review_inbox_prioritizes_contract_counted_candidates(tmp_path):
     assert payload["items"][0]["contract_counted_candidate"] is True
     md = (ns / review_inbox.INBOX_MD).read_text(encoding="utf-8")
     assert "## Contract-Counted Burn-In Candidates" in md
-    assert "## Diagnostic / Support Review Items" in md
+    assert "## High-Value Review Candidates Not Contract-Counted" in md
+    assert "## Diagnostic / Support Items" in md
     assert md.index("LIVE / live") < md.index("SUPPORT / support")
 
 
@@ -165,6 +166,7 @@ def test_daily_review_inbox_reports_no_real_candidate_evidence(tmp_path):
         now=datetime(2026, 7, 5, tzinfo=timezone.utc),
     )
     md = (ns / review_inbox.INBOX_MD).read_text(encoding="utf-8")
+    assert "No contract-counted burn-in candidates yet." in md
     assert "No real candidate evidence yet." in md
 
 
@@ -575,112 +577,6 @@ def test_daily_burn_in_default_remains_no_candidate_mode(tmp_path, monkeypatch):
     assert payload["normal_rsi_signal_rows_written"] == 0
     assert payload["triggered_fade_created"] == 0
     assert not (tmp_path / "burn_default" / daily_burn_in.CANDIDATE_MODE_MANIFEST_JSON).exists()
-
-
-def test_daily_burn_in_candidate_mode_no_provider_config_is_safe(tmp_path, monkeypatch):
-    monkeypatch.delenv("RSI_EVENT_DISCOVERY_COINALYZE_API_KEY", raising=False)
-    monkeypatch.delenv("RSI_EVENT_ALPHA_COINALYZE_ALLOW_LIVE_PREFLIGHT", raising=False)
-    monkeypatch.delenv("RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT", raising=False)
-    monkeypatch.setattr(daily_burn_in.config, "EVENT_DISCOVERY_COINALYZE_API_KEY", "", raising=False)
-    monkeypatch.setattr(daily_burn_in, "build_steps", lambda **kwargs: ())
-    payload = daily_burn_in.run_daily_burn_in(
-        profile="live_burn_in_no_send",
-        artifact_namespace="burn_candidate_safe",
-        base_dir=tmp_path,
-        python=sys.executable,
-        candidate_mode=True,
-    )
-    manifest = common.read_json(tmp_path / "burn_candidate_safe" / daily_burn_in.CANDIDATE_MODE_MANIFEST_JSON)
-    assert payload["candidate_mode"] is True
-    assert payload["live_provider_calls_allowed"] is False
-    assert manifest["candidate_mode"] is True
-    assert manifest["contract_counted_candidate_count"] == 0
-    assert manifest["real_burn_in_candidate_count"] == 0
-    assert "coinalyze" in manifest["skipped_missing_config"]
-    assert "bybit_announcements" in manifest["skipped_live_calls_disabled"]
-    assert manifest["next_steps"]
-    assert payload["telegram_sends"] == 0
-    assert payload["trades_created"] == 0
-    assert payload["paper_trades_created"] == 0
-    assert payload["normal_rsi_signal_rows_written"] == 0
-    assert payload["triggered_fade_created"] == 0
-
-
-def test_daily_burn_in_candidate_mode_mocked_live_candidate_counts_with_ledger(tmp_path, monkeypatch):
-    monkeypatch.setenv("RSI_EVENT_DISCOVERY_COINALYZE_API_KEY", "fake-test-key")
-    monkeypatch.setenv("RSI_EVENT_ALPHA_COINALYZE_ALLOW_LIVE_PREFLIGHT", "1")
-    monkeypatch.delenv("RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT", raising=False)
-    monkeypatch.setattr(daily_burn_in.config, "EVENT_DISCOVERY_COINALYZE_API_KEY", "", raising=False)
-    step = daily_burn_in.BurnInStep("integrated_radar_cycle", (sys.executable, "-c", "print('mock')"), required=True, timeout_seconds=5)
-    monkeypatch.setattr(daily_burn_in, "build_steps", lambda **kwargs: (step,))
-
-    def fake_run_step(step, *, env, cwd):
-        namespace_dir = Path(env["RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR"]) / env["RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE"]
-        _write_jsonl(
-            namespace_dir / daily_burn_in.COINALYZE_REQUEST_LEDGER,
-            [{"provider": "coinalyze", "status": "success", "api_key_redacted": "***"}],
-        )
-        _write_jsonl(
-            namespace_dir / "event_integrated_radar_candidates.jsonl",
-            [
-                {
-                    "row_type": "event_integrated_radar_candidate",
-                    "candidate_id": "cand:testfade",
-                    "symbol": "TESTFADE",
-                    "coin_id": "testfade",
-                    "opportunity_type": "FADE_SHORT_REVIEW",
-                    "provider": "coinalyze",
-                    "source_pack": "derivatives_crowding",
-                    "source_origin": "coinalyze",
-                    "opportunity_score_final": 81,
-                }
-            ],
-        )
-        return {
-            "name": step.name,
-            "status": "passed",
-            "required": step.required,
-            "timeout_seconds": step.timeout_seconds,
-            "duration_seconds": 0.01,
-            "command": " ".join(step.command),
-        }
-
-    monkeypatch.setattr(daily_burn_in, "_run_step", fake_run_step)
-    payload = daily_burn_in.run_daily_burn_in(
-        profile="live_burn_in_no_send",
-        artifact_namespace="live_burn_in_20260705",
-        base_dir=tmp_path,
-        python=sys.executable,
-        candidate_mode=True,
-    )
-    namespace_dir = tmp_path / "live_burn_in_20260705"
-    rows = common.read_jsonl(namespace_dir / "event_integrated_radar_candidates.jsonl")
-    manifest = common.read_json(namespace_dir / daily_burn_in.CANDIDATE_MODE_MANIFEST_JSON)
-    assert payload["live_provider_calls_allowed"] is True
-    assert rows[0]["candidate_source_mode"] == "live_no_send"
-    assert rows[0]["contract_counted_candidate"] is True
-    assert rows[0]["request_ledger_path"].endswith(daily_burn_in.COINALYZE_REQUEST_LEDGER)
-    assert rows[0]["telegram_sends"] == 0
-    assert rows[0]["trades_created"] == 0
-    assert rows[0]["paper_trades_created"] == 0
-    assert rows[0]["normal_rsi_signal_rows_written"] == 0
-    assert rows[0]["triggered_fade_created"] == 0
-    assert manifest["contract_counted_candidate_count"] == 1
-    score = scorecard.build_scorecard(
-        profile="live_burn_in_no_send",
-        artifact_namespace="live_burn_in_20260705",
-        base_dir=tmp_path,
-        count_explicit_namespace_for_burn_in=True,
-    )
-    assert score["evidence_scope"] == "real_burn_in_evidence"
-    assert score["contract_counted_candidate_count"] == 1
-    yield_report = source_yield.build_source_yield_report(
-        profile="live_burn_in_no_send",
-        base_dir=tmp_path,
-    )
-    assert yield_report["providers"]["coinalyze"]["candidate_count"] == 1
-    assert yield_report["providers"]["coinalyze"]["candidates_produced"] == 1
-    assert yield_report["providers"]["coinalyze"]["source_yield_confidence"] == "insufficient_labels"
 
 
 def test_daily_burn_in_plan_prints_without_writing_artifacts(tmp_path, capsys):

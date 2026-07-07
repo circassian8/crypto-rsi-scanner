@@ -169,7 +169,7 @@ def format_review_inbox(payload: Mapping[str, Any]) -> str:
         lines.append("")
     collapsed = payload.get("collapsed_family_summary") or []
     if collapsed:
-        lines.extend(["## Collapsed Symbol Family Summary", ""])
+        lines.extend(["## Collapsed Family Summary", ""])
         for row in collapsed:
             if isinstance(row, Mapping):
                 lines.append(
@@ -179,19 +179,30 @@ def format_review_inbox(payload: Mapping[str, Any]) -> str:
         lines.append("")
     items = [row for row in payload.get("items", []) or [] if isinstance(row, Mapping)]
     contract_items = [row for row in items if row.get("contract_counted_candidate") is True]
-    support_items = [row for row in items if row.get("contract_counted_candidate") is not True]
+    non_contract_items = [row for row in items if row.get("contract_counted_candidate") is not True]
+    high_value_items = [
+        row for row in non_contract_items
+        if _is_high_value_non_contract_item(row)
+    ]
+    support_items = [row for row in non_contract_items if row not in high_value_items]
     lines.extend(["## Review Items", ""])
     lines.extend(["## Contract-Counted Burn-In Candidates", ""])
     if not contract_items:
-        lines.append("- No real candidate evidence yet.")
+        lines.append("- No contract-counted burn-in candidates yet. No real candidate evidence yet.")
         lines.append("")
     for index, row in enumerate(contract_items, start=1):
         _append_review_item_lines(lines, index, row)
-    lines.extend(["## Diagnostic / Support Review Items", ""])
+    lines.extend(["## High-Value Review Candidates Not Contract-Counted", ""])
+    if not high_value_items:
+        lines.append("- No high-value non-contract review candidates selected.")
+        lines.append("")
+    for index, row in enumerate(high_value_items, start=len(contract_items) + 1):
+        _append_review_item_lines(lines, index, row)
+    lines.extend(["## Diagnostic / Support Items", ""])
     if not support_items:
         lines.append("- No diagnostic or support review items selected.")
         lines.append("")
-    for index, row in enumerate(support_items, start=len(contract_items) + 1):
+    for index, row in enumerate(support_items, start=len(contract_items) + len(high_value_items) + 1):
         _append_review_item_lines(lines, index, row)
     lines.extend(
         [
@@ -205,6 +216,16 @@ def format_review_inbox(payload: Mapping[str, Any]) -> str:
         ]
     )
     return "\n".join(lines).rstrip()
+
+
+def _is_high_value_non_contract_item(row: Mapping[str, Any]) -> bool:
+    if row.get("diagnostic_only") is True or row.get("preflight_only") is True:
+        return False
+    if int(row.get("review_value_score") or 0) >= 50:
+        return True
+    codes = {str(item) for item in row.get("review_value_reason_codes") or []}
+    lane = str(row.get("opportunity_type") or "").upper()
+    return bool(codes & HIGH_VALUE_REASON_CODES or lane in {"EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH", "FADE_SHORT_REVIEW", "RISK_ONLY", "UNCONFIRMED_RESEARCH"})
 
 
 def _append_review_item_lines(lines: list[str], index: int, row: Mapping[str, Any]) -> None:

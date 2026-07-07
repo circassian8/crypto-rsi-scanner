@@ -347,6 +347,9 @@ def _evidence_scope(
 ) -> tuple[str, str]:
     if explicit_scope and not contract_countable:
         return "explicit_single_namespace_diagnostic", "explicit namespace is diagnostic unless counted intentionally"
+    fixture_count = int(candidate_evidence.get("fixture_candidates") or 0) + int(candidate_evidence.get("integrated_fixture_rows") or 0)
+    if candidate_evidence.get("candidate_mode_namespaces") and fixture_count and not int(candidate_evidence.get("real_burn_in_candidates") or 0):
+        return "fixture_candidate_mode_smoke", "candidate-mode smoke produced mocked fixture candidates that are not contract-counted"
     if _mixed_non_burn_in_categories(policy):
         return "mixed_explicit_diagnostic", "explicit non-burn-in namespace categories are mixed into the selection"
     return evidence_semantics.evidence_scope_from_summary(

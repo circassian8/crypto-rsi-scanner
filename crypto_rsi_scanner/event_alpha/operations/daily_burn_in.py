@@ -15,6 +15,8 @@ from typing import Any, Mapping
 
 from ... import config
 from . import common
+from .daily_burn_in_doctor import SCOPED_DOCTOR_JSON
+from .daily_burn_in_readiness import READINESS_JSON
 
 
 RUN_JSON = "event_alpha_daily_burn_in_run.json"
@@ -49,21 +51,151 @@ def build_steps(
     integrated_timeout_seconds: float = 180.0,
     report_timeout_seconds: float = 60.0,
     doctor_timeout_seconds: float = 120.0,
+    doctor_required: bool = True,
+    doctor_mode: str = "scoped_burn_in",
     candidate_mode: bool = False,
+    candidate_mode_smoke: bool = False,
     provider_status: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> tuple[BurnInStep | dict[str, Any], ...]:
     base = ("--event-alpha-profile", profile, "--event-alpha-artifact-namespace", namespace)
+    operation_base = ("--profile", profile, "--artifact-namespace", namespace)
     if smoke:
-        return (
-            BurnInStep("burn_in_contract", (python, "-m", "crypto_rsi_scanner.project_health.radar_north_star", "--burn-in-contract-only"), timeout_seconds=report_timeout_seconds),
-            BurnInStep("burn_in_smoke_fixture_step", (python, "-c", "print('burn_in_smoke_fixture_step: safe fixture-only runner check')"), required=True, timeout_seconds=report_timeout_seconds),
-            BurnInStep("burn_in_scorecard", (python, "-m", "crypto_rsi_scanner.event_alpha.operations.scorecard", "--profile", profile, "--artifact-namespace", namespace), timeout_seconds=report_timeout_seconds),
+        return _smoke_steps(
+            python=python,
+            profile=profile,
+            namespace=namespace,
+            report_timeout_seconds=report_timeout_seconds,
         )
+    if candidate_mode_smoke:
+        return _candidate_mode_smoke_steps(
+            python=python,
+            profile=profile,
+            namespace=namespace,
+            base=base,
+            operation_base=operation_base,
+            report_timeout_seconds=report_timeout_seconds,
+            doctor_timeout_seconds=doctor_timeout_seconds,
+            doctor_required=doctor_required,
+            doctor_mode=doctor_mode,
+        )
+    return _daily_steps(
+        python=python,
+        profile=profile,
+        namespace=namespace,
+        base=base,
+        operation_base=operation_base,
+        include_coinalyze_rehearsal=include_coinalyze_rehearsal,
+        readiness_timeout_seconds=readiness_timeout_seconds,
+        integrated_timeout_seconds=integrated_timeout_seconds,
+        report_timeout_seconds=report_timeout_seconds,
+        doctor_timeout_seconds=doctor_timeout_seconds,
+        doctor_required=doctor_required,
+        doctor_mode=doctor_mode,
+        candidate_mode=candidate_mode,
+        provider_status=provider_status,
+    )
+
+
+def _contract_step(python: str, report_timeout_seconds: float) -> BurnInStep:
+    return BurnInStep(
+        "burn_in_contract",
+        (python, "-m", "crypto_rsi_scanner.project_health.radar_north_star", "--burn-in-contract-only"),
+        timeout_seconds=report_timeout_seconds,
+    )
+
+
+def _smoke_steps(
+    *,
+    python: str,
+    profile: str,
+    namespace: str,
+    report_timeout_seconds: float,
+) -> tuple[BurnInStep, ...]:
+    return (
+        _contract_step(python, report_timeout_seconds),
+        BurnInStep(
+            "burn_in_smoke_fixture_step",
+            (python, "-c", "print('burn_in_smoke_fixture_step: safe fixture-only runner check')"),
+            required=True,
+            timeout_seconds=report_timeout_seconds,
+        ),
+        BurnInStep(
+            "burn_in_scorecard",
+            (python, "-m", "crypto_rsi_scanner.event_alpha.operations.scorecard", "--profile", profile, "--artifact-namespace", namespace),
+            timeout_seconds=report_timeout_seconds,
+        ),
+    )
+
+
+def _candidate_mode_smoke_steps(
+    *,
+    python: str,
+    profile: str,
+    namespace: str,
+    base: tuple[str, ...],
+    operation_base: tuple[str, ...],
+    report_timeout_seconds: float,
+    doctor_timeout_seconds: float,
+    doctor_required: bool,
+    doctor_mode: str,
+) -> tuple[BurnInStep, ...]:
+    return (
+        _contract_step(python, report_timeout_seconds),
+        BurnInStep(
+            "candidate_mode_fixture_providers",
+            (
+                python,
+                "-m",
+                "crypto_rsi_scanner.event_alpha.operations.daily_burn_in",
+                "--write-candidate-mode-fixture-artifacts",
+                *operation_base,
+            ),
+            required=True,
+            timeout_seconds=report_timeout_seconds,
+        ),
+        BurnInStep(
+            "review_inbox",
+            (python, "-m", "crypto_rsi_scanner.event_alpha.operations.review_inbox", *operation_base),
+            timeout_seconds=report_timeout_seconds,
+        ),
+        BurnInStep(
+            "artifact_doctor",
+            _doctor_command(
+                python=python,
+                profile=profile,
+                namespace=namespace,
+                base=base,
+                operation_base=operation_base,
+                doctor_mode=doctor_mode,
+            ),
+            required=doctor_required,
+            timeout_seconds=doctor_timeout_seconds,
+        ),
+        BurnInStep(
+            "burn_in_scorecard",
+            (
+                python,
+                "-m",
+                "crypto_rsi_scanner.event_alpha.operations.scorecard",
+                *operation_base,
+                "--include-fixture-namespaces",
+                "--count-explicit-namespace-for-burn-in",
+            ),
+            timeout_seconds=report_timeout_seconds,
+        ),
+    )
+
+
+def _provider_rehearsal_steps(
+    *,
+    python: str,
+    base: tuple[str, ...],
+    readiness_timeout_seconds: float,
+    include_coinalyze_rehearsal: bool,
+    candidate_mode: bool,
+    provider_status: Mapping[str, Mapping[str, Any]] | None,
+) -> tuple[BurnInStep | dict[str, Any], ...]:
     steps: list[BurnInStep | dict[str, Any]] = [
-        BurnInStep("burn_in_contract", (python, "-m", "crypto_rsi_scanner.project_health.radar_north_star", "--burn-in-contract-only"), timeout_seconds=report_timeout_seconds),
-        BurnInStep("live_provider_readiness", (python, "main.py", "--event-alpha-live-provider-readiness", *base), timeout_seconds=readiness_timeout_seconds),
-        BurnInStep("cryptopanic_preflight", (python, "main.py", "--event-alpha-cryptopanic-preflight", *base), timeout_seconds=readiness_timeout_seconds),
-        BurnInStep("coinalyze_preflight", (python, "main.py", "--event-alpha-coinalyze-preflight", *base), timeout_seconds=readiness_timeout_seconds),
         _provider_step(
             provider_status,
             "coinalyze",
@@ -87,38 +219,69 @@ def build_steps(
                 timeout_seconds=readiness_timeout_seconds,
             ),
             enabled=include_coinalyze_rehearsal,
+        )
+    ]
+    if candidate_mode:
+        steps.append(
+            _provider_step(
+                provider_status,
+                "bybit_announcements",
+                default_skip={
+                    "name": "bybit_announcements_no_send_rehearsal",
+                    "status": "skipped",
+                    "required": False,
+                    "timeout_seconds": readiness_timeout_seconds,
+                    "skip_reason": "Bybit live announcements remain no-live unless RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT=1 is explicit",
+                    "provider_category_impact": "official exchange announcements live rehearsal not sampled in this run",
+                },
+                run_step=BurnInStep(
+                    "bybit_announcements_no_send_rehearsal",
+                    (
+                        python,
+                        "main.py",
+                        "--event-alpha-bybit-announcements-no-send-rehearsal",
+                        *base,
+                        *_flag_tuple(candidate_mode, "--event-alpha-bybit-announcements-allow-live-preflight"),
+                    ),
+                    timeout_seconds=readiness_timeout_seconds,
+                ),
+                enabled=bool(provider_status and provider_status.get("bybit_announcements", {}).get("live_call_allowed")),
+            )
+        )
+    return tuple(steps)
+
+
+def _daily_steps(
+    *,
+    python: str,
+    profile: str,
+    namespace: str,
+    base: tuple[str, ...],
+    operation_base: tuple[str, ...],
+    include_coinalyze_rehearsal: bool,
+    readiness_timeout_seconds: float,
+    integrated_timeout_seconds: float,
+    report_timeout_seconds: float,
+    doctor_timeout_seconds: float,
+    doctor_required: bool,
+    doctor_mode: str,
+    candidate_mode: bool,
+    provider_status: Mapping[str, Mapping[str, Any]] | None,
+) -> tuple[BurnInStep | dict[str, Any], ...]:
+    steps: list[BurnInStep | dict[str, Any]] = [
+        _contract_step(python, report_timeout_seconds),
+        BurnInStep("live_provider_readiness", (python, "main.py", "--event-alpha-live-provider-readiness", *base), timeout_seconds=readiness_timeout_seconds),
+        BurnInStep("cryptopanic_preflight", (python, "main.py", "--event-alpha-cryptopanic-preflight", *base), timeout_seconds=readiness_timeout_seconds),
+        BurnInStep("coinalyze_preflight", (python, "main.py", "--event-alpha-coinalyze-preflight", *base), timeout_seconds=readiness_timeout_seconds),
+        *_provider_rehearsal_steps(
+            python=python,
+            base=base,
+            readiness_timeout_seconds=readiness_timeout_seconds,
+            include_coinalyze_rehearsal=include_coinalyze_rehearsal,
+            candidate_mode=candidate_mode,
+            provider_status=provider_status,
         ),
         BurnInStep("bybit_announcements_preflight", (python, "main.py", "--event-alpha-bybit-announcements-preflight", *base), timeout_seconds=readiness_timeout_seconds),
-        *(
-            (
-                _provider_step(
-                    provider_status,
-                    "bybit_announcements",
-                    default_skip={
-                        "name": "bybit_announcements_no_send_rehearsal",
-                        "status": "skipped",
-                        "required": False,
-                        "timeout_seconds": readiness_timeout_seconds,
-                        "skip_reason": "Bybit live announcements remain no-live unless RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT=1 is explicit",
-                        "provider_category_impact": "official exchange announcements live rehearsal not sampled in this run",
-                    },
-                    run_step=BurnInStep(
-                        "bybit_announcements_no_send_rehearsal",
-                        (
-                            python,
-                            "main.py",
-                            "--event-alpha-bybit-announcements-no-send-rehearsal",
-                            *base,
-                            *_flag_tuple(candidate_mode, "--event-alpha-bybit-announcements-allow-live-preflight"),
-                        ),
-                        timeout_seconds=readiness_timeout_seconds,
-                    ),
-                    enabled=bool(provider_status and provider_status.get("bybit_announcements", {}).get("live_call_allowed")),
-                ),
-            )
-            if candidate_mode
-            else ()
-        ),
         BurnInStep(
             "integrated_radar_cycle",
             (
@@ -135,7 +298,12 @@ def build_steps(
         BurnInStep("notification_preview", (python, "main.py", "--event-alpha-notify-preview-from-artifacts", *base), timeout_seconds=report_timeout_seconds),
         BurnInStep("daily_brief", (python, "main.py", "--event-alpha-daily-brief", *base), timeout_seconds=report_timeout_seconds),
         BurnInStep("review_inbox", (python, "-m", "crypto_rsi_scanner.event_alpha.operations.review_inbox", "--profile", profile, "--artifact-namespace", namespace), timeout_seconds=report_timeout_seconds),
-        BurnInStep("artifact_doctor", (python, "main.py", "--event-alpha-artifact-doctor", *base), timeout_seconds=doctor_timeout_seconds),
+        BurnInStep(
+            "artifact_doctor",
+            _doctor_command(python=python, profile=profile, namespace=namespace, base=base, operation_base=operation_base, doctor_mode=doctor_mode),
+            required=doctor_required,
+            timeout_seconds=doctor_timeout_seconds,
+        ),
         BurnInStep(
             "burn_in_scorecard",
             (
@@ -168,7 +336,10 @@ def run_daily_burn_in(
     integrated_timeout_seconds: float = 180.0,
     report_timeout_seconds: float = 60.0,
     doctor_timeout_seconds: float = 120.0,
+    doctor_required: bool = True,
+    doctor_mode: str = "scoped_burn_in",
     candidate_mode: bool = False,
+    candidate_mode_smoke: bool = False,
 ) -> dict[str, Any]:
     generated = (now or common.utc_now()).astimezone(timezone.utc)
     namespace = artifact_namespace or default_namespace(generated)
@@ -204,50 +375,90 @@ def run_daily_burn_in(
         integrated_timeout_seconds=integrated_timeout_seconds,
         report_timeout_seconds=report_timeout_seconds,
         doctor_timeout_seconds=doctor_timeout_seconds,
+        doctor_required=doctor_required,
+        doctor_mode=doctor_mode,
         candidate_mode=candidate_mode,
+        candidate_mode_smoke=candidate_mode_smoke,
         provider_status=provider_status,
     )
     step_rows: list[dict[str, Any]] = []
-    for step in steps:
-        if isinstance(step, Mapping):
-            row = _skipped_step_row(step)
+    interrupted = False
+    interruption_reason = ""
+    try:
+        for step in steps:
+            if isinstance(step, Mapping):
+                row = _skipped_step_row(step)
+                _augment_step_row(row, context=context, before_state=None, after_state=_namespace_step_state(context))
+                step_rows.append(row)
+                print(f"[burn-in] skipped {row.get('name')}: {row.get('skip_reason')}", flush=True)
+                _write_run_artifacts(
+                    context=context,
+                    generated=generated,
+                    profile=profile,
+                    namespace=namespace,
+                    step_rows=step_rows,
+                    allow_rehearsal=allow_rehearsal,
+                    env=env,
+                    completed=False,
+                    smoke=smoke,
+                    candidate_mode=candidate_mode,
+                    provider_status=provider_status,
+                    interrupted=interrupted,
+                    interruption_reason=interruption_reason,
+                )
+                continue
+            print(f"[burn-in] starting {step.name} timeout={step.timeout_seconds}s", flush=True)
+            if step.name == "artifact_doctor":
+                _write_scoped_doctor_pending(context=context, timeout_seconds=step.timeout_seconds, required=step.required, doctor_mode=doctor_mode)
+            before_state = _namespace_step_state(context)
+            try:
+                row = _run_step(step, env=env, cwd=common.repo_root_from_module())
+            except KeyboardInterrupt:
+                interrupted = True
+                interruption_reason = f"interrupted_during:{step.name}"
+                now_iso = common.utc_now().isoformat()
+                row = {
+                    "name": step.name,
+                    "status": "interrupted",
+                    "required": step.required,
+                    "started_at": now_iso,
+                    "finished_at": now_iso,
+                    "step_started_at": now_iso,
+                    "step_finished_at": now_iso,
+                    "duration_seconds": 0.0,
+                    "timeout_seconds": step.timeout_seconds,
+                    "returncode": None,
+                    "command": " ".join(step.command),
+                    "stdout_tail": "",
+                    "stderr_tail": "KeyboardInterrupt",
+                }
+            after_state = _namespace_step_state(context)
+            _augment_step_row(row, context=context, before_state=before_state, after_state=after_state)
+            if step.name == "artifact_doctor":
+                _write_step_doctor_status(context=context, row=row, doctor_mode=doctor_mode)
             step_rows.append(row)
-            print(f"[burn-in] skipped {row.get('name')}: {row.get('skip_reason')}", flush=True)
-            _write_run_artifacts(
-                context=context,
-                generated=generated,
-                profile=profile,
-                namespace=namespace,
-                step_rows=step_rows,
-                allow_rehearsal=allow_rehearsal,
-                env=env,
-                completed=False,
-                smoke=smoke,
-                candidate_mode=candidate_mode,
-                provider_status=provider_status,
-            )
-            continue
-        print(f"[burn-in] starting {step.name} timeout={step.timeout_seconds}s", flush=True)
-        row = _run_step(step, env=env, cwd=common.repo_root_from_module())
-        step_rows.append(row)
-        if candidate_mode:
-            _postprocess_candidate_mode_artifacts(context=context, provider_status=provider_status)
-            _write_candidate_mode_manifest(
-                context=context,
-                generated=generated,
-                profile=profile,
-                namespace=namespace,
-                candidate_mode=candidate_mode,
-                provider_status=provider_status,
-                completed=False,
-            )
-        print(f"[burn-in] finished {step.name} status={row.get('status')} duration={row.get('duration_seconds')}s", flush=True)
-        _write_run_artifacts(context=context, generated=generated, profile=profile, namespace=namespace, step_rows=step_rows, allow_rehearsal=allow_rehearsal, env=env, completed=False, smoke=smoke, candidate_mode=candidate_mode, provider_status=provider_status)
-        if step.required and row["status"] != "passed" and not continue_on_error:
-            break
+            if candidate_mode:
+                _postprocess_candidate_mode_artifacts(context=context, provider_status=provider_status)
+                _write_candidate_mode_manifest(
+                    context=context,
+                    generated=generated,
+                    profile=profile,
+                    namespace=namespace,
+                    candidate_mode=candidate_mode,
+                    provider_status=provider_status,
+                    completed=False,
+                    doctor_status=_doctor_status_payload(context),
+                )
+            print(f"[burn-in] finished {step.name} status={row.get('status')} duration={row.get('duration_seconds')}s", flush=True)
+            _write_run_artifacts(context=context, generated=generated, profile=profile, namespace=namespace, step_rows=step_rows, allow_rehearsal=allow_rehearsal, env=env, completed=False, smoke=smoke, candidate_mode=candidate_mode, provider_status=provider_status, interrupted=interrupted, interruption_reason=interruption_reason)
+            if interrupted or (step.required and row["status"] != "passed" and not continue_on_error):
+                break
+    except KeyboardInterrupt:
+        interrupted = True
+        interruption_reason = "interrupted"
     if candidate_mode:
         _postprocess_candidate_mode_artifacts(context=context, provider_status=provider_status)
-    payload = _write_run_artifacts(context=context, generated=generated, profile=profile, namespace=namespace, step_rows=step_rows, allow_rehearsal=allow_rehearsal, env=env, completed=True, smoke=smoke, candidate_mode=candidate_mode, provider_status=provider_status)
+    payload = _write_run_artifacts(context=context, generated=generated, profile=profile, namespace=namespace, step_rows=step_rows, allow_rehearsal=allow_rehearsal, env=env, completed=True, smoke=smoke, candidate_mode=candidate_mode, provider_status=provider_status, interrupted=interrupted, interruption_reason=interruption_reason)
     _write_candidate_mode_manifest(
         context=context,
         generated=generated,
@@ -256,6 +467,7 @@ def run_daily_burn_in(
         candidate_mode=candidate_mode,
         provider_status=provider_status,
         completed=True,
+        doctor_status=_doctor_status_payload(context),
     )
     common.append_jsonl(context.run_ledger_path, _ledger_row(payload))
     return payload
@@ -272,7 +484,10 @@ def format_daily_burn_in_plan(
     integrated_timeout_seconds: float = 180.0,
     report_timeout_seconds: float = 60.0,
     doctor_timeout_seconds: float = 120.0,
+    doctor_required: bool = True,
+    doctor_mode: str = "scoped_burn_in",
     candidate_mode: bool = False,
+    candidate_mode_smoke: bool = False,
 ) -> str:
     provider_status = _candidate_provider_status(common.context_for(profile=profile, artifact_namespace=namespace)) if candidate_mode else {}
     steps = build_steps(
@@ -285,7 +500,10 @@ def format_daily_burn_in_plan(
         integrated_timeout_seconds=integrated_timeout_seconds,
         report_timeout_seconds=report_timeout_seconds,
         doctor_timeout_seconds=doctor_timeout_seconds,
+        doctor_required=doctor_required,
+        doctor_mode=doctor_mode,
         candidate_mode=candidate_mode,
+        candidate_mode_smoke=candidate_mode_smoke,
         provider_status=provider_status,
     )
     lines = [
@@ -295,6 +513,10 @@ def format_daily_burn_in_plan(
         f"- artifact_namespace: `{namespace}`",
         f"- dry_run_plan: `True`",
         f"- candidate_mode: `{candidate_mode}`",
+        f"- candidate_mode_smoke: `{candidate_mode_smoke}`",
+        f"- doctor_mode: `{doctor_mode}`",
+        f"- doctor_timeout_seconds: `{doctor_timeout_seconds}`",
+        f"- doctor_required: `{doctor_required}`",
         "- No live providers were run by default.",
         "- Coinalyze rehearsal skipped unless explicit allow flags are set.",
         "- No Telegram sends, trades, paper trades, normal RSI rows, or Event Alpha-created `TRIGGERED_FADE` are authorized.",
@@ -320,11 +542,14 @@ def format_daily_burn_in_report(payload: Mapping[str, Any]) -> str:
         "Coinalyze rehearsal skipped unless explicit allow flags are set.",
         "",
         f"- generated_at: `{payload.get('generated_at')}`",
+        f"- run_id: `{payload.get('run_id')}`",
         f"- profile: `{payload.get('profile')}`",
         f"- artifact_namespace: `{payload.get('artifact_namespace')}`",
         f"- namespace_dir: `{payload.get('namespace_dir')}`",
         f"- candidate_mode: `{payload.get('candidate_mode')}`",
         f"- live_provider_calls_allowed: `{payload.get('live_provider_calls_allowed')}`",
+        f"- status: `{payload.get('status')}`",
+        f"- final_status_reason: `{payload.get('final_status_reason')}`",
         f"- completed: `{payload.get('completed')}`",
         f"- steps: `{payload.get('steps_passed')}` passed, `{payload.get('steps_skipped')}` skipped, `{payload.get('steps_failed')}` failed",
         f"- steps_timeout: `{payload.get('steps_timeout')}`",
@@ -499,23 +724,42 @@ def _write_run_artifacts(
     smoke: bool,
     candidate_mode: bool = False,
     provider_status: Mapping[str, Mapping[str, Any]] | None = None,
+    interrupted: bool = False,
+    interruption_reason: str = "",
 ) -> dict[str, Any]:
     normalized_steps = [_normalize_step_row(row) for row in step_rows]
     provider_status = provider_status or {}
     live_allowed = any(bool(row.get("live_call_allowed")) for row in provider_status.values())
+    final_status, final_status_reason = _final_run_status(
+        normalized_steps,
+        candidate_mode=candidate_mode,
+        interrupted=interrupted,
+        interruption_reason=interruption_reason,
+    )
+    if candidate_mode and final_status == "passed_no_candidates" and common.read_jsonl(context.namespace_dir / "event_integrated_radar_candidates.jsonl"):
+        final_status = "passed"
+        final_status_reason = "candidate artifacts present; contract-counting is reported in candidate-mode manifest"
+    finished_at = common.utc_now().isoformat() if completed or interrupted else ""
+    run_id = f"{generated.isoformat()}|daily_burn_in|{namespace}"
     payload = common.with_safety(
         {
             "schema_version": "event_alpha_daily_burn_in_run_v1",
             "row_type": "event_alpha_daily_burn_in_run",
+            "run_id": run_id,
             "generated_at": generated.isoformat(),
+            "started_at": generated.isoformat(),
+            "finished_at": finished_at,
             "last_updated_at": common.utc_now().isoformat(),
             "profile": profile,
             "artifact_namespace": namespace,
             "namespace_dir": common.rel_path(context.namespace_dir),
             "completed": bool(completed),
+            "status": final_status,
+            "final_status_reason": final_status_reason,
             "smoke": bool(smoke),
             "candidate_mode": bool(candidate_mode),
             "no_send": True,
+            "no_send_rehearsal": True,
             "live_provider_calls_allowed": live_allowed,
             "candidate_mode_manifest_path": common.rel_path(context.namespace_dir / CANDIDATE_MODE_MANIFEST_JSON) if candidate_mode else "",
             "provider_activation_status": provider_status,
@@ -528,10 +772,11 @@ def _write_run_artifacts(
             "steps_skipped": sum(1 for row in normalized_steps if row.get("status") == "skipped"),
             "steps_failed": sum(1 for row in normalized_steps if row.get("status") == "failed"),
             "steps_timeout": sum(1 for row in normalized_steps if row.get("status") == "timeout"),
+            "steps_interrupted": sum(1 for row in normalized_steps if row.get("status") == "interrupted"),
             "required_failed": [
                 row.get("name")
                 for row in normalized_steps
-                if row.get("required") and row.get("status") != "passed"
+                if row.get("required") and row.get("status") not in {"passed", "skipped"}
             ],
             "coinalyze_rehearsal_allowed": allow_rehearsal,
             "safe_environment": {
@@ -561,11 +806,188 @@ def _normalize_step_row(row: Mapping[str, Any]) -> dict[str, Any]:
     if finished:
         out["finished_at"] = finished
         out.setdefault("step_finished_at", finished)
+    out.setdefault("artifact_paths_written", [])
+    out.setdefault("candidate_rows_written", 0)
+    out.setdefault("provider_calls_attempted", 0)
+    out.setdefault("live_calls_attempted", 0)
+    out.setdefault("safety_side_effects", _zero_safety_side_effects())
     return out
+
+
+def _final_run_status(
+    steps: list[Mapping[str, Any]],
+    *,
+    candidate_mode: bool,
+    interrupted: bool,
+    interruption_reason: str,
+) -> tuple[str, str]:
+    if interrupted or any(str(row.get("status") or "") == "interrupted" for row in steps):
+        return "interrupted", interruption_reason or "interrupted"
+    required_timeouts = [str(row.get("name") or "") for row in steps if row.get("required") and row.get("status") == "timeout"]
+    if required_timeouts:
+        return "timeout_required_step", ",".join(required_timeouts)
+    required_failed = [
+        str(row.get("name") or "")
+        for row in steps
+        if row.get("required") and row.get("status") not in {"passed", "skipped"}
+    ]
+    if required_failed:
+        return "failed_required_step", ",".join(required_failed)
+    non_required_timeouts = [str(row.get("name") or "") for row in steps if not row.get("required") and row.get("status") == "timeout"]
+    if non_required_timeouts:
+        return "timeout_non_required_step", ",".join(non_required_timeouts)
+    skipped = [str(row.get("name") or "") for row in steps if row.get("status") == "skipped"]
+    failed_optional = [str(row.get("name") or "") for row in steps if not row.get("required") and row.get("status") == "failed"]
+    if candidate_mode and not any(int(row.get("candidate_rows_written") or 0) for row in steps):
+        return "passed_no_candidates", "candidate mode completed without candidate rows"
+    if skipped or failed_optional:
+        reason = []
+        if skipped:
+            reason.append("skipped=" + ",".join(skipped))
+        if failed_optional:
+            reason.append("optional_failed=" + ",".join(failed_optional))
+        return "passed_with_skips", ";".join(reason) or "non-required steps skipped"
+    return "passed", "all required steps passed"
+
+
+def _zero_safety_side_effects() -> dict[str, int]:
+    return {
+        "strict_alerts_created": 0,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "paper_trades_created": 0,
+        "normal_rsi_signal_rows_written": 0,
+        "triggered_fade_created": 0,
+    }
 
 
 def _flag_tuple(enabled: bool, flag: str) -> tuple[str, ...]:
     return (flag,) if enabled else ()
+
+
+def _doctor_command(
+    *,
+    python: str,
+    profile: str,
+    namespace: str,
+    base: tuple[str, ...],
+    operation_base: tuple[str, ...],
+    doctor_mode: str,
+) -> tuple[str, ...]:
+    if doctor_mode == "full_namespace":
+        return (python, "main.py", "--event-alpha-artifact-doctor", *base)
+    return (
+        python,
+        "-m",
+        "crypto_rsi_scanner.event_alpha.operations.daily_burn_in",
+        "--scoped-doctor",
+        *operation_base,
+    )
+
+
+def _namespace_step_state(context: Any) -> dict[str, Any]:
+    files: dict[str, float] = {}
+    if context.namespace_dir.exists():
+        for path in context.namespace_dir.rglob("*"):
+            if path.is_file():
+                try:
+                    files[common.rel_path(path)] = path.stat().st_mtime
+                except OSError:
+                    continue
+    return {
+        "files": files,
+        "candidate_rows": len(common.read_jsonl(context.namespace_dir / "event_integrated_radar_candidates.jsonl")),
+        "ledger_rows": _request_ledger_row_total(context),
+    }
+
+
+def _augment_step_row(
+    row: dict[str, Any],
+    *,
+    context: Any,
+    before_state: Mapping[str, Any] | None,
+    after_state: Mapping[str, Any],
+) -> None:
+    before_files = dict((before_state or {}).get("files") or {})
+    after_files = dict(after_state.get("files") or {})
+    changed_files = [
+        path
+        for path, mtime in after_files.items()
+        if path not in before_files or before_files.get(path) != mtime
+    ]
+    before_candidates = int((before_state or {}).get("candidate_rows") or 0)
+    after_candidates = int(after_state.get("candidate_rows") or 0)
+    before_ledgers = int((before_state or {}).get("ledger_rows") or 0)
+    after_ledgers = int(after_state.get("ledger_rows") or 0)
+    row["artifact_paths_written"] = sorted(changed_files)
+    row["candidate_rows_written"] = max(0, after_candidates - before_candidates)
+    row["provider_calls_attempted"] = max(0, after_ledgers - before_ledgers)
+    row["live_calls_attempted"] = max(0, after_ledgers - before_ledgers)
+    row["safety_side_effects"] = _zero_safety_side_effects()
+
+
+def _request_ledger_row_total(context: Any) -> int:
+    return sum(
+        len(common.read_jsonl(context.namespace_dir / name))
+        for name in (COINALYZE_REQUEST_LEDGER, BYBIT_REQUEST_LEDGER)
+    )
+
+
+def _write_scoped_doctor_pending(*, context: Any, timeout_seconds: float, required: bool, doctor_mode: str) -> None:
+    if doctor_mode != "scoped_burn_in":
+        return
+    payload = common.with_safety(
+        {
+            "schema_version": "event_alpha_daily_burn_in_doctor_status_v1",
+            "row_type": "event_alpha_daily_burn_in_doctor_status",
+            "generated_at": common.utc_now().isoformat(),
+            "profile": context.profile,
+            "artifact_namespace": context.artifact_namespace,
+            "doctor_mode": doctor_mode,
+            "status": "pending",
+            "required": bool(required),
+            "timeout_seconds": timeout_seconds,
+            "blockers": [],
+            "warnings": [],
+            "scoped_to_current_namespace": True,
+        }
+    )
+    _write_doctor_status(context, payload)
+
+
+def _write_step_doctor_status(*, context: Any, row: Mapping[str, Any], doctor_mode: str) -> None:
+    if doctor_mode != "scoped_burn_in":
+        return
+    if row.get("status") == "timeout":
+        payload = common.with_safety(
+            {
+                "schema_version": "event_alpha_daily_burn_in_doctor_status_v1",
+                "row_type": "event_alpha_daily_burn_in_doctor_status",
+                "generated_at": common.utc_now().isoformat(),
+                "profile": context.profile,
+                "artifact_namespace": context.artifact_namespace,
+                "doctor_mode": doctor_mode,
+                "status": "timeout",
+                "required": bool(row.get("required")),
+                "timeout_seconds": row.get("timeout_seconds"),
+                "blockers": ["scoped_doctor_timeout"],
+                "warnings": [],
+                "stdout_tail": row.get("stdout_tail") or "",
+                "stderr_tail": row.get("stderr_tail") or "",
+                "scoped_to_current_namespace": True,
+            }
+        )
+        _write_doctor_status(context, payload)
+
+
+def _doctor_status_payload(context: Any) -> dict[str, Any]:
+    return common.read_json(context.namespace_dir / SCOPED_DOCTOR_JSON)
+
+
+def _write_doctor_status(context: Any, payload: Mapping[str, Any]) -> None:
+    from . import daily_burn_in_doctor
+
+    daily_burn_in_doctor.write_doctor_status(context, payload)
 
 
 def _provider_step(
@@ -665,13 +1087,14 @@ def _write_candidate_mode_manifest(
     candidate_mode: bool,
     provider_status: Mapping[str, Mapping[str, Any]],
     completed: bool,
+    doctor_status: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     if not candidate_mode:
         return None
     counts = _candidate_mode_counts(context, provider_status)
     payload = common.with_safety(
         {
-            "schema_version": "event_alpha_candidate_mode_manifest_v1",
+            "schema_version": "event_alpha_candidate_mode_manifest_v2",
             "row_type": "event_alpha_candidate_mode_manifest",
             "generated_at": generated.isoformat(),
             "last_updated_at": common.utc_now().isoformat(),
@@ -680,12 +1103,17 @@ def _write_candidate_mode_manifest(
             "namespace_dir": common.rel_path(context.namespace_dir),
             "candidate_mode": True,
             "completed": bool(completed),
+            "status": _candidate_manifest_status(counts, provider_status, completed=completed),
             "no_send": True,
+            "no_send_rehearsal": True,
             "live_provider_calls_allowed": any(bool(row.get("live_call_allowed")) for row in provider_status.values()),
             "providers": {key: dict(value) for key, value in provider_status.items()},
             "skipped_missing_config": _providers_with_status(provider_status, "skipped_missing_config"),
             "skipped_live_calls_disabled": _providers_with_status(provider_status, "skipped_live_calls_disabled", "live_call_blocked_by_default"),
+            "skipped_request_budget": _providers_with_status(provider_status, "request_budget_not_small"),
+            "skipped_not_required_for_profile": [],
             "next_steps": _candidate_mode_next_steps(provider_status),
+            "doctor_status": doctor_status or {},
             **counts,
         }
     )
@@ -750,12 +1178,55 @@ def _candidate_mode_counts(context: Any, provider_status: Mapping[str, Mapping[s
         for key, value in provider_status.items()
         if value.get("request_ledger_path")
     }
+    existing_ledgers = [
+        str(value.get("request_ledger_path"))
+        for key, value in provider_status.items()
+        if int(ledger_counts.get(key) or 0) > 0 and str(value.get("request_ledger_path") or "").strip()
+    ]
+    source_artifacts = _existing_artifacts(
+        context,
+        (
+            "event_alpha_live_provider_readiness.json",
+            "event_coinalyze_preflight.json",
+            "event_coinalyze_rehearsal_report.json",
+            "event_bybit_announcements_preflight.json",
+            "event_bybit_announcements_rehearsal_report.json",
+            "event_exchange_announcements.jsonl",
+            "event_official_exchange_events.jsonl",
+            "event_derivatives_state.jsonl",
+            "event_derivatives_crowding_candidates.jsonl",
+            "event_alpha_source_coverage.json",
+        ),
+    )
+    candidate_artifacts = _existing_artifacts(
+        context,
+        (
+            "event_integrated_radar_candidates.jsonl",
+            "event_core_opportunities.jsonl",
+            "event_official_listing_candidates.jsonl",
+            "event_fade_short_review_candidates.jsonl",
+            "event_alpha_alerts.jsonl",
+        ),
+    )
     return {
         "candidate_rows": len(rows),
+        "integrated_candidate_rows": len(rows),
+        "notification_preview_rows": int((context.namespace_dir / "event_alpha_notification_preview.md").exists()),
+        "preflight_diagnostic_rows": _json_doc_count(context.namespace_dir / "event_coinalyze_preflight.json") + _json_doc_count(context.namespace_dir / "event_bybit_announcements_preflight.json"),
+        "readiness_rows": _json_doc_count(context.namespace_dir / "event_alpha_live_provider_readiness.json"),
+        "source_coverage_rows": _json_doc_count(context.namespace_dir / "event_alpha_source_coverage.json"),
         "real_burn_in_candidate_count": sum(1 for row in rows if row.get("contract_counted_candidate") is True),
         "contract_counted_candidate_count": sum(1 for row in rows if row.get("contract_counted_candidate") is True),
         "fixture_candidate_count": sum(1 for row in rows if _is_fixture_candidate(row)),
+        "provider_attempts": sum(1 for row in provider_status.values() if row.get("live_call_allowed")),
+        "provider_skips": sum(1 for row in provider_status.values() if str(row.get("status") or "") != "ready_live_no_send"),
+        "provider_successes": sum(1 for key in provider_status if int(ledger_counts.get(key) or 0) > 0),
         "request_ledger_rows": ledger_counts,
+        "request_ledgers": sorted(existing_ledgers),
+        "source_artifacts": source_artifacts,
+        "candidate_artifacts": candidate_artifacts,
+        "review_inbox_path": common.rel_path(context.namespace_dir / "event_alpha_daily_review_inbox.json") if (context.namespace_dir / "event_alpha_daily_review_inbox.json").exists() else "",
+        "scorecard_path": common.rel_path(context.namespace_dir / "event_alpha_burn_in_scorecard.json") if (context.namespace_dir / "event_alpha_burn_in_scorecard.json").exists() else "",
         "providers_with_candidates": sorted(
             {
                 _infer_candidate_provider(row)
@@ -764,6 +1235,30 @@ def _candidate_mode_counts(context: Any, provider_status: Mapping[str, Mapping[s
             }
         ),
     }
+
+
+def _json_doc_count(path: Path) -> int:
+    return 1 if common.read_json(path) else 0
+
+
+def _existing_artifacts(context: Any, names: tuple[str, ...]) -> list[str]:
+    return [
+        common.rel_path(context.namespace_dir / name)
+        for name in names
+        if (context.namespace_dir / name).exists()
+    ]
+
+
+def _candidate_manifest_status(counts: Mapping[str, Any], provider_status: Mapping[str, Mapping[str, Any]], *, completed: bool) -> str:
+    if not completed:
+        return "running"
+    if int(counts.get("contract_counted_candidate_count") or 0) > 0:
+        return "completed_with_contract_candidates"
+    if int(counts.get("fixture_candidate_count") or 0) > 0:
+        return "completed_fixture_candidates_only"
+    if not any(bool(row.get("live_call_allowed")) for row in provider_status.values()):
+        return "completed_no_candidate_providers"
+    return "completed_no_candidates"
 
 
 def _request_ledger_for_provider(provider: str, context: Any) -> str:
@@ -886,13 +1381,40 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stop-on-required-failure", action="store_true")
     parser.add_argument("--include-coinalyze-rehearsal", action="store_true")
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--candidate-mode-smoke", action="store_true")
     parser.add_argument("--dry-run-plan", action="store_true")
+    parser.add_argument("--scoped-doctor", action="store_true")
+    parser.add_argument("--readiness-report", action="store_true")
+    parser.add_argument("--write-candidate-mode-fixture-artifacts", action="store_true")
     parser.add_argument("--event-alpha-burn-in-candidate-mode", action="store_true")
     parser.add_argument("--readiness-timeout-seconds", type=float, default=60.0)
     parser.add_argument("--integrated-timeout-seconds", type=float, default=180.0)
     parser.add_argument("--report-timeout-seconds", type=float, default=60.0)
     parser.add_argument("--doctor-timeout-seconds", type=float, default=120.0)
+    parser.add_argument("--doctor-mode", choices=("scoped_burn_in", "full_namespace"), default="scoped_burn_in")
+    parser.add_argument("--doctor-optional", action="store_true")
     args = parser.parse_args(argv)
+    if args.scoped_doctor:
+        from . import daily_burn_in_doctor
+
+        payload = daily_burn_in_doctor.run_scoped_doctor(profile=args.profile, artifact_namespace=args.artifact_namespace or default_namespace(), base_dir=args.base_dir)
+        print(f"event_alpha_daily_burn_in_doctor_status: {payload['namespace_dir']}/{SCOPED_DOCTOR_JSON}")
+        print(f"status={payload.get('status')} blockers={len(payload.get('blockers') or [])} warnings={len(payload.get('warnings') or [])}")
+        return 1 if payload.get("blockers") else 0
+    if args.readiness_report:
+        from . import daily_burn_in_readiness
+
+        payload = daily_burn_in_readiness.build_readiness_report(profile=args.profile, artifact_namespace=args.artifact_namespace or args.profile, base_dir=args.base_dir)
+        print(f"event_alpha_daily_burn_in_readiness: {payload['namespace_dir']}/{READINESS_JSON}")
+        print(f"candidate_mode_status={payload.get('candidate_mode_status')} can_run_candidate_mode={payload.get('can_run_candidate_mode')}")
+        return 0
+    if args.write_candidate_mode_fixture_artifacts:
+        from . import candidate_mode_smoke
+
+        payload = candidate_mode_smoke.write_candidate_mode_fixture_artifacts(profile=args.profile, artifact_namespace=args.artifact_namespace or "daily_burn_in_candidate_mode_smoke", base_dir=args.base_dir)
+        print(f"event_alpha_candidate_mode_fixture_smoke: {payload['artifact_namespace']}/event_alpha_candidate_mode_fixture_smoke.json")
+        print(f"fixture_candidates={payload.get('candidate_count')} live_calls_attempted={payload.get('live_calls_attempted')}")
+        return 0
     if args.dry_run_plan:
         namespace = args.artifact_namespace or default_namespace()
         print(
@@ -906,7 +1428,10 @@ def main(argv: list[str] | None = None) -> int:
                 integrated_timeout_seconds=args.integrated_timeout_seconds,
                 report_timeout_seconds=args.report_timeout_seconds,
                 doctor_timeout_seconds=args.doctor_timeout_seconds,
+                doctor_required=not args.doctor_optional,
+                doctor_mode=args.doctor_mode,
                 candidate_mode=args.event_alpha_burn_in_candidate_mode,
+                candidate_mode_smoke=args.candidate_mode_smoke,
             )
         )
         return 0
@@ -922,7 +1447,10 @@ def main(argv: list[str] | None = None) -> int:
         integrated_timeout_seconds=args.integrated_timeout_seconds,
         report_timeout_seconds=args.report_timeout_seconds,
         doctor_timeout_seconds=args.doctor_timeout_seconds,
+        doctor_required=not args.doctor_optional,
+        doctor_mode=args.doctor_mode,
         candidate_mode=args.event_alpha_burn_in_candidate_mode,
+        candidate_mode_smoke=args.candidate_mode_smoke,
     )
     namespace_dir = payload.get("namespace_dir")
     print(f"event_alpha_daily_burn_in_run: {namespace_dir}/{RUN_JSON}")
@@ -931,9 +1459,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"event_alpha_candidate_mode_manifest: {namespace_dir}/{CANDIDATE_MODE_MANIFEST_JSON}")
     print(
         f"steps_passed={payload.get('steps_passed')} "
-        f"steps_skipped={payload.get('steps_skipped')} steps_failed={payload.get('steps_failed')}"
+        f"steps_skipped={payload.get('steps_skipped')} steps_failed={payload.get('steps_failed')} status={payload.get('status')}"
     )
     print("No live sends, trades, paper trades, normal RSI rows, or Event Alpha TRIGGERED_FADE were created.")
+    if payload.get("status") == "interrupted":
+        return 130
     return 0 if not payload.get("required_failed") else 1
 
 

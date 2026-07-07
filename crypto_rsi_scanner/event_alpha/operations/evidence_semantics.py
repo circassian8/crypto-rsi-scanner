@@ -195,14 +195,16 @@ def evidence_scope_from_summary(
     real_count = int(aggregate.get("real_burn_in_candidates") or 0)
     if real_count > 0:
         return "real_burn_in_evidence", "burn-in run produced contract-counted candidate artifacts"
+    fixture_count = int(aggregate.get("fixture_candidates") or 0) + int(aggregate.get("integrated_fixture_rows") or 0)
+    if aggregate.get("candidate_mode_namespaces") and fixture_count > 0:
+        return "fixture_candidate_mode_smoke", "candidate-mode smoke produced mocked fixture candidates that are not contract-counted"
     if aggregate.get("candidate_mode_namespaces"):
         return "active_burn_in_candidate_mode_no_candidates", "candidate mode ran but no contract-counted candidate artifacts were produced"
     support_rows = (
         int(aggregate.get("preflight_diagnostic_rows") or 0)
         + int(aggregate.get("readiness_rows") or 0)
         + int(aggregate.get("source_coverage_rows") or 0)
-        + int(aggregate.get("fixture_candidates") or 0)
-        + int(aggregate.get("integrated_fixture_rows") or 0)
+        + fixture_count
     )
     if support_rows > 0:
         return "active_burn_in_preflight_only", "burn-in run completed but only fixture/preflight/readiness/support rows were found"

@@ -726,7 +726,7 @@ def test_architecture_final_report_generation_writes_size_and_shim_gates():
         "production_files_over_1200_lines",
         "class_exceptions_remaining",
     }
-    assert payload["v3_accepted_exceptions"]["production_files_over_1200_lines"]["count"] == 13
+    assert payload["v3_accepted_exceptions"]["production_files_over_1200_lines"]["count"] == payload["accepted_production_files_over_1200_lines"]
     assert payload["v3_accepted_exceptions"]["class_exceptions_remaining"]["count"] == 3
     for gate_name in architecture_v3_contract.V3_GATE_NAMES:
         assert gate_name in payload["v3_gates"]

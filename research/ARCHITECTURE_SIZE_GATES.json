@@ -1409,6 +1409,15 @@
     {
       "accepted": true,
       "limit": 1500,
+      "line_count": 1471,
+      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+      "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
+      "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
       "line_count": 1431,
       "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
@@ -1506,7 +1515,7 @@
       "source_kind": "production"
     }
   ],
-  "accepted_production_files_over_1200_lines": 13,
+  "accepted_production_files_over_1200_lines": 14,
   "api_classes_over_limit": 0,
   "api_classes_over_limit_rows": [],
   "api_decomposition_blockers": [],
@@ -1580,7 +1589,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 3995,
+      "line_count": 4052,
       "path": "tests/event_alpha/test_artifact_doctor.py",
       "severity": "warning",
       "source_kind": "test",
@@ -1589,7 +1598,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 16184,
+      "line_count": 16234,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "severity": "warning",
       "source_kind": "test",
@@ -1701,18 +1710,18 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 651,
+  "file_count": 657,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
       "limit": 1500,
-      "line_count": 3995,
+      "line_count": 4052,
       "path": "tests/event_alpha/test_artifact_doctor.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 16184,
+      "line_count": 16234,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "source_kind": "test"
     },
@@ -1758,7 +1767,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-06T16:48:53.253707+00:00",
+  "generated_at": "2026-07-07T03:42:48.577994+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1772,6 +1781,12 @@
       "limit": 1500,
       "line_count": 1472,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1471,
+      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
       "source_kind": "production"
     },
     {
@@ -1872,6 +1887,18 @@
     },
     {
       "limit": 1500,
+      "line_count": 1126,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1125,
+      "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1123,
       "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
       "source_kind": "production"
@@ -1886,12 +1913,6 @@
       "limit": 1500,
       "line_count": 1096,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1079,
-      "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py",
       "source_kind": "production"
     },
     {
@@ -1922,6 +1943,12 @@
       "limit": 1500,
       "line_count": 1044,
       "path": "crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1039,
+      "path": "crypto_rsi_scanner/event_alpha/operations/review_inbox.py",
       "source_kind": "production"
     },
     {
@@ -1983,30 +2010,12 @@
       "line_count": 973,
       "path": "crypto_rsi_scanner/event_alpha/radar/core_opportunities.py",
       "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 966,
-      "path": "crypto_rsi_scanner/event_alpha/radar/evidence/executor.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 961,
-      "path": "crypto_rsi_scanner/cli/services/scanner_parts/reports.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 941,
-      "path": "crypto_rsi_scanner/event_alpha/radar/identity.py",
-      "source_kind": "production"
     }
   ],
   "largest_test_files": [
     {
       "limit": 1500,
-      "line_count": 16184,
+      "line_count": 16234,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "source_kind": "test"
     },
@@ -2024,14 +2033,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 4031,
-      "path": "tests/event_alpha/test_outcomes.py",
+      "line_count": 4052,
+      "path": "tests/event_alpha/test_artifact_doctor.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 3995,
-      "path": "tests/event_alpha/test_artifact_doctor.py",
+      "line_count": 4031,
+      "path": "tests/event_alpha/test_outcomes.py",
       "source_kind": "test"
     },
     {
@@ -2060,26 +2069,26 @@
     },
     {
       "limit": 1500,
+      "line_count": 1235,
+      "path": "tests/event_alpha/test_burn_in_operations.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 850,
+      "path": "tests/event_alpha/test_artifact_schema.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 825,
       "path": "tests/event_alpha/_api_helpers.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 746,
-      "path": "tests/event_alpha/test_artifact_schema.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
       "line_count": 727,
       "path": "tests/rsi/test_indicators_core.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 719,
-      "path": "tests/event_alpha/test_burn_in_operations.py",
       "source_kind": "test"
     },
     {
@@ -2104,6 +2113,12 @@
       "limit": 1500,
       "line_count": 308,
       "path": "tests/cli/test_parser.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 293,
+      "path": "tests/event_alpha/test_burn_in_candidate_mode.py",
       "source_kind": "test"
     },
     {
@@ -3579,6 +3594,13 @@
       "status": "accepted_near_threshold"
     },
     {
+      "line_count": 1471,
+      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
       "line_count": 1431,
       "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3699,6 +3721,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1471,
+      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1431,
       "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "source_kind": "production"
@@ -3764,7 +3792,7 @@
       "source_kind": "production"
     }
   ],
-  "production_files_over_1200_lines": 13,
+  "production_files_over_1200_lines": 14,
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
@@ -3998,7 +4026,7 @@
       ]
     },
     "production_files_over_1200_lines": {
-      "count": 13,
+      "count": 14,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
         {
@@ -4017,6 +4045,15 @@
           "path": "crypto_rsi_scanner/project_health/architecture_report.py",
           "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
           "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1471,
+          "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+          "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
+          "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
           "source_kind": "production"
         },
         {
@@ -4151,7 +4188,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 13,
+      "production_files_over_1200_lines": 14,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -4168,6 +4205,11 @@
       {
         "line_count": 1472,
         "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1471,
+        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
         "threshold": 1200
       },
       {
@@ -4282,7 +4324,7 @@
         ]
       },
       "production_files_over_1200_lines": {
-        "count": 13,
+        "count": 14,
         "reason": "accepted/documented production files over the v3 1,200-line target",
         "rows": [
           {
@@ -4301,6 +4343,15 @@
             "path": "crypto_rsi_scanner/project_health/architecture_report.py",
             "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
             "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1471,
+            "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+            "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
+            "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
             "source_kind": "production"
           },
           {
@@ -4419,7 +4470,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 13,
+    "production_files_over_1200_lines": 14,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,
@@ -4443,7 +4494,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 3995,
+      "line_count": 4052,
       "path": "tests/event_alpha/test_artifact_doctor.py",
       "severity": "warning",
       "source_kind": "test",
@@ -4452,7 +4503,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 16184,
+      "line_count": 16234,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "severity": "warning",
       "source_kind": "test",

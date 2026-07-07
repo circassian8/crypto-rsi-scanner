@@ -2,15 +2,15 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-06T16:48:53.253707+00:00`
+- generated_at: `2026-07-07T03:42:48.577994+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
 - v3_gate_status: `accepted_with_documented_exceptions`
 - v3_auto_accept_ready: `False`
 - v3_blockers: `[]`
-- production_files_over_1200_lines: `13`
-- accepted_production_files_over_1200_lines: `13`
+- production_files_over_1200_lines: `14`
+- accepted_production_files_over_1200_lines: `14`
 - unresolved_production_files_over_1200_lines: `0`
 - production_size_gate_status: `warning`
 - production_files_over_1500_lines: `0`
@@ -70,7 +70,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 13 | accepted_exception |
+| `production_files_over_1200_lines` | 14 | accepted_exception |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | accepted_exception |
@@ -94,6 +94,7 @@ Static source inventory only. This report does not call providers, send Telegram
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1472 |
+| `crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py` | 1471 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1431 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 |
@@ -110,15 +111,17 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py` | 1145 |
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1136 |
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 1135 |
+| `crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py` | 1126 |
+| `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py` | 1125 |
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1123 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/rsi_scan.py` | 1103 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py` | 1096 |
-| `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py` | 1079 |
 | `crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py` | 1078 |
 | `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1069 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1059 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1047 |
 | `crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py` | 1044 |
+| `crypto_rsi_scanner/event_alpha/operations/review_inbox.py` | 1039 |
 | `crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py` | 1035 |
 | `crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py` | 1033 |
 | `crypto_rsi_scanner/event_alpha/radar/llm/extractor.py` | 1002 |
@@ -129,9 +132,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/radar/impact_hypothesis_store.py` | 980 |
 | `crypto_rsi_scanner/event_alpha/radar/incident_graph.py` | 976 |
 | `crypto_rsi_scanner/event_alpha/radar/core_opportunities.py` | 973 |
-| `crypto_rsi_scanner/event_alpha/radar/evidence/executor.py` | 966 |
-| `crypto_rsi_scanner/cli/services/scanner_parts/reports.py` | 961 |
-| `crypto_rsi_scanner/event_alpha/radar/identity.py` | 941 |
 
 ## Accepted Production Files Over 1200 Lines
 
@@ -139,6 +139,7 @@ Static source inventory only. This report does not call providers, send Telegram
 |---|---:|---|---|
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 | Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged. | When identity/source/market/derivatives merge golden fixtures can be compared before and after split. |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1472 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
+| `crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py` | 1471 | Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out. | When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split. |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1431 | Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral. | When deleted-shim reporting can be split from old-import linting without changing gate output. |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 | Dense operator audit renderer with many cross-section helper dependencies. | When audit sections are split with golden Markdown fixture comparison. |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | Verdict scoring and live-confirmation policy share many ordered caps and guardrails. | When verdict snapshots cover each opportunity level and cap reason. |
@@ -161,23 +162,24 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `tests/event_alpha/test_integrated_radar.py` | 16184 |
+| `tests/event_alpha/test_integrated_radar.py` | 16234 |
 | `tests/event_alpha/test_provider_readiness.py` | 5357 |
 | `tests/event_alpha/test_notifications.py` | 5002 |
+| `tests/event_alpha/test_artifact_doctor.py` | 4052 |
 | `tests/event_alpha/test_outcomes.py` | 4031 |
-| `tests/event_alpha/test_artifact_doctor.py` | 3995 |
 | `tests/event_alpha/test_source_coverage.py` | 2991 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
 | `tests/test_indicators.py` | 1779 |
 | `tests/cli/test_make_targets.py` | 1476 |
+| `tests/event_alpha/test_burn_in_operations.py` | 1235 |
+| `tests/event_alpha/test_artifact_schema.py` | 850 |
 | `tests/event_alpha/_api_helpers.py` | 825 |
-| `tests/event_alpha/test_artifact_schema.py` | 746 |
 | `tests/rsi/test_indicators_core.py` | 727 |
-| `tests/event_alpha/test_burn_in_operations.py` | 719 |
 | `tests/rsi/test_backtest.py` | 561 |
 | `tests/event_alpha/test_shim_registry.py` | 515 |
 | `tests/rsi/test_paper_risk.py` | 412 |
 | `tests/cli/test_parser.py` | 308 |
+| `tests/event_alpha/test_burn_in_candidate_mode.py` | 293 |
 | `tests/cli/test_event_alpha_command_registry.py` | 202 |
 | `tests/cli/test_dispatch.py` | 169 |
 | `tests/cli/test_burn_in_make_targets.py` | 122 |
@@ -197,8 +199,8 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `tests/event_alpha/test_artifact_doctor.py` | 3995 |
-| `tests/event_alpha/test_integrated_radar.py` | 16184 |
+| `tests/event_alpha/test_artifact_doctor.py` | 4052 |
+| `tests/event_alpha/test_integrated_radar.py` | 16234 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
 | `tests/event_alpha/test_notifications.py` | 5002 |
 | `tests/event_alpha/test_outcomes.py` | 4031 |
@@ -210,8 +212,8 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | category | id | lines/count |
 |---|---|---:|
-| `file_over_1500_lines` | `file:tests/event_alpha/test_artifact_doctor.py` | 3995 |
-| `file_over_1500_lines` | `file:tests/event_alpha/test_integrated_radar.py` | 16184 |
+| `file_over_1500_lines` | `file:tests/event_alpha/test_artifact_doctor.py` | 4052 |
+| `file_over_1500_lines` | `file:tests/event_alpha/test_integrated_radar.py` | 16234 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_notifications.py` | 5002 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_outcomes.py` | 4031 |
