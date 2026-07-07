@@ -532,6 +532,7 @@ def test_event_alpha_consolidation_import_shims_and_schema_registry():
         "namespace_status_v1",
         "run_ledger_v1",
         "event_alpha_daily_burn_in_run_v1",
+        "event_alpha_candidate_mode_manifest_v1",
         "event_alpha_daily_review_inbox_v1",
         "event_alpha_burn_in_scorecard_v1",
         "event_alpha_burn_in_measurement_dashboard_v1",
@@ -641,6 +642,14 @@ def test_event_alpha_burn_in_operation_schemas_validate(tmp_path):
             "artifact_namespace": "burn",
             "completed": True,
             "steps": [{"name": "doctor", "status": "passed", "timeout_seconds": 60}],
+            **safety,
+        },
+        "event_alpha_candidate_mode_manifest.json": {
+            "row_type": "event_alpha_candidate_mode_manifest",
+            "profile": "live_burn_in_no_send",
+            "artifact_namespace": "burn",
+            "candidate_mode": True,
+            "providers": {},
             **safety,
         },
         "event_alpha_daily_review_inbox.json": {

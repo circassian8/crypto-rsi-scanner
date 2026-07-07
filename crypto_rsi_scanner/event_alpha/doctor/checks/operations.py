@@ -11,11 +11,13 @@ from ._utils import Messages, ctx_mapping, ctx_value
 
 def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
     daily_run = ctx_mapping(ctx, "daily_burn_in_run")
+    candidate_mode_manifest = ctx_mapping(ctx, "candidate_mode_manifest")
     scorecard = ctx_mapping(ctx, "burn_in_scorecard")
     source_yield = ctx_mapping(ctx, "source_yield_report")
     review_inbox = ctx_mapping(ctx, "daily_review_inbox")
     archive_manifest = ctx_mapping(ctx, "burn_in_archive_manifest")
     _check_daily_run(ctx, daily_run, blockers, warnings)
+    _check_candidate_mode(ctx, daily_run, candidate_mode_manifest, blockers, warnings)
     _check_scorecard(scorecard, blockers)
     _check_source_yield(source_yield, blockers)
     _check_review_inbox(review_inbox, blockers, warnings)
@@ -86,6 +88,62 @@ def _check_daily_run(ctx: object, daily_run: Mapping[str, Any], blockers: Messag
             check_registry.format_check_message(
                 "outcomes.daily_burn_in_integrated_preview",
                 "daily_burn_in_integrated_preview_mismatch",
+            )
+        )
+
+
+def _check_candidate_mode(ctx: object, daily_run: Mapping[str, Any], candidate_mode_manifest: Mapping[str, Any], blockers: Messages, warnings: Messages) -> None:
+    if daily_run.get("candidate_mode") is True and not candidate_mode_manifest:
+        warnings.append(
+            check_registry.format_check_message(
+                "outcomes.daily_burn_in_candidate_mode_manifest",
+                "daily_burn_in_candidate_mode_manifest_missing",
+            )
+        )
+    candidate_rows = [row for row in ctx_value(ctx, "integrated_candidates", []) or [] if isinstance(row, Mapping)]
+    missing_provenance = 0
+    missing_ledger = 0
+    fixture_counted = 0
+    preflight_counted = 0
+    for row in candidate_rows:
+        if row.get("contract_counted_candidate") is not True:
+            continue
+        required_fields = ("candidate_provenance", "provider", "source_pack", "source_origin")
+        if any(not str(row.get(field) or "").strip() for field in required_fields):
+            missing_provenance += 1
+        source_mode = str(row.get("candidate_source_mode") or "").strip()
+        if source_mode == "live_no_send" and not str(row.get("request_ledger_path") or "").strip():
+            missing_ledger += 1
+        if source_mode in {"mocked_fixture", "fixture"} or row.get("fixture_only") is True or row.get("test_fixture") is True:
+            fixture_counted += 1
+        if source_mode in {"preflight_only", "readiness_only"}:
+            preflight_counted += 1
+    if missing_provenance:
+        blockers.append(
+            check_registry.format_check_message(
+                "outcomes.daily_burn_in_candidate_provenance",
+                f"daily_burn_in_contract_candidate_missing_provenance={missing_provenance}",
+            )
+        )
+    if missing_ledger:
+        blockers.append(
+            check_registry.format_check_message(
+                "outcomes.daily_burn_in_candidate_live_ledger",
+                f"daily_burn_in_live_candidate_missing_request_ledger={missing_ledger}",
+            )
+        )
+    if fixture_counted:
+        blockers.append(
+            check_registry.format_check_message(
+                "outcomes.daily_burn_in_scorecard_fixture_real",
+                f"daily_burn_in_fixture_candidate_counted_as_real={fixture_counted}",
+            )
+        )
+    if preflight_counted:
+        blockers.append(
+            check_registry.format_check_message(
+                "outcomes.source_yield_preflight_candidate_yield",
+                f"daily_burn_in_preflight_row_counted_as_candidate={preflight_counted}",
             )
         )
 

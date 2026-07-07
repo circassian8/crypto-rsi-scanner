@@ -177,50 +177,22 @@ def format_review_inbox(payload: Mapping[str, Any]) -> str:
                     f"selected=`{row.get('selected_feedback_targets')}`"
                 )
         lines.append("")
+    items = [row for row in payload.get("items", []) or [] if isinstance(row, Mapping)]
+    contract_items = [row for row in items if row.get("contract_counted_candidate") is True]
+    support_items = [row for row in items if row.get("contract_counted_candidate") is not True]
     lines.extend(["## Review Items", ""])
-    for index, row in enumerate(payload.get("items", []) or [], start=1):
-        if not isinstance(row, Mapping):
-            continue
-        lines.extend(
-            [
-                f"### {index}. {row.get('symbol') or 'UNKNOWN'} / {row.get('coin_id') or 'unknown'}",
-                f"- family: `{row.get('family')}`",
-                f"- visible_family_key: `{row.get('visible_family_key')}`",
-                f"- primary_visible_family_key: `{row.get('primary_visible_family_key')}`",
-                f"- secondary_visible_family_key: `{row.get('secondary_visible_family_key')}`",
-                f"- duplicate_visible_family_count: `{row.get('duplicate_visible_family_count')}`",
-                f"- symbol_duplicate_count: `{row.get('symbol_duplicate_count')}`",
-                f"- collapsed_symbol_family_count: `{row.get('collapsed_symbol_family_count')}`",
-                f"- visible_family_rank: `{row.get('visible_family_rank')}`",
-                f"- symbol_family_rank: `{row.get('symbol_family_rank')}`",
-                f"- selection_bucket: `{row.get('selection_bucket')}`",
-                f"- allowed_second_family_reason: `{row.get('allowed_second_family_reason') or 'none'}`",
-                f"- Provenance: `{row.get('candidate_provenance')}` from `{row.get('source_artifact')}` row_type=`{row.get('source_artifact_row_type')}`",
-                f"- Counts toward burn-in candidate evidence: `{row.get('contract_counted_candidate')}`",
-                f"- opportunity_type: `{row.get('opportunity_type')}`",
-                f"- score: `{row.get('score')}`",
-                f"- Review value: `{row.get('review_value_score')}` ({', '.join(row.get('review_value_reason_codes') or []) or 'general review'})",
-                f"- downrank_reason_codes: `{', '.join(row.get('downrank_reason_codes') or []) or 'none'}`",
-                f"- selection_reason: `{row.get('selection_reason')}`",
-                f"- Why this needs human review: {row.get('why_not_alertable')}",
-                f"- selected_representative_reason: `{row.get('selected_representative_reason') or row.get('collapsed_family_representative_reason')}`",
-                f"- diversity_bucket: `{row.get('diversity_bucket')}`",
-                f"- source_origin/source_pack: `{row.get('source_origin')}` / `{row.get('source_pack')}`",
-                f"- evidence_status: `{row.get('evidence_status')}`",
-                f"- market_state: `{row.get('market_state')}`",
-                f"- why_not_alertable: {row.get('why_not_alertable')}",
-                f"- what_confirms: {row.get('what_confirms')}",
-                f"- what_invalidates: {row.get('what_invalidates')}",
-                f"- card_path: `{row.get('card_path') or 'none'}`",
-                f"- feedback_target: `{row.get('feedback_target')}`",
-                "- suggested_feedback_commands:",
-            ]
-        )
-        for command in row.get("suggested_feedback_commands") or []:
-            lines.append(f"  - `{command}`")
-        if row.get("provider_gap"):
-            lines.append(f"- provider_gap: {row.get('provider_gap')}")
+    lines.extend(["## Contract-Counted Burn-In Candidates", ""])
+    if not contract_items:
+        lines.append("- No real candidate evidence yet.")
         lines.append("")
+    for index, row in enumerate(contract_items, start=1):
+        _append_review_item_lines(lines, index, row)
+    lines.extend(["## Diagnostic / Support Review Items", ""])
+    if not support_items:
+        lines.append("- No diagnostic or support review items selected.")
+        lines.append("")
+    for index, row in enumerate(support_items, start=len(contract_items) + 1):
+        _append_review_item_lines(lines, index, row)
     lines.extend(
         [
             "## Safety",
@@ -233,6 +205,51 @@ def format_review_inbox(payload: Mapping[str, Any]) -> str:
         ]
     )
     return "\n".join(lines).rstrip()
+
+
+def _append_review_item_lines(lines: list[str], index: int, row: Mapping[str, Any]) -> None:
+    if not isinstance(row, Mapping):
+        return
+    lines.extend(
+        [
+            f"### {index}. {row.get('symbol') or 'UNKNOWN'} / {row.get('coin_id') or 'unknown'}",
+            f"- family: `{row.get('family')}`",
+            f"- visible_family_key: `{row.get('visible_family_key')}`",
+            f"- primary_visible_family_key: `{row.get('primary_visible_family_key')}`",
+            f"- secondary_visible_family_key: `{row.get('secondary_visible_family_key')}`",
+            f"- duplicate_visible_family_count: `{row.get('duplicate_visible_family_count')}`",
+            f"- symbol_duplicate_count: `{row.get('symbol_duplicate_count')}`",
+            f"- collapsed_symbol_family_count: `{row.get('collapsed_symbol_family_count')}`",
+            f"- visible_family_rank: `{row.get('visible_family_rank')}`",
+            f"- symbol_family_rank: `{row.get('symbol_family_rank')}`",
+            f"- selection_bucket: `{row.get('selection_bucket')}`",
+            f"- allowed_second_family_reason: `{row.get('allowed_second_family_reason') or 'none'}`",
+            f"- Provenance: `{row.get('candidate_provenance')}` from `{row.get('source_artifact')}` row_type=`{row.get('source_artifact_row_type')}`",
+            f"- Counts toward burn-in candidate evidence: `{row.get('contract_counted_candidate')}`",
+            f"- opportunity_type: `{row.get('opportunity_type')}`",
+            f"- score: `{row.get('score')}`",
+            f"- Review value: `{row.get('review_value_score')}` ({', '.join(row.get('review_value_reason_codes') or []) or 'general review'})",
+            f"- downrank_reason_codes: `{', '.join(row.get('downrank_reason_codes') or []) or 'none'}`",
+            f"- selection_reason: `{row.get('selection_reason')}`",
+            f"- Why this needs human review: {row.get('why_not_alertable')}",
+            f"- selected_representative_reason: `{row.get('selected_representative_reason') or row.get('collapsed_family_representative_reason')}`",
+            f"- diversity_bucket: `{row.get('diversity_bucket')}`",
+            f"- source_origin/source_pack: `{row.get('source_origin')}` / `{row.get('source_pack')}`",
+            f"- evidence_status: `{row.get('evidence_status')}`",
+            f"- market_state: `{row.get('market_state')}`",
+            f"- why_not_alertable: {row.get('why_not_alertable')}",
+            f"- what_confirms: {row.get('what_confirms')}",
+            f"- what_invalidates: {row.get('what_invalidates')}",
+            f"- card_path: `{row.get('card_path') or 'none'}`",
+            f"- feedback_target: `{row.get('feedback_target')}`",
+            "- suggested_feedback_commands:",
+        ]
+    )
+    for command in row.get("suggested_feedback_commands") or []:
+        lines.append(f"  - `{command}`")
+    if row.get("provider_gap"):
+        lines.append(f"- provider_gap: {row.get('provider_gap')}")
+    lines.append("")
 
 
 def _candidate_rows(context: Any) -> list[dict[str, Any]]:
@@ -591,7 +608,15 @@ def _select_review_items(items: list[ReviewItem], *, limit: int) -> list[ReviewI
         if item.secondary_visible_family_key in {selected_item.secondary_visible_family_key for selected_item in selected}:
             continue
         selected.append(item)
-    ordered = sorted(selected, key=lambda item: (-_priority(item), -item.score, item.visible_family_key))
+    ordered = sorted(
+        selected,
+        key=lambda item: (
+            0 if item.contract_counted_candidate else 1,
+            -_priority(item),
+            -item.score,
+            item.visible_family_key,
+        ),
+    )
     primary_counts = {
         primary: sum(item.duplicate_visible_family_count for item in values)
         for primary, values in by_primary.items()

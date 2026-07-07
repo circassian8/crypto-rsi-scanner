@@ -510,6 +510,27 @@ CHECKS: tuple[DoctorCheck, ...] = (
         "Daily burn-in integrated delivery rows must reconcile to an integrated radar preview.",
     ),
     _check(
+        "outcomes.daily_burn_in_candidate_mode_manifest",
+        CATEGORY_OUTCOMES,
+        "warning",
+        ("candidate_mode", "candidate_mode_manifest_path"),
+        "Daily burn-in candidate mode must write a candidate-mode manifest.",
+    ),
+    _check(
+        "outcomes.daily_burn_in_candidate_provenance",
+        CATEGORY_OUTCOMES,
+        "blocker",
+        ("contract_counted_candidate", "candidate_provenance", "provider", "source_pack", "source_origin"),
+        "Contract-counted burn-in candidates must carry provider/source provenance.",
+    ),
+    _check(
+        "outcomes.daily_burn_in_candidate_live_ledger",
+        CATEGORY_OUTCOMES,
+        "blocker",
+        ("candidate_source_mode", "request_ledger_path"),
+        "Live no-send burn-in candidates must carry a request ledger path.",
+    ),
+    _check(
         "outcomes.daily_burn_in_scorecard_fixture_real",
         CATEGORY_OUTCOMES,
         "blocker",

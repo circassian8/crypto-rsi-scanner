@@ -9,7 +9,7 @@ from typing import Any, Mapping
 from . import common
 from . import evidence_semantics
 from . import namespace_policy
-from .daily_burn_in import RUN_JSON
+from .daily_burn_in import CANDIDATE_MODE_MANIFEST_JSON, RUN_JSON
 
 
 SOURCE_YIELD_JSON = "event_alpha_source_yield_report.json"
@@ -52,6 +52,11 @@ def build_source_yield_report(
     outcomes = _rows(base, "event_integrated_radar_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces) + _rows(base, "event_alpha_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces)
     daily_runs = [common.read_json(base / namespace / RUN_JSON) for namespace in included_namespaces]
     daily_runs = [row for row in daily_runs if row]
+    candidate_mode_manifests = [
+        common.read_json(base / namespace / CANDIDATE_MODE_MANIFEST_JSON)
+        for namespace in included_namespaces
+    ]
+    candidate_mode_manifests = [row for row in candidate_mode_manifests if row]
     evidence_summaries = evidence_semantics.namespace_summaries(base, included_namespaces, cutoff=cutoff, policy=policy)
     evidence_aggregate = evidence_semantics.aggregate_namespace_summaries(evidence_summaries)
     explicit_scope = bool(artifact_namespace) or _has_explicit_policy_flags(policy.get("explicit_inclusion_flags") or {})
@@ -81,6 +86,7 @@ def build_source_yield_report(
         provider: _summary_for(provider, "provider", rows=rows, feedback=feedback, outcomes=outcomes)
         for provider in providers
     }
+    _merge_activation_rows(provider_rows, candidate_mode_manifests)
     source_pack_rows = {
         pack: _summary_for(pack, "source_pack", rows=rows, feedback=feedback, outcomes=outcomes)
         for pack in source_packs
@@ -191,7 +197,13 @@ def format_source_yield_report(payload: Mapping[str, Any]) -> str:
     for provider, row in sorted((payload.get("providers") or {}).items()):
         lines.append(
             f"- {provider}: candidates={row.get('candidate_count')} labels={row.get('label_count')} "
+            f"candidates_produced={row.get('candidates_produced')} "
+            f"evidence_accepted={row.get('evidence_accepted')} "
             f"useful={row.get('useful_label_count')} noise={row.get('noise_label_count')} "
+            f"activation=`{row.get('activation_status') or 'not_observed'}` "
+            f"configured=`{row.get('configured')}` allow=`{row.get('allow_flag_set')}` "
+            f"ledger_rows=`{row.get('request_ledger_rows')}` "
+            f"confidence=`{row.get('source_yield_confidence')}` "
             f"recommendation=`{row.get('recommended_action')}`"
         )
     lines.extend(["", "## Source Packs", ""])
@@ -287,6 +299,11 @@ def _summary_for(
 ) -> dict[str, Any]:
     key_fn = _provider if kind == "provider" else _source_pack
     candidate_rows = [row for row in rows if key_fn(row) == name]
+    accepted_rows = [
+        row
+        for row in candidate_rows
+        if row.get("accepted_evidence") or common.int_value(row.get("accepted_evidence_count")) > 0
+    ]
     label_rows = [row for row in feedback if key_fn(row) == name]
     useful = [row for row in label_rows if str(row.get("label") or "") in {"useful", "watch", "promising_source_type"}]
     noisy = [row for row in label_rows if str(row.get("label") or "") in {"junk", "source_noise", "false_positive", "duplicate"}]
@@ -296,6 +313,8 @@ def _summary_for(
         "name": name,
         "kind": kind,
         "candidate_count": len(candidate_rows),
+        "candidates_produced": len(candidate_rows),
+        "evidence_accepted": len(accepted_rows),
         "label_count": len(label_rows),
         "useful_label_count": len(useful),
         "noise_label_count": len(noisy),
@@ -304,8 +323,89 @@ def _summary_for(
         "source_noise_rate_pct": round(100.0 * len(noisy) / len(label_rows), 2) if label_rows else 0.0,
         "usefulness_rate_pct": round(100.0 * len(useful) / len(label_rows), 2) if label_rows else 0.0,
         "recommended_action": _recommend_action(name, candidate_rows, label_rows, noisy, useful),
+        "activation_status": "candidate_rows_observed" if candidate_rows else "not_observed",
+        "configured": None,
+        "allow_flag_set": None,
+        "live_call_allowed": None,
+        "live_calls_attempted": bool(candidate_rows),
+        "request_ledger_rows": sum(common.int_value(row.get("request_ledger_rows")) for row in candidate_rows),
+        "candidate_production_status": "produced_candidates" if candidate_rows else "no_candidates",
+        "source_yield_confidence": "insufficient_labels" if not label_rows else "labeled",
         "auto_apply": False,
     }
+
+
+def _merge_activation_rows(provider_rows: dict[str, dict[str, Any]], manifests: list[Mapping[str, Any]]) -> None:
+    for manifest in manifests:
+        providers = manifest.get("providers") if isinstance(manifest.get("providers"), Mapping) else {}
+        ledger_rows_by_provider = manifest.get("request_ledger_rows") if isinstance(manifest.get("request_ledger_rows"), Mapping) else {}
+        for provider, status in providers.items():
+            if not isinstance(status, Mapping):
+                continue
+            row = provider_rows.setdefault(
+                str(provider),
+                {
+                    "name": str(provider),
+                    "kind": "provider",
+                    "candidate_count": 0,
+                    "candidates_produced": 0,
+                    "evidence_accepted": 0,
+                    "label_count": 0,
+                    "useful_label_count": 0,
+                    "noise_label_count": 0,
+                    "late_label_count": 0,
+                    "outcome_count": 0,
+                    "source_noise_rate_pct": 0.0,
+                    "usefulness_rate_pct": 0.0,
+                    "auto_apply": False,
+                },
+            )
+            request_ledger_rows = common.int_value(ledger_rows_by_provider.get(provider))
+            activation_status = str(status.get("status") or "unknown")
+            row.update(
+                {
+                    "activation_status": activation_status,
+                    "configured": bool(status.get("configured")),
+                    "allow_flag_set": bool(status.get("allow_flag_set")),
+                    "live_call_allowed": bool(status.get("live_call_allowed")),
+                    "live_calls_attempted": request_ledger_rows > 0,
+                    "request_budget": status.get("request_budget"),
+                    "request_ledger_path": status.get("request_ledger_path"),
+                    "request_ledger_rows": request_ledger_rows,
+                    "candidates_produced": common.int_value(row.get("candidate_count")),
+                    "candidate_production_status": _candidate_production_status(row, activation_status),
+                    "source_yield_confidence": _activation_confidence(row, activation_status),
+                    "recommended_action": _activation_recommendation(activation_status),
+                }
+            )
+
+
+def _candidate_production_status(row: Mapping[str, Any], activation_status: str) -> str:
+    if common.int_value(row.get("candidate_count")) > 0:
+        return "produced_candidates"
+    if activation_status in {"skipped_missing_config", "skipped_live_calls_disabled", "live_call_blocked_by_default", "request_budget_not_small"}:
+        return activation_status
+    return "active_burn_in_candidate_mode_no_candidates"
+
+
+def _activation_confidence(row: Mapping[str, Any], activation_status: str) -> str:
+    if common.int_value(row.get("candidate_count")) > 0:
+        return "insufficient_labels" if common.int_value(row.get("label_count")) == 0 else "candidate_rows_observed"
+    if activation_status in {"skipped_missing_config", "skipped_live_calls_disabled", "live_call_blocked_by_default"}:
+        return "activation_pending"
+    return "no_candidates_yet"
+
+
+def _activation_recommendation(activation_status: str) -> str:
+    if activation_status == "skipped_missing_config":
+        return "activate_next_missing_config"
+    if activation_status in {"skipped_live_calls_disabled", "live_call_blocked_by_default"}:
+        return "activate_next_allow_flag_required"
+    if activation_status == "request_budget_not_small":
+        return "set_small_request_budget"
+    if activation_status == "ready_live_no_send":
+        return "measure_candidate_yield"
+    return "hold_no_threshold_change"
 
 
 def _recommend_action(

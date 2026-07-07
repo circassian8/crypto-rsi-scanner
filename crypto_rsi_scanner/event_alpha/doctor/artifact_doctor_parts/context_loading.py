@@ -91,6 +91,7 @@ def _load_doctor_context_inputs(options: Mapping[str, Any]) -> SimpleNamespace:
     ctx.source_yield_report = loaded.source_yield_report
     ctx.daily_review_inbox = loaded.daily_review_inbox
     ctx.daily_burn_in_run = loaded.daily_burn_in_run
+    ctx.candidate_mode_manifest = loaded.candidate_mode_manifest
     ctx.burn_in_namespace_policy = loaded.burn_in_namespace_policy
     ctx.burn_in_archive_manifest = loaded.burn_in_archive_manifest
     ctx.dex_pool_state = loaded.dex_pool_state
@@ -772,6 +773,7 @@ def _load_raw_doctor_artifacts(options: Mapping[str, Any]) -> SimpleNamespace:
         raw_source_yield_report=_read_json(default_dir / "event_alpha_source_yield_report.json" if default_dir is not None else None),
         raw_daily_review_inbox=_read_json(default_dir / "event_alpha_daily_review_inbox.json" if default_dir is not None else None),
         raw_daily_burn_in_run=_read_json(default_dir / "event_alpha_daily_burn_in_run.json" if default_dir is not None else None),
+        raw_candidate_mode_manifest=_read_json(default_dir / "event_alpha_candidate_mode_manifest.json" if default_dir is not None else None),
         raw_burn_in_namespace_policy=_read_json(default_dir / "event_alpha_burn_in_namespace_policy.json" if default_dir is not None else None),
         raw_burn_in_archive_manifest=_read_json(default_dir / "event_alpha_burn_in_archive_manifest.json" if default_dir is not None else None),
         integrated_manifest_path=(
@@ -838,6 +840,7 @@ def _filter_doctor_artifacts(raw: SimpleNamespace, options: Mapping[str, Any]) -
         source_yield_report=raw.raw_source_yield_report,
         daily_review_inbox=raw.raw_daily_review_inbox,
         daily_burn_in_run=raw.raw_daily_burn_in_run,
+        candidate_mode_manifest=raw.raw_candidate_mode_manifest,
         burn_in_namespace_policy=raw.raw_burn_in_namespace_policy,
         burn_in_archive_manifest=raw.raw_burn_in_archive_manifest,
     )

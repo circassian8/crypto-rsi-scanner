@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-07 — Add explicit burn-in candidate mode · Codex
+**Why:** Daily live no-send burn-in needed a deliberate candidate-producing mode
+so normal preflight/safety runs do not get confused with contract-counted burn-in
+evidence.
+**Changes:**
+- Added `--event-alpha-burn-in-candidate-mode` and
+  `CANDIDATE_MODE=1` wiring for the daily live no-send burn-in Make target,
+  with a candidate-mode manifest and explicit provider skip/next-step details.
+- Kept Coinalyze and Bybit live-capable steps disabled by default; candidate
+  mode only allows bounded provider work when configuration and explicit allow
+  flags are present.
+- Stamped candidate-mode rows with provenance, source-mode,
+  contract-counted, request-ledger, and safety fields; fixture/preflight/support
+  diagnostics stay out of real burn-in evidence.
+- Split the review inbox into contract-counted burn-in candidates vs diagnostic
+  support items, and updated source-yield/provider activation status plus
+  schema/doctor checks for candidate-mode misuse.
+**Verify:** `python3 tests/test_indicators.py` (774/774 passed);
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/event_alpha tests/rsi
+tests/cli tests/test_indicators.py -q` (832 passed); `python3 -m compileall -q
+crypto_rsi_scanner tests`; targeted burn-in/schema tests (52 passed); daily
+burn-in smoke/plan, candidate-mode no-send run (`live_burn_in_20260707`: 12
+passed, 2 skipped, 0 failed), scorecard, review inbox, weekly measurement,
+source-yield, archive dry-run, Coinalyze preflight/rehearsal safe paths,
+official exchange smoke, notification format smoke, Telegram no-send final
+check, integrated radar smoke/doctor, strict live burn-in doctor (OK/no
+warnings), strict CryptoPanic rehearsal doctor, and `make verify PYTHON=python3`.
+**Notes/risks:** With no provider configuration or allow flags, candidate mode
+exits 0 with `candidate_mode=true`, zero real candidates, explicit skipped
+configuration, and no live sends, trades, paper trades, normal RSI rows, or
+Event Alpha-created `TRIGGERED_FADE`.
+
 ## 2026-07-07 — Polish daily burn-in traceability and skip statuses · Codex
 **Why:** The final daily burn-in loop needed to be doctor-clean for
 `live_burn_in_20260705` before routine no-send use: executable steps needed

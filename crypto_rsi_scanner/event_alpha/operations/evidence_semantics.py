@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from . import common
-from .daily_burn_in import RUN_JSON
+from .daily_burn_in import CANDIDATE_MODE_MANIFEST_JSON, RUN_JSON
 
 
 INTEGRATED_CANDIDATES = "event_integrated_radar_candidates.jsonl"
@@ -65,6 +65,9 @@ def namespace_summaries(base: Path, namespaces: list[str] | tuple[str, ...], *, 
 def namespace_summary(base: Path, namespace: str, *, cutoff, categories: set[str] | None = None) -> dict[str, Any]:
     categories = set(categories or set())
     namespace_dir = base / namespace
+    daily_run = common.read_json(namespace_dir / RUN_JSON)
+    candidate_manifest = common.read_json(namespace_dir / CANDIDATE_MODE_MANIFEST_JSON)
+    candidate_mode = bool(daily_run.get("candidate_mode") or candidate_manifest.get("candidate_mode"))
     burn_in_run_count = _json_doc_count(namespace_dir / RUN_JSON, cutoff=cutoff)
     integrated_rows = _rows(namespace_dir / INTEGRATED_CANDIDATES, cutoff=cutoff)
     core_rows = _rows(namespace_dir / CORE_OPPORTUNITIES, cutoff=cutoff)
@@ -89,6 +92,8 @@ def namespace_summary(base: Path, namespace: str, *, cutoff, categories: set[str
         "categories": sorted(categories),
         "burn_in_run_count": burn_in_run_count,
         "has_burn_in_run": burn_in_run_count > 0,
+        "candidate_mode": candidate_mode,
+        "has_candidate_mode_manifest": bool(candidate_manifest),
         "integrated_candidate_count": len(integrated_rows),
         "core_opportunity_count": len(core_rows),
         "notification_rehearsal_rows": len(alert_rows),
@@ -130,6 +135,8 @@ def aggregate_namespace_summaries(summaries: list[dict[str, Any]]) -> dict[str, 
         "namespaces_with_integrated_candidates": _names_where(summaries, "has_integrated_candidates"),
         "namespaces_with_notification_preview_only": _names_where(summaries, "has_notification_preview_only"),
         "namespaces_with_no_candidate_artifacts": _names_where(summaries, "has_no_candidate_artifacts"),
+        "candidate_mode_namespaces": _names_where(summaries, "candidate_mode"),
+        "candidate_mode_manifest_namespaces": _names_where(summaries, "has_candidate_mode_manifest"),
         "real_burn_in_candidates": len(real_rows),
         "fixture_candidates": sum(int(item.get("fixture_candidate_count") or 0) for item in summaries),
         "preflight_diagnostic_rows": sum(int(item.get("preflight_diagnostic_rows") or 0) for item in summaries),
@@ -158,6 +165,8 @@ def payload_fields(aggregate: Mapping[str, Any]) -> dict[str, Any]:
         "namespaces_with_integrated_candidates",
         "namespaces_with_notification_preview_only",
         "namespaces_with_no_candidate_artifacts",
+        "candidate_mode_namespaces",
+        "candidate_mode_manifest_namespaces",
         "real_burn_in_candidates",
         "fixture_candidates",
         "preflight_diagnostic_rows",
@@ -186,6 +195,8 @@ def evidence_scope_from_summary(
     real_count = int(aggregate.get("real_burn_in_candidates") or 0)
     if real_count > 0:
         return "real_burn_in_evidence", "burn-in run produced contract-counted candidate artifacts"
+    if aggregate.get("candidate_mode_namespaces"):
+        return "active_burn_in_candidate_mode_no_candidates", "candidate mode ran but no contract-counted candidate artifacts were produced"
     support_rows = (
         int(aggregate.get("preflight_diagnostic_rows") or 0)
         + int(aggregate.get("readiness_rows") or 0)
@@ -205,6 +216,15 @@ def is_contract_counted_candidate(row: Mapping[str, Any], *, namespace_categorie
         return False
     if is_diagnostic_row(row) or _is_fixture_row(row):
         return False
+    source_mode = str(row.get("candidate_source_mode") or "").strip().casefold()
+    if source_mode in {"mocked_fixture", "fixture", "preflight_only", "readiness_only", "artifact_replay"}:
+        return False
+    if row.get("contract_counted_candidate") is False:
+        return False
+    if row.get("contract_counted_candidate") is True:
+        if source_mode == "live_no_send" and not str(row.get("request_ledger_path") or "").strip():
+            return False
+        return True
     return True
 
 
@@ -227,7 +247,15 @@ def row_provenance(row: Mapping[str, Any]) -> dict[str, Any]:
     fixture_only = _is_fixture_row(row)
     diagnostic_only = is_diagnostic_row(row)
     preflight_only = record_type in {"preflight", "readiness"}
+    source_mode = str(row.get("candidate_source_mode") or "").strip()
+    requested_contract_count = row.get("contract_counted_candidate")
     real_evidence = record_type == "integrated_candidate" and not fixture_only and not diagnostic_only
+    if requested_contract_count is False:
+        real_evidence = False
+    if source_mode in {"mocked_fixture", "preflight_only", "readiness_only", "artifact_replay"}:
+        real_evidence = False
+    if requested_contract_count is True and source_mode == "live_no_send" and row.get("request_ledger_path"):
+        real_evidence = True
     return {
         "candidate_record_type": record_type,
         "candidate_provenance": record_type,
@@ -237,7 +265,12 @@ def row_provenance(row: Mapping[str, Any]) -> dict[str, Any]:
         "diagnostic_only": diagnostic_only,
         "fixture_only": fixture_only,
         "preflight_only": preflight_only,
-        "contract_counted_candidate": real_evidence,
+        "candidate_source_mode": source_mode,
+        "provider": str(row.get("provider") or row.get("source_provider") or row.get("source_origin") or ""),
+        "source_pack": str(row.get("source_pack") or row.get("source_pack_id") or row.get("source_class") or ""),
+        "source_origin": str(row.get("source_origin") or row.get("provider") or row.get("source_provider") or ""),
+        "request_ledger_path": str(row.get("request_ledger_path") or ""),
+        "contract_counted_candidate": bool(real_evidence if requested_contract_count is None else requested_contract_count and real_evidence),
     }
 
 

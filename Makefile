@@ -113,6 +113,7 @@ INCLUDE_DIAGNOSTICS ?= 0
 BURN_IN_REVIEW ?= 0
 BURN_IN_NAMESPACE ?=
 BURN_IN_NAMESPACE_ARG = $(if $(strip $(BURN_IN_NAMESPACE)),--artifact-namespace $(BURN_IN_NAMESPACE),)
+BURN_IN_CANDIDATE_MODE_ARG = $(if $(filter 1 true yes,$(CANDIDATE_MODE)),--event-alpha-burn-in-candidate-mode,)
 BURN_IN_REPORT_PROFILE = $(if $(filter command line environment override,$(origin PROFILE)),$(EVENT_ALPHA_RUNTIME_PROFILE),live_burn_in_no_send)
 BURN_IN_REPORT_NAMESPACE_ARG = $(if $(strip $(BURN_IN_NAMESPACE)),$(BURN_IN_NAMESPACE_ARG),$(if $(filter $(PROFILE),$(ARTIFACT_NAMESPACE)),,$(if $(strip $(ARTIFACT_NAMESPACE)),--artifact-namespace $(ARTIFACT_NAMESPACE),)))
 BURN_IN_DRY_RUN_ARG = $(if $(filter 1 true yes,$(DRY_RUN)),--dry-run,)
@@ -334,7 +335,7 @@ help:
 	@echo "  make event-alpha-burn-in-llm  LLM research burn-in: status, cycle, brief, source reliability"
 	@echo "  make event-alpha-weekly-review  Weekly outcomes/missed/calibration/reliability/priors review"
 	@echo "  make event-alpha-burn-in-scorecard  Summarize burn-in runs, alerts, feedback, missed rows, health, and LLM budget"
-	@echo "  make event-alpha-daily-live-no-send-burn-in  Run the safe daily Event Alpha no-send burn-in loop"
+	@echo "  make event-alpha-daily-live-no-send-burn-in  Run the safe daily Event Alpha no-send burn-in loop (CANDIDATE_MODE=1 enables guarded candidate mode)"
 	@echo "  make event-alpha-daily-live-no-send-burn-in-plan  Print the daily no-send burn-in plan without running it"
 	@echo "  make event-alpha-daily-live-no-send-burn-in-smoke  Run a quick fixture-only burn-in loop smoke"
 	@echo "  make event-alpha-daily-review-inbox  Write the compact daily review inbox"
@@ -2182,11 +2183,11 @@ event-alpha-weekly-review:
 
 event-alpha-daily-live-no-send-burn-in:
 	RSI_EVENT_ALERTS_ENABLED=0 \
-	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.daily_burn_in --profile live_burn_in_no_send --python $(PYTHON) $(BURN_IN_NAMESPACE_ARG)
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.daily_burn_in --profile live_burn_in_no_send --python $(PYTHON) $(BURN_IN_NAMESPACE_ARG) $(BURN_IN_CANDIDATE_MODE_ARG)
 
 event-alpha-daily-live-no-send-burn-in-plan:
 	RSI_EVENT_ALERTS_ENABLED=0 \
-	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.daily_burn_in --profile live_burn_in_no_send --python $(PYTHON) $(BURN_IN_NAMESPACE_ARG) --dry-run-plan
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.daily_burn_in --profile live_burn_in_no_send --python $(PYTHON) $(BURN_IN_NAMESPACE_ARG) $(BURN_IN_CANDIDATE_MODE_ARG) --dry-run-plan
 
 event-alpha-daily-live-no-send-burn-in-smoke:
 	RSI_EVENT_ALERTS_ENABLED=0 \
