@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-09 — Adopt risk-based verification cadence · Codex
+**Why:** Full pytest and `make verify` are too slow for every small prompt now
+that the suite is large, and the user explicitly asked to stop paying that cost
+on every iteration.
+**Changes:**
+- Updated `AGENTS.md` so ordinary prompts use targeted pytest, compileall,
+  relevant smokes/doctors, or static checks instead of defaulting to full
+  pytest/`make verify`.
+- Added a durable `DECISIONS.md` entry superseding the previous full-verify
+  pre-commit policy while keeping full `make verify` for release/risky/shared
+  code/provider activation/periodic 5-10 prompt sweeps.
+- Updated the `verify-fast` Makefile comment and `ROADMAP.md` status row to
+  reflect the new cadence.
+**Verify:** `git diff --check` passed, targeted CLI Makefile pytest passed
+(`26 passed`), and docs grep confirmed remaining full-verify language is only in
+superseded/historical records. Full `make verify` intentionally not run because
+this was a docs/policy-only change whose purpose is to avoid full-suite cost on
+every prompt.
+**Notes/risks:** If a targeted gate misses a regression, revisit the cadence and
+make the relevant package/smoke gate mandatory for that change class.
+
 ## 2026-07-09 — Run safe candidate-mode burn-in gate · Codex
 **Why:** The path hygiene gate needed confirmation before running the requested
 candidate-mode burn-in workflow, and the operator needed a concise report showing

@@ -451,9 +451,9 @@ normalize-export-timestamps:
 
 verify: check-python test test-full smoke-alerts backtest-fixture score
 
-# Faster local loop: this keeps the hard pytest gate and runtime smokes, but
-# skips the duplicate standalone compatibility runner. Use full verify before
-# committing or release-style handoff.
+# Broader local loop: this keeps the hard pytest gate and runtime smokes, but
+# skips the duplicate standalone compatibility runner. Use targeted tests for
+# ordinary small prompts; use full verify for release/risky/periodic sweeps.
 verify-fast: check-python test-full smoke-alerts backtest-fixture score
 
 test:

@@ -16,8 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
-## 2026-07-05 - Test optimization keeps strict verify intact
+## 2026-07-09 - Risk-based verification replaces full pytest on every prompt
 **Status:** accepted
+**Decision:** Do not run the full pytest package gate or `make verify` by
+default on every small prompt. Ordinary changes should use the smallest
+meaningful gate: targeted pytest file/package for touched code, compileall for
+Python import/syntax risk, matching Event Alpha/provider/notification smoke or
+doctor targets for artifact behavior, and static/JSON/Markdown checks for
+docs/report-only changes. Full `make verify` remains the release/risky/shared
+code gate and should run before live/provider activation work, CI-parity
+handoff, broad shared-module changes, or after a cluster of roughly 5-10
+low-risk prompts. If full `make verify` is skipped, the handoff must say why and
+list the targeted gate that passed.
+**Why:** The full pytest package suite currently adds about 3.5 minutes and
+`make verify` also duplicates the standalone compatibility runner. That is too
+slow for normal iteration and encourages waiting instead of making focused,
+verified changes. Keeping full verify as a deliberate release/risk gate preserves
+coverage without taxing every small prompt.
+**Revisit when:** Targeted gates miss a regression that full verify would have
+caught, CI timing changes materially, or the pytest suite is split so the full
+gate becomes fast enough for every prompt again.
+
+## 2026-07-05 - Test optimization keeps strict verify intact
+**Status:** superseded by `2026-07-09 - Risk-based verification replaces full pytest on every prompt`
 **Decision:** `make verify` remains the strict pre-commit/release gate and still
 runs both the standalone compatibility runner and the hard pytest suite. Faster
 developer loops are explicit: `make verify-fast` skips only the duplicate
@@ -142,7 +163,7 @@ an accepted owner note, or the project intentionally changes the v3
 zero-exception auto-accept definition.
 
 ## 2026-07-05 - Full pytest suite is a hard verification gate
-**Status:** accepted
+**Status:** superseded by `2026-07-09 - Risk-based verification replaces full pytest on every prompt`
 **Decision:** `make verify` must run the full pytest-compatible suite through
 `make test-full`, with `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`, and fail if pytest
 is unavailable. `pytest` is a declared dependency in `requirements.txt`.

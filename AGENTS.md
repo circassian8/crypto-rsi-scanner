@@ -26,7 +26,10 @@ This is a git repo with a GitHub remote. **End any prompt that changed files
 with one commit and push it to `origin/main`** capturing that prompt's work, with
 a clear message:
 - One logical commit per change-making prompt (don't fold in unrelated prompts).
-- Run `make verify` first; don't commit a red tree.
+- Run the risk-appropriate verification gate before committing. Do not default
+  to full pytest/`make verify` for every small prompt; use the verification
+  ladder in "Run / test / deploy" below, and record exactly what ran in
+  `DEVLOG.md`.
 - Never commit secrets/artifacts: `.env`, `*.db`, logs, `.venv`, and
   `.claude/settings.local.json` are gitignored — keep it that way.
 - Commit on `main`, then `git push` after the commit. The human gave standing
@@ -87,11 +90,20 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `pytest` and `pytest-xdist`; `make verify` runs the full pytest suite via
   `test-full` and hard-fails if pytest is missing). `make bootstrap` creates
   `.venv`; `make verify PYTHON=python3` is acceptable for source-archive review.
-  For local iteration, `make verify-fast PYTHON=python3` skips the duplicate
-  standalone runner while preserving the hard pytest gate and runtime smokes;
-  `make test-pytest-durations PYTHON=python3` prints slow tests; and
-  `make test-pytest-parallel PYTHON=python3 PYTEST_WORKERS=4` uses xdist when
-  installed. Run full `make verify` before committing or release-style handoff.
+  For local iteration, prefer targeted tests over the full pytest package gate:
+  run the focused pytest file/package for touched code, `python3 -m compileall -q
+  crypto_rsi_scanner tests` for Python changes, and the matching Make smoke or
+  doctor target for Event Alpha/provider/notification paths. Docs/report-only
+  prompts can use `git diff --check`, JSON validation, and the relevant static
+  report target. Use `make verify-fast PYTHON=python3` when a broader local gate
+  is warranted but the duplicate standalone runner is not useful. Use
+  `make test-pytest-durations PYTHON=python3` to profile slow tests and
+  `make test-pytest-parallel PYTHON=python3 PYTEST_WORKERS=4` when xdist is
+  installed. Run full `make verify` for release-style handoff, risky shared
+  code changes, CI/parity checks, before live/provider activation work, after a
+  cluster of roughly 5-10 low-risk prompts, or whenever targeted evidence is
+  not enough. If you skip full `make verify`, say why and list the targeted gate
+  that passed.
 - **Clean source export:** `make export-src` writes
   `crypto-rsi-scanner-source.zip` via `git archive` so ignored local artifacts
   such as `.env`, DBs, logs, caches, and `.venv` are not shared.
@@ -108,10 +120,14 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   wall-clock UTC unless the operator explicitly sets it; stale/future fixed
   clocks block actual notification sends unless
   `RSI_EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY=1` is set.
-- **Standard verification:** `make verify` (runs tests + alert render smoke +
-  backtest fixture smoke + paper scoreboard).
-- **Tests (must all pass before you claim done):**
-  `.venv/bin/python tests/test_indicators.py`
+- **Standard verification:** `make verify` (full release gate: standalone
+  compatibility runner + pytest package suite + alert render smoke + backtest
+  fixture smoke + paper scoreboard). Use it intentionally, not as the default
+  loop for every prompt.
+- **Targeted tests:** choose the smallest meaningful gate for the files touched:
+  focused pytest file/package, `tests/test_indicators.py` for umbrella runner
+  changes, compileall for Python import/syntax risk, and matching Event Alpha
+  smoke/doctor targets for artifact behavior.
 - **Alert render smoke (no sends/network):** `make smoke-alerts`
 - **Backtest fixture smoke (no network):** `make backtest-fixture` runs the
   default Binance-style backtest path from checked-in BTC/ETH/SOL kline fixtures.
@@ -619,8 +635,11 @@ work.
   representative Telegram/plain-text renders without sending anything.
 - Notification bookkeeping is delivery-sensitive: only mark instant cooldowns or
   digest timestamps after at least one channel succeeds.
-- Run `make verify` before claiming implementation work is complete. If you skip
-  it, say exactly why.
+- Run the risk-appropriate verification gate before claiming implementation work
+  is complete. Full `make verify` is still required for release/risky/shared
+  changes and periodic full sweeps, but ordinary small prompts should use
+  targeted tests plus relevant smokes. If you skip full `make verify`, say
+  exactly why.
 - Storage: additive `ALTER` in `_migrate`; bump a `meta` flag for one-time data
   migrations so they run exactly once.
 - External calls **fail soft** (log + degrade; never crash the scan).
