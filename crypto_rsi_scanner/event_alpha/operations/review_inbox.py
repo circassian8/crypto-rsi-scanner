@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from ..artifacts import paths as event_artifact_paths
 from ..artifacts import research_cards
 from . import common
 from . import evidence_semantics
@@ -100,11 +101,11 @@ def build_review_inbox(
     card_index = _card_index(context)
     grouped = _group_rows(rows)
     all_items = [
-        _item_from_group(family, family_rows, card_index=card_index, profile=profile)
+        _item_from_group(family, family_rows, card_index=card_index, profile=profile, context=context)
         for family, family_rows in grouped
     ]
     items = _select_review_items(all_items, limit=max(1, int(limit or 10)))
-    stale_paths = _stale_path_warnings(items)
+    stale_paths = _stale_path_warnings(items, context=context)
     selected_primary = {item.primary_visible_family_key for item in items}
     second_family_count = sum(1 for item in items if item.symbol_family_rank > 1)
     payload = common.with_safety(
@@ -130,12 +131,23 @@ def build_review_inbox(
             "blockers": [
                 f"stale_or_missing_review_path:{path}"
                 for path in stale_paths
-                if path.startswith("/tmp/") or path.startswith("missing:")
+                if path
             ],
         }
     )
+    payload = event_artifact_paths.normalize_operator_path_fields(
+        payload,
+        repo_root=common.repo_root_from_module(),
+        artifact_base=context.base_dir,
+    )
     common.write_json(context.namespace_dir / INBOX_JSON, payload)
-    common.write_text(context.namespace_dir / INBOX_MD, format_review_inbox(payload))
+    common.write_text(
+        context.namespace_dir / INBOX_MD,
+        event_artifact_paths.scrub_absolute_paths_from_markdown(
+            format_review_inbox(payload),
+            base=context.base_dir,
+        ),
+    )
     return payload
 
 
@@ -437,6 +449,7 @@ def _item_from_group(
     *,
     card_index: Mapping[str, Path],
     profile: str,
+    context: Any,
 ) -> ReviewItem:
     best = max(rows, key=lambda row: _representative_sort_key(row, card_index=card_index))
     candidate_family_id = common.item_family(best)
@@ -454,7 +467,7 @@ def _item_from_group(
     why = _why_not_alertable(best, opportunity_type)
     confirms = str(best.get("what_confirms") or best.get("confirm_if") or _default_confirm(opportunity_type))
     invalidates = str(best.get("what_invalidates") or best.get("invalidate_if") or _default_invalidate(opportunity_type))
-    card_path = common.rel_path(card) if card else ""
+    card_path = _display_card_path(card, context=context) if card else ""
     card_not_available_reason = "" if card_path else _card_not_available_reason(best)
     value_score, value_reasons, downrank_reasons, bucket = _review_value(best, opportunity_type, score, source_origin, source_pack, evidence_status, market_state, why, has_card=bool(card_path))
     primary_key = _primary_visible_family_key(best)
@@ -1020,18 +1033,67 @@ def _selection_reason(item: ReviewItem, rank: int) -> str:
     return "next_highest_review_value"
 
 
-def _stale_path_warnings(items: Iterable[ReviewItem]) -> list[str]:
+def _display_card_path(path: str | Path, *, context: Any) -> str:
+    return event_artifact_paths.artifact_display_path(
+        path,
+        repo_root=common.repo_root_from_module(),
+        artifact_base=context.base_dir,
+    )
+
+
+def _resolve_review_card_path(raw_path: str, *, context: Any) -> Path | None:
+    text = str(raw_path or "").strip()
+    if not text or text.casefold() == "none":
+        return None
+    path = Path(text).expanduser()
+    roots = [
+        Path(context.base_dir),
+        Path(context.namespace_dir),
+        common.repo_root_from_module(),
+        Path.cwd(),
+    ]
+    if path.is_absolute():
+        try:
+            resolved = path.resolve()
+        except OSError:
+            resolved = path
+        for root in roots:
+            try:
+                resolved.relative_to(root.resolve())
+                return resolved
+            except (OSError, ValueError):
+                continue
+        return None
+    for root in roots:
+        candidate = root / path
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _path_warning_label(raw_path: str, *, context: Any) -> str:
+    text = str(raw_path or "").strip()
+    if not text:
+        return "missing:empty"
+    path = Path(text).expanduser()
+    if path.is_absolute():
+        if _resolve_review_card_path(text, context=context) is None:
+            return f"absolute_review_path_outside_allowed_roots:{path.name}"
+        return event_artifact_paths.artifact_display_path(
+            path,
+            repo_root=common.repo_root_from_module(),
+            artifact_base=context.base_dir,
+        )
+    return f"missing:{text}"
+
+
+def _stale_path_warnings(items: Iterable[ReviewItem], *, context: Any) -> list[str]:
     warnings: list[str] = []
-    root = common.repo_root_from_module()
     for item in items:
         if not item.card_path:
             continue
-        if item.card_path.startswith("/tmp/"):
-            warnings.append(item.card_path)
-            continue
-        path = root / item.card_path if not Path(item.card_path).is_absolute() else Path(item.card_path)
-        if not path.exists():
-            warnings.append(f"missing:{item.card_path}")
+        if _resolve_review_card_path(item.card_path, context=context) is None:
+            warnings.append(_path_warning_label(item.card_path, context=context))
     return warnings
 
 

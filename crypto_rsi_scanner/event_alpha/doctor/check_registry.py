@@ -447,6 +447,20 @@ CHECKS: tuple[DoctorCheck, ...] = (
         "Daily review inbox must not surface diagnostic or preflight-only rows as default selected review items.",
     ),
     _check(
+        "outcomes.review_inbox_blockers",
+        CATEGORY_OUTCOMES,
+        "blocker",
+        (),
+        "Daily review inbox must not carry unresolved path or selection blockers.",
+    ),
+    _check(
+        "outcomes.review_inbox_missing_card_or_reason",
+        CATEGORY_OUTCOMES,
+        "blocker",
+        (),
+        "Daily review inbox selected rows must include a card path or explicit no-card reason.",
+    ),
+    _check(
         "outcomes.review_inbox_generic_context_priority",
         CATEGORY_OUTCOMES,
         "warning",
@@ -648,6 +662,20 @@ CHECKS: tuple[DoctorCheck, ...] = (
         "blocker",
         ("card_path", "research_card_path"),
         "Card path references must resolve to rendered research-card artifacts.",
+    ),
+    _check(
+        "paths.review_inbox_card_path_absolute",
+        CATEGORY_PATHS,
+        "blocker",
+        ("card_path",),
+        "Daily review inbox card path fields must be portable relative paths.",
+    ),
+    _check(
+        "paths.review_inbox_markdown_absolute_path",
+        CATEGORY_PATHS,
+        "blocker",
+        ("card_path",),
+        "Daily review inbox Markdown must not render local absolute paths.",
     ),
     _check(
         "paths.active_shim_contains_logic",

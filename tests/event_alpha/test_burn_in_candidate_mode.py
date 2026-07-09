@@ -296,7 +296,9 @@ def test_daily_burn_in_candidate_mode_fixture_smoke_produces_lanes_without_contr
     inbox_md = (ns / review_inbox.INBOX_MD).read_text(encoding="utf-8")
     cards = sorted((ns / "research_cards").glob("*.md"))
     rows_by_symbol = {row["symbol"]: row for row in rows}
+    review_step = next(row for row in payload["steps"] if row.get("name") == "review_inbox")
     assert payload["status"] == "passed"
+    assert review_step["status"] == "passed"
     assert manifest["status"] == "completed_fixture_candidates_only"
     assert manifest["fixture_candidate_count"] >= 5
     assert manifest["contract_counted_candidate_count"] == 0
@@ -305,6 +307,11 @@ def test_daily_burn_in_candidate_mode_fixture_smoke_produces_lanes_without_contr
     assert score["contract_counted_candidate_count"] == 0
     assert score["enough_data"] is False
     assert cards
+    assert all(not Path(str(row.get("card_path") or "none")).is_absolute() for row in rows)
+    assert all(not Path(str(row.get("card_path") or "none")).is_absolute() for row in inbox["items"])
+    assert "/tmp/" not in inbox_md
+    assert "/mnt/data/" not in inbox_md
+    assert "/Users/" not in inbox_md
     assert rows_by_symbol["TESTFADE"]["card_path"]
     assert rows_by_symbol["TESTPERP"]["card_path"]
     fade_card = (tmp_path / rows_by_symbol["TESTFADE"]["card_path"]).read_text(encoding="utf-8")

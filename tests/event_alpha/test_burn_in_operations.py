@@ -93,6 +93,72 @@ def test_daily_review_inbox_groups_candidates_and_uses_stable_feedback_commands(
     assert "Counts toward burn-in candidate evidence" in md
 
 
+def test_daily_review_inbox_normalizes_absolute_temp_card_paths(tmp_path):
+    ns = tmp_path / "burn"
+    card = ns / "research_cards" / "core_early.md"
+    card.parent.mkdir(parents=True)
+    card.write_text("# EARLY card\n", encoding="utf-8")
+    _write_jsonl(
+        ns / "event_integrated_radar_candidates.jsonl",
+        [
+            {
+                "candidate_id": "cand:early",
+                "symbol": "EARLY",
+                "coin_id": "early",
+                "opportunity_type": "EARLY_LONG_RESEARCH",
+                "opportunity_score": 70,
+                "candidate_provenance": "integrated_candidate",
+                "source_artifact": "event_integrated_radar_candidates.jsonl",
+                "card_path": str(card),
+            }
+        ],
+    )
+    payload = review_inbox.build_review_inbox(
+        profile="live_burn_in_no_send",
+        artifact_namespace="burn",
+        base_dir=tmp_path,
+        limit=10,
+        now=datetime(2026, 7, 5, tzinfo=timezone.utc),
+    )
+    item = payload["items"][0]
+    assert payload["blockers"] == []
+    assert item["card_path"] == "burn/research_cards/core_early.md"
+    assert not Path(item["card_path"]).is_absolute()
+    assert (tmp_path / item["card_path"]).exists()
+    rendered = (ns / review_inbox.INBOX_MD).read_text(encoding="utf-8")
+    assert "/tmp/" not in json.dumps(payload)
+    assert "/tmp/" not in rendered
+    assert "/mnt/data/" not in rendered
+    assert "/Users/" not in rendered
+
+
+def test_daily_review_inbox_blocks_missing_relative_card_path(tmp_path):
+    ns = tmp_path / "burn"
+    _write_jsonl(
+        ns / "event_integrated_radar_candidates.jsonl",
+        [
+            {
+                "candidate_id": "cand:missing",
+                "symbol": "MISS",
+                "coin_id": "miss",
+                "opportunity_type": "UNCONFIRMED_RESEARCH",
+                "opportunity_score": 52,
+                "candidate_provenance": "integrated_candidate",
+                "source_artifact": "event_integrated_radar_candidates.jsonl",
+                "card_path": "burn/research_cards/missing.md",
+            }
+        ],
+    )
+    payload = review_inbox.build_review_inbox(
+        profile="live_burn_in_no_send",
+        artifact_namespace="burn",
+        base_dir=tmp_path,
+        limit=10,
+        now=datetime(2026, 7, 5, tzinfo=timezone.utc),
+    )
+    assert any("stale_or_missing_review_path:missing:burn/research_cards/missing.md" in blocker for blocker in payload["blockers"])
+
+
 def test_daily_review_inbox_prioritizes_contract_counted_candidates(tmp_path):
     ns = tmp_path / "burn"
     _write_jsonl(
@@ -1136,6 +1202,62 @@ def test_burn_in_doctor_operations_check_blocks_bad_candidate_semantics():
     assert any("review_inbox_selected_diagnostic_or_preflight_only=1" in blocker for blocker in blockers)
 
 
+def test_burn_in_doctor_blocks_review_inbox_path_hygiene_regressions():
+    blockers: list[str] = []
+    warnings: list[str] = []
+    ctx = SimpleNamespace(
+        burn_in_scorecard={},
+        source_yield_report={},
+        daily_review_inbox={
+            "blockers": ["stale_or_missing_review_path:missing:burn/research_cards/missing.md"],
+            "items": [
+                {
+                    "candidate_provenance": "integrated_candidate",
+                    "source_artifact": "event_integrated_radar_candidates.jsonl",
+                    "card_path": "/tmp/local/research_cards/core_bad.md",
+                },
+                {
+                    "candidate_provenance": "integrated_candidate",
+                    "source_artifact": "event_integrated_radar_candidates.jsonl",
+                },
+            ],
+        },
+        daily_review_inbox_markdown="- card_path: `/tmp/local/research_cards/core_bad.md`",
+    )
+    doctor_operations_checks.apply_checks(ctx, blockers, warnings)
+    assert any("daily_review_inbox_blockers=1" in blocker for blocker in blockers)
+    assert any("review_inbox_operator_card_paths_absolute=1" in blocker for blocker in blockers)
+    assert any("review_inbox_markdown_contains_local_absolute_path" in blocker for blocker in blockers)
+    assert any("review_inbox_selected_items_missing_card_path_or_reason=1" in blocker for blocker in blockers)
+
+
+def test_burn_in_doctor_accepts_relative_review_inbox_card_path_in_temp_base(tmp_path):
+    ns = tmp_path / "burn"
+    card = ns / "research_cards" / "core_ok.md"
+    card.parent.mkdir(parents=True)
+    card.write_text("# OK card\n", encoding="utf-8")
+    blockers: list[str] = []
+    warnings: list[str] = []
+    ctx = SimpleNamespace(
+        namespace_dir=ns,
+        burn_in_scorecard={},
+        source_yield_report={},
+        daily_review_inbox={
+            "blockers": [],
+            "items": [
+                {
+                    "candidate_provenance": "integrated_candidate",
+                    "source_artifact": "event_integrated_radar_candidates.jsonl",
+                    "card_path": "burn/research_cards/core_ok.md",
+                }
+            ],
+        },
+    )
+    doctor_operations_checks.apply_checks(ctx, blockers, warnings)
+    assert blockers == []
+    assert warnings == []
+
+
 def test_burn_in_doctor_candidate_mode_manifest_and_provenance_checks():
     blockers: list[str] = []
     warnings: list[str] = []
@@ -1326,11 +1448,13 @@ def test_burn_in_doctor_operations_warns_when_generic_context_outranks_accepted_
                     "candidate_provenance": "integrated_candidate",
                     "source_artifact": "event_integrated_radar_candidates.jsonl",
                     "downrank_reason_codes": ["generic_context_source_downranked"],
+                    "card_not_available_reason": "source_candidate_has_no_core_card",
                 },
                 {
                     "candidate_provenance": "integrated_candidate",
                     "source_artifact": "event_integrated_radar_candidates.jsonl",
                     "review_value_reason_codes": ["accepted_evidence_found"],
+                    "card_not_available_reason": "source_candidate_has_no_core_card",
                 },
             ],
         },

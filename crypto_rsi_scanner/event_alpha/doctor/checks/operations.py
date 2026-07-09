@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 from .. import check_registry
 from ._utils import Messages, ctx_mapping, ctx_value
+from ...artifacts import paths as event_artifact_paths
 from ...operations import common
 
 
@@ -22,7 +24,7 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
     _check_candidate_mode(ctx, daily_run, candidate_mode_manifest, blockers, warnings)
     _check_scorecard(scorecard, blockers)
     _check_source_yield(source_yield, blockers)
-    _check_review_inbox(review_inbox, blockers, warnings)
+    _check_review_inbox(ctx, review_inbox, blockers, warnings)
     _check_archive_manifest(archive_manifest, blockers)
 
 
@@ -222,10 +224,47 @@ def _check_source_yield(source_yield: Mapping[str, Any], blockers: Messages) -> 
         )
 
 
-def _check_review_inbox(review_inbox: Mapping[str, Any], blockers: Messages, warnings: Messages) -> None:
+def _check_review_inbox(ctx: object, review_inbox: Mapping[str, Any], blockers: Messages, warnings: Messages) -> None:
     if not review_inbox:
         return
     items = [row for row in review_inbox.get("items") or [] if isinstance(row, Mapping)]
+    inbox_blockers = [str(item) for item in review_inbox.get("blockers") or [] if str(item or "").strip()]
+    if inbox_blockers:
+        blockers.append(
+            check_registry.format_check_message(
+                "outcomes.review_inbox_blockers",
+                f"daily_review_inbox_blockers={len(inbox_blockers)}",
+            )
+        )
+    absolute_card_paths = _count_absolute_card_path_fields(review_inbox)
+    if absolute_card_paths:
+        blockers.append(
+            check_registry.format_check_message(
+                "paths.review_inbox_card_path_absolute",
+                f"review_inbox_operator_card_paths_absolute={absolute_card_paths}",
+            )
+        )
+    markdown = _review_inbox_markdown(ctx)
+    if markdown and event_artifact_paths.has_operator_absolute_path(markdown):
+        blockers.append(
+            check_registry.format_check_message(
+                "paths.review_inbox_markdown_absolute_path",
+                "review_inbox_markdown_contains_local_absolute_path",
+            )
+        )
+    missing_card_or_reason = sum(
+        1
+        for row in items
+        if not str(row.get("card_path") or "").strip()
+        and not str(row.get("card_not_available_reason") or "").strip()
+    )
+    if missing_card_or_reason:
+        blockers.append(
+            check_registry.format_check_message(
+                "outcomes.review_inbox_missing_card_or_reason",
+                f"review_inbox_selected_items_missing_card_path_or_reason={missing_card_or_reason}",
+            )
+        )
     missing_provenance = sum(1 for row in items if not row.get("candidate_provenance") or not row.get("source_artifact"))
     if missing_provenance:
         blockers.append(
@@ -255,6 +294,36 @@ def _check_review_inbox(review_inbox: Mapping[str, Any], blockers: Messages, war
                     "review_inbox_generic_context_outranks_accepted_evidence",
                 )
             )
+
+
+def _count_absolute_card_path_fields(value: Any) -> int:
+    if isinstance(value, Mapping):
+        count = 0
+        for key, item in value.items():
+            key_text = str(key)
+            if key_text.endswith("_abs_debug"):
+                continue
+            if "card_path" in key_text.casefold() and event_artifact_paths.has_operator_absolute_path(item):
+                count += 1
+            count += _count_absolute_card_path_fields(item)
+        return count
+    if isinstance(value, (list, tuple, set)):
+        return sum(_count_absolute_card_path_fields(item) for item in value)
+    return 0
+
+
+def _review_inbox_markdown(ctx: object) -> str:
+    explicit = str(ctx_value(ctx, "daily_review_inbox_markdown", "") or "")
+    if explicit:
+        return explicit
+    namespace_dir = ctx_value(ctx, "namespace_dir", None)
+    if not namespace_dir:
+        return ""
+    path = Path(str(namespace_dir)) / "event_alpha_daily_review_inbox.md"
+    try:
+        return path.read_text(encoding="utf-8") if path.exists() else ""
+    except OSError:
+        return ""
 
 
 def _check_archive_manifest(archive_manifest: Mapping[str, Any], blockers: Messages) -> None:

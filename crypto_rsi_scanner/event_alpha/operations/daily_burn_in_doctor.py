@@ -27,6 +27,7 @@ def run_scoped_doctor(
     ctx = SimpleNamespace(
         profile=profile,
         artifact_namespace=artifact_namespace,
+        namespace_dir=context.namespace_dir,
         namespace_status=None,
         daily_burn_in_run=common.read_json(context.namespace_dir / daily_burn_in.RUN_JSON),
         candidate_mode_manifest=common.read_json(context.namespace_dir / daily_burn_in.CANDIDATE_MODE_MANIFEST_JSON),

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from ..artifacts import paths as event_artifact_paths
 from . import common
 
 
@@ -170,7 +171,11 @@ def _write_research_cards(
         core_id = row["candidate_id"].replace("mock:", "core:")
         filename = f"{core_id.replace(':', '_')}.md"
         path = cards_dir / filename
-        rel = common.rel_path(path)
+        rel = event_artifact_paths.artifact_display_path(
+            path,
+            repo_root=common.repo_root_from_module(),
+            artifact_base=context.base_dir,
+        )
         feedback_target = core_id
         lines = [
             f"# {row['symbol']} {row['opportunity_type']}",

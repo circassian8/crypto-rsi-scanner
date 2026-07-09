@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-09 — Fix burn-in review inbox path portability · Codex
+**Why:** Candidate-mode burn-in smoke passed in the repo namespace but failed in
+isolated pytest temp artifact bases because review inbox items carried local
+absolute card paths that later looked stale or missing.
+**Changes:**
+- Normalized candidate-mode fixture research-card paths with Event Alpha
+  artifact path helpers so repo runs render `event_fade_cache/...` paths and
+  temp-base runs render namespace-relative paths.
+- Updated daily review inbox card-path writing and stale-path validation to
+  resolve against artifact base, namespace dir, repo root, and cwd while keeping
+  operator JSON/Markdown free of local absolute paths.
+- Added scoped/full doctor checks for review inbox self-blockers, absolute
+  operator card paths, Markdown path leaks, and selected items missing both a
+  card path and explicit no-card reason.
+- Added focused pytest coverage for temp-base path normalization, missing
+  relative card paths, doctor path blockers, and the candidate-mode smoke
+  review-inbox step.
+**Verify:** Targeted burn-in pytest passed, candidate-mode smoke and strict
+smoke doctor passed, standalone runner passed `774/774`, safe pytest passed
+`844`, compileall passed, daily candidate-mode no-send/readiness/scorecard/
+source-yield/archive checks passed, integrated radar smoke/doctor passed,
+notification format and Telegram no-send final checks passed, strict live burn-in
+and CryptoPanic rehearsal doctors passed, and `make verify PYTHON=python3`
+passed.
+**Notes/risks:** Behavior remains research-only/no-send/no-live-by-default. This
+does not loosen digest/watchlist/high-priority gates or create sends, trades,
+paper trades, normal RSI rows, or Event Alpha-created `TRIGGERED_FADE`.
+
 ## 2026-07-07 — Prepare provider-backed burn-in candidate path · Codex
 **Why:** Candidate-mode burn-in needed a complete operator path before real
 provider-backed no-send candidates are enabled: selected smoke candidates needed
