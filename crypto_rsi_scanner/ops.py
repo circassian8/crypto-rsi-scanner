@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .security import ensure_private_file
+
 
 @dataclass(frozen=True)
 class LogFileStatus:
@@ -151,6 +153,7 @@ def rotate_logs(
             results.append(LogRotationResult(path, None, 0, deleted, "missing"))
             continue
 
+        ensure_private_file(path)
         size = path.stat().st_size
         if size <= max_bytes:
             deleted = _prune_rotations(path, keep)
@@ -159,6 +162,7 @@ def rotate_logs(
 
         rotated_to = _next_rotation_path(path, now)
         shutil.copy2(path, rotated_to)
+        ensure_private_file(rotated_to)
         with path.open("r+b") as fh:
             fh.truncate(0)
         deleted = _prune_rotations(path, keep)
@@ -321,6 +325,7 @@ def maintenance_agent_plist(
         "WorkingDirectory": str(working_dir),
         "StandardOutPath": str(log_path),
         "StandardErrorPath": str(log_path),
+        "Umask": 0o077,
         "StartCalendarInterval": {"Hour": int(hour), "Minute": int(minute)},
         "RunAtLoad": False,
         "EnvironmentVariables": {

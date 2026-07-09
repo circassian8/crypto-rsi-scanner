@@ -125,6 +125,7 @@ def generate_launchd_plist(*, profile: str, repo_path: str | Path, python_path: 
   <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>10</integer></dict>
   <key>StandardOutPath</key><string>{html.escape(str(cwd / 'event_alpha_notify.out.log'))}</string>
   <key>StandardErrorPath</key><string>{html.escape(str(cwd / 'event_alpha_notify.err.log'))}</string>
+  <key>Umask</key><integer>63</integer>
 </dict>
 </plist>
 """

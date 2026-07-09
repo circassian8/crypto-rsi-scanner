@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .security import ensure_private_directory, ensure_private_file
+
 
 @dataclass(frozen=True)
 class BackupResult:
@@ -183,7 +185,7 @@ def backup_database(
     backup_dir = Path(backup_dir).expanduser()
     if not source.exists():
         raise FileNotFoundError(f"database not found: {source}")
-    backup_dir.mkdir(parents=True, exist_ok=True)
+    ensure_private_directory(backup_dir, create=True)
 
     final = backup_dir / _backup_name(source, now)
     suffix = 1
@@ -192,6 +194,7 @@ def backup_database(
         suffix += 1
     tmp = final.with_suffix(final.suffix + ".tmp")
     tmp.unlink(missing_ok=True)
+    ensure_private_file(tmp, create=True)
 
     src = sqlite3.connect(f"file:{source}?mode=ro", uri=True, timeout=30.0)
     dst = sqlite3.connect(str(tmp))
@@ -208,6 +211,7 @@ def backup_database(
         tmp.unlink(missing_ok=True)
         raise
     tmp.replace(final)
+    ensure_private_file(final)
     deleted = prune_backups(backup_dir, source.stem, keep)
     return BackupResult(
         path=final,

@@ -869,7 +869,7 @@ COINGECKO_KEY_TYPE = (os.getenv("COINGECKO_KEY_TYPE") or "demo").lower()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-# One or more recipient chat IDs, comma-separated (e.g. "133428954,987654321").
+# One or more recipient chat IDs, comma-separated (e.g. "<your_chat_id>,<second_chat_id>").
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 TELEGRAM_CHAT_IDS = [
     cid.strip() for cid in (TELEGRAM_CHAT_ID or "").split(",") if cid.strip()
@@ -1289,13 +1289,46 @@ if not BACKTEST_CACHE_DIR.is_absolute():
 
 
 def redact_token(text: str) -> str:
-    """Strip the Telegram bot token from a string before logging — it rides
-    along inside request URLs in exception messages (e.g. getUpdates failures),
-    which would otherwise leak the token into the log file."""
-    token = TELEGRAM_BOT_TOKEN
-    if token and token in text:
-        return text.replace(token, "<bot-token>")
-    return text
+    """Redact configured credentials and recipient identifiers from text.
+
+    Provider libraries often include request URLs or account identifiers in
+    exception messages.  Keep this compatibility function as the single logging
+    boundary, but cover every credential-bearing channel rather than only the
+    Telegram bot token.
+    """
+
+    redactions = (
+        (TELEGRAM_BOT_TOKEN, "<bot-token>"),
+        (COINGECKO_API_KEY, "<coingecko-key>"),
+        (OPENAI_API_KEY, "<openai-key>"),
+        (DISCORD_WEBHOOK_URL, "<discord-webhook>"),
+        (SMTP_PASS, "<smtp-password>"),
+        (EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_KEY, "<binance-key>"),
+        (EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_SECRET, "<binance-secret>"),
+        (EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN, "<cryptopanic-token>"),
+        (EVENT_DISCOVERY_COINALYZE_API_KEY, "<coinalyze-key>"),
+        (SMTP_USER, "<email-account>"),
+    )
+    result = str(text)
+    for value, replacement in sorted(
+        ((str(value), replacement) for value, replacement in redactions if value),
+        key=lambda item: len(item[0]),
+        reverse=True,
+    ):
+        result = result.replace(value, replacement)
+    for chat_id in sorted(
+        (str(value) for value in TELEGRAM_CHAT_IDS if len(str(value)) >= 5),
+        key=len,
+        reverse=True,
+    ):
+        result = result.replace(chat_id, "<telegram-chat-id>")
+    for recipient in sorted(
+        (value.strip() for value in (EMAIL_TO or "").split(",") if len(value.strip()) >= 5),
+        key=len,
+        reverse=True,
+    ):
+        result = result.replace(recipient, "<email-recipient>")
+    return result
 
 
 def has_notification_channel() -> bool:

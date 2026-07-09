@@ -643,7 +643,9 @@ work.
 - Storage: additive `ALTER` in `_migrate`; bump a `meta` flag for one-time data
   migrations so they run exactly once.
 - External calls **fail soft** (log + degrade; never crash the scan).
-- Never print/log secrets — route through `config.redact_token`.
+- Never print/log configured credentials or recipient identifiers — route
+  exception and provider text through `config.redact_token`. Runtime logs,
+  SQLite files, and backups must remain owner-only (`0600`; directories `0700`).
 - **Backtest any signal-logic change before shipping it live.** This project has
   burned us with regime-skewed conclusions (see below) — validate first.
 - Don't trust short-window or <~1-week live hit-rates; they're one regime.

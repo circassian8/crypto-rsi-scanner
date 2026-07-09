@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-09 - Runtime credentials and recipient identifiers stay private by default
+**Status:** accepted
+**Decision:** All configured credentials and recipient/account identifiers must
+pass through `config.redact_token` before entering logs or operator error text.
+Runtime credential, log, SQLite, and backup files use owner-only permissions
+(`0600` files and `0700` sensitive directories), launchd templates use a `077`
+umask, and source-with-artifacts exports scan exact locally configured sensitive
+values in a temporary ZIP before atomically replacing the review artifact.
+Tracked examples must use explicit placeholders rather than real recipient IDs.
+**Why:** A historical Telegram request exception placed the bot token and chat
+identifier in an ignored log, while permissive file modes and path-only ZIP
+validation left avoidable disclosure paths. Privacy controls should be enforced
+by code and export gates, not depend on each caller remembering to scrub output.
+**Revisit when:** Runtime storage moves off the local Mac, a new credential or
+notification channel is added, or export artifacts need an approved encrypted
+secret-bearing format.
+
 ## 2026-07-09 - Risk-based verification replaces full pytest on every prompt
 **Status:** accepted
 **Decision:** Do not run the full pytest package gate or `make verify` by

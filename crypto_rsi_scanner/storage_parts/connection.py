@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..security import ensure_private_file
 from .schema import _SCHEMA
 
 
@@ -35,6 +36,7 @@ def _parse_iso(value: str | None) -> datetime | None:
 
 class ConnectionMixin:
     def __init__(self, db_path: Path):
+        db_path = ensure_private_file(db_path, create=True)
         # timeout: wait (don't immediately error) when another process holds the lock.
         self.conn = sqlite3.connect(str(db_path), timeout=30.0)
         self.conn.row_factory = sqlite3.Row
@@ -46,6 +48,9 @@ class ConnectionMixin:
         self.conn.executescript(_SCHEMA)
         self._migrate()
         self.conn.commit()
+        ensure_private_file(db_path)
+        ensure_private_file(Path(f"{db_path}-wal"))
+        ensure_private_file(Path(f"{db_path}-shm"))
 
     def close(self) -> None:
         self.conn.close()

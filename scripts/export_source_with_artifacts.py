@@ -18,6 +18,27 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "crypto_rsi_scanner_source_with_artifacts.zip"
 
+SECRET_ENV_FIELDS = {
+    "TELEGRAM_BOT_TOKEN": "telegram_bot_token",
+    "COINGECKO_API_KEY": "coingecko_api_key",
+    "OPENAI_API_KEY": "openai_api_key",
+    "DISCORD_WEBHOOK_URL": "discord_webhook",
+    "SMTP_PASS": "smtp_password",
+    "RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_KEY": "binance_api_key",
+    "RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_SECRET": "binance_api_secret",
+    "RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN": "cryptopanic_token",
+    "RSI_EVENT_DISCOVERY_CRYPTOPANIC_AUTH_TOKEN": "cryptopanic_token",
+    "CRYPTOPANIC_AUTH_TOKEN": "cryptopanic_token",
+    "CRYPTOPANIC_API_KEY": "cryptopanic_token",
+    "CRYPTOPANIC_TOKEN": "cryptopanic_token",
+    "RSI_EVENT_DISCOVERY_COINALYZE_API_KEY": "coinalyze_api_key",
+}
+IDENTIFIER_ENV_FIELDS = {
+    "TELEGRAM_CHAT_ID": "telegram_chat_id",
+    "SMTP_USER": "email_account",
+    "EMAIL_TO": "email_recipient",
+}
+
 EXCLUDE_DIRS = {
     ".git",
     ".venv",
@@ -126,7 +147,51 @@ def _validate(names: list[str]) -> list[str]:
     return bad
 
 
-def _validate_archive_entries(zip_path: Path, *, safe_export_timestamp: float) -> list[str]:
+def _dotenv_values(path: Path) -> dict[str, str]:
+    """Read the simple KEY=VALUE subset used by this project's local .env."""
+
+    values: dict[str, str] = {}
+    if not path.exists():
+        return values
+    for raw_line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].lstrip()
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        values[key] = value
+    return values
+
+
+def _configured_sensitive_values(root: Path) -> tuple[tuple[str, bytes], ...]:
+    """Return exact configured secrets/identifiers without exposing them."""
+
+    dotenv = _dotenv_values(root / ".env")
+    found: set[tuple[str, bytes]] = set()
+    for key, label in SECRET_ENV_FIELDS.items():
+        for raw in (dotenv.get(key, ""), os.environ.get(key, "")):
+            value = raw.strip()
+            if len(value) >= 8:
+                found.add((label, value.encode()))
+    for key, label in IDENTIFIER_ENV_FIELDS.items():
+        for raw in (dotenv.get(key, ""), os.environ.get(key, "")):
+            for value in (part.strip() for part in raw.split(",")):
+                if len(value) >= 5:
+                    found.add((label, value.encode()))
+    return tuple(sorted(found, key=lambda item: (item[0], item[1])))
+
+
+def _validate_archive_entries(
+    zip_path: Path,
+    *,
+    safe_export_timestamp: float,
+    sensitive_values: tuple[tuple[str, bytes], ...] = (),
+) -> list[str]:
     bad = []
     with zipfile.ZipFile(zip_path) as zf:
         names = zf.namelist()
@@ -136,6 +201,11 @@ def _validate_archive_entries(zip_path: Path, *, safe_export_timestamp: float) -
             # Zip timestamps have two-second granularity.
             if entry_ts > safe_export_timestamp + 2:
                 bad.append(f"future_mtime:{info.filename}:{entry_ts:.0f}>{safe_export_timestamp:.0f}")
+            if not info.is_dir() and sensitive_values:
+                data = zf.read(info)
+                for label, value in sensitive_values:
+                    if value in data:
+                        bad.append(f"sensitive_value:{label}:{info.filename}")
         makefile = next((info for info in zf.infolist() if info.filename == "Makefile"), None)
         if makefile is not None:
             makefile_ts = datetime(*makefile.date_time).timestamp()
@@ -211,15 +281,19 @@ def main(root: Path = ROOT, out: Path = OUT) -> int:
 
     now_ts = _safe_export_timestamp()
     normalized_mtimes = _normalize_input_timestamps(entries, safe_export_timestamp=now_ts)
-    if out.exists():
-        out.unlink()
-    with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+    candidate = out.with_name(f"{out.name}.tmp")
+    candidate.unlink(missing_ok=True)
+    with zipfile.ZipFile(candidate, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         for path in entries:
             _write_file_to_zip(zf, path, path.relative_to(root).as_posix(), now_ts=now_ts)
 
-    with zipfile.ZipFile(out) as zf:
+    with zipfile.ZipFile(candidate) as zf:
         names = zf.namelist()
-    bad = _validate_archive_entries(out, safe_export_timestamp=now_ts)
+    bad = _validate_archive_entries(
+        candidate,
+        safe_export_timestamp=now_ts,
+        sensitive_values=_configured_sensitive_values(root),
+    )
     artifact_entries = [name for name in names if name.startswith("event_fade_cache/")]
     research_cards = [
         name
@@ -228,7 +302,7 @@ def main(root: Path = ROOT, out: Path = OUT) -> int:
     ]
 
     print(out)
-    print(f"size_bytes={out.stat().st_size}")
+    print(f"size_bytes={candidate.stat().st_size}")
     print(f"entries={len(names)}")
     print(f"artifact_entries={len(artifact_entries)}")
     print(f"research_card_files={len(research_cards)}")
@@ -236,7 +310,9 @@ def main(root: Path = ROOT, out: Path = OUT) -> int:
     print(f"bad_entries={len(bad)}")
     if bad:
         print("\n".join(bad[:50]))
+        candidate.unlink(missing_ok=True)
         return 1
+    candidate.replace(out)
     return 0
 
 

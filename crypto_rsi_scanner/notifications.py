@@ -91,7 +91,7 @@ def send_telegram_structured(
     failed_chunks = 0
     first_error_class: str | None = None
     first_error_safe: str | None = None
-    for chat_id in recipients:
+    for recipient_index, chat_id in enumerate(recipients, start=1):
         delivered_all = True
         for body in chunks:
             payload = {
@@ -116,7 +116,12 @@ def send_telegram_structured(
                     first_error_class = type(e).__name__
                     first_error_safe = safe_error(config.redact_token(str(e)))
                 # Most common cause: recipient never pressed Start on the bot.
-                log.error("Telegram send to %s failed: %s", chat_id, config.redact_token(str(e)))
+                log.error(
+                    "Telegram send to recipient %d/%d failed: %s",
+                    recipient_index,
+                    len(recipients),
+                    config.redact_token(str(e)),
+                )
                 break
         if delivered_all:
             delivered_recipients += 1
@@ -166,7 +171,7 @@ def send_discord(text: str) -> bool:
         log.info("Discord message sent")
         return True
     except Exception as e:
-        log.error("Discord send failed: %s", e)
+        log.error("Discord send failed: %s", config.redact_token(str(e)))
         return False
 
 
@@ -182,10 +187,10 @@ def send_email(subject: str, body: str) -> bool:
             server.starttls()
             server.login(config.SMTP_USER, config.SMTP_PASS)
             server.send_message(msg)
-        log.info("Email sent to %s", config.EMAIL_TO)
+        log.info("Email sent")
         return True
     except Exception as e:
-        log.error("Email send failed: %s", e)
+        log.error("Email send failed: %s", config.redact_token(str(e)))
         return False
 
 

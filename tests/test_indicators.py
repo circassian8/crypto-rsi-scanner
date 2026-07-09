@@ -1685,6 +1685,7 @@ _RSI_TEST_MODULES = (
     "tests.rsi.test_backtest",
     "tests.rsi.test_indicators_core",
     "tests.rsi.test_paper_risk",
+    "tests.rsi.test_security",
 )
 
 _CLI_TEST_MODULES = (

@@ -1452,6 +1452,21 @@ def test_export_source_with_artifacts_fallback_and_archive_validation():
         assert "local.db" not in names
         assert "backtest_cache/cached.json" not in names
         assert makefile_ts <= time.time()
+        safe_archive = out.read_bytes()
+
+        configured_secret = "123456789:configured-secret"
+        (tree / ".env").write_text(
+            f"TELEGRAM_BOT_TOKEN={configured_secret}\n",
+            encoding="utf-8",
+        )
+        (tree / "crypto_rsi_scanner" / "unit.py").write_text(
+            f"VALUE = {configured_secret!r}\n",
+            encoding="utf-8",
+        )
+        assert export_module.main(root=tree, out=out) == 1
+        assert out.read_bytes() == safe_archive
+        assert not out.with_name(f"{out.name}.tmp").exists()
+
         extract_dir = Path(tmp) / "extract"
         with zipfile.ZipFile(out) as zf:
             zf.extractall(extract_dir)

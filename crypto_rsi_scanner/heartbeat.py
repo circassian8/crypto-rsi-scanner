@@ -8,6 +8,7 @@ of hiding in the logs.
 
 from __future__ import annotations
 
+import html
 import logging
 
 from . import config
@@ -27,16 +28,17 @@ def alert_failure(exc: Exception, storage=None) -> None:
     """The run raised before completing — notify that the scanner is down."""
     if not config.HEARTBEAT_ENABLED:
         return
+    safe_error = html.escape(config.redact_token(str(exc)[:300]))
     text = (
         "🚨 <b>RSI Scanner FAILED</b>\n"
-        f"The run crashed: <code>{type(exc).__name__}: {str(exc)[:300]}</code>\n"
+        f"The run crashed: <code>{type(exc).__name__}: {safe_error}</code>\n"
         "No scan was produced. Check network / API key / logs."
     )
     try:
         _send(text, storage)
         log.info("Heartbeat failure alert sent")
     except Exception as e:  # never let the alerter mask the original error
-        log.error("Heartbeat failure alert could not be sent: %s", e)
+        log.error("Heartbeat failure alert could not be sent: %s", config.redact_token(str(e)))
 
 
 def alert_stale_scan(last_scan, hours_stale: float, storage=None) -> None:
@@ -56,7 +58,7 @@ def alert_stale_scan(last_scan, hours_stale: float, storage=None) -> None:
         _send(text, storage)
         log.warning("Stale-scan alert sent (last scan ~%.0fh ago)", hours_stale)
     except Exception as e:
-        log.error("Stale-scan alert could not be sent: %s", e)
+        log.error("Stale-scan alert could not be sent: %s", config.redact_token(str(e)))
 
 
 def check_health(stats: dict, storage=None) -> bool:

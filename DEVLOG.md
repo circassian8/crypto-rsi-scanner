@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-09 — Contain credential exposure and harden runtime privacy · Codex
+**Why:** The project audit found the active Telegram bot token in one historical
+ignored log line, the real Telegram recipient ID in tracked examples, broad
+runtime files at `0644`, incomplete error redaction, and a review ZIP gate that
+validated paths but not configured sensitive content.
+**Changes:**
+- Scrubbed the bot token and Telegram recipient IDs from the local `scan.log`
+  without printing them, changed `.env`, logs, SQLite/WAL/SHM, and retained
+  backups to owner-only permissions, and applied a `077` umask to the three
+  installed launch agents before confirming the listener returned to `running`.
+- Expanded `config.redact_token` across Telegram, CoinGecko, OpenAI, Discord,
+  SMTP, Binance announcement, CryptoPanic, and Coinalyze credentials plus
+  Telegram/email recipients; notification and heartbeat error paths now use the
+  boundary and heartbeat HTML-escapes exception text.
+- Added reusable private-file helpers so new SQLite, WAL/SHM, backup, rotated-log,
+  maintenance, and Event Alpha scheduled-log artifacts default to private modes.
+- Replaced tracked recipient examples with explicit placeholders and changed the
+  source-with-artifacts exporter to scan exact `.env`/process credentials and
+  identifiers in a temporary archive, reject it without revealing values, and
+  preserve the last safe ZIP on failure.
+- Added focused regression coverage for redaction, notification/heartbeat error
+  handling, private runtime modes, launchd umasks, and fail-closed exports; added
+  the new RSI security module to the standalone compatibility runner.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests scripts` passed;
+focused security/export tests passed (`6 passed`); `make test-rsi` passed
+(`105 passed`); Event Alpha notification plus CLI Make-target tests passed
+(`92 passed`); `make smoke-alerts` passed all four no-send render cases; and the
+full `make verify` release gate passed (standalone `779/779`, pytest `849`, alert
+render smoke, offline backtest fixture, and paper scoreboard).
+**Notes/risks:** Repository and local-runtime containment are complete, but the
+exposed bot token remains valid until the human owner revokes/replaces it through
+BotFather. That external rotation is tracked as `waiting` in `ROADMAP.md`.
+
 ## 2026-07-09 — Adopt risk-based verification cadence · Codex
 **Why:** Full pytest and `make verify` are too slow for every small prompt now
 that the suite is large, and the user explicitly asked to stop paying that cost
