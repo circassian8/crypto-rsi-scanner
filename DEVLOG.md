@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-09 — Run safe candidate-mode burn-in gate · Codex
+**Why:** The path hygiene gate needed confirmation before running the requested
+candidate-mode burn-in workflow, and the operator needed a concise report showing
+whether provider-backed `live_no_send` candidates were produced.
+**Changes:**
+- Added `research/EVENT_ALPHA_CANDIDATE_MODE_RUN_REPORT.md` and `.json` with
+  the latest namespace, provider skip reasons, request ledger paths, burn-in
+  counts, artifact paths, safety counters, archive dry-run status, and next safe
+  operator commands.
+- Ran the default guarded candidate-mode burn-in path for
+  `live_burn_in_20260709`; Coinalyze was skipped for missing usable config and
+  Bybit was skipped because the explicit allow flag was absent.
+**Verify:** Candidate-mode path hygiene pytest passed (`6 passed`), standalone
+runner passed `774/774`, safe pytest passed `844`, compileall passed, naming/
+transitional/old-import checks passed, candidate-mode smoke and strict smoke
+doctor passed, integrated radar smoke/doctor passed, notification format and
+Telegram no-send final checks passed, default candidate-mode burn-in completed
+as `passed_no_candidates`, latest namespace strict doctor passed with no
+blockers/warnings, archive dry-run reported `secret_hit_count=0`, and final
+`make verify PYTHON=python3` passed.
+**Notes/risks:** No live provider calls were made because required explicit
+allow flags were not present. No Telegram sends, trades, paper trades, normal RSI
+rows, or Event Alpha-created `TRIGGERED_FADE` were created.
+
 ## 2026-07-09 — Fix burn-in review inbox path portability · Codex
 **Why:** Candidate-mode burn-in smoke passed in the repo namespace but failed in
 isolated pytest temp artifact bases because review inbox items carried local

@@ -1,0 +1,97 @@
+{
+  "artifact_doctor": {
+    "blockers": 0,
+    "path": "event_fade_cache/live_burn_in_20260709/event_alpha_daily_burn_in_doctor_status.json",
+    "status": "OK",
+    "warnings": 0
+  },
+  "archive_dry_run": {
+    "dry_run": true,
+    "files_archived": 128,
+    "manifest_path": "research/event_alpha_burn_in_archive_manifest.json",
+    "secret_hit_count": 0,
+    "status": "passed"
+  },
+  "candidate_mode_result": {
+    "candidate_mode": true,
+    "contract_counted_candidate_count": 0,
+    "fixture_candidate_count": 0,
+    "live_provider_calls_allowed": false,
+    "real_burn_in_candidate_count": 0,
+    "status": "passed_no_candidates"
+  },
+  "coinalyze_rehearsal": {
+    "configured": false,
+    "live_call_allowed": false,
+    "provider_health_status": "not_observed",
+    "requests_used": 0,
+    "snapshots_written": 0,
+    "status": "missing_config"
+  },
+  "cryptopanic_rehearsal_conservative_check": {
+    "chz_status": "UNCONFIRMED_RESEARCH / exploratory",
+    "event_alpha_alerts_rows": 0,
+    "strict_daily_digest_rows": 0,
+    "velvet_status": "UNCONFIRMED_RESEARCH / exploratory"
+  },
+  "latest_candidate_mode_namespace": "live_burn_in_20260709",
+  "next_safe_operator_commands": [
+    "make event-alpha-daily-burn-in-readiness PYTHON=python3",
+    "After configuring RSI_EVENT_DISCOVERY_COINALYZE_API_KEY and explicitly setting RSI_EVENT_ALPHA_COINALYZE_ALLOW_LIVE_PREFLIGHT=1, run: make event-alpha-coinalyze-no-send-rehearsal PYTHON=python3",
+    "After explicitly setting RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT=1, run: make event-alpha-bybit-announcements-no-send-rehearsal PYTHON=python3",
+    "After any bounded provider rehearsal, rerun: make event-alpha-daily-live-no-send-burn-in CANDIDATE_MODE=1 PYTHON=python3"
+  ],
+  "operator_paths": {
+    "review_inbox": "event_fade_cache/live_burn_in_20260709/event_alpha_daily_review_inbox.md",
+    "run_report": "event_fade_cache/live_burn_in_20260709/event_alpha_daily_burn_in_report.md",
+    "scorecard": "event_fade_cache/live_burn_in_no_send/event_alpha_burn_in_scorecard.md",
+    "source_yield": "event_fade_cache/live_burn_in_no_send/event_alpha_source_yield_report.md"
+  },
+  "preflight_and_readiness": {
+    "burn_in_readiness_status": "missing_config",
+    "can_run_candidate_mode": false,
+    "preflight_diagnostic_rows": 2,
+    "readiness_rows": 0,
+    "source_coverage_rows": 1
+  },
+  "providers_configured": {
+    "bybit_announcements": true,
+    "coinalyze": false
+  },
+  "providers_skipped": {
+    "bybit_announcements": "skipped_live_calls_disabled: set RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT=1 for guarded no-send candidate mode",
+    "coinalyze": "skipped_missing_config: missing RSI_EVENT_DISCOVERY_COINALYZE_API_KEY"
+  },
+  "repo_status": {
+    "head": "fc8dc6cb",
+    "refactor_status": "complete; no broad refactor work performed"
+  },
+  "request_ledger_paths": {
+    "bybit_announcements": "event_fade_cache/live_burn_in_20260709/event_bybit_announcements_request_ledger.jsonl",
+    "coinalyze": "event_fade_cache/live_burn_in_20260709/event_coinalyze_request_ledger.jsonl"
+  },
+  "run_timestamp": "2026-07-09T03:29:47.664370+00:00",
+  "safety_counters": {
+    "normal_rsi_signal_rows_written": 0,
+    "paper_trades_created": 0,
+    "strict_alerts_created": 0,
+    "telegram_sends": 0,
+    "trades_created": 0,
+    "triggered_fade_created": 0
+  },
+  "test_gate_status": {
+    "architecture_naming_check": "passed",
+    "architecture_transitional_file_check": "passed",
+    "compileall": "passed",
+    "event_alpha_old_import_check": "passed",
+    "integrated_radar_doctor": "passed",
+    "integrated_radar_smoke": "passed",
+    "notification_format_smoke": "passed_with_existing_non_strict_schema_warnings",
+    "pytest_candidate_mode": "6 passed",
+    "safe_pytest": "844 passed",
+    "standalone_runner": "774/774 passed",
+    "strict_cryptopanic_rehearsal_doctor": "passed_with_existing_warnings_no_blockers",
+    "telegram_no_send_final_check_fast": "passed"
+  },
+  "summary": "Candidate mode ran safely, but no provider-backed live_no_send candidates were produced because provider config/allow flags were missing or disabled."
+}
