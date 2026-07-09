@@ -464,15 +464,18 @@ def test_github_actions_are_safe_fixture_verification_only():
     assert 'RSI_EVENT_RESEARCH_NOW: "2026-06-15T16:00:00Z"' in smoke_text
     assert 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in verify_text
     assert 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in smoke_text
+    assert "timeout-minutes: 30" in verify_text
 
     verify_runs = [line.split("run:", 1)[1].strip() for line in verify_text.splitlines() if line.strip().startswith("run:")]
-    assert verify_runs[:4] == [
+    assert verify_runs == [
         "python3 -m pip install --disable-pip-version-check -r requirements.txt pytest",
-        "python3 tests/test_indicators.py",
-        "python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py",
         "python3 -m compileall -q crypto_rsi_scanner tests",
+        "|",
+        "make verify PYTHON=python3",
     ]
-    assert verify_runs[-1] == "make verify PYTHON=python3"
+    assert "python3 tests/test_indicators.py" not in verify_text
+    assert "python3 -m pytest tests/event_alpha tests/rsi tests/cli tests/test_indicators.py" not in verify_text
+    assert verify_text.count("make verify PYTHON=python3") == 1
     for command in [
         "make architecture-baseline PYTHON=python3",
         "make architecture-size-gates PYTHON=python3",

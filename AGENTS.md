@@ -646,6 +646,9 @@ work.
 - Never print/log configured credentials or recipient identifiers — route
   exception and provider text through `config.redact_token`. Runtime logs,
   SQLite files, and backups must remain owner-only (`0600`; directories `0700`).
+- Cross-platform path tests must check path semantics or the actual temporary
+  root (`Path.is_absolute`, `has_operator_absolute_path`, `str(tmp_path)`) rather
+  than assuming Linux `/tmp/` or macOS `/var/` prefixes.
 - **Backtest any signal-logic change before shipping it live.** This project has
   burned us with regime-skewed conclusions (see below) — validate first.
 - Don't trust short-window or <~1-week live hit-rates; they're one regime.

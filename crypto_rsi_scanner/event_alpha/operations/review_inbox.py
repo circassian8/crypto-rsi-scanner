@@ -135,10 +135,12 @@ def build_review_inbox(
             ],
         }
     )
-    payload = event_artifact_paths.normalize_operator_path_fields(
-        payload,
-        repo_root=common.repo_root_from_module(),
-        artifact_base=context.base_dir,
+    payload = _without_absolute_debug_paths(
+        event_artifact_paths.normalize_operator_path_fields(
+            payload,
+            repo_root=common.repo_root_from_module(),
+            artifact_base=context.base_dir,
+        )
     )
     common.write_json(context.namespace_dir / INBOX_JSON, payload)
     common.write_text(
@@ -149,6 +151,22 @@ def build_review_inbox(
         ),
     )
     return payload
+
+
+def _without_absolute_debug_paths(value: Any) -> Any:
+    """Remove host-local debug paths from the persisted operator inbox."""
+
+    if isinstance(value, Mapping):
+        return {
+            str(key): _without_absolute_debug_paths(item)
+            for key, item in value.items()
+            if not str(key).endswith("_abs_debug")
+        }
+    if isinstance(value, list):
+        return [_without_absolute_debug_paths(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_without_absolute_debug_paths(item) for item in value)
+    return value
 
 
 def format_review_inbox(payload: Mapping[str, Any]) -> str:

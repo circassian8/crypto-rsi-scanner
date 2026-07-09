@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+from crypto_rsi_scanner.event_alpha.artifacts import paths as event_artifact_paths
 from crypto_rsi_scanner.event_alpha.doctor.checks import operations as doctor_operations_checks
 from crypto_rsi_scanner.event_alpha.operations import archive, common, daily_burn_in, feedback_progress, measurement, namespace_policy, review_inbox, scorecard, source_yield
 from crypto_rsi_scanner.project_health import radar_north_star
@@ -126,7 +127,9 @@ def test_daily_review_inbox_normalizes_absolute_temp_card_paths(tmp_path):
     assert not Path(item["card_path"]).is_absolute()
     assert (tmp_path / item["card_path"]).exists()
     rendered = (ns / review_inbox.INBOX_MD).read_text(encoding="utf-8")
-    assert "/tmp/" not in json.dumps(payload)
+    assert not event_artifact_paths.has_operator_absolute_path(payload)
+    assert str(tmp_path) not in json.dumps(payload)
+    assert str(tmp_path) not in rendered
     assert "/tmp/" not in rendered
     assert "/mnt/data/" not in rendered
     assert "/Users/" not in rendered

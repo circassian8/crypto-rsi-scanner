@@ -44,7 +44,9 @@ docs/report-only changes. Full `make verify` remains the release/risky/shared
 code gate and should run before live/provider activation work, CI-parity
 handoff, broad shared-module changes, or after a cluster of roughly 5-10
 low-risk prompts. If full `make verify` is skipped, the handoff must say why and
-list the targeted gate that passed.
+list the targeted gate that passed. CI should invoke the canonical full
+`make verify` once, not run standalone and pytest separately before repeating
+them inside the same release gate.
 **Why:** The full pytest package suite currently adds about 3.5 minutes and
 `make verify` also duplicates the standalone compatibility runner. That is too
 slow for normal iteration and encourages waiting instead of making focused,

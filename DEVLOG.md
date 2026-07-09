@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-09 — Fix Linux CI review-inbox path portability · Codex
+**Why:** GitHub Actions had failed on four consecutive main-branch pushes even
+though the full suite passed on macOS. Ubuntu revealed that the persisted daily
+review inbox retained `namespace_dir_abs_debug=/tmp/...`; the test only rejected
+the literal Linux prefix, so macOS `/var/...` runs masked the leak.
+**Changes:**
+- Removed all recursively generated `*_abs_debug` fields from the persisted and
+  returned Event Alpha daily review-inbox payload after portable path
+  normalization. Internal path resolution still uses the local context before
+  serialization; operator JSON/Markdown no longer carries host-absolute debug
+  paths.
+- Replaced the OS-specific assertion with semantic absolute-path detection and
+  checks against the actual pytest `tmp_path`, while retaining explicit common
+  host-prefix checks for rendered Markdown.
+- Removed duplicated standalone and pytest workflow steps because the final
+  `make verify` already runs both suites, retained compileall and all static
+  architecture gates, and raised the now-single-pass job timeout from 20 to 30
+  minutes. The preceding failing run had already spent about 16 minutes before
+  reaching the duplicate release gate.
+- Updated the README CI summary to describe the single canonical release gate.
+- Documented the cross-platform path-test rule in `AGENTS.md` and marked the CI
+  portability item complete in `ROADMAP.md`.
+**Verify:** Reproduced the original failure locally with `TMPDIR=/tmp`; the same
+command passed after the fix (`1 passed`), the full burn-in operations module
+passed (`45 passed`), the focused workflow/path guard passed (`2 passed`),
+compileall passed, and `TMPDIR=/tmp make verify` passed
+(standalone `779/779`, pytest `849`, alert render smoke, offline backtest fixture,
+and paper scoreboard).
+**Notes/risks:** This change intentionally removes debug-only absolute paths from
+the public review-inbox artifact only; the generic path normalizer may still keep
+`*_abs_debug` fields on internal/debug surfaces that explicitly permit them.
+
 ## 2026-07-09 — Contain credential exposure and harden runtime privacy · Codex
 **Why:** The project audit found the active Telegram bot token in one historical
 ignored log line, the real Telegram recipient ID in tracked examples, broad
