@@ -603,6 +603,7 @@ def test_universe_filters_stable_wrapped_and_bad_quality():
         (_market(id="usdtb", symbol="usdtb", name="USDtb"), "stable_like"),
         (_market(id="bfusd", symbol="bfusd", name="BFUSD"), "stable_like"),
         (_market(id="apxusd", symbol="apxusd", name="apxUSD"), "stable_like"),
+        (_market(id="euro-coin", symbol="eurc", name="EURC"), "stable_like"),
         (_market(id="united-stables", symbol="u", name="United Stables"), "stable_like"),
         (_market(id="gho", symbol="gho", name="GHO"), "stable_like"),
         (_market(id="ylds", symbol="ylds", name="YLDS"), "stable_like"),
@@ -616,6 +617,13 @@ def test_universe_filters_stable_wrapped_and_bad_quality():
     ]
     for market, reason in cases:
         assert universe.exclusion_reason(market) == reason
+
+    euro_named_non_stable = _market(
+        id="european-football",
+        symbol="eurofan",
+        name="European Football Fan Token",
+    )
+    assert universe.exclusion_reason(euro_named_non_stable) is None
 
 
 def test_universe_keeps_stacks_and_limits_clean_results():

@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Exclude observed fiat-pegged assets by exact identity
+**Status:** accepted
+**Decision:** EURC is a `stable_like` universe exclusion in both shared
+CoinGecko hygiene and exchange-based backtest pools. Prefer exact observed
+symbols or identities for non-USD fiat-pegged products instead of broad terms
+such as `euro` that could remove unrelated crypto assets.
+**Why:** The latest persisted audit kept EURC at rank 111 even though stablecoins
+are unsuitable for the scanner's directional RSI, outcome, paper, and backtest
+universes. Exact identity closes the observed leak while limiting false-positive
+risk.
+**Revisit when:** CoinGecko supplies reliable asset categories, another
+fiat-pegged product leaks through, or an exact identity is reused by a legitimate
+non-pegged asset.
+
 ## 2026-07-10 - One authoritative Event Alpha burn-in maturity gate
 **Status:** accepted
 **Decision:** The policy-scoped 30-day North Star operations scorecard is the

@@ -22,7 +22,7 @@ _STABLE_SYMBOLS = {
     "usd", "usdt", "usdc", "dai", "usde", "fdusd", "tusd", "usdd", "pyusd",
     "usds", "busd", "gusd", "frax", "lusd", "usd0", "usdb", "crvusd",
     "usdx", "susd", "eusd", "usdp", "usdy", "usdl", "rlusd", "usd1",
-    "usdg", "usdtb", "gho", "ylds", "usx", "usyc", "xaut", "paxg",
+    "usdg", "usdtb", "gho", "ylds", "usx", "usyc", "eurc", "xaut", "paxg",
 }
 
 _STABLE_NAME_RE = re.compile(

@@ -408,7 +408,9 @@ work.
   `main.py --universe-audit`, or refresh only the audit with
   `main.py --refresh-universe-audit`. The 2026-06-09 audit tightened
   stable/pegged detection for fiat, gold, and yield products that were slipping
-  into kept candidates.
+  into kept candidates. The 2026-07-10 audit added exact-symbol EURC exclusion;
+  prefer exact observed fiat-pegged identities over broad currency-name matching
+  that could remove legitimate crypto assets.
 - `state_features.py` is pure and shadow-first. State features may be tested,
   stored, and reported before they are allowed to affect conviction, routing, or
   gating. The live scanner attaches `state_json` only after the existing decision

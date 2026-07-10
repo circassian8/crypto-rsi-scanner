@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Exclude EURC from live and backtest universes · Codex
+**Why:** Audit item #6 was confirmed in the latest persisted universe snapshot:
+EURC (`euro-coin`) remained in the kept top-100 candidate set at market-cap rank
+111 even though it is a euro stablecoin.
+**Changes:**
+- Added the exact `eurc` symbol to the shared stable-like filter and mirrored it
+  in `config.EXCLUDE_SYMBOLS`, keeping live CoinGecko selection and Binance
+  volume-PIT backtest pools aligned.
+- Added regression coverage for CoinGecko EURC classification, exchange-pool
+  exclusion, and a euro-named non-stable control so the fix does not become a
+  broad currency-name filter.
+- Updated the shared working agreement, durable decision, and roadmap status.
+**Verify:** The focused EURC/live-backtest tests passed (`2 passed`), compileall
+and `git diff --check` passed, and the complete RSI package passed (`105
+passed`). `make refresh-universe-audit PYTHON=.venv/bin/python` fetched 200
+current rows and confirmed EURC is excluded as `stable_like` with 0 EURC rows
+kept; totals are 100 kept and 58 excluded (`stable_like=37`,
+`low_liquidity=21`). Full `make verify` was intentionally skipped because this
+is a narrow pure-filter change covered by the complete RSI package plus the
+live audit refresh.
+**Notes/risks:** The audit refresh fetches only the CoinGecko market list; it did
+not run RSI analysis, send notifications, or write signal/paper state.
+
 ## 2026-07-10 — Unify Event Alpha operator readiness gates · Codex
 **Why:** The checklist and burn-in-pack commands crashed on an undefined alias,
 v1 readiness passed obsolete arguments, and the remaining reports conflated

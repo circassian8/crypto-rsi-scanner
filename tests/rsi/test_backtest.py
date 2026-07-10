@@ -405,6 +405,7 @@ def test_backtest_filter_usdt_bases_hygiene():
         {"baseAsset": "BTC", "quoteAsset": "USDT", "status": "TRADING"},
         {"baseAsset": "JUP", "quoteAsset": "USDT", "status": "TRADING"},   # real coin, UP suffix
         {"baseAsset": "USDC", "quoteAsset": "USDT", "status": "TRADING"},  # stable
+        {"baseAsset": "EURC", "quoteAsset": "USDT", "status": "TRADING"},  # euro stable
         {"baseAsset": "EUR", "quoteAsset": "USDT", "status": "TRADING"},   # fiat
         {"baseAsset": "WBTC", "quoteAsset": "USDT", "status": "TRADING"},  # wrapped
         {"baseAsset": "OLD", "quoteAsset": "USDT", "status": "BREAK"},     # not trading
