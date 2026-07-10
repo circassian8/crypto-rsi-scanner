@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Separate integrated-radar merge policy from row assembly
+**Status:** accepted
+**Decision:** Pure integrated-radar normalization, family selection, opportunity
+policy, market/derivatives interpretation, source ranking, and summary helpers
+belong in `pipeline_parts/merge_policy.py`. `pipeline_parts/merge.py` owns the
+merged-family context and schema-field assembly. Private compatibility names
+remain exported through the existing API wrapper synchronization, and changes
+to either side must preserve fixed semantic hashes spanning identity, source,
+market, derivatives, diagnostics, and research-only safety fields.
+**Why:** The former 1,498-line module sat two lines below the production blocker
+threshold and mixed policy decisions with mechanical row construction. The
+split yields 551- and 1,016-line modules without changing any candidate field or
+weakening monkeypatch compatibility.
+**Revisit when:** Integrated candidate schema v2 intentionally replaces the
+current row contract, or the private compatibility API is explicitly retired.
+
 ## 2026-07-10 - Keep burn-in command planning pure and execution stateful
 **Status:** accepted
 **Decision:** Daily Event Alpha burn-in command construction belongs in

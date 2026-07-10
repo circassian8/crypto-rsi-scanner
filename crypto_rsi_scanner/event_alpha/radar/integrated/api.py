@@ -14,6 +14,7 @@ from typing import Any
 from .pipeline_parts.runtime import *
 from .pipeline_parts import cycle as _cycle
 from .pipeline_parts import merge as _merge
+from .pipeline_parts import merge_policy as _merge_policy
 from .pipeline_parts import models as _models
 from .pipeline_parts import report as _report
 from .pipeline_parts import sidecars as _sidecars
@@ -22,6 +23,7 @@ from .pipeline_parts import utilities as _utilities
 _API_MODULES: tuple[ModuleType, ...] = (
     _cycle,
     _merge,
+    _merge_policy,
     _models,
     _report,
     _sidecars,
@@ -30,6 +32,7 @@ _API_MODULES: tuple[ModuleType, ...] = (
 _API_MODULE_EXPORTS: dict[ModuleType, set[str]] = {
     _cycle: set(getattr(_cycle, "__all__", ())),
     _merge: set(getattr(_merge, "__all__", ())),
+    _merge_policy: set(getattr(_merge_policy, "__all__", ())),
     _models: set(getattr(_models, "__all__", ())),
     _report: set(getattr(_report, "__all__", ())),
     _sidecars: set(getattr(_sidecars, "__all__", ())),

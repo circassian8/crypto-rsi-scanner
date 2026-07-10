@@ -60,10 +60,6 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
         "revisit_condition": "When adding a new derivatives metric family or crowding class.",
     },
-    "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py": {
-        "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
-        "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
-    },
     "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py": {
         "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
         "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",

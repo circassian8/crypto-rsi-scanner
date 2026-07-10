@@ -1391,15 +1391,6 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1498,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
-      "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
-      "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
       "line_count": 1472,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
@@ -1506,7 +1497,7 @@
       "source_kind": "production"
     }
   ],
-  "accepted_production_files_over_1200_lines": 13,
+  "accepted_production_files_over_1200_lines": 12,
   "active_shim_modules_with_implementation_logic": 0,
   "active_shims": 0,
   "api_artifact_doctor_core_lines": 91,
@@ -1533,7 +1524,7 @@
       "crypto_rsi_scanner/event_alpha/notifications/pipeline_core.py"
     ],
     "api_total_lines": 0,
-    "generated_at": "2026-07-10T04:45:18+00:00",
+    "generated_at": "2026-07-10T04:56:52+00:00",
     "largest_api_files": [],
     "no_live_provider_calls": true,
     "normal_rsi_signal_rows_written": 0,
@@ -1555,7 +1546,7 @@
   "baseline_line_counts": {
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 36,
     "crypto_rsi_scanner/scanner.py": 90,
-    "tests/test_indicators.py": 1660
+    "tests/test_indicators.py": 1661
   },
   "blockers": [],
   "ci_static_safety": {
@@ -4330,13 +4321,6 @@
     "multi_public_class_modules_count": 80,
     "near_threshold_file_status": [
       {
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
         "line_count": 1472,
         "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -4626,7 +4610,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-10T04:45:23+00:00",
+  "generated_at": "2026-07-10T04:56:58+00:00",
   "generator": "crypto_rsi_scanner.project_health.architecture_report",
   "historical_row_type_alias": "refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
@@ -4641,7 +4625,7 @@
     "evidence_acquisition_wrapper": 14,
     "impact_hypotheses_api": 59,
     "impact_hypotheses_wrapper": 14,
-    "integrated_radar_api": 83,
+    "integrated_radar_api": 86,
     "integrated_radar_wrapper": 32,
     "notifications_pipeline_core": 104,
     "notifications_pipeline_wrapper": 49,
@@ -4650,12 +4634,6 @@
   },
   "largest_api_files": [],
   "largest_production_files": [
-    {
-      "limit": 1500,
-      "line_count": 1498,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
-      "source_kind": "production"
-    },
     {
       "limit": 1500,
       "line_count": 1472,
@@ -4844,6 +4822,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1016,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge_policy.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1002,
       "path": "crypto_rsi_scanner/event_alpha/radar/llm/extractor.py",
       "source_kind": "production"
@@ -4936,7 +4920,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1660,
+      "line_count": 1661,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },
@@ -5074,6 +5058,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 115,
+      "path": "tests/event_alpha/test_integrated_merge_policy.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 103,
       "path": "tests/cli/test_event_alpha_operator_command_smoke.py",
       "source_kind": "test"
@@ -5125,12 +5115,6 @@
       "line_count": 13,
       "path": "tests/conftest.py",
       "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1,
-      "path": "tests/__init__.py",
-      "source_kind": "test"
     }
   ],
   "line_counts": {
@@ -5141,7 +5125,7 @@
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 36,
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py": 91,
     "crypto_rsi_scanner/scanner.py": 90,
-    "tests/test_indicators.py": 1660
+    "tests/test_indicators.py": 1661
   },
   "line_gates": [
     {
@@ -5157,9 +5141,9 @@
       "target_lines_lt": 2000
     },
     {
-      "baseline_lines": 1660,
+      "baseline_lines": 1661,
       "blocker_reason": "",
-      "current_lines": 1660,
+      "current_lines": 1661,
       "gate_status": "pass",
       "next_migration_module": "tests/rsi, tests/cli, and tests/event_alpha for any remaining umbrella-only cases",
       "path": "tests/test_indicators.py",
@@ -6601,13 +6585,6 @@
   },
   "near_threshold_file_status": [
     {
-      "line_count": 1498,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
       "line_count": 1472,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -6682,7 +6659,7 @@
     "stale_artifacts": 1
   },
   "production_classes_over_limit": 3,
-  "production_files_over_1200_lines": 13,
+  "production_files_over_1200_lines": 12,
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
@@ -6850,22 +6827,22 @@
     "include_runtime_artifacts": false,
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "AGENTS.md:1783658368",
-      "ARCHITECTURE_FINAL_REPORT.md:1783658652",
+      "AGENTS.md:1783659295",
+      "ARCHITECTURE_FINAL_REPORT.md:1783659353",
       "CLAUDE.md:1783278280",
-      "DECISIONS.md:1783658368",
-      "DEVLOG.md:1783658640"
+      "DECISIONS.md:1783659295",
+      "DEVLOG.md:1783659406"
     ],
-    "newest_source_mtime": 1783658671.650695,
+    "newest_source_mtime": 1783659412.8796463,
     "regex_compile_count": 0,
     "report_mtime": 1783260863.808767,
-    "scan_duration_seconds": 1.1822,
+    "scan_duration_seconds": 1.1761,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 51,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
-    "scanned_source_files": 628,
-    "scanned_test_files": 43,
+    "scanned_source_files": 629,
+    "scanned_test_files": 44,
     "skipped_artifact_files": 1486,
     "skipped_binary_files": 0,
     "skipped_dir_samples": [
@@ -6887,10 +6864,10 @@
     "skipped_large_files": 1,
     "skipped_suffix_files": 1
   },
-  "shim_dependency_scan_duration_seconds": 1.1822,
+  "shim_dependency_scan_duration_seconds": 1.1761,
   "shim_dependency_scanned_doc_files": 51,
-  "shim_dependency_scanned_source_files": 628,
-  "shim_dependency_scanned_test_files": 43,
+  "shim_dependency_scanned_source_files": 629,
+  "shim_dependency_scanned_test_files": 44,
   "shim_dependency_skipped_artifact_files": 1486,
   "shim_dependency_skipped_large_files": 1,
   "shim_removal_blockers": 0,
@@ -6952,7 +6929,7 @@
     "deleted_shims_count": 124,
     "event_alpha_public_compatibility_entrypoints_path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
     "event_fade_safety_exception_present": true,
-    "generated_at": "2026-07-10T04:45:18.148854+00:00",
+    "generated_at": "2026-07-10T04:56:52.961314+00:00",
     "historical_row_type_alias": "final_refactor_transitional_file_report",
     "migration_named_dirs": [],
     "migration_named_dirs_count": 0,
@@ -7061,18 +7038,9 @@
       ]
     },
     "production_files_over_1200_lines": {
-      "count": 13,
+      "count": 12,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1498,
-          "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
-          "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
-          "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
-          "source_kind": "production"
-        },
         {
           "accepted": true,
           "limit": 1500,
@@ -7215,7 +7183,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 13,
+      "production_files_over_1200_lines": 12,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -7224,11 +7192,6 @@
     "historical_row_type_alias": "refactor_v3_gate_snapshot",
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
-      {
-        "line_count": 1498,
-        "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
-        "threshold": 1200
-      },
       {
         "line_count": 1472,
         "path": "crypto_rsi_scanner/project_health/architecture_report.py",
@@ -7346,18 +7309,9 @@
         ]
       },
       "production_files_over_1200_lines": {
-        "count": 13,
+        "count": 12,
         "reason": "accepted/documented production files over the v3 1,200-line target",
         "rows": [
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1498,
-            "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
-            "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
-            "revisit_condition": "When identity/source/market/derivatives merge golden fixtures can be compared before and after split.",
-            "source_kind": "production"
-          },
           {
             "accepted": true,
             "limit": 1500,
@@ -7483,7 +7437,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 13,
+    "production_files_over_1200_lines": 12,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,

@@ -1547,6 +1547,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_fade_review_workflows",
     "tests.event_alpha.test_fade_validation",
     "tests.event_alpha.test_integrated_radar",
+    "tests.event_alpha.test_integrated_merge_policy",
     "tests.event_alpha.test_market_surfaces",
     "tests.event_alpha.test_namespace_lifecycle",
     "tests.event_alpha.test_no_old_event_alpha_imports",

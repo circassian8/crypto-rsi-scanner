@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split integrated-radar merge policy from assembly · Codex
+**Why:** The behavior-critical integrated-radar merge module was 1,498 lines,
+only two lines below the production blocker threshold, and combined pure
+identity/source/market/derivatives policy with final candidate row assembly.
+**Changes:**
+- Moved 59 pure source normalization, asset-key matching, family selection,
+  opportunity scoring, market/derivatives interpretation, source ranking,
+  warning, and summary helpers into
+  `event_alpha/radar/integrated/pipeline_parts/merge_policy.py` (1,016 lines).
+  The remaining 551-line `merge.py` owns merged-family context construction and
+  final schema-field assembly.
+- Registered the policy module with the integrated API synchronization layer so
+  all prior private compatibility exports remain callable and monkeypatch-aware.
+  Added explicit wrapper-identity coverage and registered the new test module
+  with the standalone compatibility runner.
+- Added a fixed semantic golden over six fixture candidates (`AAVE`, `BTC`,
+  `SECTOR`, `TESTFADE`, `TESTPERP`, and `TKNC`) covering canonical identity,
+  sources, official/scheduled events, opportunity policy, market state,
+  derivatives/crowding, DEX/protocol data, diagnostics, and no-side-effect
+  safety fields. Retired the now-obsolete over-1,200 architecture exception.
+**Verify:** The golden was stable across two pre-split runs and all six hashes
+match after extraction. The focused integrated merge set passed 5 tests, all
+market surfaces plus the new golden/compatibility module passed 36 tests, two
+new tests passed through the standalone adapter, and the full Event Alpha
+package passed all 650 tests in 149.00s. Compileall and `git diff --check`
+passed. The no-send integrated-radar smoke produced 11 candidates, 9 canonical
+cores, 9 cards, and the guarded preview; all lane/artifact assertions passed and
+strict artifact doctor returned `OK` with zero blockers/warnings. Canonical
+architecture reports remain green/accepted with production files and accepted
+exceptions over 1,200 lines reduced from 13 to 12, unresolved over-1,200 files
+at zero, over-1,500 files at zero, functions over the limit at zero, and
+`new_violation_count=0`.
+**Notes/risks:** Candidate output remains byte-equivalent for every golden field.
+No provider activation, live call, notification, normal RSI signal, paper trade,
+trade, execution, or Event Alpha `TRIGGERED_FADE` behavior changed. Routine
+GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split daily burn-in planning from execution · Codex
 **Why:** The 1,499-line daily burn-in module was the repository's largest
 behavioral production file and mixed immutable command construction with
