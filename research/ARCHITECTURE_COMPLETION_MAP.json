@@ -299,7 +299,7 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-10T05:02:35+00:00",
+  "generated_at": "2026-07-10T05:07:25+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
@@ -719,7 +719,7 @@
     "largest_test_files": [
       {
         "limit": 1500,
-        "line_count": 9018,
+        "line_count": 7536,
         "path": "tests/event_alpha/test_integrated_radar.py",
         "source_kind": "test"
       },
@@ -761,7 +761,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 1662,
+        "line_count": 1664,
         "path": "tests/test_indicators.py",
         "source_kind": "test"
       },
@@ -809,6 +809,12 @@
       },
       {
         "limit": 1500,
+        "line_count": 867,
+        "path": "tests/event_alpha/test_claim_semantics.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
         "line_count": 850,
         "path": "tests/event_alpha/test_artifact_schema.py",
         "source_kind": "test"
@@ -829,6 +835,12 @@
         "limit": 1500,
         "line_count": 735,
         "path": "tests/rsi/test_indicators_core.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 639,
+        "path": "tests/event_alpha/test_incident_relevance.py",
         "source_kind": "test"
       },
       {
@@ -943,18 +955,6 @@
         "limit": 1500,
         "line_count": 39,
         "path": "tests/event_alpha/test_no_old_event_alpha_imports.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 30,
-        "path": "tests/event_alpha/conftest.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 27,
-        "path": "tests/event_alpha/test_canonical_imports.py",
         "source_kind": "test"
       }
     ],

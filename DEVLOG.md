@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split integrated-radar incident semantics tests · Codex
+**Why:** After the LLM split, the 9,018-line monolith ended with four independent
+incident/claim/context regressions totaling 1,474 source lines. Keeping all four
+in one new file would leave almost no room below the 1,500-line warning.
+**Changes:**
+- Moved the 853-line claim/cause/role/market-context/doctor/card regression into
+  `tests/event_alpha/test_claim_semantics.py` (867 lines).
+- Moved incident relevance gates, raw/external observation isolation,
+  opportunity upgrade/audit sections, and daily-brief/research-card context into
+  `tests/event_alpha/test_incident_relevance.py` (639 lines). Registered both
+  focused modules with the standalone compatibility runner.
+- Reduced `test_integrated_radar.py` from 9,018 to 7,536 lines. Its pre-split 98
+  names remain exact and unique across the three files (sorted-name SHA-256
+  `0d4c4729...`). Updated the organization map and durable split history.
+**Verify:** Both extracted modules passed all four tests in 16.27s and all four
+passed through the standalone adapter. The complete source-plus-extracted
+surface passed all 98 tests in 18.52s. Standalone discovery remains 786 total /
+594 Event Alpha / 109 RSI / 42 CLI / 41 umbrella tests. Compileall and
+`git diff --check` passed. The already-green 650-test Event Alpha package was
+not redundantly rerun for this exact, test-only move.
+**Notes/risks:** Test organization and documentation only; no incident, claim,
+market, audit, doctor, card, notification, signal, paper, trade, or execution
+behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split integrated-radar LLM test surface · Codex
 **Why:** The remaining 9,953-line integrated-radar test monolith still contained
 a contiguous, independent LLM relationship/analyzer/extractor surface with no

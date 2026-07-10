@@ -68,6 +68,9 @@ A third 27-test split isolated LLM relationship analysis, advisory behavior,
 provider timeout/budget/cache handling, and raw extraction in a 942-line module;
 the source monolith fell again from 9,953 to 9,018 lines while preserving the
 exact 125-name remaining surface across source plus extraction.
+A fourth split separated the final four incident/claim/context regressions into
+867- and 639-line modules; the source monolith fell from 9,018 to 7,536 lines
+with the exact 98-name surface preserved.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.
