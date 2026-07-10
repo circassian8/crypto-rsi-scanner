@@ -1400,15 +1400,6 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1392,
-      "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-      "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
-      "revisit_condition": "When config/report command bodies move to focused service modules.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
       "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
@@ -1422,6 +1413,15 @@
       "path": "crypto_rsi_scanner/config.py",
       "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
       "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1295,
+      "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
+      "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
+      "revisit_condition": "When config/report command bodies move to focused service modules.",
       "source_kind": "production"
     },
     {
@@ -1593,7 +1593,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 716,
+  "file_count": 717,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1601,7 +1601,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-10T07:12:02.544288+00:00",
+  "generated_at": "2026-07-10T07:16:00.827676+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1609,12 +1609,6 @@
       "limit": 1500,
       "line_count": 1398,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1392,
-      "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
       "source_kind": "production"
     },
     {
@@ -1627,6 +1621,12 @@
       "limit": 1500,
       "line_count": 1352,
       "path": "crypto_rsi_scanner/config.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1295,
+      "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
       "source_kind": "production"
     },
     {
@@ -3469,13 +3469,6 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1392,
-      "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3562,12 +3555,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 1392,
-      "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
       "source_kind": "production"
@@ -3576,6 +3563,12 @@
       "limit": 1500,
       "line_count": 1352,
       "path": "crypto_rsi_scanner/config.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1295,
+      "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
       "source_kind": "production"
     },
     {
@@ -3867,15 +3860,6 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1392,
-          "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-          "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
-          "revisit_condition": "When config/report command bodies move to focused service modules.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
           "line_count": 1387,
           "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
           "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
@@ -3889,6 +3873,15 @@
           "path": "crypto_rsi_scanner/config.py",
           "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
           "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1295,
+          "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
+          "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
+          "revisit_condition": "When config/report command bodies move to focused service modules.",
           "source_kind": "production"
         },
         {
@@ -3984,11 +3977,6 @@
         "threshold": 1200
       },
       {
-        "line_count": 1392,
-        "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-        "threshold": 1200
-      },
-      {
         "line_count": 1387,
         "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
         "threshold": 1200
@@ -3996,6 +3984,11 @@
       {
         "line_count": 1352,
         "path": "crypto_rsi_scanner/config.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1295,
+        "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
         "threshold": 1200
       },
       {
@@ -4095,15 +4088,6 @@
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1392,
-            "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-            "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
-            "revisit_condition": "When config/report command bodies move to focused service modules.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
             "line_count": 1387,
             "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
             "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
@@ -4117,6 +4101,15 @@
             "path": "crypto_rsi_scanner/config.py",
             "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
             "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1295,
+            "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
+            "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
+            "revisit_condition": "When config/report command bodies move to focused service modules.",
             "source_kind": "production"
           },
           {

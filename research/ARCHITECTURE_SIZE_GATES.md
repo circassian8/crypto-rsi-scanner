@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-10T07:12:02.544288+00:00`
+- generated_at: `2026-07-10T07:16:00.827676+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -93,9 +93,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1398 |
-| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 |
 | `crypto_rsi_scanner/config.py` | 1352 |
+| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1295 |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
@@ -138,9 +138,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines | reason | revisit |
 |---|---:|---|---|
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1398 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
-| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 | Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to focused service modules. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | Route-gate decision logic is dense and behavior-critical for no-send notification eligibility. | When route-decision/gate snapshots cover every lane and quality-gate cap. |
 | `crypto_rsi_scanner/config.py` | 1352 | Central environment/config contract; splitting risks import-time default and env-var behavior drift. | When a dedicated config-v2 migration freeze and env snapshot tests exist. |
+| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1295 | Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to focused service modules. |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 | Stable argparse flag bundle; splitting individual flag groups risks CLI default drift. | Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule. |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 | Provider/cache enrichment flow is stable and below blocker threshold. | When adding a new enrichment source or cache policy. |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 | Legacy notification-plan compatibility core; no-send semantics are more important than churn. | When notification plan rows are covered by schema-level golden fixtures. |

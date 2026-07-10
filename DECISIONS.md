@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Separate notification runtime helpers from config assembly
+**Status:** accepted
+**Decision:** Notification wall-clock budgets, partial-warning detection,
+operator next-step rendering, feedback-target selection, and integer coercion
+belong in `notification_runtime_helpers.py`. Runtime configuration builders and
+the empty pipeline-result constructor remain in `config_reports.py`; the latter
+depends on watchlist/router configuration and is not a pure runtime helper.
+**Why:** The 1,392-line config service mixed provider/profile assembly with 126
+lines of notification runtime/report helpers. A broad regression test caught
+and corrected the attempted movement of the config-coupled constructor before
+acceptance. The final split yields 1,295- and 126-line modules with all seven
+moved ASTs unchanged.
+**Revisit when:** Notification configuration gains a dedicated dependency-
+injected factory that can own empty-result construction without circular imports.
+
 ## 2026-07-10 - Separate verdict value and evidence-semantics helpers
 **Status:** accepted
 **Decision:** Generic mapping, score, count, and normalized-value helpers belong

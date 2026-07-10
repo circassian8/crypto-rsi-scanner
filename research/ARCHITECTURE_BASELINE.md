@@ -27,7 +27,7 @@ This pass records current behavior and architecture before significant code move
 
 - Top-level `crypto_rsi_scanner/event_*.py` modules: `1`
 - `crypto_rsi_scanner/event_alpha/` files: `447`
-- `crypto_rsi_scanner/cli/` files: `60`
+- `crypto_rsi_scanner/cli/` files: `61`
 - `tests/` package files: `81`
 - GitHub Actions workflows: `2`
 - Event-related Makefile targets: `230`
@@ -537,6 +537,7 @@ This pass records current behavior and architecture before significant code move
 - `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py`
 - `crypto_rsi_scanner/cli/services/scanner_parts/event_research.py`
 - `crypto_rsi_scanner/cli/services/scanner_parts/fade_review.py`
+- `crypto_rsi_scanner/cli/services/scanner_parts/notification_runtime_helpers.py`
 - `crypto_rsi_scanner/cli/services/scanner_parts/provider_preflights.py`
 - `crypto_rsi_scanner/cli/services/scanner_parts/reports.py`
 - `crypto_rsi_scanner/cli/services/scanner_parts/rsi_scan.py`

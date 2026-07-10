@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split notification runtime helpers from CLI config reports · Codex
+**Why:** `cli/services/scanner_parts/config_reports.py` was 1,392 lines and mixed
+provider/profile config assembly with notification runtime and operator helpers.
+**Changes:**
+- Added `notification_runtime_helpers.py` (126 lines) for the runtime-budget
+  class, budget/warning helpers, next-step rendering, feedback-target selection,
+  and integer coercion.
+- A broad fail-soft test exposed that `_empty_notification_pipeline_result`
+  depends on local watchlist/router config builders, so it was restored unchanged
+  to `config_reports.py`. The final config module is 1,295 lines.
+- Preserved all seven moved ASTs and the existing `__all__` surface; updated the
+  roadmap/decision and regenerated architecture reports.
+**Verify:** The dependency-catching fail-soft regression passed, then all 67
+notification planning/routing/readiness/delivery/lane/operations/inbox and CLI
+operator tests passed in 11.18s. Compileall, architecture gates, JSON validation,
+and `git diff --check` passed with zero file-size and zero new violations.
+**Notes/risks:** Organization only; no profile, provider, budget, fail-soft,
+notification, send, signal, paper, trade, or execution behavior changed. Routine
+GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split opportunity-verdict value and evidence helpers · Codex
 **Why:** `event_alpha/radar/opportunity_verdict.py` was 1,395 lines and mixed
 scoring/cap policy with reusable normalization and evidence predicates.

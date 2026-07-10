@@ -2,7 +2,7 @@
 
 Research-only architecture gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-10T07:12:09+00:00`
+- generated_at: `2026-07-10T07:16:07+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `124`
@@ -10,7 +10,7 @@ Research-only architecture gate report. This report does not call providers, sen
 - retained_public_shims_count: `0`
 - shim_dependency_report_cache_status: `miss`
 - shim_dependency_include_runtime_artifacts: `False`
-- shim_dependency_scan_duration_seconds: `1.2002`
+- shim_dependency_scan_duration_seconds: `1.1825`
 - shim_dependency_skipped_artifact_files: `1486`
 - shim_dependency_skipped_large_files: `1`
 - v3_gate_status: `accepted_with_documented_exceptions`
@@ -149,9 +149,9 @@ Research-only architecture gate report. This report does not call providers, sen
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1398 |
-| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 |
 | `crypto_rsi_scanner/config.py` | 1352 |
+| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1295 |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
@@ -194,9 +194,9 @@ Research-only architecture gate report. This report does not call providers, sen
 | path | lines | reason | revisit |
 |---|---:|---|---|
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1398 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
-| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 | Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to focused service modules. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | Route-gate decision logic is dense and behavior-critical for no-send notification eligibility. | When route-decision/gate snapshots cover every lane and quality-gate cap. |
 | `crypto_rsi_scanner/config.py` | 1352 | Central environment/config contract; splitting risks import-time default and env-var behavior drift. | When a dedicated config-v2 migration freeze and env snapshot tests exist. |
+| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1295 | Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to focused service modules. |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 | Stable argparse flag bundle; splitting individual flag groups risks CLI default drift. | Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule. |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 | Provider/cache enrichment flow is stable and below blocker threshold. | When adding a new enrichment source or cache policy. |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 | Legacy notification-plan compatibility core; no-send semantics are more important than churn. | When notification plan rows are covered by schema-level golden fixtures. |
@@ -292,7 +292,6 @@ Research-only architecture gate report. This report does not call providers, sen
 | path | lines | status | revisit condition |
 |---|---:|---|---|
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1398 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/config.py` | 1352 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 
