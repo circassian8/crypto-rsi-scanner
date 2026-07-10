@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Retire the provider-readiness test monolith · Codex
+**Why:** After two provider-family splits, the residual 3,079-line file divided
+cleanly into activation/readiness/health, discovery transformation/external
+catalyst safety, and cache/scanner-report contracts.
+**Changes:**
+- Moved 22 provider status/readiness/no-key target, profile-scoped preflight and
+  health, visible-core doctor, backoff/reset/wrapper, v1/tuning/pack, daily-brief
+  readiness, and Bybit preflight tests into `test_provider_activation.py`
+  (1,356 lines).
+- Moved 14 LLM-hint, market fail-soft, catalyst-search adapter/budget, identity,
+  asset-role/news, external-catalyst/prediction-market, and event-fade isolation
+  tests into `test_discovery_pipeline.py` (940 lines). Moved 12 cache/refresh/run
+  diagnostics, Binance listen, and multi-fixture scanner-report tests into
+  `test_discovery_cache_reports.py` (817 lines).
+- Replaced the old standalone registration with all three focused modules and
+  deleted `test_provider_readiness.py`. The residual 48 names remain exact and
+  unique (sorted-name SHA-256 `8be34124...`), completing the full 88-test
+  identity-preserving provider migration from the original 5,379-line file.
+**Verify:** All 48 residual tests passed under pytest in 10.75s and all 48 passed
+through the standalone adapter. The full Event Alpha package passed all 650
+tests in 150.69s. Standalone discovery remains 786 total / 594 Event Alpha /
+109 RSI / 42 CLI / 41 umbrella tests. Compileall and `git diff --check` passed;
+canonical architecture reports remain green/accepted with test files over 1,500
+lines reduced from 7 to 6 and `new_violation_count=0`.
+**Notes/risks:** Test organization and documentation only; no activation,
+provider health, cache, discovery, resolver, request, credential, notification,
+signal, paper, trade, or execution behavior changed. Routine GitHub CI will not
+be awaited.
+
 ## 2026-07-10 — Split exchange and market-data provider tests · Codex
 **Why:** After the news split, provider readiness still mixed exchange/universe
 normalization with derivatives, DEX, and supply enrichment contracts.

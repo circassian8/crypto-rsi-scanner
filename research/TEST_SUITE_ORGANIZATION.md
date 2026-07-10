@@ -27,6 +27,8 @@ This document records the pytest-compatible split of the historical
 | `tests/event_alpha/test_impact_hypotheses.py` | Hypothesis generation, contextual matching, category refinement, identity-safe impact validation, persistence transitions, verdict policy, watchlist identity, and external-entity exclusion. |
 | `tests/event_alpha/test_core_opportunities.py` | Core-opportunity storage, watchlist promotion, canonical operator grouping, research cards, and opportunity-audit regressions. |
 | `tests/event_alpha/test_core_reconciliation.py` | Canonical-core/snapshot reconciliation, diagnostic isolation, audit reconciliation, and daily-brief evidence accounting. |
+| `tests/event_alpha/test_discovery_cache_reports.py` | Point-in-time cache writes, refresh/run diagnostics, Binance raw listen cache, and scanner reports across exchange/derivatives/supply/news/external/calendar fixtures. |
+| `tests/event_alpha/test_discovery_pipeline.py` | LLM hint validation, market fail-soft health, catalyst-search adapters/budgets, candidate identity, asset-role/news safety, external catalysts, prediction markets, and event-fade isolation. |
 | `tests/event_alpha/test_operator_identity.py` | Asset knowledge, role validation, identity metadata, live-confirmation caps, and stale source-only normalization. |
 | `tests/event_alpha/test_operator_presentation.py` | Integrated fixture lane contract, canonical core grouping, daily-brief sections, card-index grouping/collapse, opportunity audit, and lineage markers. |
 | `tests/event_alpha/test_operator_workflows.py` | Digest caps/confirmation, status budgets, monitor/scanner updates, identity/market providers, cards/explain output, no-key target, and review dedupe. |
@@ -36,6 +38,7 @@ This document records the pytest-compatible split of the historical
 | `tests/event_alpha/test_market_data_providers.py` | Coinalyze preflight/fixtures/live fail-soft/auto-symbols, derivatives non-overwrite enrichment, DEX readiness, and supply-provider hard gates. |
 | `tests/event_alpha/test_news_providers.py` | CryptoPanic, GDELT, project RSS, news-derived external assets, explicit/text event-time provenance, classifier-confidence caps, and no-trade safety. |
 | `tests/event_alpha/test_playbooks_graph.py` | Deterministic playbook classification and catalyst graph clustering/link rejection across proxy, direct, infrastructure, noise, supply, and derivatives evidence. |
+| `tests/event_alpha/test_provider_activation.py` | Provider status/readiness, no-key Make targets, profile-scoped preflight/health, visible-core doctor readiness, backoff/reset/wrappers, v1/tuning/pack reports, daily-brief readiness, and Bybit preflight. |
 | `tests/event_alpha/test_radar_pipeline.py` | Radar/scanner reports, watchlist/router pipeline cycles, search validation, hypothesis persistence/briefs, LLM suggestions and skip reasons, extraction ordering, and upstream hints. |
 | `tests/event_alpha/test_watchlist_router.py` | Watchlist state/expiry compatibility, router escalation/digest/material-change policy, near-miss market refresh, and router-approved send gating. |
 | `tests/event_alpha/` | Event Alpha artifact, radar, notification, provider readiness, source coverage, namespace lifecycle, and outcome tests split into focused package homes. |
@@ -64,7 +67,7 @@ release guard.
 ## Size Gate
 
 After the Event Alpha and base-suite splits, `tests/test_indicators.py` was
-1,784 lines immediately before the focused backup-test move. It is now 1,676
+1,784 lines immediately before the focused backup-test move. It is now 1,678
 lines and reports these standalone counts:
 
 | count | value |
@@ -87,11 +90,12 @@ workflow, and presentation modules are 1,156, 1,006, and 618 lines. The full
 Event Alpha package passes 650 cases, and the complete historical standalone
 runner passes 786/786.
 
-The provider-readiness burn-down has moved 40 tests into three focused modules:
-1,113-line news/event-time safety, 699-line exchange/universe/calendar, and
-534-line Coinalyze/DEX/supply coverage. `test_provider_readiness.py` fell from
-5,379 to 3,079 lines with its exact 74-name remaining surface preserved across
-source and extraction.
+The provider-readiness burn-down moved all 88 original identities into six
+focused modules and retired `tests/event_alpha/test_provider_readiness.py`.
+News/event-time, exchange/universe, and Coinalyze/DEX/supply modules are 1,113,
+699, and 534 lines; the final activation/readiness, discovery-pipeline, and
+cache/scanner-report modules are 1,356, 940, and 817 lines. Exact names, pytest,
+and standalone compatibility were preserved at every step.
 
 ## Remaining Umbrella Sections
 

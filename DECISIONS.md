@@ -98,6 +98,10 @@ tests into a 1,113-line module while preserving the exact 88-name source surface
 A second provider split moved 16 exchange/universe/calendar normalization tests
 and 10 Coinalyze/DEX/supply tests into 699- and 534-line modules; provider
 readiness fell from 4,277 to 3,079 lines with the exact 74-name surface preserved.
+A third and final provider split partitioned the residual 48 tests into
+1,356-line activation/readiness/health, 940-line discovery-pipeline, and
+817-line cache/scanner-report modules, then deleted the source monolith. All 88
+original provider-readiness identities now live in focused sub-threshold homes.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.

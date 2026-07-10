@@ -2,7 +2,7 @@
 
 Research-only architecture acceptance report. This report does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-10T05:47:09.118455+00:00`
+- generated_at: `2026-07-10T05:56:15.584036+00:00`
 - acceptance_status: `accepted`
 - critical_gate_status: `pass`
 - architecture_status: `accepted`
