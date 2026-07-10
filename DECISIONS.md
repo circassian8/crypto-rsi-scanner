@@ -95,6 +95,9 @@ test identities are now housed in focused modules no larger than 1,450 lines.
 The same rule now applies beyond the retired integrated-radar file: the first
 provider-readiness split moved 14 CryptoPanic/GDELT/RSS/news timing and safety
 tests into a 1,113-line module while preserving the exact 88-name source surface.
+A second provider split moved 16 exchange/universe/calendar normalization tests
+and 10 Coinalyze/DEX/supply tests into 699- and 534-line modules; provider
+readiness fell from 4,277 to 3,079 lines with the exact 74-name surface preserved.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.

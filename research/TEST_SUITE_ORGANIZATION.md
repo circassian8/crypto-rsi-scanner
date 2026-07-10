@@ -20,6 +20,7 @@ This document records the pytest-compatible split of the historical
 | `tests/event_alpha/test_fade_review_workflows.py` | Review sidecars, balanced templates, scanner reports, review bundles, cached workspaces, and merge workflows. |
 | `tests/event_alpha/test_fade_core.py` | Pure event-fade scoring/state/trigger/risk behavior plus conservative discovery resolver collision/noise handling. |
 | `tests/event_alpha/test_event_alert_ranking.py` | Research alert ranking, proxy-venue opt-in, triggered-fade tier eligibility, cluster/noise caps, playbook tiers, and rejection overrides. |
+| `tests/event_alpha/test_exchange_universe_providers.py` | Official exchange/package smoke, manual and CoinGecko universe providers, Binance/Bybit adapters, structured calendars, normalization/dedupe, resolution, and direct-no-trade safety. |
 | `tests/event_alpha/test_catalyst_frames.py` | Catalyst-frame classification, LLM validation/runtime controls, strategic-frame downstream use, e2e artifacts, missing-provider modes, roles, aggregation, and unresolved-frame caps. |
 | `tests/event_alpha/test_claim_semantics.py` | Claim extraction, cause-status transitions, asset roles, incident construction, market context, and doctor/card propagation. |
 | `tests/event_alpha/test_incident_relevance.py` | Incident relevance gates, raw/external observation isolation, upgrade paths, audit sections, daily briefs, and research cards. |
@@ -32,6 +33,7 @@ This document records the pytest-compatible split of the historical
 | `tests/event_alpha/test_market_surfaces.py` | Market reaction/state/anomaly, official exchange, scheduled catalyst, derivatives, instrument resolution, and integrated-radar surface regressions. |
 | `tests/event_alpha/test_llm_radar.py` | LLM relationship analysis, advisory caps, provider timeout/cache/budget behavior, golden evals, raw-event extraction, and scanner-report integration. |
 | `tests/event_alpha/test_market_enrichment.py` | CoinGecko market enrichment, non-overwrite guarantees, store-only anomaly creation, bounded evidence search, and anomaly lifecycle transitions. |
+| `tests/event_alpha/test_market_data_providers.py` | Coinalyze preflight/fixtures/live fail-soft/auto-symbols, derivatives non-overwrite enrichment, DEX readiness, and supply-provider hard gates. |
 | `tests/event_alpha/test_news_providers.py` | CryptoPanic, GDELT, project RSS, news-derived external assets, explicit/text event-time provenance, classifier-confidence caps, and no-trade safety. |
 | `tests/event_alpha/test_playbooks_graph.py` | Deterministic playbook classification and catalyst graph clustering/link rejection across proxy, direct, infrastructure, noise, supply, and derivatives evidence. |
 | `tests/event_alpha/test_radar_pipeline.py` | Radar/scanner reports, watchlist/router pipeline cycles, search validation, hypothesis persistence/briefs, LLM suggestions and skip reasons, extraction ordering, and upstream hints. |
@@ -62,7 +64,7 @@ release guard.
 ## Size Gate
 
 After the Event Alpha and base-suite splits, `tests/test_indicators.py` was
-1,784 lines immediately before the focused backup-test move. It is now 1,674
+1,784 lines immediately before the focused backup-test move. It is now 1,676
 lines and reports these standalone counts:
 
 | count | value |
@@ -85,10 +87,11 @@ workflow, and presentation modules are 1,156, 1,006, and 618 lines. The full
 Event Alpha package passes 650 cases, and the complete historical standalone
 runner passes 786/786.
 
-The provider-readiness burn-down has moved 14 news-provider and event-time
-safety tests into a 1,113-line module. `test_provider_readiness.py` fell from
-5,379 to 4,277 lines with its exact 88-name surface preserved across source and
-extraction.
+The provider-readiness burn-down has moved 40 tests into three focused modules:
+1,113-line news/event-time safety, 699-line exchange/universe/calendar, and
+534-line Coinalyze/DEX/supply coverage. `test_provider_readiness.py` fell from
+5,379 to 3,079 lines with its exact 74-name remaining surface preserved across
+source and extraction.
 
 ## Remaining Umbrella Sections
 

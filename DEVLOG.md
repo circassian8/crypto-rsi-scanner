@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split exchange and market-data provider tests · Codex
+**Why:** After the news split, provider readiness still mixed exchange/universe
+normalization with derivatives, DEX, and supply enrichment contracts.
+**Changes:**
+- Moved 16 official-exchange/package smoke, manual/CoinGecko universe,
+  Binance CMS/WebSocket, Bybit, structured-calendar, normalize/dedupe, asset
+  resolution, and direct-no-trade tests into
+  `test_exchange_universe_providers.py` (699 lines).
+- Moved 10 Coinalyze preflight/fixture/live/auto-symbol/fail-soft/non-overwrite,
+  DEX readiness, and supply-provider/hard-gate tests into
+  `test_market_data_providers.py` (534 lines). Registered both with the
+  standalone compatibility runner and restored the source module's explicit
+  provider-test imports in the extracted files.
+- Reduced `test_provider_readiness.py` from 4,277 to 3,079 lines. Its pre-split
+  74 names remain exact and unique across the three files (sorted-name SHA-256
+  `232f6514...`). Updated the collaboration/test-organization artifacts.
+**Verify:** Both extracted modules passed all 26 tests and all 26 passed through
+the standalone adapter. The complete source-plus-extracted surface passed all
+74 tests in 13.49s. Standalone discovery remains 786 total / 594 Event Alpha /
+109 RSI / 42 CLI / 41 umbrella tests. Compileall and `git diff --check` passed.
+**Notes/risks:** The first focused run caught and fixed an inherited
+`datetime/timezone` header import; final focused, affected, and standalone gates
+are green. Test organization only—no provider calls, credentials, request
+ledgers, normalization, enrichment, notification, signal, paper, trade, or
+execution behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split provider-readiness news tests · Codex
 **Why:** With the integrated-radar monolith retired, the next-largest test debt
 was the 5,379-line provider-readiness file. Its CryptoPanic/GDELT/RSS and news

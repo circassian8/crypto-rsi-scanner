@@ -299,7 +299,7 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-10T05:41:42+00:00",
+  "generated_at": "2026-07-10T05:47:16+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
@@ -725,12 +725,6 @@
       },
       {
         "limit": 1500,
-        "line_count": 4277,
-        "path": "tests/event_alpha/test_provider_readiness.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
         "line_count": 4082,
         "path": "tests/event_alpha/test_outcomes.py",
         "source_kind": "test"
@@ -739,6 +733,12 @@
         "limit": 1500,
         "line_count": 4052,
         "path": "tests/event_alpha/test_artifact_doctor.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 3079,
+        "path": "tests/event_alpha/test_provider_readiness.py",
         "source_kind": "test"
       },
       {
@@ -755,7 +755,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 1674,
+        "line_count": 1676,
         "path": "tests/test_indicators.py",
         "source_kind": "test"
       },
@@ -869,6 +869,12 @@
       },
       {
         "limit": 1500,
+        "line_count": 699,
+        "path": "tests/event_alpha/test_exchange_universe_providers.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
         "line_count": 639,
         "path": "tests/event_alpha/test_incident_relevance.py",
         "source_kind": "test"
@@ -883,6 +889,12 @@
         "limit": 1500,
         "line_count": 562,
         "path": "tests/rsi/test_backtest.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 534,
+        "path": "tests/event_alpha/test_market_data_providers.py",
         "source_kind": "test"
       },
       {
@@ -943,18 +955,6 @@
         "limit": 1500,
         "line_count": 224,
         "path": "tests/rsi/test_security.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 202,
-        "path": "tests/cli/test_event_alpha_command_registry.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 171,
-        "path": "tests/rsi/test_backups.py",
         "source_kind": "test"
       }
     ],
