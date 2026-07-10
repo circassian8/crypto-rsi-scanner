@@ -54,7 +54,7 @@
         "RestoreCheckResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 25,
+      "max_class_line_count": 31,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.backups",
       "public_class_count": 3,
@@ -211,7 +211,7 @@
         "EventAlphaV1ReadinessResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 11,
+      "max_class_line_count": 13,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
       "public_class_count": 2,
@@ -371,7 +371,7 @@
         "EventAlphaBurnInScorecard"
       ],
       "exception_reason": "",
-      "max_class_line_count": 24,
+      "max_class_line_count": 27,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.burn_in",
       "public_class_count": 3,
@@ -1397,7 +1397,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 502,
+  "class_count": 503,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1452,12 +1452,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 5892,
+  "function_count": 6090,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-06T12:50:44.877900+00:00",
+  "generated_at": "2026-07-10T04:22:25.485011+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -1474,7 +1474,7 @@
         "RestoreCheckResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 25,
+      "max_class_line_count": 31,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.backups",
       "public_class_count": 3,
@@ -1631,7 +1631,7 @@
         "EventAlphaV1ReadinessResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 11,
+      "max_class_line_count": 13,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
       "public_class_count": 2,
@@ -1791,7 +1791,7 @@
         "EventAlphaBurnInScorecard"
       ],
       "exception_reason": "",
-      "max_class_line_count": 24,
+      "max_class_line_count": 27,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.burn_in",
       "public_class_count": 3,
@@ -2833,6 +2833,13 @@
   "multi_public_class_modules_count": 80,
   "near_threshold_file_status": [
     {
+      "line_count": 1499,
+      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
       "line_count": 1498,
       "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -2882,7 +2889,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1319,
+      "line_count": 1352,
       "path": "crypto_rsi_scanner/config.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -3067,7 +3074,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 410,
+  "public_class_count": 411,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -3123,6 +3130,7 @@
     "crypto_rsi_scanner.event_alpha.notifications.slo": 1,
     "crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor": 2,
     "crypto_rsi_scanner.event_alpha.operations.daily_burn_in": 1,
+    "crypto_rsi_scanner.event_alpha.operations.namespace_policy": 1,
     "crypto_rsi_scanner.event_alpha.operations.review_inbox": 1,
     "crypto_rsi_scanner.event_alpha.outcomes.burn_in": 3,
     "crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist": 1,
@@ -3289,9 +3297,17 @@
       "rows": []
     },
     "production_files_over_1200_lines": {
-      "count": 13,
+      "count": 14,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
+        {
+          "accepted": true,
+          "line_count": 1499,
+          "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+          "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
+          "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
+          "threshold": 1200
+        },
         {
           "accepted": true,
           "line_count": 1498,
@@ -3350,7 +3366,7 @@
         },
         {
           "accepted": true,
-          "line_count": 1319,
+          "line_count": 1352,
           "path": "crypto_rsi_scanner/config.py",
           "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
           "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
@@ -3429,7 +3445,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 13,
+      "production_files_over_1200_lines": 14,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -3438,6 +3454,11 @@
     "historical_row_type_alias": "refactor_v3_gate_snapshot",
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
+      {
+        "line_count": 1499,
+        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+        "threshold": 1200
+      },
       {
         "line_count": 1498,
         "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
@@ -3474,7 +3495,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1319,
+        "line_count": 1352,
         "path": "crypto_rsi_scanner/config.py",
         "threshold": 1200
       },
@@ -3517,9 +3538,17 @@
         "rows": []
       },
       "production_files_over_1200_lines": {
-        "count": 13,
+        "count": 14,
         "reason": "accepted/documented production files over the v3 1,200-line target",
         "rows": [
+          {
+            "accepted": true,
+            "line_count": 1499,
+            "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+            "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
+            "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
+            "threshold": 1200
+          },
           {
             "accepted": true,
             "line_count": 1498,
@@ -3578,7 +3607,7 @@
           },
           {
             "accepted": true,
-            "line_count": 1319,
+            "line_count": 1352,
             "path": "crypto_rsi_scanner/config.py",
             "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
             "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
@@ -3641,7 +3670,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 13,
+    "production_files_over_1200_lines": 14,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,

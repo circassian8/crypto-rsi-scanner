@@ -13,6 +13,13 @@
     "modules_with_multiple_public_classes_status": "pass",
     "near_threshold_file_status": [
       {
+        "line_count": 1499,
+        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
         "line_count": 1498,
         "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -62,7 +69,7 @@
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1319,
+        "line_count": 1352,
         "path": "crypto_rsi_scanner/config.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -246,6 +253,7 @@
       "integrated_radar": 3,
       "namespace": 1,
       "notifications": 1,
+      "operations": 33,
       "outcomes": 1,
       "paths": 1,
       "provider_readiness": 2,
@@ -268,6 +276,7 @@
       "integrated_radar": 3,
       "namespace": 1,
       "notifications": 1,
+      "operations": 33,
       "outcomes": 1,
       "paths": 1,
       "provider_readiness": 2,
@@ -304,18 +313,18 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-05T13:29:59+00:00",
+  "generated_at": "2026-07-10T04:22:38+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
   "live_provider_calls_allowed": false,
   "namespace_lifecycle_inventory": {
-    "namespace_count": 46,
+    "namespace_count": 52,
     "status_counts": {
       "active_architecture_report": 1,
-      "active_fixture_smoke": 18,
+      "active_fixture_smoke": 20,
       "active_integrated_smoke": 1,
-      "active_live_rehearsal": 9,
+      "active_live_rehearsal": 13,
       "active_provider_preflight": 5,
       "active_provider_rehearsal": 5,
       "manual_review": 5,
@@ -357,6 +366,15 @@
   "size_gates": {
     "accepted_class_exceptions_count": 3,
     "accepted_production_files_over_1200_line_rows": [
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1499,
+        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+        "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
+        "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
+        "source_kind": "production"
+      },
       {
         "accepted": true,
         "limit": 1500,
@@ -423,10 +441,19 @@
       {
         "accepted": true,
         "limit": 1500,
-        "line_count": 1319,
+        "line_count": 1352,
         "path": "crypto_rsi_scanner/config.py",
         "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
         "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1285,
+        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+        "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+        "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
         "source_kind": "production"
       },
       {
@@ -464,18 +491,9 @@
         "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
         "revisit_condition": "When outcome performance views gain new sections.",
         "source_kind": "production"
-      },
-      {
-        "accepted": true,
-        "limit": 1500,
-        "line_count": 1231,
-        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-        "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-        "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
-        "source_kind": "production"
       }
     ],
-    "accepted_production_files_over_1200_lines": 13,
+    "accepted_production_files_over_1200_lines": 14,
     "api_classes_over_limit": 0,
     "api_decomposition_gate_status": "pass",
     "api_files_over_1500_lines": 0,
@@ -489,6 +507,12 @@
     "gate_status": "pass",
     "largest_api_files": [],
     "largest_production_files": [
+      {
+        "limit": 1500,
+        "line_count": 1499,
+        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+        "source_kind": "production"
+      },
       {
         "limit": 1500,
         "line_count": 1498,
@@ -533,8 +557,14 @@
       },
       {
         "limit": 1500,
-        "line_count": 1319,
+        "line_count": 1352,
         "path": "crypto_rsi_scanner/config.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1285,
+        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
         "source_kind": "production"
       },
       {
@@ -563,12 +593,6 @@
       },
       {
         "limit": 1500,
-        "line_count": 1231,
-        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
         "line_count": 1181,
         "path": "crypto_rsi_scanner/event_fade.py",
         "source_kind": "production"
@@ -587,6 +611,12 @@
       },
       {
         "limit": 1500,
+        "line_count": 1138,
+        "path": "crypto_rsi_scanner/event_alpha/operations/review_inbox.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
         "line_count": 1136,
         "path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
         "source_kind": "production"
@@ -595,6 +625,18 @@
         "limit": 1500,
         "line_count": 1135,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_confirmation.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1126,
+        "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1125,
+        "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py",
         "source_kind": "production"
       },
       {
@@ -611,14 +653,8 @@
       },
       {
         "limit": 1500,
-        "line_count": 1096,
+        "line_count": 1078,
         "path": "crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 1079,
-        "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py",
         "source_kind": "production"
       },
       {
@@ -710,36 +746,18 @@
         "line_count": 973,
         "path": "crypto_rsi_scanner/event_alpha/radar/core_opportunities.py",
         "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 966,
-        "path": "crypto_rsi_scanner/event_alpha/radar/evidence/executor.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 961,
-        "path": "crypto_rsi_scanner/cli/services/scanner_parts/reports.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 941,
-        "path": "crypto_rsi_scanner/event_alpha/radar/identity.py",
-        "source_kind": "production"
       }
     ],
     "largest_test_files": [
       {
         "limit": 1500,
-        "line_count": 16184,
+        "line_count": 12311,
         "path": "tests/event_alpha/test_integrated_radar.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 5357,
+        "line_count": 5379,
         "path": "tests/event_alpha/test_provider_readiness.py",
         "source_kind": "test"
       },
@@ -751,13 +769,13 @@
       },
       {
         "limit": 1500,
-        "line_count": 4031,
+        "line_count": 4082,
         "path": "tests/event_alpha/test_outcomes.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 3995,
+        "line_count": 4052,
         "path": "tests/event_alpha/test_artifact_doctor.py",
         "source_kind": "test"
       },
@@ -775,14 +793,38 @@
       },
       {
         "limit": 1500,
-        "line_count": 1779,
+        "line_count": 1658,
         "path": "tests/test_indicators.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 1322,
+        "line_count": 1477,
+        "path": "tests/event_alpha/test_burn_in_operations.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1450,
+        "path": "tests/event_alpha/test_market_surfaces.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1407,
         "path": "tests/cli/test_make_targets.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1282,
+        "path": "tests/event_alpha/test_core_opportunities.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 850,
+        "path": "tests/event_alpha/test_artifact_schema.py",
         "source_kind": "test"
       },
       {
@@ -793,19 +835,19 @@
       },
       {
         "limit": 1500,
-        "line_count": 743,
-        "path": "tests/event_alpha/test_artifact_schema.py",
+        "line_count": 786,
+        "path": "tests/event_alpha/test_core_reconciliation.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 694,
+        "line_count": 735,
         "path": "tests/rsi/test_indicators_core.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 561,
+        "line_count": 562,
         "path": "tests/rsi/test_backtest.py",
         "source_kind": "test"
       },
@@ -817,14 +859,32 @@
       },
       {
         "limit": 1500,
-        "line_count": 379,
+        "line_count": 466,
         "path": "tests/rsi/test_paper_risk.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 276,
+        "line_count": 461,
+        "path": "tests/event_alpha/test_operator_identity.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 334,
+        "path": "tests/event_alpha/test_burn_in_candidate_mode.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 308,
         "path": "tests/cli/test_parser.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 224,
+        "path": "tests/rsi/test_security.py",
         "source_kind": "test"
       },
       {
@@ -835,14 +895,44 @@
       },
       {
         "limit": 1500,
-        "line_count": 129,
+        "line_count": 171,
+        "path": "tests/rsi/test_backups.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 169,
         "path": "tests/cli/test_dispatch.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 152,
+        "path": "tests/cli/test_dependency_ci.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 122,
+        "path": "tests/cli/test_burn_in_make_targets.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 103,
+        "path": "tests/cli/test_event_alpha_operator_command_smoke.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
         "line_count": 88,
         "path": "tests/cli/test_relative_import_integrity.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 83,
+        "path": "tests/event_alpha/test_burn_in_contract_hermeticity.py",
         "source_kind": "test"
       },
       {
@@ -898,17 +988,18 @@
         "line_count": 1,
         "path": "tests/event_alpha/__init__.py",
         "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 1,
-        "path": "tests/rsi/__init__.py",
-        "source_kind": "test"
       }
     ],
     "modules_with_multiple_public_classes_status": "pass",
     "moved_existing_violation_count": 0,
     "near_threshold_file_status": [
+      {
+        "line_count": 1499,
+        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
       {
         "line_count": 1498,
         "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
@@ -959,7 +1050,7 @@
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1319,
+        "line_count": 1352,
         "path": "crypto_rsi_scanner/config.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -968,7 +1059,7 @@
     ],
     "new_violation_count": 0,
     "production_classes_over_limit": 3,
-    "production_files_over_1200_lines": 13,
+    "production_files_over_1200_lines": 14,
     "production_files_over_1500_lines": 0,
     "production_files_over_2000_lines": 0,
     "production_files_over_3000_lines": 0,

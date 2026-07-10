@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split integrated-radar core and market tests · Codex
+**Why:** `tests/event_alpha/test_integrated_radar.py` was the repository's
+largest test file at 16,234 lines. Its final core-opportunity and market-surface
+groups had clean dependency boundaries and could be separated without touching
+production or research behavior.
+**Changes:**
+- Mechanically moved 70 tests (3,923 source lines) into focused
+  `test_core_opportunities.py`, `test_core_reconciliation.py`,
+  `test_operator_identity.py`, and `test_market_surfaces.py`. Their final sizes
+  are 1,282, 786, 461, and 1,450 lines; the source monolith is now 12,311 lines.
+- Kept the shared Event Alpha API-helper setup local to each module, registered
+  all four modules in the compatibility runner, and verified the original set
+  of 240 names was preserved with no cross-test references, duplicates, or
+  losses.
+- Refreshed the test-organization map and canonical architecture baseline,
+  size, class-ownership, final, completion, release, transitional-file, and
+  naming reports so current reports show the new module layout. Static gates
+  remain accepted, test files over 1,500 stay at eight, and
+  `new_violation_count=0`.
+**Verify:** The four extracted modules passed `70 tests`; the complete original
+plus extracted surface passed `240 tests`; and all 70 moved tests passed through
+the direct standalone adapter. Standalone discovery remains 784 total / 592
+Event Alpha / 109 RSI / 42 CLI / 41 umbrella tests. The full Event Alpha pytest
+package passed `647 tests` in 150.09s. Compileall,
+`git diff --check`, and the canonical architecture report sequence passed
+(`gate_status=pass`, completion `accepted`, naming `OK`).
+**Notes/risks:** This is test/report organization only. No scanner, provider,
+artifact, notification, signal, paper, trading, or Event Alpha routing behavior
+changed. The monolith remains oversized and needs additional cohesive splits;
+routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Eliminate backup sidecar debris and harden restore checks · Codex
 **Why:** Operational status reported the intended 14/14 retained backups as
 healthy while `backups/` actually held 82 files. The extra files needed to be

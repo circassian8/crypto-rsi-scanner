@@ -399,7 +399,11 @@ CLI parser
 construction belongs in `cli/parser.py`, dispatch in `cli/dispatch.py`, and
 command groups in `cli/commands_*.py`. New tests belong in
 `tests/event_alpha/`, `tests/rsi/`, or `tests/cli/`; `tests/test_indicators.py`
-is the compatibility umbrella runner. New artifact fields require schema v1
+is the compatibility umbrella runner. When splitting a large test module, keep
+each extracted module below the 1,500-line warning when a cohesive boundary
+allows it, use package `_api_helpers` instead of importing test callables from
+the old monolith, register the module in the standalone runner, and prove the
+test-name set has neither losses nor duplicates. New artifact fields require schema v1
 updates, and new doctor checks require check-registry schema dependencies.
 Every new Event Alpha namespace needs lifecycle status, retention policy, and
 explicit `safe_for_send_readiness`. Preserve

@@ -49,6 +49,15 @@
     {
       "accepted": true,
       "limit": 1500,
+      "line_count": 1499,
+      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+      "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
+      "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
       "line_count": 1498,
       "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
       "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
@@ -112,10 +121,19 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1319,
+      "line_count": 1352,
       "path": "crypto_rsi_scanner/config.py",
       "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
       "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1285,
+      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+      "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+      "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
       "source_kind": "production"
     },
     {
@@ -125,15 +143,6 @@
       "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
       "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
       "revisit_condition": "When adding a new enrichment source or cache policy.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
-      "line_count": 1268,
-      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-      "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-      "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
       "source_kind": "production"
     },
     {
@@ -218,9 +227,18 @@
       ]
     },
     "production_files_over_1200_lines": {
-      "count": 13,
+      "count": 14,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1499,
+          "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+          "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
+          "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
+          "source_kind": "production"
+        },
         {
           "accepted": true,
           "limit": 1500,
@@ -287,10 +305,19 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1319,
+          "line_count": 1352,
           "path": "crypto_rsi_scanner/config.py",
           "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
           "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1285,
+          "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+          "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+          "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
           "source_kind": "production"
         },
         {
@@ -300,15 +327,6 @@
           "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
           "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
           "revisit_condition": "When adding a new enrichment source or cache policy.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1268,
-          "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-          "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-          "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
           "source_kind": "production"
         },
         {
@@ -384,7 +402,7 @@
   "duration_seconds_total": null,
   "event_fade_safety_exception_present": true,
   "functions_over_150_lines": 0,
-  "generated_at": "2026-07-05T14:28:20.390449+00:00",
+  "generated_at": "2026-07-10T04:22:30.704550+00:00",
   "historical_row_type_alias": "refactor_v3_release_candidate_report",
   "model_bundles": [
     {
@@ -396,7 +414,7 @@
         "RestoreCheckResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 25,
+      "max_class_line_count": 31,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.backups",
       "public_class_count": 3,
@@ -553,7 +571,7 @@
         "EventAlphaV1ReadinessResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 11,
+      "max_class_line_count": 13,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.config.v1_readiness",
       "public_class_count": 2,
@@ -713,7 +731,7 @@
         "EventAlphaBurnInScorecard"
       ],
       "exception_reason": "",
-      "max_class_line_count": 24,
+      "max_class_line_count": 27,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.burn_in",
       "public_class_count": 3,
@@ -1730,12 +1748,12 @@
   ],
   "model_bundles_count": 79,
   "namespace_lifecycle_status": {
-    "namespace_count": 46,
+    "namespace_count": 52,
     "status_counts": {
       "active_architecture_report": 1,
-      "active_fixture_smoke": 18,
+      "active_fixture_smoke": 20,
       "active_integrated_smoke": 1,
-      "active_live_rehearsal": 9,
+      "active_live_rehearsal": 13,
       "active_provider_preflight": 5,
       "active_provider_rehearsal": 5,
       "manual_review": 5,
@@ -1749,7 +1767,7 @@
   "old_path_import_allowed_exceptions": 0,
   "old_path_internal_imports": 0,
   "old_path_test_imports": 0,
-  "production_files_over_1200_lines": 13,
+  "production_files_over_1200_lines": 14,
   "production_files_over_1500_lines": 0,
   "public_compatibility_entrypoints_path": "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
   "retained_public_entrypoints": 0,

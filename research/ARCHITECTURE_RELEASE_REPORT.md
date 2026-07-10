@@ -2,7 +2,7 @@
 
 Research-only release-candidate report. This report does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-05T14:28:20.390449+00:00`
+- generated_at: `2026-07-10T04:22:30.704550+00:00`
 - acceptance_status: `accepted`
 - critical_gate_status: `pass`
 - commands_passed: `26/26`
@@ -39,7 +39,7 @@ Research-only release-candidate report. This report does not authorize live prov
 
 | item | value |
 |---|---:|
-| `production_files_over_1200_lines` | `13` |
+| `production_files_over_1200_lines` | `14` |
 | `accepted_class_exceptions_count` | `3` |
 | `architecture_v3_gate_status` | `accepted_with_documented_exceptions` |
 | `architecture_v3_auto_accept_blockers` | `[]` |
@@ -70,7 +70,7 @@ Retained public shims:
 ## Size And Ownership
 
 - production_files_over_1500_lines: `0`
-- production_files_over_1200_lines: `13`
+- production_files_over_1200_lines: `14`
 - unresolved_production_files_over_1200_lines: `0`
 - functions_over_150_lines: `0`
 - classes_over_75_lines: `None`

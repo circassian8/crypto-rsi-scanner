@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Split oversized tests into focused sub-threshold modules
+**Status:** accepted
+**Decision:** Oversized package test modules must be reduced through cohesive
+behavioral slices, with extracted files kept below the architecture warning of
+1,500 lines whenever the boundary permits. Shared setup comes from the package's
+`_api_helpers` module rather than importing test functions from the source
+monolith. Every new module must be registered with the direct standalone runner,
+and the split must prove unique test-name preservation plus both pytest and
+standalone execution before acceptance.
+**Why:** `tests/event_alpha/test_integrated_radar.py` had reached 16,234 lines
+and mixed core-store, reconciliation, operator-identity, provider, and market
+surface regressions. A naive move into another multi-thousand-line file would
+only relocate the warning; four focused modules reduced the monolith by 3,923
+lines without creating another over-1,500 file or weakening the compatibility
+runner.
+**Revisit when:** The standalone runner is intentionally retired, the project
+adopts a different test-size threshold, or shared fixtures replace the current
+API-helper compatibility layer.
+
 ## 2026-07-10 - Treat retained SQLite backups as immutable standalone snapshots
 **Status:** accepted
 **Decision:** Backup creation still uses SQLite's online backup API, but every

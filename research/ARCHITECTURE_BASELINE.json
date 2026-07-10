@@ -10,7 +10,7 @@
     },
     {
       "current_status": "baseline_recorded",
-      "current_value": 1779,
+      "current_value": 1658,
       "gate": "tests/test_indicators.py becomes umbrella runner below 2000 lines by final phase",
       "metric": "line_count",
       "path": "tests/test_indicators.py",
@@ -270,6 +270,7 @@
     "crypto_rsi_scanner/event_alpha/doctor/checks/integrated_radar.py",
     "crypto_rsi_scanner/event_alpha/doctor/checks/namespace.py",
     "crypto_rsi_scanner/event_alpha/doctor/checks/notifications.py",
+    "crypto_rsi_scanner/event_alpha/doctor/checks/operations.py",
     "crypto_rsi_scanner/event_alpha/doctor/checks/outcomes.py",
     "crypto_rsi_scanner/event_alpha/doctor/checks/paths.py",
     "crypto_rsi_scanner/event_alpha/doctor/checks/provider_readiness.py",
@@ -355,6 +356,21 @@
     "crypto_rsi_scanner/event_alpha/notifications/skip_telemetry.py",
     "crypto_rsi_scanner/event_alpha/notifications/slo.py",
     "crypto_rsi_scanner/event_alpha/notifications/watchlist_monitor.py",
+    "crypto_rsi_scanner/event_alpha/operations/__init__.py",
+    "crypto_rsi_scanner/event_alpha/operations/archive.py",
+    "crypto_rsi_scanner/event_alpha/operations/candidate_mode_smoke.py",
+    "crypto_rsi_scanner/event_alpha/operations/common.py",
+    "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+    "crypto_rsi_scanner/event_alpha/operations/daily_burn_in_doctor.py",
+    "crypto_rsi_scanner/event_alpha/operations/daily_burn_in_guardrails.py",
+    "crypto_rsi_scanner/event_alpha/operations/daily_burn_in_readiness.py",
+    "crypto_rsi_scanner/event_alpha/operations/evidence_semantics.py",
+    "crypto_rsi_scanner/event_alpha/operations/feedback_progress.py",
+    "crypto_rsi_scanner/event_alpha/operations/measurement.py",
+    "crypto_rsi_scanner/event_alpha/operations/namespace_policy.py",
+    "crypto_rsi_scanner/event_alpha/operations/review_inbox.py",
+    "crypto_rsi_scanner/event_alpha/operations/scorecard.py",
+    "crypto_rsi_scanner/event_alpha/operations/source_yield.py",
     "crypto_rsi_scanner/event_alpha/outcomes/__init__.py",
     "crypto_rsi_scanner/event_alpha/outcomes/burn_in.py",
     "crypto_rsi_scanner/event_alpha/outcomes/burn_in_checklist.py",
@@ -567,7 +583,7 @@
     "crypto_rsi_scanner/event_alpha/shim_scan.py",
     "crypto_rsi_scanner/event_alpha/shims.py"
   ],
-  "generated_at": "2026-07-05T13:06:57+00:00",
+  "generated_at": "2026-07-10T04:22:21+00:00",
   "generator": "crypto_rsi_scanner.project_health.baseline",
   "github_actions_safety": {
     "forbidden_live_or_secret_terms_present": [],
@@ -580,22 +596,25 @@
   "line_counts": {
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 36,
     "crypto_rsi_scanner/scanner.py": 90,
-    "tests/test_indicators.py": 1779
+    "tests/test_indicators.py": 1658
   },
   "live_provider_calls_allowed": false,
-  "makefile_event_target_count": 211,
+  "makefile_event_target_count": 230,
   "makefile_event_targets": [
     "event-alert-no-key-llm-report",
     "event-alert-no-key-report",
     "event-alert-no-key-send",
     "event-alpha-alerts-report",
+    "event-alpha-archive-burn-in-evidence",
     "event-alpha-archive-stale-namespaces",
     "event-alpha-artifact-doctor",
     "event-alpha-burn-in-checklist",
+    "event-alpha-burn-in-contract",
     "event-alpha-burn-in-llm",
     "event-alpha-burn-in-no-key",
     "event-alpha-burn-in-readiness",
     "event-alpha-burn-in-scorecard",
+    "event-alpha-burn-in-weekly-measurement",
     "event-alpha-bybit-announcements-no-send-rehearsal",
     "event-alpha-bybit-announcements-preflight",
     "event-alpha-bybit-announcements-preflight-smoke",
@@ -616,8 +635,15 @@
     "event-alpha-cycle-search-llm",
     "event-alpha-cycle-send",
     "event-alpha-daily-brief",
+    "event-alpha-daily-burn-in-readiness",
+    "event-alpha-daily-live-no-send-burn-in",
+    "event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke",
+    "event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke-doctor",
+    "event-alpha-daily-live-no-send-burn-in-plan",
+    "event-alpha-daily-live-no-send-burn-in-smoke",
     "event-alpha-daily-llm-report",
     "event-alpha-daily-report",
+    "event-alpha-daily-review-inbox",
     "event-alpha-daily-send",
     "event-alpha-day1-start",
     "event-alpha-day1-start-llm",
@@ -635,6 +661,7 @@
     "event-alpha-export-notification-pack",
     "event-alpha-export-signal-quality-cases",
     "event-alpha-fade-review-smoke",
+    "event-alpha-feedback-progress",
     "event-alpha-feedback-readiness",
     "event-alpha-fill-outcomes",
     "event-alpha-frame-quality-loop",
@@ -715,6 +742,7 @@
     "event-alpha-quality-loop-llm",
     "event-alpha-quality-review",
     "event-alpha-quality-validation-cycle",
+    "event-alpha-radar-north-star",
     "event-alpha-replay",
     "event-alpha-research-review-digest-smoke",
     "event-alpha-resume-notifications",
@@ -730,6 +758,7 @@
     "event-alpha-shim-report",
     "event-alpha-signal-quality-eval",
     "event-alpha-source-coverage-report",
+    "event-alpha-source-yield-report",
     "event-alpha-status",
     "event-alpha-telegram-final-send-checklist",
     "event-alpha-telegram-no-send-final-check",
@@ -779,8 +808,14 @@
     "event-fade-review-cycle",
     "event-fade-review-packet",
     "event-fade-review-sample",
+    "event-feedback-duplicate",
+    "event-feedback-false-positive",
     "event-feedback-junk",
+    "event-feedback-late",
+    "event-feedback-needs-confirmation",
+    "event-feedback-promising-source-type",
     "event-feedback-report",
+    "event-feedback-source-noise",
     "event-feedback-useful",
     "event-feedback-watch",
     "event-impact-hypotheses-inbox",
@@ -802,7 +837,7 @@
     "known_stale_namespaces": [
       "notify_llm_deep"
     ],
-    "namespace_count": 46,
+    "namespace_count": 52,
     "namespaces": [
       {
         "artifact_counts": {
@@ -934,6 +969,36 @@
       },
       {
         "artifact_counts": {
+          "json": 9,
+          "jsonl": 3,
+          "md": 8
+        },
+        "file_count": 20,
+        "marker_present": false,
+        "namespace": "daily_burn_in_candidate_mode_smoke",
+        "path": "event_fade_cache/daily_burn_in_candidate_mode_smoke",
+        "reason": "fixture smoke namespace",
+        "safe_for_send_readiness": false,
+        "stale": false,
+        "status": "active_fixture_smoke"
+      },
+      {
+        "artifact_counts": {
+          "json": 3,
+          "jsonl": 1,
+          "md": 3
+        },
+        "file_count": 7,
+        "marker_present": false,
+        "namespace": "daily_burn_in_smoke",
+        "path": "event_fade_cache/daily_burn_in_smoke",
+        "reason": "fixture smoke namespace",
+        "safe_for_send_readiness": false,
+        "stale": false,
+        "status": "active_fixture_smoke"
+      },
+      {
+        "artifact_counts": {
           "json": 1,
           "jsonl": 4,
           "md": 2
@@ -1036,11 +1101,71 @@
       },
       {
         "artifact_counts": {
-          "json": 3,
-          "jsonl": 7,
-          "md": 1
+          "json": 10,
+          "jsonl": 5,
+          "md": 13
         },
-        "file_count": 11,
+        "file_count": 28,
+        "marker_present": false,
+        "namespace": "live_burn_in_20260705",
+        "path": "event_fade_cache/live_burn_in_20260705",
+        "reason": "unclassified namespace",
+        "safe_for_send_readiness": false,
+        "stale": false,
+        "status": "unknown"
+      },
+      {
+        "artifact_counts": {
+          "json": 10,
+          "jsonl": 5,
+          "md": 13
+        },
+        "file_count": 28,
+        "marker_present": false,
+        "namespace": "live_burn_in_20260706",
+        "path": "event_fade_cache/live_burn_in_20260706",
+        "reason": "unclassified namespace",
+        "safe_for_send_readiness": false,
+        "stale": false,
+        "status": "unknown"
+      },
+      {
+        "artifact_counts": {
+          "json": 15,
+          "jsonl": 5,
+          "md": 17
+        },
+        "file_count": 37,
+        "marker_present": false,
+        "namespace": "live_burn_in_20260707",
+        "path": "event_fade_cache/live_burn_in_20260707",
+        "reason": "unclassified namespace",
+        "safe_for_send_readiness": false,
+        "stale": false,
+        "status": "unknown"
+      },
+      {
+        "artifact_counts": {
+          "json": 12,
+          "jsonl": 5,
+          "md": 14
+        },
+        "file_count": 31,
+        "marker_present": false,
+        "namespace": "live_burn_in_20260709",
+        "path": "event_fade_cache/live_burn_in_20260709",
+        "reason": "unclassified namespace",
+        "safe_for_send_readiness": false,
+        "stale": false,
+        "status": "unknown"
+      },
+      {
+        "artifact_counts": {
+          "json": 9,
+          "jsonl": 7,
+          "md": 7
+        },
+        "file_count": 23,
         "marker_present": true,
         "namespace": "live_burn_in_no_send",
         "path": "event_fade_cache/live_burn_in_no_send",
@@ -1109,9 +1234,10 @@
       },
       {
         "artifact_counts": {
-          "json": 3
+          "json": 8,
+          "md": 5
         },
-        "file_count": 3,
+        "file_count": 13,
         "marker_present": true,
         "namespace": "no_key_live",
         "path": "event_fade_cache/no_key_live",
@@ -1151,11 +1277,11 @@
       },
       {
         "artifact_counts": {
-          "json": 5,
+          "json": 8,
           "jsonl": 9,
-          "md": 4
+          "md": 7
         },
-        "file_count": 18,
+        "file_count": 24,
         "marker_present": true,
         "namespace": "notify_llm_deep",
         "path": "event_fade_cache/notify_llm_deep",
@@ -1166,11 +1292,11 @@
       },
       {
         "artifact_counts": {
-          "json": 5,
+          "json": 11,
           "jsonl": 10,
-          "md": 4
+          "md": 10
         },
-        "file_count": 19,
+        "file_count": 31,
         "marker_present": true,
         "namespace": "notify_llm_deep_cryptopanic_rehearsal",
         "path": "event_fade_cache/notify_llm_deep_cryptopanic_rehearsal",
@@ -1473,7 +1599,7 @@
       }
     ],
     "status_counts": {
-      "active_fixture_smoke": 18,
+      "active_fixture_smoke": 20,
       "active_integrated_smoke": 1,
       "active_live_rehearsal": 9,
       "active_provider_preflight": 5,
@@ -1482,7 +1608,7 @@
       "manual_review": 4,
       "quarantine": 1,
       "stale_deprecated": 1,
-      "unknown": 1
+      "unknown": 5
     }
   },
   "normal_rsi_signal_rows_written": 0,
@@ -1498,7 +1624,7 @@
     },
     {
       "current_status": "baseline_recorded",
-      "current_value": 1779,
+      "current_value": 1658,
       "gate": "tests/test_indicators.py becomes umbrella runner below 2000 lines by final phase",
       "metric": "line_count",
       "path": "tests/test_indicators.py",
@@ -1559,8 +1685,11 @@
   "tests_package_files": [
     "tests/__init__.py",
     "tests/cli/__init__.py",
+    "tests/cli/test_burn_in_make_targets.py",
+    "tests/cli/test_dependency_ci.py",
     "tests/cli/test_dispatch.py",
     "tests/cli/test_event_alpha_command_registry.py",
+    "tests/cli/test_event_alpha_operator_command_smoke.py",
     "tests/cli/test_make_targets.py",
     "tests/cli/test_ops_command_smoke.py",
     "tests/cli/test_parser.py",
@@ -1571,11 +1700,18 @@
     "tests/event_alpha/conftest.py",
     "tests/event_alpha/test_artifact_doctor.py",
     "tests/event_alpha/test_artifact_schema.py",
+    "tests/event_alpha/test_burn_in_candidate_mode.py",
+    "tests/event_alpha/test_burn_in_contract_hermeticity.py",
+    "tests/event_alpha/test_burn_in_operations.py",
     "tests/event_alpha/test_canonical_imports.py",
+    "tests/event_alpha/test_core_opportunities.py",
+    "tests/event_alpha/test_core_reconciliation.py",
     "tests/event_alpha/test_integrated_radar.py",
+    "tests/event_alpha/test_market_surfaces.py",
     "tests/event_alpha/test_namespace_lifecycle.py",
     "tests/event_alpha/test_no_old_event_alpha_imports.py",
     "tests/event_alpha/test_notifications.py",
+    "tests/event_alpha/test_operator_identity.py",
     "tests/event_alpha/test_outcomes.py",
     "tests/event_alpha/test_provider_readiness.py",
     "tests/event_alpha/test_shim_registry.py",
@@ -1583,8 +1719,10 @@
     "tests/rsi/__init__.py",
     "tests/rsi/_api_helpers.py",
     "tests/rsi/test_backtest.py",
+    "tests/rsi/test_backups.py",
     "tests/rsi/test_indicators_core.py",
     "tests/rsi/test_paper_risk.py",
+    "tests/rsi/test_security.py",
     "tests/test_indicators.py"
   ],
   "top_level_event_module_count": 1,

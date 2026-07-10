@@ -20,17 +20,17 @@ This pass records current behavior and architecture before significant code move
 | file | lines |
 |---|---:|
 | `crypto_rsi_scanner/scanner.py` | 90 |
-| `tests/test_indicators.py` | 1779 |
+| `tests/test_indicators.py` | 1658 |
 | `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py` | 36 |
 
 ## Architecture Inventory
 
 - Top-level `crypto_rsi_scanner/event_*.py` modules: `1`
-- `crypto_rsi_scanner/event_alpha/` files: `424`
+- `crypto_rsi_scanner/event_alpha/` files: `440`
 - `crypto_rsi_scanner/cli/` files: `60`
-- `tests/` package files: `29`
+- `tests/` package files: `41`
 - GitHub Actions workflows: `2`
-- Event-related Makefile targets: `211`
+- Event-related Makefile targets: `230`
 
 ### Event Alpha Package Files
 
@@ -162,6 +162,7 @@ This pass records current behavior and architecture before significant code move
 - `crypto_rsi_scanner/event_alpha/doctor/checks/integrated_radar.py`
 - `crypto_rsi_scanner/event_alpha/doctor/checks/namespace.py`
 - `crypto_rsi_scanner/event_alpha/doctor/checks/notifications.py`
+- `crypto_rsi_scanner/event_alpha/doctor/checks/operations.py`
 - `crypto_rsi_scanner/event_alpha/doctor/checks/outcomes.py`
 - `crypto_rsi_scanner/event_alpha/doctor/checks/paths.py`
 - `crypto_rsi_scanner/event_alpha/doctor/checks/provider_readiness.py`
@@ -247,6 +248,21 @@ This pass records current behavior and architecture before significant code move
 - `crypto_rsi_scanner/event_alpha/notifications/skip_telemetry.py`
 - `crypto_rsi_scanner/event_alpha/notifications/slo.py`
 - `crypto_rsi_scanner/event_alpha/notifications/watchlist_monitor.py`
+- `crypto_rsi_scanner/event_alpha/operations/__init__.py`
+- `crypto_rsi_scanner/event_alpha/operations/archive.py`
+- `crypto_rsi_scanner/event_alpha/operations/candidate_mode_smoke.py`
+- `crypto_rsi_scanner/event_alpha/operations/common.py`
+- `crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py`
+- `crypto_rsi_scanner/event_alpha/operations/daily_burn_in_doctor.py`
+- `crypto_rsi_scanner/event_alpha/operations/daily_burn_in_guardrails.py`
+- `crypto_rsi_scanner/event_alpha/operations/daily_burn_in_readiness.py`
+- `crypto_rsi_scanner/event_alpha/operations/evidence_semantics.py`
+- `crypto_rsi_scanner/event_alpha/operations/feedback_progress.py`
+- `crypto_rsi_scanner/event_alpha/operations/measurement.py`
+- `crypto_rsi_scanner/event_alpha/operations/namespace_policy.py`
+- `crypto_rsi_scanner/event_alpha/operations/review_inbox.py`
+- `crypto_rsi_scanner/event_alpha/operations/scorecard.py`
+- `crypto_rsi_scanner/event_alpha/operations/source_yield.py`
 - `crypto_rsi_scanner/event_alpha/outcomes/__init__.py`
 - `crypto_rsi_scanner/event_alpha/outcomes/burn_in.py`
 - `crypto_rsi_scanner/event_alpha/outcomes/burn_in_checklist.py`
@@ -526,8 +542,11 @@ This pass records current behavior and architecture before significant code move
 
 - `tests/__init__.py`
 - `tests/cli/__init__.py`
+- `tests/cli/test_burn_in_make_targets.py`
+- `tests/cli/test_dependency_ci.py`
 - `tests/cli/test_dispatch.py`
 - `tests/cli/test_event_alpha_command_registry.py`
+- `tests/cli/test_event_alpha_operator_command_smoke.py`
 - `tests/cli/test_make_targets.py`
 - `tests/cli/test_ops_command_smoke.py`
 - `tests/cli/test_parser.py`
@@ -538,11 +557,18 @@ This pass records current behavior and architecture before significant code move
 - `tests/event_alpha/conftest.py`
 - `tests/event_alpha/test_artifact_doctor.py`
 - `tests/event_alpha/test_artifact_schema.py`
+- `tests/event_alpha/test_burn_in_candidate_mode.py`
+- `tests/event_alpha/test_burn_in_contract_hermeticity.py`
+- `tests/event_alpha/test_burn_in_operations.py`
 - `tests/event_alpha/test_canonical_imports.py`
+- `tests/event_alpha/test_core_opportunities.py`
+- `tests/event_alpha/test_core_reconciliation.py`
 - `tests/event_alpha/test_integrated_radar.py`
+- `tests/event_alpha/test_market_surfaces.py`
 - `tests/event_alpha/test_namespace_lifecycle.py`
 - `tests/event_alpha/test_no_old_event_alpha_imports.py`
 - `tests/event_alpha/test_notifications.py`
+- `tests/event_alpha/test_operator_identity.py`
 - `tests/event_alpha/test_outcomes.py`
 - `tests/event_alpha/test_provider_readiness.py`
 - `tests/event_alpha/test_shim_registry.py`
@@ -550,8 +576,10 @@ This pass records current behavior and architecture before significant code move
 - `tests/rsi/__init__.py`
 - `tests/rsi/_api_helpers.py`
 - `tests/rsi/test_backtest.py`
+- `tests/rsi/test_backups.py`
 - `tests/rsi/test_indicators_core.py`
 - `tests/rsi/test_paper_risk.py`
+- `tests/rsi/test_security.py`
 - `tests/test_indicators.py`
 
 ### GitHub Actions Workflows
@@ -565,13 +593,16 @@ This pass records current behavior and architecture before significant code move
 - `event-alert-no-key-report`
 - `event-alert-no-key-send`
 - `event-alpha-alerts-report`
+- `event-alpha-archive-burn-in-evidence`
 - `event-alpha-archive-stale-namespaces`
 - `event-alpha-artifact-doctor`
 - `event-alpha-burn-in-checklist`
+- `event-alpha-burn-in-contract`
 - `event-alpha-burn-in-llm`
 - `event-alpha-burn-in-no-key`
 - `event-alpha-burn-in-readiness`
 - `event-alpha-burn-in-scorecard`
+- `event-alpha-burn-in-weekly-measurement`
 - `event-alpha-bybit-announcements-no-send-rehearsal`
 - `event-alpha-bybit-announcements-preflight`
 - `event-alpha-bybit-announcements-preflight-smoke`
@@ -592,8 +623,15 @@ This pass records current behavior and architecture before significant code move
 - `event-alpha-cycle-search-llm`
 - `event-alpha-cycle-send`
 - `event-alpha-daily-brief`
+- `event-alpha-daily-burn-in-readiness`
+- `event-alpha-daily-live-no-send-burn-in`
+- `event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke`
+- `event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke-doctor`
+- `event-alpha-daily-live-no-send-burn-in-plan`
+- `event-alpha-daily-live-no-send-burn-in-smoke`
 - `event-alpha-daily-llm-report`
 - `event-alpha-daily-report`
+- `event-alpha-daily-review-inbox`
 - `event-alpha-daily-send`
 - `event-alpha-day1-start`
 - `event-alpha-day1-start-llm`
@@ -611,6 +649,7 @@ This pass records current behavior and architecture before significant code move
 - `event-alpha-export-notification-pack`
 - `event-alpha-export-signal-quality-cases`
 - `event-alpha-fade-review-smoke`
+- `event-alpha-feedback-progress`
 - `event-alpha-feedback-readiness`
 - `event-alpha-fill-outcomes`
 - `event-alpha-frame-quality-loop`
@@ -691,6 +730,7 @@ This pass records current behavior and architecture before significant code move
 - `event-alpha-quality-loop-llm`
 - `event-alpha-quality-review`
 - `event-alpha-quality-validation-cycle`
+- `event-alpha-radar-north-star`
 - `event-alpha-replay`
 - `event-alpha-research-review-digest-smoke`
 - `event-alpha-resume-notifications`
@@ -706,6 +746,7 @@ This pass records current behavior and architecture before significant code move
 - `event-alpha-shim-report`
 - `event-alpha-signal-quality-eval`
 - `event-alpha-source-coverage-report`
+- `event-alpha-source-yield-report`
 - `event-alpha-status`
 - `event-alpha-telegram-final-send-checklist`
 - `event-alpha-telegram-no-send-final-check`
@@ -755,8 +796,14 @@ This pass records current behavior and architecture before significant code move
 - `event-fade-review-cycle`
 - `event-fade-review-packet`
 - `event-fade-review-sample`
+- `event-feedback-duplicate`
+- `event-feedback-false-positive`
 - `event-feedback-junk`
+- `event-feedback-late`
+- `event-feedback-needs-confirmation`
+- `event-feedback-promising-source-type`
 - `event-feedback-report`
+- `event-feedback-source-noise`
 - `event-feedback-useful`
 - `event-feedback-watch`
 - `event-impact-hypotheses-inbox`
@@ -776,12 +823,12 @@ This pass records current behavior and architecture before significant code move
 ## Namespace Inventory
 
 - Base directory: `event_fade_cache`
-- Namespace count: `46`
+- Namespace count: `52`
 - Known stale namespaces: `notify_llm_deep`
 
 | status | count |
 |---|---:|
-| `active_fixture_smoke` | 18 |
+| `active_fixture_smoke` | 20 |
 | `active_integrated_smoke` | 1 |
 | `active_live_rehearsal` | 9 |
 | `active_provider_preflight` | 5 |
@@ -790,7 +837,7 @@ This pass records current behavior and architecture before significant code move
 | `manual_review` | 4 |
 | `quarantine` | 1 |
 | `stale_deprecated` | 1 |
-| `unknown` | 1 |
+| `unknown` | 5 |
 
 | namespace | status | stale | files | reason |
 |---|---|---:|---:|---|
@@ -803,6 +850,8 @@ This pass records current behavior and architecture before significant code move
 | `coinalyze_preflight` | `active_provider_preflight` | `False` | 3 | provider preflight namespace |
 | `coinalyze_preflight_smoke` | `active_fixture_smoke` | `False` | 2 | fixture smoke namespace |
 | `coinmarketcal_preflight` | `active_provider_preflight` | `False` | 3 | provider preflight namespace |
+| `daily_burn_in_candidate_mode_smoke` | `active_fixture_smoke` | `False` | 20 | fixture smoke namespace |
+| `daily_burn_in_smoke` | `active_fixture_smoke` | `False` | 7 | fixture smoke namespace |
 | `derivatives_crowding_smoke` | `active_fixture_smoke` | `False` | 7 | fixture smoke namespace |
 | `dex_onchain_readiness_smoke` | `active_fixture_smoke` | `False` | 10 | fixture smoke namespace |
 | `evidence_acquisition_smoke` | `active_fixture_smoke` | `False` | 9 | fixture smoke namespace |
@@ -810,16 +859,20 @@ This pass records current behavior and architecture before significant code move
 | `fixture_notify_smoke` | `active_fixture_smoke` | `False` | 6 | fixture smoke namespace |
 | `full_llm_live` | `active_live_rehearsal` | `False` | 1 | active no-send live rehearsal namespace |
 | `integrated_radar_smoke` | `active_integrated_smoke` | `False` | 36 | current integrated radar smoke namespace |
-| `live_burn_in_no_send` | `active_live_rehearsal` | `False` | 11 | active no-send live rehearsal namespace |
+| `live_burn_in_20260705` | `unknown` | `False` | 28 | unclassified namespace |
+| `live_burn_in_20260706` | `unknown` | `False` | 28 | unclassified namespace |
+| `live_burn_in_20260707` | `unknown` | `False` | 37 | unclassified namespace |
+| `live_burn_in_20260709` | `unknown` | `False` | 31 | unclassified namespace |
+| `live_burn_in_no_send` | `active_live_rehearsal` | `False` | 23 | active no-send live rehearsal namespace |
 | `live_provider_readiness_smoke` | `active_fixture_smoke` | `False` | 2 | fixture smoke namespace |
 | `market_anomaly_smoke` | `active_fixture_smoke` | `False` | 12 | fixture smoke namespace |
 | `market_refresh_smoke` | `active_fixture_smoke` | `False` | 10 | fixture smoke namespace |
 | `messari_unlocks_preflight` | `active_provider_preflight` | `False` | 3 | provider preflight namespace |
-| `no_key_live` | `active_live_rehearsal` | `False` | 3 | active no-send live rehearsal namespace |
+| `no_key_live` | `active_live_rehearsal` | `False` | 13 | active no-send live rehearsal namespace |
 | `notification_format_smoke` | `active_fixture_smoke` | `False` | 6 | fixture smoke namespace |
 | `notify_llm` | `active_live_rehearsal` | `False` | 11 | active no-send live rehearsal namespace |
-| `notify_llm_deep` | `stale_deprecated` | `True` | 18 | pre-canonical notify_llm_deep artifacts; superseded by current rehearsal namespaces |
-| `notify_llm_deep_cryptopanic_rehearsal` | `active_provider_rehearsal` | `False` | 19 | provider no-send rehearsal namespace |
+| `notify_llm_deep` | `stale_deprecated` | `True` | 24 | pre-canonical notify_llm_deep artifacts; superseded by current rehearsal namespaces |
+| `notify_llm_deep_cryptopanic_rehearsal` | `active_provider_rehearsal` | `False` | 31 | provider no-send rehearsal namespace |
 | `notify_llm_deep_fixture_rehearsal` | `active_provider_rehearsal` | `False` | 7 | provider no-send rehearsal namespace |
 | `notify_llm_deep_no_send_smoke` | `active_fixture_smoke` | `False` | 7 | fixture smoke namespace |
 | `notify_llm_deep_rehearsal` | `active_provider_rehearsal` | `False` | 15 | provider no-send rehearsal namespace |
@@ -861,7 +914,7 @@ This pass records current behavior and architecture before significant code move
 | gate | target | current | status |
 |---|---|---:|---|
 | scanner.py reduced below 2000 lines by final phase | `<2000` | 90 | `baseline_recorded` |
-| tests/test_indicators.py becomes umbrella runner below 2000 lines by final phase | `<2000` | 1779 | `baseline_recorded` |
+| tests/test_indicators.py becomes umbrella runner below 2000 lines by final phase | `<2000` | 1658 | `baseline_recorded` |
 | event_alpha/doctor/artifact_doctor.py remains public orchestrator below 300 lines by final phase | `<300` | 36 | `baseline_recorded` |
 | pytest-compatible test package exists | `exists` | true | `present` |
 | schema v1 is the declared artifact contract | `exists` | true | `present` |
