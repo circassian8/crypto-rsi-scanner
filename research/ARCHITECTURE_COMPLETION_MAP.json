@@ -299,7 +299,7 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-10T05:21:24+00:00",
+  "generated_at": "2026-07-10T05:24:55+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
@@ -743,14 +743,14 @@
       },
       {
         "limit": 1500,
-        "line_count": 3832,
-        "path": "tests/event_alpha/test_integrated_radar.py",
+        "line_count": 2991,
+        "path": "tests/event_alpha/test_source_coverage.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 2991,
-        "path": "tests/event_alpha/test_source_coverage.py",
+        "line_count": 2756,
+        "path": "tests/event_alpha/test_integrated_radar.py",
         "source_kind": "test"
       },
       {
@@ -761,7 +761,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 1670,
+        "line_count": 1671,
         "path": "tests/test_indicators.py",
         "source_kind": "test"
       },
@@ -799,6 +799,12 @@
         "limit": 1500,
         "line_count": 1127,
         "path": "tests/event_alpha/test_catalyst_frames.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1088,
+        "path": "tests/event_alpha/test_radar_pipeline.py",
         "source_kind": "test"
       },
       {
@@ -949,12 +955,6 @@
         "limit": 1500,
         "line_count": 122,
         "path": "tests/cli/test_burn_in_make_targets.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 115,
-        "path": "tests/event_alpha/test_integrated_merge_policy.py",
         "source_kind": "test"
       }
     ],

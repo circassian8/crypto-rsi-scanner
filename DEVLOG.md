@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split integrated-radar pipeline and scanner tests · Codex
+**Why:** The 3,832-line monolith still contained one contiguous operating path
+from radar/scanner reports through search validation, persistence/brief output,
+LLM hint handling, extraction ordering, and scanner-cycle orchestration.
+**Changes:**
+- Moved 12 tests covering the fixture anomaly report, watchlist/router pipeline,
+  non-alertable hypotheses, search-before-token validation, profile-scoped
+  storage, rejected-sample briefs, LLM-suggested asset validation, external
+  entity separation, search skip buckets, extraction-before-discovery, fixture
+  scanner cycles, and LLM extraction hints into `test_radar_pipeline.py` (1,088
+  lines).
+- Registered the module with the standalone compatibility runner. The source
+  monolith fell from 3,832 to 2,756 lines; its pre-split 43 names remain exact
+  and unique across the two files (sorted-name SHA-256 `b919210b...`).
+- Updated the roadmap, durable split evidence, and test-organization map.
+**Verify:** The extracted module passed all 12 tests and all 12 passed through
+the standalone adapter. The complete source-plus-extracted surface passed all
+43 tests in 1.66s. Standalone discovery remains 786 total / 594 Event Alpha /
+109 RSI / 42 CLI / 41 umbrella tests. Compileall and `git diff --check` passed.
+The already-green 650-test Event Alpha package was not redundantly rerun for
+this exact, test-only move.
+**Notes/risks:** Test organization and documentation only; no pipeline, search,
+hypothesis, LLM, scanner, router, notification, signal, paper, trade, or
+execution behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split integrated-radar impact-hypothesis tests · Codex
 **Why:** The 4,740-line monolith still contained one contiguous pure
 impact-hypothesis lifecycle from seed generation through verdict/watchlist

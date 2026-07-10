@@ -31,6 +31,7 @@ This document records the pytest-compatible split of the historical
 | `tests/event_alpha/test_llm_radar.py` | LLM relationship analysis, advisory caps, provider timeout/cache/budget behavior, golden evals, raw-event extraction, and scanner-report integration. |
 | `tests/event_alpha/test_market_enrichment.py` | CoinGecko market enrichment, non-overwrite guarantees, store-only anomaly creation, bounded evidence search, and anomaly lifecycle transitions. |
 | `tests/event_alpha/test_playbooks_graph.py` | Deterministic playbook classification and catalyst graph clustering/link rejection across proxy, direct, infrastructure, noise, supply, and derivatives evidence. |
+| `tests/event_alpha/test_radar_pipeline.py` | Radar/scanner reports, watchlist/router pipeline cycles, search validation, hypothesis persistence/briefs, LLM suggestions and skip reasons, extraction ordering, and upstream hints. |
 | `tests/event_alpha/` | Event Alpha artifact, radar, notification, provider readiness, source coverage, namespace lifecycle, and outcome tests split into focused package homes. |
 
 ## Commands
@@ -57,7 +58,7 @@ release guard.
 ## Size Gate
 
 After the Event Alpha and base-suite splits, `tests/test_indicators.py` was
-1,784 lines immediately before the focused backup-test move. It is now 1,670
+1,784 lines immediately before the focused backup-test move. It is now 1,671
 lines and reports these standalone counts:
 
 | count | value |
@@ -71,17 +72,18 @@ lines and reports these standalone counts:
 The architecture baseline final-phase gate for `tests/test_indicators.py` is below
 2,000 lines, so the umbrella runner now satisfies that size target.
 
-Eight integrated-radar burn-downs moved 197 tests while preserving each source
+Nine integrated-radar burn-downs moved 209 tests while preserving each source
 surface's exact unique names. `tests/event_alpha/test_integrated_radar.py` fell
-from 16,234 to 3,832 lines. The first four extracted modules are 1,282, 786, 461,
+from 16,234 to 2,756 lines. The first four extracted modules are 1,282, 786, 461,
 and 1,450 lines; the validation/review modules are 1,081 and 1,309 lines; and the
 LLM radar module is 942 lines. Claim semantics and incident relevance are 867
 and 639 lines; catalyst frames are 1,127 lines; fade core and alert ranking are
 435 and 377 lines; market enrichment and playbook/graph are 387 and 531 lines;
-impact hypotheses are 920 lines. No extracted file is above the 1,500-line
-architecture warning. The full Event Alpha pytest package currently collects
-and passes 650 cases; that count includes parametrization and package-only
-modules not represented as direct standalone callables.
+impact hypotheses are 920 lines; radar pipeline/scanner is 1,088 lines. No
+extracted file is above the 1,500-line architecture warning. The full Event
+Alpha pytest package currently collects and passes 650 cases; that count
+includes parametrization and package-only modules not represented as direct
+standalone callables.
 
 ## Remaining Umbrella Sections
 

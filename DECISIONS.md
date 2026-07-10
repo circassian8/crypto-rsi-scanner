@@ -84,6 +84,10 @@ An eighth split isolated 9 impact-hypothesis generation/matching/validation,
 persistence, verdict, watchlist-identity, and external-entity tests in a
 920-line module; the source monolith fell from 4,740 to 3,832 lines with the
 exact 52-name surface preserved.
+A ninth split isolated 12 operating-pipeline/scanner, search validation,
+hypothesis store/brief, LLM suggestion/skip, extraction-order, and upstream-hint
+tests in a 1,088-line module; the source monolith fell from 3,832 to 2,756 lines
+with the exact 43-name surface preserved.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.
