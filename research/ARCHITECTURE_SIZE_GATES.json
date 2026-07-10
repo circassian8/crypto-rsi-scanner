@@ -1400,15 +1400,6 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1395,
-      "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-      "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
-      "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
       "line_count": 1392,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
       "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
@@ -1479,7 +1470,7 @@
       "source_kind": "production"
     }
   ],
-  "accepted_production_files_over_1200_lines": 10,
+  "accepted_production_files_over_1200_lines": 9,
   "api_classes_over_limit": 0,
   "api_classes_over_limit_rows": [],
   "api_decomposition_blockers": [],
@@ -1602,7 +1593,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 714,
+  "file_count": 716,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1610,7 +1601,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-10T07:07:06.931603+00:00",
+  "generated_at": "2026-07-10T07:12:02.544288+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1618,12 +1609,6 @@
       "limit": 1500,
       "line_count": 1398,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1395,
-      "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
       "source_kind": "production"
     },
     {
@@ -1774,6 +1759,12 @@
       "limit": 1500,
       "line_count": 1059,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1056,
+      "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
       "source_kind": "production"
     },
     {
@@ -3478,13 +3469,6 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1395,
-      "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
       "line_count": 1392,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3578,12 +3562,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 1395,
-      "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1392,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
       "source_kind": "production"
@@ -3631,7 +3609,7 @@
       "source_kind": "production"
     }
   ],
-  "production_files_over_1200_lines": 10,
+  "production_files_over_1200_lines": 9,
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
@@ -3874,7 +3852,7 @@
       ]
     },
     "production_files_over_1200_lines": {
-      "count": 10,
+      "count": 9,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
         {
@@ -3884,15 +3862,6 @@
           "path": "crypto_rsi_scanner/project_health/architecture_report.py",
           "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
           "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1395,
-          "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-          "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
-          "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
           "source_kind": "production"
         },
         {
@@ -4000,7 +3969,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 10,
+      "production_files_over_1200_lines": 9,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -4012,11 +3981,6 @@
       {
         "line_count": 1398,
         "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1395,
-        "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
         "threshold": 1200
       },
       {
@@ -4116,7 +4080,7 @@
         ]
       },
       "production_files_over_1200_lines": {
-        "count": 10,
+        "count": 9,
         "reason": "accepted/documented production files over the v3 1,200-line target",
         "rows": [
           {
@@ -4126,15 +4090,6 @@
             "path": "crypto_rsi_scanner/project_health/architecture_report.py",
             "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
             "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1395,
-            "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-            "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
-            "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
             "source_kind": "production"
           },
           {
@@ -4226,7 +4181,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 10,
+    "production_files_over_1200_lines": 9,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,

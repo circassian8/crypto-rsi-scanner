@@ -58,15 +58,6 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1395,
-      "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-      "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
-      "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
       "line_count": 1392,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
       "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
@@ -191,7 +182,7 @@
       ]
     },
     "production_files_over_1200_lines": {
-      "count": 10,
+      "count": 9,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
         {
@@ -201,15 +192,6 @@
           "path": "crypto_rsi_scanner/project_health/architecture_report.py",
           "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
           "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1395,
-          "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-          "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
-          "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
           "source_kind": "production"
         },
         {
@@ -330,7 +312,7 @@
   "duration_seconds_total": null,
   "event_fade_safety_exception_present": true,
   "functions_over_150_lines": 0,
-  "generated_at": "2026-07-10T07:07:13.548894+00:00",
+  "generated_at": "2026-07-10T07:12:09.219521+00:00",
   "historical_row_type_alias": "refactor_v3_release_candidate_report",
   "model_bundles": [
     {
@@ -1695,7 +1677,7 @@
   "old_path_import_allowed_exceptions": 0,
   "old_path_internal_imports": 0,
   "old_path_test_imports": 0,
-  "production_files_over_1200_lines": 10,
+  "production_files_over_1200_lines": 9,
   "production_files_over_1500_lines": 0,
   "public_compatibility_entrypoints_path": "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
   "retained_public_entrypoints": 0,

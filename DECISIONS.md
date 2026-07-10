@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Separate verdict value and evidence-semantics helpers
+**Status:** accepted
+**Decision:** Generic mapping, score, count, and normalized-value helpers belong
+in `opportunity_verdict_values.py`; narrative/proxy, official/structured,
+fresh-market, strategic-context, and sector predicates belong in
+`opportunity_verdict_evidence.py`. `opportunity_verdict.py` owns scoring,
+thresholds, caps, final levels, live-confirmation policy, and explanation text,
+and re-exports all moved private names.
+**Why:** The 1,395-line verdict module mixed final policy decisions with 396
+lines of reusable normalization and evidence classification. The split yields
+1,056-, 132-, and 264-line modules with all 15 moved ASTs unchanged.
+**Revisit when:** Verdict schema v2 changes score/confirmation semantics or
+evidence predicates become a shared cross-product policy service.
+
 ## 2026-07-10 - Separate opportunity-audit matching and value normalization
 **Status:** accepted
 **Decision:** Opportunity-audit scalar normalization, quality-field access, row

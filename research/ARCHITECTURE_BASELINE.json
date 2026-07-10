@@ -547,6 +547,8 @@
     "crypto_rsi_scanner/event_alpha/radar/near_miss/report.py",
     "crypto_rsi_scanner/event_alpha/radar/near_miss/utils.py",
     "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
+    "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict_evidence.py",
+    "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict_values.py",
     "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
     "crypto_rsi_scanner/event_alpha/radar/pipeline_models.py",
     "crypto_rsi_scanner/event_alpha/radar/pipeline_report.py",
@@ -588,7 +590,7 @@
     "crypto_rsi_scanner/event_alpha/shim_scan.py",
     "crypto_rsi_scanner/event_alpha/shims.py"
   ],
-  "generated_at": "2026-07-10T07:07:04+00:00",
+  "generated_at": "2026-07-10T07:12:00+00:00",
   "generator": "crypto_rsi_scanner.project_health.baseline",
   "github_actions_safety": {
     "forbidden_live_or_secret_terms_present": [],

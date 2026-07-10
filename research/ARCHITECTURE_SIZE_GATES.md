@@ -2,15 +2,15 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-10T07:07:06.931603+00:00`
+- generated_at: `2026-07-10T07:12:02.544288+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
 - v3_gate_status: `accepted_with_documented_exceptions`
 - v3_auto_accept_ready: `False`
 - v3_blockers: `[]`
-- production_files_over_1200_lines: `10`
-- accepted_production_files_over_1200_lines: `10`
+- production_files_over_1200_lines: `9`
+- accepted_production_files_over_1200_lines: `9`
 - unresolved_production_files_over_1200_lines: `0`
 - production_size_gate_status: `warning`
 - production_files_over_1500_lines: `0`
@@ -70,7 +70,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 10 | accepted_exception |
+| `production_files_over_1200_lines` | 9 | accepted_exception |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | accepted_exception |
@@ -93,7 +93,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1398 |
-| `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 |
 | `crypto_rsi_scanner/config.py` | 1352 |
@@ -119,6 +118,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py` | 1078 |
 | `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1069 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1059 |
+| `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1056 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1047 |
 | `crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py` | 1044 |
 | `crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py` | 1035 |
@@ -138,7 +138,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines | reason | revisit |
 |---|---:|---|---|
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1398 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
-| `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | Verdict scoring and live-confirmation policy share many ordered caps and guardrails. | When verdict snapshots cover each opportunity level and cap reason. |
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1392 | Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to focused service modules. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | Route-gate decision logic is dense and behavior-critical for no-send notification eligibility. | When route-decision/gate snapshots cover every lane and quality-gate cap. |
 | `crypto_rsi_scanner/config.py` | 1352 | Central environment/config contract; splitting risks import-time default and env-var behavior drift. | When a dedicated config-v2 migration freeze and env snapshot tests exist. |

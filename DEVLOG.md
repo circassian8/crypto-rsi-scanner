@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split opportunity-verdict value and evidence helpers · Codex
+**Why:** `event_alpha/radar/opportunity_verdict.py` was 1,395 lines and mixed
+scoring/cap policy with reusable normalization and evidence predicates.
+**Changes:**
+- Added `opportunity_verdict_values.py` (132 lines) for eight generic mapping,
+  score, count, and normalized-value helpers.
+- Added `opportunity_verdict_evidence.py` (264 lines) for seven narrative,
+  official/structured, market-freshness, strategic-context, and sector checks.
+- Re-exported all moved names through the 1,056-line policy core; all 15 moved
+  function ASTs remain exact. Updated roadmap/decision and architecture reports.
+**Verify:** Five named verdict/live-confirmation tests passed, then all 144
+consumer tests across alert outcomes, incidents, core/reconciliation, doctors,
+quality, hypotheses, notifications, operators, source coverage, and router
+passed in 109.37s. Compileall, architecture gates, JSON validation, and
+`git diff --check` passed with zero file-size violations and zero new violations.
+**Notes/risks:** Organization only; no score, cap, verdict, confirmation, route,
+notification, signal, paper, trade, or execution behavior changed. Routine
+GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split opportunity-audit normalization and matching helpers · Codex
 **Why:** `event_alpha/artifacts/opportunity_audit.py` was 1,404 lines and mixed
 decision-path rendering with reusable scalar normalization and identity matching.

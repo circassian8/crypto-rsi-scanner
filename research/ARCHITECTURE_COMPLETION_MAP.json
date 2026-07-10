@@ -20,13 +20,6 @@
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1395,
-        "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
         "line_count": 1392,
         "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -285,7 +278,7 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-10T07:07:21+00:00",
+  "generated_at": "2026-07-10T07:12:16+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
@@ -345,15 +338,6 @@
         "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
         "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
-        "source_kind": "production"
-      },
-      {
-        "accepted": true,
-        "limit": 1500,
-        "line_count": 1395,
-        "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-        "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
-        "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
         "source_kind": "production"
       },
       {
@@ -429,7 +413,7 @@
         "source_kind": "production"
       }
     ],
-    "accepted_production_files_over_1200_lines": 10,
+    "accepted_production_files_over_1200_lines": 9,
     "api_classes_over_limit": 0,
     "api_decomposition_gate_status": "pass",
     "api_files_over_1500_lines": 0,
@@ -447,12 +431,6 @@
         "limit": 1500,
         "line_count": 1398,
         "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
-        "line_count": 1395,
-        "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
         "source_kind": "production"
       },
       {
@@ -603,6 +581,12 @@
         "limit": 1500,
         "line_count": 1059,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1056,
+        "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
         "source_kind": "production"
       },
       {
@@ -937,13 +921,6 @@
         "status": "accepted_near_threshold"
       },
       {
-        "line_count": 1395,
-        "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
         "line_count": 1392,
         "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -967,7 +944,7 @@
     ],
     "new_violation_count": 0,
     "production_classes_over_limit": 3,
-    "production_files_over_1200_lines": 10,
+    "production_files_over_1200_lines": 9,
     "production_files_over_1500_lines": 0,
     "production_files_over_2000_lines": 0,
     "production_files_over_3000_lines": 0,

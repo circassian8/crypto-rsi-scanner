@@ -2,7 +2,7 @@
 
 Static map of the behavior-preserving Event Alpha architecture. It records package ownership, compatibility cores, size gates, and safety boundaries.
 
-- generated_at: `2026-07-10T07:07:21+00:00`
+- generated_at: `2026-07-10T07:12:16+00:00`
 - status: `accepted`
 - scanner.py lines: `90`
 - scanner command bodies remaining: `0`
@@ -11,8 +11,8 @@ Static map of the behavior-preserving Event Alpha architecture. It records packa
 - active shim logic violations: `0`
 - size gate status: `pass`
 - production size gate status: `warning`
-- production files over 1200 lines: `10`
-- accepted production files over 1200 lines: `10`
+- production files over 1200 lines: `9`
+- accepted production files over 1200 lines: `9`
 - unresolved production files over 1200 lines: `0`
 - production files over 1500 lines: `0`
 - production files over 2000 lines: `0`
