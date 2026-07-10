@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split integrated-radar catalyst-frame tests · Codex
+**Why:** The remaining 7,536-line monolith contained a cohesive catalyst-frame
+surface spanning deterministic classification, LLM validation/runtime guards,
+downstream roles/aggregation, and the fixture e2e workflow.
+**Changes:**
+- Moved 13 tests covering main/background/negation frames, the AAVE/Kraken
+  strategic frame, quote and identity validation, runtime deadline/timeout
+  bounds, operating-cycle application, profiles/Make targets, e2e artifacts,
+  missing provider/key/disabled status, role demotion, aggregation, and the
+  unresolved-frame opportunity cap into `test_catalyst_frames.py` (1,127 lines).
+- Registered the module with the standalone compatibility runner. The source
+  monolith fell from 7,536 to 6,421 lines; its pre-split 94 names remain exact
+  and unique across the two files (sorted-name SHA-256 `e7a89cab...`).
+- Updated the roadmap, durable split evidence, and test-organization map.
+**Verify:** The extracted module passed all 13 tests and all 13 passed through
+the standalone adapter. The complete source-plus-extracted surface passed all
+94 tests in 2.39s. Standalone discovery remains 786 total / 594 Event Alpha /
+109 RSI / 42 CLI / 41 umbrella tests. Compileall and `git diff --check` passed.
+The already-green 650-test Event Alpha package was not redundantly rerun for
+this exact, test-only move.
+**Notes/risks:** Test organization and documentation only; no catalyst-frame,
+LLM, incident, role, aggregation, radar, notification, signal, paper, trade, or
+execution behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split integrated-radar incident semantics tests · Codex
 **Why:** After the LLM split, the 9,018-line monolith ended with four independent
 incident/claim/context regressions totaling 1,474 source lines. Keeping all four

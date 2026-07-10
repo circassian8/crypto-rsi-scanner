@@ -1542,6 +1542,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_artifact_doctor",
     "tests.event_alpha.test_artifact_schema",
     "tests.event_alpha.test_canonical_imports",
+    "tests.event_alpha.test_catalyst_frames",
     "tests.event_alpha.test_claim_semantics",
     "tests.event_alpha.test_core_opportunities",
     "tests.event_alpha.test_core_reconciliation",

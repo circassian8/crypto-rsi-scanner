@@ -299,7 +299,7 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-10T05:07:25+00:00",
+  "generated_at": "2026-07-10T05:11:45+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
@@ -719,7 +719,7 @@
     "largest_test_files": [
       {
         "limit": 1500,
-        "line_count": 7536,
+        "line_count": 6421,
         "path": "tests/event_alpha/test_integrated_radar.py",
         "source_kind": "test"
       },
@@ -761,7 +761,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 1664,
+        "line_count": 1665,
         "path": "tests/test_indicators.py",
         "source_kind": "test"
       },
@@ -793,6 +793,12 @@
         "limit": 1500,
         "line_count": 1282,
         "path": "tests/event_alpha/test_core_opportunities.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1127,
+        "path": "tests/event_alpha/test_catalyst_frames.py",
         "source_kind": "test"
       },
       {
@@ -949,12 +955,6 @@
         "limit": 1500,
         "line_count": 68,
         "path": "tests/rsi/_api_helpers.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 39,
-        "path": "tests/event_alpha/test_no_old_event_alpha_imports.py",
         "source_kind": "test"
       }
     ],

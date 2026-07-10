@@ -71,6 +71,9 @@ exact 125-name remaining surface across source plus extraction.
 A fourth split separated the final four incident/claim/context regressions into
 867- and 639-line modules; the source monolith fell from 9,018 to 7,536 lines
 with the exact 98-name surface preserved.
+A fifth split isolated 13 catalyst-frame and downstream role/aggregation tests
+in a 1,127-line module; the source monolith fell from 7,536 to 6,421 lines with
+the exact 94-name surface preserved.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.
