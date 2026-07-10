@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split provider-readiness news tests · Codex
+**Why:** With the integrated-radar monolith retired, the next-largest test debt
+was the 5,379-line provider-readiness file. Its CryptoPanic/GDELT/RSS and news
+event-time block had a clean provider-family boundary.
+**Changes:**
+- Moved 14 tests covering generic news fixtures, CryptoPanic parsing/request
+  hygiene/deduplication/diagnostics/currency filters, GDELT, project RSS
+  feed/provider failures, external-asset inference, text-date provenance,
+  explicit-vs-inferred trigger eligibility, classifier-confidence caps, and
+  missing-time no-trade behavior into `test_news_providers.py` (1,113 lines).
+- Registered the module with the standalone compatibility runner. The source
+  file fell from 5,379 to 4,277 lines; its pre-split 88 names remain exact and
+  unique across both files (sorted-name SHA-256 `b3b4e448...`).
+- Updated the roadmap, durable split evidence, and test-organization map.
+**Verify:** The extracted module passed all 14 tests and all 14 passed through
+the standalone adapter. The complete source-plus-extracted surface passed all
+88 tests in 13.63s. Standalone discovery remains 786 total / 594 Event Alpha /
+109 RSI / 42 CLI / 41 umbrella tests. Compileall and `git diff --check` passed.
+The already-green 650-test Event Alpha package was not redundantly rerun for
+this exact, test-only move.
+**Notes/risks:** Test organization and documentation only; no provider request,
+credential, event-time, resolver, classifier, notification, signal, paper,
+trade, or execution behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Retire the integrated-radar test monolith · Codex
 **Why:** After nine cohesive burn-downs, the residual 2,756-line file had clear
 watchlist/router, operator-workflow, and operator-presentation boundaries. A

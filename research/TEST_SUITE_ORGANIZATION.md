@@ -32,6 +32,7 @@ This document records the pytest-compatible split of the historical
 | `tests/event_alpha/test_market_surfaces.py` | Market reaction/state/anomaly, official exchange, scheduled catalyst, derivatives, instrument resolution, and integrated-radar surface regressions. |
 | `tests/event_alpha/test_llm_radar.py` | LLM relationship analysis, advisory caps, provider timeout/cache/budget behavior, golden evals, raw-event extraction, and scanner-report integration. |
 | `tests/event_alpha/test_market_enrichment.py` | CoinGecko market enrichment, non-overwrite guarantees, store-only anomaly creation, bounded evidence search, and anomaly lifecycle transitions. |
+| `tests/event_alpha/test_news_providers.py` | CryptoPanic, GDELT, project RSS, news-derived external assets, explicit/text event-time provenance, classifier-confidence caps, and no-trade safety. |
 | `tests/event_alpha/test_playbooks_graph.py` | Deterministic playbook classification and catalyst graph clustering/link rejection across proxy, direct, infrastructure, noise, supply, and derivatives evidence. |
 | `tests/event_alpha/test_radar_pipeline.py` | Radar/scanner reports, watchlist/router pipeline cycles, search validation, hypothesis persistence/briefs, LLM suggestions and skip reasons, extraction ordering, and upstream hints. |
 | `tests/event_alpha/test_watchlist_router.py` | Watchlist state/expiry compatibility, router escalation/digest/material-change policy, near-miss market refresh, and router-approved send gating. |
@@ -61,7 +62,7 @@ release guard.
 ## Size Gate
 
 After the Event Alpha and base-suite splits, `tests/test_indicators.py` was
-1,784 lines immediately before the focused backup-test move. It is now 1,673
+1,784 lines immediately before the focused backup-test move. It is now 1,674
 lines and reports these standalone counts:
 
 | count | value |
@@ -83,6 +84,11 @@ the 1,500-line architecture warning; the final watchlist/router, operator
 workflow, and presentation modules are 1,156, 1,006, and 618 lines. The full
 Event Alpha package passes 650 cases, and the complete historical standalone
 runner passes 786/786.
+
+The provider-readiness burn-down has moved 14 news-provider and event-time
+safety tests into a 1,113-line module. `test_provider_readiness.py` fell from
+5,379 to 4,277 lines with its exact 88-name surface preserved across source and
+extraction.
 
 ## Remaining Umbrella Sections
 

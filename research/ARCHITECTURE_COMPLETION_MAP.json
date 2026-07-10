@@ -299,7 +299,7 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-10T05:37:03+00:00",
+  "generated_at": "2026-07-10T05:41:42+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
@@ -719,14 +719,14 @@
     "largest_test_files": [
       {
         "limit": 1500,
-        "line_count": 5379,
-        "path": "tests/event_alpha/test_provider_readiness.py",
+        "line_count": 5002,
+        "path": "tests/event_alpha/test_notifications.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 5002,
-        "path": "tests/event_alpha/test_notifications.py",
+        "line_count": 4277,
+        "path": "tests/event_alpha/test_provider_readiness.py",
         "source_kind": "test"
       },
       {
@@ -755,7 +755,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 1673,
+        "line_count": 1674,
         "path": "tests/test_indicators.py",
         "source_kind": "test"
       },
@@ -799,6 +799,12 @@
         "limit": 1500,
         "line_count": 1127,
         "path": "tests/event_alpha/test_catalyst_frames.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1113,
+        "path": "tests/event_alpha/test_news_providers.py",
         "source_kind": "test"
       },
       {
@@ -949,12 +955,6 @@
         "limit": 1500,
         "line_count": 171,
         "path": "tests/rsi/test_backups.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 169,
-        "path": "tests/cli/test_dispatch.py",
         "source_kind": "test"
       }
     ],

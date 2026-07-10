@@ -1557,6 +1557,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_market_enrichment",
     "tests.event_alpha.test_market_surfaces",
     "tests.event_alpha.test_namespace_lifecycle",
+    "tests.event_alpha.test_news_providers",
     "tests.event_alpha.test_no_old_event_alpha_imports",
     "tests.event_alpha.test_notifications",
     "tests.event_alpha.test_operator_identity",

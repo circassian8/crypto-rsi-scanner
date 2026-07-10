@@ -1,6 +1,6 @@
 # Architecture Release-Candidate Report
 
-- generated_at: `2026-07-10T05:37:11+00:00`
+- generated_at: `2026-07-10T05:41:50+00:00`
 - status: `accepted`
 - verdict: Event Alpha architecture accepted: critical behavior, safety, shim, size, scanner-facade, and regression checks passed.
 - verification_failed_commands: `0`

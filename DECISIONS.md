@@ -92,6 +92,9 @@ A tenth and final split partitioned the residual 31 tests into 1,156-line
 watchlist/router, 1,006-line operator-workflow, and 618-line presentation
 modules, then deleted the source monolith. All original 240 integrated-radar
 test identities are now housed in focused modules no larger than 1,450 lines.
+The same rule now applies beyond the retired integrated-radar file: the first
+provider-readiness split moved 14 CryptoPanic/GDELT/RSS/news timing and safety
+tests into a 1,113-line module while preserving the exact 88-name source surface.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.
