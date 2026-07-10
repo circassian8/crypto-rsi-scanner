@@ -92,7 +92,7 @@ release guard.
 ## Size Gate
 
 After the Event Alpha and base-suite splits, `tests/test_indicators.py` was
-1,784 lines immediately before the focused backup-test move. It is now 1,698
+1,784 lines immediately before the focused backup-test move. It is now 913
 lines and reports these standalone counts:
 
 | count | value |
@@ -104,7 +104,8 @@ lines and reports these standalone counts:
 | umbrella_tests | 41 |
 
 The architecture baseline final-phase gate for `tests/test_indicators.py` is below
-2,000 lines, so the umbrella runner now satisfies that size target.
+2,000 lines, and the umbrella runner now also satisfies the generic 1,500-line
+architecture warning.
 
 Ten integrated-radar burn-downs moved all 240 original test identities into
 focused modules and retired `tests/event_alpha/test_integrated_radar.py`. Every
@@ -146,6 +147,12 @@ The 1,826-line namespace-lifecycle test monolith was retired into four focused
 modules ranging from 242 to 683 lines. All 30 original namespace identities
 remain exact and unique, all pass through both pytest and the standalone
 adapter, and the full Event Alpha package remains green at 650 tests.
+
+After those package splits, 747 lines of Event Alpha fixtures were still
+duplicated in the umbrella despite having no consumers outside their own dead
+helper graph. Their canonical copies remain in `_api_helpers.py`; removing the
+duplicates reduced the umbrella from 1,698 to 913 lines while preserving all 41
+local identities and the complete 786-test standalone execution path.
 
 ## Remaining Umbrella Sections
 

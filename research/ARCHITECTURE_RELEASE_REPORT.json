@@ -366,7 +366,7 @@
   "duration_seconds_total": null,
   "event_fade_safety_exception_present": true,
   "functions_over_150_lines": 0,
-  "generated_at": "2026-07-10T06:37:54.453845+00:00",
+  "generated_at": "2026-07-10T06:45:32.926233+00:00",
   "historical_row_type_alias": "refactor_v3_release_candidate_report",
   "model_bundles": [
     {

@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Keep split-test helper ownership out of the umbrella runner
+**Status:** accepted
+**Decision:** Event Alpha fixtures and compatibility globals used by split test
+modules belong only in `tests/event_alpha/_api_helpers.py`. The standalone
+umbrella owns its 41 residual tests, module registries, adapter, and runner; it
+must not retain a second copy of package helper graphs that none of its local
+tests consumes.
+**Why:** After all oversized Event Alpha tests moved to focused modules, 747
+lines of old helper definitions remained duplicated in `test_indicators.py`.
+Removing the unreferenced graph reduced the umbrella from 1,698 to 913 lines
+while preserving all 41 local identities and the complete 786-test standalone
+execution path.
+**Revisit when:** A residual umbrella test genuinely needs a shared Event Alpha
+fixture and cannot be moved to its focused package home.
+
 ## 2026-07-10 - Separate integrated-radar merge policy from row assembly
 **Status:** accepted
 **Decision:** Pure integrated-radar normalization, family selection, opportunity

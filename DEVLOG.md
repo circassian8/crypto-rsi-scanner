@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Remove obsolete Event Alpha umbrella helpers · Codex
+**Why:** After every oversized Event Alpha test was moved, the standalone
+umbrella still duplicated 747 lines of package fixtures that no local test or
+runner path referenced, leaving the final accepted file-size warning.
+**Changes:**
+- Proved the old Event Alpha definitions formed a self-contained dead helper
+  graph, then removed them from `tests/test_indicators.py`; canonical split-test
+  helpers remain in `tests/event_alpha/_api_helpers.py`.
+- Removed imports used only by that dead graph and clarified the umbrella
+  module description. The file fell from 1,698 to 913 lines.
+- Recorded the single-owner rule, roadmap completion, and organization evidence.
+**Verify:** All 41 local umbrella tests passed under pytest in 0.37s with exact
+identity preservation (sorted-name SHA-256 `3cdefc03...`). The complete direct
+standalone runner passed all 786 tests. Compileall, the full local release gate,
+architecture reports, JSON validation, and `git diff --check` passed; canonical
+files over 1,500 fell from 1 to 0 with `new_violation_count=0`.
+**Notes/risks:** Test scaffolding only; no production, Event Alpha, provider,
+signal, notification, paper, trade, or execution behavior changed. Routine
+GitHub CI will not be awaited.
+
 ## 2026-07-10 — Retire the namespace-lifecycle test monolith · Codex
 **Why:** `test_namespace_lifecycle.py` was the final Event Alpha package test
 above the 1,500-line warning, combining four independent lifecycle concerns.

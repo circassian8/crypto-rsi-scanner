@@ -2,10 +2,10 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-10T06:37:47.832794+00:00`
+- generated_at: `2026-07-10T06:45:26.245110+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
-- files_over_limit_count: `1`
+- files_over_limit_count: `0`
 - v3_gate_status: `accepted_with_documented_exceptions`
 - v3_auto_accept_ready: `False`
 - v3_blockers: `[]`
@@ -18,8 +18,8 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `3`
 - production_functions_over_limit: `0`
-- test_size_gate_status: `warning`
-- test_files_over_1500_lines: `1`
+- test_size_gate_status: `pass`
+- test_files_over_1500_lines: `0`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `0`
 - accepted_class_exceptions_count: `3`
@@ -160,7 +160,6 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `tests/test_indicators.py` | 1698 |
 | `tests/event_alpha/test_burn_in_operations.py` | 1477 |
 | `tests/event_alpha/test_market_surfaces.py` | 1450 |
 | `tests/cli/test_make_targets.py` | 1407 |
@@ -180,6 +179,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_llm_radar.py` | 942 |
 | `tests/event_alpha/test_discovery_pipeline.py` | 940 |
 | `tests/event_alpha/test_impact_hypotheses.py` | 920 |
+| `tests/test_indicators.py` | 913 |
 | `tests/event_alpha/test_feedback_calibration.py` | 905 |
 | `tests/event_alpha/test_doctor_provider_conflicts.py` | 895 |
 | `tests/event_alpha/test_catalyst_search.py` | 891 |
@@ -205,13 +205,11 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `tests/test_indicators.py` | 1698 |
 
 ## Existing Violations
 
 | category | id | lines/count |
 |---|---|---:|
-| `file_over_1500_lines` | `file:tests/test_indicators.py` | 1698 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/migrations.py:MigrationsMixin` | 88 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/signals.py:SignalsMixin` | 129 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin` | 89 |

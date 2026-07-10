@@ -2,7 +2,7 @@
 
 Static map of the behavior-preserving Event Alpha architecture. It records package ownership, compatibility cores, size gates, and safety boundaries.
 
-- generated_at: `2026-07-10T06:38:02+00:00`
+- generated_at: `2026-07-10T06:45:40+00:00`
 - status: `accepted`
 - scanner.py lines: `90`
 - scanner command bodies remaining: `0`
@@ -20,7 +20,7 @@ Static map of the behavior-preserving Event Alpha architecture. It records packa
 - accepted class exceptions: `3`
 - remaining class ownership debt: `0`
 - multiple public class module status: `pass`
-- test size gate status: `warning`
+- test size gate status: `pass`
 - api decomposition gate status: `pass`
 - api files over 3000 lines: `0`
 - transitional_named_files_remaining: `0`
