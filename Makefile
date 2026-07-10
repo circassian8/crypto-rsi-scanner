@@ -2244,19 +2244,20 @@ event-alpha-archive-burn-in-evidence:
 	RSI_EVENT_ALERTS_ENABLED=0 \
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.archive --base-dir $(EVENT_ALPHA_ARTIFACT_BASE_DIR) --out-dir research $(BURN_IN_DRY_RUN_ARG) $(BURN_IN_REPORT_NAMESPACE_ARG) $(BURN_IN_POLICY_FLAGS)
 
+event-alpha-burn-in-checklist: PROFILE = live_burn_in_no_send
 event-alpha-burn-in-checklist:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
 	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
-	$(PYTHON) main.py --event-alpha-burn-in-checklist --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG)
+	$(PYTHON) main.py --event-alpha-burn-in-checklist --days 30 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG)
 
 event-alpha-v1-readiness:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
 	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
-	$(PYTHON) main.py --event-alpha-v1-readiness --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG)
+	$(PYTHON) main.py --event-alpha-v1-readiness --days 30 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG)
 
 event-alpha-health-guard:
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
@@ -2296,13 +2297,14 @@ event-alpha-tuning-worksheet:
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
 	$(PYTHON) main.py --event-alpha-tuning-worksheet --event-alpha-profile $(PROFILE)
 
+event-alpha-export-burn-in-pack: PROFILE = live_burn_in_no_send
 event-alpha-export-burn-in-pack:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
 	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
-	$(PYTHON) main.py --event-alpha-export-burn-in-pack $(EVENT_ALPHA_BURN_IN_PACK) --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG)
+	$(PYTHON) main.py --event-alpha-export-burn-in-pack $(EVENT_ALPHA_BURN_IN_PACK) --days 30 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_HISTORICAL_ARG)
 
 event-alpha-launchd-template:
 	@echo "Launchd template: research/event_alpha_launchd_template.plist"

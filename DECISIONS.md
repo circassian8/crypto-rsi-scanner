@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - One authoritative Event Alpha burn-in maturity gate
+**Status:** accepted
+**Decision:** The policy-scoped 30-day North Star operations scorecard is the
+sole source of truth for Event Alpha promotion and calibrated research-send
+maturity. Feedback readiness reports only whether review labels can be
+collected, while operational burn-in readiness reports only whether another
+no-send research cycle can run. Neither status may imply contract maturity.
+V1/day-1 readiness also requires a successful matching run, and all promotion
+lanes remain frozen while the authoritative scorecard reports
+`enough_data=false`.
+**Why:** The prior commands mixed three different meanings of readiness, used a
+legacy seven-day view, and could report feedback or day-1 readiness while the
+North Star minimums were unmet. Two command paths also crashed before showing
+any result, making operator output both contradictory and unreliable.
+**Revisit when:** The 30-day minimums are met and reviewed, or the North Star
+contract is explicitly superseded by a new accepted operating contract.
+
 ## 2026-07-09 - Runtime credentials and recipient identifiers stay private by default
 **Status:** accepted
 **Decision:** All configured credentials and recipient/account identifiers must

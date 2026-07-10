@@ -2766,6 +2766,33 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
     )
     assert event_alpha_burn_in_checklist.build_burn_in_checklist(ready_scorecard).ready_for_research_send is True
 
+    contract_scorecard = {
+        "schema_version": "event_alpha_burn_in_scorecard_v1",
+        "window_days": 30,
+        "live_no_send_cycles_completed": 4,
+        "real_burn_in_candidate_count": 0,
+        "labels_collected": 0,
+        "labeled_near_misses": 0,
+        "outcome_rows": 0,
+        "enough_data": False,
+        "enough_data_reasons": ("min_live_no_send_cycles:4/20", "min_real_candidates:0/300"),
+        "promotion_freeze_status_by_lane": {"EARLY_LONG_RESEARCH": "frozen_insufficient_data"},
+        "auto_apply_thresholds": False,
+        "contract": {
+            "duration_days": 30,
+            "min_live_no_send_cycles": 20,
+            "min_real_candidates": 300,
+            "min_human_labels": 150,
+            "min_labeled_near_misses": 50,
+            "min_outcome_rows": 100,
+        },
+    }
+    contract_checklist = event_alpha_burn_in_checklist.build_burn_in_checklist(contract_scorecard)
+    assert contract_checklist.ready_for_research_send is False
+    assert contract_checklist.checks["live_no_send_cycles"] == "4/20"
+    assert contract_checklist.checks["real_candidates"] == "0/300"
+    assert any("min_real_candidates:0/300" in item for item in contract_checklist.blockers)
+
     missing_snapshots = event_alpha_burn_in.build_burn_in_scorecard(
         days=7,
         now=now,
@@ -2867,6 +2894,22 @@ def test_event_alpha_burn_in_readiness_requires_no_send_and_reviewable_artifacts
             core_opportunity_rows=[{"core_opportunity_id": "core:velvet"}],
             evidence_acquisition_rows=[{"accepted_evidence_count": 1}],
             daily_brief_path=brief,
+            burn_in_contract_scorecard={
+                "enough_data": False,
+                "enough_data_reasons": ["min_real_candidates:0/300"],
+                "live_no_send_cycles_completed": 4,
+                "real_burn_in_candidate_count": 0,
+                "labels_collected": 0,
+                "labeled_near_misses": 0,
+                "outcome_rows": 0,
+                "contract": {
+                    "min_live_no_send_cycles": 20,
+                    "min_real_candidates": 300,
+                    "min_human_labels": 150,
+                    "min_labeled_near_misses": 50,
+                    "min_outcome_rows": 100,
+                },
+            },
         )
         text = event_alpha_burn_in_readiness.format_burn_in_readiness(result)
 
@@ -2874,6 +2917,8 @@ def test_event_alpha_burn_in_readiness_requires_no_send_and_reviewable_artifacts
         assert result.no_send_confirmed is True
         assert result.market_freshness_visible is True
         assert "READY_FOR_NO_SEND_BURN_IN_REVIEW: yes" in text
+        assert "BURN_IN_CONTRACT_ENOUGH_DATA: no" in text
+        assert "real_candidates:0/300" in text
         assert "provider_coverage:" in text
         assert "manual review checklist:" in text
 
@@ -2924,6 +2969,11 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     assert "event-alpha-burn-in-llm:" in text
     assert "event-alpha-burn-in-scorecard:" in text
     assert "event-alpha-burn-in-checklist:" in text
+    assert "event-alpha-burn-in-checklist: PROFILE = live_burn_in_no_send" in text
+    assert "--event-alpha-burn-in-checklist --days 30" in text
+    assert "event-alpha-export-burn-in-pack: PROFILE = live_burn_in_no_send" in text
+    assert "--event-alpha-export-burn-in-pack $(EVENT_ALPHA_BURN_IN_PACK) --days 30" in text
+    assert "--event-alpha-v1-readiness --days 30" in text
     assert "event-alpha-live-burn-in-no-send:" in text
     assert "event-alpha-burn-in-readiness:" in text
     assert "event-alpha-v1-readiness:" in text
@@ -3198,7 +3248,8 @@ def test_event_alpha_feedback_readiness_and_core_feedback_target():
         assert ready.cards_with_feedback_target == 1
         assert ready.core_opportunity_cards_ready == 1
         text = event_alpha_feedback_readiness.format_feedback_readiness(ready)
-        assert "ready: true" in text
+        assert "ready_for_feedback_collection: true" in text
+        assert "burn_in_contract_maturity: not evaluated by this command" in text
         assert "cards_with_feedback_target: 1/1" in text
         cfg = event_feedback.EventFeedbackConfig(path=tmp_path / "feedback.jsonl")
         record = event_feedback.mark_feedback(core_id, "useful", watchlist_entries=[entry], cfg=cfg)

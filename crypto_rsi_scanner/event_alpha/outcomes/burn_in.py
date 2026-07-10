@@ -432,6 +432,9 @@ class EventAlphaBurnInReadinessResult:
     artifact_doctor_blockers: tuple[str, ...]
     feedback_readiness_ready: bool
     feedback_readiness_blockers: tuple[str, ...]
+    burn_in_contract_enough_data: bool | None = None
+    burn_in_contract_reasons: tuple[str, ...] = ()
+    burn_in_contract_progress: tuple[str, ...] = ()
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
     review_commands: tuple[str, ...] = ()
@@ -448,6 +451,7 @@ def build_burn_in_readiness(
     core_opportunity_rows: Iterable[Mapping[str, Any]] = (),
     evidence_acquisition_rows: Iterable[Mapping[str, Any]] = (),
     daily_brief_path: str | Path | None = None,
+    burn_in_contract_scorecard: Mapping[str, Any] | None = None,
 ) -> EventAlphaBurnInReadinessResult:
     """Summarize whether a fresh live-style no-send burn-in is reviewable."""
     runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
@@ -516,6 +520,45 @@ def build_burn_in_readiness(
         f"make event-alpha-artifact-doctor PROFILE={profile} STRICT=1",
         f"make event-alpha-quality-review PROFILE={profile}",
     )
+    contract_scorecard = dict(burn_in_contract_scorecard or {})
+    contract_enough_data = (
+        contract_scorecard.get("enough_data") is True
+        if contract_scorecard
+        else None
+    )
+    contract_reasons = tuple(
+        str(item) for item in contract_scorecard.get("enough_data_reasons") or () if str(item)
+    )
+    contract = contract_scorecard.get("contract") if isinstance(contract_scorecard.get("contract"), Mapping) else {}
+    contract_progress = (
+        (
+            "live_no_send_cycles:"
+            f"{_readiness_int(contract_scorecard.get('live_no_send_cycles_completed'))}/"
+            f"{_readiness_int(contract.get('min_live_no_send_cycles'))}"
+        ),
+        (
+            "real_candidates:"
+            f"{_readiness_int(contract_scorecard.get('real_burn_in_candidate_count'))}/"
+            f"{_readiness_int(contract.get('min_real_candidates'))}"
+        ),
+        (
+            "human_labels:"
+            f"{_readiness_int(contract_scorecard.get('labels_collected'))}/"
+            f"{_readiness_int(contract.get('min_human_labels'))}"
+        ),
+        (
+            "labeled_near_misses:"
+            f"{_readiness_int(contract_scorecard.get('labeled_near_misses'))}/"
+            f"{_readiness_int(contract.get('min_labeled_near_misses'))}"
+        ),
+        (
+            "outcome_rows:"
+            f"{_readiness_int(contract_scorecard.get('outcome_rows'))}/"
+            f"{_readiness_int(contract.get('min_outcome_rows'))}"
+        ),
+    ) if contract_scorecard else ()
+    if contract_enough_data is False:
+        warnings.append("30-day burn-in contract is not mature; all promotion lanes remain frozen")
     clean_blockers = tuple(dict.fromkeys(blockers))
     return EventAlphaBurnInReadinessResult(
         profile=profile,
@@ -538,6 +581,9 @@ def build_burn_in_readiness(
         artifact_doctor_blockers=tuple(artifact_doctor.blockers),
         feedback_readiness_ready=feedback_ready,
         feedback_readiness_blockers=() if feedback_ready else tuple(feedback_readiness.blockers),
+        burn_in_contract_enough_data=contract_enough_data,
+        burn_in_contract_reasons=contract_reasons,
+        burn_in_contract_progress=contract_progress,
         blockers=clean_blockers,
         warnings=tuple(dict.fromkeys(str(item) for item in warnings if str(item))),
         review_commands=commands,
@@ -572,6 +618,14 @@ def format_burn_in_readiness(result: EventAlphaBurnInReadinessResult) -> str:
         "EVENT ALPHA LIVE-STYLE BURN-IN READINESS (research-only; no-send)",
         "=" * 76,
         f"READY_FOR_NO_SEND_BURN_IN_REVIEW: {'yes' if result.ready else 'no'}",
+        (
+            "BURN_IN_CONTRACT_ENOUGH_DATA: "
+            + (
+                "unknown"
+                if result.burn_in_contract_enough_data is None
+                else ("yes" if result.burn_in_contract_enough_data else "no")
+            )
+        ),
         f"profile: {result.profile}",
         f"artifact_namespace: {result.artifact_namespace}",
         f"latest_run_id: {result.latest_run_id or 'none'}",
@@ -582,6 +636,11 @@ def format_burn_in_readiness(result: EventAlphaBurnInReadinessResult) -> str:
             f"configured={result.provider_configured} not_configured={result.provider_not_configured} "
             f"event_sources_ready={result.provider_ready_event_sources} "
             f"enrichment_ready={result.provider_ready_enrichment_sources}"
+        ),
+        "burn_in_contract_progress: " + (
+            " · ".join(result.burn_in_contract_progress)
+            if result.burn_in_contract_progress
+            else "not evaluated"
         ),
         (
             "artifacts: "
@@ -603,6 +662,10 @@ def format_burn_in_readiness(result: EventAlphaBurnInReadinessResult) -> str:
     lines.append("")
     lines.append("warnings:")
     lines.extend(f"- {item}" for item in result.warnings) if result.warnings else lines.append("- none")
+    if result.burn_in_contract_reasons:
+        lines.append("")
+        lines.append("burn-in contract blockers:")
+        lines.extend(f"- {item}" for item in result.burn_in_contract_reasons)
     lines.append("")
     lines.append("manual review checklist:")
     lines.append("- inspect provider gaps and decide whether missing sources make absence evidence meaningful")
@@ -614,6 +677,13 @@ def format_burn_in_readiness(result: EventAlphaBurnInReadinessResult) -> str:
     lines.extend(f"- {command}" for command in result.review_commands)
     lines.append("Readiness report is artifact-only; it sends nothing and changes no alert/trading state.")
     return "\n".join(lines).rstrip()
+
+
+def _readiness_int(value: object) -> int:
+    try:
+        return int(float(value or 0))
+    except (TypeError, ValueError):
+        return 0
 
 
 # ---------------------------------------------------------------------------

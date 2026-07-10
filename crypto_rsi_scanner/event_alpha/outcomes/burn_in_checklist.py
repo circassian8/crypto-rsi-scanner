@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Mapping
 
 from crypto_rsi_scanner.event_alpha.outcomes import burn_in as event_alpha_burn_in
 
@@ -18,12 +18,15 @@ class EventAlphaBurnInChecklist:
 
 
 def build_burn_in_checklist(
-    scorecard: event_alpha_burn_in.EventAlphaBurnInScorecard,
+    scorecard: event_alpha_burn_in.EventAlphaBurnInScorecard | Mapping[str, Any],
     *,
     card_paths: tuple[str, ...] = (),
     min_successful_runs: int = 1,
 ) -> EventAlphaBurnInChecklist:
     """Score local burn-in artifacts without mutating thresholds or routing."""
+    if isinstance(scorecard, Mapping):
+        return _build_contract_checklist(scorecard)
+
     checks: dict[str, str] = {}
     blockers: list[str] = []
     warnings: list[str] = []
@@ -94,6 +97,80 @@ def build_burn_in_checklist(
     ready = not blockers
     if ready and not next_actions:
         next_actions.append("continue burn-in and review calibration before enabling research_send")
+    return EventAlphaBurnInChecklist(
+        ready_for_research_send=ready,
+        checks=checks,
+        blockers=tuple(dict.fromkeys(blockers)),
+        warnings=tuple(dict.fromkeys(warnings)),
+        next_actions=tuple(dict.fromkeys(next_actions)),
+    )
+
+
+def _build_contract_checklist(scorecard: Mapping[str, Any]) -> EventAlphaBurnInChecklist:
+    """Evaluate the authoritative 30-day North Star burn-in contract."""
+
+    contract = scorecard.get("contract") if isinstance(scorecard.get("contract"), Mapping) else {}
+    checks = {
+        "authoritative_scorecard": "event_alpha_burn_in_scorecard_v1",
+        "window_days": f"{_int(scorecard.get('window_days'))}/{_int(contract.get('duration_days')) or 30}",
+        "live_no_send_cycles": (
+            f"{_int(scorecard.get('live_no_send_cycles_completed'))}/"
+            f"{_int(contract.get('min_live_no_send_cycles'))}"
+        ),
+        "real_candidates": (
+            f"{_int(scorecard.get('real_burn_in_candidate_count'))}/"
+            f"{_int(contract.get('min_real_candidates'))}"
+        ),
+        "human_labels": (
+            f"{_int(scorecard.get('labels_collected'))}/"
+            f"{_int(contract.get('min_human_labels'))}"
+        ),
+        "labeled_near_misses": (
+            f"{_int(scorecard.get('labeled_near_misses'))}/"
+            f"{_int(contract.get('min_labeled_near_misses'))}"
+        ),
+        "outcome_rows": (
+            f"{_int(scorecard.get('outcome_rows'))}/"
+            f"{_int(contract.get('min_outcome_rows'))}"
+        ),
+        "burn_in_contract_enough_data": "yes" if scorecard.get("enough_data") is True else "no",
+        "auto_apply_thresholds": "enabled" if scorecard.get("auto_apply_thresholds") is True else "disabled",
+    }
+    blockers = [
+        f"burn-in contract threshold not met: {reason}"
+        for reason in scorecard.get("enough_data_reasons") or ()
+    ]
+    if scorecard.get("auto_apply_thresholds") is True:
+        blockers.append("auto_apply_thresholds must remain disabled")
+    for field in (
+        "telegram_sends",
+        "trades_created",
+        "paper_trades_created",
+        "normal_rsi_signal_rows_written",
+        "triggered_fade_created",
+    ):
+        if _int(scorecard.get(field)) > 0:
+            blockers.append(f"safety invariant violated: {field}={_int(scorecard.get(field))}")
+
+    lane_status = scorecard.get("promotion_freeze_status_by_lane")
+    frozen_lanes = [
+        str(lane)
+        for lane, status in (lane_status.items() if isinstance(lane_status, Mapping) else ())
+        if str(status).startswith("frozen")
+    ]
+    checks["promotion_lanes_frozen"] = str(len(frozen_lanes))
+    if frozen_lanes and not blockers:
+        blockers.append("promotion lanes remain frozen")
+
+    next_actions = [
+        "continue policy-scoped 30-day live no-send burn-in cycles",
+        "collect human labels and mature near-miss/outcome rows before promotion review",
+    ]
+    next_command = str(scorecard.get("next_command") or "").strip()
+    if next_command:
+        next_actions.insert(0, next_command)
+    warnings = tuple(str(item) for item in scorecard.get("warnings") or () if str(item))
+    ready = scorecard.get("enough_data") is True and not blockers
     return EventAlphaBurnInChecklist(
         ready_for_research_send=ready,
         checks=checks,

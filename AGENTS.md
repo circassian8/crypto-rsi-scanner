@@ -518,6 +518,13 @@ work.
   `main.py --event-alpha-artifact-doctor` / `make event-alpha-artifact-doctor`
   to diagnose mixed namespaces, orphan snapshots, missing provider/budget rows,
   and missing snapshot writes before treating burn-in artifacts as evidence.
+- Event Alpha promotion and calibrated-send readiness must use the policy-scoped
+  30-day North Star operations scorecard as the authoritative contract state.
+  Feedback readiness means only that feedback can be collected; operational
+  no-send readiness means only that another research burn-in cycle can run.
+  Neither may imply contract maturity, and a notification profile with no
+  successful matching run is not day-1 ready. Keep all promotion lanes frozen
+  while the authoritative scorecard reports `enough_data=false`.
 - Event Alpha consolidation is compatibility-first. New Event Alpha code should
   use `crypto_rsi_scanner/event_alpha/` and `crypto_rsi_scanner/cli/`. Old flat
   Event Alpha import paths are tombstoned, not retained; any future public

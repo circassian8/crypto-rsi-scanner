@@ -246,7 +246,7 @@ def event_alpha_dex_onchain_readiness_report(
     print(event_dex_onchain_readiness.format_readiness_report(result.report))
 
 def event_alpha_v1_readiness_report(
-    days: int = 7,
+    days: int = 30,
     verbose: bool = False,
     *,
     profile_name: str | None = None,
@@ -256,6 +256,8 @@ def event_alpha_v1_readiness_report(
 ) -> None:
     """Print v1 promotion readiness flags from local research artifacts."""
     _setup_event_discovery_logging(verbose)
+    from crypto_rsi_scanner.event_alpha.operations import scorecard as event_alpha_contract_scorecard
+
     try:
         context = resolve_event_alpha_artifact_context_for_report(
             profile_name,
@@ -267,6 +269,9 @@ def event_alpha_v1_readiness_report(
         return
     artifact_namespace = artifact_namespace or context.artifact_namespace
     artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
+    contract_scorecard = event_alpha_contract_scorecard.build_authoritative_scorecard(
+        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
+    )
     result = event_alpha_v1_readiness.build_v1_readiness(
         run_rows=artifacts["runs"].rows,
         alert_rows=artifacts["alerts"].rows,
@@ -279,8 +284,8 @@ def event_alpha_v1_readiness_report(
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
-        clock_status=_event_clock_status(),
-        generated_at=_event_research_now(),
+        now=_event_research_now(),
+        burn_in_contract_scorecard=contract_scorecard,
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_v1_readiness.format_v1_readiness_report(result))

@@ -14,6 +14,23 @@ from . import namespace_policy
 
 SCORECARD_JSON = "event_alpha_burn_in_scorecard.json"
 SCORECARD_MD = "event_alpha_burn_in_scorecard.md"
+AUTHORITATIVE_PROFILE = "live_burn_in_no_send"
+
+
+def build_authoritative_scorecard(
+    *,
+    base_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    """Build the policy-scoped scorecard using the North Star contract window."""
+
+    contract = common.load_contract()
+    days = max(1, int(contract.get("duration_days") or 30))
+    return build_scorecard(
+        profile=AUTHORITATIVE_PROFILE,
+        artifact_namespace=None,
+        base_dir=base_dir,
+        days=days,
+    )
 
 
 def build_scorecard(

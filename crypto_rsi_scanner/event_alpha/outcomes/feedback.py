@@ -363,7 +363,8 @@ def format_feedback_readiness(result: EventAlphaFeedbackReadinessResult) -> str:
         "=" * 76,
         f"profile: {result.profile}",
         f"artifact_namespace: {result.artifact_namespace}",
-        f"ready: {str(result.ready).lower()}",
+        f"ready_for_feedback_collection: {str(result.ready).lower()}",
+        "burn_in_contract_maturity: not evaluated by this command",
         f"cards_with_lineage: {result.cards_with_lineage}/{result.cards_checked}",
         f"cards_with_feedback_target: {result.cards_with_feedback_target}/{result.cards_checked}",
         (

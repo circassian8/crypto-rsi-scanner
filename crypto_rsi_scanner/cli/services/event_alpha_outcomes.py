@@ -54,6 +54,8 @@ def event_alpha_burn_in_readiness_report(
     """Print live-style no-send burn-in readiness from profile-scoped artifacts."""
     _refresh_scanner_globals()
     _setup_event_discovery_logging(verbose)
+    from crypto_rsi_scanner.event_alpha.operations import scorecard as event_alpha_contract_scorecard
+
     selected_profile = profile_name or "live_burn_in_no_send"
     try:
         context = resolve_event_alpha_artifact_context_for_report(selected_profile, artifact_namespace)
@@ -160,6 +162,9 @@ def event_alpha_burn_in_readiness_report(
         include_api=True,
     )
     acquisition_rows = event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path)
+    contract_scorecard = event_alpha_contract_scorecard.build_authoritative_scorecard(
+        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
+    )
     readiness = event_alpha_burn_in_readiness.build_burn_in_readiness(
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
@@ -170,6 +175,7 @@ def event_alpha_burn_in_readiness_report(
         core_opportunity_rows=core_store.rows,
         evidence_acquisition_rows=acquisition_rows,
         daily_brief_path=context.daily_brief_path,
+        burn_in_contract_scorecard=contract_scorecard,
     )
     print(_event_alpha_context_block(context))
     print(event_provider_status.format_event_discovery_provider_status(provider_report))
@@ -232,22 +238,13 @@ def event_alpha_export_burn_in_pack(
         return
     artifact_namespace = artifact_namespace or context.artifact_namespace
     artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
-    scorecard = event_alpha_burn_in.build_burn_in_scorecard(
-        run_rows=artifacts["runs"].rows,
-        alert_rows=artifacts["alerts"].rows,
-        feedback_rows=artifacts["feedback_rows"],
-        missed_rows=artifacts["missed_rows"],
-        provider_health_rows=artifacts["provider_rows"],
-        llm_budget_rows=artifacts["budget_rows"],
-        outcome_rows=artifacts["outcome_rows"],
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_api_artifacts=include_api_artifacts,
-        days=days,
-    )
     import crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist as event_alpha_burn_in_checklist
+    from crypto_rsi_scanner.event_alpha.operations import scorecard as event_alpha_contract_scorecard
 
-    checklist_result = checklist.build_burn_in_checklist(scorecard)
+    contract_scorecard = event_alpha_contract_scorecard.build_authoritative_scorecard(
+        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
+    )
+    checklist_result = event_alpha_burn_in_checklist.build_burn_in_checklist(contract_scorecard)
     readiness = event_alpha_v1_readiness.build_v1_readiness(
         run_rows=artifacts["runs"].rows,
         alert_rows=artifacts["alerts"].rows,
@@ -260,6 +257,7 @@ def event_alpha_export_burn_in_pack(
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
         days=days,
+        burn_in_contract_scorecard=contract_scorecard,
     )
     health = event_alpha_health_guard.evaluate_health_guard(
         run_rows=artifacts["runs"].rows,
@@ -327,8 +325,8 @@ def event_alpha_export_burn_in_pack(
     result = event_alpha_burn_in_pack.export_burn_in_pack(
         out_path,
         daily_brief=daily_brief,
-        burn_in_scorecard=event_alpha_burn_in.format_burn_in_scorecard(scorecard),
-        burn_in_checklist=checklist.format_burn_in_checklist(checklist_result),
+        burn_in_scorecard=event_alpha_contract_scorecard.format_scorecard(contract_scorecard),
+        burn_in_checklist=event_alpha_burn_in_checklist.format_burn_in_checklist(checklist_result),
         v1_readiness=event_alpha_v1_readiness.format_v1_readiness_report(readiness),
         health_guard=event_alpha_health_guard.format_health_guard_report(health),
         artifact_doctor=event_alpha_artifact_doctor.format_artifact_doctor_report(doctor),

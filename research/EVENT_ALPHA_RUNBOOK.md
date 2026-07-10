@@ -2008,13 +2008,13 @@ explain without enabling sends:
 make event-alpha-burn-in-no-key
 ```
 
-For a 7-day operational scorecard across recent run-ledger rows, alert
-snapshots, feedback, missed opportunities, provider health, and LLM budget
-usage:
+For the authoritative policy-scoped 30-day North Star scorecard across daily
+no-send runs, real candidates, feedback, labeled near misses, outcomes, and lane
+freeze status:
 
 ```bash
 make event-alpha-burn-in-scorecard
-python3 main.py --event-alpha-burn-in-scorecard --days 7
+python3 main.py --event-alpha-burn-in-scorecard --days 30
 ```
 
 Before promoting any research-send burn-in, run the checklist. It reports
@@ -2023,11 +2023,21 @@ operator actions:
 
 ```bash
 make event-alpha-burn-in-checklist
-python3 main.py --event-alpha-burn-in-checklist --days 7
+python3 main.py --event-alpha-burn-in-checklist --days 30
 ```
 
-The checklist is advisory only. It does not enable sends, change thresholds,
-apply priors, write live signal rows, paper trade, or execute.
+The checklist consumes the same authoritative scorecard and must remain
+`READY_FOR_RESEARCH_SEND: no` while any contract threshold is unmet or a lane is
+frozen. `event-alpha-feedback-readiness` answers only whether cards and targets
+are ready to collect human feedback; it does not evaluate contract maturity.
+`event-alpha-burn-in-readiness` answers whether the latest no-send run is
+reviewable and prints the contract progress separately. `event-alpha-v1-readiness`
+also prints the authoritative contract gate and cannot report calibrated
+research-send readiness while that gate is false.
+
+All readiness/checklist commands are advisory and artifact-only. They do not
+enable sends, change thresholds, apply priors, write live signal rows, paper
+trade, or execute.
 
 ## Artifact Hygiene
 

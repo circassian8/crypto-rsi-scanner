@@ -34,6 +34,9 @@ class EventAlphaV1ReadinessResult:
     ready_for_full_llm_live: bool
     ready_for_scheduled_burn_in: bool
     profiles: tuple[EventAlphaV1ProfileReadiness, ...]
+    burn_in_contract_enough_data: bool | None = None
+    burn_in_contract_reasons: tuple[str, ...] = ()
+    promotion_freeze_status_by_lane: tuple[tuple[str, str], ...] = ()
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
     recommended_commands: tuple[str, ...] = ()
@@ -55,6 +58,7 @@ def build_v1_readiness(
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
     include_api_artifacts: bool = False,
+    burn_in_contract_scorecard: Mapping[str, Any] | None = None,
 ) -> EventAlphaV1ReadinessResult:
     """Build explicit v1 readiness flags without mutating runtime behavior."""
     observed = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -119,8 +123,24 @@ def build_v1_readiness(
             include_api_artifacts=include_api_artifacts,
         ))
 
+    contract_scorecard = dict(burn_in_contract_scorecard or {})
+    contract_enough_data = (
+        contract_scorecard.get("enough_data") is True
+        if contract_scorecard
+        else None
+    )
+    contract_reasons = tuple(
+        str(item) for item in contract_scorecard.get("enough_data_reasons") or () if str(item)
+    )
+    lane_status = contract_scorecard.get("promotion_freeze_status_by_lane")
+    lane_status_rows = tuple(
+        (str(lane), str(status))
+        for lane, status in sorted(lane_status.items())
+    ) if isinstance(lane_status, Mapping) else ()
     ready_day1 = any(row.ready_for_day1_notifications for row in profile_rows)
     ready_send = any(row.ready_for_research_send for row in profile_rows)
+    if contract_enough_data is False:
+        ready_send = False
     ready_llm = any(row.profile == "full_llm_live" and row.ready_for_full_llm_live for row in profile_rows)
     ready_burn_in = any(row.ready_for_scheduled_burn_in for row in profile_rows)
     blockers: list[str] = []
@@ -139,6 +159,8 @@ def build_v1_readiness(
         commands.append("make event-alpha-burn-in-checklist")
     if not ready_burn_in:
         commands.append("make event-alpha-health-guard PROFILE=no_key_live")
+    if contract_enough_data is False:
+        blockers.append("authoritative 30-day burn-in contract is not mature")
     return EventAlphaV1ReadinessResult(
         generated_at=observed.isoformat(),
         ready_for_day1_notifications=ready_day1,
@@ -146,6 +168,9 @@ def build_v1_readiness(
         ready_for_full_llm_live=ready_llm,
         ready_for_scheduled_burn_in=ready_burn_in,
         profiles=tuple(profile_rows),
+        burn_in_contract_enough_data=contract_enough_data,
+        burn_in_contract_reasons=contract_reasons,
+        promotion_freeze_status_by_lane=lane_status_rows,
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
         recommended_commands=tuple(dict.fromkeys(commands)),
@@ -162,6 +187,14 @@ def format_v1_readiness_report(result: EventAlphaV1ReadinessResult) -> str:
         f"READY_FOR_CALIBRATED_RESEARCH_SEND: {_yes_no(result.ready_for_research_send)}",
         f"READY_FOR_FULL_LLM_LIVE: {_yes_no(result.ready_for_full_llm_live)}",
         f"READY_FOR_SCHEDULED_BURN_IN: {_yes_no(result.ready_for_scheduled_burn_in)}",
+        (
+            "BURN_IN_CONTRACT_ENOUGH_DATA: "
+            + (
+                "unknown"
+                if result.burn_in_contract_enough_data is None
+                else _yes_no(result.burn_in_contract_enough_data)
+            )
+        ),
         "READY_FOR_TRADING: no (out of scope)",
         "Day-1 notifications are unvalidated research output; calibrated research send still requires burn-in evidence.",
         "",
@@ -183,6 +216,12 @@ def format_v1_readiness_report(result: EventAlphaV1ReadinessResult) -> str:
     lines.extend(f"- {item}" for item in result.blockers) if result.blockers else lines.append("- none")
     lines.extend(["", "warnings:"])
     lines.extend(f"- {item}" for item in result.warnings) if result.warnings else lines.append("- none")
+    if result.burn_in_contract_reasons:
+        lines.extend(["", "authoritative burn-in contract blockers:"])
+        lines.extend(f"- {item}" for item in result.burn_in_contract_reasons)
+    if result.promotion_freeze_status_by_lane:
+        lines.extend(["", "promotion/freeze status by lane:"])
+        lines.extend(f"- {lane}: {status}" for lane, status in result.promotion_freeze_status_by_lane)
     lines.extend(["", "recommended commands:"])
     lines.extend(f"- {item}" for item in result.recommended_commands) if result.recommended_commands else lines.append("- continue daily burn-in")
     lines.append("Readiness reports do not enable sends, change tiers, paper trade, write live signal rows, or execute.")
@@ -247,7 +286,7 @@ def _profile_readiness(
         warnings.extend(f"calibrated burn-in blocker: {item}" for item in checklist.blockers)
     blockers.extend(provider_blockers)
     scheduled_ready = bool(matching_runs) and not provider_blockers
-    day1_ready = profile_is_notify and not provider_blockers
+    day1_ready = profile_is_notify and scheduled_ready and not provider_blockers
     research_send_ready = profile_name == "research_send" and checklist.ready_for_research_send and scheduled_ready
     full_llm_ready = (
         profile_name == "full_llm_live"

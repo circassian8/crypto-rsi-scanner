@@ -979,7 +979,7 @@ def event_alpha_burn_in_scorecard(
     print(event_alpha_burn_in.format_burn_in_scorecard(scorecard))
 
 def event_alpha_burn_in_checklist(
-    days: int = 7,
+    days: int = 30,
     verbose: bool = False,
     *,
     profile_name: str | None = None,
@@ -990,42 +990,24 @@ def event_alpha_burn_in_checklist(
     """Print the operational burn-in acceptance checklist."""
     _setup_event_discovery_logging(verbose)
     import crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist as event_alpha_burn_in_checklist
+    from crypto_rsi_scanner.event_alpha.operations import scorecard as event_alpha_contract_scorecard
 
     try:
         context = resolve_event_alpha_artifact_context_for_report(
-            profile_name,
-            artifact_namespace,
+            event_alpha_contract_scorecard.AUTHORITATIVE_PROFILE,
+            event_alpha_contract_scorecard.AUTHORITATIVE_PROFILE,
             include_test_artifacts=include_test_artifacts,
         )
     except ValueError as exc:
         print(str(exc))
         return
-    artifact_namespace = artifact_namespace or context.artifact_namespace
-    profile_name = profile_name or (context.profile if context.profile != "default" else None)
-    runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=500)
-    alerts = event_alpha_alert_store.load_alert_snapshots(
-        _event_alpha_alert_store_config_from_runtime().path,
-        latest_only=False,
-    )
-    feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
-    missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
-    provider_rows = event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH)
-    budget_rows = event_alpha_burn_in.load_llm_budget_rows(config.EVENT_LLM_BUDGET_LEDGER_PATH)
-    scorecard = event_alpha_burn_in.build_burn_in_scorecard(
-        run_rows=runs.rows,
-        alert_rows=alerts.rows,
-        feedback_rows=[record.__dict__ for record in feedback.records],
-        missed_rows=missed_rows,
-        provider_health_rows=provider_rows,
-        llm_budget_rows=budget_rows,
-        profile=profile_name,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_api_artifacts=include_api_artifacts,
-        days=days,
+    scorecard = event_alpha_contract_scorecard.build_authoritative_scorecard(
+        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
     )
     print(_event_alpha_context_block(context))
-    print(checklist.format_burn_in_checklist(checklist.build_burn_in_checklist(scorecard)))
+    print(event_alpha_burn_in_checklist.format_burn_in_checklist(
+        event_alpha_burn_in_checklist.build_burn_in_checklist(scorecard)
+    ))
 
 from .utility_calibration_exports import (
     _event_alpha_local_artifacts,

@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Unify Event Alpha operator readiness gates · Codex
+**Why:** The checklist and burn-in-pack commands crashed on an undefined alias,
+v1 readiness passed obsolete arguments, and the remaining reports conflated
+feedback collection, operational no-send readiness, and North Star contract
+maturity. Operators could therefore receive contradictory answers from commands
+that were supposed to describe the same burn-in state.
+**Changes:**
+- Added one policy-scoped authoritative scorecard builder for the 30-day North
+  Star contract and routed checklist, burn-in readiness, v1 readiness, and the
+  exported burn-in pack through it. The current contract view is explicit:
+  4/20 live no-send cycles, 0/300 real candidates, 0/150 human labels, 0/50
+  labeled near misses, 0/100 outcome rows, `enough_data=false`, and all six
+  promotion lanes frozen.
+- Fixed the checklist/export alias `NameError` paths and the v1-readiness
+  obsolete-argument `TypeError`; made day-1 readiness require a successful
+  matching run and calibrated-send readiness require authoritative contract
+  maturity.
+- Renamed feedback output to `ready_for_feedback_collection` and marked contract
+  maturity as unevaluated there. Burn-in readiness now separately reports
+  operational no-send review readiness and contract maturity instead of
+  overloading one `ready` value.
+- Changed the relevant Make targets and runbook from a legacy seven-day default
+  to the 30-day authoritative profile, documented the durable semantics in
+  `AGENTS.md`/`DECISIONS.md`, and added subprocess smoke coverage for the three
+  previously broken operator commands.
+**Verify:** Real no-send invocations of `make event-alpha-burn-in-checklist`,
+`make event-alpha-v1-readiness`, `make event-alpha-burn-in-readiness`,
+`make event-alpha-feedback-readiness`, and
+`make event-alpha-export-burn-in-pack` completed without traceback and agreed on
+the authoritative contract state. The focused operator/outcomes/provider/Make
+suite passed (`171 passed`), compileall and `git diff --check` passed, and full
+`make verify PYTHON=.venv/bin/python` passed (standalone `780/780`, pytest
+`850 passed`, alert render smoke, offline backtest fixture, and paper
+scoreboard).
+**Notes/risks:** No command enables provider calls, sends, normal RSI writes,
+paper trades, Event Alpha-created `TRIGGERED_FADE`, or execution. The sole
+external blocker remains human rotation of the exposed Telegram bot token.
+
 ## 2026-07-09 — Fix Linux CI review-inbox path portability · Codex
 **Why:** GitHub Actions had failed on four consecutive main-branch pushes even
 though the full suite passed on macOS. Ubuntu revealed that the persisted daily

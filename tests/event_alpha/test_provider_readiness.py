@@ -5119,9 +5119,31 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
         profiles=("notify_no_key", "research_send"),
     )
     day1_text = event_alpha_v1_readiness.format_v1_readiness_report(day1)
-    assert "READY_TO_START_DAY1_NOTIFICATIONS: yes" in day1_text
+    assert "READY_TO_START_DAY1_NOTIFICATIONS: no" in day1_text
     assert "READY_FOR_CALIBRATED_RESEARCH_SEND: no" in day1_text
     assert "Day-1 notifications are unvalidated research output" in day1_text
+
+    contract_blocked = event_alpha_v1_readiness.build_v1_readiness(
+        run_rows=run_rows,
+        alert_rows=alert_rows,
+        feedback_rows=feedback_rows,
+        missed_rows=missed_rows,
+        provider_health_rows=health_rows,
+        outcome_rows=alert_rows,
+        now=now,
+        burn_in_contract_scorecard={
+            "enough_data": False,
+            "enough_data_reasons": ["min_real_candidates:0/300"],
+            "promotion_freeze_status_by_lane": {
+                "EARLY_LONG_RESEARCH": "frozen_insufficient_data",
+            },
+        },
+    )
+    contract_text = event_alpha_v1_readiness.format_v1_readiness_report(contract_blocked)
+    assert "BURN_IN_CONTRACT_ENOUGH_DATA: no" in contract_text
+    assert "READY_FOR_CALIBRATED_RESEARCH_SEND: no" in contract_text
+    assert "min_real_candidates:0/300" in contract_text
+    assert "EARLY_LONG_RESEARCH: frozen_insufficient_data" in contract_text
 
     guard = event_alpha_health_guard.evaluate_health_guard(
         run_rows=run_rows,
