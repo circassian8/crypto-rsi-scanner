@@ -1566,7 +1566,7 @@
     }
   ],
   "classes_over_limit_count": 3,
-  "existing_violation_count": 9,
+  "existing_violation_count": 8,
   "existing_violations": [
     {
       "category": "file_over_1500_lines",
@@ -1589,15 +1589,6 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 5002,
-      "path": "tests/event_alpha/test_notifications.py",
-      "severity": "warning",
-      "source_kind": "test",
-      "violation_id": "file:tests/event_alpha/test_notifications.py"
-    },
-    {
-      "category": "file_over_1500_lines",
-      "limit": 1500,
       "line_count": 4082,
       "path": "tests/event_alpha/test_outcomes.py",
       "severity": "warning",
@@ -1616,7 +1607,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1678,
+      "line_count": 1684,
       "path": "tests/test_indicators.py",
       "severity": "warning",
       "source_kind": "test",
@@ -1674,7 +1665,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 690,
+  "file_count": 696,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -1691,12 +1682,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 5002,
-      "path": "tests/event_alpha/test_notifications.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
       "line_count": 4082,
       "path": "tests/event_alpha/test_outcomes.py",
       "source_kind": "test"
@@ -1709,17 +1694,17 @@
     },
     {
       "limit": 1500,
-      "line_count": 1678,
+      "line_count": 1684,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     }
   ],
-  "files_over_limit_count": 6,
+  "files_over_limit_count": 5,
   "function_line_limit": 150,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-10T05:55:09.987431+00:00",
+  "generated_at": "2026-07-10T06:05:08.868329+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1967,12 +1952,6 @@
   "largest_test_files": [
     {
       "limit": 1500,
-      "line_count": 5002,
-      "path": "tests/event_alpha/test_notifications.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
       "line_count": 4082,
       "path": "tests/event_alpha/test_outcomes.py",
       "source_kind": "test"
@@ -1997,7 +1976,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1678,
+      "line_count": 1684,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },
@@ -2069,6 +2048,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1019,
+      "path": "tests/event_alpha/test_notification_inbox_rehearsals.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1006,
       "path": "tests/event_alpha/test_operator_workflows.py",
       "source_kind": "test"
@@ -2089,6 +2074,12 @@
       "limit": 1500,
       "line_count": 920,
       "path": "tests/event_alpha/test_impact_hypotheses.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 868,
+      "path": "tests/event_alpha/test_notification_operations.py",
       "source_kind": "test"
     },
     {
@@ -2117,8 +2108,20 @@
     },
     {
       "limit": 1500,
+      "line_count": 796,
+      "path": "tests/event_alpha/test_notification_readiness.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 786,
       "path": "tests/event_alpha/test_core_reconciliation.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 747,
+      "path": "tests/event_alpha/test_notification_routing.py",
       "source_kind": "test"
     },
     {
@@ -2135,6 +2138,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 675,
+      "path": "tests/event_alpha/test_notification_planning.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 639,
       "path": "tests/event_alpha/test_incident_relevance.py",
       "source_kind": "test"
@@ -2143,6 +2152,12 @@
       "limit": 1500,
       "line_count": 618,
       "path": "tests/event_alpha/test_operator_presentation.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 600,
+      "path": "tests/event_alpha/test_notification_lanes.py",
       "source_kind": "test"
     },
     {
@@ -2173,36 +2188,6 @@
       "limit": 1500,
       "line_count": 466,
       "path": "tests/rsi/test_paper_risk.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 461,
-      "path": "tests/event_alpha/test_operator_identity.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 435,
-      "path": "tests/event_alpha/test_fade_core.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 387,
-      "path": "tests/event_alpha/test_market_enrichment.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 377,
-      "path": "tests/event_alpha/test_event_alert_ranking.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 376,
-      "path": "tests/event_alpha/test_burn_in_candidate_mode.py",
       "source_kind": "test"
     }
   ],
@@ -3898,9 +3883,10 @@
   "remaining_class_ownership_debt": [],
   "remaining_class_ownership_debt_count": 0,
   "research_only": true,
-  "resolved_violation_count": 2,
+  "resolved_violation_count": 3,
   "resolved_violation_ids": [
     "file:tests/event_alpha/test_integrated_radar.py",
+    "file:tests/event_alpha/test_notifications.py",
     "file:tests/event_alpha/test_provider_readiness.py"
   ],
   "row_type": "architecture_size_gate_report",
@@ -3944,8 +3930,8 @@
     }
   ],
   "telegram_sends": 0,
-  "test_files_over_1500_lines": 6,
-  "test_files_over_2000_lines": 6,
+  "test_files_over_1500_lines": 5,
+  "test_files_over_2000_lines": 5,
   "test_size_gate_status": "warning",
   "trades_created": 0,
   "triggered_fade_created": 0,
@@ -4414,7 +4400,6 @@
     "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin",
     "file:tests/event_alpha/test_artifact_doctor.py",
     "file:tests/event_alpha/test_namespace_lifecycle.py",
-    "file:tests/event_alpha/test_notifications.py",
     "file:tests/event_alpha/test_outcomes.py",
     "file:tests/event_alpha/test_source_coverage.py",
     "file:tests/test_indicators.py"
@@ -4441,15 +4426,6 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 5002,
-      "path": "tests/event_alpha/test_notifications.py",
-      "severity": "warning",
-      "source_kind": "test",
-      "violation_id": "file:tests/event_alpha/test_notifications.py"
-    },
-    {
-      "category": "file_over_1500_lines",
-      "limit": 1500,
       "line_count": 4082,
       "path": "tests/event_alpha/test_outcomes.py",
       "severity": "warning",
@@ -4468,7 +4444,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1678,
+      "line_count": 1684,
       "path": "tests/test_indicators.py",
       "severity": "warning",
       "source_kind": "test",

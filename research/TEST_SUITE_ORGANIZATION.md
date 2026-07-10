@@ -37,6 +37,13 @@ This document records the pytest-compatible split of the historical
 | `tests/event_alpha/test_market_enrichment.py` | CoinGecko market enrichment, non-overwrite guarantees, store-only anomaly creation, bounded evidence search, and anomaly lifecycle transitions. |
 | `tests/event_alpha/test_market_data_providers.py` | Coinalyze preflight/fixtures/live fail-soft/auto-symbols, derivatives non-overwrite enrichment, DEX readiness, and supply-provider hard gates. |
 | `tests/event_alpha/test_news_providers.py` | CryptoPanic, GDELT, project RSS, news-derived external assets, explicit/text event-time provenance, classifier-confidence caps, and no-trade safety. |
+| `tests/event_alpha/test_notification_delivery.py` | Delivered/failed/partial delivery state, cooldown policy, dedupe windows/keys, heartbeat buckets, in-flight retry, and disabled-send ledger behavior. |
+| `tests/event_alpha/test_notification_inbox_rehearsals.py` | Canonical inbox selection, burn-in review collapse, run filtering, planned review state, Bybit/Coinalyze rehearsals, lane labels, fallback status, and heartbeat copy. |
+| `tests/event_alpha/test_notification_lanes.py` | Blocked heartbeat previews, exploratory/research-review digests, control exclusions, quality-mode filters, verdict-aware cards, quality-profile no-send, and delivery reports. |
+| `tests/event_alpha/test_notification_operations.py` | Go/no-go and final readiness, no-send Make targets, pause/resume, scheduler/SLO/pack redaction, operational target presence, and failure-state SLOs. |
+| `tests/event_alpha/test_notification_planning.py` | No-send preview/heartbeat wording, skip telemetry, formatting facade, final guard checks, hypothesis/inbox fields, profiles, alert-store snapshots, and preflight guards. |
+| `tests/event_alpha/test_notification_readiness.py` | Runs/checklists/next steps, notification inbox and exploratory separation, recipient redaction, degraded heartbeat, fail-fast defaults, guarded send tests, fail-soft ledgers, and burn-in blocks. |
+| `tests/event_alpha/test_notification_routing.py` | Lane independence/dedupe, research-only routed messages, canonical identity, rejected/unconfirmed digest blocks, preview path recovery, clean rehearsal acceptance, disabled/no-candidate previews. |
 | `tests/event_alpha/test_playbooks_graph.py` | Deterministic playbook classification and catalyst graph clustering/link rejection across proxy, direct, infrastructure, noise, supply, and derivatives evidence. |
 | `tests/event_alpha/test_provider_activation.py` | Provider status/readiness, no-key Make targets, profile-scoped preflight/health, visible-core doctor readiness, backoff/reset/wrappers, v1/tuning/pack reports, daily-brief readiness, and Bybit preflight. |
 | `tests/event_alpha/test_radar_pipeline.py` | Radar/scanner reports, watchlist/router pipeline cycles, search validation, hypothesis persistence/briefs, LLM suggestions and skip reasons, extraction ordering, and upstream hints. |
@@ -67,7 +74,7 @@ release guard.
 ## Size Gate
 
 After the Event Alpha and base-suite splits, `tests/test_indicators.py` was
-1,784 lines immediately before the focused backup-test move. It is now 1,678
+1,784 lines immediately before the focused backup-test move. It is now 1,684
 lines and reports these standalone counts:
 
 | count | value |
@@ -96,6 +103,11 @@ News/event-time, exchange/universe, and Coinalyze/DEX/supply modules are 1,113,
 699, and 534 lines; the final activation/readiness, discovery-pipeline, and
 cache/scanner-report modules are 1,356, 940, and 817 lines. Exact names, pytest,
 and standalone compatibility were preserved at every step.
+
+The 5,002-line notification test monolith was retired into seven focused modules
+ranging from 393 to 1,019 lines. All 66 original notification identities remain
+exact and unique, all pass through both pytest and the standalone adapter, and
+the full Event Alpha package remains green at 650 tests.
 
 ## Remaining Umbrella Sections
 

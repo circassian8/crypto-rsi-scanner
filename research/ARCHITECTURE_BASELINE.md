@@ -20,7 +20,7 @@ This pass records current behavior and architecture before significant code move
 | file | lines |
 |---|---:|
 | `crypto_rsi_scanner/scanner.py` | 90 |
-| `tests/test_indicators.py` | 1678 |
+| `tests/test_indicators.py` | 1684 |
 | `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py` | 36 |
 
 ## Architecture Inventory
@@ -28,7 +28,7 @@ This pass records current behavior and architecture before significant code move
 - Top-level `crypto_rsi_scanner/event_*.py` modules: `1`
 - `crypto_rsi_scanner/event_alpha/` files: `442`
 - `crypto_rsi_scanner/cli/` files: `60`
-- `tests/` package files: `61`
+- `tests/` package files: `67`
 - GitHub Actions workflows: `2`
 - Event-related Makefile targets: `230`
 
@@ -584,7 +584,13 @@ This pass records current behavior and architecture before significant code move
 - `tests/event_alpha/test_namespace_lifecycle.py`
 - `tests/event_alpha/test_news_providers.py`
 - `tests/event_alpha/test_no_old_event_alpha_imports.py`
-- `tests/event_alpha/test_notifications.py`
+- `tests/event_alpha/test_notification_delivery.py`
+- `tests/event_alpha/test_notification_inbox_rehearsals.py`
+- `tests/event_alpha/test_notification_lanes.py`
+- `tests/event_alpha/test_notification_operations.py`
+- `tests/event_alpha/test_notification_planning.py`
+- `tests/event_alpha/test_notification_readiness.py`
+- `tests/event_alpha/test_notification_routing.py`
 - `tests/event_alpha/test_operator_identity.py`
 - `tests/event_alpha/test_operator_presentation.py`
 - `tests/event_alpha/test_operator_workflows.py`
@@ -936,7 +942,7 @@ This pass records current behavior and architecture before significant code move
 | gate | target | current | status |
 |---|---|---:|---|
 | scanner.py reduced below 2000 lines by final phase | `<2000` | 90 | `baseline_recorded` |
-| tests/test_indicators.py becomes umbrella runner below 2000 lines by final phase | `<2000` | 1678 | `baseline_recorded` |
+| tests/test_indicators.py becomes umbrella runner below 2000 lines by final phase | `<2000` | 1684 | `baseline_recorded` |
 | event_alpha/doctor/artifact_doctor.py remains public orchestrator below 300 lines by final phase | `<300` | 36 | `baseline_recorded` |
 | pytest-compatible test package exists | `exists` | true | `present` |
 | schema v1 is the declared artifact contract | `exists` | true | `present` |

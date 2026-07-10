@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Retire the notification test monolith · Codex
+**Why:** After the provider retirement, `test_notifications.py` was the largest
+remaining test file at 5,002 lines, but its 66 tests had seven clear domains.
+**Changes:**
+- Split planning/profiles (675 lines), routing/send-readiness (747),
+  runs/inbox/heartbeat readiness (796), delivery-ledger mechanics (393),
+  exploratory/review/quality lanes (600), go-no-go/scheduler/SLO operations
+  (868), and canonical inbox/provider rehearsals (1,019) into dedicated modules.
+- Replaced the old standalone registration with all seven focused modules and
+  deleted `test_notifications.py`. All 66 names remain exact and unique
+  (sorted-name SHA-256 `268bae27...`); no replacement crosses 1,500 lines.
+- Updated the roadmap, durable split evidence, and test-organization map.
+**Verify:** All 66 notification tests passed under pytest in 5.46s and all 66
+passed through the standalone adapter. The full Event Alpha package passed all
+650 tests in 150.56s. Standalone discovery remains 786 total / 594 Event Alpha /
+109 RSI / 42 CLI / 41 umbrella tests. Compileall and `git diff --check` passed;
+canonical architecture reports remain green/accepted with test files over 1,500
+lines reduced from 6 to 5 and `new_violation_count=0`.
+**Notes/risks:** Test organization and documentation only; no notification plan,
+routing, send guard, cooldown, delivery, heartbeat, readiness, provider
+rehearsal, signal, paper, trade, or execution behavior changed. Routine GitHub
+CI will not be awaited.
+
 ## 2026-07-10 — Retire the provider-readiness test monolith · Codex
 **Why:** After two provider-family splits, the residual 3,079-line file divided
 cleanly into activation/readiness/health, discovery transformation/external

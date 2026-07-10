@@ -102,6 +102,10 @@ A third and final provider split partitioned the residual 48 tests into
 1,356-line activation/readiness/health, 940-line discovery-pipeline, and
 817-line cache/scanner-report modules, then deleted the source monolith. All 88
 original provider-readiness identities now live in focused sub-threshold homes.
+The 5,002-line notification test file was likewise partitioned into seven
+planning, routing, readiness, delivery, lane, operations, and inbox/rehearsal
+modules ranging from 393 to 1,019 lines; all 66 identities were preserved and
+the source monolith was deleted.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.
