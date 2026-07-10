@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split static architecture-report contract data · Codex
+**Why:** `project_health/architecture_report.py` was 1,472 lines, only 28 below
+the production blocker, while mixing immutable contract metadata with report
+measurement and rendering logic.
+**Changes:**
+- Added `architecture_report_contract.py` for schema/output names, major target
+  metadata, tracked paths, Event Alpha split inventory, and migrated-module
+  history.
+- Re-exported all 11 established names through `architecture_report.py`; the
+  generator fell to 1,398 lines and the contract module is 93 lines.
+- Updated the roadmap and durable ownership decision, then regenerated the
+  canonical architecture reports.
+**Verify:** Exact-object checks passed for all 11 compatibility exports. The 18
+architecture/project-health pytest cases passed in 34.53s. Architecture gates,
+compileall, JSON validation, and `git diff --check` passed with zero file-size
+violations and zero new violations.
+**Notes/risks:** Static project-health organization only; no report field,
+gate, application runtime, Event Alpha, provider, notification, signal, paper,
+trade, or execution behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Remove obsolete Event Alpha umbrella helpers · Codex
 **Why:** After every oversized Event Alpha test was moved, the standalone
 umbrella still duplicated 747 lines of package fixtures that no local test or

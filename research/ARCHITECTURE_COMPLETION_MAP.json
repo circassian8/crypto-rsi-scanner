@@ -13,13 +13,6 @@
     "modules_with_multiple_public_classes_status": "pass",
     "near_threshold_file_status": [
       {
-        "line_count": 1472,
-        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
         "line_count": 1431,
         "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -29,6 +22,13 @@
       {
         "line_count": 1404,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1398,
+        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
@@ -299,7 +299,7 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-10T06:45:40+00:00",
+  "generated_at": "2026-07-10T06:58:51+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
@@ -355,15 +355,6 @@
       {
         "accepted": true,
         "limit": 1500,
-        "line_count": 1472,
-        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-        "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
-        "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
-        "source_kind": "production"
-      },
-      {
-        "accepted": true,
-        "limit": 1500,
         "line_count": 1431,
         "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
@@ -377,6 +368,15 @@
         "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
         "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
         "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
+        "source_kind": "production"
+      },
+      {
+        "accepted": true,
+        "limit": 1500,
+        "line_count": 1398,
+        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+        "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
+        "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
         "source_kind": "production"
       },
       {
@@ -477,12 +477,6 @@
     "largest_production_files": [
       {
         "limit": 1500,
-        "line_count": 1472,
-        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-        "source_kind": "production"
-      },
-      {
-        "limit": 1500,
         "line_count": 1431,
         "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "source_kind": "production"
@@ -491,6 +485,12 @@
         "limit": 1500,
         "line_count": 1404,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1398,
+        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "source_kind": "production"
       },
       {
@@ -962,13 +962,6 @@
     "moved_existing_violation_count": 0,
     "near_threshold_file_status": [
       {
-        "line_count": 1472,
-        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
         "line_count": 1431,
         "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -978,6 +971,13 @@
       {
         "line_count": 1404,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1398,
+        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"

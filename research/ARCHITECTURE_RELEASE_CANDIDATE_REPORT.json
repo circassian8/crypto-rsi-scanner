@@ -14,13 +14,6 @@
     "modules_with_multiple_public_classes_status": "pass",
     "near_threshold_file_status": [
       {
-        "line_count": 1472,
-        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
         "line_count": 1431,
         "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -30,6 +23,13 @@
       {
         "line_count": 1404,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+        "status": "accepted_near_threshold"
+      },
+      {
+        "line_count": 1398,
+        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
         "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
         "status": "accepted_near_threshold"
@@ -246,7 +246,7 @@
     },
     "remaining_api_unregistered_details": []
   },
-  "generated_at": "2026-07-10T06:45:48+00:00",
+  "generated_at": "2026-07-10T06:58:58+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_release_candidate_report",
   "known_remaining_blockers": [],

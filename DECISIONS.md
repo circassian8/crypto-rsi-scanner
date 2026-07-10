@@ -16,6 +16,19 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Separate architecture-report contract data from report logic
+**Status:** accepted
+**Decision:** Static final-report schema names, output names, major target
+metadata, tracked paths, split-path inventory, and historical migrated-module
+inventory belong in `project_health/architecture_report_contract.py`.
+`architecture_report.py` continues to re-export every established name and owns
+measurement, report construction, formatting, writing, and CLI behavior.
+**Why:** The report generator was 1,472 lines, only 28 below the production file
+blocker. Moving 93 lines of immutable contract data created headroom without
+altering generated fields, public names, safety gates, or runtime behavior.
+**Revisit when:** The architecture report schema is deliberately versioned or
+the historical migrated-module inventory is retired.
+
 ## 2026-07-10 - Keep split-test helper ownership out of the umbrella runner
 **Status:** accepted
 **Decision:** Event Alpha fixtures and compatibility globals used by split test

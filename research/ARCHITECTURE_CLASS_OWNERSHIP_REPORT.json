@@ -1457,7 +1457,7 @@
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-10T06:45:27.325325+00:00",
+  "generated_at": "2026-07-10T06:58:37.990815+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -2833,13 +2833,6 @@
   "multi_public_class_modules_count": 80,
   "near_threshold_file_status": [
     {
-      "line_count": 1472,
-      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
       "line_count": 1431,
       "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -2849,6 +2842,13 @@
     {
       "line_count": 1404,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
+      "line_count": 1398,
+      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3288,14 +3288,6 @@
       "rows": [
         {
           "accepted": true,
-          "line_count": 1472,
-          "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-          "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
-          "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
           "line_count": 1431,
           "path": "crypto_rsi_scanner/event_alpha/shims.py",
           "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
@@ -3308,6 +3300,14 @@
           "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
           "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
           "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
+          "threshold": 1200
+        },
+        {
+          "accepted": true,
+          "line_count": 1398,
+          "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+          "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
+          "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
           "threshold": 1200
         },
         {
@@ -3425,11 +3425,6 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
-        "line_count": 1472,
-        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-        "threshold": 1200
-      },
-      {
         "line_count": 1431,
         "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "threshold": 1200
@@ -3437,6 +3432,11 @@
       {
         "line_count": 1404,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1398,
+        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "threshold": 1200
       },
       {
@@ -3503,14 +3503,6 @@
         "rows": [
           {
             "accepted": true,
-            "line_count": 1472,
-            "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-            "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
-            "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
             "line_count": 1431,
             "path": "crypto_rsi_scanner/event_alpha/shims.py",
             "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
@@ -3523,6 +3515,14 @@
             "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
             "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
             "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
+            "threshold": 1200
+          },
+          {
+            "accepted": true,
+            "line_count": 1398,
+            "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+            "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
+            "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
             "threshold": 1200
           },
           {
