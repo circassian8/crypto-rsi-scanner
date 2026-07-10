@@ -2,7 +2,7 @@
 
 Research-only, behavior-preserving finalization contract. This document does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created TRIGGERED_FADE.
 
-- generated_at: `2026-07-10T04:56:58.056732+00:00`
+- generated_at: `2026-07-10T05:02:27.553279+00:00`
 - schema_version: `architecture_contract_v1`
 - purpose: Move from accepted refactor v2 compatibility shims to fully finished refactor v3.
 - feature_policy: Behavior-preserving refactor only; do not add product features.

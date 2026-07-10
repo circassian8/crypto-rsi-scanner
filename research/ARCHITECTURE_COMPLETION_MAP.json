@@ -299,7 +299,7 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-10T04:57:05+00:00",
+  "generated_at": "2026-07-10T05:02:35+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
@@ -719,7 +719,7 @@
     "largest_test_files": [
       {
         "limit": 1500,
-        "line_count": 9953,
+        "line_count": 9018,
         "path": "tests/event_alpha/test_integrated_radar.py",
         "source_kind": "test"
       },
@@ -761,7 +761,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 1661,
+        "line_count": 1662,
         "path": "tests/test_indicators.py",
         "source_kind": "test"
       },
@@ -799,6 +799,12 @@
         "limit": 1500,
         "line_count": 1081,
         "path": "tests/event_alpha/test_fade_validation.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 942,
+        "path": "tests/event_alpha/test_llm_radar.py",
         "source_kind": "test"
       },
       {
@@ -949,12 +955,6 @@
         "limit": 1500,
         "line_count": 27,
         "path": "tests/event_alpha/test_canonical_imports.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 13,
-        "path": "tests/conftest.py",
         "source_kind": "test"
       }
     ],

@@ -2,7 +2,7 @@
 
 Static map of the behavior-preserving Event Alpha architecture. It records package ownership, compatibility cores, size gates, and safety boundaries.
 
-- generated_at: `2026-07-10T04:57:05+00:00`
+- generated_at: `2026-07-10T05:02:35+00:00`
 - status: `accepted`
 - scanner.py lines: `90`
 - scanner command bodies remaining: `0`

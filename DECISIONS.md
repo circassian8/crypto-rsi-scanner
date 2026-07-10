@@ -64,6 +64,10 @@ lines without creating another over-1,500 file or weakening the compatibility
 runner. A second validation/review split applied the same rule to 45 tests,
 reducing the monolith again from 12,311 to 9,953 lines while producing 1,081-
 and 1,309-line modules and preserving all 240 integrated-radar test identities.
+A third 27-test split isolated LLM relationship analysis, advisory behavior,
+provider timeout/budget/cache handling, and raw extraction in a 942-line module;
+the source monolith fell again from 9,953 to 9,018 lines while preserving the
+exact 125-name remaining surface across source plus extraction.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.

@@ -1580,7 +1580,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 9953,
+      "line_count": 9018,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "severity": "warning",
       "source_kind": "test",
@@ -1634,7 +1634,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1661,
+      "line_count": 1662,
       "path": "tests/test_indicators.py",
       "severity": "warning",
       "source_kind": "test",
@@ -1692,7 +1692,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 673,
+  "file_count": 674,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -1703,7 +1703,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 9953,
+      "line_count": 9018,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "source_kind": "test"
     },
@@ -1739,7 +1739,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1661,
+      "line_count": 1662,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     }
@@ -1749,7 +1749,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-10T04:55:45.954507+00:00",
+  "generated_at": "2026-07-10T05:02:20.997945+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1997,7 +1997,7 @@
   "largest_test_files": [
     {
       "limit": 1500,
-      "line_count": 9953,
+      "line_count": 9018,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "source_kind": "test"
     },
@@ -2039,7 +2039,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1661,
+      "line_count": 1662,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },
@@ -2077,6 +2077,12 @@
       "limit": 1500,
       "line_count": 1081,
       "path": "tests/event_alpha/test_fade_validation.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 942,
+      "path": "tests/event_alpha/test_llm_radar.py",
       "source_kind": "test"
     },
     {
@@ -2227,12 +2233,6 @@
       "limit": 1500,
       "line_count": 27,
       "path": "tests/event_alpha/test_canonical_imports.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 13,
-      "path": "tests/conftest.py",
       "source_kind": "test"
     }
   ],
@@ -4461,7 +4461,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 9953,
+      "line_count": 9018,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "severity": "warning",
       "source_kind": "test",
@@ -4515,7 +4515,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1661,
+      "line_count": 1662,
       "path": "tests/test_indicators.py",
       "severity": "warning",
       "source_kind": "test",

@@ -2,7 +2,7 @@
 
 Research-only architecture gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-10T04:56:58+00:00`
+- generated_at: `2026-07-10T05:02:27+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `124`
@@ -10,7 +10,7 @@ Research-only architecture gate report. This report does not call providers, sen
 - retained_public_shims_count: `0`
 - shim_dependency_report_cache_status: `miss`
 - shim_dependency_include_runtime_artifacts: `False`
-- shim_dependency_scan_duration_seconds: `1.1761`
+- shim_dependency_scan_duration_seconds: `1.1813`
 - shim_dependency_skipped_artifact_files: `1486`
 - shim_dependency_skipped_large_files: `1`
 - v3_gate_status: `accepted_with_documented_exceptions`
@@ -27,7 +27,7 @@ Research-only architecture gate report. This report does not call providers, sen
 | file | baseline lines | current lines | reduced by | reduction | target | status |
 |---|---:|---:|---:|---:|---:|---|
 | `crypto_rsi_scanner/scanner.py` | 90 | 90 | 0 | 0.0% | <2000 | `pass` |
-| `tests/test_indicators.py` | 1661 | 1661 | 0 | 0.0% | <2000 | `pass` |
+| `tests/test_indicators.py` | 1662 | 1662 | 0 | 0.0% | <2000 | `pass` |
 | `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py` | 36 | 36 | 0 | 0.0% | <300 | `pass` |
 
 ## Organization Counts
@@ -216,20 +216,21 @@ Research-only architecture gate report. This report does not call providers, sen
 
 | path | lines |
 |---|---:|
-| `tests/event_alpha/test_integrated_radar.py` | 9953 |
+| `tests/event_alpha/test_integrated_radar.py` | 9018 |
 | `tests/event_alpha/test_provider_readiness.py` | 5379 |
 | `tests/event_alpha/test_notifications.py` | 5002 |
 | `tests/event_alpha/test_outcomes.py` | 4082 |
 | `tests/event_alpha/test_artifact_doctor.py` | 4052 |
 | `tests/event_alpha/test_source_coverage.py` | 2991 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
-| `tests/test_indicators.py` | 1661 |
+| `tests/test_indicators.py` | 1662 |
 | `tests/event_alpha/test_burn_in_operations.py` | 1477 |
 | `tests/event_alpha/test_market_surfaces.py` | 1450 |
 | `tests/cli/test_make_targets.py` | 1407 |
 | `tests/event_alpha/test_fade_review_workflows.py` | 1309 |
 | `tests/event_alpha/test_core_opportunities.py` | 1282 |
 | `tests/event_alpha/test_fade_validation.py` | 1081 |
+| `tests/event_alpha/test_llm_radar.py` | 942 |
 | `tests/event_alpha/test_artifact_schema.py` | 850 |
 | `tests/event_alpha/_api_helpers.py` | 825 |
 | `tests/event_alpha/test_core_reconciliation.py` | 786 |
@@ -255,7 +256,6 @@ Research-only architecture gate report. This report does not call providers, sen
 | `tests/event_alpha/test_no_old_event_alpha_imports.py` | 39 |
 | `tests/event_alpha/conftest.py` | 30 |
 | `tests/event_alpha/test_canonical_imports.py` | 27 |
-| `tests/conftest.py` | 13 |
 
 ## Class Ownership Cleanup
 

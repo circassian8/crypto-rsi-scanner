@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split integrated-radar LLM test surface · Codex
+**Why:** The remaining 9,953-line integrated-radar test monolith still contained
+a contiguous, independent LLM relationship/analyzer/extractor surface with no
+cross-test references and a natural focused package home.
+**Changes:**
+- Mechanically moved 27 tests covering relationship models and quote validation,
+  advisory-only tier changes, OpenAI missing-key/timeout behavior, cache and
+  bounded-parallel runtime controls, budget ledgers, golden evals, raw-event
+  extraction, resolver validation, profiles/Make targets, and scanner reporting
+  into `tests/event_alpha/test_llm_radar.py` (942 lines).
+- Registered the module with the direct standalone compatibility runner and
+  removed unused copied imports. The source monolith fell from 9,953 to 9,018
+  lines; its original 125 names are preserved exactly and uniquely across the
+  two files (sorted-name SHA-256 `70e1a459...`).
+- Updated the test-organization map, roadmap, and durable split evidence with
+  current line and discovery counts.
+**Verify:** The extracted module passed all 27 tests and all 27 passed through
+the standalone adapter. The original-plus-extracted surface passed all 125 tests
+in 18.64s. Standalone discovery remains 786 total / 594 Event Alpha / 109 RSI /
+42 CLI / 41 umbrella tests. Compileall and `git diff --check` passed. The full
+Event Alpha package had passed all 650 tests immediately before this test-only
+move; it was not redundantly rerun because the exact complete affected surface
+and standalone adapter both passed after the move.
+**Notes/risks:** Test organization and documentation only; no LLM provider,
+resolver, radar, notification, artifact, signal, paper, trade, or execution
+behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split integrated-radar merge policy from assembly · Codex
 **Why:** The behavior-critical integrated-radar merge module was 1,498 lines,
 only two lines below the production blocker threshold, and combined pure
