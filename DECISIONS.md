@@ -16,6 +16,19 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Separate opportunity-audit matching and value normalization
+**Status:** accepted
+**Decision:** Opportunity-audit scalar normalization, quality-field access, row
+conversion, and incident value helpers belong in `opportunity_audit_values.py`;
+card, feedback, and target matching belong in `opportunity_audit_matching.py`.
+`opportunity_audit.py` owns decision-path assembly and re-exports the existing
+private helper names for compatibility.
+**Why:** The 1,404-line audit module mixed operator report assembly with 312
+lines of reusable normalization and identity matching. The split yields 1,145-,
+182-, and 130-line modules with all 19 moved function ASTs unchanged.
+**Revisit when:** Opportunity-audit schema v2 replaces the current row contract
+or matching is centralized across all operator artifacts.
+
 ## 2026-07-10 - Keep shim report formatting pure and separate from audits
 **Status:** accepted
 **Decision:** Markdown rendering for shim registry, dependency, old-import,

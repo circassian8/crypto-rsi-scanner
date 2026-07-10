@@ -1391,15 +1391,6 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1404,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-      "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
-      "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
       "line_count": 1398,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
@@ -1488,7 +1479,7 @@
       "source_kind": "production"
     }
   ],
-  "accepted_production_files_over_1200_lines": 11,
+  "accepted_production_files_over_1200_lines": 10,
   "api_classes_over_limit": 0,
   "api_classes_over_limit_rows": [],
   "api_decomposition_blockers": [],
@@ -1611,7 +1602,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 712,
+  "file_count": 714,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1619,16 +1610,10 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-10T07:02:13.775186+00:00",
+  "generated_at": "2026-07-10T07:07:06.931603+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
-    {
-      "limit": 1500,
-      "line_count": 1404,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-      "source_kind": "production"
-    },
     {
       "limit": 1500,
       "line_count": 1398,
@@ -1717,6 +1702,12 @@
       "limit": 1500,
       "line_count": 1145,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1145,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
       "source_kind": "production"
     },
     {
@@ -3480,13 +3471,6 @@
   "multi_public_class_modules_count": 80,
   "near_threshold_file_status": [
     {
-      "line_count": 1404,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
       "line_count": 1398,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3588,12 +3572,6 @@
   "production_files_over_1200_line_rows": [
     {
       "limit": 1500,
-      "line_count": 1404,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1398,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "source_kind": "production"
@@ -3653,7 +3631,7 @@
       "source_kind": "production"
     }
   ],
-  "production_files_over_1200_lines": 11,
+  "production_files_over_1200_lines": 10,
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
@@ -3896,18 +3874,9 @@
       ]
     },
     "production_files_over_1200_lines": {
-      "count": 11,
+      "count": 10,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1404,
-          "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-          "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
-          "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
-          "source_kind": "production"
-        },
         {
           "accepted": true,
           "limit": 1500,
@@ -4031,7 +4000,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 11,
+      "production_files_over_1200_lines": 10,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -4040,11 +4009,6 @@
     "historical_row_type_alias": "refactor_v3_gate_snapshot",
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
-      {
-        "line_count": 1404,
-        "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-        "threshold": 1200
-      },
       {
         "line_count": 1398,
         "path": "crypto_rsi_scanner/project_health/architecture_report.py",
@@ -4152,18 +4116,9 @@
         ]
       },
       "production_files_over_1200_lines": {
-        "count": 11,
+        "count": 10,
         "reason": "accepted/documented production files over the v3 1,200-line target",
         "rows": [
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1404,
-            "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-            "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
-            "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
-            "source_kind": "production"
-          },
           {
             "accepted": true,
             "limit": 1500,
@@ -4271,7 +4226,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 11,
+    "production_files_over_1200_lines": 10,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,

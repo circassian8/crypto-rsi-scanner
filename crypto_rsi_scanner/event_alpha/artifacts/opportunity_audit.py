@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -17,6 +16,29 @@ import crypto_rsi_scanner.event_alpha.providers.source_registry as event_source_
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from . import reason_text as event_alpha_reason_text
 from . import research_cards as event_research_cards
+from .opportunity_audit_matching import (
+    _audit_feedback_target,
+    _matching_card_paths,
+    _matching_feedback_rows,
+    _target_from_card_path,
+)
+from .opportunity_audit_values import (
+    _as_list_values,
+    _asset_list,
+    _asset_role_summary,
+    _claim_history_value,
+    _collect_core_row_values,
+    _components,
+    _entry_row,
+    _float_value,
+    _incident_context,
+    _list_value,
+    _market_age_value,
+    _quality_source,
+    _role_capabilities_value,
+    _row,
+    _value,
+)
 
 
 def format_opportunity_audit(
@@ -1036,59 +1058,14 @@ def _row_matches(row: Mapping[str, Any], clean: str, original: str) -> bool:
     return clean in text_keys or original in text_keys or ("ea:" + clean) in text_keys
 
 
-def _as_list_values(value: Any) -> set[str]:
-    if value in (None, "", [], {}, ()):
-        return set()
-    if isinstance(value, str):
-        return {value}
-    if isinstance(value, Iterable) and not isinstance(value, Mapping):
-        return {str(item) for item in value if str(item or "")}
-    return {str(value)}
 
 
-def _entry_row(entry: event_watchlist.EventWatchlistEntry | Mapping[str, Any]) -> dict[str, Any]:
-    if isinstance(entry, Mapping):
-        return dict(entry)
-    row = asdict(entry)
-    row["alert_id"] = event_alpha_router.alert_id_for_entry(entry)
-    row["card_id"] = event_alpha_router.card_id_for_entry(entry)
-    return row
 
 
-def _row(value: Mapping[str, Any] | object) -> dict[str, Any]:
-    if isinstance(value, Mapping):
-        return dict(value)
-    if is_dataclass(value):
-        return asdict(value)
-    return dict(getattr(value, "__dict__", {}) or {})
 
 
-def _components(row: Mapping[str, Any]) -> dict[str, Any]:
-    components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else {}
-    if not components and isinstance(row.get("score_components"), Mapping):
-        components = row.get("score_components")
-    out = dict(components)
-    for key, value in row.items():
-        if key in event_alpha_quality_fields.REQUIRED_QUALITY_FIELDS:
-            if value not in (None, "", [], {}):
-                out[key] = value
-        elif key not in out and value not in (None, "", [], {}):
-            out[key] = value
-    return event_alpha_quality_fields.ensure_quality_fields(out)
 
 
-def _incident_context(
-    row: Mapping[str, Any],
-    components: Mapping[str, Any],
-    incidents: Iterable[Mapping[str, Any]],
-) -> Mapping[str, Any] | None:
-    incident_id = str(row.get("incident_id") or components.get("incident_id") or "")
-    if not incident_id:
-        return row if str(row.get("row_type") or "") == "event_incident" else None
-    for incident in incidents:
-        if str(incident.get("incident_id") or "") == incident_id:
-            return incident
-    return row if row.get("incident_id") else None
 
 
 def _incident_lines(
@@ -1166,239 +1143,3 @@ def _incident_lines(
         f"source={source.get('market_context_source') or components.get('market_context_source') or 'none'}",
         f"- linked assets and roles: {_asset_list(linked_assets) if linked_assets else _asset_role_summary(row, components)}",
     ]
-
-
-def _claim_history_value(value: Any) -> str:
-    if not value:
-        return "none"
-    labels: list[str] = []
-    for item in list(value)[:4]:
-        if isinstance(item, Mapping):
-            labels.append(
-                f"{item.get('claim_type') or 'claim'}:"
-                f"{item.get('polarity') or 'unknown'}/"
-                f"{item.get('cause_status') or 'unknown'}"
-            )
-        else:
-            labels.append(str(item))
-    return "; ".join(labels) or "none"
-
-
-def _asset_role_summary(row: Mapping[str, Any], components: Mapping[str, Any]) -> str:
-    symbol = components.get("validated_symbol") or row.get("validated_symbol") or row.get("symbol")
-    coin_id = components.get("validated_coin_id") or row.get("validated_coin_id") or row.get("coin_id")
-    role = components.get("candidate_role") or row.get("candidate_role") or "unknown"
-    if symbol or coin_id:
-        return f"{symbol or coin_id}({role})"
-    return "none"
-
-
-def _quality_source(row: Mapping[str, Any]) -> str:
-    source = event_alpha_quality_fields.quality_source(row, components_key="latest_score_components")
-    if source == "nested_score_components":
-        return "nested_score_components"
-    if source in {"partial_quality_fields", "recomputed"}:
-        return "recomputed" if source == "recomputed" else "partial_top_level_recomputed"
-    return source
-
-
-def _value(row: Mapping[str, Any], *keys: Any, default: str = "unknown") -> str:
-    for key in keys:
-        if isinstance(key, str):
-            value = row.get(key)
-        else:
-            value = key
-        if value not in (None, "", [], {}):
-            return str(value)
-    return default
-
-
-def _list_value(value: Any) -> str:
-    if value in (None, "", [], ()):
-        return "none"
-    if isinstance(value, str):
-        return value
-    if isinstance(value, Mapping):
-        return ", ".join(f"{key}={child}" for key, child in list(value.items())[:6])
-    return "; ".join(str(item) for item in list(value)[:6])
-
-
-def _market_age_value(components: Mapping[str, Any], row: Mapping[str, Any]) -> str:
-    age_hours = _float_value(
-        components.get("market_context_age_hours")
-        if components.get("market_context_age_hours") is not None
-        else row.get("market_context_age_hours")
-    )
-    if age_hours is None:
-        age_seconds = _float_value(
-            components.get("market_context_age_seconds")
-            if components.get("market_context_age_seconds") is not None
-            else row.get("market_context_age_seconds")
-        )
-        if age_seconds is not None:
-            age_hours = age_seconds / 3600.0
-    if age_hours is None:
-        return "n/a"
-    if age_hours < 1:
-        return f"{age_hours * 60:.0f}m"
-    return f"{age_hours:.1f}h"
-
-
-def _float_value(value: object) -> float | None:
-    try:
-        return float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-
-
-def _asset_list(value: Any) -> str:
-    if not value:
-        return "none"
-    if isinstance(value, Mapping):
-        value = [value]
-    rows = []
-    for item in list(value)[:6]:
-        if isinstance(item, Mapping):
-            rows.append(
-                f"{item.get('symbol') or item.get('coin_id') or item.get('name') or 'asset'}"
-                f"({item.get('rejection_reason') or item.get('identity_reason') or item.get('source') or 'candidate'})"
-            )
-        else:
-            rows.append(str(item))
-    return "; ".join(rows)
-
-
-def _role_capabilities_value(value: Any) -> str:
-    if not isinstance(value, Mapping):
-        return "unknown"
-    enabled = [str(key) for key, child in sorted(value.items()) if bool(child)]
-    return ", ".join(enabled) if enabled else "none"
-
-
-def _collect_core_row_values(rows: Iterable[Mapping[str, Any]], *keys: str) -> tuple[str, ...]:
-    values: list[str] = []
-    for row in rows:
-        for key in keys:
-            value = row.get(key)
-            if value not in (None, "", [], {}, ()):
-                values.append(str(value))
-    return tuple(dict.fromkeys(values))
-
-
-def _audit_feedback_target(
-    row: Mapping[str, Any],
-    fallback: str,
-    core: event_core_opportunities.CoreOpportunity | None = None,
-    card_paths: Iterable[Path] = (),
-) -> str:
-    for path in card_paths:
-        card_target = event_research_cards.card_feedback_target(path)
-        if card_target:
-            return card_target
-    if core is not None:
-        for candidate in (core.core_opportunity_id, row.get("card_id"), row.get("alert_id"), row.get("key"), row.get("hypothesis_id")):
-            if candidate:
-                return str(candidate)
-    return str(row.get("card_id") or row.get("alert_id") or row.get("key") or row.get("hypothesis_id") or fallback)
-
-
-def _matching_card_paths(
-    target: str,
-    row: Mapping[str, Any],
-    core: event_core_opportunities.CoreOpportunity | None,
-    card_paths: Iterable[str | Path],
-) -> tuple[Path, ...]:
-    identifiers = {
-        target,
-        str(row.get("alert_id") or ""),
-        str(row.get("card_id") or ""),
-        str(row.get("snapshot_id") or ""),
-        str(row.get("key") or ""),
-        str(row.get("event_id") or ""),
-        str(row.get("hypothesis_id") or ""),
-        str(row.get("incident_id") or ""),
-        str(row.get("symbol") or ""),
-        str(row.get("coin_id") or ""),
-        str(row.get("validated_symbol") or ""),
-        str(row.get("validated_coin_id") or ""),
-    }
-    if core is not None:
-        identifiers.add(core.core_opportunity_id)
-        identifiers.add(core.incident_id or "")
-        identifiers.update(str(value) for value in core.supporting_hypothesis_ids)
-        identifiers.update(str(support.get("key") or "") for support in core.supporting_rows)
-        identifiers.update(str(support.get("card_id") or "") for support in core.supporting_rows)
-        identifiers.update(str(support.get("alert_id") or "") for support in core.supporting_rows)
-    identifiers = {item for item in identifiers if item}
-    identifiers_l = {item.lower() for item in identifiers}
-    out: list[Path] = []
-    for raw_path in card_paths:
-        path = Path(raw_path)
-        if path.name == "index.md" or not path.exists():
-            continue
-        path_targets = {
-            str(path),
-            path.name,
-            path.stem,
-            event_research_cards.card_feedback_target(path) or "",
-        }
-        if identifiers_l.intersection(value.lower() for value in path_targets if value):
-            out.append(path)
-            continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        if any(identifier in text for identifier in identifiers):
-            out.append(path)
-    return tuple(dict.fromkeys(out))
-
-
-def _matching_feedback_rows(
-    feedback_target: str,
-    row: Mapping[str, Any],
-    feedback_rows: Iterable[Mapping[str, Any] | object],
-) -> tuple[dict[str, Any], ...]:
-    identifiers = {
-        str(feedback_target or ""),
-        str(row.get("alert_id") or ""),
-        str(row.get("alert_key") or ""),
-        str(row.get("card_id") or ""),
-        str(row.get("snapshot_id") or ""),
-        str(row.get("key") or ""),
-        str(row.get("event_id") or ""),
-        str(row.get("hypothesis_id") or ""),
-        str(row.get("incident_id") or ""),
-        str(row.get("symbol") or ""),
-        str(row.get("coin_id") or ""),
-        str(row.get("validated_symbol") or ""),
-        str(row.get("validated_coin_id") or ""),
-    }
-    components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
-    identifiers.update({
-        str(components.get("validated_symbol") or ""),
-        str(components.get("validated_coin_id") or ""),
-    })
-    identifiers = {item for item in identifiers if item}
-    matches: list[dict[str, Any]] = []
-    for item in feedback_rows:
-        feedback = _row(item)
-        candidates = {
-            str(feedback.get("target") or ""),
-            str(feedback.get("key") or ""),
-            str(feedback.get("event_id") or ""),
-            str(feedback.get("incident_id") or ""),
-            str(feedback.get("coin_id") or ""),
-            str(feedback.get("symbol") or ""),
-        }
-        if identifiers.intersection(candidate for candidate in candidates if candidate):
-            matches.append(feedback)
-    return tuple(matches)
-
-
-def _target_from_card_path(target: str, card_paths: Iterable[str | Path]) -> str | None:
-    target_l = target.lower()
-    for raw_path in card_paths:
-        path = Path(raw_path)
-        if path.name == "index.md" or not path.exists():
-            continue
-        if target_l in {str(path).lower(), path.name.lower(), path.stem.lower()}:
-            return event_research_cards.card_feedback_target(path)
-    return None

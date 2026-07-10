@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split opportunity-audit normalization and matching helpers · Codex
+**Why:** `event_alpha/artifacts/opportunity_audit.py` was 1,404 lines and mixed
+decision-path rendering with reusable scalar normalization and identity matching.
+**Changes:**
+- Added `opportunity_audit_values.py` (182 lines) for 15 row/value/quality/
+  incident helpers and `opportunity_audit_matching.py` (130 lines) for four
+  card, feedback, and target matching helpers.
+- Re-exported every moved private name through `opportunity_audit.py`, which
+  fell to 1,145 lines; all 19 moved ASTs remain exact.
+- Updated the roadmap and durable ownership decision, then regenerated the
+  canonical architecture reports.
+**Verify:** All 98 catalyst-frame, core, reconciliation, evidence-acquisition,
+incident, identity, presentation, quality-feedback, and router pytest cases
+passed in 12.86s. Compileall, architecture gates, JSON validation, and
+`git diff --check` passed with zero file-size violations and zero new violations.
+**Notes/risks:** Organization only; no opportunity score, verdict, matching,
+route, notification, signal, paper, trade, or execution behavior changed.
+Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split pure shim-report formatting from audits · Codex
 **Why:** `event_alpha/shims.py` was 1,431 lines and combined safety-critical
 tombstone/import audits with 268 lines of pure Markdown rendering.

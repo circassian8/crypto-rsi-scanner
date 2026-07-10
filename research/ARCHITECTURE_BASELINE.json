@@ -188,6 +188,8 @@
     "crypto_rsi_scanner/event_alpha/artifacts/explain.py",
     "crypto_rsi_scanner/event_alpha/artifacts/locks.py",
     "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+    "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit_matching.py",
+    "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit_values.py",
     "crypto_rsi_scanner/event_alpha/artifacts/paths.py",
     "crypto_rsi_scanner/event_alpha/artifacts/reason_text.py",
     "crypto_rsi_scanner/event_alpha/artifacts/replay.py",
@@ -586,7 +588,7 @@
     "crypto_rsi_scanner/event_alpha/shim_scan.py",
     "crypto_rsi_scanner/event_alpha/shims.py"
   ],
-  "generated_at": "2026-07-10T07:02:11+00:00",
+  "generated_at": "2026-07-10T07:07:04+00:00",
   "generator": "crypto_rsi_scanner.project_health.baseline",
   "github_actions_safety": {
     "forbidden_live_or_secret_terms_present": [],
