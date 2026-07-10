@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split event-fade validation and review workflow tests · Codex
+**Why:** After the first integrated-radar burn-down, one contiguous 2,360-line
+surface still mixed validation schemas, promotion blockers, human review
+templates, bundle/cache workspaces, and scanner command regressions into the
+9k-plus monolith.
+**Changes:**
+- Moved 20 validation/schema/review-gate tests into
+  `tests/event_alpha/test_fade_validation.py` (1,081 lines) and 25 sidecar,
+  review-bundle, cache, and scanner workflow tests into
+  `tests/event_alpha/test_fade_review_workflows.py` (1,309 lines).
+- Registered both modules with the standalone compatibility runner and verified
+  that the cumulative seven-file integrated-radar surface still contains the
+  exact original 240 unique test names. The source monolith fell from 12,311 to
+  9,953 lines; cumulative reduction from the initial 16,234 lines is 6,281.
+- Updated roadmap, durable split evidence, and the test-organization map. The
+  final canonical architecture reports are regenerated after the completed
+  documentation so their inventories and line measurements match the commit.
+**Verify:** Both extracted modules passed `45 tests`, and all 45 passed through
+the direct standalone adapter. Standalone discovery remains 784 total / 592
+Event Alpha / 109 RSI / 42 CLI / 41 umbrella tests, with no names lost, added,
+or duplicated. The full Event Alpha package passed `647 tests` in 150.59s;
+compileall and `git diff --check` passed.
+**Notes/risks:** Test/report organization only; no scanner, provider, artifact,
+notification, signal, paper, trading, or Event Alpha routing code changed. The
+remaining 9,953-line monolith still requires further cohesive splits. Routine
+GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split integrated-radar core and market tests · Codex
 **Why:** `tests/event_alpha/test_integrated_radar.py` was the repository's
 largest test file at 16,234 lines. Its final core-opportunity and market-surface

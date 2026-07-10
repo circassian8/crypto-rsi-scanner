@@ -10,7 +10,7 @@
     },
     {
       "current_status": "baseline_recorded",
-      "current_value": 1658,
+      "current_value": 1660,
       "gate": "tests/test_indicators.py becomes umbrella runner below 2000 lines by final phase",
       "metric": "line_count",
       "path": "tests/test_indicators.py",
@@ -583,7 +583,7 @@
     "crypto_rsi_scanner/event_alpha/shim_scan.py",
     "crypto_rsi_scanner/event_alpha/shims.py"
   ],
-  "generated_at": "2026-07-10T04:22:21+00:00",
+  "generated_at": "2026-07-10T04:29:56+00:00",
   "generator": "crypto_rsi_scanner.project_health.baseline",
   "github_actions_safety": {
     "forbidden_live_or_secret_terms_present": [],
@@ -596,7 +596,7 @@
   "line_counts": {
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 36,
     "crypto_rsi_scanner/scanner.py": 90,
-    "tests/test_indicators.py": 1658
+    "tests/test_indicators.py": 1660
   },
   "live_provider_calls_allowed": false,
   "makefile_event_target_count": 230,
@@ -1624,7 +1624,7 @@
     },
     {
       "current_status": "baseline_recorded",
-      "current_value": 1658,
+      "current_value": 1660,
       "gate": "tests/test_indicators.py becomes umbrella runner below 2000 lines by final phase",
       "metric": "line_count",
       "path": "tests/test_indicators.py",
@@ -1706,6 +1706,8 @@
     "tests/event_alpha/test_canonical_imports.py",
     "tests/event_alpha/test_core_opportunities.py",
     "tests/event_alpha/test_core_reconciliation.py",
+    "tests/event_alpha/test_fade_review_workflows.py",
+    "tests/event_alpha/test_fade_validation.py",
     "tests/event_alpha/test_integrated_radar.py",
     "tests/event_alpha/test_market_surfaces.py",
     "tests/event_alpha/test_namespace_lifecycle.py",

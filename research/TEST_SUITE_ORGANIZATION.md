@@ -16,6 +16,8 @@ This document records the pytest-compatible split of the historical
 | `tests/rsi/test_paper_risk.py` | Outcome grading, paper scoreboard, refresh-paper, and risk/rendering guard tests. |
 | `tests/cli/test_parser.py` | Parser snapshots, command classification, CLI help smoke, and dispatch smoke with patched handlers. |
 | `tests/cli/test_make_targets.py` | Makefile, export archive, CI workflow, architecture baseline, and split-target static checks. |
+| `tests/event_alpha/test_fade_validation.py` | Event-fade sample schema, promotion blockers, provenance, diversity, timing, labeling-queue, and human-evidence regressions. |
+| `tests/event_alpha/test_fade_review_workflows.py` | Review sidecars, balanced templates, scanner reports, review bundles, cached workspaces, and merge workflows. |
 | `tests/event_alpha/test_core_opportunities.py` | Core-opportunity storage, watchlist promotion, canonical operator grouping, research cards, and opportunity-audit regressions. |
 | `tests/event_alpha/test_core_reconciliation.py` | Canonical-core/snapshot reconciliation, diagnostic isolation, audit reconciliation, and daily-brief evidence accounting. |
 | `tests/event_alpha/test_operator_identity.py` | Asset knowledge, role validation, identity metadata, live-confirmation caps, and stale source-only normalization. |
@@ -46,7 +48,7 @@ release guard.
 ## Size Gate
 
 After the Event Alpha and base-suite splits, `tests/test_indicators.py` was
-1,784 lines immediately before the focused backup-test move. It is now 1,658
+1,784 lines immediately before the focused backup-test move. It is now 1,660
 lines and reports these standalone counts:
 
 | count | value |
@@ -60,13 +62,13 @@ lines and reports these standalone counts:
 The architecture baseline final-phase gate for `tests/test_indicators.py` is below
 2,000 lines, so the umbrella runner now satisfies that size target.
 
-The first integrated-radar burn-down moved 70 tests without changing the totals
-above. `tests/event_alpha/test_integrated_radar.py` fell from 16,234 to 12,311
-lines. The extracted modules are 1,282, 786, 461, and 1,450 lines, so the split
-did not add another file above the 1,500-line architecture warning. The full
-Event Alpha pytest package currently collects and passes 647 cases; that count
-includes parametrization and package-only modules not represented as direct
-standalone callables.
+Two integrated-radar burn-downs moved 115 tests without changing the totals
+above. `tests/event_alpha/test_integrated_radar.py` fell from 16,234 to 9,953
+lines. The first four extracted modules are 1,282, 786, 461, and 1,450 lines;
+the validation/review modules are 1,081 and 1,309 lines. No extracted file is
+above the 1,500-line architecture warning. The full Event Alpha pytest package
+currently collects and passes 647 cases; that count includes parametrization
+and package-only modules not represented as direct standalone callables.
 
 ## Remaining Umbrella Sections
 

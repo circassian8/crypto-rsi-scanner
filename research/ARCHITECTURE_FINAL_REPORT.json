@@ -1542,7 +1542,7 @@
       "crypto_rsi_scanner/event_alpha/notifications/pipeline_core.py"
     ],
     "api_total_lines": 0,
-    "generated_at": "2026-07-10T04:22:25+00:00",
+    "generated_at": "2026-07-10T04:30:00+00:00",
     "largest_api_files": [],
     "no_live_provider_calls": true,
     "normal_rsi_signal_rows_written": 0,
@@ -1564,7 +1564,7 @@
   "baseline_line_counts": {
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 36,
     "crypto_rsi_scanner/scanner.py": 90,
-    "tests/test_indicators.py": 1658
+    "tests/test_indicators.py": 1660
   },
   "blockers": [],
   "ci_static_safety": {
@@ -4642,7 +4642,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-10T04:22:30+00:00",
+  "generated_at": "2026-07-10T04:30:05+00:00",
   "generator": "crypto_rsi_scanner.project_health.architecture_report",
   "historical_row_type_alias": "refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
@@ -4910,7 +4910,7 @@
   "largest_test_files": [
     {
       "limit": 1500,
-      "line_count": 12311,
+      "line_count": 9953,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "source_kind": "test"
     },
@@ -4952,7 +4952,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1658,
+      "line_count": 1660,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },
@@ -4976,8 +4976,20 @@
     },
     {
       "limit": 1500,
+      "line_count": 1309,
+      "path": "tests/event_alpha/test_fade_review_workflows.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1282,
       "path": "tests/event_alpha/test_core_opportunities.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1081,
+      "path": "tests/event_alpha/test_fade_validation.py",
       "source_kind": "test"
     },
     {
@@ -5135,18 +5147,6 @@
       "line_count": 1,
       "path": "tests/__init__.py",
       "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1,
-      "path": "tests/cli/__init__.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1,
-      "path": "tests/event_alpha/__init__.py",
-      "source_kind": "test"
     }
   ],
   "line_counts": {
@@ -5157,7 +5157,7 @@
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 36,
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py": 91,
     "crypto_rsi_scanner/scanner.py": 90,
-    "tests/test_indicators.py": 1658
+    "tests/test_indicators.py": 1660
   },
   "line_gates": [
     {
@@ -5173,9 +5173,9 @@
       "target_lines_lt": 2000
     },
     {
-      "baseline_lines": 1658,
+      "baseline_lines": 1660,
       "blocker_reason": "",
-      "current_lines": 1658,
+      "current_lines": 1660,
       "gate_status": "pass",
       "next_migration_module": "tests/rsi, tests/cli, and tests/event_alpha for any remaining umbrella-only cases",
       "path": "tests/test_indicators.py",
@@ -6874,21 +6874,21 @@
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
       "AGENTS.md:1783657113",
-      "ARCHITECTURE_FINAL_REPORT.md:1783657001",
+      "ARCHITECTURE_FINAL_REPORT.md:1783657137",
       "CLAUDE.md:1783278280",
-      "DECISIONS.md:1783657135",
-      "DEVLOG.md:1783657335"
+      "DECISIONS.md:1783657791",
+      "DEVLOG.md:1783657791"
     ],
-    "newest_source_mtime": 1783657345.5120254,
+    "newest_source_mtime": 1783657800.5171204,
     "regex_compile_count": 0,
     "report_mtime": 1783260863.808767,
-    "scan_duration_seconds": 1.196,
+    "scan_duration_seconds": 1.2716,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 51,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
     "scanned_source_files": 627,
-    "scanned_test_files": 41,
+    "scanned_test_files": 43,
     "skipped_artifact_files": 1486,
     "skipped_binary_files": 0,
     "skipped_dir_samples": [
@@ -6910,10 +6910,10 @@
     "skipped_large_files": 1,
     "skipped_suffix_files": 1
   },
-  "shim_dependency_scan_duration_seconds": 1.196,
+  "shim_dependency_scan_duration_seconds": 1.2716,
   "shim_dependency_scanned_doc_files": 51,
   "shim_dependency_scanned_source_files": 627,
-  "shim_dependency_scanned_test_files": 41,
+  "shim_dependency_scanned_test_files": 43,
   "shim_dependency_skipped_artifact_files": 1486,
   "shim_dependency_skipped_large_files": 1,
   "shim_removal_blockers": 0,
@@ -6975,7 +6975,7 @@
     "deleted_shims_count": 124,
     "event_alpha_public_compatibility_entrypoints_path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
     "event_fade_safety_exception_present": true,
-    "generated_at": "2026-07-10T04:22:25.599545+00:00",
+    "generated_at": "2026-07-10T04:30:00.614727+00:00",
     "historical_row_type_alias": "final_refactor_transitional_file_report",
     "migration_named_dirs": [],
     "migration_named_dirs_count": 0,

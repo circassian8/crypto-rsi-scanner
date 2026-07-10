@@ -1544,6 +1544,8 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_canonical_imports",
     "tests.event_alpha.test_core_opportunities",
     "tests.event_alpha.test_core_reconciliation",
+    "tests.event_alpha.test_fade_review_workflows",
+    "tests.event_alpha.test_fade_validation",
     "tests.event_alpha.test_integrated_radar",
     "tests.event_alpha.test_market_surfaces",
     "tests.event_alpha.test_namespace_lifecycle",

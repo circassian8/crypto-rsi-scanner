@@ -1598,7 +1598,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 12311,
+      "line_count": 9953,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "severity": "warning",
       "source_kind": "test",
@@ -1652,7 +1652,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1658,
+      "line_count": 1660,
       "path": "tests/test_indicators.py",
       "severity": "warning",
       "source_kind": "test",
@@ -1710,7 +1710,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 668,
+  "file_count": 670,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -1721,7 +1721,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 12311,
+      "line_count": 9953,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "source_kind": "test"
     },
@@ -1757,7 +1757,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1658,
+      "line_count": 1660,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     }
@@ -1767,7 +1767,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-10T04:22:24.411759+00:00",
+  "generated_at": "2026-07-10T04:29:59.413709+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2015,7 +2015,7 @@
   "largest_test_files": [
     {
       "limit": 1500,
-      "line_count": 12311,
+      "line_count": 9953,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "source_kind": "test"
     },
@@ -2057,7 +2057,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1658,
+      "line_count": 1660,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },
@@ -2081,8 +2081,20 @@
     },
     {
       "limit": 1500,
+      "line_count": 1309,
+      "path": "tests/event_alpha/test_fade_review_workflows.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1282,
       "path": "tests/event_alpha/test_core_opportunities.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1081,
+      "path": "tests/event_alpha/test_fade_validation.py",
       "source_kind": "test"
     },
     {
@@ -2239,18 +2251,6 @@
       "limit": 1500,
       "line_count": 1,
       "path": "tests/__init__.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1,
-      "path": "tests/cli/__init__.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1,
-      "path": "tests/event_alpha/__init__.py",
       "source_kind": "test"
     }
   ],
@@ -4551,7 +4551,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 12311,
+      "line_count": 9953,
       "path": "tests/event_alpha/test_integrated_radar.py",
       "severity": "warning",
       "source_kind": "test",
@@ -4605,7 +4605,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1658,
+      "line_count": 1660,
       "path": "tests/test_indicators.py",
       "severity": "warning",
       "source_kind": "test",

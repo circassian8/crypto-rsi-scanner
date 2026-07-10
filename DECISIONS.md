@@ -30,7 +30,9 @@ and mixed core-store, reconciliation, operator-identity, provider, and market
 surface regressions. A naive move into another multi-thousand-line file would
 only relocate the warning; four focused modules reduced the monolith by 3,923
 lines without creating another over-1,500 file or weakening the compatibility
-runner.
+runner. A second validation/review split applied the same rule to 45 tests,
+reducing the monolith again from 12,311 to 9,953 lines while producing 1,081-
+and 1,309-line modules and preserving all 240 integrated-radar test identities.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.

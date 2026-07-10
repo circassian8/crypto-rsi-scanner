@@ -405,7 +405,7 @@
   "event_alpha_public_compatibility_entrypoints_manifest": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
   "event_fade_safety_exception_present": true,
   "functions_over_150_lines": 0,
-  "generated_at": "2026-07-10T04:22:30.704550+00:00",
+  "generated_at": "2026-07-10T04:30:05.858442+00:00",
   "historical_row_type_alias": "refactor_v4_final_report",
   "model_bundles": [
     {
