@@ -218,7 +218,7 @@
     },
     "remaining_api_unregistered_details": []
   },
-  "generated_at": "2026-07-10T07:25:36+00:00",
+  "generated_at": "2026-07-10T07:29:12+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_release_candidate_report",
   "known_remaining_blockers": [],

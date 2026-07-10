@@ -66,7 +66,7 @@ final-status, and removal-candidate reports belongs in
 scanning, counters, persistence, and CLI behavior and re-exports all established
 formatter names plus `LEGACY_IMPORT_COMPATIBILITY_TEST`.
 **Why:** The safety-critical tombstone registry was 1,431 lines and mixed pure
-presentation with filesystem/import auditing. The split yields 1,163- and
+presentation with filesystem/import auditing. The split yields 1,169- and
 286-line modules while all five rendered reports remain byte-for-byte identical.
 **Revisit when:** A structured report schema replaces Markdown or the deleted
 shim tombstone system is explicitly retired.

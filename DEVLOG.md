@@ -99,7 +99,7 @@ tombstone/import audits with 268 lines of pure Markdown rendering.
 - Added `shim_formatting.py` for the five registry/dependency/old-import/final-
   status/removal-candidate formatters and the compatibility-test path constant.
 - Re-exported all established names through `shims.py`; the audit module fell
-  to 1,163 lines and the formatter module is 286 lines.
+  to 1,169 lines and the formatter module is 286 lines.
 - Updated the roadmap and durable ownership decision, then regenerated the
   canonical architecture reports.
 **Verify:** All five current report formats matched the pre-change implementation
