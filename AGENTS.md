@@ -281,7 +281,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --universe-audit` (latest hygiene audit)
 - **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
   API + integrity check + retention); `main.py --verify-restore` restore-checks
-  the newest retained backup.
+  the newest retained backup. Retained backup `.db` files are immutable,
+  standalone snapshots: verification must use read-only immutable SQLite URIs,
+  refuse a non-empty backup WAL, and never create `-wal`/`-shm` sidecars.
+  Retention removes sidecars paired with pruned snapshots, and `main.py --status`
+  reports any sidecar or interrupted-temp debris instead of hiding it.
 - **Ops maintenance:** `make status` shows scan, backup, and log health;
   `make maintenance` runs backup + restore drill + log rotation; `make rotate-logs`
   copy-truncates oversized logs; `make install-maintenance-agent` installs the

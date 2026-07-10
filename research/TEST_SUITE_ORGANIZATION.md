@@ -1,6 +1,6 @@
 # Test Suite Organization
 
-Date: 2026-07-02
+Date: 2026-07-10
 
 This document records the pytest-compatible split of the historical
 `tests/test_indicators.py` standalone runner.
@@ -10,6 +10,7 @@ This document records the pytest-compatible split of the historical
 | path | role |
 |---|---|
 | `tests/test_indicators.py` | Umbrella compatibility runner plus remaining ops/config/storage tests. Running it directly still executes the split Event Alpha, RSI, and CLI packages. |
+| `tests/rsi/test_backups.py` | SQLite online-backup, immutable restore, retention, debris visibility, and backup-status regressions. |
 | `tests/rsi/test_indicators_core.py` | Pure RSI math, scanner scoring, setup/tier/regime, state features, and universe hygiene tests. |
 | `tests/rsi/test_backtest.py` | Backtest edge, state-slice, PIT/volume membership, cache, fixture-loader, and CLI-argument regressions. |
 | `tests/rsi/test_paper_risk.py` | Outcome grading, paper scoreboard, refresh-paper, and risk/rendering guard tests. |
@@ -40,16 +41,17 @@ release guard.
 
 ## Size Gate
 
-Before this pass, `tests/test_indicators.py` was 4,987 lines after the Event
-Alpha split. It is now 1,770 lines and reports these standalone counts:
+After the Event Alpha and base-suite splits, `tests/test_indicators.py` was
+1,784 lines immediately before the focused backup-test move. It is now 1,654
+lines and reports these standalone counts:
 
 | count | value |
 |---|---:|
-| standalone_tests | 717 |
-| event_alpha_tests | 559 |
-| rsi_tests | 97 |
-| cli_tests | 17 |
-| umbrella_tests | 44 |
+| standalone_tests | 784 |
+| event_alpha_tests | 592 |
+| rsi_tests | 109 |
+| cli_tests | 42 |
+| umbrella_tests | 41 |
 
 The architecture baseline final-phase gate for `tests/test_indicators.py` is below
 2,000 lines, so the umbrella runner now satisfies that size target.
@@ -61,7 +63,7 @@ in place for a later, narrower pass:
 
 - Config and dotenv parsing.
 - Storage, subscriber, Telegram formatting, bot command, and heartbeat tests.
-- Backup, restore drill, status, log rotation, launchd, and maintenance helper tests.
+- Log rotation, launchd, and remaining maintenance helper tests.
 - CoinGecko fixture-client and SQLite WAL/busy-timeout checks.
 - Historical helper definitions that are still useful for standalone compatibility
   until the ops/storage packages receive focused pytest homes.

@@ -34,6 +34,8 @@ class BackupStatus:
     age_hours: float | None
     size_bytes: int
     count: int
+    sidecar_count: int
+    temporary_count: int
     stale_after_hours: float
 
     @property
@@ -51,6 +53,10 @@ class BackupStatus:
         if self.stale:
             return "STALE"
         return "OK"
+
+    @property
+    def debris_count(self) -> int:
+        return self.sidecar_count + self.temporary_count
 
 
 @dataclass(frozen=True)
@@ -93,9 +99,47 @@ def _file_time(path: Path) -> datetime | None:
         return None
 
 
+def _immutable_read_uri(path: Path) -> str:
+    """Return a read-only SQLite URI that cannot create WAL/SHM sidecars."""
+    return f"{path.resolve().as_uri()}?mode=ro&immutable=1"
+
+
+def _sqlite_sidecars(path: Path) -> tuple[Path, Path]:
+    return Path(f"{path}-wal"), Path(f"{path}-shm")
+
+
+def _assert_no_pending_wal(path: Path) -> None:
+    wal, _ = _sqlite_sidecars(path)
+    try:
+        wal_size = wal.stat().st_size
+    except FileNotFoundError:
+        return
+    if wal_size:
+        raise RuntimeError(
+            f"backup has a non-empty WAL sidecar ({wal_size} bytes): {wal}"
+        )
+
+
+def _backup_debris_counts(backup_dir: Path, source_stem: str) -> tuple[int, int]:
+    if not backup_dir.exists():
+        return 0, 0
+    sidecars = {
+        *backup_dir.glob(f"{source_stem}-*.db-wal"),
+        *backup_dir.glob(f"{source_stem}-*.db-shm"),
+    }
+    temporary = {
+        *backup_dir.glob(f"{source_stem}-*.db.tmp"),
+        *backup_dir.glob(f"{source_stem}-*.db.tmp-wal"),
+        *backup_dir.glob(f"{source_stem}-*.db.tmp-shm"),
+    }
+    return len(sidecars), len(temporary)
+
+
 def verify_backup(path: Path) -> str:
     """Open a backup and run SQLite's integrity check."""
-    conn = sqlite3.connect(str(path))
+    path = Path(path).expanduser()
+    _assert_no_pending_wal(path)
+    conn = sqlite3.connect(_immutable_read_uri(path), uri=True)
     try:
         row = conn.execute("PRAGMA integrity_check").fetchone()
         result = str(row[0]) if row else ""
@@ -125,7 +169,8 @@ def verify_restore(
 
     with tempfile.TemporaryDirectory(prefix="rsi-restore-drill-") as tmpdir:
         restored = Path(tmpdir) / "restore.db"
-        src = sqlite3.connect(f"file:{backup_path}?mode=ro", uri=True, timeout=30.0)
+        _assert_no_pending_wal(backup_path)
+        src = sqlite3.connect(_immutable_read_uri(backup_path), uri=True, timeout=30.0)
         dst = sqlite3.connect(str(restored))
         try:
             src.execute("PRAGMA busy_timeout=30000")
@@ -165,6 +210,8 @@ def prune_backups(backup_dir: Path, source_stem: str, keep: int) -> tuple[Path, 
     deleted: list[Path] = []
     for path in extra:
         path.unlink(missing_ok=True)
+        for sidecar in _sqlite_sidecars(path):
+            sidecar.unlink(missing_ok=True)
         deleted.append(path)
     return tuple(deleted)
 
@@ -238,6 +285,7 @@ def latest_backup_status(
     backup_dir = Path(backup_dir).expanduser()
     backups = sorted(backup_dir.glob(f"{source.stem}-*.db")) if backup_dir.exists() else []
     if not backups:
+        sidecar_count, temporary_count = _backup_debris_counts(backup_dir, source.stem)
         return BackupStatus(
             backup_dir=backup_dir,
             source_stem=source.stem,
@@ -246,6 +294,8 @@ def latest_backup_status(
             age_hours=None,
             size_bytes=0,
             count=0,
+            sidecar_count=sidecar_count,
+            temporary_count=temporary_count,
             stale_after_hours=stale_after_hours,
         )
 
@@ -258,6 +308,7 @@ def latest_backup_status(
     age_hours = None
     if created_at is not None:
         age_hours = max(0.0, (now - created_at.astimezone(timezone.utc)).total_seconds() / 3600.0)
+    sidecar_count, temporary_count = _backup_debris_counts(backup_dir, source.stem)
     return BackupStatus(
         backup_dir=backup_dir,
         source_stem=source.stem,
@@ -266,6 +317,8 @@ def latest_backup_status(
         age_hours=age_hours,
         size_bytes=latest.stat().st_size,
         count=len(backups),
+        sidecar_count=sidecar_count,
+        temporary_count=temporary_count,
         stale_after_hours=stale_after_hours,
     )
 

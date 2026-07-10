@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Treat retained SQLite backups as immutable standalone snapshots
+**Status:** accepted
+**Decision:** Backup creation still uses SQLite's online backup API, but every
+retained backup must be verified and restored through a read-only immutable URI
+that cannot create WAL/SHM sidecars. A non-empty backup WAL blocks verification
+rather than being ignored. Retention deletes sidecars paired with a pruned
+snapshot, and operational status reports all matching sidecar and interrupted
+temporary files as backup debris. Do not delete retained backup databases or
+performance/research caches merely because they are ignored runtime state.
+**Why:** The live directory contained exactly 14 valid retained databases but
+also 34 WAL/SHM pairs. Restore checks had created one pair per WAL-mode snapshot,
+and retention removed old `.db` files without their sidecars, leaving 20 orphan
+pairs. All WALs were empty and all retained databases independently passed
+integrity checks, so the debris was harmless but invisible to the previous
+healthy status report.
+**Revisit when:** Backups become writable by design, move to managed/encrypted
+storage, or concurrent restore consumers require a different immutable snapshot
+protocol.
+
 ## 2026-07-10 - Pin every third-party GitHub Action to a release commit
 **Status:** accepted
 **Decision:** Workflow `uses:` references for third-party actions must use the

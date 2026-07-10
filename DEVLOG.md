@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Eliminate backup sidecar debris and harden restore checks · Codex
+**Why:** Operational status reported the intended 14/14 retained backups as
+healthy while `backups/` actually held 82 files. The extra files needed to be
+classified and resolved without risking live SQLite state or useful research
+caches.
+**Changes:**
+- Performed a metadata-only inventory: 14 retained `.db` snapshots, 34 zero-byte
+  WAL files, and 34 SHM files. Twenty WAL/SHM pairs were orphaned after their base
+  snapshots aged out; restore verification had created the pairs by opening
+  WAL-mode backups without immutable semantics.
+- Changed backup integrity and restore sources to read-only immutable SQLite
+  URIs, added a hard refusal for non-empty backup WALs, made retention remove
+  sidecars paired with pruned databases, and exposed sidecar/interrupted-temp
+  counts in operational status.
+- Verified all 14 databases and the newest four-table restore before removing
+  only the 68 proven sidecars. Also removed five `.DS_Store` files; retained
+  backups, the live DB/WAL/SHM, logs, backtest cache, Event Alpha evidence cache,
+  environment, and research artifacts were not deleted or rewritten.
+- Moved the three backup/restore/status tests into focused
+  `tests/rsi/test_backups.py`, added WAL-mode/no-side-effect, non-empty-WAL,
+  sidecar-pruning, and debris-reporting regressions, registered the module with
+  the standalone runner, and reduced `tests/test_indicators.py` to 1,654 lines.
+**Verify:** The focused backup/security/ops suite passed (`6 passed`). All 14
+retained backups returned `integrity_check=ok`; the newest restore drill passed
+the four expected tables before and after cleanup; final state is `OK`, 14/14
+retained, 14 total backup files, and zero sidecar/temp debris. `make verify-fast
+PYTHON=.venv/bin/python` passed `858 tests`, alert rendering, the 33-observation
+fixture backtest, and the paper scoreboard. Compileall and `git diff --check`
+passed, and the broad gate left tracked status and debris counts unchanged.
+**Notes/risks:** No scanner, signal, notification, or Event Alpha behavior
+changed. Full `make verify` was not repeated because `verify-fast` ran the full
+pytest package and all runtime smokes; only the duplicate standalone execution
+was omitted. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Pin GitHub Actions and remove Node 20 deprecation · Codex
 **Why:** The new Python parity run passed but GitHub warned that
 `actions/checkout@v4` and `actions/setup-python@v5` target deprecated Node 20

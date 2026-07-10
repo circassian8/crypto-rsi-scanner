@@ -193,6 +193,14 @@ def format_status(storage, now: datetime | None = None) -> str:
             f"({_fmt_age(backup.age_hours)}, {format_bytes(backup.size_bytes)}, "
             f"{backup.count}/{s['backup_keep']} retained)"
         )
+    if backup.debris_count:
+        lines.append(
+            "backup debris: WARNING "
+            f"{backup.sidecar_count} sidecar(s), "
+            f"{backup.temporary_count} temporary file(s)"
+        )
+    else:
+        lines.append("backup debris: clean")
     lines.append(f"backup stale threshold: {backup.stale_after_hours:.0f}h")
 
     logs = s["logs"]

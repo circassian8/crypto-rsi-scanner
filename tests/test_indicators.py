@@ -1095,135 +1095,6 @@ def test_scan_status_failure_and_bot_health_escapes():
         st.close()
 
 
-def test_sqlite_backup_api_integrity_and_retention():
-    import sqlite3
-    import tempfile
-    from datetime import datetime, timezone
-    from pathlib import Path
-
-    from crypto_rsi_scanner.backups import backup_database
-
-    root = Path(tempfile.mkdtemp())
-    src = root / "source.db"
-    backup_dir = root / "backups"
-    conn = sqlite3.connect(src)
-    conn.execute("CREATE TABLE sample (id INTEGER PRIMARY KEY, value TEXT)")
-    conn.execute("INSERT INTO sample (value) VALUES ('ok')")
-    conn.commit()
-    conn.close()
-
-    result = backup_database(
-        src,
-        backup_dir,
-        keep=2,
-        now=datetime(2026, 6, 8, 1, 2, 3, tzinfo=timezone.utc),
-    )
-    assert result.path.exists()
-    assert result.quick_check == "ok"
-    copied = sqlite3.connect(result.path)
-    try:
-        assert copied.execute("SELECT value FROM sample").fetchone()[0] == "ok"
-    finally:
-        copied.close()
-
-    backup_database(src, backup_dir, keep=2, now=datetime(2026, 6, 8, 1, 2, 4, tzinfo=timezone.utc))
-    third = backup_database(src, backup_dir, keep=2, now=datetime(2026, 6, 8, 1, 2, 5, tzinfo=timezone.utc))
-    backups = sorted(backup_dir.glob("source-*.db"))
-    assert len(backups) == 2
-    assert backups[-1] == third.path
-    assert not result.path.exists()
-
-
-def test_sqlite_restore_drill_checks_schema_counts():
-    import sqlite3
-    import tempfile
-    from datetime import datetime, timezone
-    from pathlib import Path
-
-    from crypto_rsi_scanner.backups import backup_database, format_restore_result, verify_restore
-
-    root = Path(tempfile.mkdtemp())
-    src = root / "source.db"
-    backup_dir = root / "backups"
-    conn = sqlite3.connect(src)
-    conn.execute("CREATE TABLE scans (id INTEGER PRIMARY KEY)")
-    conn.execute("CREATE TABLE signals (id INTEGER PRIMARY KEY)")
-    conn.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT)")
-    conn.execute("CREATE TABLE paper_trades (id INTEGER PRIMARY KEY)")
-    conn.execute("INSERT INTO scans DEFAULT VALUES")
-    conn.execute("INSERT INTO meta (key, value) VALUES ('k', 'v')")
-    conn.commit()
-    conn.close()
-
-    backup = backup_database(
-        src,
-        backup_dir,
-        now=datetime(2026, 6, 8, 2, 0, 0, tzinfo=timezone.utc),
-    )
-    result = verify_restore(
-        backup.path,
-        expected_tables=("scans", "signals", "meta", "paper_trades"),
-    )
-    assert result.quick_check == "ok"
-    assert result.table_counts["scans"] == 1
-    assert result.table_counts["meta"] == 1
-    assert "SQLite restore drill complete" in format_restore_result(result)
-
-
-def test_backup_freshness_status_report():
-    import sqlite3
-    import tempfile
-    from datetime import datetime, timedelta, timezone
-    from pathlib import Path
-
-    from crypto_rsi_scanner import config, status_report
-    from crypto_rsi_scanner.backups import backup_database
-
-    root = Path(tempfile.mkdtemp())
-    src = root / "rsi_scanner.db"
-    backup_dir = root / "backups"
-    conn = sqlite3.connect(src)
-    conn.execute("CREATE TABLE sample (id INTEGER PRIMARY KEY)")
-    conn.commit()
-    conn.close()
-
-    st = _fresh_storage()
-    orig_db = config.DB_PATH
-    orig_dir = config.BACKUP_DIR
-    orig_keep = config.BACKUP_KEEP
-    orig_stale = config.BACKUP_STALE_HOURS
-    orig_logs = config.LOG_FILES
-    config.DB_PATH = src
-    config.BACKUP_DIR = backup_dir
-    config.BACKUP_KEEP = 2
-    config.BACKUP_STALE_HOURS = 24
-    config.LOG_FILES = []
-    try:
-        created = datetime(2026, 6, 8, 1, 0, 0, tzinfo=timezone.utc)
-        backup_database(src, backup_dir, keep=2, now=created)
-
-        fresh = status_report.format_status(st, now=created + timedelta(hours=2))
-        assert "backup: OK" in fresh
-        assert "rsi_scanner-20260608T010000Z.db" in fresh
-        assert "2.0h ago" in fresh
-        assert "1/2 retained" in fresh
-
-        stale = status_report.format_status(st, now=created + timedelta(hours=25))
-        assert "backup: STALE" in stale
-
-        config.BACKUP_DIR = root / "empty"
-        missing = status_report.format_status(st, now=created + timedelta(hours=2))
-        assert "backup: MISSING" in missing
-        assert "run main.py --backup-db" in missing
-    finally:
-        config.DB_PATH = orig_db
-        config.BACKUP_DIR = orig_dir
-        config.BACKUP_KEEP = orig_keep
-        config.BACKUP_STALE_HOURS = orig_stale
-        config.LOG_FILES = orig_logs
-        st.close()
-
-
 def test_log_rotation_copytruncate_and_retention():
     import tempfile
     from datetime import datetime, timezone
@@ -1682,6 +1553,7 @@ _EVENT_ALPHA_TEST_MODULES = (
 )
 
 _RSI_TEST_MODULES = (
+    "tests.rsi.test_backups",
     "tests.rsi.test_backtest",
     "tests.rsi.test_indicators_core",
     "tests.rsi.test_paper_risk",
