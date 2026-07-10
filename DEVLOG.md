@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split integrated-radar impact-hypothesis tests · Codex
+**Why:** The 4,740-line monolith still contained one contiguous pure
+impact-hypothesis lifecycle from seed generation through verdict/watchlist
+identity and external-entity exclusion.
+**Changes:**
+- Moved 9 tests covering seed categories/search queries, contextual matching,
+  validated-news category refinement, resolver/identity safety, real impact vs
+  co-occurrence, upgrade/downgrade persistence, incident-confidence verdicts,
+  validated-asset watchlist selection, and external-entity exclusion into
+  `test_impact_hypotheses.py` (920 lines).
+- Registered the module with the standalone compatibility runner. The source
+  monolith fell from 4,740 to 3,832 lines; its pre-split 52 names remain exact
+  and unique across the two files (sorted-name SHA-256 `23f14d97...`).
+- Updated the roadmap, durable split evidence, and test-organization map.
+**Verify:** The extracted module passed all 9 tests and all 9 passed through the
+standalone adapter. The complete source-plus-extracted surface passed all 52
+tests in 1.78s. Standalone discovery remains 786 total / 594 Event Alpha / 109
+RSI / 42 CLI / 41 umbrella tests. Compileall and `git diff --check` passed. The
+already-green 650-test Event Alpha package was not redundantly rerun for this
+exact, test-only move.
+**Notes/risks:** Test organization and documentation only; no hypothesis,
+validation, verdict, watchlist, resolver, radar, notification, signal, paper,
+trade, or execution behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split integrated-radar market and playbook tests · Codex
 **Why:** The 5,634-line monolith still mixed market enrichment/anomaly lifecycle
 with deterministic playbook classification and catalyst graph behavior.

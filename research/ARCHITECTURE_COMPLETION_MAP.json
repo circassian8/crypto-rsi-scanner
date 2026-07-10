@@ -299,7 +299,7 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-10T05:18:11+00:00",
+  "generated_at": "2026-07-10T05:21:24+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
@@ -731,12 +731,6 @@
       },
       {
         "limit": 1500,
-        "line_count": 4740,
-        "path": "tests/event_alpha/test_integrated_radar.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
         "line_count": 4082,
         "path": "tests/event_alpha/test_outcomes.py",
         "source_kind": "test"
@@ -745,6 +739,12 @@
         "limit": 1500,
         "line_count": 4052,
         "path": "tests/event_alpha/test_artifact_doctor.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 3832,
+        "path": "tests/event_alpha/test_integrated_radar.py",
         "source_kind": "test"
       },
       {
@@ -761,7 +761,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 1669,
+        "line_count": 1670,
         "path": "tests/test_indicators.py",
         "source_kind": "test"
       },
@@ -811,6 +811,12 @@
         "limit": 1500,
         "line_count": 942,
         "path": "tests/event_alpha/test_llm_radar.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 920,
+        "path": "tests/event_alpha/test_impact_hypotheses.py",
         "source_kind": "test"
       },
       {
@@ -949,12 +955,6 @@
         "limit": 1500,
         "line_count": 115,
         "path": "tests/event_alpha/test_integrated_merge_policy.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 103,
-        "path": "tests/cli/test_event_alpha_operator_command_smoke.py",
         "source_kind": "test"
       }
     ],

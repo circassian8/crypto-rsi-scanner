@@ -1524,7 +1524,7 @@
       "crypto_rsi_scanner/event_alpha/notifications/pipeline_core.py"
     ],
     "api_total_lines": 0,
-    "generated_at": "2026-07-10T05:17:59+00:00",
+    "generated_at": "2026-07-10T05:21:12+00:00",
     "largest_api_files": [],
     "no_live_provider_calls": true,
     "normal_rsi_signal_rows_written": 0,
@@ -1546,7 +1546,7 @@
   "baseline_line_counts": {
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 36,
     "crypto_rsi_scanner/scanner.py": 90,
-    "tests/test_indicators.py": 1669
+    "tests/test_indicators.py": 1670
   },
   "blockers": [],
   "ci_static_safety": {
@@ -4610,7 +4610,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-10T05:18:04+00:00",
+  "generated_at": "2026-07-10T05:21:17+00:00",
   "generator": "crypto_rsi_scanner.project_health.architecture_report",
   "historical_row_type_alias": "refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
@@ -4890,12 +4890,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 4740,
-      "path": "tests/event_alpha/test_integrated_radar.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
       "line_count": 4082,
       "path": "tests/event_alpha/test_outcomes.py",
       "source_kind": "test"
@@ -4904,6 +4898,12 @@
       "limit": 1500,
       "line_count": 4052,
       "path": "tests/event_alpha/test_artifact_doctor.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 3832,
+      "path": "tests/event_alpha/test_integrated_radar.py",
       "source_kind": "test"
     },
     {
@@ -4920,7 +4920,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1669,
+      "line_count": 1670,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },
@@ -4970,6 +4970,12 @@
       "limit": 1500,
       "line_count": 942,
       "path": "tests/event_alpha/test_llm_radar.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 920,
+      "path": "tests/event_alpha/test_impact_hypotheses.py",
       "source_kind": "test"
     },
     {
@@ -5109,12 +5115,6 @@
       "line_count": 115,
       "path": "tests/event_alpha/test_integrated_merge_policy.py",
       "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 103,
-      "path": "tests/cli/test_event_alpha_operator_command_smoke.py",
-      "source_kind": "test"
     }
   ],
   "line_counts": {
@@ -5125,7 +5125,7 @@
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 36,
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py": 91,
     "crypto_rsi_scanner/scanner.py": 90,
-    "tests/test_indicators.py": 1669
+    "tests/test_indicators.py": 1670
   },
   "line_gates": [
     {
@@ -5141,9 +5141,9 @@
       "target_lines_lt": 2000
     },
     {
-      "baseline_lines": 1669,
+      "baseline_lines": 1670,
       "blocker_reason": "",
-      "current_lines": 1669,
+      "current_lines": 1670,
       "gate_status": "pass",
       "next_migration_module": "tests/rsi, tests/cli, and tests/event_alpha for any remaining umbrella-only cases",
       "path": "tests/test_indicators.py",
@@ -6828,21 +6828,21 @@
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
       "AGENTS.md:1783659174",
-      "ARCHITECTURE_FINAL_REPORT.md:1783660249",
+      "ARCHITECTURE_FINAL_REPORT.md:1783660439",
       "CLAUDE.md:1783278280",
-      "DECISIONS.md:1783660659",
-      "DEVLOG.md:1783660659"
+      "DECISIONS.md:1783660848",
+      "DEVLOG.md:1783660848"
     ],
-    "newest_source_mtime": 1783660679.3058364,
+    "newest_source_mtime": 1783660872.2915492,
     "regex_compile_count": 0,
     "report_mtime": 1783260863.808767,
-    "scan_duration_seconds": 1.1713,
+    "scan_duration_seconds": 1.1669,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 51,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
     "scanned_source_files": 629,
-    "scanned_test_files": 52,
+    "scanned_test_files": 53,
     "skipped_artifact_files": 1486,
     "skipped_binary_files": 0,
     "skipped_dir_samples": [
@@ -6864,10 +6864,10 @@
     "skipped_large_files": 1,
     "skipped_suffix_files": 1
   },
-  "shim_dependency_scan_duration_seconds": 1.1713,
+  "shim_dependency_scan_duration_seconds": 1.1669,
   "shim_dependency_scanned_doc_files": 51,
   "shim_dependency_scanned_source_files": 629,
-  "shim_dependency_scanned_test_files": 52,
+  "shim_dependency_scanned_test_files": 53,
   "shim_dependency_skipped_artifact_files": 1486,
   "shim_dependency_skipped_large_files": 1,
   "shim_removal_blockers": 0,
@@ -6929,7 +6929,7 @@
     "deleted_shims_count": 124,
     "event_alpha_public_compatibility_entrypoints_path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
     "event_fade_safety_exception_present": true,
-    "generated_at": "2026-07-10T05:17:59.387375+00:00",
+    "generated_at": "2026-07-10T05:21:12.373375+00:00",
     "historical_row_type_alias": "final_refactor_transitional_file_report",
     "migration_named_dirs": [],
     "migration_named_dirs_count": 0,
