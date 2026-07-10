@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Make daily burn-in contract checks hermetic · Codex
+**Why:** A focused candidate-mode test passed while silently rewriting the two
+tracked Event Alpha burn-in contract reports with a fresh `generated_at`, so
+local and GitHub verification could leave a dirty checkout despite green tests.
+**Changes:**
+- Replaced the daily burn-in contract-generation subprocess with a read-only
+  `--check-burn-in-contract` command. It validates the authored JSON/Markdown,
+  schema, six lanes, no-auto-apply posture, and zero-side-effect safety fields
+  without writing files.
+- Kept `make event-alpha-radar-north-star` and
+  `make event-alpha-burn-in-contract` as the explicit contract authoring paths;
+  daily, smoke, candidate-mode, and test runs now only consume/check them.
+- Added a fake-repository sentinel regression that runs the real subprocess
+  smoke, proves both contract files remain byte-identical, and keeps runtime
+  artifacts in the temporary artifact base. Added invalid-contract and command
+  wiring coverage in focused test modules without creating new size-gate debt.
+- Updated the working agreement, durable decision, and roadmap so tracked
+  contracts/reports cannot be regenerated as an incidental verification side
+  effect.
+**Verify:** The focused burn-in suites passed (`55 passed`), the CLI and
+project-health suite passed (`26 passed`), the original candidate-mode
+reproduction passed with both tracked contract hashes unchanged, compileall and
+`git diff --check` passed, and `make verify-fast PYTHON=.venv/bin/python` passed
+(`854 passed`, alert render smoke, 33-observation backtest fixture, paper
+scoreboard). The tracked status was byte-for-byte unchanged by the broad gate.
+**Notes/risks:** Full `make verify` was intentionally not repeated because
+`verify-fast` ran the complete pytest package plus all runtime smokes and only
+omits the duplicate standalone compatibility runner. GitHub status is reported
+after push but is not awaited.
+
 ## 2026-07-10 — Audit and surface extreme paper outcomes · Codex
 **Why:** The project audit found that a handful of high-volatility names
 dominated paper averages/equity and required an identity, price, and

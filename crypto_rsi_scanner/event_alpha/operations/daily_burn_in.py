@@ -99,7 +99,7 @@ def build_steps(
 def _contract_step(python: str, report_timeout_seconds: float) -> BurnInStep:
     return BurnInStep(
         "burn_in_contract",
-        (python, "-m", "crypto_rsi_scanner.project_health.radar_north_star", "--burn-in-contract-only"),
+        (python, "-m", "crypto_rsi_scanner.project_health.radar_north_star", "--check-burn-in-contract"),
         timeout_seconds=report_timeout_seconds,
     )
 

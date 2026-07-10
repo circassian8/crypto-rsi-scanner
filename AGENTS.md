@@ -654,6 +654,12 @@ work.
   changes and periodic full sweeps, but ordinary small prompts should use
   targeted tests plus relevant smokes. If you skip full `make verify`, say
   exactly why.
+- Verification and runtime commands must not rewrite tracked contracts or
+  reports incidentally. `make event-alpha-radar-north-star` and
+  `make event-alpha-burn-in-contract` are the explicit Event Alpha contract
+  authoring paths; daily burn-in uses `--check-burn-in-contract`. Test real
+  subprocess behavior against temporary/fake repository roots and assert
+  tracked or sentinel bytes remain unchanged.
 - Storage: additive `ALTER` in `_migrate`; bump a `meta` flag for one-time data
   migrations so they run exactly once.
 - External calls **fail soft** (log + degrade; never crash the scan).

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -485,6 +486,76 @@ def write_burn_in_contract(
     return json_path, md_path, payload
 
 
+def check_burn_in_contract(
+    *,
+    root: str | Path | None = None,
+    out_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    """Validate the authored burn-in contract without rewriting it."""
+    repo_root = Path(root).expanduser() if root is not None else repo_root_from_module()
+    target = Path(out_dir).expanduser() if out_dir is not None else repo_root / "research"
+    json_path = target / BURN_IN_CONTRACT_JSON
+    md_path = target / BURN_IN_CONTRACT_MD
+    errors: list[str] = []
+    payload: Mapping[str, Any] | None = None
+    if not json_path.is_file():
+        errors.append("burn_in_contract_json_missing")
+    else:
+        try:
+            loaded = json.loads(json_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, Mapping):
+                payload = loaded
+            else:
+                errors.append("burn_in_contract_json_not_object")
+        except (OSError, json.JSONDecodeError):
+            errors.append("burn_in_contract_json_invalid")
+    markdown: str | None = None
+    if not md_path.is_file():
+        errors.append("burn_in_contract_markdown_missing")
+    else:
+        try:
+            markdown = md_path.read_text(encoding="utf-8")
+        except OSError:
+            errors.append("burn_in_contract_markdown_unreadable")
+    if payload is not None:
+        if payload.get("schema_version") != "event_alpha_burn_in_contract_v1":
+            errors.append("burn_in_contract_schema_invalid")
+        if payload.get("row_type") != "event_alpha_burn_in_contract":
+            errors.append("burn_in_contract_row_type_invalid")
+        if payload.get("auto_apply_thresholds") is not False:
+            errors.append("burn_in_contract_auto_apply_not_false")
+        lanes = payload.get("opportunity_lanes") if isinstance(payload.get("opportunity_lanes"), Mapping) else {}
+        missing_lanes = [lane for lane in LANE_NAMES if lane not in lanes]
+        if missing_lanes:
+            errors.append("burn_in_contract_lanes_missing:" + ",".join(missing_lanes))
+        for field in (
+            "research_only",
+            "no_send_rehearsal",
+        ):
+            if payload.get(field) is not True:
+                errors.append(f"burn_in_contract_{field}_not_true")
+        for field in (
+            "strict_alerts_created",
+            "telegram_sends",
+            "trades_created",
+            "paper_trades_created",
+            "normal_rsi_signal_rows_written",
+            "triggered_fade_created",
+        ):
+            if type(payload.get(field)) is not int or payload.get(field) != 0:
+                errors.append(f"burn_in_contract_{field}_not_zero")
+        if markdown is not None and markdown != format_burn_in_contract(payload):
+            errors.append("burn_in_contract_markdown_out_of_sync")
+    return {
+        "valid": not errors,
+        "json_path": json_path.as_posix(),
+        "markdown_path": md_path.as_posix(),
+        "schema_version": payload.get("schema_version") if payload is not None else None,
+        "auto_apply_thresholds": payload.get("auto_apply_thresholds") if payload is not None else None,
+        "errors": errors,
+    }
+
+
 def north_star_status(*, root: str | Path | None = None) -> dict[str, Any]:
     repo_root = Path(root).expanduser() if root is not None else repo_root_from_module()
     research = repo_root / "research"
@@ -706,10 +777,24 @@ def _burn_in(payload: Mapping[str, Any]) -> Mapping[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Write the Event Alpha Radar North Star contract.")
+    parser = argparse.ArgumentParser(description="Write or validate the Event Alpha Radar North Star contract.")
     parser.add_argument("--out-dir", default="research")
-    parser.add_argument("--burn-in-contract-only", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--burn-in-contract-only", action="store_true")
+    mode.add_argument("--check-burn-in-contract", action="store_true")
     args = parser.parse_args(argv)
+    if args.check_burn_in_contract:
+        status = check_burn_in_contract(out_dir=args.out_dir)
+        print(status["json_path"])
+        print(status["markdown_path"])
+        print(f"schema_version={status['schema_version']}")
+        print(f"auto_apply_thresholds={status['auto_apply_thresholds']}")
+        if status["errors"]:
+            print("burn_in_contract_check=failed:" + ",".join(status["errors"]), file=sys.stderr)
+            return 1
+        print("burn_in_contract_check=passed")
+        print("No files, providers, Telegram sends, trades, paper trades, RSI rows, or Event Alpha TRIGGERED_FADE were changed.")
+        return 0
     if args.burn_in_contract_only:
         json_path, md_path, payload = write_burn_in_contract(out_dir=args.out_dir)
         print(json_path)

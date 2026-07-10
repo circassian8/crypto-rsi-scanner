@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Tracked contracts and reports require explicit authoring commands
+**Status:** accepted
+**Decision:** Tests, verification gates, daily burn-in, and other runtime paths
+must not regenerate tracked research contracts or reports as a side effect. The
+Event Alpha North Star and burn-in contract may be rewritten only through their
+explicit authoring targets. Daily burn-in must use the read-only contract check,
+and subprocess regressions for this boundary must run against temporary or fake
+repository roots with byte-preservation assertions.
+**Why:** The candidate-mode fixture smoke was green while its contract step
+rewrote `research/event_alpha_burn_in_contract.json` and `.md` solely to refresh
+`generated_at`. That made verification non-hermetic, dirtied developer and CI
+checkouts, and blurred the boundary between an authored policy contract and
+runtime evidence.
+**Revisit when:** Tracked reports move to a deterministic generated-source
+system with an explicit freshness gate, or the burn-in contract is replaced by
+a versioned immutable contract store.
+
 ## 2026-07-10 - Retain extreme paper outcomes and expose robust diagnostics
 **Status:** accepted
 **Decision:** Closed paper trades with extreme returns remain in canonical

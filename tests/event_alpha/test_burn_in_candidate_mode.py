@@ -118,6 +118,9 @@ def test_daily_burn_in_build_steps_uses_scoped_doctor_by_default():
         candidate_mode=True,
     )
     doctor = next(step for step in steps if isinstance(step, daily_burn_in.BurnInStep) and step.name == "artifact_doctor")
+    contract = next(step for step in steps if isinstance(step, daily_burn_in.BurnInStep) and step.name == "burn_in_contract")
+    assert "--check-burn-in-contract" in contract.command
+    assert "--burn-in-contract-only" not in contract.command
     assert "--scoped-doctor" in doctor.command
     assert "--event-alpha-artifact-doctor" not in doctor.command
     skipped = [step for step in steps if isinstance(step, dict) and step.get("status") == "skipped"]
