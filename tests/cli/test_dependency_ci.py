@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import re
 import subprocess
+from collections import Counter
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+CHECKOUT_SHA = "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"
+SETUP_PYTHON_SHA = "ece7cb06caefa5fff74198d8649806c4678c61a1"
 
 
 def test_dependency_lock_and_make_targets_are_reproducible():
@@ -108,6 +111,35 @@ def test_github_actions_use_hash_lock_and_python_parity_without_live_paths():
     assert "make verify python=python3" in text
     assert "event-alpha-integrated-radar-smoke" in text
     assert "--upgrade pip" not in text
+
+
+def test_github_actions_are_immutable_supported_node24_releases():
+    expected = {
+        "actions/checkout": (CHECKOUT_SHA, "v7.0.0"),
+        "actions/setup-python": (SETUP_PYTHON_SHA, "v6.3.0"),
+    }
+    uses_pattern = re.compile(
+        r"^\s*-\s+uses:\s+([^@\s]+)@([0-9a-f]{40})\s+#\s+(v\d+\.\d+\.\d+)\s*$"
+    )
+    references: list[tuple[str, str, str]] = []
+    uses_lines: list[str] = []
+    for path in sorted((REPO_ROOT / ".github" / "workflows").glob("*.y*ml")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if "uses:" not in line:
+                continue
+            uses_lines.append(line)
+            match = uses_pattern.match(line)
+            assert match, f"external action must use a full release SHA: {path}: {line.strip()}"
+            references.append(match.groups())
+
+    assert references
+    assert len(references) == len(uses_lines)
+    assert Counter(action for action, _, _ in references) == {
+        "actions/checkout": 3,
+        "actions/setup-python": 3,
+    }
+    for action, sha, version in references:
+        assert (sha, version) == expected[action]
 
 
 def test_dependabot_tracks_python_and_github_actions_dependencies():

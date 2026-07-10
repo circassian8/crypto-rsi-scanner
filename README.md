@@ -15,6 +15,11 @@ keys, Telegram tokens, live-provider allow flags, live-send targets, trading,
 paper trading, execution, normal RSI signal writes, or Event Alpha
 `TRIGGERED_FADE` creation.
 
+All third-party workflow actions are pinned to immutable full release commit
+SHAs with readable version comments. The current checkout/setup actions use
+their supported Node 24 releases; weekly Dependabot proposes reviewed SHA
+updates instead of silently following mutable major tags.
+
 `requirements.in` records direct dependency intent; `requirements.txt` is the
 cross-platform, Python 3.11+-compatible hash-pinned environment used by
 bootstrap and CI. Install the pinned dependency tools with

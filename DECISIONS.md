@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Pin every third-party GitHub Action to a release commit
+**Status:** accepted
+**Decision:** Workflow `uses:` references for third-party actions must use the
+full 40-character commit SHA of a reviewed upstream release and retain the
+human-readable release tag in a comment. The current baseline is
+`actions/checkout` v7.0.0 and `actions/setup-python` v6.3.0, both on Node 24.
+Weekly GitHub Actions Dependabot updates may propose new release commits, but
+they still require release-note review and the normal CI gate; mutable major,
+branch, and floating tags are not accepted.
+**Why:** The prior v4/v5 actions targeted deprecated Node 20 and GitHub was
+forcibly substituting Node 24 at runtime. Moving to supported manifests removes
+that compatibility ambiguity, while full commit pins prevent an upstream tag
+move from changing executed CI code without a repository diff.
+**Revisit when:** GitHub changes immutable-action policy, a pinned release is
+withdrawn or compromised, or a new supported runtime requires another reviewed
+release upgrade.
+
 ## 2026-07-10 - Hash-lock dependencies and verify Python 3.11/3.13 equally
 **Status:** accepted
 **Decision:** `requirements.in` is the human-edited direct dependency source;

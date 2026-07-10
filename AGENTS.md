@@ -92,6 +92,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   SHA-256-pinned install set (including `pytest` and `pytest-xdist`). Do not edit
   the lock by hand. Use `make dependency-tools`, `make lock-dependencies`
   (`UPGRADE=1` only for an intentional refresh), and `make dependency-verify`.
+  Third-party GitHub Actions must use a full 40-character release commit SHA
+  with the human-readable release tag in a comment; weekly Dependabot updates
+  the pinned commits. Do not restore mutable major-version action tags.
   `make bootstrap` creates `.venv` from the hash-pinned lock. `make verify` runs
   the full pytest suite via `test-full` and hard-fails if pytest is missing;
   `make verify PYTHON=python3` is acceptable for source-archive review.

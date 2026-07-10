@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Pin GitHub Actions and remove Node 20 deprecation · Codex
+**Why:** The new Python parity run passed but GitHub warned that
+`actions/checkout@v4` and `actions/setup-python@v5` target deprecated Node 20
+and were being forced onto Node 24. The floating major tags also left workflow
+code mutable outside repository review.
+**Changes:**
+- Upgraded all three checkout and three Python-setup call sites across the push/
+  PR verifier and manual no-call Event Alpha smoke to the exact upstream release
+  commits for `actions/checkout` v7.0.0 and `actions/setup-python` v6.3.0; both
+  action manifests declare Node 24.
+- Kept readable release comments beside the full 40-character SHAs and retained
+  weekly GitHub Actions Dependabot coverage for proposed updates.
+- Added a repository-wide regression that rejects unpinned/floating action
+  references and validates the approved action, SHA, version, and call-site
+  counts. Documented the immutable-action policy in the operator agreement,
+  README, roadmap, and durable decisions.
+**Verify:** Upstream tag refs exactly matched both pinned commits and each
+commit's `action.yml` declared `node24`; all three GitHub YAML files parsed with
+the system Ruby parser; the focused dependency/CI and Make target suite passed
+(`5 passed`); compileall, the mutable-reference scan, and `git diff --check`
+passed.
+**Notes/risks:** This changes CI bootstrap actions only; scanner behavior and
+all Event Alpha no-send/no-trading guards are untouched. Full local verification
+was not repeated after the immediately preceding clean 3.11/3.13 matrix because
+the changed executable surface is GitHub-hosted; this CI-specific push will be
+checked remotely once, while routine future changes remain no-wait.
+
 ## 2026-07-10 — Lock dependencies and add Python 3.11/3.13 CI parity · Codex
 **Why:** The project installed only lower-bounded dependencies, had no
 vulnerability gate, and verified GitHub changes solely on Python 3.11 while the
