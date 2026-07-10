@@ -1457,7 +1457,7 @@
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-10T06:58:37.990815+00:00",
+  "generated_at": "2026-07-10T07:02:14.841809+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -2833,13 +2833,6 @@
   "multi_public_class_modules_count": 80,
   "near_threshold_file_status": [
     {
-      "line_count": 1431,
-      "path": "crypto_rsi_scanner/event_alpha/shims.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
       "line_count": 1404,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3283,17 +3276,9 @@
       "rows": []
     },
     "production_files_over_1200_lines": {
-      "count": 12,
+      "count": 11,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
-        {
-          "accepted": true,
-          "line_count": 1431,
-          "path": "crypto_rsi_scanner/event_alpha/shims.py",
-          "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
-          "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
-          "threshold": 1200
-        },
         {
           "accepted": true,
           "line_count": 1404,
@@ -3415,7 +3400,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 12,
+      "production_files_over_1200_lines": 11,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -3424,11 +3409,6 @@
     "historical_row_type_alias": "refactor_v3_gate_snapshot",
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
-      {
-        "line_count": 1431,
-        "path": "crypto_rsi_scanner/event_alpha/shims.py",
-        "threshold": 1200
-      },
       {
         "line_count": 1404,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
@@ -3498,17 +3478,9 @@
         "rows": []
       },
       "production_files_over_1200_lines": {
-        "count": 12,
+        "count": 11,
         "reason": "accepted/documented production files over the v3 1,200-line target",
         "rows": [
-          {
-            "accepted": true,
-            "line_count": 1431,
-            "path": "crypto_rsi_scanner/event_alpha/shims.py",
-            "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
-            "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
-            "threshold": 1200
-          },
           {
             "accepted": true,
             "line_count": 1404,
@@ -3614,7 +3586,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 12,
+    "production_files_over_1200_lines": 11,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,

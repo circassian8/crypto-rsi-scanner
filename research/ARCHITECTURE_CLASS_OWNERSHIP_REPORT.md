@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-10T06:58:37.990815+00:00`
+- generated_at: `2026-07-10T07:02:14.841809+00:00`
 - public_class_count: `411`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `0`
@@ -45,7 +45,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 12 | accepted_exception |
+| `production_files_over_1200_lines` | 11 | accepted_exception |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | accepted_exception |
@@ -92,7 +92,6 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines | status | revisit condition |
 |---|---:|---|---|
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1431 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1404 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1398 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1395 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |

@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split pure shim-report formatting from audits · Codex
+**Why:** `event_alpha/shims.py` was 1,431 lines and combined safety-critical
+tombstone/import audits with 268 lines of pure Markdown rendering.
+**Changes:**
+- Added `shim_formatting.py` for the five registry/dependency/old-import/final-
+  status/removal-candidate formatters and the compatibility-test path constant.
+- Re-exported all established names through `shims.py`; the audit module fell
+  to 1,163 lines and the formatter module is 286 lines.
+- Updated the roadmap and durable ownership decision, then regenerated the
+  canonical architecture reports.
+**Verify:** All five current report formats matched the pre-change implementation
+byte-for-byte, and the legacy compatibility-test path is exact. All 23 shim
+registry/old-import tests passed in 10.55s. Compileall, architecture gates, JSON
+validation, and `git diff --check` passed with zero file-size violations and
+zero new violations.
+**Notes/risks:** Pure report organization only; no tombstone, import-blocking,
+scan, safety, provider, notification, signal, paper, trade, or execution behavior
+changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split static architecture-report contract data · Codex
 **Why:** `project_health/architecture_report.py` was 1,472 lines, only 28 below
 the production blocker, while mixing immutable contract metadata with report

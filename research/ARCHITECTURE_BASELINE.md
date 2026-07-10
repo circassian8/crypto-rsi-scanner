@@ -26,7 +26,7 @@ This pass records current behavior and architecture before significant code move
 ## Architecture Inventory
 
 - Top-level `crypto_rsi_scanner/event_*.py` modules: `1`
-- `crypto_rsi_scanner/event_alpha/` files: `442`
+- `crypto_rsi_scanner/event_alpha/` files: `443`
 - `crypto_rsi_scanner/cli/` files: `60`
 - `tests/` package files: `81`
 - GitHub Actions workflows: `2`
@@ -474,6 +474,7 @@ This pass records current behavior and architecture before significant code move
 - `crypto_rsi_scanner/event_alpha/radar/watchlist_enrichment.py`
 - `crypto_rsi_scanner/event_alpha/radar/watchlist_market.py`
 - `crypto_rsi_scanner/event_alpha/shim_cache.py`
+- `crypto_rsi_scanner/event_alpha/shim_formatting.py`
 - `crypto_rsi_scanner/event_alpha/shim_scan.py`
 - `crypto_rsi_scanner/event_alpha/shims.py`
 

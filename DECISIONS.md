@@ -16,6 +16,19 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Keep shim report formatting pure and separate from audits
+**Status:** accepted
+**Decision:** Markdown rendering for shim registry, dependency, old-import,
+final-status, and removal-candidate reports belongs in
+`event_alpha/shim_formatting.py`. `event_alpha/shims.py` owns registry/audit,
+scanning, counters, persistence, and CLI behavior and re-exports all established
+formatter names plus `LEGACY_IMPORT_COMPATIBILITY_TEST`.
+**Why:** The safety-critical tombstone registry was 1,431 lines and mixed pure
+presentation with filesystem/import auditing. The split yields 1,163- and
+286-line modules while all five rendered reports remain byte-for-byte identical.
+**Revisit when:** A structured report schema replaces Markdown or the deleted
+shim tombstone system is explicitly retired.
+
 ## 2026-07-10 - Separate architecture-report contract data from report logic
 **Status:** accepted
 **Decision:** Static final-report schema names, output names, major target
