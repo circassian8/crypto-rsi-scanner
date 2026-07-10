@@ -2,17 +2,17 @@
   "commands": [
     {
       "command": [
-        "python3",
+        ".venv/bin/python",
         "tests/test_indicators.py"
       ],
       "name": "standalone_runner",
       "returncode": 0,
-      "runtime_seconds": 11.191,
+      "runtime_seconds": 191.61,
       "status": "pass"
     },
     {
       "command": [
-        "python3",
+        ".venv/bin/python",
         "-m",
         "pytest",
         "tests/event_alpha",
@@ -22,19 +22,19 @@
       ],
       "name": "pytest_safe",
       "returncode": 0,
-      "runtime_seconds": 11.538,
+      "runtime_seconds": 198.114,
       "status": "pass"
     }
   ],
-  "generated_at": "2026-07-02T18:33:39+00:00",
+  "generated_at": "2026-07-10T07:24:23+00:00",
   "live_provider_calls_allowed": false,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "paper_trades_created": 0,
-  "pytest_runtime_seconds": 11.538,
+  "pytest_runtime_seconds": 198.114,
   "research_only": true,
   "schema_version": "test_runtime_report_v1",
-  "standalone_runner_runtime_seconds": 11.191,
+  "standalone_runner_runtime_seconds": 191.61,
   "status": "pass",
   "telegram_sends": 0,
   "trades_created": 0,

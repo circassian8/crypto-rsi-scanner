@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Refresh local verification runtime evidence · Codex
+**Why:** `research/test_runtime_report.json` still described the much smaller
+July 2 suite as roughly 11 seconds per runner, which no longer supported honest
+verification-cadence decisions after the coverage expansion.
+**Changes:**
+- Regenerated the canonical no-live runtime report on the latest code and
+  documented the measured cost in the test-organization guide and roadmap.
+- Propagated the fresh timing fields into the canonical architecture reports.
+**Verify:** The standalone runner passed all 786 tests in 191.610s; pytest passed
+all 861 tests in 198.114s. The timing harness reported `research_only=true`,
+`no_send_rehearsal=true`, and zero live-provider calls, Telegram sends, trades,
+paper trades, normal RSI writes, or triggered fades. Architecture reports, JSON
+validation, and `git diff --check` passed.
+**Notes/risks:** Evidence/documentation only. The result reinforces targeted
+ordinary-prompt gates and `verify-fast`; full duplicate verification remains a
+release/risky/cluster boundary. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split notification runtime helpers from CLI config reports · Codex
 **Why:** `cli/services/scanner_parts/config_reports.py` was 1,392 lines and mixed
 provider/profile config assembly with notification runtime and operator helpers.

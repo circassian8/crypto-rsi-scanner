@@ -89,6 +89,17 @@ tests/test_indicators.py` so the standalone compatibility runner stays covered
 inside pytest while full `make verify` still runs it directly as a separate
 release guard.
 
+## Current Runtime Evidence
+
+The 2026-07-10 no-live timing report records 191.610 seconds for the complete
+786-test standalone runner and 198.114 seconds for the 861-test pytest suite.
+Running both serially therefore costs about 6.5 minutes before alert, backtest,
+and scoreboard smokes. Ordinary prompts should continue using the smallest
+targeted gate; `verify-fast` retains the full pytest/smoke stack while saving the
+duplicate standalone 3.2 minutes. Full `make verify` remains appropriate for
+release, risky shared-code, parity, provider-activation, or 5–10 prompt cluster
+boundaries.
+
 ## Size Gate
 
 After the Event Alpha and base-suite splits, `tests/test_indicators.py` was
