@@ -299,7 +299,7 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-10T06:16:16+00:00",
+  "generated_at": "2026-07-10T06:25:56+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
@@ -470,7 +470,7 @@
     "api_modules_with_multiple_public_classes": 0,
     "api_total_lines": 0,
     "classes_over_limit_count": 3,
-    "files_over_limit_count": 4,
+    "files_over_limit_count": 3,
     "functions_over_limit_count": 0,
     "gate_status": "pass",
     "largest_api_files": [],
@@ -719,12 +719,6 @@
     "largest_test_files": [
       {
         "limit": 1500,
-        "line_count": 4052,
-        "path": "tests/event_alpha/test_artifact_doctor.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
         "line_count": 2991,
         "path": "tests/event_alpha/test_source_coverage.py",
         "source_kind": "test"
@@ -737,7 +731,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 1688,
+        "line_count": 1692,
         "path": "tests/test_indicators.py",
         "source_kind": "test"
       },
@@ -803,6 +797,12 @@
       },
       {
         "limit": 1500,
+        "line_count": 1082,
+        "path": "tests/event_alpha/test_doctor_notifications.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
         "line_count": 1081,
         "path": "tests/event_alpha/test_fade_validation.py",
         "source_kind": "test"
@@ -851,6 +851,12 @@
       },
       {
         "limit": 1500,
+        "line_count": 895,
+        "path": "tests/event_alpha/test_doctor_provider_conflicts.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
         "line_count": 868,
         "path": "tests/event_alpha/test_evidence_quality.py",
         "source_kind": "test"
@@ -883,6 +889,12 @@
         "limit": 1500,
         "line_count": 817,
         "path": "tests/event_alpha/test_discovery_cache_reports.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 805,
+        "path": "tests/event_alpha/test_doctor_reconciliation.py",
         "source_kind": "test"
       },
       {
@@ -923,6 +935,12 @@
       },
       {
         "limit": 1500,
+        "line_count": 696,
+        "path": "tests/event_alpha/test_doctor_core.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
         "line_count": 675,
         "path": "tests/event_alpha/test_notification_planning.py",
         "source_kind": "test"
@@ -935,26 +953,8 @@
       },
       {
         "limit": 1500,
-        "line_count": 618,
-        "path": "tests/event_alpha/test_operator_presentation.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 600,
-        "path": "tests/event_alpha/test_notification_lanes.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 588,
-        "path": "tests/event_alpha/test_burn_in_outcomes.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 562,
-        "path": "tests/rsi/test_backtest.py",
+        "line_count": 623,
+        "path": "tests/event_alpha/test_doctor_quality.py",
         "source_kind": "test"
       }
     ],
@@ -1180,7 +1180,7 @@
         "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
       }
     ],
-    "test_files_over_1500_lines": 4,
+    "test_files_over_1500_lines": 3,
     "test_size_gate_status": "warning",
     "unresolved_production_files_over_1200_line_rows": [],
     "unresolved_production_files_over_1200_lines": 0

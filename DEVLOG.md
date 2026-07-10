@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Retire the artifact-doctor test monolith · Codex
+**Why:** `test_artifact_doctor.py` was the largest remaining test file at 4,052
+lines. Its 47 regressions had five stable boundaries matching doctor concerns.
+**Changes:**
+- Split public/schema/filter/provider-readiness checks (696 lines), notification
+  identity/preview/delivery/review checks (1,082), quality/environment/core
+  checks (623), reconciliation/delivery/lane/anomaly checks (805), and provider
+  conflict/integrated-safety checks (895) into dedicated modules.
+- Registered all five modules with the standalone compatibility runner and
+  deleted `test_artifact_doctor.py`. All 47 names remain exact and unique
+  (sorted-name SHA-256 `2a1f4e8f...`); no replacement crosses 1,500 lines.
+- Updated the roadmap, durable split evidence, and test-organization map.
+**Verify:** All 47 doctor tests passed under pytest in 78.56s and all 47 passed
+through the standalone adapter. The full Event Alpha package passed all 650
+tests in 151.30s. Standalone discovery remains 786 total / 594 Event Alpha /
+109 RSI / 42 CLI / 41 umbrella tests. Compileall, architecture reports, and
+`git diff --check` passed; the canonical oversized-test count fell from 4 to 3
+with `new_violation_count=0`.
+**Notes/risks:** Test organization and documentation only; no doctor phase,
+schema, readiness, notification, evidence, provider, signal, paper, trade, or
+execution behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Retire the outcomes test monolith · Codex
 **Why:** After retiring the notification monolith, `test_outcomes.py` was the
 largest remaining non-doctor test file at 4,082 lines, but its 49 tests divided

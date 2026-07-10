@@ -10,6 +10,11 @@ This document records the pytest-compatible split of the historical
 | path | role |
 |---|---|
 | `tests/test_indicators.py` | Umbrella compatibility runner plus remaining ops/config/storage tests. Running it directly still executes the split Event Alpha, RSI, and CLI packages. |
+| `tests/event_alpha/test_doctor_core.py` | Artifact-doctor public API, plugin messages, schema-only behavior, filters, and provider-readiness/preflight checks. |
+| `tests/event_alpha/test_doctor_notifications.py` | Notification identity, previews, digest delivery, daily-brief selection, and research-review doctor checks. |
+| `tests/event_alpha/test_doctor_quality.py` | Quality fields, environment inputs, live-path caps, core-store coverage, and route/verdict checks. |
+| `tests/event_alpha/test_doctor_reconciliation.py` | Canonical-core/card/snapshot reconciliation, delivery status, opportunity lanes, and anomaly artifact checks. |
+| `tests/event_alpha/test_doctor_provider_conflicts.py` | Bybit, exchange, catalyst, derivatives, instrument-resolution, and integrated doctor safety conflicts. |
 | `tests/rsi/test_backups.py` | SQLite online-backup, immutable restore, retention, debris visibility, and backup-status regressions. |
 | `tests/rsi/test_indicators_core.py` | Pure RSI math, scanner scoring, setup/tier/regime, state features, and universe hygiene tests. |
 | `tests/rsi/test_backtest.py` | Backtest edge, state-slice, PIT/volume membership, cache, fixture-loader, and CLI-argument regressions. |
@@ -79,7 +84,7 @@ release guard.
 ## Size Gate
 
 After the Event Alpha and base-suite splits, `tests/test_indicators.py` was
-1,784 lines immediately before the focused backup-test move. It is now 1,688
+1,784 lines immediately before the focused backup-test move. It is now 1,692
 lines and reports these standalone counts:
 
 | count | value |
@@ -118,6 +123,11 @@ The 4,082-line outcomes test monolith was retired into five focused modules
 ranging from 588 to 1,023 lines. All 49 original outcome identities remain
 exact and unique, all pass through both pytest and the standalone adapter, and
 the full Event Alpha package remains green at 650 tests.
+
+The 4,052-line artifact-doctor test monolith was retired into five focused
+modules ranging from 623 to 1,082 lines. All 47 original doctor identities
+remain exact and unique, all pass through both pytest and the standalone
+adapter, and the full Event Alpha package remains green at 650 tests.
 
 ## Remaining Umbrella Sections
 

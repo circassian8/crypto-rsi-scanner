@@ -110,6 +110,10 @@ The 4,082-line outcomes test file was partitioned into five evidence/quality,
 alert-outcome, feedback/calibration, burn-in/replay, and quality-feedback modules
 ranging from 588 to 1,023 lines; all 49 identities were preserved and the source
 monolith was deleted.
+The 4,052-line artifact-doctor test file was partitioned into five core/schema,
+notification, quality, reconciliation, and provider-conflict/integrated-safety
+modules ranging from 623 to 1,082 lines; all 47 identities were preserved and
+the source monolith was deleted.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.
