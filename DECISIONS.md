@@ -74,6 +74,9 @@ with the exact 98-name surface preserved.
 A fifth split isolated 13 catalyst-frame and downstream role/aggregation tests
 in a 1,127-line module; the source monolith fell from 7,536 to 6,421 lines with
 the exact 94-name surface preserved.
+A sixth split moved 15 fade/resolver tests and 6 alert-ranking/trigger-guard
+tests into 435- and 377-line modules; the source monolith fell from 6,421 to
+5,634 lines with the exact 81-name surface preserved.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.

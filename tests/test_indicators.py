@@ -1546,6 +1546,8 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_claim_semantics",
     "tests.event_alpha.test_core_opportunities",
     "tests.event_alpha.test_core_reconciliation",
+    "tests.event_alpha.test_event_alert_ranking",
+    "tests.event_alpha.test_fade_core",
     "tests.event_alpha.test_fade_review_workflows",
     "tests.event_alpha.test_fade_validation",
     "tests.event_alpha.test_integrated_radar",

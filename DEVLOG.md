@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split integrated-radar fade and alert tests · Codex
+**Why:** The 6,421-line monolith still opened with two independent research
+surfaces: pure event-fade/resolver behavior and alert ranking/tier/trigger gates.
+**Changes:**
+- Moved 15 fade component, state-machine, proxy hard-gate, event-time, BTC-risk,
+  sizing, JSON feature, alias/collision, publisher/source-noise, and recap
+  confidence tests into `test_fade_core.py` (435 lines).
+- Moved 6 research alert ranking, proxy-venue opt-in, triggered-fade tier,
+  cluster/noise cap, rejection override, and playbook-first guard tests into
+  `test_event_alert_ranking.py` (377 lines). Registered both modules with the
+  standalone compatibility runner.
+- Reduced `test_integrated_radar.py` from 6,421 to 5,634 lines. Its pre-split 81
+  names remain exact and unique across the three files (sorted-name SHA-256
+  `f44421c6...`). Updated the roadmap, durable split evidence, and organization
+  map.
+**Verify:** Both extracted modules passed all 21 tests and all 21 passed through
+the standalone adapter. The complete source-plus-extracted surface passed all 81
+tests in 1.94s. Standalone discovery remains 786 total / 594 Event Alpha / 109
+RSI / 42 CLI / 41 umbrella tests. Compileall and `git diff --check` passed. The
+already-green 650-test Event Alpha package was not redundantly rerun for this
+exact, test-only move.
+**Notes/risks:** Test organization and documentation only; no fade scoring,
+resolver, alert ranking, tier, trigger, provider, notification, signal, paper,
+trade, or execution behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split integrated-radar catalyst-frame tests · Codex
 **Why:** The remaining 7,536-line monolith contained a cohesive catalyst-frame
 surface spanning deterministic classification, LLM validation/runtime guards,
