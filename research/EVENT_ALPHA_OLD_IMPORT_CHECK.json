@@ -2201,7 +2201,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 514,
+          "line": 868,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2239,7 +2239,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 514,
+          "line": 868,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2350,7 +2350,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 3321,
+          "line": 4324,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2452,17 +2452,17 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-09T03:27:27.875550+00:00",
+  "generated_at": "2026-07-10T07:30:53.171322+00:00",
   "include_runtime_artifacts": false,
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "DEVLOG.md:1783566645",
-    "Makefile:1783429541",
-    "ROADMAP.md:1783565798",
-    "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py:1783394364",
-    "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py:1783391892"
+    "DEVLOG.md:1783668643",
+    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1783668620",
+    "research/ARCHITECTURE_SIZE_GATES.md:1783668619",
+    "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1783668651",
+    "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1783668652"
   ],
-  "newest_source_mtime": 1783567641.0551078,
+  "newest_source_mtime": 1783668651.82875,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2474,7 +2474,7 @@
   "old_path_text_references": 61,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1783342241.140263,
+  "report_mtime": 1783668616.4360154,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2483,22 +2483,22 @@
     "include_runtime_artifacts": false,
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "DEVLOG.md:1783566645",
-      "Makefile:1783429541",
-      "ROADMAP.md:1783565798",
-      "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py:1783394364",
-      "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py:1783391892"
+      "DEVLOG.md:1783668643",
+      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1783668620",
+      "research/ARCHITECTURE_SIZE_GATES.md:1783668619",
+      "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1783668651",
+      "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1783668652"
     ],
-    "newest_source_mtime": 1783567641.0551078,
+    "newest_source_mtime": 1783668651.82875,
     "regex_compile_count": 124,
-    "report_mtime": 1783342241.140263,
-    "scan_duration_seconds": 1.5641,
+    "report_mtime": 1783668616.4360154,
+    "scan_duration_seconds": 1.23,
     "scanned_artifact_files": 0,
-    "scanned_doc_files": 49,
+    "scanned_doc_files": 51,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
-    "scanned_source_files": 626,
-    "scanned_test_files": 32,
+    "scanned_source_files": 636,
+    "scanned_test_files": 81,
     "skipped_artifact_files": 1486,
     "skipped_binary_files": 0,
     "skipped_dir_samples": [
@@ -2520,10 +2520,10 @@
     "skipped_large_files": 1,
     "skipped_suffix_files": 1
   },
-  "scan_duration_seconds": 1.5641,
-  "scanned_doc_files": 49,
-  "scanned_source_files": 626,
-  "scanned_test_files": 32,
+  "scan_duration_seconds": 1.23,
+  "scanned_doc_files": 51,
+  "scanned_source_files": 636,
+  "scanned_test_files": 81,
   "schema_version": "event_alpha_old_import_check_v1",
   "skipped_artifact_files": 1486,
   "skipped_dirs": 64,

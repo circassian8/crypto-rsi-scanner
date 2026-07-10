@@ -17,6 +17,22 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Refresh aggregate architecture-cleanliness evidence · Codex
+**Why:** The final long-goal audit needed one current aggregate check after the
+test/package burn-downs and production helper splits, including refreshed
+old-import source references.
+**Changes:**
+- Regenerated transitional-file, naming, old-import, size-gate, and class-
+  ownership reports through the single static cleanliness target.
+**Verify:** `make architecture-cleanliness-check PYTHON=.venv/bin/python`
+passed: transitional and naming status are `OK`; old-path internal imports,
+test imports, documentation references, and allowed exceptions are all zero;
+the size gate passes with zero file/new violations; function violations are
+zero; the three class warnings remain documented SQLite mixin exceptions.
+**Notes/risks:** Static evidence only; no runtime, provider, notification,
+signal, paper, trade, or execution behavior changed. Routine GitHub CI was not
+awaited.
+
 ## 2026-07-10 — Refresh local verification runtime evidence · Codex
 **Why:** `research/test_runtime_report.json` still described the much smaller
 July 2 suite as roughly 11 seconds per runner, which no longer supported honest
