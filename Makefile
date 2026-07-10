@@ -4,6 +4,12 @@ PYTEST_SAFE_ENV = PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 PYTEST_DURATIONS ?= 50
 PYTEST_WORKERS ?= auto
 PYTEST_XDIST_MODE ?= loadfile
+DEPENDENCY_INPUT ?= requirements.in
+DEPENDENCY_LOCK ?= requirements.txt
+DEPENDENCY_MIN_PYTHON ?= 3.11
+UV ?= .venv/bin/uv
+UV_VERSION ?= 0.11.28
+PIP_AUDIT_VERSION ?= 2.10.1
 EVENT_FIXTURE_NOW ?= 2026-06-15T16:00:00Z
 EVENT_RESEARCH_NOW ?=
 EVENT_FIXTURE_NOW_ENV = RSI_EVENT_RESEARCH_NOW=$(EVENT_FIXTURE_NOW)
@@ -159,10 +165,16 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: event-alpha-live-provider-readiness event-alpha-live-provider-readiness-smoke event-alpha-dex-onchain-readiness event-alpha-dex-onchain-readiness-smoke event-alpha-coinalyze-preflight event-alpha-coinalyze-preflight-smoke event-alpha-coinalyze-no-send-rehearsal event-alpha-bybit-announcements-preflight event-alpha-bybit-announcements-preflight-smoke event-alpha-bybit-announcements-no-send-rehearsal event-alpha-tokenomist-preflight event-alpha-messari-unlocks-preflight event-alpha-coinmarketcal-preflight event-alpha-notify-preview-from-artifacts event-alpha-mark-namespace-stale event-alpha-mark-known-stale-namespaces event-alpha-prune-or-archive-stale-namespace event-alpha-shim-report event-alpha-shim-dependency-report event-alpha-old-import-check normalize-export-timestamps export-src-with-artifacts-smoke
 .PHONY: verify-fast test-full test-rsi test-cli test-pytest test-pytest-safe test-pytest-timed test-pytest-durations test-pytest-parallel test-event-alpha architecture-baseline architecture-api-inventory architecture-class-ownership-report architecture-size-baseline-update architecture-size-gates architecture-transitional-file-check architecture-terminology-check architecture-naming-check architecture-final-report architecture-completion-map architecture-cleanliness-check event-alpha-radar-north-star event-alpha-namespace-lifecycle-report event-alpha-list-active-namespaces event-alpha-archive-stale-namespaces
 .PHONY: event-alpha-burn-in-contract event-alpha-daily-live-no-send-burn-in event-alpha-daily-live-no-send-burn-in-plan event-alpha-daily-live-no-send-burn-in-smoke event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke-doctor event-alpha-daily-burn-in-readiness event-alpha-daily-review-inbox event-alpha-feedback-progress event-alpha-burn-in-weekly-measurement event-alpha-source-yield-report conviction-priors-shadow-report paper-risk-research event-alpha-archive-burn-in-evidence event-feedback-false-positive event-feedback-late event-feedback-source-noise event-feedback-needs-confirmation event-feedback-duplicate event-feedback-promising-source-type
+.PHONY: dependency-tools lock-dependencies dependency-lock-check dependency-audit dependency-verify
 
 help:
 	@echo "Targets:"
-	@echo "  make bootstrap  Create .venv and install requirements"
+	@echo "  make bootstrap  Create .venv and install hash-pinned requirements.txt"
+	@echo "  make dependency-tools  Install pinned uv and pip-audit tooling into the selected Python environment"
+	@echo "  make lock-dependencies  Resolve requirements.in into universal hash-pinned requirements.txt (UPGRADE=1 to refresh all pins)"
+	@echo "  make dependency-lock-check  Prove requirements.txt is reproducible from requirements.in"
+	@echo "  make dependency-audit  Fail on known vulnerabilities in requirements.txt"
+	@echo "  make dependency-verify  Run lock reproducibility plus vulnerability audit"
 	@echo "  make export-src  Write a clean source zip using git archive"
 	@echo "  make export-src-with-artifacts  Overwrite crypto_rsi_scanner_source_with_artifacts.zip"
 	@echo "  make verify   Run the standard local verification suite"
@@ -435,7 +447,38 @@ check-python:
 
 bootstrap:
 	python3 -m venv .venv
-	.venv/bin/python -m pip install -r requirements.txt
+	.venv/bin/python -m pip install --require-hashes -r $(DEPENDENCY_LOCK)
+
+dependency-tools: check-python
+	$(PYTHON) -m pip install --disable-pip-version-check "uv==$(UV_VERSION)" "pip-audit==$(PIP_AUDIT_VERSION)"
+
+lock-dependencies:
+	@if ! test -x "$(UV)" && ! command -v "$(UV)" >/dev/null 2>&1; then \
+		echo "uv runtime '$(UV)' not found; run 'make dependency-tools' or set UV=uv."; \
+		exit 127; \
+	fi
+	UV_CUSTOM_COMPILE_COMMAND='make lock-dependencies' $(UV) pip compile $(DEPENDENCY_INPUT) \
+		--universal --python-version $(DEPENDENCY_MIN_PYTHON) --generate-hashes \
+		$(if $(filter 1 true yes,$(UPGRADE)),--upgrade,) --output-file $(DEPENDENCY_LOCK) --quiet
+
+dependency-lock-check:
+	@if ! test -x "$(UV)" && ! command -v "$(UV)" >/dev/null 2>&1; then \
+		echo "uv runtime '$(UV)' not found; run 'make dependency-tools' or set UV=uv."; \
+		exit 127; \
+	fi
+	@tmp=$$(mktemp "$${TMPDIR:-/tmp}/requirements.txt.XXXXXX"); \
+	cp "$(DEPENDENCY_LOCK)" "$$tmp"; \
+	trap 'rm -f "$$tmp"' EXIT; \
+	UV_CUSTOM_COMPILE_COMMAND='make lock-dependencies' $(UV) pip compile $(DEPENDENCY_INPUT) \
+		--universal --python-version $(DEPENDENCY_MIN_PYTHON) --generate-hashes \
+		--output-file "$$tmp" --quiet; \
+	diff -u "$(DEPENDENCY_LOCK)" "$$tmp"
+
+dependency-audit: check-python
+	$(PYTHON) -m pip_audit --strict --require-hashes --disable-pip \
+		--progress-spinner off -r $(DEPENDENCY_LOCK)
+
+dependency-verify: dependency-lock-check dependency-audit
 
 export-src:
 	git archive --format=zip -o crypto-rsi-scanner-source.zip HEAD

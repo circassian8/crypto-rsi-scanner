@@ -1,0 +1,8 @@
+# Direct runtime and test dependency intent. Compile the hash-pinned
+# requirements.txt with `make lock-dependencies`.
+aiohttp>=3.9
+numpy>=1.24
+pandas>=2.0
+pytest>=8.0
+pytest-xdist>=3.6
+requests>=2.28

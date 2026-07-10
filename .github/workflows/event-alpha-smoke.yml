@@ -8,8 +8,13 @@ permissions:
 
 jobs:
   event-alpha-smoke:
+    name: Event Alpha Smoke (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
     env:
       CI: "true"
       RSI_EVENT_ALERTS_ENABLED: "0"
@@ -19,9 +24,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install dependencies
-        run: python3 -m pip install --disable-pip-version-check -r requirements.txt pytest
+        run: python3 -m pip install --disable-pip-version-check --require-hashes -r requirements.txt
       - name: Integrated radar smoke
         run: make event-alpha-integrated-radar-smoke PYTHON=python3
       - name: Integrated radar doctor

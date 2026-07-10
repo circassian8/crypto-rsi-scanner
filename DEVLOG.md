@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Lock dependencies and add Python 3.11/3.13 CI parity · Codex
+**Why:** The project installed only lower-bounded dependencies, had no
+vulnerability gate, and verified GitHub changes solely on Python 3.11 while the
+local/deployed development environment used Python 3.13.
+**Changes:**
+- Split human-edited direct dependency intent into `requirements.in` and
+  generated a universal Python 3.11+ `requirements.txt` with 28 exact package
+  rows, 915 SHA-256 hashes, and the required NumPy compatibility fork (2.4.6 on
+  Python 3.11; 2.5.1 on 3.12+).
+- Made bootstrap and both GitHub workflows install with `--require-hashes`.
+  Added pinned uv/pip-audit tooling plus Make targets to refresh, byte-check,
+  audit, or jointly verify the lock; the current audit reports no known
+  vulnerabilities.
+- Matrixed push/PR `make verify` and manual no-call Event Alpha smokes across
+  Python 3.11 and 3.13. Static architecture report generation remains once on
+  3.13, while dependency audits run on both versions so marker-specific pins
+  are covered.
+- Added `.python-version` for the 3.13 local default, weekly Dependabot coverage
+  for pip and GitHub Actions, focused static regressions, and updated CI/dependency
+  documentation and collaboration policy.
+**Verify:** `make dependency-lock-check` reproduced the committed lock exactly;
+`make dependency-audit` reported no known vulnerabilities; fresh hash-enforced
+installs succeeded on Python 3.11.15 and 3.13.5. On each clean environment,
+`make verify-fast` passed (`857 passed`, alert render smoke, 33-observation
+backtest fixture, paper scoreboard) and `tests/test_indicators.py` passed
+`783/783`; both runs left tracked status unchanged. The focused dependency/CI
+suite passed (`28 passed`), all YAML parsed, compileall and `git diff --check`
+passed.
+**Notes/risks:** This changes dependency installation and CI policy, not scanner
+or Event Alpha behavior. The existing deployed `.venv` is not automatically
+upgraded to the new pins. Because this is CI-specific and release-oriented, the
+new remote matrix is awaited once after push; routine future changes return to
+the no-wait policy.
+
 ## 2026-07-10 — Make daily burn-in contract checks hermetic · Codex
 **Why:** A focused candidate-mode test passed while silently rewriting the two
 tracked Event Alpha burn-in contract reports with a fresh `generated_at`, so

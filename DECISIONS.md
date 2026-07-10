@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Hash-lock dependencies and verify Python 3.11/3.13 equally
+**Status:** accepted
+**Decision:** `requirements.in` is the human-edited direct dependency source;
+the generated `requirements.txt` is the universal Python 3.11+ installation
+lock and every resolved distribution must be exact-versioned and SHA-256
+hashed. Bootstrap and CI must install it with `--require-hashes`; dependency
+changes must pass deterministic uv regeneration plus pip-audit. Push/PR CI runs
+the canonical `make verify` on both Python 3.11 and 3.13, while the repository
+defaults locally to 3.13. Dependabot reviews pip and GitHub Actions updates
+weekly, but no update is accepted unless the lock and both-version gates pass.
+**Why:** Lower bounds alone produced different environments over time, CI only
+covered 3.11 while the deployed development venv used 3.13, and the project had
+no repeatable vulnerability gate. A universal lock retains the one necessary
+NumPy version fork while making every installed artifact reviewable and
+integrity-checked.
+**Revisit when:** Python 3.11 support is intentionally retired, Python 3.14 is
+adopted, the project moves to a standardized `pylock.toml` workflow supported by
+all deployment tooling, or a lock/audit incident requires a different resolver.
+
 ## 2026-07-10 - Tracked contracts and reports require explicit authoring commands
 **Status:** accepted
 **Decision:** Tests, verification gates, daily burn-in, and other runtime paths

@@ -86,10 +86,15 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 
 ## Run / test / deploy
 
-- **Python:** `.venv/bin/python` (3.13). Deps in `requirements.txt` (including
-  `pytest` and `pytest-xdist`; `make verify` runs the full pytest suite via
-  `test-full` and hard-fails if pytest is missing). `make bootstrap` creates
-  `.venv`; `make verify PYTHON=python3` is acceptable for source-archive review.
+- **Python:** `.venv/bin/python` (3.13 default via `.python-version`); supported
+  CI/runtime compatibility is Python 3.11 and 3.13. Direct dependency intent is
+  in `requirements.in`; `requirements.txt` is the generated universal,
+  SHA-256-pinned install set (including `pytest` and `pytest-xdist`). Do not edit
+  the lock by hand. Use `make dependency-tools`, `make lock-dependencies`
+  (`UPGRADE=1` only for an intentional refresh), and `make dependency-verify`.
+  `make bootstrap` creates `.venv` from the hash-pinned lock. `make verify` runs
+  the full pytest suite via `test-full` and hard-fails if pytest is missing;
+  `make verify PYTHON=python3` is acceptable for source-archive review.
   For local iteration, prefer targeted tests over the full pytest package gate:
   run the focused pytest file/package for touched code, `python3 -m compileall -q
   crypto_rsi_scanner tests` for Python changes, and the matching Make smoke or

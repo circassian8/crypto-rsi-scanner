@@ -1689,6 +1689,7 @@ _RSI_TEST_MODULES = (
 )
 
 _CLI_TEST_MODULES = (
+    "tests.cli.test_dependency_ci",
     "tests.cli.test_event_alpha_operator_command_smoke",
     "tests.cli.test_make_targets",
     "tests.cli.test_parser",
