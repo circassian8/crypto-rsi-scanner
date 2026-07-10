@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Retire the integrated-radar test monolith · Codex
+**Why:** After nine cohesive burn-downs, the residual 2,756-line file had clear
+watchlist/router, operator-workflow, and operator-presentation boundaries. A
+final partition could eliminate the last oversized integrated-radar test file
+without creating a new warning.
+**Changes:**
+- Moved 7 watchlist state/expiry, router escalation/digest/material-change,
+  near-miss refresh, and router-approved send tests into
+  `test_watchlist_router.py` (1,156 lines).
+- Moved 15 digest/status/monitor/scanner, no-key target, identity/market-source,
+  card/explain, provider fallback, derivatives/supply, and review-dedupe tests
+  into `test_operator_workflows.py` (1,006 lines). Moved the fixture lane
+  contract plus 8 canonical-core, daily-brief, card-index, audit, and lineage
+  tests into `test_operator_presentation.py` (618 lines).
+- Replaced the old module registration with all three focused modules and
+  deleted `tests/event_alpha/test_integrated_radar.py`. The residual 31 names
+  remain exact and unique (sorted-name SHA-256 `7d939240...`), completing the
+  full 240-test identity-preserving migration from the original 16,234-line
+  monolith.
+**Verify:** All 31 residual tests passed under pytest and all 31 passed through
+the standalone adapter. The full Event Alpha package passed all 650 tests in
+149.26s, and the full historical standalone runner passed 786/786. Compileall
+and `git diff --check` passed. Canonical architecture reports remain
+green/accepted with test files over 1,500 lines reduced from 8 to 7,
+`new_violation_count=0`, production files over 1,500 at zero, and unresolved
+production files over 1,200 at zero.
+**Notes/risks:** The initial focused run exposed and fixed three explicit fixture
+imports (`Counter`, `json`, `TemporaryDirectory`) that previously came from the
+old module header; final focused, package, and standalone gates are green. Test
+organization only—no watchlist, router, delivery, card, brief, audit, provider,
+notification, signal, paper, trade, or execution behavior changed. Routine
+GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split integrated-radar pipeline and scanner tests · Codex
 **Why:** The 3,832-line monolith still contained one contiguous operating path
 from radar/scanner reports through search validation, persistence/brief output,

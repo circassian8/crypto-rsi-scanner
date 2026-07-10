@@ -1551,7 +1551,6 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_fade_review_workflows",
     "tests.event_alpha.test_fade_validation",
     "tests.event_alpha.test_impact_hypotheses",
-    "tests.event_alpha.test_integrated_radar",
     "tests.event_alpha.test_integrated_merge_policy",
     "tests.event_alpha.test_incident_relevance",
     "tests.event_alpha.test_llm_radar",
@@ -1561,12 +1560,15 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_no_old_event_alpha_imports",
     "tests.event_alpha.test_notifications",
     "tests.event_alpha.test_operator_identity",
+    "tests.event_alpha.test_operator_presentation",
+    "tests.event_alpha.test_operator_workflows",
     "tests.event_alpha.test_outcomes",
     "tests.event_alpha.test_playbooks_graph",
     "tests.event_alpha.test_provider_readiness",
     "tests.event_alpha.test_radar_pipeline",
     "tests.event_alpha.test_shim_registry",
     "tests.event_alpha.test_source_coverage",
+    "tests.event_alpha.test_watchlist_router",
 )
 
 _RSI_TEST_MODULES = (

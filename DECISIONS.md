@@ -88,6 +88,10 @@ A ninth split isolated 12 operating-pipeline/scanner, search validation,
 hypothesis store/brief, LLM suggestion/skip, extraction-order, and upstream-hint
 tests in a 1,088-line module; the source monolith fell from 3,832 to 2,756 lines
 with the exact 43-name surface preserved.
+A tenth and final split partitioned the residual 31 tests into 1,156-line
+watchlist/router, 1,006-line operator-workflow, and 618-line presentation
+modules, then deleted the source monolith. All original 240 integrated-radar
+test identities are now housed in focused modules no larger than 1,450 lines.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.

@@ -299,7 +299,7 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-10T05:24:55+00:00",
+  "generated_at": "2026-07-10T05:37:03+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
@@ -470,7 +470,7 @@
     "api_modules_with_multiple_public_classes": 0,
     "api_total_lines": 0,
     "classes_over_limit_count": 3,
-    "files_over_limit_count": 8,
+    "files_over_limit_count": 7,
     "functions_over_limit_count": 0,
     "gate_status": "pass",
     "largest_api_files": [],
@@ -749,19 +749,13 @@
       },
       {
         "limit": 1500,
-        "line_count": 2756,
-        "path": "tests/event_alpha/test_integrated_radar.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
         "line_count": 1826,
         "path": "tests/event_alpha/test_namespace_lifecycle.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 1671,
+        "line_count": 1673,
         "path": "tests/test_indicators.py",
         "source_kind": "test"
       },
@@ -797,6 +791,12 @@
       },
       {
         "limit": 1500,
+        "line_count": 1156,
+        "path": "tests/event_alpha/test_watchlist_router.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
         "line_count": 1127,
         "path": "tests/event_alpha/test_catalyst_frames.py",
         "source_kind": "test"
@@ -811,6 +811,12 @@
         "limit": 1500,
         "line_count": 1081,
         "path": "tests/event_alpha/test_fade_validation.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1006,
+        "path": "tests/event_alpha/test_operator_workflows.py",
         "source_kind": "test"
       },
       {
@@ -859,6 +865,12 @@
         "limit": 1500,
         "line_count": 639,
         "path": "tests/event_alpha/test_incident_relevance.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 618,
+        "path": "tests/event_alpha/test_operator_presentation.py",
         "source_kind": "test"
       },
       {
@@ -943,18 +955,6 @@
         "limit": 1500,
         "line_count": 169,
         "path": "tests/cli/test_dispatch.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 152,
-        "path": "tests/cli/test_dependency_ci.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 122,
-        "path": "tests/cli/test_burn_in_make_targets.py",
         "source_kind": "test"
       }
     ],
@@ -1180,7 +1180,7 @@
         "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
       }
     ],
-    "test_files_over_1500_lines": 8,
+    "test_files_over_1500_lines": 7,
     "test_size_gate_status": "warning",
     "unresolved_production_files_over_1200_line_rows": [],
     "unresolved_production_files_over_1200_lines": 0

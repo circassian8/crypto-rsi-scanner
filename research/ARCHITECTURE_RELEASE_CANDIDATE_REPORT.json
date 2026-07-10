@@ -246,7 +246,7 @@
     },
     "remaining_api_unregistered_details": []
   },
-  "generated_at": "2026-07-10T05:25:03+00:00",
+  "generated_at": "2026-07-10T05:37:11+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_release_candidate_report",
   "known_remaining_blockers": [],
@@ -258,7 +258,7 @@
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 36,
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py": 91,
     "crypto_rsi_scanner/scanner.py": 90,
-    "tests/test_indicators.py": 1671
+    "tests/test_indicators.py": 1673
   },
   "migrated_modules": {
     "active_shim_modules_with_implementation_logic": 0,
