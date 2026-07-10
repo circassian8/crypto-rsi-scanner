@@ -8,6 +8,7 @@ import statistics
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from . import paper
 from .storage import Storage
 
 
@@ -100,6 +101,7 @@ def build_research_report_from_trades(trades: list[Mapping[str, Any]], *, out_di
         "research_only": True,
         "trades_read": len(trades),
         "scenarios": scenarios,
+        "outlier_review": paper.build_outlier_review([dict(row) for row in trades]),
         "paper_opening_behavior_changed": False,
         "execution_logic_changed": False,
         "auto_apply": False,
@@ -122,6 +124,28 @@ def format_research_report(payload: Mapping[str, Any]) -> str:
         f"- auto_apply: `{payload.get('auto_apply')}`",
         "",
     ]
+    outlier_review = payload.get("outlier_review") or {}
+    lines.extend(
+        [
+            "## Extreme-outcome review",
+            "",
+            f"- threshold_pct: `{outlier_review.get('threshold_pct')}`",
+            f"- count: `{outlier_review.get('count')}`",
+            f"- retained_in_aggregate_stats: `{outlier_review.get('retained_in_aggregate_stats')}`",
+            f"- auto_excluded: `{outlier_review.get('auto_excluded')}`",
+            "",
+        ]
+    )
+    for row in outlier_review.get("rows") or ():
+        lines.append(
+            f"- {row.get('symbol')}/{row.get('coin_id')} "
+            f"{row.get('direction')} ret={row.get('ret_pct')} "
+            f"setup={row.get('setup_type')} price_check={row.get('stored_price_return_check')} "
+            f"volatility={row.get('volatility_state')} liquidity={row.get('liquidity_bucket')}"
+        )
+    if not outlier_review.get("rows"):
+        lines.append("- none")
+    lines.extend(["", "## Scenarios", ""])
     for name, row in sorted((payload.get("scenarios") or {}).items()):
         lines.append(f"- {name}: n={row.get('count')} avg={row.get('avg_return')} worst={row.get('worst_case')}")
     return "\n".join(lines).rstrip() + "\n"

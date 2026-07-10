@@ -27,6 +27,9 @@ from .outcomes import _price_asof
 
 log = logging.getLogger(__name__)
 
+OUTLIER_REVIEW_THRESHOLD_PCT = 50.0
+RETURN_CONSISTENCY_TOLERANCE_PCT = 0.01
+
 
 def _direction(expected_dir: str) -> str:
     return "long" if expected_dir == "up" else "short"
@@ -143,6 +146,10 @@ def _fmt_stats(label: str, st: dict | None, indent: str = "") -> str:
     return (f"{indent}{label:<22}{st['n']:>4}{st['win']:>6.0f}%"
             f"{st['avg']:>+7.1f}%{st['med']:>+7.1f}%"
             f"{(st['equity'] - 1) * 100:>+8.1f}%{st['maxdd']:>7.0f}%")
+
+
+def _fmt_trimmed_mean(st: dict | None) -> str:
+    return f"{st['trimmed_mean']:+.1f}%" if st else "n/a"
 
 
 def _conviction_bucket(value: int | float | None) -> str:
@@ -262,6 +269,71 @@ def _open_position(t: dict) -> dict:
     }
 
 
+def build_outlier_review(
+    trades: list[dict],
+    *,
+    threshold_pct: float = OUTLIER_REVIEW_THRESHOLD_PCT,
+) -> dict:
+    """Surface extreme paper outcomes without removing them from statistics."""
+    threshold = abs(float(threshold_pct))
+    rows: list[dict] = []
+    for trade in trades:
+        try:
+            ret_pct = float(trade.get("ret_pct"))
+        except (TypeError, ValueError):
+            continue
+        if abs(ret_pct) < threshold:
+            continue
+        try:
+            entry_price = float(trade.get("entry_price") or 0.0)
+            exit_price = float(trade.get("exit_price") or 0.0)
+        except (TypeError, ValueError):
+            entry_price = 0.0
+            exit_price = 0.0
+        recomputed_ret_pct = None
+        delta_pct = None
+        if entry_price > 0 and exit_price > 0:
+            sign = 1.0 if str(trade.get("direction") or "long") == "long" else -1.0
+            recomputed_ret_pct = sign * (exit_price / entry_price - 1.0) * 100.0
+            delta_pct = abs(recomputed_ret_pct - ret_pct)
+        rows.append(
+            {
+                "paper_trade_id": trade.get("id"),
+                "symbol": trade.get("symbol"),
+                "coin_id": trade.get("coin_id"),
+                "setup_type": trade.get("setup_type"),
+                "market_regime": trade.get("market_regime"),
+                "market_aligned": trade.get("market_aligned"),
+                "direction": trade.get("direction"),
+                "conviction": trade.get("conviction"),
+                "entry_price": entry_price or None,
+                "exit_price": exit_price or None,
+                "entry_at": trade.get("entry_at"),
+                "exit_at": trade.get("exit_at"),
+                "hold_days": trade.get("hold_days"),
+                "ret_pct": ret_pct,
+                "recomputed_ret_pct": recomputed_ret_pct,
+                "stored_return_delta_pct": delta_pct,
+                "stored_price_return_check": (
+                    "consistent"
+                    if delta_pct is not None and delta_pct <= RETURN_CONSISTENCY_TOLERANCE_PCT
+                    else "mismatch_or_missing"
+                ),
+                "volatility_state": _state_bucket(trade, "volatility"),
+                "liquidity_bucket": _state_bucket(trade, "liquidity"),
+                "falling_knife_bucket": _state_bucket(trade, "falling_knife"),
+            }
+        )
+    rows.sort(key=lambda row: abs(float(row["ret_pct"])), reverse=True)
+    return {
+        "threshold_pct": threshold,
+        "count": len(rows),
+        "retained_in_aggregate_stats": True,
+        "auto_excluded": False,
+        "rows": rows,
+    }
+
+
 def summary(storage, now: datetime | None = None) -> dict:
     closed = [dict(r) for r in storage.closed_paper_trades()]
     open_ = [dict(r) for r in storage.open_paper_trades()]
@@ -285,6 +357,7 @@ def summary(storage, now: datetime | None = None) -> dict:
         "by_conviction_bucket_by_scope": _conviction_bucket_scope_stats(closed),
         "conviction_bucket_cohorts": _conviction_bucket_rows(closed),
         "by_state": _state_group_stats(closed),
+        "outlier_review": build_outlier_review(closed),
         "open_positions": [_open_position(t) for t in open_],
     }
 
@@ -308,11 +381,20 @@ def report(storage, now: datetime | None = None, *, cohorts: bool = False) -> st
     header = f"  {'book':<22}{'n':>4}{'win%':>6}{'avg':>7}{'med':>7}{'equity':>8}{'maxDD':>7}"
     out.append("\nReturns per trade, and sequential equity (overlap ignored):")
     out.append(header)
-    out.append(_fmt_stats("ALL closed", _stats(closed)))
     actionable = [t for t in closed if _is_actionable(t)]
     control = [t for t in closed if not _is_actionable(t)]
-    out.append(_fmt_stats("→ actionable (gated)", _stats(actionable)))
-    out.append(_fmt_stats("→ control (gated-out)", _stats(control)))
+    all_stats = _stats(closed)
+    actionable_stats = _stats(actionable)
+    control_stats = _stats(control)
+    out.append(_fmt_stats("ALL closed", all_stats))
+    out.append(_fmt_stats("→ actionable (gated)", actionable_stats))
+    out.append(_fmt_stats("→ control (gated-out)", control_stats))
+    out.append(
+        "Robust check (drop one best/worst when n>4): "
+        f"all={_fmt_trimmed_mean(all_stats)} · "
+        f"actionable={_fmt_trimmed_mean(actionable_stats)} · "
+        f"control={_fmt_trimmed_mean(control_stats)}"
+    )
 
     # by setup
     setups = sorted({t.get("setup_type") or "?" for t in closed})
@@ -379,6 +461,23 @@ def report(storage, now: datetime | None = None, *, cohorts: bool = False) -> st
             out.append(header.replace("book", "bucket"))
             for bucket, st in rows.items():
                 out.append(_fmt_stats(bucket, st, indent="  "))
+
+    outlier_review = build_outlier_review(closed)
+    if outlier_review["rows"]:
+        out.append(
+            f"\nExtreme outcomes for review (|return| >= "
+            f"{outlier_review['threshold_pct']:.0f}%; retained in all statistics):"
+        )
+        for row in outlier_review["rows"]:
+            out.append(
+                f"  {str(row.get('symbol') or '?'):<7} "
+                f"{str(row.get('direction') or '?'):<5} "
+                f"{float(row['ret_pct']):>+7.1f}% · "
+                f"{row.get('setup_type') or '?'} · "
+                f"price-check={row['stored_price_return_check']} · "
+                f"vol={row['volatility_state']} · liq={row['liquidity_bucket']}"
+            )
+        out.append("  Diagnostic only: no rows are removed and no thresholds are auto-applied.")
 
     if open_:
         out.append(f"\nOpen positions ({len(open_)}): "

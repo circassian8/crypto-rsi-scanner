@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Audit and surface extreme paper outcomes · Codex
+**Why:** The project audit found that a handful of high-volatility names
+dominated paper averages/equity and required an identity, price, and
+corporate-action review before those metrics could be interpreted safely.
+**Changes:**
+- Reviewed all seven closed paper rows with absolute returns at least 50% against
+  their stored entry/exit prices, nearest crossing signals, independent 7-day
+  outcomes, and current CoinGecko price/market-cap histories. The evidence is
+  consistent with genuine extreme moves; no corrupt identity join or
+  redenomination was found.
+- Added structured outlier review data to `paper.summary` and the existing
+  research-only paper-risk report. Each row exposes stored-price recomputation,
+  setup/direction, conviction, volatility, liquidity, and falling-knife context.
+- Added a trimmed-mean cross-check and an explicit extreme-outcome section to the
+  text scoreboard. All rows remain in every aggregate; no scoring, trade,
+  routing, threshold, or stop behavior changed.
+- Added focused regression coverage plus a checked-in evidence note at
+  `research/PAPER_TRADE_OUTLIER_REVIEW_2026-07-10.md`; updated the durable
+  decision, working agreement, and roadmap.
+**Verify:** `tests/rsi/test_paper_risk.py` passed (`16 passed`), the complete RSI
+package passed (`106 passed`), and compileall plus `git diff --check` passed.
+`main.py --score` rendered 75 closed/19 open rows, robust means, and seven
+retained outliers; `make paper-risk-research PYTHON=.venv/bin/python` regenerated
+the ignored local structured report with `outlier_review.count=7` and
+`auto_excluded=false`. Full `make verify` was intentionally skipped for this
+report-only, no-behavior change.
+**Notes/risks:** CoinGecko is still the single price provider for live paper
+grading. The review proves internal and provider-history consistency, not
+cross-provider execution quality; actual stop scenarios remain shadow research.
+
 ## 2026-07-10 — Exclude EURC from live and backtest universes · Codex
 **Why:** Audit item #6 was confirmed in the latest persisted universe snapshot:
 EURC (`euro-coin`) remained in the kept top-100 candidate set at market-cap rank

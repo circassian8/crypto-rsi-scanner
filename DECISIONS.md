@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Retain extreme paper outcomes and expose robust diagnostics
+**Status:** accepted
+**Decision:** Closed paper trades with extreme returns remain in canonical
+scoreboard aggregates. The human-readable scoreboard must show a trimmed-mean
+cross-check and explicit retained outlier rows, while the research report carries
+structured price-recomputation and state diagnostics. Do not cap, winsorize,
+delete, or automatically exclude these rows, and do not apply stop scenarios or
+state thresholds to live behavior from this review.
+**Why:** Seven of 75 closed rows have absolute returns of at least 50%, but their
+stored prices recompute exactly, matched signals and independent 7-day outcomes
+agree, and provider price/market-cap histories support real high-volatility moves
+rather than an identity, database, or redenomination error. Removing them would
+hide genuine tail risk; presenting only averages lets them obscure the typical
+trade.
+**Revisit when:** Cross-provider evidence contradicts CoinGecko history, an
+identity/corporate-action mismatch is proven, or a separately reviewed
+path-aware stop/risk policy has enough live evidence for promotion.
+
 ## 2026-07-10 - Exclude observed fiat-pegged assets by exact identity
 **Status:** accepted
 **Decision:** EURC is a `stable_like` universe exclusion in both shared

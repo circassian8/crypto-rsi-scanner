@@ -252,7 +252,60 @@ def test_paper_report_empty_and_populated():
         for row in cohort_rows
     )
     assert data["by_state"]["volatility"]["high"]["n"] == 1
+    assert data["outlier_review"]["count"] == 0
     st.close()
+
+
+def test_paper_outlier_review_is_diagnostic_and_checks_stored_prices():
+    from crypto_rsi_scanner import paper
+
+    trades = [
+        {
+            "id": 1,
+            "symbol": "SIREN",
+            "coin_id": "siren-2",
+            "setup_type": "trend_continuation",
+            "market_regime": "DOWNTREND",
+            "market_aligned": "neutral",
+            "direction": "long",
+            "conviction": 67,
+            "entry_price": 1.3,
+            "exit_price": 0.05542759356,
+            "ret_pct": -95.7363389569,
+            "state_json": '{"volatility":{"state":"crisis"},"liquidity":{"bucket":"high"}}',
+        },
+        {
+            "id": 2,
+            "symbol": "BTC",
+            "coin_id": "bitcoin",
+            "direction": "long",
+            "entry_price": 100.0,
+            "exit_price": 110.0,
+            "ret_pct": 10.0,
+        },
+    ]
+    review = paper.build_outlier_review(trades)
+
+    assert review["count"] == 1
+    assert review["retained_in_aggregate_stats"] is True
+    assert review["auto_excluded"] is False
+    assert review["rows"][0]["symbol"] == "SIREN"
+    assert review["rows"][0]["stored_price_return_check"] == "consistent"
+    assert review["rows"][0]["volatility_state"] == "crisis"
+    assert review["rows"][0]["liquidity_bucket"] == "high"
+
+    class FakeStorage:
+        def closed_paper_trades(self):
+            return trades
+
+        def open_paper_trades(self):
+            return []
+
+    text = paper.report(FakeStorage())
+    assert "Extreme outcomes for review" in text
+    assert "SIREN" in text
+    assert "retained in all statistics" in text
+    assert "no rows are removed" in text
 
 
 def test_paper_risk_research_scenarios_are_report_only(tmp_path):
@@ -271,6 +324,7 @@ def test_paper_risk_research_scenarios_are_report_only(tmp_path):
     assert payload["scenarios"]["exclude_breakdown_risk"]["count"] == 2
     assert payload["scenarios"]["mean_reversion_chop_only"]["count"] == 1
     assert payload["scenarios"]["stop_10_pct_shadow"]["stopped_count"] == 0
+    assert payload["outlier_review"]["count"] == 0
     metrics = paper_risk_research.path_metrics(100, [95, 90, 110], direction="long", stop_pct=10)
     assert metrics["stopped"] is True
     assert metrics["return_pct"] == -10

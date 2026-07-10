@@ -415,6 +415,11 @@ work.
   stored, and reported before they are allowed to affect conviction, routing, or
   gating. The live scanner attaches `state_json` only after the existing decision
   fields are already computed.
+- Paper outcomes with extreme returns remain part of the canonical scoreboard.
+  Surface them through the robust-mean and outlier-review diagnostics in
+  `paper.py` / `paper_risk_research.py`; do not delete, cap, winsorize, or
+  auto-apply thresholds retrospectively without a separate evidence-backed
+  decision.
 - `event_fade.py` is a separate research sleeve for dated proxy-catalyst
   sell-the-news fades. It must stay alert-only and inert by default: no storage,
   notification routing, paper trading, or execution without explicit
