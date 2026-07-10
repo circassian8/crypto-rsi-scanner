@@ -86,6 +86,14 @@ def _core_row_serialization_context(
         "all_rows": all_rows,
         "support_ids": _row_ids(support),
         "diagnostic_ids": _row_ids(diagnostics),
+        "diagnostic_row_count": max(
+            item.diagnostic_row_count,
+            _int_or_zero(primary.get("diagnostic_row_count") or primary.get("hidden_diagnostic_count")),
+        ),
+        "source_noise_control_count": max(
+            item.source_noise_control_count,
+            _int_or_zero(primary.get("source_noise_control_count")),
+        ),
     }
     context.update(_core_row_initial_metrics(item, all_rows))
     context.update(_core_row_acquisition_metrics(item, all_rows, context))
@@ -283,6 +291,8 @@ def _core_row_policy_context(
         "source_title": accepted_source.get("title") or _first_text(all_rows, ("source_title", "latest_source_title", "title")),
         "supporting_categories": list(item.supporting_categories),
         "supporting_impact_paths": list(item.supporting_impact_paths),
+        "diagnostic_row_count": context["diagnostic_row_count"],
+        "source_noise_control_count": context["source_noise_control_count"],
         "playbook_type": item.primary_impact_path,
         "effective_playbook_type": item.primary_impact_path,
         "impact_path_reason": impact_path_reason,
@@ -462,9 +472,9 @@ def _core_row_identity_source_fields(context: Mapping[str, Any]) -> dict[str, An
         "derivatives_warning_codes": context["derivatives_warning_codes"],
         "supporting_row_ids": context["support_ids"],
         "diagnostic_row_ids": context["diagnostic_ids"],
-        "diagnostic_row_count": item.diagnostic_row_count,
-        "hidden_diagnostic_count": item.diagnostic_row_count,
-        "source_noise_control_count": item.source_noise_control_count,
+        "diagnostic_row_count": context["diagnostic_row_count"],
+        "hidden_diagnostic_count": context["diagnostic_row_count"],
+        "source_noise_control_count": context["source_noise_control_count"],
         "quality_capped_support_count": item.quality_capped_supporting_rows,
         "initial_opportunity_level": context["initial_level"],
         "initial_opportunity_score": (

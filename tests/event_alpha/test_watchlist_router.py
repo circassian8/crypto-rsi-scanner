@@ -109,12 +109,14 @@ def test_event_watchlist_refresh_tracks_escalations_and_suppresses_duplicates():
 
 
 def test_event_watchlist_expiration_and_backward_compatible_reads():
+    from dataclasses import asdict
     import json
     import tempfile
     from dataclasses import replace
     from datetime import datetime, timezone
     from pathlib import Path
     import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
     import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
     import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
     from crypto_rsi_scanner.event_core.models import DiscoveredAsset, RawDiscoveredEvent
@@ -181,6 +183,55 @@ def test_event_watchlist_expiration_and_backward_compatible_reads():
         assert loaded.rows_read == 1
         assert loaded.entries[0].state == event_watchlist.EventWatchlistState.RADAR.value
         assert loaded.entries[0].highest_score == 61
+
+        legacy_hypothesis_path = Path(tmp) / "legacy-hypothesis-watchlist.jsonl"
+        legacy_hypothesis_path.write_text(
+            json.dumps({
+                "schema_version": "event_watchlist_v1",
+                "row_type": "event_watchlist_state",
+                "key": "hypothesis|world-cup|sports-event|2026-06-23|sports_fan_proxy",
+                "event_id": "hyp:legacy-world-cup",
+                "coin_id": "chiliz",
+                "symbol": "CHZ",
+                "relationship_type": "impact_hypothesis",
+                "state": "RADAR",
+                "last_seen_at": now.isoformat(),
+                "latest_score": 60,
+            }) + "\n",
+            encoding="utf-8",
+        )
+        legacy_hypothesis = event_watchlist.load_watchlist(legacy_hypothesis_path).entries[0]
+        assert legacy_hypothesis.incident_id is None
+        assert legacy_hypothesis.incident_link_status == "no_incident"
+        assert legacy_hypothesis.incident_link_reason == "legacy_pre_incident_watchlist_row"
+
+        modern_hypothesis_path = Path(tmp) / "modern-missing-incident-watchlist.jsonl"
+        modern_hypothesis_path.write_text(
+            json.dumps({
+                "schema_version": "event_watchlist_v1",
+                "row_type": "event_watchlist_state",
+                "key": "hypothesis|modern-cluster|security_or_regulatory_shock",
+                "event_id": "hyp:modern-missing-incident",
+                "coin_id": "modern-token",
+                "symbol": "MODERN",
+                "relationship_type": "impact_hypothesis",
+                "state": "RADAR",
+                "last_seen_at": now.isoformat(),
+                "latest_score": 60,
+            }) + "\n",
+            encoding="utf-8",
+        )
+        modern_hypothesis = event_watchlist.load_watchlist(modern_hypothesis_path).entries[0]
+        assert modern_hypothesis.hypothesis_id is None
+        assert modern_hypothesis.incident_link_status is None
+        doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "run-modern-missing-incident", "alertable": 0}],
+            watchlist_rows=[asdict(modern_hypothesis)],
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert doctor.watchlist_hypothesis_rows_missing_incident_id == 1
+        assert doctor.status == "BLOCKED"
 
 
 def test_event_alpha_router_routes_watchlist_escalations_safely():

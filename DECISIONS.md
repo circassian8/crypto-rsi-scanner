@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Scope artifact-doctor semantics to explicit contracts
+**Status:** accepted
+**Decision:** Event Alpha doctor checks must interpret rows using their declared
+schema, delivery mode, guard state, return unit, namespace measurement
+eligibility, and artifact generation. Guarded historical sends are valid only
+for the notification-delivery and run-ledger schemas when live-send mode,
+guards, status, and accounting agree; no-send and integrated-delivery rows stay
+strict. Notification rehearsal status alone does not make a namespace daily
+burn-in evidence. Market-unit compatibility may infer only from the horizons
+being reconciled, and legacy normalization must use a narrow, identifiable
+signature while preserving the original evidence. Any existing-ledger rewrite
+must use a same-directory atomic replacement after flushing durable bytes.
+**Why:** Generic truthiness and whole-row heuristics produced false blockers for
+valid historical sends, extreme unrelated market horizons, and a rehearsal
+namespace that explicitly opted out of burn-in measurement. Narrow migrations
+also clear pre-schema paths and incident rows without relabeling modern malformed
+evidence or weakening research-only/no-send safety.
+**Revisit when:** Artifact schema v2 replaces these contracts, delivery ledgers
+gain a different guarded-send accounting model, market snapshots adopt a single
+mandatory unit with no legacy rows, or the pre-incident watchlist generation is
+fully retired from retained artifacts.
+
 ## 2026-07-10 - Separate notification runtime helpers from config assembly
 **Status:** accepted
 **Decision:** Notification wall-clock budgets, partial-warning detection,

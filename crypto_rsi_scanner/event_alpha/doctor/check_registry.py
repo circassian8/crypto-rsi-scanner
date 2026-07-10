@@ -145,7 +145,7 @@ CHECKS: tuple[DoctorCheck, ...] = (
             "trade_created",
             "paper_trade_created",
         ),
-        "Research artifact rows must not claim sends, trades, paper rows, RSI rows, or triggered fades.",
+        "No-send rows must not claim sends, and no Event Alpha row may claim trades, paper rows, RSI rows, or triggered fades.",
     ),
     _check(
         "safety.no_send_side_effects",

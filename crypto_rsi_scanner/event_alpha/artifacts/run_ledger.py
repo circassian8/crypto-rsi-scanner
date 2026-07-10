@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 import math
+import os
+import stat
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,10 +59,70 @@ def append_run_record(
     )
     path = cfg.path.expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
+    rewrite_normalized_run_records(path)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
         fh.write("\n")
     return row
+
+
+def rewrite_normalized_run_records(path: str | Path) -> int:
+    """Rewrite legacy run rows with portable paths; returns changed rows."""
+    p = Path(path).expanduser()
+    if not p.exists():
+        return 0
+    raw_rows: list[dict[str, Any]] = []
+    try:
+        with p.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    return 0
+                if not isinstance(row, dict):
+                    return 0
+                raw_rows.append(row)
+    except OSError:
+        return 0
+    normalized_rows = [
+        event_artifact_paths.normalize_operator_path_fields(row)
+        if row.get("row_type") == "event_alpha_run"
+        else row
+        for row in raw_rows
+    ]
+    changed = sum(1 for old, new in zip(raw_rows, normalized_rows, strict=False) if old != new)
+    if not changed:
+        return 0
+    temp_path: Path | None = None
+    try:
+        original_mode = stat.S_IMODE(p.stat().st_mode)
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=p.parent,
+            prefix=f".{p.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as fh:
+            temp_path = Path(fh.name)
+            for row in normalized_rows:
+                fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
+                fh.write("\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        temp_path.chmod(original_mode)
+        os.replace(temp_path, p)
+    except OSError:
+        if temp_path is not None:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        return 0
+    return changed
 
 
 def run_id_for(started_at: datetime, profile: str | None) -> str:

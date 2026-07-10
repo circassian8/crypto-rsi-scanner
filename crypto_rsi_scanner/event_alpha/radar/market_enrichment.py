@@ -14,6 +14,7 @@ from ... import config, universe
 import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
 from ...client import CoinGeckoClient
 from ...event_providers.coingecko_universe import load_market_rows
+from . import market_units as event_market_units
 from .resolver import clean_text
 
 log = logging.getLogger(__name__)
@@ -155,6 +156,7 @@ def market_snapshot_from_row(row: Mapping[str, Any], *, now: datetime | None = N
         "coin_id": str(row.get("id") or ""),
         "symbol": str(row.get("symbol") or "").upper(),
         "timestamp": timestamp.isoformat(),
+        "return_unit": event_market_units.RETURN_UNIT_FRACTION,
         "price": price,
         "volume_24h": volume_24h,
         "spot_volume_24h": volume_24h,

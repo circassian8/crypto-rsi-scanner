@@ -117,8 +117,13 @@ def validate_market_snapshot_units(
     if not snapshot.get("return_unit"):
         warnings.append("return_unit_missing")
     if isinstance(reference_snapshot, Mapping):
-        ref_unit = infer_return_unit(reference_snapshot, default=RETURN_UNIT_FRACTION)
-        for key in ("return_1h", "return_4h", "return_24h"):
+        compared_keys = ("return_1h", "return_4h", "return_24h")
+        ref_unit = infer_return_unit(
+            reference_snapshot,
+            default=RETURN_UNIT_FRACTION,
+            keys=compared_keys,
+        )
+        for key in compared_keys:
             actual = normalize_return_percent_points(snapshot.get(key), unit)
             expected = normalize_return_percent_points(reference_snapshot.get(key), ref_unit)
             if actual is None or expected is None:

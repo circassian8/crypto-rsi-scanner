@@ -515,7 +515,10 @@ def _attach_artifact_conflict_context(ctx: SimpleNamespace) -> None:
          *delivery_rows)
     )
     if namespace_dir is not None:
-        structured_path_conflicts += _structured_operator_path_file_conflicts(namespace_dir)
+        structured_path_conflicts = max(
+            structured_path_conflicts,
+            _structured_operator_path_file_conflicts(namespace_dir),
+        )
     integrated_conflicts["operator_structured_path_absolute"] = max(
         int(integrated_conflicts.get("operator_structured_path_absolute", 0)),
         int(structured_path_conflicts),

@@ -462,13 +462,11 @@ def _is_burn_in_namespace(ctx: object) -> bool:
     namespace = str(ctx_value(ctx, "artifact_namespace", "") or "")
     profile = str(ctx_value(ctx, "profile", "") or "")
     status_obj = ctx_value(ctx, "namespace_status", None)
-    status = str(getattr(status_obj, "status", "") or "")
     safe_for_burn = bool(getattr(status_obj, "safe_for_burn_in_measurement", False))
     return (
         namespace.startswith("live_burn_in_")
         or profile.startswith("live_burn_in")
         or safe_for_burn
-        or status in {"active_live_rehearsal", "active"}
     )
 
 

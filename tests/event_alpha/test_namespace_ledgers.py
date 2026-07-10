@@ -97,6 +97,60 @@ def test_event_alpha_run_ledger_records_send_accounting():
         )
 
 
+def test_event_alpha_run_ledger_normalizer_migrates_legacy_absolute_paths(tmp_path):
+    import json
+    from unittest import mock
+    import crypto_rsi_scanner.event_alpha.artifacts.run_ledger as event_alpha_run_ledger
+
+    namespace_dir = tmp_path / "event_fade_cache" / "notify_no_key"
+    run_path = namespace_dir / "event_alpha_runs.jsonl"
+    run_path.parent.mkdir(parents=True)
+    legacy = {
+        "row_type": "event_alpha_run",
+        "run_id": "legacy-live-send",
+        "profile": "notify_no_key",
+        "sent": True,
+        "send_requested": True,
+        "send_attempted": True,
+        "send_success": True,
+        "send_items_delivered": 1,
+        "run_ledger_path": str(run_path),
+        "alert_store_path": str(namespace_dir / "event_alpha_alerts.jsonl"),
+        "watchlist_state_path": str(namespace_dir / "event_watchlist_state.jsonl"),
+        "research_cards_dir": str(namespace_dir / "research_cards"),
+    }
+    second = {
+        **legacy,
+        "run_id": "legacy-live-send-second",
+        "send_items_delivered": 2,
+        "business_note": "preserve row order and evidence",
+    }
+    original_bytes = (json.dumps(legacy) + "\n" + json.dumps(second) + "\n").encode()
+    run_path.write_bytes(original_bytes)
+
+    with mock.patch.object(
+        event_alpha_run_ledger.os,
+        "replace",
+        side_effect=OSError("simulated atomic replace failure"),
+    ):
+        assert event_alpha_run_ledger.rewrite_normalized_run_records(run_path) == 0
+        assert run_path.read_bytes() == original_bytes
+        assert list(run_path.parent.glob(f".{run_path.name}.*.tmp")) == []
+
+    assert event_alpha_run_ledger.rewrite_normalized_run_records(run_path) == 2
+    migrated_rows = [json.loads(line) for line in run_path.read_text(encoding="utf-8").splitlines()]
+    assert [row["run_id"] for row in migrated_rows] == [legacy["run_id"], second["run_id"]]
+    migrated = migrated_rows[0]
+    assert migrated["sent"] is True
+    assert migrated["run_ledger_path"] == "event_fade_cache/notify_no_key/event_alpha_runs.jsonl"
+    assert migrated["research_cards_dir"] == "event_fade_cache/notify_no_key/research_cards"
+    assert migrated["run_ledger_path_abs_debug"] == str(run_path)
+    assert migrated["research_cards_dir_abs_debug"] == str(namespace_dir / "research_cards")
+    assert migrated_rows[1]["business_note"] == second["business_note"]
+    assert migrated_rows[1]["send_items_delivered"] == 2
+    assert event_alpha_run_ledger.rewrite_normalized_run_records(run_path) == 0
+
+
 def test_event_alpha_run_lock_acquire_skip_recover_and_release():
     import tempfile
     from datetime import datetime, timezone

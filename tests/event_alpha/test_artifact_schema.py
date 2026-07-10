@@ -583,6 +583,65 @@ def test_event_alpha_schema_v1_validation_policy(tmp_path):
     assert "absolute_non_debug_path:research_card_path" in schema_v1.validate_row_against_schema(bad_path, path_schema)
     debug_abs = dict(bad_path, research_card_path="event_fade_cache/unit/card.md", research_card_path_abs_debug="/tmp/local-card.md")
     assert "absolute_non_debug_path:research_card_path" not in schema_v1.validate_row_against_schema(debug_abs, path_schema)
+    bad_dir = dict(bad_path, research_card_path="event_fade_cache/unit/card.md", research_cards_dir="/tmp/local-cards")
+    assert "absolute_non_debug_path:research_cards_dir" in schema_v1.validate_row_against_schema(bad_dir, path_schema)
+
+    live_delivery = {
+        "row_type": "event_alpha_notification_delivery",
+        "delivery_id": "delivery-live",
+        "status": "sent",
+        "delivery_mode": "live_send",
+        "send_guard_enabled": True,
+        "no_send_rehearsal": False,
+        "delivered_count": 1,
+        "sent": True,
+    }
+    delivery_schema = schema_v1.get_schema("notification_delivery_v1")
+    assert schema_v1.validate_row_against_schema(live_delivery, delivery_schema) == []
+    unsafe_rehearsal = dict(live_delivery, no_send_rehearsal=True)
+    assert "unsafe_side_effect_flag:sent" in schema_v1.validate_row_against_schema(
+        unsafe_rehearsal,
+        delivery_schema,
+    )
+    for inconsistent_delivery in (
+        {key: value for key, value in live_delivery.items() if key != "delivered_count"},
+        dict(live_delivery, delivered_count=0),
+        {key: value for key, value in live_delivery.items() if key != "no_send_rehearsal"},
+    ):
+        assert "unsafe_side_effect_flag:sent" in schema_v1.validate_row_against_schema(
+            inconsistent_delivery,
+            delivery_schema,
+        )
+    unsafe_integrated = {
+        "row_type": "event_integrated_radar_notification_delivery",
+        "lane": "research_review_digest",
+        "sent": True,
+        "no_send_rehearsal": False,
+    }
+    assert "unsafe_side_effect_flag:sent" in schema_v1.validate_row_against_schema(
+        unsafe_integrated,
+        schema_v1.get_schema("integrated_notification_delivery_v1"),
+    )
+
+    guarded_run = {
+        "row_type": "event_alpha_run",
+        "run_id": "run-live",
+        "profile": "notify_no_key",
+        "send_requested": True,
+        "send_attempted": True,
+        "send_success": True,
+        "send_items_delivered": 2,
+        "sent": True,
+    }
+    assert schema_v1.validate_row_against_schema(
+        guarded_run,
+        schema_v1.get_schema("run_ledger_v1"),
+    ) == []
+    inconsistent_run = dict(guarded_run, send_items_delivered=0)
+    assert "unsafe_side_effect_flag:sent" in schema_v1.validate_row_against_schema(
+        inconsistent_run,
+        schema_v1.get_schema("run_ledger_v1"),
+    )
 
     legacy_path = tmp_path / "event_integrated_radar_candidates.jsonl"
     legacy_path.write_text(json.dumps(valid, sort_keys=True) + "\n", encoding="utf-8")

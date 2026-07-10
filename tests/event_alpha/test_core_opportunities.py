@@ -470,6 +470,61 @@ def test_event_core_opportunity_store_persists_canonical_rows():
         assert set(by_symbol) == {"AAVE", "MEME", "RUNE", "VELVET"}
 
 
+def test_core_store_first_write_matches_read_normalization_for_diagnostic_support():
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
+
+    primary = {
+        "row_type": "event_impact_hypothesis",
+        "hypothesis_id": "hyp-primary",
+        "incident_id": "incident-noise-pair",
+        "canonical_incident_name": "Ambiguous source-noise pair",
+        "validated_symbol": "TEST",
+        "validated_coin_id": "test-token",
+        "candidate_role": "proxy_venue",
+        "impact_category": "rwa_preipo_proxy",
+        "impact_path_type": "proxy_attention",
+        "opportunity_level": "local_only",
+        "opportunity_score_final": 48,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+        "latest_effective_playbook_type": "proxy_attention",
+    }
+    diagnostic = {
+        **primary,
+        "hypothesis_id": "hyp-source-noise",
+        "candidate_role": "source_noise",
+        "impact_category": "publisher_noise",
+        "impact_path_type": "generic_cooccurrence_only",
+        "latest_effective_playbook_type": "source_noise_control",
+    }
+    now = datetime(2026, 7, 10, 12, 0, tzinfo=timezone.utc)
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        result = event_core_opportunity_store.write_core_opportunities(
+            [primary, diagnostic],
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            now=now,
+            run_id="run-diagnostic-idempotence",
+            profile="notify_no_key",
+            run_mode="notification_burn_in",
+            artifact_namespace="notify_no_key",
+        )
+        assert result.success is True
+        stored = event_core_opportunity_store.load_core_opportunities(path, latest_run=True).rows
+        normalized = event_core_opportunity_store.normalize_core_opportunity_rows(stored, now=now)
+
+    assert len(stored) == len(normalized) == 1
+    assert stored[0]["diagnostic_row_count"] == 1
+    assert stored[0]["source_noise_control_count"] == 1
+    assert stored[0]["opportunity_type"] == "DIAGNOSTIC"
+    assert normalized[0]["opportunity_type"] == stored[0]["opportunity_type"]
+    assert normalized[0]["final_opportunity_level"] == stored[0]["final_opportunity_level"]
+    assert normalized[0]["final_route_after_quality_gate"] == stored[0]["final_route_after_quality_gate"]
+
+
 def test_event_core_opportunity_store_derives_route_from_final_verdict():
     import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
     import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store

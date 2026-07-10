@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Clear active Event Alpha artifact-doctor blockers · Codex
+**Why:** The first real-system run exposed 51 strict schema findings plus stale
+daily-brief, burn-in-scope, incident-link, and market-unit conflicts in the
+active `notify_no_key` research namespace. Several were false positives against
+valid historical evidence, while legacy operator rows needed a safe migration.
+**Changes:**
+- Made guarded historical delivery/run-ledger send facts schema-valid only when
+  live-send mode, guard state, no-send state, delivery status, and accounting
+  agree; no-send and integrated-delivery rows remain strict.
+- Added an idempotent, mode-preserving, fsync-plus-atomic-replace run-ledger
+  migration for portable operator paths, removed duplicate loaded/file path
+  counting, and preserved absolute paths only in explicit debug fields.
+- Stamped raw market snapshots with explicit fractional return units and limited
+  compatibility inference to the compared short horizons, eliminating the two
+  false double-scale findings without weakening extreme-return checks.
+- Scoped daily burn-in requirements to explicit measurement namespaces, added
+  narrow pre-incident watchlist compatibility, and made first-write Core
+  Opportunity diagnostic counts match reload normalization and card grouping.
+- Regenerated the local daily brief/research-card view, added focused regressions,
+  and split the new compatibility logic/test placement to keep architecture size
+  gates below their hard thresholds.
+**Verify:** Focused Event Alpha coverage passed `132 passed`, including simulated
+atomic-replace failure with byte-exact ledger preservation; compileall and
+`git diff --check` passed; the deterministic no-send fixture smoke completed
+with 2/2 fake deliveries and zero live providers, Telegram sends, RSI writes,
+paper trades, DB rows, or execution. Full `make verify` passed 791/791 standalone
+tests, 866 pytest tests, alert rendering, the offline 33-observation backtest,
+and the paper scoreboard. The final strict `notify_no_key` doctor validated 491
+schema rows with zero schema/path/safety errors and no blockers.
+**Notes/risks:** Doctor status remains `WARN` only for truthful research-quality
+telemetry (one quality-capped row and unqualified/quality-blocked incident
+links). The exposed Telegram token still requires human rotation before any
+listener restart or real-send validation. Routine GitHub CI was not awaited.
+
 ## 2026-07-10 — Refresh live outcome waiting evidence · Codex
 **Why:** The long-goal final audit found that three waiting rows still cited June
 17 sample counts even though the read-only live outcome and paper reports have

@@ -25,11 +25,41 @@ def test_event_market_enrichment_from_coingecko_rows():
     )
     sol = snapshots["solana"]
     assert sol["symbol"] == "SOL"
+    assert sol["return_unit"] == "fraction"
     assert sol["price"] == 160.0
     assert sol["volume_24h"] == 4500000000.0
     assert abs(sol["return_24h"] - 0.034) < 1e-9
     assert abs(sol["return_7d"] - 0.092) < 1e-9
     assert abs(event_market_enrichment.volume_to_market_cap(rows[2]) - 0.06) < 1e-9
+
+
+def test_market_unit_validation_ignores_unrelated_extreme_long_horizons():
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.radar.market_units as event_market_units
+
+    raw = {
+        "return_1h": -0.09910469368037955,
+        "return_4h": -0.2180730431133927,
+        "return_24h": 0.2825155388560951,
+        "return_72h": 678534.2292165436,
+        "return_7d": 1266458.1966185595,
+    }
+    normalized = {
+        "return_unit": "percent_points",
+        "source_return_unit": "fraction",
+        "return_1h": -9.910469368037955,
+        "return_4h": -21.80730431133927,
+        "return_24h": 28.25155388560951,
+    }
+
+    assert event_market_units.validate_market_snapshot_units(normalized, raw) == ()
+    conflicts = event_alpha_artifact_doctor._opportunity_lane_conflicts([{
+        "core_opportunity_id": "core-cashcat",
+        "opportunity_type": "UNCONFIRMED_RESEARCH",
+        "market_state_snapshot": normalized,
+        "latest_market_snapshot": raw,
+    }])
+    assert conflicts["market_state_possible_double_scaled"] == 0
 
 
 def test_event_market_enrichment_fills_candidates_without_overriding_raw_market():

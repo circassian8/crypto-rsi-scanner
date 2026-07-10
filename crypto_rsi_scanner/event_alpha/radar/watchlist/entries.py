@@ -730,6 +730,40 @@ def _row_entry_quality_state(
     return requested_state, first_seen, last_seen, raw_quality, quality, final_state, state_quality_capped, quality_state_block
 
 
+def _row_incident_link_fields(
+    row: Mapping[str, Any],
+    components: Mapping[str, Any],
+    *,
+    key: str,
+    relationship_type: str,
+) -> tuple[str | None, str | None, str | None, str | None]:
+    incident_id = _optional_str(row.get("incident_id") or components.get("incident_id"))
+    hypothesis_id = _optional_str(row.get("hypothesis_id") or components.get("hypothesis_id"))
+    link_status = _optional_str(row.get("incident_link_status") or components.get("incident_link_status"))
+    link_reason = _optional_str(row.get("incident_link_reason") or components.get("incident_link_reason"))
+    if (
+        relationship_type == "impact_hypothesis"
+        and _legacy_pre_incident_hypothesis_key(key)
+        and incident_id is None
+        and hypothesis_id is None
+        and link_status is None
+    ):
+        link_status = "no_incident"
+        link_reason = "legacy_pre_incident_watchlist_row"
+    return incident_id, hypothesis_id, link_status, link_reason
+
+
+def _legacy_pre_incident_hypothesis_key(key: str) -> bool:
+    parts = key.split("|")
+    if len(parts) != 5 or parts[0] != "hypothesis" or not all(parts[1:]):
+        return False
+    try:
+        datetime.strptime(parts[3], "%Y-%m-%d")
+    except ValueError:
+        return False
+    return True
+
+
 def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
     try:
         key = str(row.get("key") or "")
@@ -740,6 +774,9 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
         if not key or not event_id or not coin_id or not relationship_type:
             return None
         components = dict(row.get("latest_score_components") or {})
+        incident_id, hypothesis_id, incident_link_status, incident_link_reason = _row_incident_link_fields(
+            row, components, key=key, relationship_type=relationship_type
+        )
         (
             requested_state,
             first_seen,
@@ -765,8 +802,8 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             previous_state=_optional_str(row.get("previous_state")),
             first_seen_at=first_seen,
             last_seen_at=last_seen,
-            incident_id=_optional_str(row.get("incident_id") or components.get("incident_id")),
-            hypothesis_id=_optional_str(row.get("hypothesis_id") or components.get("hypothesis_id")),
+            incident_id=incident_id,
+            hypothesis_id=hypothesis_id,
             incident_canonical_name=_optional_str(
                 row.get("incident_canonical_name")
                 or row.get("canonical_incident_name")
@@ -809,8 +846,8 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
                 if "causal_mechanism_confirmed" in row
                 else components.get("causal_mechanism_confirmed")
             ),
-            incident_link_status=_optional_str(row.get("incident_link_status") or components.get("incident_link_status")),
-            incident_link_reason=_optional_str(row.get("incident_link_reason") or components.get("incident_link_reason")),
+            incident_link_status=incident_link_status,
+            incident_link_reason=incident_link_reason,
             requested_state_before_quality_gate=requested_state,
             final_state_after_quality_gate=final_state,
             quality_state_block_reason=quality_state_block,

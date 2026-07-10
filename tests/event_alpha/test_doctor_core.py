@@ -44,6 +44,32 @@ def test_event_alpha_artifact_doctor_public_entrypoints_are_split():
     assert secrets.secret_leak_count(({"api_key": "redacted"},)) == 1
 
 
+def test_notification_rehearsal_namespace_does_not_require_daily_burn_in_artifact():
+    from crypto_rsi_scanner.event_alpha.doctor.checks import operations
+
+    ctx = SimpleNamespace(
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        namespace_status=SimpleNamespace(status="active_live_rehearsal", safe_for_burn_in_measurement=False),
+        daily_burn_in_run={},
+        candidate_mode_manifest={},
+        burn_in_scorecard={},
+        source_yield_report={},
+        daily_review_inbox={},
+        burn_in_archive_manifest={},
+        integrated_conflicts={},
+        integrated_candidates=[],
+    )
+    blockers: list[str] = []
+    warnings: list[str] = []
+    operations.apply_checks(ctx, blockers, warnings)
+    assert not any("daily_burn_in_run_missing" in blocker for blocker in blockers)
+
+    ctx.namespace_status = SimpleNamespace(status="active_live_rehearsal", safe_for_burn_in_measurement=True)
+    operations.apply_checks(ctx, blockers, warnings)
+    assert any("daily_burn_in_run_missing" in blocker for blocker in blockers)
+
+
 def test_event_alpha_doctor_check_plugins_emit_regression_messages():
     from crypto_rsi_scanner.event_alpha.doctor.checks import (
         integrated_radar,
@@ -178,6 +204,39 @@ def test_event_alpha_doctor_check_plugins_emit_regression_messages():
     assert "derivatives_unit_metadata_missing=1" in warnings
     assert "source_pack_provider_status_missing=1" in warnings
     assert any("pre-canonical notification delivery rows" in message for message in warnings)
+
+
+def test_artifact_doctor_does_not_double_count_loaded_absolute_paths(tmp_path):
+    import json
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+
+    namespace_dir = tmp_path / "notify_no_key"
+    namespace_dir.mkdir()
+    absolute_alert_path = "/tmp/event_fade_cache/notify_no_key/event_alpha_alerts.jsonl"
+    run = {
+        "row_type": "event_alpha_run",
+        "run_id": "legacy-path-run",
+        "profile": "notify_no_key",
+        "artifact_namespace": "notify_no_key",
+        "run_mode": "notification_burn_in",
+        "alert_store_path": absolute_alert_path,
+    }
+    (namespace_dir / "event_alpha_runs.jsonl").write_text(
+        json.dumps(run) + "\n",
+        encoding="utf-8",
+    )
+    source_coverage = namespace_dir / "event_alpha_source_coverage.md"
+    source_coverage.write_text("research-only source coverage\n", encoding="utf-8")
+
+    result = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[run],
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        inspected_alert_store_path=namespace_dir / "event_alpha_alerts.jsonl",
+        source_coverage_report_path=source_coverage,
+        strict=True,
+    )
+    assert result.operator_structured_path_absolute == 1
 
 
 def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor_checked():

@@ -81,6 +81,7 @@ class ArtifactSchema:
     lineage_fields: tuple[str, ...] = ()
     artifact_relpath_fields: tuple[str, ...] = ()
     secret_redaction_fields: tuple[str, ...] = ()
+    allows_guarded_send: bool = False
     allowed_opportunity_types: tuple[str, ...] = ALLOWED_OPPORTUNITY_TYPES
     allowed_final_levels: tuple[str, ...] = ALLOWED_FINAL_LEVELS
     allowed_delivery_statuses: tuple[str, ...] = ALLOWED_DELIVERY_STATUSES
@@ -197,6 +198,7 @@ def _schema(
     paths: Iterable[str] = (),
     timestamps: Iterable[str] = (),
     lineage: Iterable[str] = (),
+    allows_guarded_send: bool = False,
 ) -> ArtifactSchema:
     enum_values = {key: tuple(value) for key, value in (enums or {}).items()}
     return ArtifactSchema(
@@ -213,6 +215,7 @@ def _schema(
         lineage_fields=tuple(dict.fromkeys((*lineage, *COMMON_LINEAGE))),
         artifact_relpath_fields=tuple(paths),
         secret_redaction_fields=tuple(sorted(SECRET_FIELD_NAMES)),
+        allows_guarded_send=bool(allows_guarded_send),
     )
 
 
@@ -287,6 +290,7 @@ SCHEMAS: dict[str, ArtifactSchema] = {
         paths=("card_path", "canonical_card_path", "notification_preview_path"),
         timestamps=("attempted_at", "delivered_at"),
         lineage=COMMON_LINEAGE,
+        allows_guarded_send=True,
     ),
     "integrated_notification_delivery_v1": _schema(
         "integrated_notification_delivery_v1",
@@ -702,6 +706,7 @@ SCHEMAS: dict[str, ArtifactSchema] = {
         timestamps=("started_at", "finished_at", "completed_at", "generated_at"),
         paths=("integrated_candidates_path", "integrated_report_path", "integrated_input_manifest_path", "integrated_source_coverage_json_path"),
         lineage=COMMON_LINEAGE,
+        allows_guarded_send=True,
     ),
 }
 
@@ -871,7 +876,7 @@ def validate_safety_fields(row: Mapping[str, Any], schema: ArtifactSchema) -> li
         if field_name not in row:
             continue
         value = row.get(field_name)
-        if field_name == "sent" and _truthy(value):
+        if field_name == "sent" and _truthy(value) and not _guarded_send_claim_is_valid(row, schema):
             out.append("unsafe_side_effect_flag:sent")
         if field_name == "research_only" and value is False:
             out.append("unsafe_research_only:false")
@@ -1043,6 +1048,8 @@ def _candidate_path_fields(row: Mapping[str, Any], schema: ArtifactSchema) -> tu
         for field in row
         if field.endswith("_path")
         or field.endswith("_paths")
+        or field.endswith("_dir")
+        or field.endswith("_dirs")
         or field.endswith("_relpath")
         or field.endswith("_abs_debug")
     )
@@ -1124,3 +1131,35 @@ def _truthy(value: Any) -> bool:
     if value is None:
         return False
     return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
+
+
+def _guarded_send_claim_is_valid(row: Mapping[str, Any], schema: ArtifactSchema) -> bool:
+    """Return whether ``sent=true`` is a consistent guarded-delivery fact."""
+    if not schema.allows_guarded_send or _truthy(row.get("no_send_rehearsal")):
+        return False
+    row_type = str(row.get("row_type") or "").strip()
+    if row_type == "event_alpha_notification_delivery":
+        status = str(row.get("status") or row.get("delivery_status") or "").strip()
+        try:
+            delivered = int(row.get("delivered_count") or 0)
+        except (TypeError, ValueError):
+            delivered = 0
+        return (
+            str(row.get("delivery_mode") or "").strip() == "live_send"
+            and _truthy(row.get("send_guard_enabled"))
+            and row.get("no_send_rehearsal") is False
+            and status in {"sent", "delivered", "partial_delivered"}
+            and delivered > 0
+        )
+    if row_type == "event_alpha_run":
+        try:
+            delivered = int(row.get("send_items_delivered") or 0)
+        except (TypeError, ValueError):
+            delivered = 0
+        return (
+            _truthy(row.get("send_requested"))
+            and _truthy(row.get("send_attempted"))
+            and _truthy(row.get("send_success"))
+            and delivered > 0
+        )
+    return False
