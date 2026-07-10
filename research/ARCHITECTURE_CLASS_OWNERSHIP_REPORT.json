@@ -1457,7 +1457,7 @@
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-10T04:30:00.490020+00:00",
+  "generated_at": "2026-07-10T04:42:23.420173+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -2833,13 +2833,6 @@
   "multi_public_class_modules_count": 80,
   "near_threshold_file_status": [
     {
-      "line_count": 1499,
-      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
       "line_count": 1498,
       "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3129,7 +3122,7 @@
     "crypto_rsi_scanner.event_alpha.notifications.sender": 1,
     "crypto_rsi_scanner.event_alpha.notifications.slo": 1,
     "crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor": 2,
-    "crypto_rsi_scanner.event_alpha.operations.daily_burn_in": 1,
+    "crypto_rsi_scanner.event_alpha.operations.daily_burn_in_plan": 1,
     "crypto_rsi_scanner.event_alpha.operations.namespace_policy": 1,
     "crypto_rsi_scanner.event_alpha.operations.review_inbox": 1,
     "crypto_rsi_scanner.event_alpha.outcomes.burn_in": 3,
@@ -3297,17 +3290,9 @@
       "rows": []
     },
     "production_files_over_1200_lines": {
-      "count": 14,
+      "count": 13,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
-        {
-          "accepted": true,
-          "line_count": 1499,
-          "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-          "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
-          "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
-          "threshold": 1200
-        },
         {
           "accepted": true,
           "line_count": 1498,
@@ -3445,7 +3430,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 14,
+      "production_files_over_1200_lines": 13,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -3454,11 +3439,6 @@
     "historical_row_type_alias": "refactor_v3_gate_snapshot",
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
-      {
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-        "threshold": 1200
-      },
       {
         "line_count": 1498,
         "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
@@ -3538,17 +3518,9 @@
         "rows": []
       },
       "production_files_over_1200_lines": {
-        "count": 14,
+        "count": 13,
         "reason": "accepted/documented production files over the v3 1,200-line target",
         "rows": [
-          {
-            "accepted": true,
-            "line_count": 1499,
-            "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-            "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
-            "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
-            "threshold": 1200
-          },
           {
             "accepted": true,
             "line_count": 1498,
@@ -3670,7 +3642,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 14,
+    "production_files_over_1200_lines": 13,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,

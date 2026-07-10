@@ -49,15 +49,6 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1499,
-      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-      "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
-      "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
       "line_count": 1498,
       "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
       "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
@@ -229,18 +220,9 @@
       ]
     },
     "production_files_over_1200_lines": {
-      "count": 14,
+      "count": 13,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1499,
-          "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-          "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
-          "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
-          "source_kind": "production"
-        },
         {
           "accepted": true,
           "limit": 1500,
@@ -405,7 +387,7 @@
   "event_alpha_public_compatibility_entrypoints_manifest": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
   "event_fade_safety_exception_present": true,
   "functions_over_150_lines": 0,
-  "generated_at": "2026-07-10T04:30:05.858442+00:00",
+  "generated_at": "2026-07-10T04:45:23.132699+00:00",
   "historical_row_type_alias": "refactor_v4_final_report",
   "model_bundles": [
     {
@@ -1770,7 +1752,7 @@
   "old_path_import_allowed_exceptions": 0,
   "old_path_internal_imports": 0,
   "old_path_test_imports": 0,
-  "production_files_over_1200_lines": 14,
+  "production_files_over_1200_lines": 13,
   "production_files_over_1500_lines": 0,
   "public_compatibility_entrypoints_manifest": "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
   "public_compatibility_entrypoints_path": "research/PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",

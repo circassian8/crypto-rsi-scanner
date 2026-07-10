@@ -13,13 +13,6 @@
     "modules_with_multiple_public_classes_status": "pass",
     "near_threshold_file_status": [
       {
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
         "line_count": 1498,
         "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -313,7 +306,7 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-10T04:30:13+00:00",
+  "generated_at": "2026-07-10T04:45:30+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
@@ -366,15 +359,6 @@
   "size_gates": {
     "accepted_class_exceptions_count": 3,
     "accepted_production_files_over_1200_line_rows": [
-      {
-        "accepted": true,
-        "limit": 1500,
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-        "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
-        "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
-        "source_kind": "production"
-      },
       {
         "accepted": true,
         "limit": 1500,
@@ -493,7 +477,7 @@
         "source_kind": "production"
       }
     ],
-    "accepted_production_files_over_1200_lines": 14,
+    "accepted_production_files_over_1200_lines": 13,
     "api_classes_over_limit": 0,
     "api_decomposition_gate_status": "pass",
     "api_files_over_1500_lines": 0,
@@ -507,12 +491,6 @@
     "gate_status": "pass",
     "largest_api_files": [],
     "largest_production_files": [
-      {
-        "limit": 1500,
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-        "source_kind": "production"
-      },
       {
         "limit": 1500,
         "line_count": 1498,
@@ -595,6 +573,12 @@
         "limit": 1500,
         "line_count": 1181,
         "path": "crypto_rsi_scanner/event_fade.py",
+        "source_kind": "production"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1159,
+        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
         "source_kind": "production"
       },
       {
@@ -883,7 +867,7 @@
       },
       {
         "limit": 1500,
-        "line_count": 334,
+        "line_count": 376,
         "path": "tests/event_alpha/test_burn_in_candidate_mode.py",
         "source_kind": "test"
       },
@@ -994,13 +978,6 @@
     "moved_existing_violation_count": 0,
     "near_threshold_file_status": [
       {
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
         "line_count": 1498,
         "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -1059,7 +1036,7 @@
     ],
     "new_violation_count": 0,
     "production_classes_over_limit": 3,
-    "production_files_over_1200_lines": 14,
+    "production_files_over_1200_lines": 13,
     "production_files_over_1500_lines": 0,
     "production_files_over_2000_lines": 0,
     "production_files_over_3000_lines": 0,

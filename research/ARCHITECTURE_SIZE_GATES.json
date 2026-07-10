@@ -1391,15 +1391,6 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1499,
-      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-      "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
-      "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
       "line_count": 1498,
       "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
       "reason": "Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged.",
@@ -1515,7 +1506,7 @@
       "source_kind": "production"
     }
   ],
-  "accepted_production_files_over_1200_lines": 14,
+  "accepted_production_files_over_1200_lines": 13,
   "api_classes_over_limit": 0,
   "api_classes_over_limit_rows": [],
   "api_decomposition_blockers": [],
@@ -1710,7 +1701,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 670,
+  "file_count": 671,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -1767,16 +1758,10 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-10T04:29:59.413709+00:00",
+  "generated_at": "2026-07-10T04:42:22.324531+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
-    {
-      "limit": 1500,
-      "line_count": 1499,
-      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-      "source_kind": "production"
-    },
     {
       "limit": 1500,
       "line_count": 1498,
@@ -1859,6 +1844,12 @@
       "limit": 1500,
       "line_count": 1181,
       "path": "crypto_rsi_scanner/event_fade.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1159,
+      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
       "source_kind": "production"
     },
     {
@@ -2147,7 +2138,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 334,
+      "line_count": 376,
       "path": "tests/event_alpha/test_burn_in_candidate_mode.py",
       "source_kind": "test"
     },
@@ -3628,13 +3619,6 @@
   "multi_public_class_modules_count": 80,
   "near_threshold_file_status": [
     {
-      "line_count": 1499,
-      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
       "line_count": 1498,
       "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3757,12 +3741,6 @@
   "production_files_over_1200_line_rows": [
     {
       "limit": 1500,
-      "line_count": 1499,
-      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1498,
       "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
       "source_kind": "production"
@@ -3840,7 +3818,7 @@
       "source_kind": "production"
     }
   ],
-  "production_files_over_1200_lines": 14,
+  "production_files_over_1200_lines": 13,
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
@@ -4074,18 +4052,9 @@
       ]
     },
     "production_files_over_1200_lines": {
-      "count": 14,
+      "count": 13,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1499,
-          "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-          "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
-          "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
-          "source_kind": "production"
-        },
         {
           "accepted": true,
           "limit": 1500,
@@ -4236,7 +4205,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 14,
+      "production_files_over_1200_lines": 13,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -4245,11 +4214,6 @@
     "historical_row_type_alias": "refactor_v3_gate_snapshot",
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
-      {
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-        "threshold": 1200
-      },
       {
         "line_count": 1498,
         "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
@@ -4372,18 +4336,9 @@
         ]
       },
       "production_files_over_1200_lines": {
-        "count": 14,
+        "count": 13,
         "reason": "accepted/documented production files over the v3 1,200-line target",
         "rows": [
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1499,
-            "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-            "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
-            "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
-            "source_kind": "production"
-          },
           {
             "accepted": true,
             "limit": 1500,
@@ -4518,7 +4473,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 14,
+    "production_files_over_1200_lines": 13,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,

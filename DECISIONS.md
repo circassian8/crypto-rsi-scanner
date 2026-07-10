@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-10 - Keep burn-in command planning pure and execution stateful
+**Status:** accepted
+**Decision:** Daily Event Alpha burn-in command construction belongs in
+`event_alpha/operations/daily_burn_in_plan.py`; subprocess execution, partial
+artifact writes, candidate accounting, safety counters, and final rendering stay
+in `daily_burn_in.py`. The orchestrator continues to re-export `BurnInStep`,
+`build_steps`, and `default_namespace` for compatibility. Planning regressions
+must prove both exact sequence and absence of send-enabling commands.
+**Why:** The previous 1,499-line module mixed pure plan creation with stateful
+execution. Separating that boundary reduced the orchestrator below the 1,200-line
+architecture threshold without changing any generated command, plan rendering,
+provider gate, required-step status, or research-only safety behavior.
+**Revisit when:** Burn-in artifact schema v2 deliberately changes the plan model,
+or callers are migrated through a separately reviewed public API change.
+
 ## 2026-07-10 - Split oversized tests into focused sub-threshold modules
 **Status:** accepted
 **Decision:** Oversized package test modules must be reduced through cohesive

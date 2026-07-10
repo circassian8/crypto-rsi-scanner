@@ -9,6 +9,7 @@ from pathlib import Path
 from crypto_rsi_scanner.event_alpha.operations import (
     common,
     daily_burn_in,
+    daily_burn_in_plan,
     daily_burn_in_readiness,
     review_inbox,
     scorecard,
@@ -137,6 +138,47 @@ def test_daily_burn_in_build_steps_uses_scoped_doctor_by_default():
     )
     full_doctor = next(step for step in full if isinstance(step, daily_burn_in.BurnInStep) and step.name == "artifact_doctor")
     assert "--event-alpha-artifact-doctor" in full_doctor.command
+
+
+def test_daily_burn_in_plan_module_preserves_public_sequence_and_no_send_boundary():
+    assert daily_burn_in.BurnInStep is daily_burn_in_plan.BurnInStep
+    assert daily_burn_in.build_steps is daily_burn_in_plan.build_steps
+    assert daily_burn_in.default_namespace is daily_burn_in_plan.default_namespace
+
+    steps = daily_burn_in.build_steps(
+        python=sys.executable,
+        profile="live_burn_in_no_send",
+        namespace="burn",
+        include_coinalyze_rehearsal=False,
+    )
+    assert [
+        step.name if isinstance(step, daily_burn_in.BurnInStep) else step["name"]
+        for step in steps
+    ] == [
+        "burn_in_contract",
+        "live_provider_readiness",
+        "cryptopanic_preflight",
+        "coinalyze_preflight",
+        "coinalyze_no_send_rehearsal",
+        "bybit_announcements_preflight",
+        "integrated_radar_cycle",
+        "source_coverage",
+        "notification_preview",
+        "daily_brief",
+        "review_inbox",
+        "artifact_doctor",
+        "burn_in_scorecard",
+    ]
+    commands = "\n".join(
+        " ".join(step.command)
+        if isinstance(step, daily_burn_in.BurnInStep)
+        else str(step.get("command") or "")
+        for step in steps
+    )
+    assert "--event-alpha-telegram-send-one-cycle" not in commands
+    assert "--event-alpha-cycle-send" not in commands
+    assert "--event-alpha-notify-cycle" not in commands
+    assert "RSI_EVENT_ALERTS_ENABLED=1" not in commands
 
 
 def test_daily_burn_in_readiness_no_key_and_mock_allow_paths(tmp_path, monkeypatch):

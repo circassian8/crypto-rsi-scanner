@@ -2,7 +2,7 @@
 
 Research-only architecture gate report. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-10T04:30:05+00:00`
+- generated_at: `2026-07-10T04:45:23+00:00`
 - gate_status: `pass`
 - compatibility_preserved: `True`
 - old_module_paths_removed: `124`
@@ -10,7 +10,7 @@ Research-only architecture gate report. This report does not call providers, sen
 - retained_public_shims_count: `0`
 - shim_dependency_report_cache_status: `miss`
 - shim_dependency_include_runtime_artifacts: `False`
-- shim_dependency_scan_duration_seconds: `1.2716`
+- shim_dependency_scan_duration_seconds: `1.1822`
 - shim_dependency_skipped_artifact_files: `1486`
 - shim_dependency_skipped_large_files: `1`
 - v3_gate_status: `accepted_with_documented_exceptions`
@@ -58,8 +58,8 @@ Research-only architecture gate report. This report does not call providers, sen
 - remaining_class_ownership_debt_count: `0`
 - modules_with_multiple_public_classes_status: `pass`
 - production_size_gate_status: `warning`
-- production_files_over_1200_lines: `14`
-- accepted_production_files_over_1200_lines: `14`
+- production_files_over_1200_lines: `13`
+- accepted_production_files_over_1200_lines: `13`
 - unresolved_production_files_over_1200_lines: `0`
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
@@ -104,7 +104,7 @@ Research-only architecture gate report. This report does not call providers, sen
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 14 | accepted_exception |
+| `production_files_over_1200_lines` | 13 | accepted_exception |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | accepted_exception |
@@ -148,7 +148,6 @@ Research-only architecture gate report. This report does not call providers, sen
 
 | path | lines |
 |---|---:|
-| `crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py` | 1499 |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1472 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1431 |
@@ -163,6 +162,7 @@ Research-only architecture gate report. This report does not call providers, sen
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1239 |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 |
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
+| `crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py` | 1159 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 1155 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py` | 1145 |
 | `crypto_rsi_scanner/event_alpha/operations/review_inbox.py` | 1138 |
@@ -193,7 +193,6 @@ Research-only architecture gate report. This report does not call providers, sen
 
 | path | lines | reason | revisit |
 |---|---:|---|---|
-| `crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py` | 1499 | Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out. | When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split. |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 | Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged. | When identity/source/market/derivatives merge golden fixtures can be compared before and after split. |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1472 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1431 | Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral. | When deleted-shim reporting can be split from old-import linting without changing gate output. |
@@ -240,7 +239,7 @@ Research-only architecture gate report. This report does not call providers, sen
 | `tests/event_alpha/test_shim_registry.py` | 515 |
 | `tests/rsi/test_paper_risk.py` | 466 |
 | `tests/event_alpha/test_operator_identity.py` | 461 |
-| `tests/event_alpha/test_burn_in_candidate_mode.py` | 334 |
+| `tests/event_alpha/test_burn_in_candidate_mode.py` | 376 |
 | `tests/cli/test_parser.py` | 308 |
 | `tests/rsi/test_security.py` | 224 |
 | `tests/cli/test_event_alpha_command_registry.py` | 202 |
@@ -296,7 +295,6 @@ Research-only architecture gate report. This report does not call providers, sen
 
 | path | lines | status | revisit condition |
 |---|---:|---|---|
-| `crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py` | 1499 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1472 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1431 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |

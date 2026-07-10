@@ -2,15 +2,15 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-10T04:29:59.413709+00:00`
+- generated_at: `2026-07-10T04:42:22.324531+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `8`
 - v3_gate_status: `accepted_with_documented_exceptions`
 - v3_auto_accept_ready: `False`
 - v3_blockers: `[]`
-- production_files_over_1200_lines: `14`
-- accepted_production_files_over_1200_lines: `14`
+- production_files_over_1200_lines: `13`
+- accepted_production_files_over_1200_lines: `13`
 - unresolved_production_files_over_1200_lines: `0`
 - production_size_gate_status: `warning`
 - production_files_over_1500_lines: `0`
@@ -70,7 +70,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 14 | accepted_exception |
+| `production_files_over_1200_lines` | 13 | accepted_exception |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | accepted_exception |
@@ -92,7 +92,6 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py` | 1499 |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1472 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1431 |
@@ -107,6 +106,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1239 |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1233 |
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
+| `crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py` | 1159 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 1155 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py` | 1145 |
 | `crypto_rsi_scanner/event_alpha/operations/review_inbox.py` | 1138 |
@@ -137,7 +137,6 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines | reason | revisit |
 |---|---:|---|---|
-| `crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py` | 1499 | Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out. | When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split. |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py` | 1498 | Integrated radar merge policy is behavior-critical and close to the blocker threshold but unchanged. | When identity/source/market/derivatives merge golden fixtures can be compared before and after split. |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1472 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1431 | Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral. | When deleted-shim reporting can be split from old-import linting without changing gate output. |
@@ -184,7 +183,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_shim_registry.py` | 515 |
 | `tests/rsi/test_paper_risk.py` | 466 |
 | `tests/event_alpha/test_operator_identity.py` | 461 |
-| `tests/event_alpha/test_burn_in_candidate_mode.py` | 334 |
+| `tests/event_alpha/test_burn_in_candidate_mode.py` | 376 |
 | `tests/cli/test_parser.py` | 308 |
 | `tests/rsi/test_security.py` | 224 |
 | `tests/cli/test_event_alpha_command_registry.py` | 202 |

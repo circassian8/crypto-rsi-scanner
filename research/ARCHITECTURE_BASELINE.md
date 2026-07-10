@@ -26,7 +26,7 @@ This pass records current behavior and architecture before significant code move
 ## Architecture Inventory
 
 - Top-level `crypto_rsi_scanner/event_*.py` modules: `1`
-- `crypto_rsi_scanner/event_alpha/` files: `440`
+- `crypto_rsi_scanner/event_alpha/` files: `441`
 - `crypto_rsi_scanner/cli/` files: `60`
 - `tests/` package files: `43`
 - GitHub Actions workflows: `2`
@@ -255,6 +255,7 @@ This pass records current behavior and architecture before significant code move
 - `crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py`
 - `crypto_rsi_scanner/event_alpha/operations/daily_burn_in_doctor.py`
 - `crypto_rsi_scanner/event_alpha/operations/daily_burn_in_guardrails.py`
+- `crypto_rsi_scanner/event_alpha/operations/daily_burn_in_plan.py`
 - `crypto_rsi_scanner/event_alpha/operations/daily_burn_in_readiness.py`
 - `crypto_rsi_scanner/event_alpha/operations/evidence_semantics.py`
 - `crypto_rsi_scanner/event_alpha/operations/feedback_progress.py`

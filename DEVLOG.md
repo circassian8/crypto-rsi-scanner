@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split daily burn-in planning from execution · Codex
+**Why:** The 1,499-line daily burn-in module was the repository's largest
+behavioral production file and mixed immutable command construction with
+subprocess execution, incremental artifact writes, safety accounting, and final
+report rendering.
+**Changes:**
+- Extracted `BurnInStep`, namespace construction, and all smoke, candidate-mode,
+  provider-rehearsal, doctor, and daily step planning into the pure
+  `event_alpha/operations/daily_burn_in_plan.py` module. The original module
+  re-exports its three public planning names so existing callers and monkeypatch
+  surfaces remain compatible.
+- Reduced `daily_burn_in.py` from 1,499 to 1,159 lines and retired its obsolete
+  accepted over-1,200-line architecture exception. Stateful execution, partial
+  writes, timeouts, candidate manifests, status semantics, redaction, and
+  no-send/no-trade safety counters remain in the orchestrator.
+- Added a focused regression for the exact default 13-step sequence, public
+  re-export identities, and the absence of send-enabling commands. Documented
+  the package boundary in the working agreement and durable decisions.
+**Verify:** Pre/post SHA-256 snapshots matched exactly for smoke
+(`433f3982...`), candidate smoke (`b73e7e60...`), default daily
+(`f561e2fa...`), provider candidate (`24ec9a09...`), full-doctor
+(`dd2c7ae9...`), and rendered dry-run plan (`1fedb279...`). All 53 burn-in/CLI
+tests passed. Both no-send fixture smokes passed (3/3 and 5/5 steps), the scoped
+doctor returned `OK` with zero blockers/warnings, and strict artifact doctor
+returned `OK` with zero blockers/warnings. The broad Event Alpha/CLI gate passed
+all 649 tests in 150.05s and the CLI Make-target surface passed all 25 tests.
+Canonical architecture reports remain green/accepted with production files and
+accepted exceptions over 1,200 lines reduced from 14 to 13, unresolved
+over-1,200 files at zero, over-1,500 files at zero, and
+`new_violation_count=0`. Compileall, transitional/naming checks, and
+`git diff --check` passed.
+**Notes/risks:** No command, provider activation rule, live-call allowance,
+notification route, artifact schema, signal, paper, trade, or Event Alpha tier
+behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split event-fade validation and review workflow tests · Codex
 **Why:** After the first integrated-radar burn-down, one contiguous 2,360-line
 surface still mixed validation schemas, promotion blockers, human review

@@ -363,6 +363,7 @@
     "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
     "crypto_rsi_scanner/event_alpha/operations/daily_burn_in_doctor.py",
     "crypto_rsi_scanner/event_alpha/operations/daily_burn_in_guardrails.py",
+    "crypto_rsi_scanner/event_alpha/operations/daily_burn_in_plan.py",
     "crypto_rsi_scanner/event_alpha/operations/daily_burn_in_readiness.py",
     "crypto_rsi_scanner/event_alpha/operations/evidence_semantics.py",
     "crypto_rsi_scanner/event_alpha/operations/feedback_progress.py",
@@ -583,7 +584,7 @@
     "crypto_rsi_scanner/event_alpha/shim_scan.py",
     "crypto_rsi_scanner/event_alpha/shims.py"
   ],
-  "generated_at": "2026-07-10T04:29:56+00:00",
+  "generated_at": "2026-07-10T04:42:19+00:00",
   "generator": "crypto_rsi_scanner.project_health.baseline",
   "github_actions_safety": {
     "forbidden_live_or_secret_terms_present": [],

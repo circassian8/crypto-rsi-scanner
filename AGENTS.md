@@ -381,6 +381,8 @@ top-level `event_*.py` shims:
 | `event_alpha/outcomes/` | outcomes, calibration, feedback, burn-in, quality, priors, policy simulation |
 | `event_alpha/doctor/` | schema-first doctor phases, check registry, plugin checks, reports |
 | `event_alpha/namespace/` | namespace status and lifecycle reporting |
+| `event_alpha/operations/daily_burn_in.py` | stateful daily no-send burn-in execution, partial/final artifacts, candidate accounting, safety counters, and report rendering |
+| `event_alpha/operations/daily_burn_in_plan.py` | pure burn-in step/command planning; keep send-enabling commands out and preserve the orchestrator's public re-exports |
 | `cli/` | parser, dispatch, and command-group modules |
 
 No old flat Event Alpha public compatibility shims remain. Deleted old imports

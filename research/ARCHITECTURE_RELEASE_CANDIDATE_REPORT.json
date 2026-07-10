@@ -14,13 +14,6 @@
     "modules_with_multiple_public_classes_status": "pass",
     "near_threshold_file_status": [
       {
-        "line_count": 1499,
-        "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
         "line_count": 1498,
         "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge.py",
         "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -260,7 +253,7 @@
     },
     "remaining_api_unregistered_details": []
   },
-  "generated_at": "2026-07-10T04:30:21+00:00",
+  "generated_at": "2026-07-10T04:45:38+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_release_candidate_report",
   "known_remaining_blockers": [],

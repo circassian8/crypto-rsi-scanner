@@ -52,10 +52,6 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
         "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
     },
-    "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py": {
-        "reason": "Daily burn-in orchestrator owns required step sequencing, final status semantics, and no-send safety counters; command bodies are split out.",
-        "revisit_condition": "When daily step planning, candidate manifest accounting, and run artifact rendering have golden JSON/Markdown fixtures for a lower-risk split.",
-    },
     "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py": {
         "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
         "revisit_condition": "When outcome performance views gain new sections.",
