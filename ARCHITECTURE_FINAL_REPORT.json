@@ -1497,7 +1497,7 @@
       "crypto_rsi_scanner/event_alpha/notifications/pipeline_core.py"
     ],
     "api_total_lines": 0,
-    "generated_at": "2026-07-10T07:28:52+00:00",
+    "generated_at": "2026-07-10T07:34:44+00:00",
     "largest_api_files": [],
     "no_live_provider_calls": true,
     "normal_rsi_signal_rows_written": 0,
@@ -4555,7 +4555,7 @@
     "passed": 3,
     "status": "pass"
   },
-  "generated_at": "2026-07-10T07:28:57+00:00",
+  "generated_at": "2026-07-10T07:34:49+00:00",
   "generator": "crypto_rsi_scanner.project_health.architecture_report",
   "historical_row_type_alias": "refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
@@ -6745,15 +6745,15 @@
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
       "AGENTS.md:1783659174",
-      "ARCHITECTURE_FINAL_REPORT.md:1783668067",
+      "ARCHITECTURE_FINAL_REPORT.md:1783668292",
       "CLAUDE.md:1783278280",
-      "DECISIONS.md:1783668519",
-      "DEVLOG.md:1783668519"
+      "DECISIONS.md:1783668292",
+      "DEVLOG.md:1783668869"
     ],
-    "newest_source_mtime": 1783668532.836511,
+    "newest_source_mtime": 1783668884.1658537,
     "regex_compile_count": 0,
     "report_mtime": 1783260863.808767,
-    "scan_duration_seconds": 1.1825,
+    "scan_duration_seconds": 1.1695,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 51,
     "scanned_makefile_files": 1,
@@ -6781,7 +6781,7 @@
     "skipped_large_files": 1,
     "skipped_suffix_files": 1
   },
-  "shim_dependency_scan_duration_seconds": 1.1825,
+  "shim_dependency_scan_duration_seconds": 1.1695,
   "shim_dependency_scanned_doc_files": 51,
   "shim_dependency_scanned_source_files": 636,
   "shim_dependency_scanned_test_files": 81,
@@ -6846,7 +6846,7 @@
     "deleted_shims_count": 124,
     "event_alpha_public_compatibility_entrypoints_path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
     "event_fade_safety_exception_present": true,
-    "generated_at": "2026-07-10T07:28:52.921218+00:00",
+    "generated_at": "2026-07-10T07:34:44.251650+00:00",
     "historical_row_type_alias": "final_refactor_transitional_file_report",
     "migration_named_dirs": [],
     "migration_named_dirs_count": 0,

@@ -17,6 +17,21 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Refresh live outcome waiting evidence · Codex
+**Why:** The long-goal final audit found that three waiting rows still cited June
+17 sample counts even though the read-only live outcome and paper reports have
+grown materially.
+**Changes:**
+- Updated conviction and state-cohort waiting evidence to the July 10 reports
+  while deliberately keeping all three items in `waiting` status.
+**Verify:** `main.py --report` completed read-only with 1,484 matured observations,
+192 at 7d, conviction counts 15/150/27, and state metadata on 91 7d rows.
+`main.py --score --cohorts` completed read-only with 75 closed / 19 open paper
+trades and state metadata on 69 closed rows. Architecture reports, JSON
+validation, and `git diff --check` passed.
+**Notes/risks:** Evidence only; no live priors, registry calibration, state rule,
+signal, notification, paper record, trade, or execution behavior changed.
+
 ## 2026-07-10 — Refresh aggregate architecture-cleanliness evidence · Codex
 **Why:** The final long-goal audit needed one current aggregate check after the
 test/package burn-downs and production helper splits, including refreshed
