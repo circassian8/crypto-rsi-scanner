@@ -2,10 +2,10 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-10T06:25:42.703474+00:00`
+- generated_at: `2026-07-10T06:31:34.182045+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
-- files_over_limit_count: `3`
+- files_over_limit_count: `2`
 - v3_gate_status: `accepted_with_documented_exceptions`
 - v3_auto_accept_ready: `False`
 - v3_blockers: `[]`
@@ -19,7 +19,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_classes_over_limit: `3`
 - production_functions_over_limit: `0`
 - test_size_gate_status: `warning`
-- test_files_over_1500_lines: `3`
+- test_files_over_1500_lines: `2`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `0`
 - accepted_class_exceptions_count: `3`
@@ -160,15 +160,15 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `tests/event_alpha/test_source_coverage.py` | 2991 |
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
-| `tests/test_indicators.py` | 1692 |
+| `tests/test_indicators.py` | 1695 |
 | `tests/event_alpha/test_burn_in_operations.py` | 1477 |
 | `tests/event_alpha/test_market_surfaces.py` | 1450 |
 | `tests/cli/test_make_targets.py` | 1407 |
 | `tests/event_alpha/test_provider_activation.py` | 1356 |
 | `tests/event_alpha/test_fade_review_workflows.py` | 1309 |
 | `tests/event_alpha/test_core_opportunities.py` | 1282 |
+| `tests/event_alpha/test_evidence_acquisition.py` | 1214 |
 | `tests/event_alpha/test_watchlist_router.py` | 1156 |
 | `tests/event_alpha/test_catalyst_frames.py` | 1127 |
 | `tests/event_alpha/test_news_providers.py` | 1113 |
@@ -183,6 +183,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_impact_hypotheses.py` | 920 |
 | `tests/event_alpha/test_feedback_calibration.py` | 905 |
 | `tests/event_alpha/test_doctor_provider_conflicts.py` | 895 |
+| `tests/event_alpha/test_catalyst_search.py` | 891 |
 | `tests/event_alpha/test_evidence_quality.py` | 868 |
 | `tests/event_alpha/test_notification_operations.py` | 868 |
 | `tests/event_alpha/test_claim_semantics.py` | 867 |
@@ -199,23 +200,20 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_doctor_core.py` | 696 |
 | `tests/event_alpha/test_notification_planning.py` | 675 |
 | `tests/event_alpha/test_incident_relevance.py` | 639 |
-| `tests/event_alpha/test_doctor_quality.py` | 623 |
 
 ## Files Over 1500 Lines
 
 | path | lines |
 |---|---:|
 | `tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
-| `tests/event_alpha/test_source_coverage.py` | 2991 |
-| `tests/test_indicators.py` | 1692 |
+| `tests/test_indicators.py` | 1695 |
 
 ## Existing Violations
 
 | category | id | lines/count |
 |---|---|---:|
 | `file_over_1500_lines` | `file:tests/event_alpha/test_namespace_lifecycle.py` | 1826 |
-| `file_over_1500_lines` | `file:tests/event_alpha/test_source_coverage.py` | 2991 |
-| `file_over_1500_lines` | `file:tests/test_indicators.py` | 1692 |
+| `file_over_1500_lines` | `file:tests/test_indicators.py` | 1695 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/migrations.py:MigrationsMixin` | 88 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/signals.py:SignalsMixin` | 129 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin` | 89 |

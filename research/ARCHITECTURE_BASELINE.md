@@ -20,7 +20,7 @@ This pass records current behavior and architecture before significant code move
 | file | lines |
 |---|---:|
 | `crypto_rsi_scanner/scanner.py` | 90 |
-| `tests/test_indicators.py` | 1692 |
+| `tests/test_indicators.py` | 1695 |
 | `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py` | 36 |
 
 ## Architecture Inventory
@@ -28,7 +28,7 @@ This pass records current behavior and architecture before significant code move
 - Top-level `crypto_rsi_scanner/event_*.py` modules: `1`
 - `crypto_rsi_scanner/event_alpha/` files: `442`
 - `crypto_rsi_scanner/cli/` files: `60`
-- `tests/` package files: `75`
+- `tests/` package files: `78`
 - GitHub Actions workflows: `2`
 - Event-related Makefile targets: `230`
 
@@ -565,6 +565,7 @@ This pass records current behavior and architecture before significant code move
 - `tests/event_alpha/test_burn_in_outcomes.py`
 - `tests/event_alpha/test_canonical_imports.py`
 - `tests/event_alpha/test_catalyst_frames.py`
+- `tests/event_alpha/test_catalyst_search.py`
 - `tests/event_alpha/test_claim_semantics.py`
 - `tests/event_alpha/test_core_opportunities.py`
 - `tests/event_alpha/test_core_reconciliation.py`
@@ -576,6 +577,7 @@ This pass records current behavior and architecture before significant code move
 - `tests/event_alpha/test_doctor_quality.py`
 - `tests/event_alpha/test_doctor_reconciliation.py`
 - `tests/event_alpha/test_event_alert_ranking.py`
+- `tests/event_alpha/test_evidence_acquisition.py`
 - `tests/event_alpha/test_evidence_quality.py`
 - `tests/event_alpha/test_exchange_universe_providers.py`
 - `tests/event_alpha/test_fade_core.py`
@@ -607,7 +609,8 @@ This pass records current behavior and architecture before significant code move
 - `tests/event_alpha/test_quality_feedback.py`
 - `tests/event_alpha/test_radar_pipeline.py`
 - `tests/event_alpha/test_shim_registry.py`
-- `tests/event_alpha/test_source_coverage.py`
+- `tests/event_alpha/test_source_coverage_reports.py`
+- `tests/event_alpha/test_source_registry.py`
 - `tests/event_alpha/test_watchlist_router.py`
 - `tests/rsi/__init__.py`
 - `tests/rsi/_api_helpers.py`
@@ -950,7 +953,7 @@ This pass records current behavior and architecture before significant code move
 | gate | target | current | status |
 |---|---|---:|---|
 | scanner.py reduced below 2000 lines by final phase | `<2000` | 90 | `baseline_recorded` |
-| tests/test_indicators.py becomes umbrella runner below 2000 lines by final phase | `<2000` | 1692 | `baseline_recorded` |
+| tests/test_indicators.py becomes umbrella runner below 2000 lines by final phase | `<2000` | 1695 | `baseline_recorded` |
 | event_alpha/doctor/artifact_doctor.py remains public orchestrator below 300 lines by final phase | `<300` | 36 | `baseline_recorded` |
 | pytest-compatible test package exists | `exists` | true | `present` |
 | schema v1 is the declared artifact contract | `exists` | true | `present` |

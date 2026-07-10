@@ -1543,6 +1543,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_artifact_schema",
     "tests.event_alpha.test_burn_in_outcomes",
     "tests.event_alpha.test_canonical_imports",
+    "tests.event_alpha.test_catalyst_search",
     "tests.event_alpha.test_catalyst_frames",
     "tests.event_alpha.test_claim_semantics",
     "tests.event_alpha.test_core_opportunities",
@@ -1555,6 +1556,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_doctor_quality",
     "tests.event_alpha.test_doctor_reconciliation",
     "tests.event_alpha.test_event_alert_ranking",
+    "tests.event_alpha.test_evidence_acquisition",
     "tests.event_alpha.test_evidence_quality",
     "tests.event_alpha.test_exchange_universe_providers",
     "tests.event_alpha.test_fade_core",
@@ -1586,7 +1588,8 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_quality_feedback",
     "tests.event_alpha.test_radar_pipeline",
     "tests.event_alpha.test_shim_registry",
-    "tests.event_alpha.test_source_coverage",
+    "tests.event_alpha.test_source_coverage_reports",
+    "tests.event_alpha.test_source_registry",
     "tests.event_alpha.test_watchlist_router",
 )
 

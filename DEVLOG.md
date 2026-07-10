@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Retire the source-coverage test monolith · Codex
+**Why:** `test_source_coverage.py` was the next largest accepted test file at
+2,991 lines, combining four independent provider-evidence concerns.
+**Changes:**
+- Split coverage imports/reports/doctor checks (527 lines), catalyst-search and
+  enrichment behavior (891), source reliability/registry/packs (405), and
+  evidence-acquisition/provider/operator contracts (1,214) into focused modules.
+- Registered all four modules with the standalone compatibility runner and
+  deleted `test_source_coverage.py`. All 35 names remain exact and unique
+  (sorted-name SHA-256 `ea7c4d92...`); no replacement crosses 1,500 lines.
+- Updated the roadmap, durable split evidence, and test-organization map.
+**Verify:** All 35 source-coverage tests passed under pytest in 12.72s and all 35
+passed through the standalone adapter. The full Event Alpha package passed all
+650 tests in 152.16s. Standalone discovery remains 786 total / 594 Event Alpha /
+109 RSI / 42 CLI / 41 umbrella tests. Compileall, architecture reports, and
+`git diff --check` passed; the canonical oversized-test count fell from 3 to 2
+with `new_violation_count=0`.
+**Notes/risks:** Test organization and documentation only; no source coverage,
+catalyst search, provider, evidence acquisition, signal, notification, paper,
+trade, or execution behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Retire the artifact-doctor test monolith · Codex
 **Why:** `test_artifact_doctor.py` was the largest remaining test file at 4,052
 lines. Its 47 regressions had five stable boundaries matching doctor concerns.

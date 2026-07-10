@@ -299,7 +299,7 @@
     "transitional_named_files_remaining": 0,
     "transitional_named_files_with_implementation": 0
   },
-  "generated_at": "2026-07-10T06:25:56+00:00",
+  "generated_at": "2026-07-10T06:31:48+00:00",
   "generator": "crypto_rsi_scanner.project_health.completion_map",
   "historical_row_type_alias": "refactor_completion_map",
   "known_remaining_blockers": [],
@@ -470,7 +470,7 @@
     "api_modules_with_multiple_public_classes": 0,
     "api_total_lines": 0,
     "classes_over_limit_count": 3,
-    "files_over_limit_count": 3,
+    "files_over_limit_count": 2,
     "functions_over_limit_count": 0,
     "gate_status": "pass",
     "largest_api_files": [],
@@ -719,19 +719,13 @@
     "largest_test_files": [
       {
         "limit": 1500,
-        "line_count": 2991,
-        "path": "tests/event_alpha/test_source_coverage.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
         "line_count": 1826,
         "path": "tests/event_alpha/test_namespace_lifecycle.py",
         "source_kind": "test"
       },
       {
         "limit": 1500,
-        "line_count": 1692,
+        "line_count": 1695,
         "path": "tests/test_indicators.py",
         "source_kind": "test"
       },
@@ -769,6 +763,12 @@
         "limit": 1500,
         "line_count": 1282,
         "path": "tests/event_alpha/test_core_opportunities.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 1214,
+        "path": "tests/event_alpha/test_evidence_acquisition.py",
         "source_kind": "test"
       },
       {
@@ -853,6 +853,12 @@
         "limit": 1500,
         "line_count": 895,
         "path": "tests/event_alpha/test_doctor_provider_conflicts.py",
+        "source_kind": "test"
+      },
+      {
+        "limit": 1500,
+        "line_count": 891,
+        "path": "tests/event_alpha/test_catalyst_search.py",
         "source_kind": "test"
       },
       {
@@ -949,12 +955,6 @@
         "limit": 1500,
         "line_count": 639,
         "path": "tests/event_alpha/test_incident_relevance.py",
-        "source_kind": "test"
-      },
-      {
-        "limit": 1500,
-        "line_count": 623,
-        "path": "tests/event_alpha/test_doctor_quality.py",
         "source_kind": "test"
       }
     ],
@@ -1180,7 +1180,7 @@
         "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
       }
     ],
-    "test_files_over_1500_lines": 3,
+    "test_files_over_1500_lines": 2,
     "test_size_gate_status": "warning",
     "unresolved_production_files_over_1200_line_rows": [],
     "unresolved_production_files_over_1200_lines": 0

@@ -114,6 +114,10 @@ The 4,052-line artifact-doctor test file was partitioned into five core/schema,
 notification, quality, reconciliation, and provider-conflict/integrated-safety
 modules ranging from 623 to 1,082 lines; all 47 identities were preserved and
 the source monolith was deleted.
+The 2,991-line source-coverage test file was partitioned into four report,
+catalyst-search, source-registry/pack, and evidence-acquisition modules ranging
+from 405 to 1,214 lines; all 35 identities were preserved and the source
+monolith was deleted.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.

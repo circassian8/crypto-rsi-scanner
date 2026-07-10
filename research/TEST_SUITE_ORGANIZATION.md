@@ -25,6 +25,10 @@ This document records the pytest-compatible split of the historical
 | `tests/event_alpha/test_fade_review_workflows.py` | Review sidecars, balanced templates, scanner reports, review bundles, cached workspaces, and merge workflows. |
 | `tests/event_alpha/test_fade_core.py` | Pure event-fade scoring/state/trigger/risk behavior plus conservative discovery resolver collision/noise handling. |
 | `tests/event_alpha/test_event_alert_ranking.py` | Research alert ranking, proxy-venue opt-in, triggered-fade tier eligibility, cluster/noise caps, playbook tiers, and rejection overrides. |
+| `tests/event_alpha/test_source_coverage_reports.py` | Canonical imports, live-provider readiness links, source-coverage reports, and doctor diagnostics. |
+| `tests/event_alpha/test_catalyst_search.py` | Catalyst-search identity safety, provider caching, source enrichment, and pipeline ordering. |
+| `tests/event_alpha/test_source_registry.py` | Source reliability recommendations, registry v2 semantics, source packs, and feed coverage. |
+| `tests/event_alpha/test_evidence_acquisition.py` | Evidence acquisition execution, provider acceptance/rejection, core reconciliation, operator surfaces, and coverage metrics. |
 | `tests/event_alpha/test_evidence_quality.py` | Source-quality mapping, evidence gates, opportunity verdicts, market confirmation, and quality-boundary regressions. |
 | `tests/event_alpha/test_alert_outcomes.py` | Event Alpha alert snapshots, local price outcome filling, cohort reporting, and schema compatibility. |
 | `tests/event_alpha/test_feedback_calibration.py` | Feedback labels, calibration reports, policy simulation, quality thresholds, and prior/recommendation contracts. |
@@ -84,7 +88,7 @@ release guard.
 ## Size Gate
 
 After the Event Alpha and base-suite splits, `tests/test_indicators.py` was
-1,784 lines immediately before the focused backup-test move. It is now 1,692
+1,784 lines immediately before the focused backup-test move. It is now 1,695
 lines and reports these standalone counts:
 
 | count | value |
@@ -126,6 +130,11 @@ the full Event Alpha package remains green at 650 tests.
 
 The 4,052-line artifact-doctor test monolith was retired into five focused
 modules ranging from 623 to 1,082 lines. All 47 original doctor identities
+remain exact and unique, all pass through both pytest and the standalone
+adapter, and the full Event Alpha package remains green at 650 tests.
+
+The 2,991-line source-coverage test monolith was retired into four focused
+modules ranging from 405 to 1,214 lines. All 35 original coverage identities
 remain exact and unique, all pass through both pytest and the standalone
 adapter, and the full Event Alpha package remains green at 650 tests.
 
