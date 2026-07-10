@@ -77,6 +77,9 @@ the exact 94-name surface preserved.
 A sixth split moved 15 fade/resolver tests and 6 alert-ranking/trigger-guard
 tests into 435- and 377-line modules; the source monolith fell from 6,421 to
 5,634 lines with the exact 81-name surface preserved.
+A seventh split moved 5 market enrichment/anomaly lifecycle tests and 3
+deterministic playbook/graph tests into 387- and 531-line modules; the source
+monolith fell from 5,634 to 4,740 lines with the exact 60-name surface preserved.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.

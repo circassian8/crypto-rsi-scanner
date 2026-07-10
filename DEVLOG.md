@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Split integrated-radar market and playbook tests · Codex
+**Why:** The 5,634-line monolith still mixed market enrichment/anomaly lifecycle
+with deterministic playbook classification and catalyst graph behavior.
+**Changes:**
+- Moved 5 CoinGecko enrichment/non-overwrite, store-only anomaly, bounded
+  evidence-search, and found/validated/expired lifecycle tests into
+  `test_market_enrichment.py` (387 lines).
+- Moved the 301-line playbook taxonomy regression plus graph clustering,
+  rejected noise links, and direct supply/derivatives linkage tests into
+  `test_playbooks_graph.py` (531 lines). Registered both modules with the
+  standalone compatibility runner.
+- Reduced `test_integrated_radar.py` from 5,634 to 4,740 lines. Its pre-split 60
+  names remain exact and unique across the three files (sorted-name SHA-256
+  `74d12ea5...`). Updated the roadmap, durable split evidence, and organization
+  map.
+**Verify:** Both extracted modules passed all 8 tests and all 8 passed through
+the standalone adapter. The complete source-plus-extracted surface passed all 60
+tests in 1.80s. Standalone discovery remains 786 total / 594 Event Alpha / 109
+RSI / 42 CLI / 41 umbrella tests. Compileall and `git diff --check` passed. The
+already-green 650-test Event Alpha package was not redundantly rerun for this
+exact, test-only move.
+**Notes/risks:** Test organization and documentation only; no enrichment,
+anomaly, search, playbook, graph, radar, notification, signal, paper, trade, or
+execution behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Split integrated-radar fade and alert tests · Codex
 **Why:** The 6,421-line monolith still opened with two independent research
 surfaces: pure event-fade/resolver behavior and alert ranking/tier/trigger gates.
