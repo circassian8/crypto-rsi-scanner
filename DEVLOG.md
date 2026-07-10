@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Retire the namespace-lifecycle test monolith · Codex
+**Why:** `test_namespace_lifecycle.py` was the final Event Alpha package test
+above the 1,500-line warning, combining four independent lifecycle concerns.
+**Changes:**
+- Split namespace/profile/clock/notification behavior (683 lines), run-ledger,
+  lock, delivery, and scheduled-target safety (338), structured unlock and
+  scheduled-catalyst behavior (242), and cross-namespace integrations and
+  lifecycle policy (612) into focused modules.
+- Registered all four modules with the standalone compatibility runner and
+  deleted `test_namespace_lifecycle.py`. All 30 names remain exact and unique
+  (sorted-name SHA-256 `c358418b...`); no replacement crosses 1,500 lines.
+- Updated the roadmap, durable split evidence, and test-organization map.
+**Verify:** All 30 namespace tests passed under pytest in 10.31s and all 30
+passed through the standalone adapter. The full Event Alpha package passed all
+650 tests in 152.22s. Standalone discovery remains 786 total / 594 Event Alpha /
+109 RSI / 42 CLI / 41 umbrella tests. Compileall, architecture reports, and
+`git diff --check` passed; the canonical oversized-test count fell from 2 to 1
+with `new_violation_count=0`.
+**Notes/risks:** Test organization and documentation only; no namespace,
+research-clock, notification, lock, provider, signal, paper, trade, or execution
+behavior changed. Routine GitHub CI will not be awaited.
+
 ## 2026-07-10 — Retire the source-coverage test monolith · Codex
 **Why:** `test_source_coverage.py` was the next largest accepted test file at
 2,991 lines, combining four independent provider-evidence concerns.

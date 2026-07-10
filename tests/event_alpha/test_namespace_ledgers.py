@@ -1,0 +1,338 @@
+"""Namespace run ledgers, locks, delivery isolation, stale markers, and scheduled-target regressions."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from crypto_rsi_scanner.event_alpha.namespace import lifecycle
+
+# --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
+from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
+
+globals().update({
+    name: value
+    for name, value in vars(_event_alpha_api_helpers).items()
+    if not name.startswith("__")
+})
+
+
+def test_event_alpha_run_ledger_records_send_accounting():
+    import tempfile
+    from dataclasses import replace
+    from datetime import datetime, timezone
+    from pathlib import Path
+    import crypto_rsi_scanner.event_alpha.radar.pipeline as event_alpha_pipeline
+    import crypto_rsi_scanner.event_alpha.artifacts.run_ledger as event_alpha_run_ledger
+    import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult
+
+    now = datetime(2026, 6, 18, 13, 0, tzinfo=timezone.utc)
+
+    def empty_loader(observed, raw_event_transform):
+        return EventDiscoveryResult((), (), (), (), ())
+
+    with tempfile.TemporaryDirectory() as tmp:
+        watch_path = Path(tmp) / "watchlist.jsonl"
+        no_decisions = event_alpha_pipeline.run_event_alpha_operating_cycle(
+            load_discovery_result=empty_loader,
+            now=now,
+            watchlist_cfg=event_watchlist.EventWatchlistConfig(enabled=True, state_path=watch_path),
+            router_cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True),
+            refresh_watchlist=False,
+            route=True,
+            send=True,
+            send_callback=lambda decisions: event_alpha_pipeline.EventAlphaSendResult(
+                requested=True,
+                attempted=True,
+                success=True,
+                items_attempted=len(decisions),
+                items_delivered=len(decisions),
+            ),
+        )
+        assert no_decisions.send_requested is True
+        assert no_decisions.send_attempted is False
+        assert no_decisions.send_block_reason == "no alertable route decisions"
+        cfg = event_alpha_run_ledger.EventAlphaRunLedgerConfig(path=Path(tmp) / "runs.jsonl")
+        row = event_alpha_run_ledger.append_run_record(
+            no_decisions,
+            cfg=cfg,
+            profile="fixture",
+            started_at=now,
+            finished_at=now,
+            with_llm=False,
+            send_requested=True,
+        )
+        assert row["send_requested"] is True
+        assert row["send_attempted"] is False
+        assert row["send_success"] is False
+        assert row["send_block_reason"] == "no alertable route decisions"
+
+        delivered = event_alpha_pipeline._normalize_send_result(True, [])
+        delivered_result = event_alpha_pipeline._with_send_result(no_decisions, delivered)
+        delivered_result = replace(
+            delivered_result,
+            clock_status={
+                "clock_mode": "fixed",
+                "research_now": "2026-06-15T16:00:00+00:00",
+                "wall_clock_now": "2026-06-20T12:00:00+00:00",
+                "fixed_clock_age_hours": 116.0,
+            },
+        )
+        row2 = event_alpha_run_ledger.append_run_record(
+            delivered_result,
+            cfg=cfg,
+            profile="fixture",
+            started_at=now,
+            finished_at=now,
+            with_llm=False,
+            send_requested=True,
+        )
+        assert row2["send_attempted"] is True
+        assert row2["send_success"] is True
+        assert row2["clock_mode"] == "fixed"
+        assert row2["fixed_clock_age_hours"] == 116.0
+        assert "send=0/0" in event_alpha_run_ledger.format_run_ledger_report(
+            event_alpha_run_ledger.load_run_records(cfg.path)
+        )
+
+
+def test_event_alpha_run_lock_acquire_skip_recover_and_release():
+    import tempfile
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.artifacts.locks as lock
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        cfg = lock.EventAlphaRunLockConfig(enabled=True, stale_minutes=30, allow_overlap=False)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        first = lock.acquire_run_lock(ctx, cfg=cfg, run_id="r1", now=now)
+        assert first.acquired and first.owned
+        assert first.status.state == lock.STATE_ACQUIRED
+        assert first.path.name == "event_alpha_notify.lock"
+        assert first.path.exists()
+
+        second = lock.acquire_run_lock(ctx, cfg=cfg, run_id="r2", now=now)
+        assert not second.acquired
+        assert second.skipped_due_to_active_lock
+        assert second.status.state == lock.STATE_ACTIVE
+        assert not second.owned
+
+        stale_now = datetime(2026, 6, 20, 13, 0, tzinfo=timezone.utc)
+        recovered = lock.acquire_run_lock(ctx, cfg=cfg, run_id="r3", now=stale_now)
+        assert recovered.acquired
+        assert recovered.stale_recovered
+        assert lock.STALE_LOCK_RECOVERED_WARNING in recovered.warnings
+
+        assert lock.release_run_lock(recovered) is True
+        assert not recovered.path.exists()
+        assert lock.inspect_run_lock(ctx, now=stale_now).state == lock.STATE_MISSING
+
+
+def test_event_alpha_run_lock_release_after_failsoft_and_distinct_profile_paths():
+    import tempfile
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.artifacts.locks as lock
+
+    with tempfile.TemporaryDirectory() as tmp:
+        no_key = _notify_artifact_context(tmp, "notify_no_key")
+        llm = _notify_artifact_context(tmp, "notify_llm")
+        cfg = lock.EventAlphaRunLockConfig(enabled=True, stale_minutes=30)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        assert lock.lock_path_for_context(no_key) != lock.lock_path_for_context(llm)
+        held = lock.acquire_run_lock(no_key, cfg=cfg, run_id="r1", now=now)
+        try:
+            raise RuntimeError("provider blew up (fail-soft)")
+        except RuntimeError:
+            pass
+        assert lock.release_run_lock(held) is True
+        assert not held.path.exists()
+        assert lock.lock_path_for_context(no_key, lock_name="other").name == "event_alpha_other.lock"
+
+
+def test_event_alpha_run_lock_acquisition_is_atomic():
+    # Two runs starting at the same instant (both would read "no lock") must not
+    # both acquire: O_CREAT|O_EXCL makes exactly one win.
+    import tempfile
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.artifacts.locks as lock
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        cfg = lock.EventAlphaRunLockConfig(enabled=True, stale_minutes=30)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        a = lock.acquire_run_lock(ctx, cfg=cfg, run_id="A", now=now)
+        b = lock.acquire_run_lock(ctx, cfg=cfg, run_id="B", now=now)
+        assert [a.acquired, b.acquired].count(True) == 1
+        assert [a.skipped_due_to_active_lock, b.skipped_due_to_active_lock].count(True) == 1
+        winner = a if a.acquired else b
+        holder = lock._read_lock(lock.lock_path_for_context(ctx))
+        assert holder is not None and holder["run_id"] == winner.run_id
+
+
+def test_event_alpha_run_lock_disabled_for_fixture_smoke():
+    import tempfile
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.artifacts.locks as lock
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "fixture")
+        cfg = lock.EventAlphaRunLockConfig(enabled=False)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        disabled = lock.acquire_run_lock(ctx, cfg=cfg, run_id="r1", now=now)
+        assert disabled.acquired
+        assert disabled.status.state == lock.STATE_DISABLED
+        assert not disabled.path.exists()
+        assert lock.release_run_lock(disabled) is False
+
+
+def test_event_alpha_notify_cycle_releases_lock_on_exception():
+    # The notify-cycle wrapper must release the run lock in a finally even when
+    # the cycle body raises after acquiring (best-effort release on exceptions).
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import scanner
+    import crypto_rsi_scanner.event_alpha.artifacts.locks as lock
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        run_lock = lock.acquire_run_lock(
+            ctx, cfg=lock.EventAlphaRunLockConfig(enabled=True), run_id="r1",
+            now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
+        )
+        assert run_lock.owned and run_lock.path.exists()
+
+        def boom(*, lock_holder, **kwargs):
+            lock_holder["lock"] = run_lock
+            raise RuntimeError("kaboom in cycle body")
+
+        original = scanner._event_alpha_notify_cycle_body
+        scanner._event_alpha_notify_cycle_body = boom
+        try:
+            try:
+                scanner.event_alpha_notify_cycle(profile_name="notify_no_key")
+            except RuntimeError:
+                pass
+        finally:
+            scanner._event_alpha_notify_cycle_body = original
+        assert not run_lock.path.exists()
+
+
+def test_event_alpha_delivery_ledger_records_dedupe_and_namespace_isolation():
+    import tempfile
+    from datetime import datetime, timezone, timedelta
+    from pathlib import Path
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as delivery
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        path = delivery.deliveries_path_for_context(ctx)
+        assert path == Path(tmp) / "notify_no_key" / "event_alpha_notification_deliveries.jsonl"
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        content_hash = delivery.compute_content_hash("digest body", alert_id="ea:A", lane="daily_digest", profile="notify_no_key")
+        rec = delivery.build_record(
+            run_id="r1", alert_id="ea:A", profile="notify_no_key", namespace="notify_no_key",
+            lane="daily_digest", route="RESEARCH_DIGEST", content_hash=content_hash,
+            state=delivery.STATE_DELIVERED, now=now, delivered_at=now, delivered_count=1,
+        )
+        delivery.append_delivery_record(rec, path=path)
+        rows = delivery.load_delivery_records(path)
+        assert len(rows) == 1 and rows[0]["state"] == "delivered"
+        assert delivery.find_recent_delivered(rows, content_hash=content_hash, namespace="notify_no_key", now=now, window_hours=24) is not None
+        assert delivery.find_recent_delivered(rows, content_hash=content_hash, namespace="notify_llm", now=now, window_hours=24) is None
+        assert delivery.find_recent_delivered(rows, content_hash=content_hash, namespace="notify_no_key", now=now + timedelta(hours=48), window_hours=24) is None
+        other = delivery.compute_content_hash("digest body", alert_id="ea:B", lane="triggered_fade", profile="notify_no_key")
+        assert other != content_hash
+        summary = delivery.summarize_delivery_rows(rows)
+        assert summary.delivered == 1 and summary.failed == 0
+
+
+def test_event_alpha_artifact_doctor_short_circuits_stale_namespace_marker():
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.namespace.status as event_alpha_namespace_status
+    import crypto_rsi_scanner.event_alpha.notifications.readiness as event_alpha_send_readiness
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        namespace_dir = base / "notify_llm_deep"
+        preview = namespace_dir / "event_alpha_notification_preview.md"
+        preview.parent.mkdir(parents=True, exist_ok=True)
+        preview.write_text("send guard: no-send rehearsal\n", encoding="utf-8")
+        marker = event_alpha_namespace_status.mark_namespace_stale(
+            namespace_dir,
+            namespace="notify_llm_deep",
+            reason="pre-canonical notification artifacts",
+            superseded_by="notify_llm_deep_rehearsal",
+            now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
+        )
+        assert marker.exists()
+        result = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "old", "profile": "notify_llm_deep", "artifact_namespace": "notify_llm_deep", "run_mode": "burn_in"}],
+            source_coverage_report_path=namespace_dir / "event_alpha_source_coverage.md",
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep",
+            strict=True,
+        )
+        assert result.status == "STALE"
+        assert result.namespace_stale_deprecated == 1
+        assert result.namespace_superseded_by == "notify_llm_deep_rehearsal"
+        assert result.schema_rows_validated == 0
+        assert result.schema_validation_errors == 0
+        assert "safe_for_send_readiness: false" in "\n".join(result.warnings)
+        included = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "old", "profile": "notify_llm_deep", "artifact_namespace": "notify_llm_deep", "run_mode": "burn_in"}],
+            source_coverage_report_path=namespace_dir / "event_alpha_source_coverage.md",
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep",
+            strict=False,
+            include_stale_artifacts=True,
+        )
+        assert included.namespace_stale_deprecated == 1
+        plan = event_alpha_namespace_status.stale_namespace_plan(namespace_dir)
+        assert plan["dry_run_only"] is True
+        assert plan["file_count"] >= 1
+        readiness = event_alpha_send_readiness.build_send_readiness(
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep",
+            run_rows=[{
+                "run_id": "old",
+                "profile": "notify_llm_deep",
+                "artifact_namespace": "notify_llm_deep",
+                "run_mode": "burn_in",
+                "cycle_completed": True,
+                "success": True,
+            }],
+            core_opportunity_rows=[],
+            alert_rows=[],
+            delivery_rows=[],
+            artifact_doctor=included,
+            send_guard_enabled=False,
+            telegram_ready=False,
+            preview_path=preview,
+            include_api_artifacts=True,
+        )
+        assert readiness.ready is False
+        assert any("stale/deprecated" in item for item in readiness.blockers)
+
+
+def test_event_alpha_scheduled_make_targets_use_profile_lock_and_no_fixed_clock():
+    import subprocess
+    from pathlib import Path
+
+    root = _event_alpha_api_helpers.REPO_ROOT
+    for target, profile in (
+        ("event-alpha-notify-no-key-scheduled", "notify_no_key"),
+        ("event-alpha-notify-llm-scheduled", "notify_llm"),
+        ("event-alpha-notify-llm-deep-scheduled", "notify_llm_deep"),
+    ):
+        out = subprocess.run(["make", "-n", target], cwd=root, capture_output=True, text=True, check=True).stdout
+        assert f"--event-alpha-profile {profile}" in out
+        assert "RSI_EVENT_ALPHA_NOTIFY_LOCK_ENABLED=1" in out
+        assert "RSI_EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT=0" in out
+        assert "RSI_EVENT_ALPHA_NOTIFICATION_DEDUPE_WINDOW_HOURS=0" in out
+        assert f"RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE={profile}" in out
+        assert "RSI_EVENT_RESEARCH_NOW" not in out
+        assert "--score" not in out
+        assert "paper" not in out
+        assert "main.py --event-alpha-notify-cycle" in out

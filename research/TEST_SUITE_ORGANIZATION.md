@@ -50,6 +50,10 @@ This document records the pytest-compatible split of the historical
 | `tests/event_alpha/test_llm_radar.py` | LLM relationship analysis, advisory caps, provider timeout/cache/budget behavior, golden evals, raw-event extraction, and scanner-report integration. |
 | `tests/event_alpha/test_market_enrichment.py` | CoinGecko market enrichment, non-overwrite guarantees, store-only anomaly creation, bounded evidence search, and anomaly lifecycle transitions. |
 | `tests/event_alpha/test_market_data_providers.py` | Coinalyze preflight/fixtures/live fail-soft/auto-symbols, derivatives non-overwrite enrichment, DEX readiness, and supply-provider hard gates. |
+| `tests/event_alpha/test_namespace_profiles.py` | Namespace classification, research clocks, profile-scoped notification state, custom briefs, and fixture notification smokes. |
+| `tests/event_alpha/test_namespace_ledgers.py` | Namespace-scoped run ledgers, locks, delivery dedupe, stale markers, and scheduled Make target safety. |
+| `tests/event_alpha/test_scheduled_catalyst_namespaces.py` | Structured unlock reactions, scheduled-catalyst fixtures, preflight/source coverage, narrative safety, and research cards. |
+| `tests/event_alpha/test_namespace_integrations.py` | Cross-namespace Coinalyze loading, performance recommendations, stale handling, inventory/archive plans, and doctor policies. |
 | `tests/event_alpha/test_news_providers.py` | CryptoPanic, GDELT, project RSS, news-derived external assets, explicit/text event-time provenance, classifier-confidence caps, and no-trade safety. |
 | `tests/event_alpha/test_notification_delivery.py` | Delivered/failed/partial delivery state, cooldown policy, dedupe windows/keys, heartbeat buckets, in-flight retry, and disabled-send ledger behavior. |
 | `tests/event_alpha/test_notification_inbox_rehearsals.py` | Canonical inbox selection, burn-in review collapse, run filtering, planned review state, Bybit/Coinalyze rehearsals, lane labels, fallback status, and heartbeat copy. |
@@ -88,7 +92,7 @@ release guard.
 ## Size Gate
 
 After the Event Alpha and base-suite splits, `tests/test_indicators.py` was
-1,784 lines immediately before the focused backup-test move. It is now 1,695
+1,784 lines immediately before the focused backup-test move. It is now 1,698
 lines and reports these standalone counts:
 
 | count | value |
@@ -135,6 +139,11 @@ adapter, and the full Event Alpha package remains green at 650 tests.
 
 The 2,991-line source-coverage test monolith was retired into four focused
 modules ranging from 405 to 1,214 lines. All 35 original coverage identities
+remain exact and unique, all pass through both pytest and the standalone
+adapter, and the full Event Alpha package remains green at 650 tests.
+
+The 1,826-line namespace-lifecycle test monolith was retired into four focused
+modules ranging from 242 to 683 lines. All 30 original namespace identities
 remain exact and unique, all pass through both pytest and the standalone
 adapter, and the full Event Alpha package remains green at 650 tests.
 

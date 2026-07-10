@@ -118,6 +118,10 @@ The 2,991-line source-coverage test file was partitioned into four report,
 catalyst-search, source-registry/pack, and evidence-acquisition modules ranging
 from 405 to 1,214 lines; all 35 identities were preserved and the source
 monolith was deleted.
+The 1,826-line namespace-lifecycle test file was partitioned into four profile,
+ledger/lock, scheduled-catalyst/unlock, and cross-namespace integration modules
+ranging from 242 to 683 lines; all 30 identities were preserved and the source
+monolith was deleted.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.
