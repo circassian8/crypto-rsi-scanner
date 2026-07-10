@@ -20,6 +20,11 @@ This document records the pytest-compatible split of the historical
 | `tests/event_alpha/test_fade_review_workflows.py` | Review sidecars, balanced templates, scanner reports, review bundles, cached workspaces, and merge workflows. |
 | `tests/event_alpha/test_fade_core.py` | Pure event-fade scoring/state/trigger/risk behavior plus conservative discovery resolver collision/noise handling. |
 | `tests/event_alpha/test_event_alert_ranking.py` | Research alert ranking, proxy-venue opt-in, triggered-fade tier eligibility, cluster/noise caps, playbook tiers, and rejection overrides. |
+| `tests/event_alpha/test_evidence_quality.py` | Source-quality mapping, evidence gates, opportunity verdicts, market confirmation, and quality-boundary regressions. |
+| `tests/event_alpha/test_alert_outcomes.py` | Event Alpha alert snapshots, local price outcome filling, cohort reporting, and schema compatibility. |
+| `tests/event_alpha/test_feedback_calibration.py` | Feedback labels, calibration reports, policy simulation, quality thresholds, and prior/recommendation contracts. |
+| `tests/event_alpha/test_burn_in_outcomes.py` | Burn-in outcome planning, replay, evidence reconciliation, and no-send research guards. |
+| `tests/event_alpha/test_quality_feedback.py` | Quality-feedback summaries, operator artifacts, source diagnostics, and downstream quality-policy propagation. |
 | `tests/event_alpha/test_exchange_universe_providers.py` | Official exchange/package smoke, manual and CoinGecko universe providers, Binance/Bybit adapters, structured calendars, normalization/dedupe, resolution, and direct-no-trade safety. |
 | `tests/event_alpha/test_catalyst_frames.py` | Catalyst-frame classification, LLM validation/runtime controls, strategic-frame downstream use, e2e artifacts, missing-provider modes, roles, aggregation, and unresolved-frame caps. |
 | `tests/event_alpha/test_claim_semantics.py` | Claim extraction, cause-status transitions, asset roles, incident construction, market context, and doctor/card propagation. |
@@ -74,7 +79,7 @@ release guard.
 ## Size Gate
 
 After the Event Alpha and base-suite splits, `tests/test_indicators.py` was
-1,784 lines immediately before the focused backup-test move. It is now 1,684
+1,784 lines immediately before the focused backup-test move. It is now 1,688
 lines and reports these standalone counts:
 
 | count | value |
@@ -106,6 +111,11 @@ and standalone compatibility were preserved at every step.
 
 The 5,002-line notification test monolith was retired into seven focused modules
 ranging from 393 to 1,019 lines. All 66 original notification identities remain
+exact and unique, all pass through both pytest and the standalone adapter, and
+the full Event Alpha package remains green at 650 tests.
+
+The 4,082-line outcomes test monolith was retired into five focused modules
+ranging from 588 to 1,023 lines. All 49 original outcome identities remain
 exact and unique, all pass through both pytest and the standalone adapter, and
 the full Event Alpha package remains green at 650 tests.
 

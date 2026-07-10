@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-10 — Retire the outcomes test monolith · Codex
+**Why:** After retiring the notification monolith, `test_outcomes.py` was the
+largest remaining non-doctor test file at 4,082 lines, but its 49 tests divided
+cleanly across five outcome and quality domains.
+**Changes:**
+- Split evidence/source quality (868 lines), alert snapshots and local outcomes
+  (758), feedback/calibration (905), burn-in/replay outcomes (588), and
+  quality-feedback/operator artifacts (1,023) into dedicated modules.
+- Registered all five modules with the standalone compatibility runner and
+  deleted `test_outcomes.py`. All 49 names remain exact and unique
+  (sorted-name SHA-256 `3d1ede8a...`); no replacement crosses 1,500 lines.
+- Updated the roadmap, durable split evidence, and test-organization map.
+**Verify:** All 49 outcome tests passed under pytest in 16.22s and all 49 passed
+through the standalone adapter. The full Event Alpha package passed all 650
+tests in 151.05s. Standalone discovery remains 786 total / 594 Event Alpha /
+109 RSI / 42 CLI / 41 umbrella tests. Compileall, architecture reports, and
+`git diff --check` passed; the canonical oversized-test count fell from 5 to 4
+with `new_violation_count=0`.
+**Notes/risks:** Test organization and documentation only; no evidence-quality,
+alert outcome, feedback, calibration, replay, burn-in, signal, notification,
+paper, trade, or execution behavior changed. Routine GitHub CI will not be
+awaited.
+
 ## 2026-07-10 — Retire the notification test monolith · Codex
 **Why:** After the provider retirement, `test_notifications.py` was the largest
 remaining test file at 5,002 lines, but its 66 tests had seven clear domains.

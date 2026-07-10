@@ -106,6 +106,10 @@ The 5,002-line notification test file was likewise partitioned into seven
 planning, routing, readiness, delivery, lane, operations, and inbox/rehearsal
 modules ranging from 393 to 1,019 lines; all 66 identities were preserved and
 the source monolith was deleted.
+The 4,082-line outcomes test file was partitioned into five evidence/quality,
+alert-outcome, feedback/calibration, burn-in/replay, and quality-feedback modules
+ranging from 588 to 1,023 lines; all 49 identities were preserved and the source
+monolith was deleted.
 **Revisit when:** The standalone runner is intentionally retired, the project
 adopts a different test-size threshold, or shared fixtures replace the current
 API-helper compatibility layer.
