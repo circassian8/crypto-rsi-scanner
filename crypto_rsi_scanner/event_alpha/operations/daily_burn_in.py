@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import subprocess
 import sys
@@ -14,6 +13,40 @@ from typing import Any, Mapping
 
 from ... import config
 from . import common
+from .daily_burn_in_candidate_mode import (
+    BYBIT_REQUEST_LEDGER,
+    CANDIDATE_MODE_MANIFEST_JSON,
+    COINALYZE_REQUEST_LEDGER,
+    _PROVIDER_CANDIDATE_SUCCESS_STATUSES,
+    _PROVIDER_REHEARSAL_REPORTS,
+    _TRUTHY,
+    _annotate_candidate_row,
+    _candidate_manifest_status,
+    _candidate_mode_counts,
+    _candidate_mode_next_steps,
+    _candidate_provider_status,
+    _configured_value,
+    _current_provider_attempt,
+    _current_provider_report_ledger_rows,
+    _env_csv,
+    _env_truthy,
+    _existing_artifacts,
+    _infer_candidate_provider,
+    _int_env,
+    _is_fixture_candidate,
+    _json_doc_count,
+    _namespace_artifact_path,
+    _postprocess_candidate_mode_artifacts,
+    _propagate_candidate_lineage_to_core,
+    _provider_source_provenance_complete,
+    _providers_with_status,
+    _regenerate_lineage_cards,
+    _request_ledger_for_provider,
+    _request_ledger_row_total,
+    _source_pack_for_provider,
+    _write_candidate_mode_manifest,
+    _write_jsonl,
+)
 from .daily_burn_in_doctor import SCOPED_DOCTOR_JSON
 from .daily_burn_in_guardrails import format_live_provider_guardrails_markdown, live_provider_guardrails
 from .daily_burn_in_plan import BurnInStep, build_steps, default_namespace
@@ -22,10 +55,6 @@ from .daily_burn_in_readiness import READINESS_JSON
 
 RUN_JSON = "event_alpha_daily_burn_in_run.json"
 RUN_MD = "event_alpha_daily_burn_in_report.md"
-CANDIDATE_MODE_MANIFEST_JSON = "event_alpha_candidate_mode_manifest.json"
-COINALYZE_REQUEST_LEDGER = "event_coinalyze_request_ledger.jsonl"
-BYBIT_REQUEST_LEDGER = "event_bybit_announcements_request_ledger.jsonl"
-_TRUTHY = {"1", "true", "yes", "on"}
 
 
 def run_daily_burn_in(
@@ -324,6 +353,10 @@ def format_daily_burn_in_report(payload: Mapping[str, Any]) -> str:
 
 def _safe_env(context: Any, *, profile: str, namespace: str, candidate_mode: bool = False, provider_status: Mapping[str, Mapping[str, Any]] | None = None) -> dict[str, str]:
     env = dict(os.environ)
+    targeted_market_authorized = bool(
+        (candidate_mode or _env_truthy("RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED"))
+        and _env_truthy("RSI_EVENT_DISCOVERY_UNIVERSE_LIVE")
+    )
     env.update(
         {
             "RSI_EVENT_ALERTS_ENABLED": "0",
@@ -349,7 +382,7 @@ def _safe_env(context: Any, *, profile: str, namespace: str, candidate_mode: boo
             "RSI_EVENT_DISCOVERY_GDELT_LIVE": "0",
             "RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE": "0",
             "RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE": "0",
-            "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE": "0",
+            "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE": "1" if targeted_market_authorized else "0",
         }
     )
     provider_status = provider_status or {}
@@ -625,13 +658,6 @@ def _augment_step_row(
     row["safety_side_effects"] = _zero_safety_side_effects()
 
 
-def _request_ledger_row_total(context: Any) -> int:
-    return sum(
-        len(common.read_jsonl(context.namespace_dir / name))
-        for name in (COINALYZE_REQUEST_LEDGER, BYBIT_REQUEST_LEDGER)
-    )
-
-
 def _write_scoped_doctor_pending(*, context: Any, timeout_seconds: float, required: bool, doctor_mode: str) -> None:
     if doctor_mode != "scoped_burn_in":
         return
@@ -693,338 +719,6 @@ def _write_doctor_status(context: Any, payload: Mapping[str, Any]) -> None:
     from . import daily_burn_in_doctor
 
     daily_burn_in_doctor.write_doctor_status(context, payload)
-
-
-
-
-def _candidate_provider_status(context: Any) -> dict[str, dict[str, Any]]:
-    coinalyze_key_present = bool(_configured_value("RSI_EVENT_DISCOVERY_COINALYZE_API_KEY", config.EVENT_DISCOVERY_COINALYZE_API_KEY))
-    coinalyze_allow = _env_truthy("RSI_EVENT_ALPHA_COINALYZE_ALLOW_LIVE_PREFLIGHT")
-    coinalyze_budget = _int_env("RSI_EVENT_ALPHA_COINALYZE_PREFLIGHT_MAX_REQUESTS", 8)
-    coinalyze_symbols = tuple(_env_csv("RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS") or config.EVENT_DISCOVERY_COINALYZE_SYMBOLS or ())
-    if not coinalyze_key_present:
-        coinalyze_status = "skipped_missing_config"
-        coinalyze_skip = "missing RSI_EVENT_DISCOVERY_COINALYZE_API_KEY"
-        coinalyze_live = False
-    elif not coinalyze_allow:
-        coinalyze_status = "live_call_blocked_by_default"
-        coinalyze_skip = "set RSI_EVENT_ALPHA_COINALYZE_ALLOW_LIVE_PREFLIGHT=1 for guarded no-send candidate mode"
-        coinalyze_live = False
-    elif coinalyze_budget <= 0 or coinalyze_budget > 10:
-        coinalyze_status = "request_budget_not_small"
-        coinalyze_skip = "set RSI_EVENT_ALPHA_COINALYZE_PREFLIGHT_MAX_REQUESTS to 1..10"
-        coinalyze_live = False
-    else:
-        coinalyze_status = "ready_live_no_send"
-        coinalyze_skip = ""
-        coinalyze_live = True
-
-    bybit_allow = _env_truthy("RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT")
-    bybit_limit = _int_env("RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_PREFLIGHT_LIMIT", int(config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIMIT or 20))
-    if not bybit_allow:
-        bybit_status = "skipped_live_calls_disabled"
-        bybit_skip = "set RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT=1 for guarded no-send candidate mode"
-        bybit_live = False
-    elif bybit_limit <= 0 or bybit_limit > 50:
-        bybit_status = "request_budget_not_small"
-        bybit_skip = "set RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_PREFLIGHT_LIMIT to 1..50"
-        bybit_live = False
-    else:
-        bybit_status = "ready_live_no_send"
-        bybit_skip = ""
-        bybit_live = True
-
-    return {
-        "coinalyze": {
-            "provider": "coinalyze",
-            "configured": coinalyze_key_present,
-            "allow_flag_set": coinalyze_allow,
-            "live_call_allowed": coinalyze_live,
-            "status": coinalyze_status,
-            "skip_reason": coinalyze_skip,
-            "request_budget": coinalyze_budget,
-            "symbols_configured": len(coinalyze_symbols),
-            "request_ledger_path": common.rel_path(context.namespace_dir / COINALYZE_REQUEST_LEDGER),
-            "source_pack": "derivatives_crowding",
-        },
-        "bybit_announcements": {
-            "provider": "bybit_announcements",
-            "configured": True,
-            "allow_flag_set": bybit_allow,
-            "live_call_allowed": bybit_live,
-            "status": bybit_status,
-            "skip_reason": bybit_skip,
-            "request_budget": bybit_limit,
-            "request_ledger_path": common.rel_path(context.namespace_dir / BYBIT_REQUEST_LEDGER),
-            "source_pack": "official_exchange_listing_pack",
-        },
-    }
-
-
-def _write_candidate_mode_manifest(
-    *,
-    context: Any,
-    generated: datetime,
-    profile: str,
-    namespace: str,
-    candidate_mode: bool,
-    provider_status: Mapping[str, Mapping[str, Any]],
-    completed: bool,
-    doctor_status: Mapping[str, Any] | None = None,
-) -> dict[str, Any] | None:
-    if not candidate_mode:
-        return None
-    counts = _candidate_mode_counts(context, provider_status)
-    payload = common.with_safety(
-        {
-            "schema_version": "event_alpha_candidate_mode_manifest_v2",
-            "row_type": "event_alpha_candidate_mode_manifest",
-            "generated_at": generated.isoformat(),
-            "last_updated_at": common.utc_now().isoformat(),
-            "profile": profile,
-            "artifact_namespace": namespace,
-            "namespace_dir": common.rel_path(context.namespace_dir),
-            "candidate_mode": True,
-            "completed": bool(completed),
-            "status": _candidate_manifest_status(counts, provider_status, completed=completed),
-            "no_send": True,
-            "no_send_rehearsal": True,
-            "live_provider_calls_allowed": any(bool(row.get("live_call_allowed")) for row in provider_status.values()),
-            "providers": {key: dict(value) for key, value in provider_status.items()},
-            "skipped_missing_config": _providers_with_status(provider_status, "skipped_missing_config"),
-            "skipped_live_calls_disabled": _providers_with_status(provider_status, "skipped_live_calls_disabled", "live_call_blocked_by_default"),
-            "skipped_request_budget": _providers_with_status(provider_status, "request_budget_not_small"),
-            "skipped_not_required_for_profile": [],
-            "next_steps": _candidate_mode_next_steps(provider_status),
-            "doctor_status": doctor_status or {},
-            **counts,
-        }
-    )
-    common.write_json(context.namespace_dir / CANDIDATE_MODE_MANIFEST_JSON, payload)
-    return payload
-
-
-def _postprocess_candidate_mode_artifacts(*, context: Any, provider_status: Mapping[str, Mapping[str, Any]]) -> None:
-    candidates_path = context.namespace_dir / "event_integrated_radar_candidates.jsonl"
-    rows = common.read_jsonl(candidates_path)
-    if not rows:
-        return
-    changed = False
-    annotated: list[dict[str, Any]] = []
-    for row in rows:
-        out = dict(row)
-        before = dict(out)
-        _annotate_candidate_row(out, context=context, provider_status=provider_status)
-        annotated.append(out)
-        changed = changed or out != before
-    if changed:
-        _write_jsonl(candidates_path, annotated)
-
-
-def _annotate_candidate_row(row: dict[str, Any], *, context: Any, provider_status: Mapping[str, Mapping[str, Any]]) -> None:
-    provider = _infer_candidate_provider(row)
-    ledger_path = _request_ledger_for_provider(provider, context)
-    ledger_exists = bool(ledger_path and (context.namespace_dir / Path(ledger_path).name).exists())
-    fixture = _is_fixture_candidate(row)
-    diagnostic = str(row.get("opportunity_type") or row.get("lane") or "").upper() == "DIAGNOSTIC" or row.get("diagnostic_only") is True
-    source_mode = str(row.get("candidate_source_mode") or "").strip()
-    if not source_mode:
-        source_mode = "mocked_fixture" if fixture else ("live_no_send" if ledger_exists else "artifact_replay")
-    row.setdefault("candidate_provenance", "integrated_candidate")
-    row.setdefault("provider", provider or "unknown")
-    row.setdefault("source_origin", row.get("provider") or provider or row.get("source_origin") or "unknown")
-    row.setdefault("source_pack", row.get("source_pack") or _source_pack_for_provider(provider))
-    row["candidate_source_mode"] = source_mode
-    if ledger_exists:
-        row["request_ledger_path"] = ledger_path
-    row["no_send_rehearsal"] = True
-    row["research_only"] = True
-    row["strict_alerts_created"] = 0
-    row["telegram_sends"] = 0
-    row["trades_created"] = 0
-    row["paper_trades_created"] = 0
-    row["normal_rsi_signal_rows_written"] = 0
-    row["triggered_fade_created"] = 0
-    row["contract_counted_candidate"] = bool(
-        source_mode == "live_no_send"
-        and ledger_exists
-        and not fixture
-        and not diagnostic
-        and provider in provider_status
-    )
-
-
-def _candidate_mode_counts(context: Any, provider_status: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
-    rows = common.read_jsonl(context.namespace_dir / "event_integrated_radar_candidates.jsonl")
-    ledger_counts = {
-        key: len(common.read_jsonl(context.namespace_dir / Path(str(value.get("request_ledger_path") or "")).name))
-        for key, value in provider_status.items()
-        if value.get("request_ledger_path")
-    }
-    existing_ledgers = [
-        str(value.get("request_ledger_path"))
-        for key, value in provider_status.items()
-        if int(ledger_counts.get(key) or 0) > 0 and str(value.get("request_ledger_path") or "").strip()
-    ]
-    source_artifacts = _existing_artifacts(
-        context,
-        (
-            "event_alpha_live_provider_readiness.json",
-            "event_coinalyze_preflight.json",
-            "event_coinalyze_rehearsal_report.json",
-            "event_bybit_announcements_preflight.json",
-            "event_bybit_announcements_rehearsal_report.json",
-            "event_exchange_announcements.jsonl",
-            "event_official_exchange_events.jsonl",
-            "event_derivatives_state.jsonl",
-            "event_derivatives_crowding_candidates.jsonl",
-            "event_alpha_source_coverage.json",
-        ),
-    )
-    candidate_artifacts = _existing_artifacts(
-        context,
-        (
-            "event_integrated_radar_candidates.jsonl",
-            "event_core_opportunities.jsonl",
-            "event_official_listing_candidates.jsonl",
-            "event_fade_short_review_candidates.jsonl",
-            "event_alpha_alerts.jsonl",
-        ),
-    )
-    return {
-        "candidate_rows": len(rows),
-        "integrated_candidate_rows": len(rows),
-        "notification_preview_rows": int((context.namespace_dir / "event_alpha_notification_preview.md").exists()),
-        "preflight_diagnostic_rows": _json_doc_count(context.namespace_dir / "event_coinalyze_preflight.json") + _json_doc_count(context.namespace_dir / "event_bybit_announcements_preflight.json"),
-        "readiness_rows": _json_doc_count(context.namespace_dir / "event_alpha_live_provider_readiness.json"),
-        "source_coverage_rows": _json_doc_count(context.namespace_dir / "event_alpha_source_coverage.json"),
-        "real_burn_in_candidate_count": sum(1 for row in rows if row.get("contract_counted_candidate") is True),
-        "contract_counted_candidate_count": sum(1 for row in rows if row.get("contract_counted_candidate") is True),
-        "fixture_candidate_count": sum(1 for row in rows if _is_fixture_candidate(row)),
-        "provider_attempts": sum(1 for row in provider_status.values() if row.get("live_call_allowed")),
-        "provider_skips": sum(1 for row in provider_status.values() if str(row.get("status") or "") != "ready_live_no_send"),
-        "provider_successes": sum(1 for key in provider_status if int(ledger_counts.get(key) or 0) > 0),
-        "request_ledger_rows": ledger_counts,
-        "request_ledgers": sorted(existing_ledgers),
-        "source_artifacts": source_artifacts,
-        "candidate_artifacts": candidate_artifacts,
-        "research_cards_written": len([path for path in context.research_cards_dir.glob("*.md") if path.name != "index.md"]) if context.research_cards_dir.exists() else 0,
-        "source_coverage_marker_written": bool((context.namespace_dir / "event_alpha_source_coverage.json").exists() or (context.namespace_dir / "event_alpha_source_coverage.md").exists()),
-        "readiness_marker_written": bool((context.namespace_dir / "event_live_provider_activation_readiness.json").exists() or (context.namespace_dir / "event_live_provider_activation_readiness.md").exists()),
-        "notification_preview_marker_written": bool((context.namespace_dir / "event_alpha_notification_preview.md").exists()),
-        "review_inbox_path": common.rel_path(context.namespace_dir / "event_alpha_daily_review_inbox.json") if (context.namespace_dir / "event_alpha_daily_review_inbox.json").exists() else "",
-        "scorecard_path": common.rel_path(context.namespace_dir / "event_alpha_burn_in_scorecard.json") if (context.namespace_dir / "event_alpha_burn_in_scorecard.json").exists() else "",
-        "providers_with_candidates": sorted(
-            {
-                _infer_candidate_provider(row)
-                for row in rows
-                if _infer_candidate_provider(row) in provider_status
-            }
-        ),
-    }
-
-
-def _json_doc_count(path: Path) -> int:
-    return 1 if common.read_json(path) else 0
-
-
-def _existing_artifacts(context: Any, names: tuple[str, ...]) -> list[str]:
-    return [
-        common.rel_path(context.namespace_dir / name)
-        for name in names
-        if (context.namespace_dir / name).exists()
-    ]
-
-
-def _candidate_manifest_status(counts: Mapping[str, Any], provider_status: Mapping[str, Mapping[str, Any]], *, completed: bool) -> str:
-    if not completed:
-        return "running"
-    if int(counts.get("contract_counted_candidate_count") or 0) > 0:
-        return "completed_with_contract_candidates"
-    if int(counts.get("fixture_candidate_count") or 0) > 0:
-        return "completed_fixture_candidates_only"
-    if not any(bool(row.get("live_call_allowed")) for row in provider_status.values()):
-        return "completed_no_candidate_providers"
-    return "completed_no_candidates"
-
-
-def _request_ledger_for_provider(provider: str, context: Any) -> str:
-    if provider == "coinalyze":
-        return common.rel_path(context.namespace_dir / COINALYZE_REQUEST_LEDGER)
-    if provider in {"bybit", "bybit_announcements"}:
-        return common.rel_path(context.namespace_dir / BYBIT_REQUEST_LEDGER)
-    return ""
-
-
-def _infer_candidate_provider(row: Mapping[str, Any]) -> str:
-    text = " ".join(
-        str(row.get(field) or "")
-        for field in ("provider", "source_provider", "source_origin", "source_pack", "source_pack_id")
-    ).casefold()
-    if "coinalyze" in text or "derivative" in text or "funding" in text:
-        return "coinalyze"
-    if "bybit" in text:
-        return "bybit_announcements"
-    return str(row.get("provider") or row.get("source_provider") or row.get("source_origin") or "unknown")
-
-
-def _source_pack_for_provider(provider: str) -> str:
-    if provider == "coinalyze":
-        return "derivatives_crowding"
-    if provider in {"bybit", "bybit_announcements"}:
-        return "official_exchange_listing_pack"
-    return "unknown"
-
-
-def _providers_with_status(provider_status: Mapping[str, Mapping[str, Any]], *statuses: str) -> list[str]:
-    wanted = set(statuses)
-    return sorted(key for key, row in provider_status.items() if str(row.get("status") or "") in wanted)
-
-
-def _candidate_mode_next_steps(provider_status: Mapping[str, Mapping[str, Any]]) -> list[str]:
-    steps: list[str] = []
-    for key, row in sorted(provider_status.items()):
-        status = str(row.get("status") or "")
-        if status == "skipped_missing_config":
-            steps.append(f"configure {key} credentials/settings before candidate-mode sampling")
-        elif status in {"skipped_live_calls_disabled", "live_call_blocked_by_default"}:
-            steps.append(f"set explicit allow flag for {key} to run guarded no-send candidate sampling")
-        elif status == "request_budget_not_small":
-            steps.append(f"set a small request budget for {key}")
-    return steps or ["review candidate artifacts and labels; no thresholds auto-apply"]
-
-
-def _is_fixture_candidate(row: Mapping[str, Any]) -> bool:
-    text = " ".join(str(row.get(field) or "") for field in ("run_mode", "profile", "artifact_namespace", "source_origin", "source_pack", "candidate_source_mode")).casefold()
-    return bool(row.get("fixture_only") is True or row.get("test_fixture") is True or "fixture" in text or "smoke" in text or "mocked_fixture" in text)
-
-
-def _configured_value(env_name: str, config_value: Any) -> str:
-    return str(os.getenv(env_name, "") or config_value or "").strip()
-
-
-def _env_truthy(name: str) -> bool:
-    return str(os.getenv(name) or "").strip().casefold() in _TRUTHY
-
-
-def _env_csv(name: str) -> tuple[str, ...]:
-    raw = os.getenv(name, "")
-    return tuple(item.strip() for item in raw.split(",") if item.strip())
-
-
-def _int_env(name: str, default: int) -> int:
-    raw = str(os.getenv(name, "")).strip()
-    if not raw:
-        return int(default)
-    try:
-        return int(raw)
-    except ValueError:
-        return 0
-
-
-def _write_jsonl(path: Path, rows: list[Mapping[str, Any]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(json.dumps(dict(row), sort_keys=True) + "\n" for row in rows), encoding="utf-8")
 
 
 def _decode_timeout_stream(value: Any) -> str:

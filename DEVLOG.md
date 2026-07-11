@@ -17,6 +17,69 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-11 — Complete Event Alpha operator semantics and guarded provider evidence · Codex
+**Why:** Pro-model review found that the safe exact-generation run still used
+contradictory provider configuration, counter, source-blocker, market-freshness,
+and no-send language, while the first provider-backed candidate path lacked a
+fully fail-closed attempt contract and bounded targeted market refresh.
+**Changes:**
+- Unified CryptoPanic configuration around the exact run/readiness artifacts:
+  the active run now reports configured but profile-disabled, never recommends
+  restoring an existing credential, and doctor blocks run/readiness/coverage
+  contradictions. Source coverage now counts explicit strong/official/
+  structured/evidence/provider/market blockers and collapses visible families
+  without treating missing evidence as negative proof.
+- Added one canonical run-counter vocabulary across ledgers, operator state,
+  previews, daily briefs, integrated reports, and explainers; separated current
+  generation, visible-current, and cumulative store scopes; named all market-
+  freshness populations; and made no-send burn-in/send-guard facts explicit.
+  Doctor now checks every repeated preview counter occurrence, so an embedded
+  heartbeat cannot disagree with the summary unnoticed.
+- Made burn-in readiness partial-provider aware. Bybit is the fastest configured
+  provider but remains no-call without its pre-existing environment gate;
+  Coinalyze remains missing-config. CLI flags cannot grant provider authority,
+  and readiness itself performs no calls.
+- Added unique per-attempt Bybit/Coinalyze generation and run lineage. A
+  contract-counted candidate requires the current rehearsal report plus exact
+  generation/run/profile/namespace, a successful no-send ledger row, a
+  namespace-local provider artifact, and provider-specific provenance. Failed
+  fixed-clock retries cannot inherit an earlier success, and current lineage
+  cannot rewrite historical rows sharing the same stable core id.
+- Added the bounded targeted CoinGecko refresh path for at most 20 prioritized,
+  canonical-asset-deduplicated families, with one batch, timeout/budget,
+  ledger/report/snapshot schemas, card/core propagation, and doctor checks.
+  Market data alone cannot confirm a source-less anomaly; strong official
+  evidence plus a fresh breakout can reach confirmed-long research.
+- Kept the implementation inside the architecture contract by extracting the
+  candidate-mode owner, provider-lineage schema specs, daily-brief run-health
+  formatting, doctor conflict helpers, and targeted-refresh tests into focused
+  modules. Static architecture reports were regenerated with zero new size,
+  naming, shim, or ownership violations.
+- Refreshed the existing `notify_no_key` readiness, source coverage, 185 cards,
+  daily brief, preview, operator state, and strict doctor for exact run
+  `2026-07-11T06:28:17.448523+00:00|notify_no_key`.
+**Verify:** Compileall and `git diff --check` passed. The required focused gate
+passed 111 tests; the provider/doctor bundle passed 67. Bybit and Coinalyze
+preflights performed zero network calls; candidate-mode fixture smoke passed
+5/5 and its full strict doctor was `OK`; integrated radar strict doctor had no
+blockers; notification-format smoke and the fast Telegram no-send final check
+passed with `READY_FOR_NO_SEND_REVIEW`, zero blockers, and zero sends.
+Architecture cleanliness passed with `new_violation_count=0`. `make verify-fast
+PYTHON=.venv/bin/python` passed 923 tests plus smokes. Final `make verify
+PYTHON=.venv/bin/python` passed 843/843 standalone tests, 923 pytest tests,
+alert rendering, the 33-observation offline backtest, and the paper scoreboard.
+Active strict doctor validated 1,058 schema rows with zero schema/path/safety
+errors and no blockers; canonical counters are 108 raw / 48 candidate / 48
+research / 0 source snapshots / 185 current core / 105 current visible / 995
+cumulative / 0 alertable / 0 strict / 1 preview item.
+**Notes/risks:** No provider allow flag, Coinalyze key, targeted-live authority,
+or send guard was present, so no live provider call occurred and real
+contract-counted candidate evidence remains zero. Strategic activation remains
+Coinalyze first; Bybit is only the fastest currently configured provider. The
+active WARN rows are research-quality telemetry, not doctor blockers. No
+Telegram send, trade, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` occurred. Routine GitHub CI was not awaited.
+
 ## 2026-07-11 — Close Event Alpha coherence gaps and run the final no-send cycle · Codex
 **Why:** Pro-model review found that the active namespace was safe but not a
 single trustworthy operator generation: lifecycle metadata, coverage, preview,

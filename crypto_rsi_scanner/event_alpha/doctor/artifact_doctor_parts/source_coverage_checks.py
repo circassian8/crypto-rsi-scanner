@@ -311,8 +311,49 @@ def _cryptopanic_artifact_conflicts(
     core_rows: Iterable[Mapping[str, Any]],
     research_card_paths: Iterable[Path],
     source_coverage_report_path: str | Path | None,
+    run_rows: Iterable[Mapping[str, Any]] = (),
 ) -> dict[str, int]:
-    out = {
+    out = _empty_cryptopanic_artifact_conflicts()
+    source_path = Path(source_coverage_report_path) if source_coverage_report_path is not None else None
+    source_text, source_payload, exact_run, readiness_row = _cryptopanic_source_context(
+        source_path,
+        run_rows=run_rows,
+    )
+    _add_source_conflict_counts(
+        out,
+        _cryptopanic_source_state_conflicts(
+            source_text=source_text,
+            source_payload=source_payload,
+            exact_run=exact_run,
+            readiness_row=readiness_row,
+            core_rows=core_rows,
+        ),
+    )
+    acquisition = [dict(row) for row in acquisition_rows if isinstance(row, Mapping)]
+    cryptopanic_used = any(_row_mentions_cryptopanic(row) for row in acquisition)
+    _add_source_conflict_counts(
+        out,
+        _cryptopanic_evidence_conflicts(
+            acquisition=acquisition,
+            core_rows=core_rows,
+            research_card_paths=research_card_paths,
+            source_text=source_text,
+            cryptopanic_used=cryptopanic_used,
+        ),
+    )
+    ledger_path = source_path.with_name("cryptopanic_request_ledger.jsonl") if source_path is not None else None
+    ledger_rows = _load_jsonl_rows(ledger_path) if ledger_path is not None else ()
+    if cryptopanic_used and ledger_path is not None and not ledger_path.exists():
+        out["cryptopanic_request_ledger_missing_when_used"] = 1
+    _add_source_conflict_counts(out, _cryptopanic_ledger_conflicts(ledger_rows, source_text=source_text))
+    combined_text = source_text + "\n" + "\n".join(_read_card_text(path) for path in research_card_paths)
+    if _contains_unredacted_cryptopanic_secret(combined_text):
+        out["cryptopanic_token_printed_or_unredacted"] = 1
+    return out
+
+
+def _empty_cryptopanic_artifact_conflicts() -> dict[str, int]:
+    return {
         "cryptopanic_configured_but_not_observed": 0,
         "cryptopanic_used_but_no_source_coverage_entry": 0,
         "cryptopanic_accepted_evidence_missing_from_card": 0,
@@ -332,18 +373,119 @@ def _cryptopanic_artifact_conflicts(
         "cryptopanic_request_ledger_missing_when_used": 0,
         "cryptopanic_success_with_backoff_status": 0,
         "cryptopanic_restore_token_recommendation_when_configured": 0,
+        "cryptopanic_run_coverage_config_mismatch": 0,
+        "cryptopanic_profile_disabled_coverage_mismatch": 0,
+        "cryptopanic_profile_disabled_credential_recommendation": 0,
+        "source_coverage_blocker_summary_inconsistent": 0,
     }
+
+
+def _add_source_conflict_counts(out: dict[str, int], increments: Mapping[str, int]) -> None:
+    for key, value in increments.items():
+        out[key] += value
+
+
+def _cryptopanic_source_context(
+    source_path: Path | None,
+    *,
+    run_rows: Iterable[Mapping[str, Any]],
+) -> tuple[str, Mapping[str, Any], Mapping[str, Any] | None, Mapping[str, Any]]:
     source_text = ""
-    if source_coverage_report_path is not None and Path(source_coverage_report_path).exists():
+    if source_path is not None and source_path.exists():
         try:
-            source_text = Path(source_coverage_report_path).read_text(encoding="utf-8", errors="replace")
+            source_text = source_path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             source_text = ""
+    source_payload: Mapping[str, Any] = {}
+    if source_path is not None:
+        source_json_path = source_path if source_path.suffix == ".json" else source_path.with_suffix(".json")
+        source_payload = _load_json_mapping(source_json_path)
+    run_list = [dict(row) for row in run_rows if isinstance(row, Mapping)]
+    source_run_id = str(source_payload.get("run_id") or "").strip()
+    exact_run = next(
+        (row for row in run_list if source_run_id and str(row.get("run_id") or "") == source_run_id),
+        None,
+    )
+    if exact_run is None and run_list:
+        latest_id = _latest_run_id(run_list)
+        exact_run = next(
+            (row for row in run_list if str(row.get("run_id") or "") == str(latest_id or "")),
+            run_list[-1],
+        )
+    readiness_payload: Mapping[str, Any] = {}
+    readiness_row: Mapping[str, Any] = {}
+    if source_path is not None:
+        candidate = _load_json_mapping(source_path.parent / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_JSON)
+        readiness_run_id = str(candidate.get("run_id") or "").strip()
+        exact_run_id = str((exact_run or {}).get("run_id") or "").strip()
+        if candidate and (not exact_run_id or readiness_run_id == exact_run_id):
+            readiness_payload = candidate
+            readiness_row = _cryptopanic_readiness_row(readiness_payload)
+    return source_text, source_payload, exact_run, readiness_row
+
+
+def _cryptopanic_source_state_conflicts(
+    *,
+    source_text: str,
+    source_payload: Mapping[str, Any],
+    exact_run: Mapping[str, Any] | None,
+    readiness_row: Mapping[str, Any],
+    core_rows: Iterable[Mapping[str, Any]],
+) -> dict[str, int]:
+    out = {
+        "cryptopanic_configured_but_not_observed": 0,
+        "cryptopanic_run_coverage_config_mismatch": 0,
+        "cryptopanic_profile_disabled_coverage_mismatch": 0,
+        "cryptopanic_profile_disabled_credential_recommendation": 0,
+        "source_coverage_blocker_summary_inconsistent": 0,
+    }
     if "CryptoPanic:" in source_text:
         if "- configured: true" in source_text and "- observed this run: false" in source_text:
             out["cryptopanic_configured_but_not_observed"] = 1
-    acquisition = [dict(row) for row in acquisition_rows if isinstance(row, Mapping)]
-    cryptopanic_used = any(_row_mentions_cryptopanic(row) for row in acquisition)
+    run_configured = bool((exact_run or {}).get("cryptopanic_configured"))
+    readiness_configured = bool(readiness_row.get("configured"))
+    coverage_configured = bool(source_payload.get("cryptopanic_configured"))
+    if source_payload and (run_configured or readiness_configured) and not coverage_configured:
+        out["cryptopanic_run_coverage_config_mismatch"] = 1
+    profile_disabled = str((exact_run or {}).get("cryptopanic_skip_reason") or "") == "profile_disabled"
+    coverage_status = str(source_payload.get("cryptopanic_coverage_status") or "")
+    not_used_reason = str(source_payload.get("cryptopanic_not_used_reason") or "")
+    if source_payload and profile_disabled and (
+        coverage_status != "configured_profile_disabled" or not_used_reason != "profile_disabled"
+    ):
+        out["cryptopanic_profile_disabled_coverage_mismatch"] = 1
+    recommendation = str(source_payload.get("cryptopanic_recommendation") or "").casefold()
+    credential_advice = any(token in recommendation for token in ("configure", "restore", "credential", "api key", "api token"))
+    if source_payload and profile_disabled and (run_configured or readiness_configured) and credential_advice:
+        out["cryptopanic_profile_disabled_credential_recommendation"] = 1
+    explicit_source_blocker = any(
+        row.get("source_requirements_met") is False
+        or row.get("opportunity_type_source_requirements_met") is False
+        or any(
+            token in str(row.get("why_not_alertable") or "").casefold()
+            for token in ("strong_source_missing", "official_exchange_source_required", "structured_unlock_source_required")
+        )
+        for row in core_rows
+        if isinstance(row, Mapping)
+    )
+    if source_payload and explicit_source_blocker and int(source_payload.get("candidates_blocked_by_source_coverage") or 0) <= 0:
+        out["source_coverage_blocker_summary_inconsistent"] = 1
+    return out
+
+
+def _cryptopanic_evidence_conflicts(
+    *,
+    acquisition: list[Mapping[str, Any]],
+    core_rows: Iterable[Mapping[str, Any]],
+    research_card_paths: Iterable[Path],
+    source_text: str,
+    cryptopanic_used: bool,
+) -> dict[str, int]:
+    out = {
+        "cryptopanic_used_but_no_source_coverage_entry": 0,
+        "cryptopanic_accepted_evidence_missing_from_card": 0,
+        "cryptopanic_rejected_only_promoted": 0,
+    }
     if cryptopanic_used and "CryptoPanic:" not in source_text:
         out["cryptopanic_used_but_no_source_coverage_entry"] = 1
     accepted_core_ids = {
@@ -378,45 +520,42 @@ def _cryptopanic_artifact_conflicts(
         alertable = bool(row.get("alertable_after_quality_gate") or row.get("route_alertable"))
         if alertable or route in {"RESEARCH_DIGEST", "WATCHLIST", "HIGH_PRIORITY_RESEARCH"} or level in {"validated_digest", "watchlist", "high_priority"}:
             out["cryptopanic_rejected_only_promoted"] += 1
-    source_path = Path(source_coverage_report_path) if source_coverage_report_path is not None else None
-    ledger_path = source_path.with_name("cryptopanic_request_ledger.jsonl") if source_path is not None else None
-    ledger_rows = _load_jsonl_rows(ledger_path) if ledger_path is not None else ()
-    if cryptopanic_used and ledger_path is not None and not ledger_path.exists():
-        out["cryptopanic_request_ledger_missing_when_used"] = 1
-    for row in ledger_rows:
-        redacted_url = str(row.get("request_url_redacted") or "")
-        plan = str(row.get("plan") or "growth_weekly").strip().lower()
-        if plan != "enterprise" and _growth_unsupported_params(redacted_url):
-            out["cryptopanic_growth_unsupported_param_used"] += 1
-        currencies = str(row.get("currencies") or "").strip()
-        if not currencies:
-            out["cryptopanic_empty_currency_request"] += 1
-        for currency in [part.strip() for part in currencies.split(",") if part.strip()]:
-            if currency != currency.upper() or not re.match(r"^[A-Z][A-Z0-9]{1,9}$", currency):
-                out["cryptopanic_invalid_currency_code"] += 1
-            if "-" in currency or "_" in currency or currency.casefold() in {"fetch-ai", "synapse-2", "chiliz"}:
-                out["cryptopanic_coin_id_sent_as_currency"] += 1
-        if "auth_token=" in redacted_url and "auth_token=%3Credacted%3E" not in redacted_url and "auth_token=<redacted>" not in redacted_url:
-            out["cryptopanic_token_printed_or_unredacted"] = 1
-        error_class = str(row.get("error_class") or "").strip()
-        status_code = row.get("status_code")
-        try:
-            status_int = int(status_code) if status_code not in (None, "") else None
-        except (TypeError, ValueError):
-            status_int = None
-        if error_class in {"json_parse_error", "empty_response"}:
-            out["cryptopanic_json_parse_errors"] += 1
-        if error_class in {"auth_failed", "rate_limited_or_forbidden", "server_error"} and status_int is None:
-            out["cryptopanic_status_code_missing_on_http_failure"] += 1
-        if _contains_unredacted_cryptopanic_secret(str(row.get("body_excerpt_redacted") or "")):
-            out["cryptopanic_body_excerpt_unredacted_token"] += 1
+    return out
+
+
+def _cryptopanic_ledger_conflicts(
+    ledger_rows: Iterable[Mapping[str, Any]],
+    *,
+    source_text: str,
+) -> dict[str, int]:
+    out = {
+        "cryptopanic_growth_unsupported_param_used": 0,
+        "cryptopanic_duplicate_request_key": 0,
+        "cryptopanic_invalid_currency_code": 0,
+        "cryptopanic_empty_currency_request": 0,
+        "cryptopanic_coin_id_sent_as_currency": 0,
+        "cryptopanic_all_requests_failed": 0,
+        "cryptopanic_json_parse_errors": 0,
+        "cryptopanic_configured_but_unusable": 0,
+        "cryptopanic_status_code_missing_on_http_failure": 0,
+        "cryptopanic_body_excerpt_unredacted_token": 0,
+        "cryptopanic_token_printed_or_unredacted": 0,
+        "cryptopanic_quota_exceeded": 0,
+        "cryptopanic_success_with_backoff_status": 0,
+        "cryptopanic_restore_token_recommendation_when_configured": 0,
+    }
+    materialized = [row for row in ledger_rows if isinstance(row, Mapping)]
+    for row in materialized:
+        _add_source_conflict_counts(out, _cryptopanic_request_row_conflicts(row))
+    if out["cryptopanic_token_printed_or_unredacted"]:
+        out["cryptopanic_token_printed_or_unredacted"] = 1
     request_keys = [
         str(row.get("normalized_request_key") or row.get("request_url_redacted") or "").strip()
-        for row in ledger_rows
+        for row in materialized
         if str(row.get("normalized_request_key") or row.get("request_url_redacted") or "").strip()
     ]
     out["cryptopanic_duplicate_request_key"] = max(0, len(request_keys) - len(set(request_keys)))
-    attempted_rows = [row for row in ledger_rows if row.get("quota_counted") is not False]
+    attempted_rows = [row for row in materialized if row.get("quota_counted") is not False]
     successful_rows = [
         row
         for row in attempted_rows
@@ -448,12 +587,72 @@ def _cryptopanic_artifact_conflicts(
         or "verify the CryptoPanic token" in source_text
     ):
         out["cryptopanic_restore_token_recommendation_when_configured"] = 1
-    if sum(1 for _ in ledger_rows) > 600:
+    if sum(1 for _ in materialized) > 600:
         out["cryptopanic_quota_exceeded"] = 1
-    combined_text = source_text + "\n" + "\n".join(_read_card_text(path) for path in research_card_paths)
-    if _contains_unredacted_cryptopanic_secret(combined_text):
-        out["cryptopanic_token_printed_or_unredacted"] = 1
     return out
+
+
+def _cryptopanic_request_row_conflicts(row: Mapping[str, Any]) -> dict[str, int]:
+    out = {
+        "cryptopanic_growth_unsupported_param_used": 0,
+        "cryptopanic_invalid_currency_code": 0,
+        "cryptopanic_empty_currency_request": 0,
+        "cryptopanic_coin_id_sent_as_currency": 0,
+        "cryptopanic_json_parse_errors": 0,
+        "cryptopanic_status_code_missing_on_http_failure": 0,
+        "cryptopanic_body_excerpt_unredacted_token": 0,
+        "cryptopanic_token_printed_or_unredacted": 0,
+    }
+    redacted_url = str(row.get("request_url_redacted") or "")
+    plan = str(row.get("plan") or "growth_weekly").strip().lower()
+    if plan != "enterprise" and _growth_unsupported_params(redacted_url):
+        out["cryptopanic_growth_unsupported_param_used"] += 1
+    currencies = str(row.get("currencies") or "").strip()
+    if not currencies:
+        out["cryptopanic_empty_currency_request"] += 1
+    for currency in [part.strip() for part in currencies.split(",") if part.strip()]:
+        if currency != currency.upper() or not re.match(r"^[A-Z][A-Z0-9]{1,9}$", currency):
+            out["cryptopanic_invalid_currency_code"] += 1
+        if "-" in currency or "_" in currency or currency.casefold() in {"fetch-ai", "synapse-2", "chiliz"}:
+            out["cryptopanic_coin_id_sent_as_currency"] += 1
+    if "auth_token=" in redacted_url and "auth_token=%3Credacted%3E" not in redacted_url and "auth_token=<redacted>" not in redacted_url:
+        out["cryptopanic_token_printed_or_unredacted"] = 1
+    error_class = str(row.get("error_class") or "").strip()
+    status_code = row.get("status_code")
+    try:
+        status_int = int(status_code) if status_code not in (None, "") else None
+    except (TypeError, ValueError):
+        status_int = None
+    if error_class in {"json_parse_error", "empty_response"}:
+        out["cryptopanic_json_parse_errors"] += 1
+    if error_class in {"auth_failed", "rate_limited_or_forbidden", "server_error"} and status_int is None:
+        out["cryptopanic_status_code_missing_on_http_failure"] += 1
+    if _contains_unredacted_cryptopanic_secret(str(row.get("body_excerpt_redacted") or "")):
+        out["cryptopanic_body_excerpt_unredacted_token"] += 1
+    return out
+
+
+def _load_json_mapping(path: Path) -> Mapping[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, Mapping) else {}
+
+
+def _cryptopanic_readiness_row(payload: Mapping[str, Any]) -> Mapping[str, Any]:
+    for row in payload.get("providers") or ():
+        if not isinstance(row, Mapping):
+            continue
+        identity = " ".join(
+            str(row.get(key) or "")
+            for key in ("provider", "provider_name", "provider_health_key")
+        ).casefold()
+        if "cryptopanic" in identity:
+            return row
+    return {}
 
 def _evidence_count_mismatches(rows: Iterable[Mapping[str, Any]]) -> int:
     mismatches = 0

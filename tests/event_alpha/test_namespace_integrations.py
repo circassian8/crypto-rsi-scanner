@@ -157,6 +157,22 @@ def test_integrated_radar_loads_external_coinalyze_namespace():
         assert manifest["coinalyze_skip_reason"] is None
         coverage = json.loads(result.source_coverage_json_path.read_text(encoding="utf-8"))
         assert coverage["coinalyze_derivatives_state_rows_loaded"] == 2
+        assert "cryptopanic_configured" in coverage
+        assert "cryptopanic_selected_for_run" in coverage
+        assert "cryptopanic_live_call_allowed" in coverage
+        assert "cryptopanic_observed" in coverage
+        assert "cryptopanic_not_used_reason" in coverage
+        assert "cryptopanic_coverage_status" in coverage
+        assert coverage["candidates_blocked_by_source_coverage"] > 0
+        assert coverage["candidate_families_blocked_by_source_coverage"] > 0
+        run_row = json.loads(context.run_ledger_path.read_text(encoding="utf-8").splitlines()[-1])
+        assert run_row["cryptopanic_configured"] is coverage["cryptopanic_configured"]
+        if coverage["cryptopanic_configured"]:
+            assert coverage["cryptopanic_selected_for_run"] is False
+            assert coverage["cryptopanic_live_call_allowed"] is False
+            assert coverage["cryptopanic_observed"] is False
+            assert coverage["cryptopanic_not_used_reason"] == "profile_disabled"
+            assert coverage["cryptopanic_coverage_status"] == "configured_profile_disabled"
         daily = result.daily_brief_path.read_text(encoding="utf-8")
         assert "### Derivatives/OI/funding status" in daily
         assert "namespace=external_coinalyze" in daily

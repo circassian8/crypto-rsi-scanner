@@ -538,6 +538,7 @@ def _attach_artifact_conflict_context(ctx: SimpleNamespace) -> None:
         core_rows=core_rows,
         research_card_paths=research_card_paths,
         source_coverage_report_path=source_coverage_report_path,
+        run_rows=runs,
     )
     evidence_count_mismatches = _evidence_count_mismatches(acquisition_rows)
     acquisition_final_conflicts = _evidence_acquisition_final_field_conflicts(acquisition_rows)
@@ -566,7 +567,11 @@ def _attach_notification_context(ctx: SimpleNamespace) -> None:
     delivery_rows = ctx.delivery_rows
     feedback = ctx.feedback
     hypotheses = ctx.hypotheses
-    latest_run = ctx.latest_run
+    latest_run = (
+        event_alpha_operator_state.enrich_run_row_from_core_store(ctx.namespace_dir, ctx.latest_run)
+        if ctx.latest_run and ctx.namespace_dir is not None
+        else ctx.latest_run
+    )
     latest_run_id = ctx.latest_run_id
     normalized_core_rows_by_id = ctx.normalized_core_rows_by_id
     store_core_ids = ctx.store_core_ids
@@ -659,6 +664,10 @@ def _attach_notification_context(ctx: SimpleNamespace) -> None:
         latest_run=latest_run,
         core_rows=core_rows,
         latest_run_id=latest_run_id,
+    )
+    daily_brief_operator_conflicts = _daily_brief_operator_semantic_conflicts(
+        ctx.daily_brief_path,
+        latest_run=latest_run,
     )
     _merge_context(ctx, locals())
     doctor_notification_checks.apply_checks(SimpleNamespace(**vars(ctx)), ctx.blockers, ctx.warnings)

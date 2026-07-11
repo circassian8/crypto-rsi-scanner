@@ -9,6 +9,7 @@ from .bindings import *  # noqa: F403
 import crypto_rsi_scanner.event_alpha.artifacts.locks as _artifact_locks
 import crypto_rsi_scanner.event_alpha.artifacts.operator_state as _operator_state
 import crypto_rsi_scanner.event_alpha.namespace.status as _namespace_status
+import crypto_rsi_scanner.event_alpha.radar.core_opportunities as _core_opportunities
 
 def _event_alpha_notify_cycle_body(
     *,
@@ -455,6 +456,10 @@ def _stamp_notification_cycle_identity(
         profile=profile,
         run_mode=run_mode,
         artifact_namespace=artifact_namespace,
+        candidate_events=pipeline_result.candidates,
+        research_candidates=len(pipeline_result.alerts),
+        alertable_decisions=pipeline_result.alertable,
+        strict_alerts=0,
         partial_results=(
             pipeline_result.partial_results
             or _notification_warnings_indicate_partial(pipeline_result.warnings)
@@ -496,11 +501,20 @@ def _write_notification_cycle_support_artifacts(
         artifact_namespace=artifact_namespace,
         card_paths=(),
     )
-    latest_core_rows = event_core_opportunity_store.load_core_opportunities(
+    core_read = event_core_opportunity_store.load_core_opportunities(
         _event_core_opportunity_store_config_from_runtime().path,
         latest_run=True,
         run_id=run_id,
-    ).rows
+    )
+    latest_core_rows = core_read.rows
+    pipeline_result = replace(
+        pipeline_result,
+        current_generation_core_rows=len(latest_core_rows),
+        current_generation_visible_core_rows=len(
+            _core_opportunities.visible_core_opportunities(latest_core_rows)
+        ),
+        cumulative_store_rows=core_read.total_rows_read,
+    )
     event_evidence_acquisition.reconcile_acquisition_core_ids(
         config.EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH,
         latest_core_rows,
@@ -546,11 +560,20 @@ def _write_notification_research_cards_if_enabled(
         card_write.card_paths,
         run_id=run_id,
     )
-    latest_core_rows = event_core_opportunity_store.load_core_opportunities(
+    core_read = event_core_opportunity_store.load_core_opportunities(
         _event_core_opportunity_store_config_from_runtime().path,
         latest_run=True,
         run_id=run_id,
-    ).rows
+    )
+    latest_core_rows = core_read.rows
+    pipeline_result = replace(
+        pipeline_result,
+        current_generation_core_rows=len(latest_core_rows),
+        current_generation_visible_core_rows=len(
+            _core_opportunities.visible_core_opportunities(latest_core_rows)
+        ),
+        cumulative_store_rows=core_read.total_rows_read,
+    )
     print(event_research_cards.format_card_write_result(card_write))
     print("")
     return pipeline_result, latest_core_rows
@@ -708,6 +731,7 @@ def _apply_notification_send_result(pipeline_result: Any, send_result: Any, run_
         research_review_digest_would_send=send_result.research_review_digest_would_send,
         research_review_digest_sent=send_result.research_review_digest_sent,
         research_review_digest_block_reason=send_result.research_review_digest_block_reason,
+        preview_rendered_items=send_result.preview_rendered_items,
         notification_lock_acquired=run_lock.acquired,
         notification_stale_lock_recovered=run_lock.stale_recovered,
         notification_delivery_records_written=send_result.delivery_records_written,
@@ -762,6 +786,7 @@ def _write_notification_alert_snapshots(
         snapshot_write_attempted=store_result.attempted,
         snapshot_write_success=store_result.success,
         snapshot_rows_written=store_result.rows_written,
+        source_alert_snapshots=store_result.rows_written,
         snapshot_write_block_reason=store_result.block_reason,
         notification_burn_in=True,
     )
@@ -1172,4 +1197,4 @@ def _ensure_preview_operator_state(context: Any, latest_run: Mapping[str, Any]) 
         )
     except (OSError, ValueError):
         return None
-    return exact_run
+    return dict(state)

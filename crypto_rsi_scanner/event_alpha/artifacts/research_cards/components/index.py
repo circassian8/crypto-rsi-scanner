@@ -30,6 +30,13 @@ def _lineage_lines(
     core_id = (core.core_opportunity_id if core is not None else _lineage_value("core_opportunity_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context))
     source_row_type = _lineage_value("source_row_type", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     integrated_candidate_id = _lineage_value("integrated_candidate_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    source_provider = _lineage_value("provider", "source_provider", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    provider_generation_id = _lineage_value("provider_generation_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    provider_source_artifact = _lineage_value("provider_source_artifact", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    request_ledger_path = _lineage_value("request_ledger_path", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    candidate_source_mode = _lineage_value("candidate_source_mode", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    contract_counted = _lineage_value("contract_counted_candidate", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    market_refresh_artifact = _lineage_value("market_refresh_artifact", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     feedback_target, feedback_target_type = _feedback_target_for_card(
         core_id=core_id,
         alert_id=alert_id,
@@ -55,6 +62,13 @@ def _lineage_lines(
         f"- Snapshot ID: {snapshot_id or 'none'}",
         f"- Source row type: {source_row_type or 'none'}",
         f"- Integrated candidate ID: {integrated_candidate_id or 'none'}",
+        f"- Source provider: {source_provider or 'unknown'}",
+        f"- Provider generation ID: {provider_generation_id or 'none'}",
+        f"- Provider source artifact: {provider_source_artifact or 'none'}",
+        f"- Request ledger: {request_ledger_path or 'none'}",
+        f"- Candidate source mode: {candidate_source_mode or 'not_contract_counted'}",
+        f"- Contract-counted burn-in candidate: {str(contract_counted or 'false').lower()}",
+        f"- Market refresh artifact: {market_refresh_artifact or 'none'}",
         f"- Source raw/event IDs: raw={_list_label(raw_ids)} events={_list_label(event_ids)}",
         f"- Card path: {card_path_label}",
         f"- Feedback target: {feedback_target}",

@@ -223,6 +223,8 @@ class _SourceCoverageReportCoreFields:
     acquisition_rows: int = 0
     core_rows: int = 0
     cryptopanic_configured: bool = False
+    cryptopanic_selected_for_run: bool = False
+    cryptopanic_live_call_allowed: bool = False
     cryptopanic_health_status: str = "not_observed"
     cryptopanic_observed: bool = False
     cryptopanic_requests_used: int = 0
@@ -239,6 +241,15 @@ class _SourceCoverageReportCoreFields:
     cryptopanic_not_used_reason: str | None = None
     cryptopanic_coverage_status: str = "not_configured"
     cryptopanic_recommendation: str | None = None
+    candidates_blocked_by_source_coverage: int = 0
+    candidates_blocked_by_missing_strong_source: int = 0
+    candidates_blocked_by_missing_official_source: int = 0
+    candidates_blocked_by_missing_structured_source: int = 0
+    candidates_blocked_by_evidence_not_acquired: int = 0
+    candidates_blocked_by_provider_unavailable: int = 0
+    candidates_blocked_by_market_context: int = 0
+    candidate_families_blocked_by_source_coverage: int = 0
+    candidate_families_blocked_by_market_coverage: int = 0
 
 
 @dataclass(frozen=True)
@@ -303,6 +314,8 @@ def _source_coverage_report_to_dict(report: EventAlphaSourceCoverageReport) -> d
         "acquisition_rows": report.acquisition_rows,
         "core_rows": report.core_rows,
         "cryptopanic_configured": report.cryptopanic_configured,
+        "cryptopanic_selected_for_run": report.cryptopanic_selected_for_run,
+        "cryptopanic_live_call_allowed": report.cryptopanic_live_call_allowed,
         "cryptopanic_health_status": report.cryptopanic_health_status,
         "cryptopanic_observed": report.cryptopanic_observed,
         "cryptopanic_requests_used": report.cryptopanic_requests_used,
@@ -319,6 +332,15 @@ def _source_coverage_report_to_dict(report: EventAlphaSourceCoverageReport) -> d
         "cryptopanic_not_used_reason": report.cryptopanic_not_used_reason,
         "cryptopanic_coverage_status": report.cryptopanic_coverage_status,
         "cryptopanic_recommendation": report.cryptopanic_recommendation,
+        "candidates_blocked_by_source_coverage": report.candidates_blocked_by_source_coverage,
+        "candidates_blocked_by_missing_strong_source": report.candidates_blocked_by_missing_strong_source,
+        "candidates_blocked_by_missing_official_source": report.candidates_blocked_by_missing_official_source,
+        "candidates_blocked_by_missing_structured_source": report.candidates_blocked_by_missing_structured_source,
+        "candidates_blocked_by_evidence_not_acquired": report.candidates_blocked_by_evidence_not_acquired,
+        "candidates_blocked_by_provider_unavailable": report.candidates_blocked_by_provider_unavailable,
+        "candidates_blocked_by_market_context": report.candidates_blocked_by_market_context,
+        "candidate_families_blocked_by_source_coverage": report.candidate_families_blocked_by_source_coverage,
+        "candidate_families_blocked_by_market_coverage": report.candidate_families_blocked_by_market_coverage,
         "coinalyze_preflight_status": report.coinalyze_preflight_status,
         "coinalyze_preflight_json_path": report.coinalyze_preflight_json_path,
         "coinalyze_preflight_report_path": report.coinalyze_preflight_report_path,

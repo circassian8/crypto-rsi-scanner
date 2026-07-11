@@ -62,8 +62,10 @@ def _write_candidate_mode_fixture_artifacts_locked(
         [
             {
                 "row_type": "event_core_opportunity",
+                "source_row_type": "event_integrated_radar_candidate",
                 "core_opportunity_id": card_row["core_opportunity_id"],
                 "candidate_id": row["candidate_id"],
+                "integrated_candidate_id": row["candidate_id"],
                 "symbol": row["symbol"],
                 "coin_id": row["coin_id"],
                 "profile": profile,
@@ -72,6 +74,14 @@ def _write_candidate_mode_fixture_artifacts_locked(
                 "run_mode": "fixture",
                 "opportunity_type": row["opportunity_type"],
                 "opportunity_score": row["opportunity_score_final"],
+                "opportunity_score_final": row["opportunity_score_final"],
+                "market_state": row["market_state_class"],
+                "market_state_class": row["market_state_class"],
+                "crowding_class": row["crowding_class"],
+                "evidence_status": row["evidence_status"],
+                "what_confirms": row["what_confirms"],
+                "what_invalidates": row["what_invalidates"],
+                "why_not_alertable": row["why_not_alertable"],
                 "source_origin": row["source_origin"],
                 "source_pack": row["source_pack"],
                 "candidate_provenance": "core_opportunity",
@@ -191,7 +201,7 @@ def _write_research_cards(
     ]
     for row in candidates:
         core_id = row["candidate_id"].replace("mock:", "core:")
-        filename = f"{core_id.replace(':', '_')}.md"
+        filename = f"card_{core_id.replace(':', '_')}.md"
         path = cards_dir / filename
         rel = event_artifact_paths.artifact_display_path(
             path,
@@ -233,6 +243,13 @@ def _write_research_cards(
             "- Snapshot ID: none",
             "- Source row type: event_integrated_radar_candidate",
             f"- Integrated candidate ID: {row['candidate_id']}",
+            f"- Source provider: {row.get('provider') or 'unknown'}",
+            "- Provider generation ID: none",
+            f"- Provider source artifact: {row.get('source_artifact') or 'none'}",
+            "- Request ledger: none",
+            f"- Candidate source mode: {row.get('candidate_source_mode') or 'not_contract_counted'}",
+            f"- Contract-counted burn-in candidate: {str(bool(row.get('contract_counted_candidate'))).lower()}",
+            "- Market refresh artifact: none",
             "- Source raw/event IDs: raw=none events=none",
             f"- Card path: {rel}",
             f"- Feedback target: {feedback_target}",

@@ -21,8 +21,10 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_429_403_and_doctor_con
     import crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight as event_bybit_announcements_preflight
 
     original_max_pages = os.environ.get(event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES)
+    original_allow = os.environ.get(event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT)
     try:
         os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES] = "1"
+        os.environ[event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT] = "1"
 
         def raising_opener(code):
             def opener(request, _timeout):
@@ -94,6 +96,10 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_429_403_and_doctor_con
             os.environ.pop(event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES, None)
         else:
             os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES] = original_max_pages
+        if original_allow is None:
+            os.environ.pop(event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT, None)
+        else:
+            os.environ[event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT] = original_allow
 
 
 def test_official_exchange_artifact_doctor_conflicts():

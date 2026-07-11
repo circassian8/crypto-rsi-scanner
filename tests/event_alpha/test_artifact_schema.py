@@ -14,6 +14,31 @@ def test_schema_registry_contains_required_ids():
     assert schema_doctor.check_registry_schema_dependency_errors() == ()
 
 
+def test_provider_lineage_schema_specs_preserve_registry_order_and_api():
+    expected = [
+        "provider_readiness_v1",
+        "provider_preflight_v1",
+        "coinalyze_request_ledger_v1",
+        "provider_request_ledger_v1",
+        "derivatives_state_snapshot_v1",
+        "derivatives_crowding_candidate_v1",
+        "fade_review_candidate_v1",
+        "market_state_snapshot_v1",
+        "targeted_market_refresh_ledger_v1",
+        "targeted_market_refresh_report_v1",
+    ]
+    registered = list(schema_v1.SCHEMAS)
+    start = registered.index(expected[0])
+    assert registered[start:start + len(expected)] == expected
+    assert all(schema_v1.get_schema(schema_id) is schema_v1.SCHEMAS[schema_id] for schema_id in expected)
+    assert schema_v1.get_schema("provider_preflight_v1").required_fields == (
+        "provider", "configured", "live_call_allowed",
+    )
+    assert schema_v1.get_schema("targeted_market_refresh_report_v1").path_fields == (
+        "ledger_path", "snapshot_path",
+    )
+
+
 def test_doctor_check_registry_declares_schema_dependencies():
     rows = check_registry.registry_rows()
     categories = {str(row["category"]) for row in rows}

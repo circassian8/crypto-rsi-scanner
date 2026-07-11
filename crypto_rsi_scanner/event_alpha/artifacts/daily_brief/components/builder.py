@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .runtime import *
+from .run_health import _latest_notification_health_lines, _latest_run_health_lines
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class _DailyBriefContext:
     entries: list[event_watchlist.EventWatchlistEntry]
     decisions: list[Any]
     alertable: list[Any]
+    all_core_opportunities: list[Any]
     core_opportunities: list[Any]
     core_source_rows: list[Any]
     core_sections: dict[str, list[Any]]
@@ -179,11 +181,17 @@ def _prepare_daily_brief_context(
         if event_alpha_router.alertable_after_quality_gate(decision)
     ]
     if rows.stored_core_rows:
-        core_opportunities = event_core_opportunity_store.core_opportunities_from_rows(rows.stored_core_rows)
+        all_core_opportunities = event_core_opportunity_store.core_opportunities_from_rows(rows.stored_core_rows)
         core_source_rows: list[Any] = rows.stored_core_rows
     else:
-        core_opportunities = event_core_opportunities.aggregate_core_opportunities([*decisions, *rows.hypotheses])
+        all_core_opportunities = list(
+            event_core_opportunities.aggregate_core_opportunities([*decisions, *rows.hypotheses])
+        )
         core_source_rows = [*(decision.entry for decision in decisions), *rows.hypotheses]
+    core_opportunities = [
+        item for item in all_core_opportunities
+        if event_core_opportunities.core_opportunity_is_visible(item)
+    ]
     core_sections = _core_opportunity_sections(core_opportunities)
     lane_sections = _core_opportunity_lane_sections(core_opportunities)
     promoted_core_asset_keys = {
@@ -229,6 +237,11 @@ def _prepare_daily_brief_context(
         and event_core_opportunities.incident_asset_key_for_opportunity(item) not in near_miss_incident_asset_keys
     ]
     latest = event_alpha_run_ledger.latest_run(rows.runs, requested_profile) or {}
+    if latest and run_ledger_path:
+        latest = event_alpha_operator_state.enrich_run_row_from_core_store(
+            Path(run_ledger_path).parent,
+            latest,
+        )
     selected_profile = str(latest.get("profile") or "default") if latest else "none"
     selected_namespace = str(latest.get("artifact_namespace") or "legacy") if latest else "none"
     requested = str(requested_profile or "latest").strip() or "latest"
@@ -236,6 +249,7 @@ def _prepare_daily_brief_context(
         entries=entries,
         decisions=decisions,
         alertable=alertable,
+        all_core_opportunities=all_core_opportunities,
         core_opportunities=core_opportunities,
         core_source_rows=core_source_rows,
         core_sections=core_sections,
@@ -246,9 +260,9 @@ def _prepare_daily_brief_context(
             else None
         ),
         core_alertable_count=_core_alertable_count(core_opportunities),
-        diagnostic_core_rows=sum(item.diagnostic_row_count for item in core_opportunities),
-        diagnostic_control_rows=sum(item.source_noise_control_count for item in core_opportunities),
-        diagnostic_capped_rows=sum(item.quality_capped_supporting_rows for item in core_opportunities),
+        diagnostic_core_rows=sum(item.diagnostic_row_count for item in all_core_opportunities),
+        diagnostic_control_rows=sum(item.source_noise_control_count for item in all_core_opportunities),
+        diagnostic_capped_rows=sum(item.quality_capped_supporting_rows for item in all_core_opportunities),
         promoted_core_asset_keys=promoted_core_asset_keys,
         promoted_core_assets=promoted_core_assets,
         near_miss_candidates=near_miss_candidates,
@@ -282,6 +296,7 @@ def _daily_brief_header_lines(
     card_paths: Iterable[Path],
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None,
 ) -> list[str]:
+    counters = event_alpha_run_counters.canonical_run_counters(context.latest)
     return [
         "# Event Alpha Daily Brief",
         "",
@@ -301,13 +316,28 @@ def _daily_brief_header_lines(
         "Canonical operator view: Core Opportunities sections above. Diagnostics appendix contains raw/supporting/control rows and may repeat assets for debugging.",
         "",
         "## Executive Summary",
-        f"- Core opportunities: {len(context.core_opportunities)} "
-        f"(canonical_store_rows={len(rows.stored_core_rows)}, "
-        f"high_priority={len(context.core_sections['strong'])}, digest={len(context.core_sections['digest'])}, "
+        (
+            f"- Run event funnel: raw_events={counters['raw_events']}, "
+            f"candidate_events={counters['candidate_events']}, "
+            f"research_candidates={counters['research_candidates']}"
+        ),
+        (
+            f"- Canonical core scopes: source_alert_snapshots={counters['source_alert_snapshots']}, "
+            f"current_generation_core_rows={counters['current_generation_core_rows']}, "
+            f"current_generation_visible_core_rows={counters['current_generation_visible_core_rows']}, "
+            f"cumulative_store_rows={counters['cumulative_store_rows']}"
+        ),
+        (
+            f"- Decision/preview output: alertable_decisions={counters['alertable_decisions']}, "
+            f"strict_alerts={counters['strict_alerts']}, "
+            f"preview_rendered_items={counters['preview_rendered_items']}"
+        ),
+        f"- Current-generation visible core opportunity identities: {len(context.core_opportunities)} "
+        f"(high_priority={len(context.core_sections['strong'])}, digest={len(context.core_sections['digest'])}, "
         f"watchlist={len(context.core_sections['watchlist'])}, near_miss={len(context.near_miss_candidates)}, "
         f"upgrade={len(context.upgrade_candidates)}, "
         f"local_or_capped={len(context.local_core_rows)})",
-        f"- Alertable routed decisions: {context.core_alertable_count}",
+        f"- Visible core rows passing final alertability gates: {context.core_alertable_count}",
         f"- Near-miss candidates: {len(context.near_miss_candidates)}",
         f"- Upgrade candidates: {len(context.upgrade_candidates)}",
         "- Opportunity lanes: "
@@ -325,6 +355,7 @@ def _daily_brief_header_lines(
             evidence_acquisition_rows=rows.acquisition_rows,
             provider_health_rows=provider_health_rows or {},
             requested_profile=requested_profile,
+            source_coverage_report_path=context.source_coverage_report_path,
         ),
         "",
     ]
@@ -445,7 +476,7 @@ def _daily_brief_source_intro_lines(
             f"diagnostic_rows={context.diagnostic_core_rows}, "
             f"source_noise_controls={context.diagnostic_control_rows}, "
             f"quality_capped_support={context.diagnostic_capped_rows}, "
-            f"diagnostic_lane_cores={len(context.lane_sections['diagnostics'])}"
+            f"hidden_nonvisible_core_identities={len(context.all_core_opportunities) - len(context.core_opportunities)}"
         ),
         (
             "- Pass include_diagnostics in local tooling to inspect collapsed controls."
@@ -484,53 +515,6 @@ def _append_system_health_detail_sections(
     lines.extend(_provider_health_lines(provider_health_rows or {}))
     lines.extend(["", "#### LLM Budget"])
     lines.extend(_llm_budget_lines(context.latest))
-
-
-def _latest_run_health_lines(latest: Mapping[str, Any], alertable_text: str) -> list[str]:
-    lines = [
-        f"- Run: {latest.get('run_id') or 'unknown'}",
-        f"- Profile: {latest.get('profile') or 'default'}",
-        f"- Success: {str(bool(latest.get('success'))).lower()}",
-        f"- Raw/events/candidates/alerts: {int(latest.get('raw_events') or 0)} / {int(latest.get('candidates') or 0)} / {int(latest.get('alerts') or 0)}",
-        f"- Routed/alertable/sent: {int(latest.get('routed') or 0)} / {alertable_text} / {str(bool(latest.get('sent'))).lower()}",
-        f"- Sent/delivered/block: {int(latest.get('send_items_delivered') or 0)}/{int(latest.get('send_items_attempted') or 0)} / {latest.get('send_block_reason') or 'none'}",
-        "- Catalyst frames analyzed/validated/disagreements/unresolved: "
-        f"{int(latest.get('catalyst_frames_analyzed') or latest.get('catalyst_frame_rows') or 0)} / "
-        f"{int(latest.get('catalyst_frame_validations') or latest.get('catalyst_frame_validations_applied') or 0)} / "
-        f"{int(latest.get('catalyst_frame_disagreements') or 0)} / "
-        f"{int(latest.get('catalyst_frame_unresolved') or 0)}",
-        f"- Catalyst frame rows skipped/missing: {int(latest.get('catalyst_frame_rows_skipped') or 0)}",
-    ]
-    catalyst_frame_skip = latest.get("catalyst_frame_skip_reasons") or {}
-    if isinstance(catalyst_frame_skip, Mapping) and catalyst_frame_skip:
-        lines.append(
-            "- Catalyst frame skip reasons: "
-            + ", ".join(f"{key}={int(value or 0)}" for key, value in sorted(catalyst_frame_skip.items()))
-        )
-    warnings = [str(w) for w in latest.get("warnings") or [] if str(w)]
-    if warnings:
-        lines.append("- Warnings: " + "; ".join(warnings[:6]))
-    return lines
-
-
-def _latest_notification_health_lines(latest_notification: Mapping[str, Any]) -> list[str]:
-    lines = [
-        "- Notify lock/deliveries: "
-        f"lock_acquired={str(bool(latest_notification.get('lock_acquired'))).lower()} "
-        f"skipped_active_lock={str(bool(latest_notification.get('skipped_due_to_active_lock'))).lower()} "
-        f"deliveries={int(latest_notification.get('deliveries_delivered') or 0)}d/"
-        f"{int(latest_notification.get('deliveries_partial_delivered') or 0)}partial/"
-        f"{int(latest_notification.get('deliveries_failed') or 0)}f/"
-        f"{int(latest_notification.get('deliveries_skipped_duplicate') or 0)}dup/"
-        f"{int(latest_notification.get('deliveries_skipped_in_flight') or 0)}flight/"
-        f"{int(latest_notification.get('deliveries_blocked') or 0)}blocked"
-    ]
-    if event_alpha_notification_runs.row_has_delivery_failures(latest_notification):
-        lines.append(
-            f"- Notify delivery failures: {int(latest_notification.get('deliveries_failed') or 0)} "
-            "failed delivery row(s) — run --event-alpha-notification-deliveries-report"
-        )
-    return lines
 
 
 def _append_hypothesis_sections(lines: list[str], *, rows: _DailyBriefRows, context: _DailyBriefContext) -> None:
@@ -763,9 +747,16 @@ def _append_signal_quality_lines(lines: list[str], rows: _DailyBriefRows, contex
         ("causal_mechanism_confirmed", "Causal Mechanism Confirmed"),
         ("evidence_specificity", "Evidence Specificity Distribution"),
         ("market_confirmation_level", "Market Confirmation Distribution"),
-        ("market_context_freshness_status", "Market Context Freshness"),
     ):
         lines.append(f"- {label}: " + _quality_decision_counts(context.decisions, field))
+    quality_rows = [
+        decision for decision in context.decisions
+        if decision.entry.relationship_type == "impact_hypothesis"
+    ]
+    lines.append(
+        f"- quality_row_market_freshness: total={len(quality_rows)}; statuses="
+        + _quality_decision_counts(quality_rows, "market_context_freshness_status")
+    )
     lines.append("- Top Upgrade Candidates: " + (_upgrade_candidate_line(context.decisions) or "none"))
     lines.append("- Top Downgrade Risks: " + (_downgrade_risk_line(context.decisions) or "none"))
     lines.append("- Candidate Discovery Funnel: " + _candidate_discovery_funnel_line(rows.hypotheses))
@@ -986,7 +977,7 @@ def _append_tail_sections(
     lines.extend(["", "### Top Suppression Reasons"])
     lines.extend(_suppression_lines(context.decisions, context.entries))
     if context.core_alertable_count <= 0:
-        lines.extend(["", "### Why No Alerts"])
+        lines.extend(["", "### Why No Strict Alerts"])
         lines.append(_compact(event_alpha_explain.format_last_run_explanation(
             rows.runs,
             alert_rows=rows.alerts,
@@ -997,7 +988,7 @@ def _append_tail_sections(
         )))
     elif context.alertable and include_diagnostics:
         lines.extend(["", "### Raw Pre-Policy Route Attempts / Diagnostics"])
-        lines.append("- These rows were generated before canonical core/live-confirmation policy and are not proof of sent alerts.")
+        lines.append("- These rows were generated before canonical core/live-confirmation policy and are not proof of sent notification items.")
         for decision in context.alertable[:8]:
             lines.append(f"- {decision.entry.symbol}/{decision.entry.coin_id}: {decision.reason}")
     else:

@@ -439,7 +439,7 @@ def test_diagnostic_support_snapshot_does_not_inherit_canonical_alertable_route(
         artifact_namespace="evidence_acquisition_smoke",
         include_test_artifacts=True,
     )
-    assert "- Alertable routed decisions: 1" in brief
+    assert "- Visible core rows passing final alertability gates: 1" in brief
 
     inbox = event_alpha_notification_inbox.build_notification_inbox(
         notification_runs=[{
@@ -642,8 +642,8 @@ def test_alert_snapshot_load_reconciles_sibling_core_store_and_reports_counts():
             requested_profile="live_burn_in_no_send",
             artifact_namespace="live_burn_in_no_send",
         )
-        assert "- Alertable routed decisions: 0" in brief
-        assert "- Routed/alertable/sent: 1 / 0 (run_ledger_pre_core=1) / false" in brief
+        assert "- Visible core rows passing final alertability gates: 0" in brief
+        assert "routed=1, alertable_decisions=1 (visible_core_gate_count=0 (run_ledger_pre_core=1))" in brief
 
         inbox = event_alpha_notification_inbox.build_notification_inbox(
             notification_runs=[{

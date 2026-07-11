@@ -22,6 +22,7 @@ from ..... import (
     config,
 )
 import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ....artifacts import context as event_alpha_artifacts
 from ....artifacts import locks as event_alpha_locks
@@ -34,13 +35,16 @@ from ....providers import coinalyze_preflight as event_coinalyze_preflight
 from ....providers import dex_onchain_readiness as event_dex_onchain_readiness
 from ....providers import live_provider_readiness as event_live_provider_readiness
 from ....providers import official_exchange as event_official_exchange
+from ....providers import provider_health as event_provider_health
 from ... import asset_registry as event_asset_registry
 from ... import core_opportunity_store as event_core_opportunity_store
+from ... import core_opportunities as event_core_opportunities
 from ... import derivatives_crowding as event_derivatives_crowding
 from ... import instrument_resolver as event_instrument_resolver
 from ... import market_anomaly_scanner as event_market_anomaly_scanner
 from ... import market_confirmation as event_market_confirmation
 from ... import market_reaction as event_market_reaction
+from ...near_miss import targeted as event_targeted_market_refresh
 from ... import scheduled_catalysts as event_scheduled_catalysts
 from ... import source_coverage as event_alpha_source_coverage
 

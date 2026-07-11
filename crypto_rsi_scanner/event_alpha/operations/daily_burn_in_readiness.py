@@ -29,6 +29,27 @@ def build_readiness_report(
     live_allowed = sorted(key for key, row in provider_status.items() if row.get("live_call_allowed"))
     request_ledgers_writable = _request_ledgers_writable(context, provider_status)
     doctor_status = daily_burn_in._doctor_status_payload(context).get("status") or "not_run"
+    doctor_blocked = str(doctor_status) in {"blocked", "failed", "strict_blockers"}
+    ready_providers = sorted(
+        key for key in live_allowed
+        if request_ledgers_writable.get(key) and not doctor_blocked
+    )
+    config_ready_no_live = sorted(
+        key for key, row in provider_status.items()
+        if row.get("configured") and key not in ready_providers
+    )
+    missing_allow = sorted(
+        key for key, row in provider_status.items()
+        if row.get("configured") and row.get("allow_flag_set") is not True
+    )
+    any_ready = bool(ready_providers)
+    all_ready = bool(provider_status) and all(
+        key in ready_providers for key in provider_status
+    )
+    fastest_ready_provider = _fastest_config_ready_provider(
+        provider_status,
+        ready_providers=ready_providers,
+    )
     ready_status = _candidate_mode_ready_status(
         provider_status=provider_status,
         missing=missing,
@@ -46,7 +67,13 @@ def build_readiness_report(
             "artifact_namespace": namespace,
             "namespace_dir": common.rel_path(context.namespace_dir),
             "can_run_default_preflight_mode": True,
-            "can_run_candidate_mode": ready_status == "ready_for_bounded_no_send_rehearsal",
+            "can_run_candidate_mode": any_ready,
+            "candidate_mode_ready_with_any_provider": any_ready,
+            "candidate_mode_ready_with_all_priority_providers": all_ready,
+            "fastest_ready_provider": fastest_ready_provider,
+            "providers_config_ready_no_live": config_ready_no_live,
+            "providers_missing_config": missing,
+            "providers_missing_allow_flag": missing_allow,
             "candidate_mode_status": candidate_status,
             "candidate_mode_ready_status": ready_status,
             "configured_providers": configured,
@@ -60,6 +87,13 @@ def build_readiness_report(
             "artifact_doctor_recent_status": doctor_status,
             "provider_activation_status": provider_status,
             "next_safe_command": _readiness_next_command(ready_status),
+            "next_safe_commands": _next_safe_commands(
+                profile=profile,
+                any_ready=any_ready,
+                ready_providers=ready_providers,
+                missing_config=missing,
+                missing_allow=missing_allow,
+            ),
             "next_steps": daily_burn_in._candidate_mode_next_steps(provider_status),
         }
     )
@@ -76,6 +110,12 @@ def format_readiness_report(payload: Mapping[str, Any]) -> str:
         "",
         f"- can_run_default_preflight_mode: `{payload.get('can_run_default_preflight_mode')}`",
         f"- can_run_candidate_mode: `{payload.get('can_run_candidate_mode')}`",
+        f"- candidate_mode_ready_with_any_provider: `{payload.get('candidate_mode_ready_with_any_provider')}`",
+        f"- candidate_mode_ready_with_all_priority_providers: `{payload.get('candidate_mode_ready_with_all_priority_providers')}`",
+        f"- fastest_ready_provider: `{payload.get('fastest_ready_provider') or 'none'}`",
+        f"- providers_config_ready_no_live: `{', '.join(payload.get('providers_config_ready_no_live') or []) or 'none'}`",
+        f"- providers_missing_config: `{', '.join(payload.get('providers_missing_config') or []) or 'none'}`",
+        f"- providers_missing_allow_flag: `{', '.join(payload.get('providers_missing_allow_flag') or []) or 'none'}`",
         f"- candidate_mode_status: `{payload.get('candidate_mode_status')}`",
         f"- candidate_mode_ready_status: `{payload.get('candidate_mode_ready_status')}`",
         f"- configured_providers: `{', '.join(payload.get('configured_providers') or []) or 'none'}`",
@@ -88,7 +128,9 @@ def format_readiness_report(payload: Mapping[str, Any]) -> str:
         f"- telegram_send_guard_status: `{payload.get('telegram_send_guard_status')}`",
         f"- artifact_doctor_recent_status: `{payload.get('artifact_doctor_recent_status')}`",
         f"- next_safe_command: `{payload.get('next_safe_command')}`",
+        "- next_safe_commands:",
     ]
+    lines.extend(f"  {index}. `{command}`" for index, command in enumerate(payload.get("next_safe_commands") or (), start=1))
     return "\n".join(lines).rstrip()
 
 
@@ -116,8 +158,6 @@ def _candidate_mode_ready_status(
 ) -> str:
     if doctor_status in {"blocked", "failed", "strict_blockers"}:
         return "blocked_by_doctor"
-    if missing:
-        return "blocked_by_missing_config"
     if not provider_status:
         return "no_candidate_providers_configured"
     if live_allowed and all(request_ledgers_writable.get(key) for key in live_allowed):
@@ -144,3 +184,57 @@ def _readiness_next_command(status: str) -> str:
     if status == "blocked_by_missing_config":
         return "make event-alpha-daily-burn-in-readiness PYTHON=python3"
     return "make event-alpha-daily-live-no-send-burn-in-plan CANDIDATE_MODE=1 PYTHON=python3"
+
+
+def _fastest_config_ready_provider(
+    provider_status: Mapping[str, Mapping[str, Any]],
+    *,
+    ready_providers: list[str],
+) -> str | None:
+    for key in ("bybit_announcements", "coinalyze"):
+        if key in ready_providers:
+            return key
+    for key in ("bybit_announcements", "coinalyze"):
+        row = provider_status.get(key) or {}
+        if row.get("configured"):
+            return key
+    return next(
+        (key for key, row in sorted(provider_status.items()) if row.get("configured")),
+        None,
+    )
+
+
+def _next_safe_commands(
+    *,
+    profile: str,
+    any_ready: bool,
+    ready_providers: list[str],
+    missing_config: list[str],
+    missing_allow: list[str],
+) -> list[str]:
+    commands: list[str] = []
+    if "bybit_announcements" in ready_providers:
+        commands.append(
+            f"make event-alpha-daily-live-no-send-burn-in CANDIDATE_MODE=1 PROFILE={profile} PYTHON=python3"
+        )
+    else:
+        commands.append(f"make event-alpha-bybit-announcements-preflight PROFILE={profile} PYTHON=python3")
+    if "bybit_announcements" in missing_allow:
+        commands.append(
+            "set RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT=1 manually only after approving the Bybit no-send preflight"
+        )
+    if "coinalyze" in missing_config:
+        commands.append(
+            "configure RSI_EVENT_DISCOVERY_COINALYZE_API_KEY locally; never write the key to artifacts"
+        )
+    elif "coinalyze" in missing_allow:
+        commands.append(
+            "set RSI_EVENT_ALPHA_COINALYZE_ALLOW_LIVE_PREFLIGHT=1 manually only after approving the Coinalyze no-send preflight"
+        )
+    if any_ready and "bybit_announcements" not in ready_providers:
+        commands.insert(
+            0,
+            f"make event-alpha-daily-live-no-send-burn-in CANDIDATE_MODE=1 PROFILE={profile} PYTHON=python3",
+        )
+    commands.append(f"make event-alpha-daily-burn-in-readiness PROFILE={profile} PYTHON=python3")
+    return commands

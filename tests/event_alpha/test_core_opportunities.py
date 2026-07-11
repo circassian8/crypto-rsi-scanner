@@ -967,7 +967,7 @@ def test_event_alpha_daily_brief_uses_canonical_core_store_rows():
         run_mode="burn_in",
         generated_at=pd.Timestamp("2026-06-15T12:00:00Z").to_pydatetime(),
     )
-    assert "canonical_store_rows=4" in brief
+    assert "Current-generation visible core opportunity identities: 4" in brief
     assert "## High-Priority Core Opportunities" in brief
     high_section = brief.split("## High-Priority Core Opportunities", 1)[1].split("## Validated Digest Core Opportunities", 1)[0]
     near_section = brief.split("## Near-Miss Candidates", 1)[1].split("## Upgrade Candidates", 1)[0]

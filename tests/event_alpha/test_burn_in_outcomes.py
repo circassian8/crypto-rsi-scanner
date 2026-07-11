@@ -44,7 +44,7 @@ def test_event_alpha_daily_brief_replay_retention_and_unmatched_feedback():
         card_paths=[Path("/tmp/velvet.md")],
     )
     assert "Event Alpha Daily Brief" in markdown
-    assert "Why No Alerts" in markdown
+    assert "Why No Strict Alerts" in markdown
     assert "Provider Health" in markdown
     assert "LLM Budget" in markdown
     assert "Watchlist Got Hotter" in markdown

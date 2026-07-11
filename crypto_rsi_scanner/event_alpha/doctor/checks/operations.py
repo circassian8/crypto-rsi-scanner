@@ -13,6 +13,18 @@ from ._utils import Messages, ctx_mapping, ctx_value
 from ...artifacts import paths as event_artifact_paths
 from ...artifacts import operator_state as event_alpha_operator_state
 from ...operations import common
+from ...providers import request_lineage as event_request_lineage
+
+
+_PROVIDER_REHEARSAL_REPORTS = {
+    "coinalyze": "event_coinalyze_rehearsal_report.json",
+    "bybit_announcements": "event_bybit_announcements_rehearsal_report.json",
+}
+_PROVIDER_SUCCESS_STATUSES = {
+    "live_rehearsal_success",
+    "live_rehearsal_partial",
+    "live_rehearsal_no_results",
+}
 
 
 def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
@@ -28,7 +40,103 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
     _check_source_yield(source_yield, blockers)
     _check_review_inbox(ctx, review_inbox, blockers, warnings)
     _check_archive_manifest(archive_manifest, blockers)
+    _check_targeted_market_refresh(ctx, blockers)
     _check_operator_state(ctx, blockers, warnings)
+
+
+def _check_targeted_market_refresh(ctx: object, blockers: Messages) -> None:
+    namespace_dir_value = ctx_value(ctx, "namespace_dir", None)
+    if not namespace_dir_value:
+        return
+    namespace_dir = Path(str(namespace_dir_value)).expanduser()
+    report = common.read_json(namespace_dir / "event_targeted_market_refresh_report.json")
+    ledger_rows = common.read_jsonl(namespace_dir / "event_targeted_market_refresh_ledger.jsonl")
+    if not report and not ledger_rows:
+        return
+    if not report:
+        _targeted_refresh_block(blockers, "targeted_market_refresh_ledger_without_report")
+        return
+    refresh_id = str(report.get("refresh_run_id") or "")
+    run_id = str(report.get("run_id") or "")
+    exact_rows = [
+        row for row in ledger_rows
+        if str(row.get("targeted_market_refresh_id") or "") == refresh_id
+    ]
+    request_count = int(report.get("request_count") or 0)
+    selected_assets = int(report.get("selected_assets") or 0)
+    timeout_seconds = float(report.get("timeout_seconds") or 0.0)
+    if not refresh_id or not run_id:
+        _targeted_refresh_block(blockers, "targeted_market_refresh_missing_exact_run_lineage")
+    if request_count not in {0, 1} or selected_assets > 20 or timeout_seconds <= 0:
+        _targeted_refresh_block(
+            blockers,
+            f"targeted_market_refresh_budget_invalid=requests:{request_count},assets:{selected_assets},timeout:{timeout_seconds}",
+            check_id="integrated_radar.targeted_market_refresh_budget",
+        )
+    if selected_assets != len(exact_rows):
+        _targeted_refresh_block(blockers, f"targeted_market_refresh_selected_ledger_mismatch={selected_assets}!={len(exact_rows)}")
+    canonical_assets = [str(row.get("canonical_asset_id") or "") for row in exact_rows]
+    if len(canonical_assets) != len(set(canonical_assets)):
+        _targeted_refresh_block(blockers, "targeted_market_refresh_duplicate_canonical_asset")
+    snapshots = [
+        row for row in common.read_jsonl(namespace_dir / "event_market_state_snapshots.jsonl")
+        if str(row.get("targeted_market_refresh_id") or "") == refresh_id
+    ]
+    snapshot_assets = {str(row.get("canonical_asset_id") or "") for row in snapshots}
+    refreshed_assets = {
+        str(row.get("canonical_asset_id") or "")
+        for row in exact_rows
+        if str(row.get("status") or "") == "refreshed"
+    }
+    if refreshed_assets != snapshot_assets:
+        _targeted_refresh_block(blockers, "targeted_market_refresh_snapshot_ledger_mismatch")
+    if int(report.get("refreshed_assets") or 0) != len(refreshed_assets):
+        _targeted_refresh_block(blockers, "targeted_market_refresh_report_refreshed_count_mismatch")
+    persisted = sum(
+        1 for row in common.read_jsonl(namespace_dir / "event_market_state_snapshots.jsonl")
+        if str(row.get("run_id") or "") == run_id
+    )
+    if int(report.get("persisted_snapshot_rows") or 0) != persisted:
+        _targeted_refresh_block(blockers, "targeted_market_refresh_persisted_snapshot_count_mismatch")
+    for row in exact_rows:
+        if str(row.get("run_id") or "") != run_id:
+            _targeted_refresh_block(blockers, "targeted_market_refresh_ledger_run_mismatch")
+        if row.get("research_only") is not True or row.get("no_send_rehearsal") is not True:
+            _targeted_refresh_block(blockers, "targeted_market_refresh_safety_missing")
+        if any(int(row.get(field) or 0) != 0 for field in (
+            "strict_alerts_created", "telegram_sends", "trades_created",
+            "paper_trades_created", "normal_rsi_signal_rows_written", "triggered_fade_created",
+        )):
+            _targeted_refresh_block(blockers, "targeted_market_refresh_side_effect_claim")
+        duration = float(row.get("duration_seconds") or 0.0)
+        timeout = float(row.get("timeout_seconds") or 0.0)
+        if duration > timeout and str(row.get("status") or "") != "timeout":
+            _targeted_refresh_block(
+                blockers,
+                "targeted_market_refresh_timeout_not_enforced",
+                check_id="integrated_radar.targeted_market_refresh_budget",
+            )
+    integrated_rows = common.read_jsonl(namespace_dir / "event_integrated_radar_candidates.jsonl")
+    by_asset = {
+        str(row.get("canonical_asset_id") or row.get("coin_id") or "").casefold(): row
+        for row in integrated_rows
+    }
+    for asset in refreshed_assets:
+        candidate = by_asset.get(asset.casefold())
+        if candidate is not None and (
+            candidate.get("market_refresh_success") is not True
+            or not str(candidate.get("market_refresh_artifact") or "").strip()
+        ):
+            _targeted_refresh_block(blockers, f"targeted_market_refresh_candidate_propagation_missing={asset}")
+
+
+def _targeted_refresh_block(
+    blockers: Messages,
+    detail: str,
+    *,
+    check_id: str = "integrated_radar.targeted_market_refresh_lineage",
+) -> None:
+    blockers.append(check_registry.format_check_message(check_id, detail))
 
 
 def _check_operator_state(ctx: object, blockers: Messages, warnings: Messages) -> None:
@@ -295,11 +403,14 @@ def _check_candidate_mode(ctx: object, daily_run: Mapping[str, Any], candidate_m
     for row in candidate_rows:
         if row.get("contract_counted_candidate") is not True:
             continue
-        required_fields = ("candidate_provenance", "provider", "source_pack", "source_origin")
+        required_fields = (
+            "candidate_provenance", "provider", "source_pack", "source_origin",
+            "provider_generation_id", "provider_source_artifact",
+        )
         if any(not str(row.get(field) or "").strip() for field in required_fields):
             missing_provenance += 1
         source_mode = str(row.get("candidate_source_mode") or "").strip()
-        if source_mode == "live_no_send" and not str(row.get("request_ledger_path") or "").strip():
+        if source_mode == "live_no_send" and not _exact_contract_ledger_valid(ctx, row):
             missing_ledger += 1
         if source_mode in {"mocked_fixture", "fixture"} or row.get("fixture_only") is True or row.get("test_fixture") is True:
             fixture_counted += 1
@@ -335,6 +446,99 @@ def _check_candidate_mode(ctx: object, daily_run: Mapping[str, Any], candidate_m
         )
     _check_candidate_mode_fixture_cards(ctx, candidate_rows, candidate_mode_manifest, blockers)
     _check_candidate_mode_safety_counters(candidate_mode_manifest, blockers)
+
+
+def _exact_contract_ledger_valid(ctx: object, row: Mapping[str, Any]) -> bool:
+    ledger_label = str(row.get("request_ledger_path") or "").strip()
+    generation_id = str(row.get("provider_generation_id") or "").strip()
+    provider = _contract_provider(row)
+    profile = str(row.get("profile") or "").strip()
+    artifact_namespace = str(row.get("artifact_namespace") or "").strip()
+    namespace_dir = Path(ctx_value(ctx, "namespace_dir", "."))
+    if (
+        not ledger_label
+        or not generation_id
+        or not provider
+        or not profile
+        or not artifact_namespace
+        or row.get("provider_request_succeeded") is not True
+    ):
+        return False
+    ctx_profile = str(ctx_value(ctx, "profile", profile) or profile)
+    ctx_namespace = str(ctx_value(ctx, "artifact_namespace", artifact_namespace) or artifact_namespace)
+    if profile != ctx_profile or artifact_namespace != ctx_namespace:
+        return False
+    report_name = _PROVIDER_REHEARSAL_REPORTS.get(provider)
+    if not report_name:
+        return False
+    report = common.read_json(namespace_dir / report_name)
+    provider_run_id = str(report.get("run_id") or "").strip()
+    if (
+        str(report.get("provider") or "").strip() != provider
+        or str(report.get("provider_generation_id") or "").strip() != generation_id
+        or not provider_run_id
+        or str(report.get("status") or "") not in _PROVIDER_SUCCESS_STATUSES
+        or report.get("live_call_allowed") is not True
+        or report.get("no_send") is not True
+        or report.get("research_only") is not True
+    ):
+        return False
+    ledger_path = _contract_artifact_path(namespace_dir, ledger_label)
+    source_path = _contract_artifact_path(
+        namespace_dir,
+        str(row.get("provider_source_artifact") or "").strip(),
+    )
+    if ledger_path is None or source_path is None:
+        return False
+    ledger_rows = event_request_lineage.generation_rows(
+        common.read_jsonl(ledger_path),
+        generation_id,
+        provider=provider,
+        run_id=provider_run_id,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+    )
+    source_rows = event_request_lineage.generation_rows(
+        common.read_jsonl(source_path),
+        generation_id,
+        provider=provider,
+        run_id=provider_run_id,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+    )
+    if provider == "bybit_announcements" and not _contract_bybit_source_fields_complete(row):
+        return False
+    return bool(source_rows) and any(
+        item.get("success") is True and item.get("no_send_rehearsal") is True
+        for item in ledger_rows
+    )
+
+
+def _contract_provider(row: Mapping[str, Any]) -> str:
+    provider = str(row.get("provider") or row.get("source_provider") or "").strip()
+    return "bybit_announcements" if "bybit" in provider.casefold() else provider
+
+
+def _contract_artifact_path(namespace_dir: Path, label: str) -> Path | None:
+    candidate = Path(label)
+    if not label:
+        return None
+    namespace_dir = namespace_dir.resolve()
+    if candidate.is_absolute():
+        resolved = candidate.resolve()
+        return resolved if resolved.parent == namespace_dir and resolved.is_file() else None
+    if ".." in candidate.parts:
+        return None
+    path = namespace_dir / candidate.name
+    return path if path.is_file() else None
+
+
+def _contract_bybit_source_fields_complete(row: Mapping[str, Any]) -> bool:
+    event = row.get("official_exchange_event") if isinstance(row.get("official_exchange_event"), Mapping) else {}
+    return all(
+        str(row.get(key) or event.get(key) or "").strip()
+        for key in ("source_url", "title", "published_at")
+    )
 
 
 def _check_scorecard(scorecard: Mapping[str, Any], blockers: Messages) -> None:

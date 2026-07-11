@@ -85,7 +85,7 @@ def _source_coverage_summary_lines(
         f"- Accepted evidence by source class: {accepted_source_text}",
         f"- Source enrichment article quality: {article_quality_text}",
         f"- Source coverage gaps: {len(gaps)} candidate(s) need healthier or more specific source coverage.",
-        f"- What data source would most improve next run: {next_source}",
+        f"- Largest current source-pack coverage gap: {next_source}",
         *_source_activation_plan_lines(source_coverage_report_path),
         "- Evidence absence rule: broad/degraded RSS/GDELT/Polymarket gaps are not treated as strong negative proof.",
     ]
@@ -106,6 +106,8 @@ def _source_coverage_json_summary_lines(
         (
             "- CryptoPanic effective coverage: "
             f"configured={str(bool(coverage.get('cryptopanic_configured'))).lower()} "
+            f"selected_for_run={str(bool(coverage.get('cryptopanic_selected_for_run'))).lower()} "
+            f"live_call_allowed={str(bool(coverage.get('cryptopanic_live_call_allowed'))).lower()} "
             f"status={coverage.get('cryptopanic_health_status') or 'unknown'} "
             f"coverage={coverage.get('cryptopanic_coverage_status') or 'unknown'} "
             f"observed={str(bool(coverage.get('cryptopanic_observed'))).lower()} "
@@ -120,7 +122,9 @@ def _source_coverage_json_summary_lines(
     if recommendation and recommendation != "none":
         lines.append(f"- CryptoPanic recommendation: {recommendation}")
     packs = [pack for pack in coverage.get("packs") or [] if isinstance(pack, Mapping)]
-    blocked = sum(int(pack.get("candidates_blocked_by_coverage_gap") or 0) for pack in packs)
+    blocked = int(coverage.get("candidates_blocked_by_source_coverage") or 0)
+    if "candidates_blocked_by_source_coverage" not in coverage:
+        blocked = sum(int(pack.get("candidates_blocked_by_coverage_gap") or 0) for pack in packs)
     accepted = sum(int(pack.get("accepted_evidence_count") or 0) for pack in packs)
     rejected_only = sum(int(pack.get("rejected_only_count") or 0) for pack in packs)
     skipped_budget = sum(int(pack.get("skipped_budget_count") or 0) for pack in packs)
@@ -134,8 +138,22 @@ def _source_coverage_json_summary_lines(
         f"provider_unavailable={provider_unavailable}"
     )
     lines.append(f"- Source coverage gaps: {blocked} candidate(s) need healthier or more specific source coverage.")
+    lines.append(
+        "- Coverage blocker accounting: "
+        f"missing_strong_source={int(coverage.get('candidates_blocked_by_missing_strong_source') or 0)}, "
+        f"missing_official_source={int(coverage.get('candidates_blocked_by_missing_official_source') or 0)}, "
+        f"missing_structured_source={int(coverage.get('candidates_blocked_by_missing_structured_source') or 0)}, "
+        f"evidence_not_acquired={int(coverage.get('candidates_blocked_by_evidence_not_acquired') or 0)}, "
+        f"provider_unavailable={int(coverage.get('candidates_blocked_by_provider_unavailable') or 0)}, "
+        f"market_context={int(coverage.get('candidates_blocked_by_market_context') or 0)}"
+    )
+    lines.append(
+        "- Coverage-blocked visible families: "
+        f"source={int(coverage.get('candidate_families_blocked_by_source_coverage') or 0)}, "
+        f"market={int(coverage.get('candidate_families_blocked_by_market_coverage') or 0)}"
+    )
     next_source = _source_coverage_json_next_source(packs, coverage)
-    lines.append(f"- What data source would most improve next run: {next_source}")
+    lines.append(f"- Largest current source-pack coverage gap: {next_source}")
     lines.append(
         "- Source coverage JSON: "
         + (event_artifact_paths.artifact_display_path(json_path) if json_path and json_path.exists() else "not written yet")
@@ -169,7 +187,7 @@ def _source_activation_plan_lines(
             top.append(f"{category} ({', '.join(str(provider) for provider in providers if str(provider)) or 'providers TBD'})")
     lines = [
         f"- Live-provider activation readiness: {readiness_label}",
-        "- Recommended next activation order: " + ("; ".join(top) if top else "none"),
+        "- Strategic activation order (not readiness): " + ("; ".join(top) if top else "none"),
     ]
     if base is not None:
         coinalyze_json = base / event_coinalyze_preflight.PREFLIGHT_JSON
@@ -404,7 +422,16 @@ def _coverage_blocked_candidate_lines(
     *,
     limit: int,
 ) -> list[str]:
-    rows = [item for item in candidates if item.source_coverage_gap or item.provider_coverage_status in {"degraded", "unavailable", "not_configured", "partial"}]
+    rows = [
+        item
+        for item in candidates
+        if item.source_coverage_gap
+        or item.provider_coverage_status in {"degraded", "unavailable", "not_configured", "partial"}
+        or bool(
+            set(item.recommended_refresh_actions)
+            & {"source_pack_search", "targeted_evidence_refresh", "official_source_search"}
+        )
+    ]
     if not rows:
         return ["- None."]
     lines: list[str] = []

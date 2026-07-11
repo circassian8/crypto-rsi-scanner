@@ -1097,7 +1097,7 @@
         "EventAlphaSendResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 27,
+      "max_class_line_count": 28,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.pipeline_models",
       "public_class_count": 2,
@@ -1245,7 +1245,7 @@
         "FixtureWatchlistMarketProvider"
       ],
       "exception_reason": "",
-      "max_class_line_count": 30,
+      "max_class_line_count": 36,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
       "public_class_count": 4,
@@ -1454,7 +1454,7 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1239,
+      "line_count": 1247,
       "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
       "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
       "revisit_condition": "When adding a new derivatives metric family or crowding class.",
@@ -1593,7 +1593,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 720,
+  "file_count": 727,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1601,7 +1601,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-11T06:49:23.200446+00:00",
+  "generated_at": "2026-07-11T18:24:58.345998+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1649,7 +1649,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1239,
+      "line_count": 1247,
       "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
       "source_kind": "production"
     },
@@ -1662,13 +1662,19 @@
     {
       "limit": 1500,
       "line_count": 1200,
+      "path": "crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1200,
       "path": "crypto_rsi_scanner/cli/services/event_alpha_research.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1194,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
+      "line_count": 1189,
+      "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/notification_delivery_checks.py",
       "source_kind": "production"
     },
     {
@@ -1679,8 +1685,8 @@
     },
     {
       "limit": 1500,
-      "line_count": 1175,
-      "path": "crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py",
+      "line_count": 1173,
+      "path": "crypto_rsi_scanner/cli/services/scanner_parts/reports.py",
       "source_kind": "production"
     },
     {
@@ -1691,20 +1697,26 @@
     },
     {
       "limit": 1500,
+      "line_count": 1168,
+      "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1159,
-      "path": "crypto_rsi_scanner/event_alpha/operations/daily_burn_in.py",
+      "path": "crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1152,
-      "path": "crypto_rsi_scanner/cli/services/scanner_parts/reports.py",
+      "line_count": 1156,
+      "path": "crypto_rsi_scanner/event_alpha/operations/review_inbox.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1145,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py",
+      "line_count": 1146,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
       "source_kind": "production"
     },
     {
@@ -1716,7 +1728,13 @@
     {
       "limit": 1500,
       "line_count": 1138,
-      "path": "crypto_rsi_scanner/event_alpha/operations/review_inbox.py",
+      "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1136,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py",
       "source_kind": "production"
     },
     {
@@ -1733,20 +1751,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1129,
-      "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1123,
-      "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1103,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/rsi_scan.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1102,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py",
       "source_kind": "production"
     },
     {
@@ -1759,12 +1771,6 @@
       "limit": 1500,
       "line_count": 1078,
       "path": "crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1071,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py",
       "source_kind": "production"
     },
     {
@@ -1793,19 +1799,19 @@
     },
     {
       "limit": 1500,
-      "line_count": 1047,
-      "path": "crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1044,
       "path": "crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1016,
+      "line_count": 1024,
+      "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/source_coverage_checks.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1020,
       "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge_policy.py",
       "source_kind": "production"
     },
@@ -1838,12 +1844,6 @@
       "line_count": 980,
       "path": "crypto_rsi_scanner/event_alpha/radar/impact_hypothesis_store.py",
       "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 976,
-      "path": "crypto_rsi_scanner/event_alpha/radar/incident_graph.py",
-      "source_kind": "production"
     }
   ],
   "largest_test_files": [
@@ -1861,13 +1861,13 @@
     },
     {
       "limit": 1500,
-      "line_count": 1450,
+      "line_count": 1470,
       "path": "tests/event_alpha/test_market_surfaces.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1393,
+      "line_count": 1412,
       "path": "tests/event_alpha/test_provider_activation.py",
       "source_kind": "test"
     },
@@ -1903,6 +1903,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1146,
+      "path": "tests/event_alpha/test_doctor_notifications.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1127,
       "path": "tests/event_alpha/test_catalyst_frames.py",
       "source_kind": "test"
@@ -1933,32 +1939,26 @@
     },
     {
       "limit": 1500,
-      "line_count": 1082,
-      "path": "tests/event_alpha/test_doctor_notifications.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
       "line_count": 1081,
       "path": "tests/event_alpha/test_fade_validation.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1023,
-      "path": "tests/event_alpha/test_quality_feedback.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1019,
+      "line_count": 1063,
       "path": "tests/event_alpha/test_notification_inbox_rehearsals.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1006,
+      "line_count": 1038,
       "path": "tests/event_alpha/test_operator_workflows.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1023,
+      "path": "tests/event_alpha/test_quality_feedback.py",
       "source_kind": "test"
     },
     {
@@ -1975,6 +1975,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 938,
+      "path": "tests/event_alpha/test_artifact_schema.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 925,
       "path": "tests/event_alpha/test_notification_operations.py",
       "source_kind": "test"
@@ -1987,14 +1993,8 @@
     },
     {
       "limit": 1500,
-      "line_count": 914,
+      "line_count": 915,
       "path": "tests/test_indicators.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 913,
-      "path": "tests/event_alpha/test_artifact_schema.py",
       "source_kind": "test"
     },
     {
@@ -2005,7 +2005,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 895,
+      "line_count": 901,
       "path": "tests/event_alpha/test_doctor_provider_conflicts.py",
       "source_kind": "test"
     },
@@ -2023,6 +2023,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 831,
+      "path": "tests/event_alpha/test_burn_in_candidate_mode.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 825,
       "path": "tests/event_alpha/_api_helpers.py",
       "source_kind": "test"
@@ -2031,6 +2037,12 @@
       "limit": 1500,
       "line_count": 817,
       "path": "tests/event_alpha/test_discovery_cache_reports.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 807,
+      "path": "tests/event_alpha/test_source_coverage_reports.py",
       "source_kind": "test"
     },
     {
@@ -2053,6 +2065,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 773,
+      "path": "tests/event_alpha/test_notification_routing.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 758,
       "path": "tests/event_alpha/test_alert_outcomes.py",
       "source_kind": "test"
@@ -2065,26 +2083,8 @@
     },
     {
       "limit": 1500,
-      "line_count": 747,
-      "path": "tests/event_alpha/test_notification_routing.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
       "line_count": 735,
       "path": "tests/rsi/test_indicators_core.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 699,
-      "path": "tests/event_alpha/test_exchange_universe_providers.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 683,
-      "path": "tests/event_alpha/test_namespace_profiles.py",
       "source_kind": "test"
     }
   ],
@@ -3146,7 +3146,7 @@
         "EventAlphaSendResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 27,
+      "max_class_line_count": 28,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.pipeline_models",
       "public_class_count": 2,
@@ -3294,7 +3294,7 @@
         "FixtureWatchlistMarketProvider"
       ],
       "exception_reason": "",
-      "max_class_line_count": 30,
+      "max_class_line_count": 36,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
       "public_class_count": 4,
@@ -3598,7 +3598,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1239,
+      "line_count": 1247,
       "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
       "source_kind": "production"
     },
@@ -3644,7 +3644,7 @@
     {
       "accepted_exception": false,
       "class_name": "CoinGeckoWatchlistMarketProvider",
-      "line_count": 30,
+      "line_count": 36,
       "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
       "over_limit": false,
       "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
@@ -3921,7 +3921,7 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1239,
+          "line_count": 1247,
           "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
           "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
           "revisit_condition": "When adding a new derivatives metric family or crowding class.",
@@ -4014,7 +4014,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1239,
+        "line_count": 1247,
         "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
         "threshold": 1200
       },
@@ -4149,7 +4149,7 @@
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1239,
+            "line_count": 1247,
             "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
             "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
             "revisit_condition": "When adding a new derivatives metric family or crowding class.",

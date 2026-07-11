@@ -482,6 +482,19 @@ def _core_row_identity_source_fields(context: Mapping[str, Any]) -> dict[str, An
         ),
         "market_refresh_attempted": _any_truthy(all_rows, ("market_refresh_attempted", "targeted_market_refresh_attempted")),
         "market_refresh_success": _any_truthy(all_rows, ("market_refresh_success", "targeted_market_refresh_success")),
+        "market_refresh_status": _first_text(all_rows, ("market_refresh_status",)),
+        "market_refresh_provider": _first_text(all_rows, ("market_refresh_provider",)),
+        "market_refresh_observed_at": _first_text(all_rows, ("market_refresh_observed_at",)),
+        "market_refresh_artifact": _first_text(all_rows, ("market_refresh_artifact",)),
+        "targeted_market_refresh_id": _first_text(all_rows, ("targeted_market_refresh_id",)),
+        "targeted_market_refresh_ledger_path": _first_text(all_rows, ("targeted_market_refresh_ledger_path",)),
+        "provider_generation_id": _first_text(all_rows, ("provider_generation_id",)),
+        "provider_request_succeeded": _any_truthy(all_rows, ("provider_request_succeeded",)),
+        "provider_source_artifact": _first_text(all_rows, ("provider_source_artifact",)),
+        "request_ledger_path": _first_text(all_rows, ("request_ledger_path",)),
+        "candidate_provenance": _first_text(all_rows, ("candidate_provenance",)),
+        "candidate_source_mode": _first_text(all_rows, ("candidate_source_mode",)),
+        "contract_counted_candidate": _any_truthy(all_rows, ("contract_counted_candidate",)),
     }
 
 

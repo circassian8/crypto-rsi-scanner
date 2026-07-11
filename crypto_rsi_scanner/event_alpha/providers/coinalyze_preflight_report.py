@@ -74,6 +74,8 @@ def format_rehearsal_report(report: CoinalyzeRehearsalReport) -> str:
         f"live_call_allowed: {str(report.live_call_allowed).lower()}",
         f"no_send: {str(report.no_send).lower()}",
         f"research_only: {str(report.research_only).lower()}",
+        f"provider_generation_id: {report.provider_generation_id}",
+        f"run_id: {report.run_id}",
         f"requests_used: {report.requests_used}",
         f"max_requests_per_run: {report.max_requests_per_run}",
         f"symbols_requested: {', '.join(report.symbols_requested) or 'none'}",
@@ -113,7 +115,10 @@ def format_rehearsal_report(report: CoinalyzeRehearsalReport) -> str:
     if report.status == "missing_config":
         lines.append(f"next_step: configure {ENV_API_KEY}, then rerun without live calls first")
     elif report.status == "live_call_blocked_by_default":
-        lines.append(f"next_step: rerun only with --event-alpha-coinalyze-allow-live-preflight or {ENV_ALLOW_LIVE_PREFLIGHT}=1 after review")
+        lines.append(
+            f"next_step: set {ENV_ALLOW_LIVE_PREFLIGHT}=1 manually after review, then rerun; "
+            "the CLI allow flag may only accompany that provider-specific environment gate"
+        )
     elif report.status == "blocked_request_budget":
         lines.append(f"next_step: keep {ENV_PREFLIGHT_MAX_REQUESTS} small and at least the required endpoint count for this symbol mode")
     else:

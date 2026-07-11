@@ -97,6 +97,116 @@ def test_event_alpha_run_ledger_records_send_accounting():
         )
 
 
+def test_operator_state_same_run_backfill_preserves_manifest_and_uses_exact_artifacts(tmp_path):
+    import json
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner.event_alpha.artifacts import operator_state, run_counters
+
+    namespace = tmp_path / "event_fade_cache" / "notify_no_key"
+    namespace.mkdir(parents=True)
+    run_id = "2026-07-11T06:28:17+00:00|notify_no_key"
+    core_path = namespace / "event_core_opportunities.jsonl"
+    core_rows = [
+        {
+            "row_type": "event_core_opportunity",
+            "schema_version": "event_core_opportunity_store_v1",
+            "run_id": run_id if index < 3 else "older-run",
+            "profile": "notify_no_key",
+            "artifact_namespace": "notify_no_key",
+            "core_opportunity_id": f"core-{min(index, 1)}" if index < 3 else "old-core",
+            "symbol": f"T{index}",
+            "coin_id": f"token-{index}",
+            "opportunity_type": "DIAGNOSTIC" if index == 2 else "UNCONFIRMED_RESEARCH",
+            "candidate_role": "source_noise" if index == 2 else "candidate_asset",
+            "final_opportunity_level": "local_only",
+            "final_route_after_quality_gate": "STORE_ONLY",
+            "generated_at": "2026-07-11T06:30:00+00:00",
+        }
+        for index in range(4)
+    ]
+    core_path.write_text("".join(json.dumps(row) + "\n" for row in core_rows), encoding="utf-8")
+    preview_path = namespace / "event_alpha_notification_preview.md"
+    preview_path.write_text(
+        "# Event Alpha Notification Preview\n\n"
+        f"run_id: {run_id}\n\n"
+        "- preview_rendered_items: 1\n",
+        encoding="utf-8",
+    )
+    run_row = {
+        "row_type": "event_alpha_run",
+        "run_id": run_id,
+        "profile": "notify_no_key",
+        "artifact_namespace": "notify_no_key",
+        "run_mode": "notification_burn_in",
+        "notification_burn_in": True,
+        "started_at": "2026-07-11T06:28:17+00:00",
+        "raw_events": 10,
+        "candidates": 2,
+        "alerts": 2,
+        "research_candidates": 0,
+        "strict_alerts": 0,
+        "snapshot_rows_written": 0,
+        "core_opportunity_rows_written": 3,
+        "core_opportunity_store_path": str(core_path),
+        "notification_preview_path": str(preview_path),
+        "send_requested": True,
+        "send_attempted": False,
+        "send_block_reason": "event alerts disabled",
+    }
+    state = operator_state.begin_run(
+        namespace,
+        run_row,
+        run_ledger_path=namespace / "event_alpha_runs.jsonl",
+    )
+    preserved_artifacts = dict(state["artifacts"])
+    legacy = dict(state)
+    for field in (
+        "counter_schema_version",
+        *run_counters.COUNTER_FIELDS,
+        "burn_in_mode",
+        "send_guard_status",
+    ):
+        legacy.pop(field, None)
+    legacy["revision"] = 7
+    legacy["doctor"] = {
+        "status": "OK",
+        "run_id": run_id,
+        "authoritative": True,
+        "strict": True,
+        "schema_only": False,
+        "skip_api_checks": False,
+        "verified_at": "2026-07-11T06:40:00+00:00",
+        "verified_revision": 7,
+        "blocker_count": 0,
+        "warning_count": 0,
+    }
+    operator_state.write_json_atomic(operator_state.operator_state_path(namespace), legacy)
+
+    backfilled = operator_state.begin_run_if_newer(
+        namespace,
+        run_row,
+        run_ledger_path=namespace / "event_alpha_runs.jsonl",
+        updated_at=datetime(2026, 7, 11, 7, 0, tzinfo=timezone.utc),
+    )
+
+    assert backfilled is not None
+    assert backfilled["revision"] == 8
+    assert backfilled["artifacts"] == preserved_artifacts
+    assert backfilled["doctor"]["status"] == "stale"
+    assert backfilled["invalidation_reason"] == "exact_run_semantics_backfilled"
+    assert backfilled["research_candidates"] == 2
+    assert backfilled["strict_alerts"] == 0
+    assert backfilled["current_generation_core_rows"] == 3
+    assert backfilled["current_generation_visible_core_rows"] == 2
+    assert backfilled["cumulative_store_rows"] == 4
+    assert backfilled["preview_rendered_items"] == 1
+    assert backfilled["burn_in_mode"] == "no_send_notification_burn_in"
+    assert backfilled["send_requested"] is True
+    assert backfilled["send_attempted"] is False
+    assert backfilled["no_send_rehearsal"] is True
+
+
 def test_event_alpha_run_ledger_normalizer_migrates_legacy_absolute_paths(tmp_path):
     import json
     from unittest import mock

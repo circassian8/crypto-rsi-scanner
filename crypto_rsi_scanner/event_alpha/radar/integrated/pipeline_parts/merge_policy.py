@@ -902,6 +902,10 @@ def _compact_event(row: Mapping[str, Any] | None) -> dict[str, Any] | None:
         "event_start_time",
         "source_url",
         "reason_codes",
+        "provider_generation_id",
+        "provider_request_succeeded",
+        "provider_source_artifact",
+        "request_ledger_path",
     )
     return {key: row.get(key) for key in keys if row.get(key) not in (None, "", [], {})}
 

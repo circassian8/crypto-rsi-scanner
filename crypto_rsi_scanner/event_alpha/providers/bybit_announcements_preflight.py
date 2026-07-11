@@ -2,8 +2,9 @@
 
 This module is deliberately research-only. The default preflight validates local
 fixture/parser readiness and writes operator artifacts without network calls.
-Live HTTP rehearsal requires an explicit allow flag/env var, no-send mode, a
-small page/limit budget, and a request ledger.
+Live HTTP rehearsal requires the provider-specific environment gate, no-send
+mode, a small page/limit budget, and a request ledger. A CLI/API allow boolean
+may only accompany the environment gate as operator confirmation.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from ..artifacts import schema_v1
 from . import official_exchange as event_official_exchange
 from . import official_exchange_activation as event_official_exchange_activation
 from . import provider_health as event_provider_health
+from . import request_lineage as event_request_lineage
 
 
 PREFLIGHT_JSON = "event_bybit_announcements_preflight.json"
@@ -141,6 +143,8 @@ class BybitAnnouncementsRehearsalReport:
     paper_trades_created: int = 0
     normal_rsi_signal_rows_written: int = 0
     triggered_fade_created: int = 0
+    provider_generation_id: str = ""
+    run_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return bybit_announcements_rehearsal_report_row(self)
@@ -186,6 +190,8 @@ def bybit_announcements_rehearsal_report_row(report: BybitAnnouncementsRehearsal
         "paper_trades_created": report.paper_trades_created,
         "normal_rsi_signal_rows_written": report.normal_rsi_signal_rows_written,
         "triggered_fade_created": report.triggered_fade_created,
+        "provider_generation_id": report.provider_generation_id,
+        "run_id": report.run_id,
     }
 
 
@@ -230,7 +236,8 @@ def build_preflight_report(
         lanes_enabled_if_healthy=LANES_ENABLED,
         source_packs_enabled=SOURCE_PACKS,
         safety_notes=(
-            f"no live calls unless --event-alpha-bybit-announcements-allow-live-preflight or {ENV_ALLOW_LIVE_PREFLIGHT}=1 is explicit",
+            f"no live calls unless {ENV_ALLOW_LIVE_PREFLIGHT}=1 already exists in the environment; "
+            "the CLI allow flag may only accompany that provider-specific gate",
             "no Telegram sends, trades, paper trades, normal RSI rows, or Event Alpha TRIGGERED_FADE",
             "Bybit announcements endpoint is public; no API key is required or written",
         ),
@@ -274,13 +281,15 @@ def run_no_send_rehearsal(
     )
     preflight_json, preflight_md = write_preflight_artifacts(preflight, base)
 
-    ledger_path = base / REQUEST_LEDGER
-    rehearsal_json = base / REHEARSAL_JSON
-    rehearsal_md = base / REHEARSAL_MD
-    exchange_announcements_path = base / event_official_exchange.EXCHANGE_ANNOUNCEMENTS_FILENAME
-    official_events_path = base / event_official_exchange.OFFICIAL_EXCHANGE_EVENTS_FILENAME
-    candidates_path = base / event_official_exchange.OFFICIAL_LISTING_CANDIDATES_FILENAME
-    official_report_path = base / event_official_exchange.OFFICIAL_EXCHANGE_REPORT_FILENAME
+    paths = _bybit_rehearsal_artifact_paths(
+        base,
+        preflight_json=preflight_json,
+        preflight_md=preflight_md,
+    )
+    ledger_path = paths["ledger"]
+    rehearsal_json = paths["rehearsal_json"]
+    rehearsal_md = paths["rehearsal_md"]
+    exchange_announcements_path = paths["exchange_announcements"]
     warnings: list[str] = []
     status = "skipped_live_calls_disabled"
     error_class: str | None = None
@@ -291,6 +300,11 @@ def run_no_send_rehearsal(
     provider_health_status = "not_observed"
     max_pages = _max_pages()
     limit = _limit()
+    generation_id = event_request_lineage.provider_generation_id(PROVIDER_HEALTH_KEY, observed)
+    run_id = (
+        f"bybit-announcements-rehearsal-{int(observed.timestamp() * 1_000_000)}-"
+        f"{generation_id.rsplit(':', 1)[-1]}"
+    )
 
     if not allow_live:
         status = "skipped_live_calls_disabled"
@@ -308,14 +322,17 @@ def run_no_send_rehearsal(
             ledger_path=ledger_path,
             max_requests=max_pages,
             opener=opener,
+            provider_generation_id=generation_id,
+            run_id=run_id,
+            profile=profile,
+            artifact_namespace=artifact_namespace,
         )
-        run_id = f"bybit-announcements-rehearsal-{int(observed.timestamp())}"
         try:
             items = _fetch_live_announcement_items(ledger, max_pages=max_pages, limit=limit)
         except Exception as exc:  # noqa: BLE001 - rehearsal must fail safely
             error_class = type(exc).__name__
             error_message_safe = _safe_error_message(exc)
-        ledger_rows = _read_jsonl(ledger_path)
+        ledger_rows = event_request_lineage.generation_rows(_read_jsonl(ledger_path), generation_id)
         http_successes = sum(1 for row in ledger_rows if bool(row.get("success")))
         status, error_class, error_message_safe = _rehearsal_status_from_ledger(
             ledger_rows,
@@ -324,6 +341,13 @@ def run_no_send_rehearsal(
             fallback_error_message=error_message_safe,
         )
         if http_successes > 0 and status in {"live_rehearsal_success", "live_rehearsal_no_results", "live_rehearsal_partial"}:
+            items = tuple({
+                **dict(item),
+                "provider_generation_id": generation_id,
+                "provider_request_succeeded": True,
+                "provider_source_artifact": event_artifact_paths.artifact_display_path(exchange_announcements_path),
+                "request_ledger_path": event_artifact_paths.artifact_display_path(ledger_path),
+            } for item in items)
             official_result = event_official_exchange.run_official_exchange_scan_from_items(
                 namespace_dir=base,
                 provider_items={PROVIDER_HEALTH_KEY: items},
@@ -350,17 +374,7 @@ def run_no_send_rehearsal(
         allow_live=allow_live,
         no_send_rehearsal=no_send_rehearsal,
         observed=observed,
-        paths={
-            "ledger": ledger_path,
-            "preflight_json": preflight_json,
-            "preflight_md": preflight_md,
-            "rehearsal_json": rehearsal_json,
-            "rehearsal_md": rehearsal_md,
-            "exchange_announcements": exchange_announcements_path,
-            "official_events": official_events_path,
-            "candidates": candidates_path,
-            "official_report": official_report_path,
-        },
+        paths=paths,
         max_pages=max_pages,
         limit=limit,
         status=status,
@@ -371,10 +385,55 @@ def run_no_send_rehearsal(
         error_class=error_class,
         error_message_safe=error_message_safe,
         warnings=warnings,
+        generation_id=generation_id,
+        run_id=run_id,
     )
     payload = schema_v1.stamp_artifact_payload(report.to_dict(), schema_id="provider_preflight_v1", path=rehearsal_json)
     rehearsal_json.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     rehearsal_md.write_text(format_rehearsal_report(report) + "\n", encoding="utf-8")
+    _write_bybit_activation_artifacts(
+        base=base,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        observed=observed,
+        report=report,
+        paths=paths,
+        provider_health_status=provider_health_status,
+        warnings=warnings,
+    )
+    return preflight, report, (preflight_json, preflight_md, rehearsal_json, rehearsal_md)
+
+
+def _bybit_rehearsal_artifact_paths(
+    base: Path,
+    *,
+    preflight_json: Path,
+    preflight_md: Path,
+) -> dict[str, Path]:
+    return {
+        "ledger": base / REQUEST_LEDGER,
+        "preflight_json": preflight_json,
+        "preflight_md": preflight_md,
+        "rehearsal_json": base / REHEARSAL_JSON,
+        "rehearsal_md": base / REHEARSAL_MD,
+        "exchange_announcements": base / event_official_exchange.EXCHANGE_ANNOUNCEMENTS_FILENAME,
+        "official_events": base / event_official_exchange.OFFICIAL_EXCHANGE_EVENTS_FILENAME,
+        "candidates": base / event_official_exchange.OFFICIAL_LISTING_CANDIDATES_FILENAME,
+        "official_report": base / event_official_exchange.OFFICIAL_EXCHANGE_REPORT_FILENAME,
+    }
+
+
+def _write_bybit_activation_artifacts(
+    *,
+    base: Path,
+    profile: str | None,
+    artifact_namespace: str | None,
+    observed: datetime,
+    report: BybitAnnouncementsRehearsalReport,
+    paths: Mapping[str, Path],
+    provider_health_status: str,
+    warnings: Iterable[str],
+) -> None:
     activation_report = event_official_exchange_activation.build_activation_report(
         namespace_dir=base,
         profile=profile,
@@ -387,7 +446,9 @@ def run_no_send_rehearsal(
             event_official_exchange_activation.PROVIDER_BYBIT_PUBLIC: report.no_send,
         },
         request_ledger_path_by_provider={
-            event_official_exchange_activation.PROVIDER_BYBIT_PUBLIC: ledger_path if ledger_path.exists() else None,
+            event_official_exchange_activation.PROVIDER_BYBIT_PUBLIC: (
+                paths["ledger"] if paths["ledger"].exists() else None
+            ),
         },
         provider_health_status_by_key={
             PROVIDER_HEALTH_KEY: provider_health_status,
@@ -395,7 +456,6 @@ def run_no_send_rehearsal(
         warnings=warnings,
     )
     event_official_exchange_activation.write_activation_artifacts(activation_report, base)
-    return preflight, report, (preflight_json, preflight_md, rehearsal_json, rehearsal_md)
 
 
 def _build_bybit_rehearsal_report(
@@ -414,9 +474,11 @@ def _build_bybit_rehearsal_report(
     error_class: str | None,
     error_message_safe: str | None,
     warnings: Iterable[str],
+    generation_id: str,
+    run_id: str,
 ) -> BybitAnnouncementsRehearsalReport:
     exchange_count, event_count, candidate_count = _official_result_counts(official_result)
-    requests_used = len(_read_jsonl(paths["ledger"]))
+    requests_used = len(event_request_lineage.generation_rows(_read_jsonl(paths["ledger"]), generation_id))
     return BybitAnnouncementsRehearsalReport(
         provider=PROVIDER_HEALTH_KEY,
         status=status,
@@ -448,6 +510,8 @@ def _build_bybit_rehearsal_report(
         error_class=error_class,
         error_message_safe=error_message_safe,
         warnings=tuple(dict.fromkeys(warnings)),
+        provider_generation_id=generation_id,
+        run_id=run_id,
     )
 
 
@@ -512,6 +576,8 @@ def format_rehearsal_report(report: BybitAnnouncementsRehearsalReport) -> str:
         f"live_call_allowed: {str(report.live_call_allowed).lower()}",
         f"no_send: {str(report.no_send).lower()}",
         f"research_only: {str(report.research_only).lower()}",
+        f"provider_generation_id: {report.provider_generation_id}",
+        f"run_id: {report.run_id}",
         f"requests_used: {report.requests_used}",
         f"http_successes: {report.http_successes}",
         f"max_pages: {report.max_pages}",
@@ -542,7 +608,10 @@ def format_rehearsal_report(report: BybitAnnouncementsRehearsalReport) -> str:
         lines.extend(["", "Warnings:"])
         lines.extend(f"- {warning}" for warning in report.warnings)
     if report.status == "skipped_live_calls_disabled":
-        lines.append(f"next_step: rerun only with --event-alpha-bybit-announcements-allow-live-preflight or {ENV_ALLOW_LIVE_PREFLIGHT}=1 after review")
+        lines.append(
+            f"next_step: set {ENV_ALLOW_LIVE_PREFLIGHT}=1 manually after review, then rerun; "
+            "the CLI allow flag may only accompany that provider-specific environment gate"
+        )
     elif report.status == "blocked_request_budget":
         lines.append(f"next_step: keep {ENV_PREFLIGHT_MAX_PAGES} <= 3 and {ENV_PREFLIGHT_LIMIT} <= 50")
     else:
@@ -551,7 +620,11 @@ def format_rehearsal_report(report: BybitAnnouncementsRehearsalReport) -> str:
 
 
 def effective_allow_live_preflight(value: bool = False) -> bool:
-    return bool(value or str(os.getenv(ENV_ALLOW_LIVE_PREFLIGHT, "")).strip().casefold() in _TRUTHY)
+    # A CLI/API boolean is never sufficient authority for a provider call. The
+    # provider-specific environment gate must already be present so copied CLI
+    # commands and generic dispatch cannot accidentally broaden live access.
+    del value
+    return str(os.getenv(ENV_ALLOW_LIVE_PREFLIGHT, "")).strip().casefold() in _TRUTHY
 
 
 def _fixture_path() -> Path | None:
@@ -749,10 +822,18 @@ class _LedgeredBybitOpener:
         ledger_path: Path,
         max_requests: int,
         opener: Callable[[Request, float], Any] | None,
+        provider_generation_id: str = "",
+        run_id: str = "",
+        profile: str | None = None,
+        artifact_namespace: str | None = None,
     ) -> None:
         self.ledger_path = ledger_path
         self.max_requests = max_requests
         self.opener = opener
+        self.provider_generation_id = provider_generation_id
+        self.run_id = run_id
+        self.profile = profile
+        self.artifact_namespace = artifact_namespace
         self.used = 0
 
     def __call__(self, request: Request, timeout: float) -> Any:
@@ -776,6 +857,10 @@ class _LedgeredBybitOpener:
             started_at=started,
             budget_before=before,
             budget_after=before - 1,
+            provider_generation_id=self.provider_generation_id,
+            run_id=self.run_id,
+            profile=self.profile,
+            artifact_namespace=self.artifact_namespace,
         )
 
     def _append_row(
@@ -798,6 +883,10 @@ class _LedgeredBybitOpener:
                 budget_after=after,
                 success=False,
                 error=exc,
+                provider_generation_id=self.provider_generation_id,
+                run_id=self.run_id,
+                profile=self.profile,
+                artifact_namespace=self.artifact_namespace,
             ),
         )
 
@@ -812,6 +901,10 @@ class _LedgeredBybitResponse:
         started_at: datetime,
         budget_before: int,
         budget_after: int,
+        provider_generation_id: str,
+        run_id: str,
+        profile: str | None,
+        artifact_namespace: str | None,
     ) -> None:
         self.response = response
         self.request = request
@@ -819,6 +912,10 @@ class _LedgeredBybitResponse:
         self.started_at = started_at
         self.budget_before = budget_before
         self.budget_after = budget_after
+        self.provider_generation_id = provider_generation_id
+        self.run_id = run_id
+        self.profile = profile
+        self.artifact_namespace = artifact_namespace
         self.payload: bytes | None = None
         self.entered: Any = None
 
@@ -841,6 +938,10 @@ class _LedgeredBybitResponse:
             response=self.entered or self.response,
             payload=self.payload,
             error=exc if isinstance(exc, Exception) else None,
+            provider_generation_id=self.provider_generation_id,
+            run_id=self.run_id,
+            profile=self.profile,
+            artifact_namespace=self.artifact_namespace,
         )
         _append_ledger_row(self.ledger_path, row)
         if hasattr(self.response, "__exit__"):
@@ -875,6 +976,10 @@ def _ledger_row(
     response: Any | None = None,
     payload: bytes | None = None,
     error: Exception | None = None,
+    provider_generation_id: str = "",
+    run_id: str = "",
+    profile: str | None = None,
+    artifact_namespace: str | None = None,
 ) -> dict[str, Any]:
     parsed = urlparse(request.full_url)
     query_params = {key: value for key, value in parse_qsl(parsed.query, keep_blank_values=True)}
@@ -900,6 +1005,10 @@ def _ledger_row(
         "live_call_allowed": True,
         "no_send_rehearsal": True,
         "token_redacted": True,
+        "provider_generation_id": provider_generation_id,
+        "run_id": run_id,
+        "profile": profile,
+        "artifact_namespace": artifact_namespace,
     }
 
 
@@ -1009,6 +1118,9 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
     rehearsal = _read_json(base / REHEARSAL_JSON)
     ledger_rows = _read_jsonl(base / REQUEST_LEDGER)
     if rehearsal:
+        generation_id = str(rehearsal.get("provider_generation_id") or "")
+        if generation_id:
+            ledger_rows = event_request_lineage.generation_rows(ledger_rows, generation_id)
         live_allowed = bool(rehearsal.get("live_call_allowed"))
         if live_allowed and not ledger_rows:
             out["bybit_announcements_rehearsal_live_without_ledger"] = 1

@@ -1080,3 +1080,67 @@ def test_event_alpha_artifact_doctor_blocks_research_review_body_not_using_canon
         assert clean.notification_body_card_mismatch_canonical == 0
         assert clean.notification_body_feedback_mismatch_canonical == 0
         assert clean.research_review_body_uses_hypothesis_target_when_core_exists == 0
+
+
+def test_operator_semantic_doctor_catches_counter_and_freshness_scope_mismatches(tmp_path):
+    from crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_parts import notification_delivery_checks
+
+    run_id = "run-counter-scopes"
+    preview = tmp_path / "event_alpha_notification_preview.md"
+    preview.write_text(
+        "# Event Alpha Notification Preview\n\n"
+        f"run_id: {run_id}\n\n"
+        "- preview_rendered_items: 1\n\n"
+        "### Telegram Body\n\n```html\n"
+        "Raw events: 108 · Candidate events: 48 · Research candidates: 47\n"
+        "Source alert snapshots: 1 · Current-generation core rows: 185 · "
+        "Current-generation visible core rows: 105 · Cumulative store rows: 995\n"
+        "Alertable decisions: 0 · Strict alerts: 0 · Research candidates: 47 · Raw source candidates: 99\n"
+        "Preview-rendered items: 2\n"
+        "Send guard: event alerts disabled\n```\n",
+        encoding="utf-8",
+    )
+    latest_run = {
+        "run_id": run_id,
+        "counter_schema_version": "event_alpha_run_counters_v1",
+        "raw_events": 108,
+        "candidate_events": 48,
+        "research_candidates": 48,
+        "source_alert_snapshots": 0,
+        "current_generation_core_rows": 185,
+        "current_generation_visible_core_rows": 105,
+        "cumulative_store_rows": 995,
+        "alertable_decisions": 0,
+        "strict_alerts": 0,
+        "preview_rendered_items": 1,
+    }
+    preview_conflicts = notification_delivery_checks._notification_preview_consistency_conflicts(
+        delivery_rows=[{
+            "run_id": run_id,
+            "attempted_at": "2026-07-11T06:30:00+00:00",
+            "notification_preview_path": str(preview),
+        }],
+        latest_run=latest_run,
+        core_rows=(),
+        latest_run_id=run_id,
+    )
+    assert preview_conflicts["notification_preview_research_candidate_count_mismatch"] == 1
+    assert preview_conflicts["notification_preview_source_snapshot_count_mismatch"] == 1
+    assert preview_conflicts["notification_preview_rendered_item_count_mismatch"] == 1
+    assert preview_conflicts["notification_preview_legacy_counter_scope_mismatch"] == 1
+
+    brief = tmp_path / "event_alpha_daily_brief.md"
+    brief.write_text(
+        "- Core opportunities: 184 (canonical_store_rows=995)\n"
+        "- current_core_market_freshness: total=184; statuses=missing=174, fresh=10\n"
+        "- quality_row_market_freshness: total=185; statuses=missing=174, fresh=11\n"
+        "- support_row_market_freshness: total=1; statuses=missing=1\n",
+        encoding="utf-8",
+    )
+    brief_conflicts = notification_delivery_checks._daily_brief_operator_semantic_conflicts(
+        brief,
+        latest_run=latest_run,
+    )
+    assert brief_conflicts["daily_brief_counter_scope_confusion"] > 0
+    assert brief_conflicts["daily_brief_freshness_scope_missing"] == 1
+    assert brief_conflicts["daily_brief_current_core_freshness_total_mismatch"] == 1

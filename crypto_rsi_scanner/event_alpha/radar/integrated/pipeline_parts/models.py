@@ -88,8 +88,13 @@ class _IntegratedRadarSnapshotFields:
     snapshot_rows_written: int = 0
     strict_alerts: int = 0
     alertable_decisions: int = 0
+    candidate_events: int | None = None
     research_candidates: int = 0
+    source_alert_snapshots: int | None = None
     raw_source_candidates: int = 0
+    current_generation_core_rows: int | None = None
+    current_generation_visible_core_rows: int | None = None
+    cumulative_store_rows: int | None = None
     cards_written: int = 0
     research_cards_written: int = 0
     preview_rendered_items: int = 0
@@ -103,6 +108,10 @@ class _IntegratedRadarSnapshotFields:
     artifact_doctor_status: str | None = None
     source_coverage_json_path_rel: str | None = None
     source_coverage_md_path_rel: str | None = None
+    cryptopanic_configured: bool = False
+    cryptopanic_attempted: bool = False
+    cryptopanic_provider_status: str = "not_observed"
+    cryptopanic_skip_reason: str | None = None
     warnings: tuple[str, ...] = ()
     cycle_completed: bool = True
 

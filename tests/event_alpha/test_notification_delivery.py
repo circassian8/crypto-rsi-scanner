@@ -67,6 +67,11 @@ def test_event_alpha_notification_send_failed_does_not_mark_cooldown():
         assert not result.success
         assert any(row["state"] == "failed" for row in delivery.load_delivery_records(dcfg.path))
         assert storage.get_meta(notif.LAST_SENT_META_KEYS[notif.LANE_DAILY_DIGEST]) is None
+        preview = (dcfg.path.parent / "event_alpha_notification_preview.md").read_text(encoding="utf-8")
+        assert "- burn_in_mode: notification_burn_in_delivery_attempted" in preview
+        assert "- send_attempted: true" in preview
+        assert "- no_send_rehearsal: false" in preview
+        assert "status: delivery_failed" in preview
 
 
 def test_event_alpha_notification_structured_partial_delivery_marks_cooldown_by_default():
@@ -391,3 +396,10 @@ def test_event_alpha_notification_send_blocked_when_disabled_records_blocked():
         assert result.deliveries_blocked >= 1
         assert len(sent) == 0
         assert any(row["state"] == "blocked" for row in delivery.load_delivery_records(dcfg.path))
+        preview = (dcfg.path.parent / "event_alpha_notification_preview.md").read_text(encoding="utf-8")
+        assert "- burn_in_mode: no_send_notification_burn_in" in preview
+        assert "- send_guard_status: disabled_by_send_guard" in preview
+        assert "- send_requested: true" in preview
+        assert "- send_attempted: false" in preview
+        assert "- no_send_rehearsal: true" in preview
+        assert "Send guard: disabled (no-send rehearsal)" in preview

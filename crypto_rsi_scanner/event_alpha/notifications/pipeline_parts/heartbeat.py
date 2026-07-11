@@ -22,6 +22,8 @@ def format_health_heartbeat(
     send_guard_status: str | None = None,
 ) -> str:
     observed = _as_utc(now or datetime.now(timezone.utc))
+    counters = event_alpha_run_counters.canonical_run_counters(result)
+    send_state = event_alpha_run_counters.canonical_send_state(result)
     warnings = tuple(str(item) for item in _value(result, "warnings") or () if str(item))
     partial = bool(_value(result, "partial_results", False) or _provider_failure_count(warnings) > 0)
     lane_due = _mapping_value(result, "send_lane_items_attempted")
@@ -38,13 +40,22 @@ def format_health_heartbeat(
         f"Generated: {_esc(observed.isoformat())}",
         f"Status: {_esc('degraded' if partial else 'ok')}",
         f"Completed: {_yes_no(bool(_value(result, 'cycle_completed', result is not None)))}",
-        f"Raw events: {_num(result, 'raw_events')} · Core opportunities: {_num(result, 'core_opportunities')}",
+        (
+            f"Raw events: {counters['raw_events']} · "
+            f"Candidate events: {counters['candidate_events']} · "
+            f"Research candidates: {counters['research_candidates']}"
+        ),
+        (
+            f"Source alert snapshots: {counters['source_alert_snapshots']} · "
+            f"Current-generation core rows: {counters['current_generation_core_rows']} · "
+            f"Current-generation visible core rows: {counters['current_generation_visible_core_rows']} · "
+            f"Cumulative store rows: {counters['cumulative_store_rows']}"
+        ),
         f"Extraction rows: {_num(result, 'extraction_rows')}",
         (
-            f"Alertable decisions: {_num(result, 'alertable')} · "
-            f"Strict alerts: {_num(result, 'alerts')} · "
-            f"Research candidates: {_num(result, 'candidates')} · "
-            f"Raw source candidates: {_raw_source_candidate_count(result)}"
+            f"Alertable decisions: {counters['alertable_decisions']} · "
+            f"Strict alerts: {counters['strict_alerts']} · "
+            f"Preview-rendered items: {counters['preview_rendered_items']}"
         ),
         (
             "Delivery lanes: "
@@ -59,6 +70,12 @@ def format_health_heartbeat(
         f"LLM calls/skips: {llm_calls}/{llm_skipped}",
         f"LLM budget: {'exhausted' if _runtime_budget_exhausted(warnings) else 'ok'}",
         f"Artifact doctor: {_esc(_value(result, 'artifact_doctor_status', 'not_run') if result is not None else 'not_run')}",
+        f"Burn-in mode: {_esc(send_state['burn_in_mode'])}",
+        (
+            f"Send requested: {_yes_no(send_state['send_requested'])} · "
+            f"attempted: {_yes_no(send_state['send_attempted'])} · "
+            f"no-send rehearsal: {_yes_no(send_state['no_send_rehearsal'])}"
+        ),
     ]
     if send_guard_status:
         lines.append(f"Send guard: {_esc(send_guard_status)}")

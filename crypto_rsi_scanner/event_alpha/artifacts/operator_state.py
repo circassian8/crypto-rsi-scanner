@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping
 
-from . import schema_v1
+from . import run_counters, schema_v1
 
 
 OPERATOR_STATE_FILENAME = "event_alpha_operator_state.json"
@@ -185,9 +185,10 @@ def begin_run(
     """Atomically start a new current generation from one persisted run row."""
 
     base = Path(namespace_dir).expanduser()
+    authoritative_row = enrich_run_row_from_core_store(base, run_row)
     state = _build_run_state(
         base,
-        run_row,
+        authoritative_row,
         run_ledger_path=run_ledger_path,
         updated_at=updated_at,
     )
@@ -206,9 +207,10 @@ def begin_run_if_newer(
     """Atomically advance state, refusing a candidate not proven newer."""
 
     base = Path(namespace_dir).expanduser()
+    authoritative_row = enrich_run_row_from_core_store(base, run_row)
     candidate = _build_run_state(
         base,
-        run_row,
+        authoritative_row,
         run_ledger_path=run_ledger_path,
         updated_at=updated_at,
     )
@@ -218,15 +220,102 @@ def begin_run_if_newer(
             current = dict(loaded.state)
             if state_matches_run(
                 current,
-                run_row,
+                authoritative_row,
                 profile=str(candidate["profile"]),
                 artifact_namespace=str(candidate["artifact_namespace"]),
             ):
-                return current
-            if not run_is_newer_than_state(run_row, current):
+                return _backfill_same_run_state(
+                    base,
+                    current,
+                    authoritative_row,
+                    updated_at=updated_at,
+                )
+            if not run_is_newer_than_state(authoritative_row, current):
                 return None
         write_json_atomic(operator_state_path(base), candidate)
     return candidate
+
+
+def enrich_run_row_from_core_store(
+    namespace_dir: str | Path,
+    run_row: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return an exact-run counter projection enriched by its canonical store.
+
+    Legacy run rows predate visible-generation and cumulative-store counters.
+    The core JSONL is safe read-only evidence for those scopes, but only when
+    its path stays inside the requested namespace and rows match the exact
+    persisted run id.
+    """
+
+    base = Path(namespace_dir).expanduser()
+    enriched = dict(run_row)
+    raw_path = str(run_row.get("core_opportunity_store_path") or "").strip()
+    run_id = str(run_row.get("run_id") or "").strip()
+    if not raw_path or not run_id:
+        return enriched
+    resolved = _resolve_namespace_artifact_path(base, raw_path)
+    if resolved is None:
+        return enriched
+    try:
+        from ..radar import core_opportunities as event_core_opportunities
+        from ..radar import core_opportunity_store as event_core_opportunity_store
+
+        current = event_core_opportunity_store.load_core_opportunities(
+            resolved,
+            run_id=run_id,
+            include_api=True,
+        )
+        visible = event_core_opportunities.visible_core_opportunities(current.rows)
+    except (OSError, ValueError, TypeError):
+        return enriched
+    enriched.update(
+        {
+            "current_generation_core_rows": int(current.rows_read),
+            "current_generation_visible_core_rows": len(visible),
+            "cumulative_store_rows": int(current.total_rows_read),
+        }
+    )
+    preview_path = _resolve_namespace_artifact_path(
+        base,
+        str(run_row.get("notification_preview_path") or OPERATOR_STATE_FILENAME).replace(
+            OPERATOR_STATE_FILENAME,
+            "event_alpha_notification_preview.md",
+        ),
+    )
+    if preview_path is not None:
+        try:
+            preview_text = preview_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            preview_text = ""
+        if text_has_exact_run_id(preview_text, run_id):
+            rendered = re.search(
+                r"(?im)^(?:-\s*)?(?:preview_rendered_items|Rendered candidate items):\s*(\d+)\b",
+                preview_text,
+            )
+            if rendered:
+                enriched["preview_rendered_items"] = int(rendered.group(1))
+    return enriched
+
+
+def _resolve_namespace_artifact_path(base: Path, raw_path: str) -> Path | None:
+    raw_candidate = Path(raw_path).expanduser()
+    path_candidates = (
+        (raw_candidate,)
+        if raw_candidate.is_absolute()
+        else (Path.cwd() / raw_candidate, base / raw_candidate, base / raw_candidate.name)
+    )
+    resolved: Path | None = None
+    for candidate_path in path_candidates:
+        try:
+            candidate_resolved = candidate_path.resolve()
+            candidate_resolved.relative_to(base.resolve())
+        except (OSError, ValueError):
+            continue
+        if candidate_resolved.exists():
+            resolved = candidate_resolved
+            break
+    return resolved
 
 
 def _build_run_state(
@@ -242,8 +331,10 @@ def _build_run_state(
     if not run_id:
         raise ValueError("operator state requires run_id")
     now = _as_utc(updated_at or datetime.now(timezone.utc)).isoformat()
-    send_requested = run_row.get("send_requested") is True
-    send_attempted = run_row.get("send_attempted") is True
+    counters = run_counters.canonical_run_counters(run_row)
+    send_state = run_counters.canonical_send_state(run_row)
+    send_requested = send_state["send_requested"] is True
+    send_attempted = send_state["send_attempted"] is True
     send_success = run_row.get("send_success") is True
     send_items_delivered = _nonnegative_int(run_row.get("send_items_delivered"))
     sent = send_items_delivered > 0
@@ -273,7 +364,11 @@ def _build_run_state(
         "revision": 1,
         "manifest_status": _manifest_status(artifacts),
         "research_only": True,
-        "no_send_rehearsal": not send_attempted,
+        "counter_schema_version": run_counters.COUNTER_SCHEMA_VERSION,
+        **counters,
+        "burn_in_mode": send_state["burn_in_mode"],
+        "send_guard_status": send_state["send_guard_status"],
+        "no_send_rehearsal": send_state["no_send_rehearsal"],
         "sent": sent,
         "send_requested": send_requested,
         "send_attempted": send_attempted,
@@ -297,6 +392,56 @@ def _build_run_state(
             "warning_count": 0,
         },
     }
+    return state
+
+
+def _backfill_same_run_state(
+    base: Path,
+    state: dict[str, Any],
+    run_row: Mapping[str, Any],
+    *,
+    updated_at: datetime | None,
+) -> dict[str, Any]:
+    """Backfill exact-run semantics without replacing its artifact manifest.
+
+    Report and preview regeneration frequently revisit an already-created
+    generation.  Adding new run-scoped fields must preserve every artifact
+    status/path while making the exact persisted run row authoritative for the
+    canonical counters and factual no-send state.
+    """
+
+    counters = run_counters.canonical_run_counters(run_row)
+    send_state = run_counters.canonical_send_state(run_row)
+    projection: dict[str, Any] = {
+        "counter_schema_version": run_counters.COUNTER_SCHEMA_VERSION,
+        **counters,
+        "burn_in_mode": send_state["burn_in_mode"],
+        "send_guard_status": send_state["send_guard_status"],
+        "send_requested": send_state["send_requested"],
+        "send_attempted": send_state["send_attempted"],
+        "no_send_rehearsal": send_state["no_send_rehearsal"],
+    }
+    if all(state.get(key) == value for key, value in projection.items()):
+        return state
+
+    now = _as_utc(updated_at or datetime.now(timezone.utc)).isoformat()
+    state.update(projection)
+    state["revision"] = int(state.get("revision") or 0) + 1
+    state["updated_at"] = now
+    state["invalidation_reason"] = "exact_run_semantics_backfilled"
+    state["doctor"] = {
+        "status": "stale",
+        "run_id": str(state.get("run_id") or ""),
+        "authoritative": False,
+        "strict": False,
+        "schema_only": False,
+        "skip_api_checks": False,
+        "verified_at": None,
+        "verified_revision": None,
+        "blocker_count": 0,
+        "warning_count": 0,
+    }
+    write_json_atomic(operator_state_path(base), state)
     return state
 
 
@@ -802,6 +947,7 @@ __all__ = (
     "OPERATOR_STATE_FILENAME",
     "begin_run",
     "begin_run_if_newer",
+    "enrich_run_row_from_core_store",
     "invalidate_operator_state",
     "latest_matching_run",
     "load_operator_state",

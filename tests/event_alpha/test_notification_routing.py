@@ -308,8 +308,8 @@ def test_event_alpha_notification_uses_canonical_core_identity_and_compact_messa
     assert "source_alert_ids:" in preview
     assert "agg:ffdcb488dbed" in preview
     assert "## Preview Summary" in preview
-    assert "Rendered candidate items: 1" in preview
-    assert "Core opportunity items: 1" in preview
+    assert "preview_rendered_items: 1" in preview
+    assert "Preview core-opportunity identities: 1" in preview
     assert "Recommendation: inspect this preview" in preview
     assert "/tmp/local/cards" not in preview
 
@@ -570,11 +570,14 @@ def test_event_alpha_send_readiness_resolves_preview_relpath_over_stale_absolute
 def test_event_alpha_send_readiness_accepts_clean_no_send_rehearsal():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.namespace.status as event_alpha_namespace_status
     import crypto_rsi_scanner.event_alpha.notifications.delivery as event_alpha_notification_delivery
     import crypto_rsi_scanner.event_alpha.notifications.readiness as event_alpha_send_readiness
 
     with TemporaryDirectory() as tmp:
-        preview = Path(tmp) / "event_alpha_notification_preview.md"
+        namespace_dir = Path(tmp) / "notify_llm_deep_rehearsal"
+        namespace_dir.mkdir(parents=True, exist_ok=True)
+        preview = namespace_dir / "event_alpha_notification_preview.md"
         preview.write_text(
             "# Event Alpha Notification Preview\n\n"
             "## Lane 1: health_heartbeat\n\n"
@@ -588,6 +591,14 @@ def test_event_alpha_send_readiness_accepts_clean_no_send_rehearsal():
             "Send guard: No-send rehearsal: would send, but send guard is disabled.\n"
             "```",
             encoding="utf-8",
+        )
+        event_alpha_namespace_status.write_namespace_status(
+            namespace_dir,
+            {
+                "namespace": "notify_llm_deep_rehearsal",
+                "status": event_alpha_namespace_status.STATUS_ACTIVE_LIVE_REHEARSAL,
+                "safe_for_send_readiness": False,
+            },
         )
         doctor = event_alpha_artifact_doctor.EventAlphaArtifactDoctorResult(
             status="OK",
@@ -660,12 +671,27 @@ def test_event_alpha_send_readiness_accepts_clean_no_send_rehearsal():
         )
         text = event_alpha_send_readiness.format_send_readiness(result)
 
+        real_send = event_alpha_send_readiness.build_send_readiness(
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep_rehearsal",
+            run_rows=[run],
+            core_opportunity_rows=[core],
+            alert_rows=[],
+            delivery_rows=[delivery_row],
+            artifact_doctor=doctor,
+            send_guard_enabled=True,
+            telegram_ready=True,
+            preview_path=preview,
+        )
+
     assert result.ready is True
     assert result.no_send_rehearsal is True
     assert "READY_FOR_NO_SEND_REHEARSAL_REVIEW: yes" in text
     assert "READY_FOR_EVENT_ALPHA_SEND: no" in text
     assert "no-send rehearsal: send guard disabled" in text
+    assert "approved for no-send review only" in text
     assert "Blockers:\n- none" in text
+    assert any("marked unsafe for send-readiness" in item for item in real_send.blockers)
 
 
 def test_event_alpha_notification_disabled_records_would_send_and_heartbeat():
@@ -742,6 +768,6 @@ def test_event_alpha_notification_no_candidate_rehearsal_writes_preview():
     assert result.attempted is False
     assert result.would_send_items == 0
     assert "Status: no digest candidates would be sent" in text
-    assert "Mode: no-send rehearsal / preview only" in text
+    assert "Burn-in mode: no_send_notification_burn_in" in text
     assert "/Users/" not in text
     assert "research_card=" not in text

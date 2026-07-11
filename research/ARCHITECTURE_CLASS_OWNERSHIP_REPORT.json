@@ -166,7 +166,7 @@
         "EventAlphaRetentionResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 8,
+      "max_class_line_count": 17,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.artifacts.retention",
       "public_class_count": 2,
@@ -519,7 +519,7 @@
         "LiveProviderReadinessReport"
       ],
       "exception_reason": "",
-      "max_class_line_count": 51,
+      "max_class_line_count": 53,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
       "public_class_count": 2,
@@ -1097,7 +1097,7 @@
         "EventAlphaSendResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 27,
+      "max_class_line_count": 28,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.pipeline_models",
       "public_class_count": 2,
@@ -1245,7 +1245,7 @@
         "FixtureWatchlistMarketProvider"
       ],
       "exception_reason": "",
-      "max_class_line_count": 30,
+      "max_class_line_count": 36,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
       "public_class_count": 4,
@@ -1397,7 +1397,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 503,
+  "class_count": 508,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1452,12 +1452,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 6090,
+  "function_count": 6290,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-10T07:34:43.737945+00:00",
+  "generated_at": "2026-07-11T18:24:59.495363+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -1586,7 +1586,7 @@
         "EventAlphaRetentionResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 8,
+      "max_class_line_count": 17,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.artifacts.retention",
       "public_class_count": 2,
@@ -1939,7 +1939,7 @@
         "LiveProviderReadinessReport"
       ],
       "exception_reason": "",
-      "max_class_line_count": 51,
+      "max_class_line_count": 53,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
       "public_class_count": 2,
@@ -2517,7 +2517,7 @@
         "EventAlphaSendResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 27,
+      "max_class_line_count": 28,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.pipeline_models",
       "public_class_count": 2,
@@ -2665,7 +2665,7 @@
         "FixtureWatchlistMarketProvider"
       ],
       "exception_reason": "",
-      "max_class_line_count": 30,
+      "max_class_line_count": 36,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
       "public_class_count": 4,
@@ -2847,8 +2847,15 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1352,
+      "line_count": 1353,
       "path": "crypto_rsi_scanner/config.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
+      "line_count": 1338,
+      "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -2938,7 +2945,7 @@
     {
       "accepted_exception": false,
       "class_name": "CoinGeckoWatchlistMarketProvider",
-      "line_count": 30,
+      "line_count": 36,
       "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
       "over_limit": false,
       "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
@@ -3032,7 +3039,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 411,
+  "public_class_count": 413,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -3048,6 +3055,7 @@
     "crypto_rsi_scanner.event_alpha.artifacts.context": 1,
     "crypto_rsi_scanner.event_alpha.artifacts.daily_brief.components.models": 1,
     "crypto_rsi_scanner.event_alpha.artifacts.locks": 3,
+    "crypto_rsi_scanner.event_alpha.artifacts.operator_state": 1,
     "crypto_rsi_scanner.event_alpha.artifacts.replay": 4,
     "crypto_rsi_scanner.event_alpha.artifacts.research_cards.components.models": 2,
     "crypto_rsi_scanner.event_alpha.artifacts.retention": 2,
@@ -3149,6 +3157,7 @@
     "crypto_rsi_scanner.event_alpha.radar.market_state": 1,
     "crypto_rsi_scanner.event_alpha.radar.missed": 2,
     "crypto_rsi_scanner.event_alpha.radar.near_miss.models": 4,
+    "crypto_rsi_scanner.event_alpha.radar.near_miss.targeted": 1,
     "crypto_rsi_scanner.event_alpha.radar.opportunity_verdict": 6,
     "crypto_rsi_scanner.event_alpha.radar.pipeline_models": 2,
     "crypto_rsi_scanner.event_alpha.radar.playbooks": 3,
@@ -3276,7 +3285,7 @@
         },
         {
           "accepted": true,
-          "line_count": 1352,
+          "line_count": 1353,
           "path": "crypto_rsi_scanner/config.py",
           "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
           "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
@@ -3284,7 +3293,7 @@
         },
         {
           "accepted": true,
-          "line_count": 1295,
+          "line_count": 1338,
           "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
           "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
           "revisit_condition": "When config/report command bodies move to focused service modules.",
@@ -3316,7 +3325,7 @@
         },
         {
           "accepted": true,
-          "line_count": 1239,
+          "line_count": 1247,
           "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
           "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
           "revisit_condition": "When adding a new derivatives metric family or crowding class.",
@@ -3383,12 +3392,12 @@
         "threshold": 1200
       },
       {
-        "line_count": 1352,
+        "line_count": 1353,
         "path": "crypto_rsi_scanner/config.py",
         "threshold": 1200
       },
       {
-        "line_count": 1295,
+        "line_count": 1338,
         "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
         "threshold": 1200
       },
@@ -3408,7 +3417,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1239,
+        "line_count": 1247,
         "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
         "threshold": 1200
       },
@@ -3452,7 +3461,7 @@
           },
           {
             "accepted": true,
-            "line_count": 1352,
+            "line_count": 1353,
             "path": "crypto_rsi_scanner/config.py",
             "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
             "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
@@ -3460,7 +3469,7 @@
           },
           {
             "accepted": true,
-            "line_count": 1295,
+            "line_count": 1338,
             "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
             "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
             "revisit_condition": "When config/report command bodies move to focused service modules.",
@@ -3492,7 +3501,7 @@
           },
           {
             "accepted": true,
-            "line_count": 1239,
+            "line_count": 1247,
             "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
             "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
             "revisit_condition": "When adding a new derivatives metric family or crowding class.",

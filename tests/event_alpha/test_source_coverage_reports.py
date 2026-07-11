@@ -25,6 +25,285 @@ def test_source_coverage_canonical_import_paths_resolve_same_objects():
     assert direct_source_coverage.LIVE_PROVIDER_READINESS_JSON == new_source_coverage.LIVE_PROVIDER_READINESS_JSON
 
 
+def test_source_coverage_cryptopanic_exact_run_semantics():
+    import json
+    from pathlib import Path
+
+    import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
+    import crypto_rsi_scanner.event_alpha.radar.source_coverage as source_coverage
+
+    provider_report = event_provider_status.build_event_discovery_provider_status(
+        _event_provider_status_cfg(
+            EVENT_DISCOVERY_CRYPTOPANIC_LIVE=False,
+            EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN="configured_test_value",
+        )
+    )
+    run_id = "run-profile-disabled"
+    readiness = {
+        "run_id": run_id,
+        "providers": [{
+            "provider": "cryptopanic_rss_gdelt_context",
+            "provider_health_key": "cryptopanic",
+            "configured": True,
+            "live_call_allowed": False,
+        }],
+    }
+    profile_disabled = source_coverage.build_source_coverage_report(
+        provider_status_report=provider_report,
+        exact_run_row={
+            "run_id": run_id,
+            "cryptopanic_configured": True,
+            "cryptopanic_attempted": False,
+            "cryptopanic_skip_reason": "profile_disabled",
+        },
+        provider_readiness_payload=readiness,
+        cryptopanic_configured_fallback=True,
+    )
+    assert profile_disabled.cryptopanic_configured is True
+    assert profile_disabled.cryptopanic_selected_for_run is False
+    assert profile_disabled.cryptopanic_live_call_allowed is False
+    assert profile_disabled.cryptopanic_observed is False
+    assert profile_disabled.cryptopanic_not_used_reason == "profile_disabled"
+    assert profile_disabled.cryptopanic_coverage_status == "configured_profile_disabled"
+    assert "explicit no-send evidence/candidate profile" in str(profile_disabled.cryptopanic_recommendation)
+    proxy = {pack.source_pack: pack for pack in profile_disabled.packs}["proxy_preipo_rwa_pack"]
+    assert "cryptopanic" in proxy.configured_providers
+    assert "cryptopanic" not in proxy.missing_providers
+    assert not any("CryptoPanic token" in action for action in proxy.recommended_actions)
+
+    selected_disabled = source_coverage.build_source_coverage_report(
+        provider_status_report=provider_report,
+        exact_run_row={
+            "run_id": "run-selected-disabled",
+            "cryptopanic_configured": True,
+            "cryptopanic_attempted": False,
+            "cryptopanic_skip_reason": "live_calls_disabled",
+        },
+        provider_readiness_payload={
+            **readiness,
+            "run_id": "run-selected-disabled",
+        },
+    )
+    assert selected_disabled.cryptopanic_selected_for_run is True
+    assert selected_disabled.cryptopanic_live_call_allowed is False
+    assert selected_disabled.cryptopanic_coverage_status == "configured_selected_live_disabled"
+
+    with TemporaryDirectory() as tmp:
+        ledger = Path(tmp) / "cryptopanic_request_ledger.jsonl"
+        ledger.write_text(json.dumps({
+            "timestamp": "2026-06-15T12:00:00+00:00",
+            "status_code": 200,
+            "result_count": 1,
+            "quota_counted": True,
+            "currencies": "RUNE",
+            "normalized_request_key": "cryptopanic:RUNE",
+            "request_url_redacted": "https://cryptopanic.test/posts/?auth_token=<redacted>&currencies=RUNE",
+        }) + "\n", encoding="utf-8")
+        observed = source_coverage.build_source_coverage_report(
+            provider_status_report=provider_report,
+            exact_run_row={
+                "run_id": "run-observed",
+                "cryptopanic_configured": True,
+                "cryptopanic_attempted": True,
+            },
+            provider_readiness_payload={
+                "run_id": "run-observed",
+                "providers": [{
+                    "provider_health_key": "cryptopanic",
+                    "configured": True,
+                    "live_call_allowed": True,
+                }],
+            },
+            evidence_acquisition_rows=[{
+                "source_pack": "security_shock_pack",
+                "status": "accepted_evidence_found",
+                "accepted_evidence": [{"provider": "cryptopanic"}],
+            }],
+            cryptopanic_request_ledger_path=ledger,
+            now=datetime(2026, 6, 15, 13, tzinfo=timezone.utc),
+        )
+    assert observed.cryptopanic_selected_for_run is True
+    assert observed.cryptopanic_live_call_allowed is True
+    assert observed.cryptopanic_observed is True
+    assert observed.cryptopanic_coverage_status == "observed_healthy"
+
+    missing = source_coverage.build_source_coverage_report(
+        provider_status_report=event_provider_status.build_event_discovery_provider_status(
+            _event_provider_status_cfg()
+        ),
+        exact_run_row={"run_id": "run-missing", "cryptopanic_configured": False},
+        provider_readiness_payload={
+            "run_id": "run-missing",
+            "providers": [{"provider_health_key": "cryptopanic", "configured": False, "live_call_allowed": False}],
+        },
+        cryptopanic_configured_fallback=False,
+    )
+    assert missing.cryptopanic_configured is False
+    assert missing.cryptopanic_coverage_status == "not_configured"
+    assert "configure CryptoPanic token" in str(missing.cryptopanic_recommendation)
+
+
+def test_source_coverage_counts_explicit_blockers_and_collapses_visible_families():
+    from types import SimpleNamespace
+
+    import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
+    import crypto_rsi_scanner.event_alpha.radar.source_coverage as source_coverage
+
+    provider_report = event_provider_status.build_event_discovery_provider_status(_event_provider_status_cfg())
+    duplicate_rows = [
+        {
+            "core_opportunity_id": f"core-duplicate-{index}",
+            "coin_id": "story-2",
+            "symbol": "DATA",
+            "primary_impact_path": "strategic_investment",
+            "source_pack": "strategic_investment_pack",
+            "source_requirements_met": False,
+            "source_pack_confirmation_status": "coverage_gap",
+            "why_not_alertable": ["strong_source_missing"],
+            "evidence_acquisition_status": "not_executed",
+            "accepted_evidence_count": 0,
+            "market_context_freshness_status": "missing",
+        }
+        for index in range(2)
+    ]
+    rows = [
+        *duplicate_rows,
+        {
+            "core_opportunity_id": "core-official",
+            "coin_id": "asset-official",
+            "symbol": "OFF",
+            "primary_impact_path": "listing_liquidity_event",
+            "source_pack": "listing_liquidity_pack",
+            "source_requirements_met": False,
+            "why_not_alertable": ["official_exchange_source_required"],
+            "evidence_acquisition_status": "not_executed",
+            "accepted_evidence_count": 0,
+            "market_context_freshness_status": "fresh",
+        },
+        {
+            "core_opportunity_id": "core-structured",
+            "coin_id": "asset-structured",
+            "symbol": "LOCK",
+            "primary_impact_path": "unlock_supply_event",
+            "source_pack": "unlock_supply_pack",
+            "source_requirements_met": False,
+            "why_not_alertable": ["structured_unlock_source_required"],
+            "evidence_acquisition_status": "not_executed",
+            "accepted_evidence_count": 0,
+            "market_context_freshness_status": "stale",
+        },
+    ]
+    report = source_coverage.build_source_coverage_report(
+        provider_status_report=provider_report,
+        core_opportunity_rows=rows,
+        near_miss_candidates=[SimpleNamespace(
+            near_miss_id="near-source-search",
+            core_opportunity_id="core-duplicate-0",
+            coin_id="story-2",
+            symbol="DATA",
+            source_pack="strategic_investment_pack",
+            recommended_refresh_actions=("targeted_evidence_refresh", "source_pack_search"),
+        )],
+    )
+    assert report.candidates_blocked_by_source_coverage == 4
+    assert report.candidates_blocked_by_missing_strong_source == 2
+    assert report.candidates_blocked_by_missing_official_source == 1
+    assert report.candidates_blocked_by_missing_structured_source == 1
+    assert report.candidates_blocked_by_evidence_not_acquired == 4
+    assert report.candidates_blocked_by_provider_unavailable == 0
+    assert report.candidates_blocked_by_market_context == 3
+    assert report.candidate_families_blocked_by_source_coverage == 3
+    assert report.candidate_families_blocked_by_market_coverage == 2
+    proxy_pack = {pack.source_pack: pack for pack in report.packs}["proxy_preipo_rwa_pack"]
+    assert proxy_pack.evidence_absence_meaningful is False
+    text = source_coverage.format_source_coverage_report(report)
+    assert "evidence absence remains non-negative proof" in text
+
+
+def test_source_coverage_doctor_blocks_exact_run_semantic_contradictions():
+    import json
+    from pathlib import Path
+
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as artifact_doctor
+
+    run = {
+        "run_id": "run-doctor-profile-disabled",
+        "profile": "notify_no_key",
+        "artifact_namespace": "notify_no_key",
+        "run_mode": "test",
+        "cryptopanic_configured": True,
+        "cryptopanic_attempted": False,
+        "cryptopanic_skip_reason": "profile_disabled",
+    }
+    core = {
+        "run_id": run["run_id"],
+        "profile": run["profile"],
+        "artifact_namespace": run["artifact_namespace"],
+        "run_mode": "test",
+        "core_opportunity_id": "core-doctor-source-gap",
+        "source_pack": "strategic_investment_pack",
+        "source_requirements_met": False,
+        "why_not_alertable": ["strong_source_missing"],
+    }
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        report_path = base / "event_alpha_source_coverage.md"
+        report_path.write_text("CryptoPanic:\n- configured: false\n", encoding="utf-8")
+        (base / "event_alpha_source_coverage.json").write_text(json.dumps({
+            "run_id": run["run_id"],
+            "cryptopanic_configured": False,
+            "cryptopanic_not_used_reason": "not_configured",
+            "cryptopanic_coverage_status": "not_configured",
+            "cryptopanic_recommendation": "configure CryptoPanic API token",
+            "candidates_blocked_by_source_coverage": 0,
+        }), encoding="utf-8")
+        (base / "event_live_provider_activation_readiness.json").write_text(json.dumps({
+            "run_id": run["run_id"],
+            "providers": [{
+                "provider_health_key": "cryptopanic",
+                "configured": True,
+                "live_call_allowed": False,
+            }],
+        }), encoding="utf-8")
+        bad = artifact_doctor.diagnose_artifacts(
+            run_rows=[run],
+            core_opportunity_rows=[core],
+            source_coverage_report_path=report_path,
+            profile=run["profile"],
+            artifact_namespace=run["artifact_namespace"],
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert bad.cryptopanic_run_coverage_config_mismatch == 1
+        assert bad.cryptopanic_profile_disabled_coverage_mismatch == 1
+        assert bad.cryptopanic_profile_disabled_credential_recommendation == 1
+        assert bad.source_coverage_blocker_summary_inconsistent == 1
+
+        (base / "event_alpha_source_coverage.json").write_text(json.dumps({
+            "run_id": run["run_id"],
+            "cryptopanic_configured": True,
+            "cryptopanic_selected_for_run": False,
+            "cryptopanic_live_call_allowed": False,
+            "cryptopanic_not_used_reason": "profile_disabled",
+            "cryptopanic_coverage_status": "configured_profile_disabled",
+            "cryptopanic_recommendation": "enable CryptoPanic in an explicit no-send evidence/candidate profile if desired",
+            "candidates_blocked_by_source_coverage": 1,
+        }), encoding="utf-8")
+        good = artifact_doctor.diagnose_artifacts(
+            run_rows=[run],
+            core_opportunity_rows=[core],
+            source_coverage_report_path=report_path,
+            profile=run["profile"],
+            artifact_namespace=run["artifact_namespace"],
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert good.cryptopanic_run_coverage_config_mismatch == 0
+        assert good.cryptopanic_profile_disabled_coverage_mismatch == 0
+        assert good.cryptopanic_profile_disabled_credential_recommendation == 0
+        assert good.source_coverage_blocker_summary_inconsistent == 0
+
+
 def test_source_coverage_links_live_provider_readiness_artifacts():
     from crypto_rsi_scanner import config
     import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status

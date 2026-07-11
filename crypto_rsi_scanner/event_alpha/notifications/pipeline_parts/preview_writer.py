@@ -55,6 +55,7 @@ def write_notification_plan_preview(
             profile=profile,
             pipeline_result=_notification_preview_result(pipeline_result, plan=plan, block_reason=reason),
             reason=reason,
+            preview_only=True,
         )
 
 
@@ -303,6 +304,14 @@ def _preview_summary_lines(sections: Iterable[Mapping[str, Any]]) -> list[str]:
         row for row in would_send
         if str(row.get("status") or "") == delivery.STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED
     ]
+    requested = any(row.get("send_requested") is True for row in rows)
+    attempted = any(row.get("send_attempted") is True for row in rows)
+    attempt_pending = any(row.get("send_attempted") is None for row in rows)
+    failed_attempt = any(
+        row.get("failed") is True or str(row.get("status") or "") == "delivery_failed"
+        for row in rows
+    )
+    preview_only = bool(rows) and all(row.get("preview_only") is True for row in rows)
     quality_blocked = [
         row for row in rows
         if "quality" in str(row.get("status") or "").casefold()
@@ -340,23 +349,51 @@ def _preview_summary_lines(sections: Iterable[Mapping[str, Any]]) -> list[str]:
         else:
             label = "not_due"
         lane_parts.append(f"{lane}={label}")
-    send_guard = (
-        "disabled (no-send rehearsal)"
-        if guard_blocked
-        else ("enabled" if sent else "not observed")
-    )
-    mode = "no-send rehearsal" if guard_blocked else ("send attempt" if sent else "preview")
+    if attempted:
+        burn_in_mode = "notification_burn_in_delivery_attempted"
+        send_guard_status = "delivery_attempt_failed" if failed_attempt and not sent else "delivery_attempt_completed"
+        send_guard = "enabled; delivery attempted"
+        attempted_text = "true"
+        no_send_text = "false"
+    elif guard_blocked:
+        burn_in_mode = "no_send_notification_burn_in"
+        send_guard_status = "disabled_by_send_guard"
+        send_guard = "disabled (no-send rehearsal)"
+        attempted_text = "false"
+        no_send_text = "true"
+    elif attempt_pending and not preview_only:
+        burn_in_mode = "delivery_pending_preview"
+        send_guard_status = "delivery_attempt_pending"
+        send_guard = "enabled; delivery outcome pending"
+        attempted_text = "unknown"
+        no_send_text = "unknown"
+    elif preview_only:
+        burn_in_mode = "preview_only"
+        send_guard_status = "preview_only_no_delivery"
+        send_guard = "preview only"
+        attempted_text = "false"
+        no_send_text = "true"
+    else:
+        burn_in_mode = "no_send_notification_burn_in"
+        send_guard_status = "no_delivery_attempted"
+        send_guard = "no delivery attempted"
+        attempted_text = "false"
+        no_send_text = "true"
     lines = [
-        f"- Mode: {mode}",
+        f"- burn_in_mode: {burn_in_mode}",
+        f"- send_guard_status: {send_guard_status}",
+        f"- send_requested: {'true' if requested else 'false'}",
+        f"- send_attempted: {attempted_text}",
+        f"- no_send_rehearsal: {no_send_text}",
         f"- Would send: {'yes' if would_send else 'no'}",
         f"- Lanes: {', '.join(lane_parts) if lane_parts else 'none'}",
         f"- Lane counts: due={len(would_send)} · sent={len(sent)} · would_send_but_guard_disabled={len(guard_blocked)} · blocked_by_quality={len(quality_blocked)} · blocked_by_cooldown={len(cooldown_blocked)} · not_due={len(not_due)}",
-        f"- Rendered candidate items: {rendered_items}",
-        f"- Core opportunity items: {len(core_ids)}",
-        f"- Source alert IDs: {source_alert_count}",
+        f"- preview_rendered_items: {rendered_items}",
+        f"- Preview core-opportunity identities: {len(core_ids)}",
+        f"- Preview source-alert identity references: {source_alert_count}",
         f"- Candidates blocked by confirmation: {len(blocked_confirmation)}",
         "- Provider issues: see Telegram body/run ledger",
-        f"- Send guard: {send_guard}",
+        f"Send guard: {send_guard}",
     ]
     if guard_blocked:
         lines.append("- No-send rehearsal: would send, but send guard is disabled. This is expected in rehearsal mode.")
@@ -470,18 +507,28 @@ def _notification_preview_result(
     delivered = dict(delivered_by_lane or {lane: 0 for lane in LANES})
     llm_stats = _llm_stats_from_result(result)
     warnings = tuple(str(item) for item in _value(result, "warnings") or () if str(item))
-    return {
+    counters = event_alpha_run_counters.canonical_run_counters(result)
+    # ``lane_counts`` already includes the heartbeat lane.  Adding
+    # ``heartbeat_due`` again made the embedded heartbeat claim two rendered
+    # items while the preview, run ledger, and operator state correctly claimed
+    # one.
+    counters["preview_rendered_items"] = sum(
+        _safe_int(value) for value in plan.lane_counts.values()
+    )
+    send_state = event_alpha_run_counters.canonical_send_state(result)
+    if block_reason:
+        send_state["send_guard_status"] = str(block_reason)
+    preview_result = {
         "profile": _value(result, "profile"),
         "cycle_completed": bool(_value(result, "cycle_completed", result is not None)),
         "partial_results": bool(_value(result, "partial_results", False)),
         "warnings": warnings,
-        "raw_events": _num(result, "raw_events"),
         "extraction_rows": _num(result, "extraction_rows"),
-        "core_opportunity_rows_written": _num(result, "core_opportunities") or _num(result, "core_opportunity_rows_written"),
-        "alertable": _num(result, "alertable"),
-        "alerts": _num(result, "alerts"),
-        "candidates": _num(result, "candidates") or _num(result, "research_candidates"),
-        "raw_source_candidates": _raw_source_candidate_count(result),
+        "counter_schema_version": event_alpha_run_counters.COUNTER_SCHEMA_VERSION,
+        **counters,
+        **event_alpha_run_counters.deprecated_counter_aliases(counters),
+        **send_state,
+        "notification_burn_in": bool(_value(result, "notification_burn_in", False)),
         "send_lane_items_attempted": dict(plan.lane_counts),
         "send_lane_items_delivered": delivered,
         "send_would_send_items": int(plan.would_send_count or 0),
@@ -492,6 +539,7 @@ def _notification_preview_result(
         "llm_skipped_due_budget": llm_stats["skipped_due_budget"],
         "artifact_doctor_status": _value(result, "artifact_doctor_status", "not_run"),
     }
+    return preview_result
 
 def _llm_stats_from_result(result: Any | None) -> dict[str, int]:
     explicit_calls = _value(result, "llm_calls_attempted", None)

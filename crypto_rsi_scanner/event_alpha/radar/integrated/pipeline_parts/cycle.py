@@ -32,17 +32,20 @@ class _IntegratedCandidateArtifacts:
     asset_registry_path: Path
     instrument_resolution_path: Path
     asset_resolution_report_path: Path
+    targeted_market_refresh_result: Any | None
 
 
 @dataclass(frozen=True)
 class _IntegratedOperatorArtifacts:
     core_result: Any
     core_rows: tuple[dict[str, Any], ...]
+    cumulative_core_rows: int
     card_result: Any
     readiness_json_path: Path
     readiness_md_path: Path
     source_coverage_path: Path
     source_coverage_json_path: Path
+    source_coverage_report: Any
     delivery_path: Path
     delivery_rows: tuple[dict[str, Any], ...]
     daily_brief_path: Path
@@ -56,6 +59,7 @@ def run_integrated_radar_cycle(
     observed_at: datetime | str | None = None,
     input_mode: str = INPUT_MODE_AUTO,
     coinalyze_namespace: str | None = None,
+    targeted_market_provider: object | None = None,
 ) -> EventIntegratedRadarResult:
     """Run one integrated research-only radar cycle and write artifacts."""
     with event_alpha_locks.artifact_mutation_guard(
@@ -72,6 +76,7 @@ def run_integrated_radar_cycle(
             observed_at=observed_at,
             input_mode=input_mode,
             coinalyze_namespace=coinalyze_namespace,
+            targeted_market_provider=targeted_market_provider,
         )
 
 
@@ -82,6 +87,7 @@ def _run_integrated_radar_cycle_locked(
     observed_at: datetime | str | None,
     input_mode: str,
     coinalyze_namespace: str | None,
+    targeted_market_provider: object | None,
 ) -> EventIntegratedRadarResult:
     start = _integrated_cycle_start(
         context=context,
@@ -99,6 +105,7 @@ def _run_integrated_radar_cycle_locked(
         start,
         inputs,
         context=context,
+        targeted_market_provider=targeted_market_provider,
     )
     operator_artifacts = _write_integrated_operator_artifacts(
         start,
@@ -191,6 +198,7 @@ def _write_integrated_candidate_artifacts(
     inputs: _IntegratedCycleInputs,
     *,
     context: event_alpha_artifacts.EventAlphaArtifactContext,
+    targeted_market_provider: object | None,
 ) -> _IntegratedCandidateArtifacts:
     manifest_path = start.namespace_dir / INPUT_MANIFEST_FILENAME
     _write_json(manifest_path, _input_manifest_document(
@@ -211,6 +219,48 @@ def _write_integrated_candidate_artifacts(
         run_id=start.run_id,
         observed_at=start.research_observed_at,
         asset_registry=inputs.asset_registry,
+    )
+    refresh_enabled = event_targeted_market_refresh.targeted_refresh_enabled(
+        explicit_enabled=bool(config.EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED),
+    )
+    provider = targeted_market_provider
+    if provider is None and refresh_enabled:
+        provider = event_targeted_market_refresh.runtime_targeted_market_provider()
+    refresh_result = event_targeted_market_refresh.run_targeted_market_refresh(
+        candidates,
+        namespace_dir=start.namespace_dir,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        run_mode=context.run_mode,
+        run_id=start.run_id,
+        provider=provider,
+        cfg=event_targeted_market_refresh.EventNearMissConfig(
+            enabled=True,
+            near_threshold_points=config.EVENT_ALPHA_NEAR_MISS_THRESHOLD_POINTS,
+            market_refresh_enabled=refresh_enabled,
+            max_market_refresh_assets=min(20, int(config.EVENT_ALPHA_TARGETED_MARKET_REFRESH_MAX_ASSETS or 20)),
+            market_refresh_timeout_seconds=config.EVENT_ALPHA_TARGETED_MARKET_REFRESH_TIMEOUT_SECONDS,
+        ),
+        enabled=refresh_enabled,
+        now=start.research_observed_at,
+    )
+    if refresh_result.snapshot_rows:
+        refreshed_sidecars = event_targeted_market_refresh.apply_targeted_market_refresh_to_sidecars(
+            inputs.sidecars,
+            refresh_result,
+        )
+        candidates = build_integrated_candidates(
+            sidecar_rows=refreshed_sidecars,
+            profile=context.profile,
+            artifact_namespace=context.artifact_namespace,
+            run_mode=context.run_mode,
+            run_id=start.run_id,
+            observed_at=start.research_observed_at,
+            asset_registry=inputs.asset_registry,
+        )
+    candidates = event_targeted_market_refresh.annotate_targeted_market_refresh_candidates(
+        candidates,
+        refresh_result,
     )
     candidates, candidate_resolution_rows = event_instrument_resolver.resolve_rows(
         candidates,
@@ -254,6 +304,7 @@ def _write_integrated_candidate_artifacts(
         asset_registry_path=asset_registry_path,
         instrument_resolution_path=instrument_resolution_path,
         asset_resolution_report_path=asset_resolution_report_path,
+        targeted_market_refresh_result=refresh_result,
     )
 
 
@@ -275,11 +326,12 @@ def _write_integrated_operator_artifacts(
         run_mode=context.run_mode,
         artifact_namespace=context.artifact_namespace,
     )
-    core_rows = event_core_opportunity_store.load_core_opportunities(
+    core_read = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
         latest_run=True,
         include_api=True,
-    ).rows
+    )
+    core_rows = core_read.rows
     card_result = event_research_cards.write_research_cards(
         context.research_cards_dir,
         watchlist_entries=(),
@@ -299,11 +351,12 @@ def _write_integrated_operator_artifacts(
         card_result.card_paths,
         run_id=start.run_id,
     )
-    core_rows = event_core_opportunity_store.load_core_opportunities(
+    core_read = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
         latest_run=True,
         include_api=True,
-    ).rows
+    )
+    core_rows = core_read.rows
     readiness_report = event_live_provider_readiness.build_readiness_report(
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
@@ -315,9 +368,19 @@ def _write_integrated_operator_artifacts(
         readiness_report,
         start.namespace_dir,
     )
+    source_coverage_report = _build_integrated_source_coverage_report(
+        start,
+        candidates=candidates,
+        core_rows=core_rows,
+        context=context,
+        readiness_payload=readiness_report.to_dict(),
+    )
     source_coverage_path = start.namespace_dir / SOURCE_COVERAGE_FILENAME
     source_coverage_path.write_text(
-        format_integrated_source_coverage(
+        f"run_id: {start.run_id}\n"
+        + event_alpha_source_coverage.format_source_coverage_report(source_coverage_report).rstrip()
+        + "\n\n"
+        + format_integrated_source_coverage(
             candidates,
             run_id=start.run_id,
             readiness_json_path=readiness_json_path,
@@ -326,16 +389,20 @@ def _write_integrated_operator_artifacts(
         encoding="utf-8",
     )
     source_coverage_json_path = start.namespace_dir / SOURCE_COVERAGE_JSON_FILENAME
-    _write_json(
-        source_coverage_json_path,
-        format_integrated_source_coverage_json(
-            candidates,
-            run_id=start.run_id,
-            input_manifest=inputs.input_manifest,
-            readiness_json_path=readiness_json_path,
-            readiness_md_path=readiness_md_path,
-        ),
+    source_coverage_payload = format_integrated_source_coverage_json(
+        candidates,
+        run_id=start.run_id,
+        input_manifest=inputs.input_manifest,
+        readiness_json_path=readiness_json_path,
+        readiness_md_path=readiness_md_path,
     )
+    source_coverage_payload.update(source_coverage_report.to_dict())
+    source_coverage_payload.update({
+        "run_id": start.run_id,
+        "source": "integrated_radar",
+        "candidate_count": len(candidates),
+    })
+    _write_json(source_coverage_json_path, source_coverage_payload)
     delivery_path = start.namespace_dir / INTEGRATED_DELIVERIES_FILENAME
     preview_path = start.namespace_dir / NOTIFICATION_PREVIEW_FILENAME
     delivery_rows = build_integrated_notification_delivery_rows(
@@ -357,6 +424,9 @@ def _write_integrated_operator_artifacts(
             input_manifest=inputs.input_manifest,
             delivery_rows=delivery_rows,
             source_coverage_path=source_coverage_path,
+            run_id=start.run_id,
+            raw_events=sum(len(rows) for rows in inputs.sidecars.values()),
+            cumulative_store_rows=core_read.total_rows_read,
         ),
         encoding="utf-8",
     )
@@ -366,21 +436,67 @@ def _write_integrated_operator_artifacts(
             candidates=candidates,
             core_rows=core_rows,
             context=context,
+            run_id=start.run_id,
+            raw_events=sum(len(rows) for rows in inputs.sidecars.values()),
+            cumulative_store_rows=core_read.total_rows_read,
         ),
         encoding="utf-8",
     )
     return _IntegratedOperatorArtifacts(
         core_result=core_result,
         core_rows=core_rows,
+        cumulative_core_rows=core_read.total_rows_read,
         card_result=card_result,
         readiness_json_path=readiness_json_path,
         readiness_md_path=readiness_md_path,
         source_coverage_path=source_coverage_path,
         source_coverage_json_path=source_coverage_json_path,
+        source_coverage_report=source_coverage_report,
         delivery_path=delivery_path,
         delivery_rows=delivery_rows,
         daily_brief_path=daily_brief_path,
         preview_path=preview_path,
+    )
+
+
+def _build_integrated_source_coverage_report(
+    start: _IntegratedCycleStart,
+    *,
+    candidates: Iterable[Mapping[str, Any]],
+    core_rows: Iterable[Mapping[str, Any]],
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    readiness_payload: Mapping[str, Any],
+) -> event_alpha_source_coverage.EventAlphaSourceCoverageReport:
+    cryptopanic_configured = any(
+        bool(row.get("configured"))
+        for row in readiness_payload.get("providers") or ()
+        if isinstance(row, Mapping)
+        and "cryptopanic" in " ".join(
+            str(row.get(key) or "")
+            for key in ("provider", "provider_name", "provider_health_key")
+        ).casefold()
+    )
+    exact_run_stub = {
+        "run_id": start.run_id,
+        "cryptopanic_configured": cryptopanic_configured,
+        "cryptopanic_selected_for_run": False,
+        "cryptopanic_live_call_allowed": False,
+        "cryptopanic_attempted": False,
+        "cryptopanic_skip_reason": "profile_disabled",
+    }
+    return event_alpha_source_coverage.build_source_coverage_report(
+        provider_status_report=event_provider_status.build_event_discovery_provider_status(config),
+        provider_health_rows=event_provider_health.load_provider_health(context.provider_health_path),
+        evidence_acquisition_rows=(),
+        core_opportunity_rows=core_rows,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        cryptopanic_request_ledger_path=start.namespace_dir / "cryptopanic_request_ledger.jsonl",
+        artifact_namespace_dir=start.namespace_dir,
+        exact_run_row=exact_run_stub,
+        provider_readiness_payload=readiness_payload,
+        near_miss_candidates=candidates,
+        now=start.research_observed_at,
     )
 
 
@@ -430,7 +546,10 @@ def _integrated_cycle_result(
         wall_finished_at=finished,
         raw_events=sum(len(rows) for rows in inputs.sidecars.values()),
         market_anomalies=sidecar_counts["market_anomalies"],
-        market_state_snapshots=sidecar_counts["market_state_snapshots"],
+        market_state_snapshots=(
+            candidate_artifacts.targeted_market_refresh_result.persisted_snapshot_rows
+            if candidate_artifacts.targeted_market_refresh_result else 0
+        ),
         official_exchange_events=sidecar_counts["official_exchange_events"],
         official_listing_candidates=sidecar_counts["official_listing_candidates"],
         scheduled_catalysts=sidecar_counts["scheduled_catalysts"],
@@ -470,11 +589,21 @@ def _integrated_cycle_result(
         research_review_digest_enabled=False,
         research_review_digest_candidates=0,
         research_review_digest_would_send=0,
-        snapshot_rows_written=len(candidates),
+        snapshot_rows_written=(
+            candidate_artifacts.targeted_market_refresh_result.refreshed_assets
+            if candidate_artifacts.targeted_market_refresh_result else 0
+        ),
         strict_alerts=0,
         alertable_decisions=0,
+        candidate_events=len(candidates),
         research_candidates=len(candidates),
+        source_alert_snapshots=0,
         raw_source_candidates=len(candidates),
+        current_generation_core_rows=len(operator_artifacts.core_rows),
+        current_generation_visible_core_rows=len(
+            event_core_opportunities.visible_core_opportunities(operator_artifacts.core_rows)
+        ),
+        cumulative_store_rows=operator_artifacts.cumulative_core_rows,
         cards_written=operator_artifacts.card_result.cards_written,
         research_cards_written=operator_artifacts.card_result.cards_written,
         preview_rendered_items=rendered_items,
@@ -487,7 +616,18 @@ def _integrated_cycle_result(
         operator_absolute_path_count=operator_absolute_paths,
         source_coverage_json_path_rel=event_artifact_paths.artifact_relpath(operator_artifacts.source_coverage_json_path),
         source_coverage_md_path_rel=event_artifact_paths.artifact_relpath(operator_artifacts.source_coverage_path),
-        warnings=tuple(_integrated_warnings(candidates)),
+        cryptopanic_configured=operator_artifacts.source_coverage_report.cryptopanic_configured,
+        cryptopanic_attempted=False,
+        cryptopanic_provider_status=operator_artifacts.source_coverage_report.cryptopanic_health_status,
+        cryptopanic_skip_reason=(
+            "profile_disabled"
+            if operator_artifacts.source_coverage_report.cryptopanic_configured
+            else "missing_config"
+        ),
+        warnings=tuple(dict.fromkeys((
+            *_integrated_warnings(candidates),
+            *(candidate_artifacts.targeted_market_refresh_result.warnings if candidate_artifacts.targeted_market_refresh_result else ()),
+        ))),
     )
 
 def _build_integrated_asset_registry(

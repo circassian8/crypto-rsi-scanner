@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import paths as event_artifact_paths
+from . import run_counters as event_alpha_run_counters
 
 
 RUN_LEDGER_SCHEMA_VERSION = "event_alpha_run_ledger_v1"
@@ -291,8 +292,13 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
     failed = len(result.rows) - success
     rows.append(f"success={success} · failure={failed}")
     rows.append("")
+    from . import operator_state as event_alpha_operator_state
+
     for row in result.rows:
-        _append_run_ledger_report_row(rows, row)
+        _append_run_ledger_report_row(
+            rows,
+            event_alpha_operator_state.enrich_run_row_from_core_store(result.path.parent, row),
+        )
     return "\n".join(rows).rstrip()
 
 
@@ -324,15 +330,33 @@ def _append_run_ledger_report_row(rows: list[str], row: Mapping[str, Any]) -> No
 
 
 def _append_run_ledger_activity_lines(rows: list[str], row: Mapping[str, Any]) -> None:
+    counters = event_alpha_run_counters.canonical_run_counters(row)
+    send_state = event_alpha_run_counters.canonical_send_state(row)
     rows.append(
         "  "
-        f"raw={int(row.get('raw_events') or 0)} anomalies={int(row.get('market_anomalies') or 0)} "
+        f"raw_events={counters['raw_events']} candidate_events={counters['candidate_events']} "
+        f"research_candidates={counters['research_candidates']} source_alert_snapshots={counters['source_alert_snapshots']} "
+        f"current_generation_core_rows={counters['current_generation_core_rows']} "
+        f"current_generation_visible_core_rows={counters['current_generation_visible_core_rows']} "
+        f"cumulative_store_rows={counters['cumulative_store_rows']} "
+        f"alertable_decisions={counters['alertable_decisions']} strict_alerts={counters['strict_alerts']} "
+        f"preview_rendered_items={counters['preview_rendered_items']}"
+    )
+    rows.append(
+        "  "
+        f"anomalies={int(row.get('market_anomalies') or 0)} "
         f"queries={int(row.get('catalyst_queries') or 0)} accepted={int(row.get('catalyst_results_accepted') or 0)} "
-        f"rejected={int(row.get('catalyst_results_rejected') or 0)} candidates={int(row.get('candidates') or 0)} "
-        f"alerts={int(row.get('alerts') or 0)} routed={int(row.get('routed') or 0)} "
-        f"alertable={int(row.get('alertable') or 0)} sent={str(bool(row.get('sent'))).lower()} "
+        f"rejected={int(row.get('catalyst_results_rejected') or 0)} routed={int(row.get('routed') or 0)} "
+        f"sent={str(bool(row.get('sent'))).lower()} "
         f"send={int(row.get('send_items_delivered') or 0)}/{int(row.get('send_items_attempted') or 0)} "
         f"would_send={int(row.get('send_would_send_items') or 0)}"
+    )
+    rows.append(
+        "  "
+        f"burn_in_mode={send_state['burn_in_mode']} send_guard_status={send_state['send_guard_status']} "
+        f"send_requested={str(send_state['send_requested']).lower()} "
+        f"send_attempted={str(send_state['send_attempted']).lower()} "
+        f"no_send_rehearsal={str(send_state['no_send_rehearsal']).lower()}"
     )
     rows.append(
         "  "
@@ -672,14 +696,17 @@ def _run_record_notification_fields(
     notify_burn: bool,
     send_requested: bool,
 ) -> dict[str, Any]:
-    return {
-        "candidates": _int(getattr(result, "candidates", 0)),
+    counters = event_alpha_run_counters.canonical_run_counters(result)
+    send_state = event_alpha_run_counters.canonical_send_state(result)
+    if notify_burn:
+        send_state["burn_in_mode"] = (
+            "no_send_notification_burn_in"
+            if send_state["no_send_rehearsal"]
+            else "notification_burn_in_delivery_attempted"
+        )
+    fields = {
+        "counter_schema_version": event_alpha_run_counters.COUNTER_SCHEMA_VERSION,
         "clusters": _int(getattr(result, "clusters", 0)),
-        "alerts": len(list(getattr(result, "alerts", ()) or ())),
-        "strict_alerts": _int(getattr(result, "strict_alerts", 0)),
-        "alertable_decisions": _int(getattr(result, "alertable_decisions", 0)),
-        "research_candidates": _int(getattr(result, "research_candidates", 0)),
-        "raw_source_candidates": _int(getattr(result, "raw_source_candidates", 0)),
         "watchlist_entries": _int(getattr(result, "watchlist_entries", 0)),
         "watchlist_escalations": _int(getattr(result, "watchlist_escalations", 0)),
         "watchlist_monitor_active_entries": _int(getattr(result, "watchlist_monitor_active_entries", 0)),
@@ -715,6 +742,10 @@ def _run_record_notification_fields(
         "send_block_reason": getattr(result, "send_block_reason", None),
         "sent": _int(getattr(result, "send_items_delivered", 0)) > 0,
     }
+    fields.update(counters)
+    fields.update(send_state)
+    fields.update(event_alpha_run_counters.deprecated_counter_aliases(counters))
+    return fields
 
 
 def _run_record_artifact_write_fields(

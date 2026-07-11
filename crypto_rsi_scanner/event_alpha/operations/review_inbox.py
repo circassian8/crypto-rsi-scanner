@@ -77,6 +77,12 @@ class ReviewItem:
     diagnostic_only: bool
     fixture_only: bool
     preflight_only: bool
+    candidate_source_mode: str = "not_contract_counted"
+    provider_generation_id: str = ""
+    provider_request_succeeded: bool = False
+    provider_source_artifact: str = ""
+    request_ledger_path: str = ""
+    market_refresh_artifact: str = ""
     provider_gap: str | None = None
     review_value_score: int = 0
     review_value_reasons: tuple[str, ...] = ()
@@ -223,13 +229,13 @@ def format_review_inbox(payload: Mapping[str, Any]) -> str:
         lines.append("")
     for index, row in enumerate(contract_items, start=1):
         _append_review_item_lines(lines, index, row)
-    lines.extend(["## High-Value Review Candidates Not Contract-Counted", ""])
+    lines.extend(["## High-Value Non-Counted Review Candidates", ""])
     if not high_value_items:
         lines.append("- No high-value non-contract review candidates selected.")
         lines.append("")
     for index, row in enumerate(high_value_items, start=len(contract_items) + 1):
         _append_review_item_lines(lines, index, row)
-    lines.extend(["## Diagnostic / Support Items", ""])
+    lines.extend(["## Diagnostics / Support", ""])
     if not support_items:
         lines.append("- No diagnostic or support review items selected.")
         lines.append("")
@@ -278,6 +284,12 @@ def _append_review_item_lines(lines: list[str], index: int, row: Mapping[str, An
             f"- allowed_second_family_reason: `{row.get('allowed_second_family_reason') or 'none'}`",
             f"- Provenance: `{row.get('candidate_provenance')}` from `{row.get('source_artifact')}` row_type=`{row.get('source_artifact_row_type')}`",
             f"- Counts toward burn-in candidate evidence: `{row.get('contract_counted_candidate')}`",
+            f"- Candidate source mode: `{row.get('candidate_source_mode') or 'not_contract_counted'}`",
+            f"- Provider generation ID: `{row.get('provider_generation_id') or 'none'}`",
+            f"- Provider request succeeded: `{bool(row.get('provider_request_succeeded'))}`",
+            f"- Provider source artifact: `{row.get('provider_source_artifact') or 'none'}`",
+            f"- Request ledger: `{row.get('request_ledger_path') or 'none'}`",
+            f"- Market refresh artifact: `{row.get('market_refresh_artifact') or 'none'}`",
             f"- opportunity_type: `{row.get('opportunity_type')}`",
             f"- score: `{row.get('score')}`",
             f"- Review value: `{row.get('review_value_score')}` ({', '.join(row.get('review_value_reason_codes') or []) or 'general review'})",
@@ -529,6 +541,12 @@ def _item_from_group(
         diagnostic_only=bool(best.get("diagnostic_only")),
         fixture_only=bool(best.get("fixture_only")),
         preflight_only=bool(best.get("preflight_only")),
+        candidate_source_mode=str(best.get("candidate_source_mode") or "not_contract_counted"),
+        provider_generation_id=str(best.get("provider_generation_id") or ""),
+        provider_request_succeeded=best.get("provider_request_succeeded") is True,
+        provider_source_artifact=str(best.get("provider_source_artifact") or ""),
+        request_ledger_path=str(best.get("request_ledger_path") or ""),
+        market_refresh_artifact=str(best.get("market_refresh_artifact") or ""),
         provider_gap=_provider_gap(best),
         review_value_score=value_score,
         review_value_reasons=tuple([*value_reasons, *downrank_reasons]),

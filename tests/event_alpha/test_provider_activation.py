@@ -1269,12 +1269,12 @@ def test_daily_brief_declares_canonical_view_and_market_freshness_readiness():
     )
     assert "Canonical operator view: Core Opportunities sections above." in markdown
     assert "## Burn-In Readiness" in markdown
-    assert "Burn-in mode: no-send" in markdown
+    assert "- burn_in_mode: `no_send_notification_burn_in`" in markdown
     assert "What to review manually" in markdown
     assert "Missing keys/providers" in markdown
     assert "## Market Freshness Readiness" in markdown
-    assert "Capped by stale/unknown context: 1" in markdown
-    assert "Needs targeted market refresh: 1" in markdown
+    assert "current_core_rows_capped_by_stale_or_unknown_context: 1" in markdown
+    assert "current_core_rows_needing_targeted_market_refresh: 1" in markdown
     assert "### Diagnostic Appendix: Diagnostics / Source-Noise / Controls" in markdown
 
 
@@ -1329,7 +1329,7 @@ def test_daily_brief_source_coverage_uses_json_effective_provider_health():
     assert "CryptoPanic effective coverage" in brief
     assert "status=healthy" in brief
     assert "fan_sports_pack: coverage=partial healthy=cryptopanic" in brief
-    assert "What data source would most improve next run: fan_sports_pack: add sports fixture confirmation" in brief
+    assert "Largest current source-pack coverage gap: fan_sports_pack: add sports fixture confirmation" in brief
 
 
 def test_event_alpha_bybit_announcements_preflight_fixture_and_default_no_network():
@@ -1366,6 +1366,15 @@ def test_event_alpha_bybit_announcements_preflight_fixture_and_default_no_networ
                 opener=forbidden_opener,
                 now=datetime(2026, 6, 15, tzinfo=timezone.utc),
             )
+            _preflight, cli_only_rehearsal, _paths = event_bybit_announcements_preflight.run_no_send_rehearsal(
+                namespace_dir=base,
+                provider_health_path=base / "event_provider_health.json",
+                profile="fixture",
+                artifact_namespace="bybit_announcements_no_send_rehearsal",
+                allow_live_preflight=True,
+                opener=forbidden_opener,
+                now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+            )
 
             assert json.loads(json_path.read_text(encoding="utf-8"))["provider"] == "bybit_announcements"
             assert "No provider network calls" in md_path.read_text(encoding="utf-8")
@@ -1374,7 +1383,17 @@ def test_event_alpha_bybit_announcements_preflight_fixture_and_default_no_networ
             assert report.live_call_allowed is False
             assert report.fixture_parser_status == "pass"
             assert report.fixture_rows_observed >= 1
+            assert any(
+                event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT in note
+                and "already exists in the environment" in note
+                and "CLI allow flag may only accompany" in note
+                for note in report.safety_notes
+            )
             assert rehearsal.status == "skipped_live_calls_disabled"
+            assert cli_only_rehearsal.status == "skipped_live_calls_disabled"
+            rehearsal_text = (base / event_bybit_announcements_preflight.REHEARSAL_MD).read_text(encoding="utf-8")
+            assert f"set {event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT}=1 manually" in rehearsal_text
+            assert "CLI allow flag may only accompany" in rehearsal_text
             assert rehearsal.requests_used == 0
             assert rehearsal.telegram_sends == 0
             assert rehearsal.trades_created == 0

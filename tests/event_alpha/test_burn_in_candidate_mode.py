@@ -70,6 +70,38 @@ def test_daily_burn_in_candidate_mode_no_provider_config_is_safe(tmp_path, monke
         assert field in manifest
 
 
+def test_daily_burn_in_targeted_market_env_requires_feature_and_universe_authority(tmp_path, monkeypatch):
+    context = common.context_for(
+        profile="live_burn_in_no_send",
+        artifact_namespace="targeted_env",
+        base_dir=tmp_path,
+    )
+    monkeypatch.setenv("RSI_EVENT_DISCOVERY_UNIVERSE_LIVE", "1")
+    monkeypatch.delenv("RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED", raising=False)
+    disabled = daily_burn_in._safe_env(  # noqa: SLF001 - guarded environment contract
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        candidate_mode=False,
+    )
+    candidate = daily_burn_in._safe_env(  # noqa: SLF001 - guarded environment contract
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        candidate_mode=True,
+    )
+    monkeypatch.setenv("RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED", "1")
+    explicit = daily_burn_in._safe_env(  # noqa: SLF001 - guarded environment contract
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        candidate_mode=False,
+    )
+    assert disabled["RSI_EVENT_DISCOVERY_UNIVERSE_LIVE"] == "0"
+    assert candidate["RSI_EVENT_DISCOVERY_UNIVERSE_LIVE"] == "1"
+    assert explicit["RSI_EVENT_DISCOVERY_UNIVERSE_LIVE"] == "1"
+
+
 def test_daily_burn_in_scoped_doctor_is_default_and_timeout_records_partial_status(tmp_path, monkeypatch):
     doctor_step = daily_burn_in.BurnInStep(
         "artifact_doctor",
@@ -182,6 +214,13 @@ def test_daily_burn_in_plan_module_preserves_public_sequence_and_no_send_boundar
 
 
 def test_daily_burn_in_readiness_no_key_and_mock_allow_paths(tmp_path, monkeypatch):
+    import urllib.request
+
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("readiness must not fetch providers")),
+    )
     monkeypatch.delenv("RSI_EVENT_DISCOVERY_COINALYZE_API_KEY", raising=False)
     monkeypatch.delenv("RSI_EVENT_ALPHA_COINALYZE_ALLOW_LIVE_PREFLIGHT", raising=False)
     monkeypatch.delenv("RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT", raising=False)
@@ -193,22 +232,43 @@ def test_daily_burn_in_readiness_no_key_and_mock_allow_paths(tmp_path, monkeypat
     )
     assert no_key["expected_live_calls_default"] == 0
     assert no_key["can_run_candidate_mode"] is False
-    assert no_key["candidate_mode_status"] == "missing_config"
-    assert no_key["candidate_mode_ready_status"] == "blocked_by_missing_config"
-    assert "coinalyze" in no_key["missing_config"]
+    assert no_key["candidate_mode_status"] == "blocked_by_default"
+    assert no_key["candidate_mode_ready_status"] == "config_ready_no_live"
+    assert no_key["candidate_mode_ready_with_any_provider"] is False
+    assert no_key["candidate_mode_ready_with_all_priority_providers"] is False
+    assert no_key["fastest_ready_provider"] == "bybit_announcements"
+    assert "bybit_announcements" in no_key["providers_config_ready_no_live"]
+    assert "coinalyze" in no_key["providers_missing_config"]
+    assert "bybit_announcements" in no_key["providers_missing_allow_flag"]
+    assert "event-alpha-bybit-announcements-preflight" in no_key["next_safe_commands"][0]
     assert no_key["telegram_sends"] == 0
 
-    monkeypatch.setenv("RSI_EVENT_DISCOVERY_COINALYZE_API_KEY", "fake-test-key")
-    blocked = daily_burn_in_readiness.build_readiness_report(
+    monkeypatch.setenv("RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT", "1")
+    bybit_only = daily_burn_in_readiness.build_readiness_report(
         profile="live_burn_in_no_send",
-        artifact_namespace="readiness_blocked",
+        artifact_namespace="readiness_bybit_only",
         base_dir=tmp_path,
     )
-    assert blocked["candidate_mode_status"] == "blocked_by_default"
-    assert blocked["candidate_mode_ready_status"] == "config_ready_no_live"
-    assert blocked["can_run_candidate_mode"] is False
+    assert bybit_only["candidate_mode_ready_with_any_provider"] is True
+    assert bybit_only["candidate_mode_ready_with_all_priority_providers"] is False
+    assert bybit_only["can_run_candidate_mode"] is True
+    assert "coinalyze" in bybit_only["providers_missing_config"]
 
+    monkeypatch.setenv("RSI_EVENT_DISCOVERY_COINALYZE_API_KEY", "fake-test-key")
+    monkeypatch.delenv("RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT", raising=False)
     monkeypatch.setenv("RSI_EVENT_ALPHA_COINALYZE_ALLOW_LIVE_PREFLIGHT", "1")
+    blocked = daily_burn_in_readiness.build_readiness_report(
+        profile="live_burn_in_no_send",
+        artifact_namespace="readiness_coinalyze_only",
+        base_dir=tmp_path,
+    )
+    assert blocked["candidate_mode_ready_with_any_provider"] is True
+    assert blocked["candidate_mode_ready_with_all_priority_providers"] is False
+    assert blocked["can_run_candidate_mode"] is True
+    assert blocked["fastest_ready_provider"] == "coinalyze"
+    assert "bybit_announcements" in blocked["providers_config_ready_no_live"]
+    assert "bybit_announcements" in blocked["providers_missing_allow_flag"]
+
     monkeypatch.setenv("RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT", "1")
     monkeypatch.setenv("RSI_EVENT_ALPHA_DAILY_BURN_IN_MOCK_PROVIDER_FIXTURES", "1")
     ready = daily_burn_in_readiness.build_readiness_report(
@@ -219,6 +279,10 @@ def test_daily_burn_in_readiness_no_key_and_mock_allow_paths(tmp_path, monkeypat
     assert ready["candidate_mode_status"] == "ready_for_mocked_candidate_mode"
     assert ready["candidate_mode_ready_status"] == "ready_for_bounded_no_send_rehearsal"
     assert ready["can_run_candidate_mode"] is True
+    assert ready["candidate_mode_ready_with_any_provider"] is True
+    assert ready["candidate_mode_ready_with_all_priority_providers"] is True
+    assert ready["providers_missing_config"] == []
+    assert ready["providers_missing_allow_flag"] == []
     assert ready["expected_live_calls_default"] == 0
     assert ready["telegram_sends"] == 0
 
@@ -233,10 +297,43 @@ def test_daily_burn_in_candidate_mode_mocked_live_candidate_counts_with_ledger(t
 
     def fake_run_step(step, *, env, cwd):
         namespace_dir = Path(env["RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR"]) / env["RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE"]
+        provider_run_id = "coinalyze-provider-run-1"
+        provider_generation_id = "coinalyze:generation-1"
         _write_jsonl(
             namespace_dir / daily_burn_in.COINALYZE_REQUEST_LEDGER,
-            [{"provider": "coinalyze", "status": "success", "api_key_redacted": "***"}],
+            [{
+                "provider": "coinalyze",
+                "status": "success",
+                "success": True,
+                "no_send_rehearsal": True,
+                "provider_generation_id": provider_generation_id,
+                "run_id": provider_run_id,
+                "profile": "live_burn_in_no_send",
+                "artifact_namespace": "live_burn_in_20260705",
+                "api_key_redacted": "***",
+            }],
         )
+        _write_jsonl(
+            namespace_dir / "event_derivatives_state.jsonl",
+            [{
+                "row_type": "derivatives_state_snapshot",
+                "symbol": "TESTFADE",
+                "provider": "coinalyze",
+                "provider_generation_id": provider_generation_id,
+                "run_id": provider_run_id,
+                "profile": "live_burn_in_no_send",
+                "artifact_namespace": "live_burn_in_20260705",
+            }],
+        )
+        common.write_json(namespace_dir / "event_coinalyze_rehearsal_report.json", {
+            "provider": "coinalyze",
+            "status": "live_rehearsal_success",
+            "live_call_allowed": True,
+            "no_send": True,
+            "research_only": True,
+            "provider_generation_id": provider_generation_id,
+            "run_id": provider_run_id,
+        })
         _write_jsonl(
             namespace_dir / "event_integrated_radar_candidates.jsonl",
             [
@@ -250,6 +347,12 @@ def test_daily_burn_in_candidate_mode_mocked_live_candidate_counts_with_ledger(t
                     "source_pack": "derivatives_crowding",
                     "source_origin": "coinalyze",
                     "opportunity_score_final": 81,
+                    "provider_generation_id": provider_generation_id,
+                    "provider_request_succeeded": True,
+                    "provider_source_artifact": "event_derivatives_state.jsonl",
+                    "run_id": "integrated-run-1",
+                    "profile": "live_burn_in_no_send",
+                    "artifact_namespace": "live_burn_in_20260705",
                 }
             ],
         )
@@ -306,7 +409,330 @@ def test_daily_burn_in_candidate_mode_mocked_live_candidate_counts_with_ledger(t
     assert yield_report["providers"]["coinalyze"]["source_yield_confidence"] == "insufficient_labels"
 
 
+def test_candidate_contract_rejects_stale_or_failed_provider_generation(tmp_path):
+    context = common.context_for(
+        profile="live_burn_in_no_send",
+        artifact_namespace="generation_contract",
+        base_dir=tmp_path,
+    )
+    context.namespace_dir.mkdir(parents=True, exist_ok=True)
+    provider_run_id = "coinalyze-provider-run-new"
+    common.write_json(context.namespace_dir / "event_coinalyze_rehearsal_report.json", {
+        "provider": "coinalyze",
+        "status": "live_rehearsal_success",
+        "live_call_allowed": True,
+        "no_send": True,
+        "research_only": True,
+        "provider_generation_id": "generation-new",
+        "run_id": provider_run_id,
+    })
+    _write_jsonl(
+        context.namespace_dir / "event_derivatives_state.jsonl",
+        [{
+            "row_type": "derivatives_state_snapshot",
+            "symbol": "TEST",
+            "provider": "coinalyze",
+            "provider_generation_id": "generation-new",
+            "run_id": provider_run_id,
+            "profile": context.profile,
+            "artifact_namespace": context.artifact_namespace,
+        }],
+    )
+    provider_status = {
+        "coinalyze": {
+            "provider": "coinalyze",
+            "live_call_allowed": True,
+            "request_ledger_path": common.rel_path(
+                context.namespace_dir / daily_burn_in.COINALYZE_REQUEST_LEDGER
+            ),
+        }
+    }
+    base_row = {
+        "row_type": "event_integrated_radar_candidate",
+        "candidate_id": "candidate:test",
+        "symbol": "TEST",
+        "coin_id": "test",
+        "provider": "coinalyze",
+        "source_pack": "derivatives_crowding",
+        "source_origin": "coinalyze",
+        "opportunity_type": "UNCONFIRMED_RESEARCH",
+        "provider_generation_id": "generation-new",
+        "provider_source_artifact": "event_derivatives_state.jsonl",
+        "run_id": "integrated-run-new",
+        "profile": context.profile,
+        "artifact_namespace": context.artifact_namespace,
+    }
+    _write_jsonl(
+        context.namespace_dir / daily_burn_in.COINALYZE_REQUEST_LEDGER,
+        [{
+            "provider": "coinalyze",
+            "provider_generation_id": "generation-old",
+            "success": True,
+            "no_send_rehearsal": True,
+            "run_id": "coinalyze-provider-run-old",
+            "profile": context.profile,
+            "artifact_namespace": context.artifact_namespace,
+        }],
+    )
+    stale = dict(base_row)
+    daily_burn_in._annotate_candidate_row(  # noqa: SLF001 - exact-generation contract regression
+        stale,
+        context=context,
+        provider_status=provider_status,
+    )
+    assert stale["candidate_source_mode"] == "artifact_replay"
+    assert stale["contract_counted_candidate"] is False
+
+    _write_jsonl(
+        context.namespace_dir / daily_burn_in.COINALYZE_REQUEST_LEDGER,
+        [{
+            "provider": "coinalyze",
+            "provider_generation_id": "generation-new",
+            "success": False,
+            "no_send_rehearsal": True,
+            "run_id": provider_run_id,
+            "profile": context.profile,
+            "artifact_namespace": context.artifact_namespace,
+        }],
+    )
+    failed = dict(base_row)
+    daily_burn_in._annotate_candidate_row(  # noqa: SLF001 - exact-generation contract regression
+        failed,
+        context=context,
+        provider_status=provider_status,
+    )
+    assert failed["candidate_source_mode"] == "artifact_replay"
+    assert failed["provider_request_succeeded"] is False
+    assert failed["contract_counted_candidate"] is False
+
+    bybit_run_id = "bybit-provider-run-new"
+    common.write_json(context.namespace_dir / "event_bybit_announcements_rehearsal_report.json", {
+        "provider": "bybit_announcements",
+        "status": "live_rehearsal_success",
+        "live_call_allowed": True,
+        "no_send": True,
+        "research_only": True,
+        "provider_generation_id": "bybit-generation-new",
+        "run_id": bybit_run_id,
+    })
+    _write_jsonl(
+        context.namespace_dir / "event_exchange_announcements.jsonl",
+        [{
+            "row_type": "exchange_announcement",
+            "title": "Bybit lists TEST",
+            "provider": "bybit_announcements",
+            "provider_generation_id": "bybit-generation-new",
+            "run_id": bybit_run_id,
+            "profile": context.profile,
+            "artifact_namespace": context.artifact_namespace,
+        }],
+    )
+    _write_jsonl(
+        context.namespace_dir / daily_burn_in.BYBIT_REQUEST_LEDGER,
+        [{
+            "provider": "bybit_announcements",
+            "provider_generation_id": "bybit-generation-new",
+            "success": True,
+            "no_send_rehearsal": True,
+            "run_id": bybit_run_id,
+            "profile": context.profile,
+            "artifact_namespace": context.artifact_namespace,
+        }],
+    )
+    bybit_status = {
+        "bybit_announcements": {
+            "provider": "bybit_announcements",
+            "live_call_allowed": True,
+            "request_ledger_path": common.rel_path(
+                context.namespace_dir / daily_burn_in.BYBIT_REQUEST_LEDGER
+            ),
+        }
+    }
+    bybit = {
+        **base_row,
+        "provider": "bybit_announcements",
+        "source_origin": "bybit_announcements",
+        "provider_generation_id": "bybit-generation-new",
+        "provider_source_artifact": "event_exchange_announcements.jsonl",
+        "source_url": "https://announcements.bybit.com/test",
+        "title": "Bybit lists TEST",
+        "published_at": "2026-07-11T12:00:00+00:00",
+    }
+    daily_burn_in._annotate_candidate_row(  # noqa: SLF001 - exact-generation contract regression
+        bybit,
+        context=context,
+        provider_status=bybit_status,
+    )
+    assert bybit["candidate_source_mode"] == "live_no_send"
+    assert bybit["provider_request_succeeded"] is True
+    assert bybit["contract_counted_candidate"] is True
+    from types import SimpleNamespace
+
+    from crypto_rsi_scanner.event_alpha.doctor.checks import operations as doctor_operations
+
+    doctor_context = SimpleNamespace(
+        namespace_dir=context.namespace_dir,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+    )
+    assert doctor_operations._exact_contract_ledger_valid(  # noqa: SLF001 - doctor exact-lineage regression
+        doctor_context,
+        bybit,
+    ) is True
+
+    # A later failed attempt is a new exact generation.  The old successful
+    # ledger/source rows remain append-only, but cannot count for the retry.
+    common.write_json(context.namespace_dir / "event_bybit_announcements_rehearsal_report.json", {
+        "provider": "bybit_announcements",
+        "status": "rate_limited",
+        "live_call_allowed": True,
+        "no_send": True,
+        "research_only": True,
+        "provider_generation_id": "bybit-generation-retry",
+        "run_id": "bybit-provider-run-retry",
+    })
+    retry = dict(bybit)
+    daily_burn_in._annotate_candidate_row(  # noqa: SLF001 - current-attempt contract regression
+        retry,
+        context=context,
+        provider_status=bybit_status,
+    )
+    assert retry["candidate_source_mode"] == "artifact_replay"
+    assert retry["provider_request_succeeded"] is False
+    assert retry["contract_counted_candidate"] is False
+    assert doctor_operations._exact_contract_ledger_valid(  # noqa: SLF001 - stale attempt must fail closed
+        doctor_context,
+        bybit,
+    ) is False
+
+
+def test_provider_attempt_generation_is_unique_at_a_fixed_research_clock():
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner.event_alpha.providers import request_lineage
+
+    observed = datetime(2026, 7, 11, 12, tzinfo=timezone.utc)
+    first = request_lineage.provider_generation_id("bybit_announcements", observed)
+    second = request_lineage.provider_generation_id("bybit_announcements", observed)
+    assert first != second
+    assert first.startswith("provider-generation:bybit_announcements:")
+    assert second.startswith("provider-generation:bybit_announcements:")
+
+
+def test_bybit_failed_retry_at_same_clock_cannot_inherit_prior_success(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    from urllib.error import HTTPError
+
+    from crypto_rsi_scanner.event_alpha.providers import bybit_announcements_preflight as bybit
+
+    class Response:
+        status = 200
+
+        def __init__(self, payload: dict) -> None:
+            self.payload = json.dumps(payload).encode("utf-8")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, _exc_type, _exc, _tb):
+            return False
+
+        def read(self) -> bytes:
+            return self.payload
+
+    payload = json.loads(
+        Path("fixtures/event_discovery/official_exchange_bybit_announcements.json").read_text(encoding="utf-8")
+    )
+    payload["result"]["list"] = payload["result"]["list"][:1]
+    monkeypatch.setenv(bybit.ENV_ALLOW_LIVE_PREFLIGHT, "1")
+    monkeypatch.setenv(bybit.ENV_PREFLIGHT_MAX_PAGES, "1")
+    monkeypatch.setenv(bybit.ENV_PREFLIGHT_LIMIT, "20")
+    observed = datetime(2026, 7, 11, 12, tzinfo=timezone.utc)
+    _preflight, first, _paths = bybit.run_no_send_rehearsal(
+        namespace_dir=tmp_path,
+        provider_health_path=tmp_path / "event_provider_health.json",
+        profile="fixture",
+        artifact_namespace="fixed_clock_retry",
+        allow_live_preflight=True,
+        opener=lambda _request, _timeout: Response(payload),
+        now=observed,
+    )
+
+    def rate_limited(request, _timeout):
+        raise HTTPError(request.full_url, 429, "blocked", None, None)
+
+    _preflight, retry, _paths = bybit.run_no_send_rehearsal(
+        namespace_dir=tmp_path,
+        provider_health_path=tmp_path / "event_provider_health.json",
+        profile="fixture",
+        artifact_namespace="fixed_clock_retry",
+        allow_live_preflight=True,
+        opener=rate_limited,
+        now=observed,
+    )
+    assert first.status == "live_rehearsal_success"
+    assert retry.status == "rate_limited"
+    assert retry.provider_generation_id != first.provider_generation_id
+    assert retry.run_id != first.run_id
+    assert retry.http_successes == 0
+    assert retry.requests_used == 1
+
+
+def test_candidate_lineage_propagation_never_rewrites_historical_same_core_id(tmp_path):
+    context = common.context_for(
+        profile="live_burn_in_no_send",
+        artifact_namespace="lineage_history",
+        base_dir=tmp_path,
+    )
+    context.namespace_dir.mkdir(parents=True, exist_ok=True)
+    core_id = "agg:stable-family"
+    old = {
+        "row_type": "event_core_opportunity",
+        "core_opportunity_id": core_id,
+        "run_id": "integrated-run-old",
+        "profile": context.profile,
+        "artifact_namespace": context.artifact_namespace,
+        "candidate_source_mode": "artifact_replay",
+        "contract_counted_candidate": False,
+    }
+    current = {
+        **old,
+        "run_id": "integrated-run-current",
+    }
+    _write_jsonl(
+        context.namespace_dir / "event_core_opportunities.jsonl",
+        [old, current],
+    )
+    candidate = {
+        "core_opportunity_id": core_id,
+        "run_id": "integrated-run-current",
+        "profile": context.profile,
+        "artifact_namespace": context.artifact_namespace,
+        "candidate_source_mode": "live_no_send",
+        "contract_counted_candidate": True,
+        "provider": "bybit_announcements",
+        "provider_generation_id": "provider-generation-current",
+        "provider_request_succeeded": True,
+        "provider_source_artifact": "event_exchange_announcements.jsonl",
+        "request_ledger_path": daily_burn_in.BYBIT_REQUEST_LEDGER,
+    }
+
+    assert daily_burn_in._propagate_candidate_lineage_to_core(  # noqa: SLF001 - exact-run propagation regression
+        context,
+        [candidate],
+    ) is True
+    rows = common.read_jsonl(context.namespace_dir / "event_core_opportunities.jsonl")
+    historical, latest = rows
+    assert historical["candidate_source_mode"] == "artifact_replay"
+    assert historical["contract_counted_candidate"] is False
+    assert "provider_generation_id" not in historical
+    assert latest["candidate_source_mode"] == "live_no_send"
+    assert latest["contract_counted_candidate"] is True
+    assert latest["provider_generation_id"] == "provider-generation-current"
+
+
 def test_daily_burn_in_candidate_mode_fixture_smoke_produces_lanes_without_contract_count(tmp_path, monkeypatch):
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
     monkeypatch.delenv("RSI_EVENT_DISCOVERY_COINALYZE_API_KEY", raising=False)
     monkeypatch.delenv("RSI_EVENT_ALPHA_COINALYZE_ALLOW_LIVE_PREFLIGHT", raising=False)
     monkeypatch.delenv("RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT", raising=False)
@@ -340,6 +766,7 @@ def test_daily_burn_in_candidate_mode_fixture_smoke_produces_lanes_without_contr
     inbox = common.read_json(ns / review_inbox.INBOX_JSON)
     inbox_md = (ns / review_inbox.INBOX_MD).read_text(encoding="utf-8")
     cards = sorted((ns / "research_cards").glob("*.md"))
+    card_files = [path for path in cards if path.name != "index.md"]
     rows_by_symbol = {row["symbol"]: row for row in rows}
     review_step = next(row for row in payload["steps"] if row.get("name") == "review_inbox")
     assert payload["status"] == "passed"
@@ -352,6 +779,8 @@ def test_daily_burn_in_candidate_mode_fixture_smoke_produces_lanes_without_contr
     assert score["contract_counted_candidate_count"] == 0
     assert score["enough_data"] is False
     assert cards
+    assert len(card_files) == 5
+    assert all(path.name.startswith("card_") for path in card_files)
     assert all(not Path(str(row.get("card_path") or "none")).is_absolute() for row in rows)
     assert all(not Path(str(row.get("card_path") or "none")).is_absolute() for row in inbox["items"])
     assert "/tmp/" not in inbox_md
@@ -362,15 +791,41 @@ def test_daily_burn_in_candidate_mode_fixture_smoke_produces_lanes_without_contr
     fade_card = (tmp_path / rows_by_symbol["TESTFADE"]["card_path"]).read_text(encoding="utf-8")
     perp_card = (tmp_path / rows_by_symbol["TESTPERP"]["card_path"]).read_text(encoding="utf-8")
     assert "FADE_SHORT_REVIEW" in fade_card
-    assert "Derivatives crowding class: extreme" in fade_card
-    assert "Research-only / unvalidated. Not a trade signal." in fade_card
+    assert "Crowding class: extreme" in fade_card
+    assert "Research artifact only. Not a trade signal" in fade_card
+    assert "Source provider:" in fade_card
+    assert "Provider source artifact:" in fade_card
+    assert "Market refresh artifact:" in fade_card
+    assert "Request ledger:" in fade_card
+    assert "Contract-counted burn-in candidate:" in fade_card
     assert "CONFIRMED_LONG_RESEARCH" in perp_card
     assert "Market confirmation: breakout_confirmed" in perp_card
-    assert "Research-only / unvalidated. Not a trade signal." in perp_card
+    assert "Research artifact only. Not a trade signal" in perp_card
     assert all(row.get("card_path") or row.get("card_not_available_reason") for row in inbox["items"])
     assert all(row.get("card_path") and row.get("card_path") != "none" for row in inbox["items"] if row.get("candidate_provenance") == "core_opportunity")
     assert all(row.get("feedback_target") for row in inbox["items"])
+    assert all(
+        {
+            "candidate_source_mode",
+            "provider_generation_id",
+            "provider_request_succeeded",
+            "provider_source_artifact",
+            "request_ledger_path",
+            "market_refresh_artifact",
+        }.issubset(row)
+        for row in inbox["items"]
+    )
     assert "## Contract-Counted Burn-In Candidates" in inbox_md
     assert "No contract-counted burn-in candidates yet." in inbox_md
-    assert "## High-Value Review Candidates Not Contract-Counted" in inbox_md
-    assert "## Diagnostic / Support Items" in inbox_md
+    assert "## High-Value Non-Counted Review Candidates" in inbox_md
+    assert "## Diagnostics / Support" in inbox_md
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=common.read_jsonl(ns / "event_alpha_runs.jsonl"),
+        core_opportunity_rows=common.read_jsonl(ns / "event_core_opportunities.jsonl"),
+        card_paths=cards,
+        profile="fixture",
+        artifact_namespace="daily_burn_in_candidate_mode_smoke",
+        include_test_artifacts=True,
+        strict=True,
+    )
+    assert doctor.daily_brief_card_group_mismatch_with_index == 0

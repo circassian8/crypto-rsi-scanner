@@ -79,6 +79,7 @@ def _merge_family(
         is_quote_asset=context.is_quote_asset,
     ))
     candidate.update(_merge_family_source_fields(
+        rows,
         context.origins,
         context.source_packs,
         source_pack=context.source_pack,
@@ -347,6 +348,7 @@ def _merge_family_identity_fields(
     }
 
 def _merge_family_source_fields(
+    rows: list[dict[str, Any]],
     origins: tuple[str, ...],
     source_packs: tuple[str, ...],
     *,
@@ -361,6 +363,10 @@ def _merge_family_source_fields(
         "source_packs": list(source_packs or (source_pack,)),
         "source_class": source_class,
         "source_strength": source_strength,
+        "provider_generation_id": _best_text(rows, "provider_generation_id"),
+        "provider_request_succeeded": any(_truthy(row.get("provider_request_succeeded")) for row in rows),
+        "provider_source_artifact": _best_text(rows, "provider_source_artifact", "coinalyze_source_artifact_path"),
+        "request_ledger_path": _best_text(rows, "request_ledger_path"),
     }
 
 def _merge_family_opportunity_fields(

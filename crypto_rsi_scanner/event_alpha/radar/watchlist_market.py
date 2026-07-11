@@ -33,6 +33,7 @@ class EventWatchlistMarketProvider(Protocol):
         coin_ids: Iterable[str],
         *,
         max_assets: int = 50,
+        timeout_seconds: float | None = None,
     ) -> tuple[list[dict[str, Any]], tuple[str, ...]]:
         ...
 
@@ -50,7 +51,9 @@ class FixtureWatchlistMarketProvider:
         coin_ids: Iterable[str],
         *,
         max_assets: int = 50,
+        timeout_seconds: float | None = None,
     ) -> tuple[list[dict[str, Any]], tuple[str, ...]]:
+        del timeout_seconds
         wanted = {str(coin_id or "").casefold() for coin_id in coin_ids if str(coin_id or "").strip()}
         out: list[dict[str, Any]] = []
         for row in self._rows:
@@ -80,14 +83,20 @@ class CoinGeckoWatchlistMarketProvider:
         coin_ids: Iterable[str],
         *,
         max_assets: int = 50,
+        timeout_seconds: float | None = None,
     ) -> tuple[list[dict[str, Any]], tuple[str, ...]]:
-        return fetch_coingecko_watchlist_market_rows(self, coin_ids, max_assets=max_assets)
+        return fetch_coingecko_watchlist_market_rows(
+            self,
+            coin_ids,
+            max_assets=max_assets,
+            timeout_seconds=timeout_seconds,
+        )
 
-    def _fetch_live_rows(self, ids: tuple[str, ...]) -> list[dict[str, Any]]:
-        return fetch_coingecko_watchlist_live_rows(self, ids)
+    def _fetch_live_rows(self, ids: tuple[str, ...], *, timeout_seconds: float | None = None) -> list[dict[str, Any]]:
+        return fetch_coingecko_watchlist_live_rows(self, ids, timeout_seconds=timeout_seconds)
 
-    async def _fetch_live_rows_async(self, ids: tuple[str, ...]) -> list[dict[str, Any]]:
-        return await fetch_coingecko_watchlist_live_rows_async(self, ids)
+    async def _fetch_live_rows_async(self, ids: tuple[str, ...], *, timeout_seconds: float | None = None) -> list[dict[str, Any]]:
+        return await fetch_coingecko_watchlist_live_rows_async(self, ids, timeout_seconds=timeout_seconds)
 
     @staticmethod
     def _as_utc(value: datetime) -> datetime:
@@ -119,6 +128,7 @@ def fetch_coingecko_watchlist_market_rows(
     coin_ids: Iterable[str],
     *,
     max_assets: int = 50,
+    timeout_seconds: float | None = None,
 ) -> tuple[list[dict[str, Any]], tuple[str, ...]]:
     ids = tuple(dict.fromkeys(str(coin_id or "").strip() for coin_id in coin_ids if str(coin_id or "").strip()))
     ids = ids[: max(1, int(max_assets or 1))]
@@ -148,7 +158,7 @@ def fetch_coingecko_watchlist_market_rows(
         if self._fetcher is not None:
             rows = [dict(row) for row in self._fetcher(ids) if isinstance(row, Mapping)]
         elif self.live_enabled:
-            rows = self._fetch_live_rows(ids)
+            rows = self._fetch_live_rows(ids, timeout_seconds=timeout_seconds)
         else:
             self.last_cache_status = "disabled"
             return [], ("CoinGecko targeted watchlist lookup is not configured; using fallback rows",)
@@ -183,12 +193,26 @@ def fetch_coingecko_watchlist_market_rows(
     return rows, ()
 
 
-def fetch_coingecko_watchlist_live_rows(self: Any, ids: tuple[str, ...]) -> list[dict[str, Any]]:
-    return _run_async(self._fetch_live_rows_async(ids))
+def fetch_coingecko_watchlist_live_rows(
+    self: Any,
+    ids: tuple[str, ...],
+    *,
+    timeout_seconds: float | None = None,
+) -> list[dict[str, Any]]:
+    return _run_async(self._fetch_live_rows_async(ids, timeout_seconds=timeout_seconds))
 
 
-async def fetch_coingecko_watchlist_live_rows_async(self: Any, ids: tuple[str, ...]) -> list[dict[str, Any]]:
-    async with self.client_factory() as client:
+async def fetch_coingecko_watchlist_live_rows_async(
+    self: Any,
+    ids: tuple[str, ...],
+    *,
+    timeout_seconds: float | None = None,
+) -> list[dict[str, Any]]:
+    try:
+        client_context = self.client_factory(timeout_seconds=timeout_seconds) if timeout_seconds is not None else self.client_factory()
+    except TypeError:
+        client_context = self.client_factory()
+    async with client_context as client:
         rows = await client._get(  # noqa: SLF001 - no public targeted markets helper yet
             "/coins/markets",
             {

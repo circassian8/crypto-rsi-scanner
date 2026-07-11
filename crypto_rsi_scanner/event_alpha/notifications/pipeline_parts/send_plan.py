@@ -221,6 +221,10 @@ def _build_send_context(
 
 def _send_result(context: _SendContext, **kwargs: Any) -> event_alpha_pipeline.EventAlphaSendResult:
     counts = context.writer.counts if context.writer else {}
+    preview_rendered_items = sum(
+        len(getattr(section.get("identity"), "notification_item_ids", ()) or ())
+        for section in (context.writer.preview_sections if context.writer else ())
+    )
     research_review_sent = kwargs.pop(
         "research_review_digest_sent",
         int((kwargs.get("lane_items_delivered") or {}).get(LANE_RESEARCH_REVIEW_DIGEST, 0)),
@@ -242,6 +246,7 @@ def _send_result(context: _SendContext, **kwargs: Any) -> event_alpha_pipeline.E
         research_review_digest_would_send=int(context.lane_attempts.get(LANE_RESEARCH_REVIEW_DIGEST, 0)),
         research_review_digest_sent=int(research_review_sent or 0),
         research_review_digest_block_reason=context.plan.blocked_by_lane.get(LANE_RESEARCH_REVIEW_DIGEST),
+        preview_rendered_items=preview_rendered_items,
         **kwargs,
     )
 
@@ -542,6 +547,11 @@ def _handle_lane_attempt_result(
             route=prepared.route_label,
             attempt=attempt,
             identity=prepared.identity,
+        )
+        context.writer.mark_preview_attempt(
+            lane=prepared.lane,
+            identity=prepared.identity,
+            attempt=attempt,
         )
 
 

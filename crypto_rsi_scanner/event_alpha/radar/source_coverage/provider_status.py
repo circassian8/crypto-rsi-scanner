@@ -47,6 +47,8 @@ def _source_coverage_header_lines(report: EventAlphaSourceCoverageReport) -> lis
         "",
         "CryptoPanic:",
         f"- configured: {str(report.cryptopanic_configured).lower()}",
+        f"- selected for run: {str(report.cryptopanic_selected_for_run).lower()}",
+        f"- live call allowed: {str(report.cryptopanic_live_call_allowed).lower()}",
         f"- health status: {report.cryptopanic_health_status}",
         f"- observed this run: {str(report.cryptopanic_observed).lower()}",
         f"- requests used today: {report.cryptopanic_requests_used}",
@@ -63,6 +65,18 @@ def _source_coverage_header_lines(report: EventAlphaSourceCoverageReport) -> lis
         f"- not-used reason: {report.cryptopanic_not_used_reason or 'none'}",
         f"- coverage status: {report.cryptopanic_coverage_status}",
         f"- recommendation: {report.cryptopanic_recommendation or 'none'}",
+        "",
+        "Coverage blockers:",
+        f"- candidates blocked by source coverage: {report.candidates_blocked_by_source_coverage}",
+        f"- missing strong source: {report.candidates_blocked_by_missing_strong_source}",
+        f"- missing official source: {report.candidates_blocked_by_missing_official_source}",
+        f"- missing structured source: {report.candidates_blocked_by_missing_structured_source}",
+        f"- evidence not acquired: {report.candidates_blocked_by_evidence_not_acquired}",
+        f"- provider unavailable: {report.candidates_blocked_by_provider_unavailable}",
+        f"- market context missing/stale: {report.candidates_blocked_by_market_context}",
+        f"- source-blocked visible families: {report.candidate_families_blocked_by_source_coverage}",
+        f"- market-blocked visible families: {report.candidate_families_blocked_by_market_coverage}",
+        "- evidence absence remains non-negative proof unless complete high-specificity coverage says otherwise",
         "",
         "Source-pack coverage:",
     ]
@@ -327,6 +341,10 @@ def _cryptopanic_stats(
     daily_soft_limit: int = 80,
     now: datetime | None = None,
     raw_backoff_present: bool = False,
+    configured_override: bool | None = None,
+    selected_for_run: bool = False,
+    live_call_allowed: bool = False,
+    run_not_used_reason: str | None = None,
 ) -> dict[str, Any]:
     accepted = 0
     rejected = 0
@@ -348,7 +366,11 @@ def _cryptopanic_stats(
         for failure in row.get("provider_failures") or ():
             if "cryptopanic" in str(failure).casefold():
                 provider_failures.add(str(failure))
-    configured_flag = "cryptopanic" in configured
+    configured_flag = (
+        bool(configured_override)
+        if configured_override is not None
+        else "cryptopanic" in configured
+    )
     health_status = _provider_effective_status("cryptopanic", health_by_provider)
     usage = cryptopanic_provider.cryptopanic_usage_summary(
         request_ledger_path,
@@ -375,10 +397,15 @@ def _cryptopanic_stats(
         accepted=accepted,
         rejected=rejected,
         usage=usage,
+        selected_for_run=selected_for_run,
+        live_call_allowed=live_call_allowed,
+        not_used_reason=run_not_used_reason,
     )
-    reason = None
+    reason = str(run_not_used_reason or "").strip() or None
     if configured_flag and not observed:
-        if health_status == "backoff":
+        if reason:
+            pass
+        elif health_status == "backoff":
             reason = "provider_backoff"
         elif health_status in {"degraded", "unavailable"}:
             reason = "provider_error"
@@ -401,6 +428,8 @@ def _cryptopanic_stats(
     )
     return {
         "configured": configured_flag,
+        "selected_for_run": bool(selected_for_run),
+        "live_call_allowed": bool(live_call_allowed),
         "health_status": effective_health_status,
         "observed": observed,
         "requests_used": int(usage.today_requests),
@@ -443,9 +472,17 @@ def _cryptopanic_coverage_status(
     accepted: int,
     rejected: int,
     usage: cryptopanic_provider.CryptoPanicUsageSummary,
+    selected_for_run: bool = False,
+    live_call_allowed: bool = False,
+    not_used_reason: str | None = None,
 ) -> str:
     if not configured:
         return "not_configured"
+    reason = str(not_used_reason or "").strip()
+    if not observed and reason == "profile_disabled":
+        return "configured_profile_disabled"
+    if not observed and selected_for_run and not live_call_allowed:
+        return "configured_selected_live_disabled"
     last_error = str(usage.last_error_class or "").strip()
     if usage.remaining_weekly == 0:
         return "quota_exhausted"
@@ -473,6 +510,12 @@ def _cryptopanic_coverage_status(
 def _cryptopanic_recommendation(status: str) -> str:
     return {
         "not_configured": "configure CryptoPanic token with RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN",
+        "configured_profile_disabled": (
+            "enable CryptoPanic in an explicit no-send evidence/candidate profile if desired"
+        ),
+        "configured_selected_live_disabled": (
+            "review the explicit CryptoPanic no-send live-call guard before enabling a bounded rehearsal"
+        ),
         "configured_not_observed": "run a CryptoPanic-enabled rehearsal or inspect provider selection",
         "observed_healthy": "no action; accepted CryptoPanic evidence is available",
         "observed_partial_success": "use accepted evidence; inspect failed CryptoPanic roles in the request ledger",
@@ -542,14 +585,34 @@ def _coverage_blocked_count(
     for row in core_rows:
         if str(row.get("source_pack") or row.get("evidence_acquisition_source_pack") or "") != pack_name:
             continue
-        reason_values = {
-            str(row.get("live_confirmation_reason") or ""),
-            str(row.get("source_pack_confirmation_status") or ""),
-            str(row.get("source_coverage_gap") or ""),
-            str(row.get("quality_gate_block_reason") or ""),
-            str(row.get("why_not_promoted") or ""),
-        }
-        if reason_values & _COVERAGE_GAP_REASONS:
+        reason_values = set(_coverage_text_values(
+            row.get("live_confirmation_reason"),
+            row.get("source_pack_confirmation_status"),
+            row.get("source_coverage_gap"),
+            row.get("quality_gate_block_reason"),
+            row.get("why_not_promoted"),
+            row.get("why_not_alertable"),
+            row.get("missing_fields"),
+            row.get("upgrade_requirements"),
+            row.get("recommended_refresh_actions"),
+            row.get("near_miss_actions"),
+        ))
+        source_unmet = any(
+            row.get(key) is False
+            for key in ("source_requirements_met", "opportunity_type_source_requirements_met")
+        )
+        explicit_gap = bool(reason_values & _COVERAGE_GAP_REASONS) or any(
+            any(token in reason for token in (
+                "strong_source_missing",
+                "official_exchange_source_required",
+                "structured_unlock_source_required",
+                "risk_source_not_confirmed",
+                "source_pack_search",
+                "targeted_evidence_refresh",
+            ))
+            for reason in reason_values
+        )
+        if explicit_gap or source_unmet:
             blocked += 1
     return blocked
 def _provider_lane_priority(provider: str) -> int:

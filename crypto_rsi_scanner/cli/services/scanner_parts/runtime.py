@@ -117,6 +117,7 @@ import crypto_rsi_scanner.event_alpha.config.profiles as event_alpha_profiles
 import crypto_rsi_scanner.event_alpha.artifacts.replay as event_alpha_replay
 import crypto_rsi_scanner.event_alpha.artifacts.retention as event_alpha_retention
 import crypto_rsi_scanner.event_alpha.artifacts.run_ledger as event_alpha_run_ledger
+import crypto_rsi_scanner.event_alpha.artifacts.run_counters as event_alpha_run_counters
 import crypto_rsi_scanner.event_alpha.artifacts.locks as event_alpha_run_lock
 import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 import crypto_rsi_scanner.event_alpha.radar.source_coverage as event_alpha_source_coverage

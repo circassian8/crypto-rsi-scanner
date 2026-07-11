@@ -570,7 +570,7 @@ def test_daily_brief_custom_namespace_selects_test_run_and_core_rows():
     assert "Selected run profile: notify_llm_deep" in brief
     assert f"Selected run namespace: {namespace}" in brief
     assert "No run ledger rows found" not in brief
-    assert "Core opportunities: 5 (canonical_store_rows=5" in brief
+    assert "Current-generation visible core opportunity identities: 5" in brief
     assert "research_review_digest_enabled=true" in brief
     assert "research_review_digest_candidates=1" in brief
     assert "research_review_digest_would_send=1" in brief

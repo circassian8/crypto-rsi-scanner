@@ -124,6 +124,10 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
     for key in (
         "cryptopanic_success_with_backoff_status",
         "cryptopanic_restore_token_recommendation_when_configured",
+        "cryptopanic_run_coverage_config_mismatch",
+        "cryptopanic_profile_disabled_coverage_mismatch",
+        "cryptopanic_profile_disabled_credential_recommendation",
+        "source_coverage_blocker_summary_inconsistent",
     ):
         count = cryptopanic_conflicts.get(key, 0)
         if count:

@@ -221,13 +221,15 @@ def is_contract_counted_candidate(row: Mapping[str, Any], *, namespace_categorie
     source_mode = str(row.get("candidate_source_mode") or "").strip().casefold()
     if source_mode in {"mocked_fixture", "fixture", "preflight_only", "readiness_only", "artifact_replay"}:
         return False
-    if row.get("contract_counted_candidate") is False:
+    if row.get("contract_counted_candidate") is not True:
         return False
-    if row.get("contract_counted_candidate") is True:
-        if source_mode == "live_no_send" and not str(row.get("request_ledger_path") or "").strip():
-            return False
-        return True
-    return True
+    return bool(
+        source_mode == "live_no_send"
+        and str(row.get("request_ledger_path") or "").strip()
+        and str(row.get("provider_generation_id") or "").strip()
+        and str(row.get("provider_source_artifact") or "").strip()
+        and row.get("provider_request_succeeded") is True
+    )
 
 
 def is_diagnostic_row(row: Mapping[str, Any]) -> bool:

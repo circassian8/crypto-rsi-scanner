@@ -33,6 +33,67 @@ class _SourceCoverageStats:
     bybit_effectively_healthy: bool
 
 
+def _cryptopanic_run_context(
+    *,
+    exact_run_row: Mapping[str, Any] | None,
+    provider_readiness_payload: Mapping[str, Any] | None,
+    configured_fallback: bool | None,
+) -> dict[str, Any]:
+    """Resolve credential, selection, and permission as separate exact-run facts."""
+    run = dict(exact_run_row or {})
+    readiness = dict(provider_readiness_payload or {})
+    run_id = str(run.get("run_id") or "").strip()
+    readiness_run_id = str(readiness.get("run_id") or "").strip()
+    readiness_is_exact = bool(readiness) and (
+        not run_id or (bool(readiness_run_id) and readiness_run_id == run_id)
+    )
+    readiness_row: Mapping[str, Any] = {}
+    if readiness_is_exact:
+        for item in readiness.get("providers") or ():
+            if not isinstance(item, Mapping):
+                continue
+            identity = " ".join(
+                str(item.get(key) or "")
+                for key in ("provider", "provider_name", "provider_health_key")
+            ).casefold()
+            if "cryptopanic" in identity:
+                readiness_row = item
+                break
+
+    configured: bool | None = None
+    if "cryptopanic_configured" in run:
+        configured = bool(run.get("cryptopanic_configured"))
+    elif "configured" in readiness_row:
+        configured = bool(readiness_row.get("configured"))
+    elif configured_fallback is not None:
+        configured = bool(configured_fallback)
+
+    skip_reason = str(run.get("cryptopanic_skip_reason") or "").strip() or None
+    if "cryptopanic_selected_for_run" in run:
+        selected_for_run = bool(run.get("cryptopanic_selected_for_run"))
+    elif bool(run.get("cryptopanic_attempted")):
+        selected_for_run = True
+    elif skip_reason:
+        selected_for_run = skip_reason != "profile_disabled"
+    else:
+        selected_for_run = bool(readiness_row.get("live_call_allowed"))
+
+    if "cryptopanic_live_call_allowed" in run:
+        live_call_allowed = bool(run.get("cryptopanic_live_call_allowed"))
+    elif "live_call_allowed" in readiness_row:
+        live_call_allowed = bool(readiness_row.get("live_call_allowed"))
+    else:
+        live_call_allowed = False
+
+    return {
+        "configured": configured,
+        "selected_for_run": selected_for_run,
+        "live_call_allowed": live_call_allowed,
+        "not_used_reason": skip_reason,
+        "readiness_lineage_exact": readiness_is_exact,
+    }
+
+
 def build_source_coverage_report(
     *,
     provider_status_report: event_provider_status.EventDiscoveryProviderStatus,
@@ -45,6 +106,10 @@ def build_source_coverage_report(
     cryptopanic_weekly_limit: int = 600,
     cryptopanic_daily_soft_limit: int = 80,
     artifact_namespace_dir: str | Path | None = None,
+    exact_run_row: Mapping[str, Any] | None = None,
+    provider_readiness_payload: Mapping[str, Any] | None = None,
+    cryptopanic_configured_fallback: bool | None = None,
+    near_miss_candidates: Iterable[object] = (),
     now: datetime | None = None,
 ) -> EventAlphaSourceCoverageReport:
     """Build source-pack coverage from readiness, health, and artifact rows."""
@@ -54,6 +119,11 @@ def build_source_coverage_report(
     configured = _configured_providers(provider_status_report, health_by_provider)
     acquisition = [dict(row) for row in evidence_acquisition_rows if isinstance(row, Mapping)]
     core_rows = [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)]
+    cryptopanic_run_context = _cryptopanic_run_context(
+        exact_run_row=exact_run_row,
+        provider_readiness_payload=provider_readiness_payload,
+        configured_fallback=cryptopanic_configured_fallback,
+    )
     stats = _source_coverage_stats(
         artifact_namespace=artifact_namespace,
         artifact_namespace_dir=artifact_namespace_dir,
@@ -64,8 +134,11 @@ def build_source_coverage_report(
         cryptopanic_weekly_limit=cryptopanic_weekly_limit,
         cryptopanic_daily_soft_limit=cryptopanic_daily_soft_limit,
         provider_health_rows=provider_health_rows or {},
+        cryptopanic_run_context=cryptopanic_run_context,
         now=observed,
     )
+    if stats.cryptopanic["configured"]:
+        configured.add("cryptopanic")
     provider_status_overrides = _source_coverage_provider_status_overrides(
         stats=stats,
         configured=configured,
@@ -81,6 +154,10 @@ def build_source_coverage_report(
         cryptopanic_effectively_healthy=stats.cryptopanic_effectively_healthy,
         now=observed,
     )
+    blocker_summary = _coverage_blocker_summary(
+        core_rows,
+        near_miss_candidates=near_miss_candidates,
+    )
     return _source_coverage_report(
         profile=profile,
         artifact_namespace=artifact_namespace,
@@ -89,6 +166,7 @@ def build_source_coverage_report(
         acquisition_rows=acquisition,
         core_rows=core_rows,
         stats=stats,
+        blocker_summary=blocker_summary,
     )
 
 
@@ -103,6 +181,7 @@ def _source_coverage_stats(
     cryptopanic_weekly_limit: int,
     cryptopanic_daily_soft_limit: int,
     provider_health_rows: Mapping[str, Mapping[str, Any]],
+    cryptopanic_run_context: Mapping[str, Any],
     now: datetime,
 ) -> _SourceCoverageStats:
     cryptopanic = _cryptopanic_stats(
@@ -114,6 +193,10 @@ def _source_coverage_stats(
         daily_soft_limit=cryptopanic_daily_soft_limit,
         now=now,
         raw_backoff_present=_raw_provider_backoff_present(provider_health_rows, "cryptopanic"),
+        configured_override=cryptopanic_run_context.get("configured"),
+        selected_for_run=bool(cryptopanic_run_context.get("selected_for_run")),
+        live_call_allowed=bool(cryptopanic_run_context.get("live_call_allowed")),
+        run_not_used_reason=str(cryptopanic_run_context.get("not_used_reason") or "") or None,
     )
     coinalyze = _coinalyze_artifact_stats(
         artifact_namespace_dir=artifact_namespace_dir,
@@ -337,6 +420,7 @@ def _source_coverage_report(
     acquisition_rows: list[dict[str, Any]],
     core_rows: list[dict[str, Any]],
     stats: _SourceCoverageStats,
+    blocker_summary: Mapping[str, int],
 ) -> EventAlphaSourceCoverageReport:
     cryptopanic_stats = stats.cryptopanic
     coinalyze_stats = stats.coinalyze
@@ -352,6 +436,8 @@ def _source_coverage_report(
         acquisition_rows=len(acquisition_rows),
         core_rows=len(core_rows),
         cryptopanic_configured=cryptopanic_stats["configured"],
+        cryptopanic_selected_for_run=cryptopanic_stats["selected_for_run"],
+        cryptopanic_live_call_allowed=cryptopanic_stats["live_call_allowed"],
         cryptopanic_health_status=cryptopanic_stats["health_status"],
         cryptopanic_observed=cryptopanic_stats["observed"],
         cryptopanic_requests_used=cryptopanic_stats["requests_used"],
@@ -368,6 +454,15 @@ def _source_coverage_report(
         cryptopanic_not_used_reason=cryptopanic_stats["not_used_reason"],
         cryptopanic_coverage_status=cryptopanic_stats["coverage_status"],
         cryptopanic_recommendation=cryptopanic_stats["recommendation"],
+        candidates_blocked_by_source_coverage=blocker_summary["candidates_blocked_by_source_coverage"],
+        candidates_blocked_by_missing_strong_source=blocker_summary["candidates_blocked_by_missing_strong_source"],
+        candidates_blocked_by_missing_official_source=blocker_summary["candidates_blocked_by_missing_official_source"],
+        candidates_blocked_by_missing_structured_source=blocker_summary["candidates_blocked_by_missing_structured_source"],
+        candidates_blocked_by_evidence_not_acquired=blocker_summary["candidates_blocked_by_evidence_not_acquired"],
+        candidates_blocked_by_provider_unavailable=blocker_summary["candidates_blocked_by_provider_unavailable"],
+        candidates_blocked_by_market_context=blocker_summary["candidates_blocked_by_market_context"],
+        candidate_families_blocked_by_source_coverage=blocker_summary["candidate_families_blocked_by_source_coverage"],
+        candidate_families_blocked_by_market_coverage=blocker_summary["candidate_families_blocked_by_market_coverage"],
         coinalyze_preflight_status=coinalyze_stats["preflight_status"],
         coinalyze_preflight_json_path=coinalyze_stats["preflight_json_path"],
         coinalyze_preflight_report_path=coinalyze_stats["preflight_report_path"],
@@ -529,6 +624,238 @@ def _accepted_count(row: Mapping[str, Any]) -> int:
     if isinstance(accepted, tuple):
         return len(accepted)
     return 1 if accepted else 0
+
+
+def _coverage_blocker_summary(
+    core_rows: Iterable[Mapping[str, Any]],
+    *,
+    near_miss_candidates: Iterable[object] = (),
+) -> dict[str, int]:
+    """Count explicit coverage blockers without treating missing evidence as proof."""
+    strong: set[str] = set()
+    official: set[str] = set()
+    structured: set[str] = set()
+    evidence_not_acquired: set[str] = set()
+    provider_unavailable: set[str] = set()
+    market_context: set[str] = set()
+    source_families: set[tuple[str, str]] = set()
+    market_families: set[tuple[str, str]] = set()
+    core_family_by_id: dict[str, tuple[str, str]] = {}
+
+    rows = [dict(row) for row in core_rows if isinstance(row, Mapping)]
+    for index, row in enumerate(rows):
+        core_id = str(row.get("core_opportunity_id") or "").strip()
+        identity = f"core:{core_id}" if core_id else f"row:{index}"
+        family = _coverage_family_key(row)
+        if core_id:
+            core_family_by_id[core_id] = family
+        reasons = set(_coverage_text_values(
+            row.get("why_not_alertable"),
+            row.get("missing_fields"),
+            row.get("live_confirmation_missing_requirements"),
+            row.get("upgrade_requirements"),
+            row.get("source_pack_confirmation_status"),
+            row.get("acquisition_confirmation_status"),
+            row.get("acquisition_confirmation_reason"),
+            row.get("no_upgrade_reason"),
+        ))
+        actions = set(_coverage_text_values(
+            row.get("recommended_refresh_actions"),
+            row.get("near_miss_actions"),
+            row.get("recommended_actions"),
+        ))
+        source_unmet = any(
+            row.get(key) is False
+            for key in ("source_requirements_met", "opportunity_type_source_requirements_met")
+        )
+        pack = str(row.get("source_pack") or row.get("evidence_acquisition_source_pack") or "").casefold()
+        official_missing = (
+            any("official" in reason and ("required" in reason or "missing" in reason) for reason in reasons)
+            or pack in {
+                "official_exchange_listing_pack",
+                "official_perp_listing_pack",
+                "official_exchange_risk_pack",
+                "listing_liquidity_pack",
+                "perp_listing_squeeze_pack",
+            }
+            and source_unmet
+        )
+        structured_missing = (
+            any(
+                any(token in reason for token in ("structured_unlock", "structured_source", "calendar_source"))
+                for reason in reasons
+            )
+            or pack == "unlock_supply_pack" and source_unmet
+        )
+        explicit_strong_missing = any(
+            any(token in reason for token in (
+                "strong_source_missing",
+                "risk_source_not_confirmed",
+                "source_pack_confirmation_missing",
+                "source_pack_confirmation_status",
+                "validated_catalyst",
+                "direct_token_mechanism",
+            ))
+            for reason in reasons
+        )
+        source_gap = source_unmet or any(
+            value in {"coverage_gap", "not_configured", "degraded", "unavailable", "partial"}
+            for value in reasons
+        ) or bool(actions & {"source_pack_search", "targeted_evidence_refresh", "official_source_search"})
+        if official_missing:
+            official.add(identity)
+        if structured_missing:
+            structured.add(identity)
+        if not official_missing and not structured_missing and (explicit_strong_missing or source_gap):
+            strong.add(identity)
+
+        results = row.get("evidence_acquisition_results")
+        result_status = str(results.get("status") or "") if isinstance(results, Mapping) else ""
+        acquisition_status = str(
+            row.get("evidence_acquisition_status")
+            or row.get("acquisition_confirmation_status")
+            or result_status
+            or ""
+        ).casefold()
+        accepted = _accepted_count(row)
+        if source_gap and accepted <= 0 and acquisition_status in {
+            "",
+            "not_executed",
+            "coverage_gap",
+            "skipped_config",
+            "skipped_live_calls_disabled",
+            "provider_unavailable",
+            "provider_backoff",
+            "failed_soft",
+        }:
+            evidence_not_acquired.add(identity)
+        failures = _coverage_text_values(
+            row.get("provider_failures"),
+            row.get("evidence_acquisition_provider_failures"),
+        )
+        provider_coverage_status = str(
+            row.get("provider_coverage_status")
+            or row.get("source_pack_coverage_status")
+            or ""
+        ).casefold()
+        if (
+            failures
+            or acquisition_status in {"provider_unavailable", "provider_backoff", "failed_soft"}
+            or provider_coverage_status in {"degraded", "unavailable", "backoff"}
+        ):
+            provider_unavailable.add(identity)
+
+        freshness = str(
+            row.get("market_context_freshness_status")
+            or row.get("integrated_market_freshness_status")
+            or row.get("market_data_freshness")
+            or ""
+        ).casefold()
+        market_blocked = (
+            freshness in {"missing", "stale", "unknown"}
+            if freshness
+            else row.get("market_requirements_met") is False
+        )
+        if market_blocked:
+            market_context.add(identity)
+            market_families.add(family)
+        if identity in strong or identity in official or identity in structured or identity in evidence_not_acquired or identity in provider_unavailable:
+            source_families.add(family)
+
+    source_ids = strong | official | structured | evidence_not_acquired | provider_unavailable
+    _add_near_miss_coverage_blockers(
+        near_miss_candidates,
+        core_family_by_id=core_family_by_id,
+        source_ids=source_ids,
+        evidence_not_acquired=evidence_not_acquired,
+        source_families=source_families,
+    )
+
+    return _coverage_blocker_counts((
+        source_ids, strong, official, structured, evidence_not_acquired,
+        provider_unavailable, market_context, source_families, market_families,
+    ))
+
+
+def _coverage_blocker_counts(groups: tuple[set[object], ...]) -> dict[str, int]:
+    (source_ids, strong, official, structured, evidence_not_acquired,
+     provider_unavailable, market_context, source_families, market_families) = groups
+    return {
+        "candidates_blocked_by_source_coverage": len(source_ids),
+        "candidates_blocked_by_missing_strong_source": len(strong),
+        "candidates_blocked_by_missing_official_source": len(official),
+        "candidates_blocked_by_missing_structured_source": len(structured),
+        "candidates_blocked_by_evidence_not_acquired": len(evidence_not_acquired),
+        "candidates_blocked_by_provider_unavailable": len(provider_unavailable),
+        "candidates_blocked_by_market_context": len(market_context),
+        "candidate_families_blocked_by_source_coverage": len(source_families),
+        "candidate_families_blocked_by_market_coverage": len(market_families),
+    }
+
+
+def _add_near_miss_coverage_blockers(
+    near_miss_candidates: Iterable[object],
+    *,
+    core_family_by_id: Mapping[str, tuple[str, str]],
+    source_ids: set[str],
+    evidence_not_acquired: set[str],
+    source_families: set[tuple[str, str]],
+) -> None:
+    for near in near_miss_candidates:
+        actions = set(_coverage_text_values(_coverage_value(near, "recommended_refresh_actions")))
+        if not actions & {"source_pack_search", "targeted_evidence_refresh", "official_source_search"}:
+            continue
+        core_id = str(_coverage_value(near, "core_opportunity_id") or "").strip()
+        family = core_family_by_id.get(core_id) or _coverage_family_key({
+            "coin_id": _coverage_value(near, "coin_id"),
+            "symbol": _coverage_value(near, "symbol"),
+            "source_pack": _coverage_value(near, "source_pack"),
+        })
+        identity = (
+            f"core:{core_id}"
+            if core_id
+            else f"near:{_coverage_value(near, 'near_miss_id') or '|'.join(family)}"
+        )
+        source_ids.add(identity)
+        evidence_not_acquired.add(identity)
+        source_families.add(family)
+
+
+def _coverage_family_key(row: Mapping[str, Any]) -> tuple[str, str]:
+    asset = str(row.get("coin_id") or row.get("symbol") or row.get("core_opportunity_id") or "unknown").casefold()
+    path = str(
+        row.get("primary_impact_path")
+        or row.get("impact_path_type")
+        or row.get("source_pack")
+        or "unknown"
+    ).casefold()
+    if path in {"venue_value_capture", "proxy_attention", "proxy_exposure"}:
+        path = "proxy"
+    return asset, path
+
+
+def _coverage_text_values(*values: object) -> tuple[str, ...]:
+    out: list[str] = []
+    for value in values:
+        if value in (None, ""):
+            continue
+        if isinstance(value, Mapping):
+            out.extend(_coverage_text_values(*value.values()))
+        elif isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+            out.extend(_coverage_text_values(*value))
+        else:
+            text = str(value).strip().casefold()
+            if text:
+                out.append(text)
+    return tuple(dict.fromkeys(out))
+
+
+def _coverage_value(item: object, key: str) -> object:
+    if isinstance(item, Mapping):
+        return item.get(key)
+    return getattr(item, key, None)
+
+
 def _article_quality_counts(rows: Iterable[Mapping[str, Any]]) -> tuple[str, ...]:
     counts: dict[str, int] = {}
     for row in rows:

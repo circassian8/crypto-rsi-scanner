@@ -809,6 +809,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_shim_registry",
     "tests.event_alpha.test_source_coverage_reports",
     "tests.event_alpha.test_source_registry",
+    "tests.event_alpha.test_targeted_market_refresh",
     "tests.event_alpha.test_watchlist_router",
 )
 

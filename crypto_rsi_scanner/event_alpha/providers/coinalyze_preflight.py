@@ -24,6 +24,7 @@ from ..artifacts import paths as event_artifact_paths
 from ..artifacts import schema_v1
 from ..radar import derivatives_crowding as event_derivatives_crowding
 from . import provider_health as event_provider_health
+from . import request_lineage as event_request_lineage
 from .coinalyze_preflight_report import (
     format_preflight_report,
     format_rehearsal_report,
@@ -146,6 +147,8 @@ class CoinalyzeRehearsalReport:
     paper_trades_created: int = 0
     normal_rsi_signal_rows_written: int = 0
     triggered_fade_created: int = 0
+    provider_generation_id: str = ""
+    run_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return coinalyze_rehearsal_report_row(self)
@@ -207,6 +210,8 @@ def coinalyze_rehearsal_report_row(report: CoinalyzeRehearsalReport) -> dict[str
         "paper_trades_created": report.paper_trades_created,
         "normal_rsi_signal_rows_written": report.normal_rsi_signal_rows_written,
         "triggered_fade_created": report.triggered_fade_created,
+        "provider_generation_id": report.provider_generation_id,
+        "run_id": report.run_id,
     }
 
 
@@ -341,7 +346,8 @@ def build_preflight_report(
         lanes_enabled_if_healthy=LANES_ENABLED,
         source_packs_enabled=SOURCE_PACKS,
         safety_notes=(
-            "no live calls unless --event-alpha-coinalyze-allow-live-preflight is explicit",
+            f"no live calls unless {ENV_ALLOW_LIVE_PREFLIGHT}=1 already exists in the environment; "
+            "the CLI allow flag may only accompany that provider-specific gate",
             "no Telegram sends, trades, paper trades, normal RSI rows, or Event Alpha TRIGGERED_FADE",
             "API key values are never printed or written to artifacts",
         ),
@@ -372,10 +378,16 @@ def write_rehearsal_report(report: CoinalyzePreflightReport, namespace_dir: str 
         next_step = f"configure {ENV_API_KEY}, then rerun preflight"
     elif not report.live_call_allowed:
         status = "live_call_blocked_by_default"
-        next_step = "rerun only with explicit --event-alpha-coinalyze-allow-live-preflight after reviewing quota and doctor output"
+        next_step = (
+            f"set {ENV_ALLOW_LIVE_PREFLIGHT}=1 manually after reviewing quota and doctor output, then rerun; "
+            "the CLI allow flag may only accompany that environment gate"
+        )
     else:
         status = "ready_for_future_bounded_no_send_rehearsal"
-        next_step = "run the bounded no-send rehearsal only with explicit allow flag and request ledger enforcement"
+        next_step = (
+            "run the bounded no-send rehearsal only while the provider-specific environment gate remains enabled; "
+            "the CLI allow flag may accompany it as operator confirmation"
+        )
     lines = [
         "# Coinalyze No-Send Rehearsal Stub",
         "",
@@ -407,8 +419,9 @@ def run_no_send_rehearsal(
     """Run a guarded Coinalyze no-send rehearsal.
 
     The default path never calls Coinalyze. Live calls require a configured key,
-    an explicit allow flag or env var, this no-send command path, a writable
-    request ledger, and a small request budget.
+    the provider-specific environment gate, this no-send command path, a writable
+    request ledger, and a small request budget. A CLI/API allow boolean may only
+    accompany the environment gate as operator confirmation.
     """
 
     base = Path(namespace_dir).expanduser()
@@ -442,6 +455,11 @@ def run_no_send_rehearsal(
     fade_written = 0
     candidate_rows: tuple[dict[str, Any], ...] = ()
     provider_health_status = "not_observed"
+    generation_id = event_request_lineage.provider_generation_id(PROVIDER_HEALTH_KEY, observed)
+    run_id = (
+        f"coinalyze-rehearsal-{int(observed.timestamp() * 1_000_000)}-"
+        f"{generation_id.rsplit(':', 1)[-1]}"
+    )
 
     if not configured:
         status = "missing_config"
@@ -473,6 +491,8 @@ def run_no_send_rehearsal(
             clock=clock,
             warnings=warnings,
             observed=observed,
+            generation_id=generation_id,
+            run_id=run_id,
         )
         status = live_result.status
         error_class = live_result.error_class
@@ -483,7 +503,7 @@ def run_no_send_rehearsal(
         candidate_rows = live_result.candidate_rows
         provider_health_status = live_result.provider_health_status
 
-    requests_used = len(_read_jsonl(ledger_path))
+    requests_used = len(event_request_lineage.generation_rows(_read_jsonl(ledger_path), generation_id))
     crowding_class_counts = _counts(str(row.get("crowding_class") or "unknown") for row in candidate_rows)
     fade_readiness_counts = _counts(str(row.get("fade_readiness") or "unknown") for row in candidate_rows)
     report = CoinalyzeRehearsalReport(
@@ -519,6 +539,8 @@ def run_no_send_rehearsal(
         error_class=error_class,
         error_message_safe=error_message_safe,
         warnings=tuple(dict.fromkeys(warnings)),
+        provider_generation_id=generation_id,
+        run_id=run_id,
     )
     payload = schema_v1.stamp_artifact_payload(report.to_dict(), schema_id="provider_preflight_v1", path=rehearsal_json)
     rehearsal_json.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -543,6 +565,8 @@ def _run_live_coinalyze_rehearsal(
     clock: Callable[[], float] | None,
     warnings: list[str],
     observed: datetime,
+    generation_id: str,
+    run_id: str,
 ) -> _CoinalyzeLiveRehearsalResult:
     ledger = _LedgeredCoinalyzeOpener(
         ledger_path=ledger_path,
@@ -550,6 +574,10 @@ def _run_live_coinalyze_rehearsal(
         max_requests=max_requests,
         opener=opener,
         now=observed,
+        provider_generation_id=generation_id,
+        run_id=run_id,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
     )
     provider: CoinalyzeDerivativesProvider | None = None
     try:
@@ -578,20 +606,21 @@ def _run_live_coinalyze_rehearsal(
         error_message_safe = _safe_error_message(exc, _api_key())
     if provider_warnings := tuple(getattr(provider, "last_warnings", ()) or ()):
         warnings.extend(provider_warnings)
-    ledger_rows = _read_jsonl(ledger_path)
+    ledger_rows = event_request_lineage.generation_rows(_read_jsonl(ledger_path), generation_id)
     status, error_class, error_message_safe = _rehearsal_status_from_ledger(
         ledger_rows,
         snapshots=snapshots,
         fallback_error_class=error_class,
         fallback_error_message=error_message_safe,
     )
-    run_id = f"coinalyze-rehearsal-{int(observed.timestamp())}"
     state_rows = _derivatives_state_rows(
         snapshots.values(),
         observed_at=observed,
         profile=profile,
         artifact_namespace=artifact_namespace,
         run_id=run_id,
+        provider_generation_id=generation_id,
+        request_ledger_path=event_artifact_paths.artifact_display_path(ledger_path),
     )
     candidate_rows: tuple[dict[str, Any], ...] = ()
     candidate_evaluation_complete = False
@@ -650,7 +679,10 @@ def _run_live_coinalyze_rehearsal(
 
 
 def effective_allow_live_preflight(value: bool = False) -> bool:
-    return bool(value or str(os.getenv(ENV_ALLOW_LIVE_PREFLIGHT, "")).strip().casefold() in _TRUTHY)
+    # The CLI/API flag is only an operator confirmation; it cannot grant live
+    # provider authority without the provider-specific environment gate.
+    del value
+    return str(os.getenv(ENV_ALLOW_LIVE_PREFLIGHT, "")).strip().casefold() in _TRUTHY
 
 
 def _api_key() -> str:
@@ -718,6 +750,8 @@ def _derivatives_state_rows(
     profile: str | None,
     artifact_namespace: str | None,
     run_id: str,
+    provider_generation_id: str,
+    request_ledger_path: str,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -741,6 +775,10 @@ def _derivatives_state_rows(
             )
         )
         rows[-1]["no_send_rehearsal"] = True
+        rows[-1]["provider_generation_id"] = provider_generation_id
+        rows[-1]["provider_request_succeeded"] = True
+        rows[-1]["provider_source_artifact"] = event_derivatives_crowding.DERIVATIVES_STATE_FILENAME
+        rows[-1]["request_ledger_path"] = request_ledger_path
         rows[-1]["strict_alerts_created"] = 0
         rows[-1]["telegram_sends"] = 0
         rows[-1]["trades_created"] = 0
@@ -987,6 +1025,13 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
     ledger_rows = _read_jsonl(base / REQUEST_LEDGER)
     state_rows = _read_jsonl(base / event_derivatives_crowding.DERIVATIVES_STATE_FILENAME)
     if rehearsal_data:
+        generation_id = str(rehearsal_data.get("provider_generation_id") or "")
+        if generation_id:
+            ledger_rows = event_request_lineage.generation_rows(ledger_rows, generation_id)
+            state_rows = tuple(
+                row for row in state_rows
+                if str(row.get("provider_generation_id") or "") == generation_id
+            )
         status = str(rehearsal_data.get("status") or "")
         live_allowed = bool(rehearsal_data.get("live_call_allowed"))
         requests_used = int(rehearsal_data.get("requests_used") or 0)

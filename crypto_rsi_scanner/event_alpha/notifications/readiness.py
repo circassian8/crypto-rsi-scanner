@@ -88,13 +88,22 @@ def build_send_readiness(
             resolved_preview_path=resolved_preview_path,
             preview_path=preview_path,
             artifact_namespace=artifact_namespace,
+            send_guard_enabled=send_guard_enabled,
         ),
         *_latest_run_blockers(latest_run),
         *_artifact_doctor_send_readiness_blockers(artifact_doctor, preview_source=preview_source),
         *_preview_path_blockers(resolved_preview),
         *_send_guard_blockers(send_guard_enabled=send_guard_enabled, telegram_ready=telegram_ready),
     ]
-    warnings = _send_readiness_warnings(send_guard_enabled=send_guard_enabled)
+    warnings = [
+        *_send_readiness_warnings(send_guard_enabled=send_guard_enabled),
+        *_namespace_send_readiness_warnings(
+            resolved_preview_path=resolved_preview_path,
+            preview_path=preview_path,
+            artifact_namespace=artifact_namespace,
+            send_guard_enabled=send_guard_enabled,
+        ),
+    ]
     latest_core_ids = {
         str(row.get("core_opportunity_id") or "").strip()
         for row in rows.core_rows
@@ -177,6 +186,7 @@ def _namespace_send_readiness_blockers(
     resolved_preview_path: Path | None,
     preview_path: str | Path | None,
     artifact_namespace: str | None,
+    send_guard_enabled: bool = True,
 ) -> list[str]:
     namespace_dir = None
     if resolved_preview_path is not None:
@@ -197,8 +207,34 @@ def _namespace_send_readiness_blockers(
         return ["artifact namespace status is invalid or unknown and blocked for send-readiness"]
     if event_alpha_namespace_status.is_inactive(namespace_status):
         return ["artifact namespace is stale/deprecated and blocked for send-readiness"]
-    if namespace_status and not namespace_status.safe_for_send_readiness:
+    if namespace_status and not namespace_status.safe_for_send_readiness and send_guard_enabled:
         return ["artifact namespace is marked unsafe for send-readiness"]
+    return []
+
+
+def _namespace_send_readiness_warnings(
+    *,
+    resolved_preview_path: Path | None,
+    preview_path: str | Path | None,
+    artifact_namespace: str | None,
+    send_guard_enabled: bool,
+) -> list[str]:
+    if send_guard_enabled:
+        return []
+    namespace_dir = None
+    if resolved_preview_path is not None:
+        namespace_dir = resolved_preview_path.expanduser().parent
+    elif preview_path:
+        namespace_dir = Path(preview_path).expanduser().parent
+    elif artifact_namespace:
+        namespace_dir = Path("event_fade_cache") / str(artifact_namespace)
+    namespace_status = event_alpha_namespace_status.load_namespace_status(namespace_dir)
+    if (
+        namespace_status
+        and not event_alpha_namespace_status.is_inactive(namespace_status)
+        and not namespace_status.safe_for_send_readiness
+    ):
+        return ["artifact namespace is approved for no-send review only; real send-readiness remains blocked"]
     return []
 
 

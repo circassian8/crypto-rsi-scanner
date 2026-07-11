@@ -434,9 +434,11 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
 
     original_max_pages = os.environ.get(event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES)
     original_limit = os.environ.get(event_bybit_announcements_preflight.ENV_PREFLIGHT_LIMIT)
+    original_allow = os.environ.get(event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT)
     try:
         os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES] = "1"
         os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_LIMIT] = "20"
+        os.environ[event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT] = "1"
         fixture_payload = json.loads(Path("fixtures/event_discovery/official_exchange_bybit_announcements.json").read_text(encoding="utf-8"))
         fixture_payload["result"]["list"] = fixture_payload["result"]["list"][:2]
         with TemporaryDirectory() as tmp:
@@ -498,6 +500,8 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             assert report.status == "live_rehearsal_success"
             assert report.provider_health_status == "observed_healthy"
             assert report.requests_used == 1
+            assert report.provider_generation_id
+            assert report.run_id
             assert report.http_successes == 1
             assert report.announcements_inspected == 2
             assert report.official_events_written == 2
@@ -522,15 +526,24 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             assert ledger_rows[0]["live_call_allowed"] is True
             assert ledger_rows[0]["no_send_rehearsal"] is True
             assert ledger_rows[0]["unsupported_query_params"] == []
+            assert ledger_rows[0]["provider_generation_id"] == report.provider_generation_id
+            assert ledger_rows[0]["run_id"] == report.run_id
             assert set(ledger_rows[0]["query_params"]) <= set(event_bybit_announcements_preflight.SUPPORTED_PARAMS)
             assert by_symbol["TESTSPOT"]["source_url"]
             assert by_symbol["TESTSPOT"]["published_at"]
+            assert by_symbol["TESTSPOT"]["provider_generation_id"] == report.provider_generation_id
+            assert by_symbol["TESTSPOT"]["provider_request_succeeded"] is True
+            assert by_symbol["TESTSPOT"]["provider_source_artifact"]
+            assert by_symbol["TESTSPOT"]["request_ledger_path"]
             assert by_symbol["TESTPERP"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH"
             assert "bybit_announcements_public" in official_pack.healthy_providers
             assert coverage.bybit_announcements_provider_health_status == "observed_healthy"
             assert coverage.bybit_announcements_official_events_written == 2
             assert "TESTPERP" in integrated_symbols
             assert "TESTSPOT" in integrated_symbols
+            integrated_by_symbol = {str(row.get("symbol") or ""): row for row in integrated_rows}
+            assert integrated_by_symbol["TESTSPOT"]["provider_generation_id"] == report.provider_generation_id
+            assert integrated_by_symbol["TESTSPOT"]["provider_request_succeeded"] is True
             assert event_bybit_announcements_preflight.artifact_conflicts(namespace_dir)[
                 "bybit_announcements_rehearsal_live_without_ledger"
             ] == 0
@@ -546,6 +559,10 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             os.environ.pop(event_bybit_announcements_preflight.ENV_PREFLIGHT_LIMIT, None)
         else:
             os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_LIMIT] = original_limit
+        if original_allow is None:
+            os.environ.pop(event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT, None)
+        else:
+            os.environ[event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT] = original_allow
 
 
 def test_notification_digest_labels_fade_short_review_lane():
@@ -717,7 +734,7 @@ def test_event_alpha_heartbeat_uses_strict_alert_and_research_candidate_copy():
     assert "Alerts:" not in message
     assert "Strict alerts: 0" in message
     assert "Research candidates: 7" in message
-    assert "Core opportunities: 6" in message
+    assert "Current-generation core rows: 6" in message
 
 
 def test_event_alpha_coinalyze_rehearsal_guards_no_key_default_and_budget():
@@ -730,6 +747,7 @@ def test_event_alpha_coinalyze_rehearsal_guards_no_key_default_and_budget():
     original_symbols = config.EVENT_DISCOVERY_COINALYZE_SYMBOLS
     original_budget = os.environ.get(event_coinalyze_preflight.ENV_PREFLIGHT_MAX_REQUESTS)
     original_env_key = os.environ.get(event_coinalyze_preflight.ENV_API_KEY)
+    original_allow = os.environ.get(event_coinalyze_preflight.ENV_ALLOW_LIVE_PREFLIGHT)
     calls = []
 
     def opener(_request, _timeout):
@@ -740,9 +758,10 @@ def test_event_alpha_coinalyze_rehearsal_guards_no_key_default_and_budget():
         config.EVENT_DISCOVERY_COINALYZE_API_KEY = ""
         config.EVENT_DISCOVERY_COINALYZE_SYMBOLS = ("BTCUSDT_PERP.A", "ETHUSDT_PERP.A", "SOLUSDT_PERP.A")
         os.environ.pop(event_coinalyze_preflight.ENV_API_KEY, None)
+        os.environ.pop(event_coinalyze_preflight.ENV_ALLOW_LIVE_PREFLIGHT, None)
         with TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _preflight, report, _paths = event_coinalyze_preflight.run_no_send_rehearsal(
+            preflight, report, _paths = event_coinalyze_preflight.run_no_send_rehearsal(
                 namespace_dir=base,
                 provider_health_path=base / "event_provider_health.json",
                 profile="notify_llm_deep",
@@ -757,7 +776,7 @@ def test_event_alpha_coinalyze_rehearsal_guards_no_key_default_and_budget():
         config.EVENT_DISCOVERY_COINALYZE_API_KEY = "coinalyze-key"
         with TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _preflight, report, _paths = event_coinalyze_preflight.run_no_send_rehearsal(
+            preflight, report, _paths = event_coinalyze_preflight.run_no_send_rehearsal(
                 namespace_dir=base,
                 provider_health_path=base / "event_provider_health.json",
                 profile="notify_llm_deep",
@@ -768,6 +787,15 @@ def test_event_alpha_coinalyze_rehearsal_guards_no_key_default_and_budget():
             )
             assert report.status == "live_call_blocked_by_default"
             assert not (base / event_coinalyze_preflight.REQUEST_LEDGER).exists()
+            assert any(
+                event_coinalyze_preflight.ENV_ALLOW_LIVE_PREFLIGHT in note
+                and "already exists in the environment" in note
+                and "CLI allow flag may only accompany" in note
+                for note in preflight.safety_notes
+            )
+            rehearsal_text = (base / event_coinalyze_preflight.REHEARSAL_MD).read_text(encoding="utf-8")
+            assert f"set {event_coinalyze_preflight.ENV_ALLOW_LIVE_PREFLIGHT}=1 manually" in rehearsal_text
+            assert "CLI allow flag may only accompany" in rehearsal_text
 
         os.environ[event_coinalyze_preflight.ENV_PREFLIGHT_MAX_REQUESTS] = "1"
         with TemporaryDirectory() as tmp:
@@ -781,7 +809,7 @@ def test_event_alpha_coinalyze_rehearsal_guards_no_key_default_and_budget():
                 opener=opener,
                 now=datetime(2026, 6, 15, tzinfo=timezone.utc),
             )
-            assert report.status == "blocked_request_budget"
+            assert report.status == "live_call_blocked_by_default"
             assert not (base / event_coinalyze_preflight.REQUEST_LEDGER).exists()
         assert calls == []
     finally:
@@ -795,6 +823,10 @@ def test_event_alpha_coinalyze_rehearsal_guards_no_key_default_and_budget():
             os.environ.pop(event_coinalyze_preflight.ENV_API_KEY, None)
         else:
             os.environ[event_coinalyze_preflight.ENV_API_KEY] = original_env_key
+        if original_allow is None:
+            os.environ.pop(event_coinalyze_preflight.ENV_ALLOW_LIVE_PREFLIGHT, None)
+        else:
+            os.environ[event_coinalyze_preflight.ENV_ALLOW_LIVE_PREFLIGHT] = original_allow
 
 
 def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_redacted():
@@ -808,9 +840,11 @@ def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_reda
     original_key = config.EVENT_DISCOVERY_COINALYZE_API_KEY
     original_symbols = config.EVENT_DISCOVERY_COINALYZE_SYMBOLS
     original_base_url = config.EVENT_DISCOVERY_COINALYZE_BASE_URL
+    original_allow = os.environ.get(event_coinalyze_preflight.ENV_ALLOW_LIVE_PREFLIGHT)
     try:
         config.EVENT_DISCOVERY_COINALYZE_API_KEY = "coinalyze-key"
         config.EVENT_DISCOVERY_COINALYZE_BASE_URL = "https://example.test/v1/"
+        os.environ[event_coinalyze_preflight.ENV_ALLOW_LIVE_PREFLIGHT] = "1"
 
         class FakeResponse:
             status = 200
@@ -878,6 +912,8 @@ def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_reda
             )
             assert report.status == "live_rehearsal_success"
             assert report.requests_used == 7
+            assert report.provider_generation_id
+            assert report.run_id
             assert calls == [
                 "open-interest",
                 "funding-rate",
@@ -916,10 +952,14 @@ def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_reda
             assert state_rows[0]["funding_rate_unit"] == "decimal_rate"
             assert state_rows[0]["basis_unit"] == "decimal_rate"
             assert state_rows[0]["derivatives_snapshot_freshness_status"] == "fresh"
+            assert state_rows[0]["provider_generation_id"] == report.provider_generation_id
+            assert state_rows[0]["provider_request_succeeded"] is True
+            assert state_rows[0]["request_ledger_path"]
             assert len(crowding_rows) == 1
             assert len(fade_rows) == 1
             assert crowding_rows[0]["supported_metric_status"]["predicted_funding"] == "implemented"
             assert crowding_rows[0]["unit_metadata"]["funding_rate_unit"] == "decimal_rate"
+            assert crowding_rows[0]["provider_generation_id"] == report.provider_generation_id
             assert fade_rows[0]["symbol"] == "TESTFADE"
             assert fade_rows[0]["opportunity_type"] == "FADE_SHORT_REVIEW"
             assert fade_rows[0]["research_only"] is True
@@ -1017,3 +1057,7 @@ def test_event_alpha_coinalyze_rehearsal_mocked_live_success_and_errors_are_reda
         config.EVENT_DISCOVERY_COINALYZE_API_KEY = original_key
         config.EVENT_DISCOVERY_COINALYZE_SYMBOLS = original_symbols
         config.EVENT_DISCOVERY_COINALYZE_BASE_URL = original_base_url
+        if original_allow is None:
+            os.environ.pop(event_coinalyze_preflight.ENV_ALLOW_LIVE_PREFLIGHT, None)
+        else:
+            os.environ[event_coinalyze_preflight.ENV_ALLOW_LIVE_PREFLIGHT] = original_allow

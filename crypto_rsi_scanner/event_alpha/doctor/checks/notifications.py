@@ -15,6 +15,7 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
     delivery_summary = ctx_value(ctx, "delivery_summary", None)
     delivery_conflicts = ctx_mapping(ctx, "delivery_conflicts")
     preview_conflicts = ctx_mapping(ctx, "preview_conflicts")
+    daily_brief_operator_conflicts = ctx_mapping(ctx, "daily_brief_operator_conflicts")
 
     if ctx_value(ctx, "research_review_enabled_but_lane_missing", 0):
         emit(blockers, warnings, "research_review_digest_enabled_but_lane_missing=1", blocker=strict)
@@ -100,8 +101,23 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
         "notification_preview_send_guard_status_missing",
         "notification_preview_no_send_status_unclear",
         "notification_preview_api_alerts_wording",
+        "notification_preview_research_candidate_count_mismatch",
+        "notification_preview_source_snapshot_count_mismatch",
+        "notification_preview_rendered_item_count_mismatch",
+        "notification_preview_counter_scope_mismatch",
+        "notification_preview_legacy_counter_scope_mismatch",
     ):
         count = preview_conflicts.get(key, 0)
+        if count:
+            emit(blockers, warnings, f"{key}={count}", blocker=strict)
+
+    for key in (
+        "daily_brief_counter_scope_confusion",
+        "daily_brief_freshness_scope_missing",
+        "daily_brief_current_core_freshness_total_mismatch",
+        "daily_brief_visible_core_freshness_total_mismatch",
+    ):
+        count = daily_brief_operator_conflicts.get(key, 0)
         if count:
             emit(blockers, warnings, f"{key}={count}", blocker=strict)
 

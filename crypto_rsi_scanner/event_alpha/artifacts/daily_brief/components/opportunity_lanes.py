@@ -65,19 +65,28 @@ def _market_freshness_readiness_lines(
     limit: int = 8,
 ) -> list[str]:
     normalized = [_row_mapping(row) for row in rows]
-    visible_core = event_core_opportunities.visible_core_opportunities(normalized)
-    statuses: dict[str, int] = {}
+    explicit_core_rows = [
+        row for row in normalized
+        if str(row.get("row_type") or "") == "event_core_opportunity"
+    ]
+    current_core_rows = explicit_core_rows or normalized
+    visible_core = event_core_opportunities.visible_core_opportunities(current_core_rows or normalized)
+    visible_primary_rows = [item.primary_row for item in visible_core]
+    support_rows = [
+        row
+        for item in visible_core
+        for row in item.supporting_rows
+        if row is not item.primary_row and dict(row) != dict(item.primary_row)
+    ]
+    current_core_statuses = _market_freshness_counts(current_core_rows)
+    visible_core_statuses = _market_freshness_counts(visible_primary_rows)
+    support_statuses = _market_freshness_counts(support_rows)
     capped: list[Mapping[str, Any]] = []
     missing: list[Mapping[str, Any]] = []
     refresh_needed: list[Mapping[str, Any]] = []
-    for row in normalized:
+    for row in current_core_rows:
         components = _components_for_row(row)
-        status = str(
-            row.get("market_context_freshness_status")
-            or components.get("market_context_freshness_status")
-            or "missing"
-        )
-        statuses[status] = statuses.get(status, 0) + 1
+        status = _market_freshness_status(row)
         cap = _truthy(row.get("market_context_freshness_cap_applied") if row.get("market_context_freshness_cap_applied") is not None else components.get("market_context_freshness_cap_applied"))
         if row.get("row_type") == "event_core_opportunity" and status in {"fresh", "fixture_allowed_stale"}:
             cap = False
@@ -90,12 +99,22 @@ def _market_freshness_readiness_lines(
     profile = str(requested_profile or "").casefold()
     can_refresh = profile not in {"fixture", "quality_validation", "catalyst_frame_e2e", "notify_llm_quality_frame", "catalyst_frame_validation"}
     lines = [
-        "- Freshness statuses: " + _format_counts(statuses),
-        f"- Fresh market context: {statuses.get('fresh', 0)}",
-        f"- Capped by stale/unknown context: {len(capped)}",
-        f"- Missing/unknown market context: {len(missing)}",
-        f"- Needs targeted market refresh: {len(refresh_needed)}",
-        f"- Live profile can perform refresh: {str(can_refresh).lower()}",
+        (
+            f"- current_core_market_freshness: total={len(current_core_rows)}; "
+            f"statuses={_format_counts(current_core_statuses)}"
+        ),
+        (
+            f"- current_generation_visible_core_freshness: total={len(visible_primary_rows)}; "
+            f"statuses={_format_counts(visible_core_statuses)}"
+        ),
+        (
+            f"- support_row_market_freshness: total={len(support_rows)}; "
+            f"statuses={_format_counts(support_statuses)}"
+        ),
+        f"- current_core_rows_capped_by_stale_or_unknown_context: {len(capped)}",
+        f"- current_core_rows_missing_or_unknown_market_context: {len(missing)}",
+        f"- current_core_rows_needing_targeted_market_refresh: {len(refresh_needed)}",
+        f"- Live profile can perform current-core refresh: {str(can_refresh).lower()}",
     ]
     if visible_core:
         lines.append("- Core opportunity freshness:")
@@ -121,8 +140,31 @@ def _market_freshness_readiness_lines(
             lines.append(f"  - +{len(refresh_needed) - limit} more rows need refresh")
     return lines
 
+
+def _market_freshness_status(row: Mapping[str, Any]) -> str:
+    components = _components_for_row(row)
+    return str(
+        row.get("market_context_freshness_status")
+        or components.get("market_context_freshness_status")
+        or "missing"
+    )
+
+
+def _market_freshness_counts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        status = _market_freshness_status(row)
+        counts[status] = counts.get(status, 0) + 1
+    return counts
+
 def _core_market_freshness_line(item: event_core_opportunities.CoreOpportunity) -> str:
-    rows = [item.primary_row, *item.supporting_rows]
+    rows = [
+        item.primary_row,
+        *(
+            row for row in item.supporting_rows
+            if row is not item.primary_row and dict(row) != dict(item.primary_row)
+        ),
+    ]
     row_infos: list[tuple[str, str, str, bool, bool]] = []
     for row in rows:
         components = _components_for_row(row)

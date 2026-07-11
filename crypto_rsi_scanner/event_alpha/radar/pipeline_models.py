@@ -57,6 +57,7 @@ class EventAlphaSendResult:
     research_review_digest_would_send: int = 0
     research_review_digest_sent: int = 0
     research_review_digest_block_reason: str | None = None
+    preview_rendered_items: int = 0
 
 
 @dataclass(frozen=True)
@@ -130,6 +131,11 @@ class _PipelineArtifactWriteFields:
     snapshot_write_success: bool = False
     snapshot_rows_written: int = 0
     snapshot_write_block_reason: str | None = None
+    candidate_events: int | None = None
+    research_candidates: int | None = None
+    source_alert_snapshots: int | None = None
+    alertable_decisions: int | None = None
+    strict_alerts: int | None = None
     hypothesis_store_path: str | None = None
     hypothesis_write_attempted: bool = False
     hypothesis_write_success: bool = False
@@ -145,6 +151,10 @@ class _PipelineArtifactWriteFields:
     core_opportunity_write_success: bool = False
     core_opportunity_rows_written: int = 0
     core_opportunity_write_block_reason: str | None = None
+    current_generation_core_rows: int | None = None
+    current_generation_visible_core_rows: int | None = None
+    cumulative_store_rows: int | None = None
+    preview_rendered_items: int | None = None
 
 
 @dataclass(frozen=True)

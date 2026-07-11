@@ -413,9 +413,26 @@ def write_preview(
     status: str | None = None,
     preview_only: bool = False,
     delivery_row_not_written_reason: str | None = None,
+    send_requested: bool | None = None,
+    send_attempted: bool | None = None,
+    no_send_rehearsal: bool | None = None,
 ) -> None:
     """Write operator-visible Telegram bodies for all lanes in this run."""
     section_status = str(status or ("sent" if sent else "would_send"))
+    if send_requested is None:
+        send_requested = False if preview_only else bool(would_send)
+    if send_attempted is None:
+        if sent:
+            send_attempted = True
+        elif preview_only or section_status in {
+            delivery.STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED,
+            "blocked_by_send_guard",
+            "no_digest_candidates",
+            "not_due",
+        }:
+            send_attempted = False
+    if no_send_rehearsal is None and send_attempted is not None:
+        no_send_rehearsal = not send_attempted
     self.preview_sections.append(
         {
             "lane": lane,
@@ -427,8 +444,48 @@ def write_preview(
             "message": message,
             "preview_only": bool(preview_only),
             "delivery_row_not_written_reason": delivery_row_not_written_reason,
+            "send_requested": send_requested,
+            "send_attempted": send_attempted,
+            "no_send_rehearsal": no_send_rehearsal,
         }
     )
+    _persist_preview_sections(self)
+
+
+def mark_preview_attempt(
+    self,
+    *,
+    lane: str,
+    identity: DeliveryIdentity,
+    attempt: Any,
+) -> None:
+    """Rewrite one preview section with terminal delivery-attempt facts."""
+
+    expected_ids = tuple(identity.notification_item_ids or ())
+    for section in reversed(self.preview_sections):
+        section_identity = section.get("identity")
+        if str(section.get("lane") or "") != str(lane):
+            continue
+        if tuple(getattr(section_identity, "notification_item_ids", ()) or ()) != expected_ids:
+            continue
+        delivered = _safe_int(getattr(attempt, "delivered_count", 0))
+        failed = _safe_int(getattr(attempt, "failed_count", 0))
+        section["send_requested"] = True
+        section["send_attempted"] = bool(getattr(attempt, "attempted", True))
+        section["no_send_rehearsal"] = False
+        section["sent"] = delivered > 0
+        section["failed"] = failed > 0
+        if delivered > 0 and failed > 0:
+            section["status"] = "partial_delivery"
+        elif delivered > 0:
+            section["status"] = "sent"
+        else:
+            section["status"] = "delivery_failed"
+        _persist_preview_sections(self)
+        return
+
+
+def _persist_preview_sections(self) -> None:
     body = [
         "# Event Alpha Notification Preview",
         "",
@@ -455,6 +512,9 @@ def write_preview(
                 f"status: {section['status']}",
                 f"would_send: {str(bool(section['would_send'])).lower()}",
                 f"sent: {str(bool(section['sent'])).lower()}",
+                f"send_requested: {_preview_bool(section.get('send_requested'))}",
+                f"send_attempted: {_preview_bool(section.get('send_attempted'))}",
+                f"no_send_rehearsal: {_preview_bool(section.get('no_send_rehearsal'))}",
                 f"alert_id: {item_identity.alert_id or self._joined(item_identity.notification_item_ids)}",
                 f"core_opportunity_id: {item_identity.core_opportunity_id or 'none'}",
                 "core_opportunity_ids: " + ", ".join(item_identity.core_opportunity_ids or ("none",)),
@@ -507,6 +567,10 @@ def write_preview(
         return
 
 
+def _preview_bool(value: Any) -> str:
+    return str(value).lower() if isinstance(value, bool) else "unknown"
+
+
 def _record_preview_operator_state(writer: _DeliveryWriter) -> None:
     loaded = event_alpha_operator_state.load_operator_state(writer.preview_path.parent)
     state = dict(loaded.state or {}) if loaded.valid else {}
@@ -550,8 +614,11 @@ def write_no_digest_preview(
     profile: str | None,
     pipeline_result: Any | None,
     reason: str,
+    preview_only: bool = False,
 ) -> None:
     warnings = tuple(str(item) for item in _value(pipeline_result, "warnings") or () if str(item))
+    counters = event_alpha_run_counters.canonical_run_counters(pipeline_result)
+    send_state = event_alpha_run_counters.canonical_send_state(pipeline_result)
     lane_due = _mapping_value(pipeline_result, "send_lane_items_attempted")
     lane_sent = _mapping_value(pipeline_result, "send_lane_items_delivered")
     lanes_due = sum(_safe_int(value) for value in lane_due.values())
@@ -560,22 +627,36 @@ def write_no_digest_preview(
         "<b>Event Alpha Notification Rehearsal</b>",
         "<i>Research-only / unvalidated. Not a trade signal.</i>",
         f"Profile: {_esc(profile or _value(pipeline_result, 'profile') or 'default')}",
-        "Mode: no-send rehearsal / preview only",
+        f"Burn-in mode: {_esc(send_state['burn_in_mode'])}",
         "Status: no digest candidates would be sent",
         f"Reason: {_esc(reason or 'no due notifications')}",
         f"Completed: {_yes_no(bool(_value(pipeline_result, 'cycle_completed', pipeline_result is not None)))}",
-        f"Raw events: {_num(pipeline_result, 'raw_events')} · Core opportunities: {_num(pipeline_result, 'core_opportunities')}",
+        (
+            f"Raw events: {counters['raw_events']} · "
+            f"Candidate events: {counters['candidate_events']} · "
+            f"Research candidates: {counters['research_candidates']}"
+        ),
+        (
+            f"Source alert snapshots: {counters['source_alert_snapshots']} · "
+            f"Current-generation core rows: {counters['current_generation_core_rows']} · "
+            f"Current-generation visible core rows: {counters['current_generation_visible_core_rows']} · "
+            f"Cumulative store rows: {counters['cumulative_store_rows']}"
+        ),
         f"Extraction rows: {_num(pipeline_result, 'extraction_rows')}",
         (
-            f"Alertable decisions: {_num(pipeline_result, 'alertable')} · "
-            f"Strict alerts: {_num(pipeline_result, 'alerts')} · "
-            f"Research candidates: {_num(pipeline_result, 'candidates')} · "
-            f"Raw source candidates: {_raw_source_candidate_count(pipeline_result)}"
+            f"Alertable decisions: {counters['alertable_decisions']} · "
+            f"Strict alerts: {counters['strict_alerts']} · "
+            f"Preview-rendered items: {counters['preview_rendered_items']}"
         ),
         f"Delivery lanes: due={lanes_due} · sent={lanes_sent} · blocked={max(0, _num(pipeline_result, 'send_would_send_items') - lanes_sent)}",
         f"Provider issues: {_provider_failure_count(warnings)}",
         f"LLM calls/skips: {_num(pipeline_result, 'llm_calls_attempted')}/{_num(pipeline_result, 'llm_skipped_due_budget')}",
         f"Send guard: {_send_guard_status_line(reason)}",
+        (
+            f"Send requested: {_yes_no(send_state['send_requested'])} · "
+            f"attempted: {_yes_no(send_state['send_attempted'])} · "
+            f"no-send rehearsal: {_yes_no(send_state['no_send_rehearsal'])}"
+        ),
     ]
     if warnings:
         lines.append("Top issues: " + _esc("; ".join(_truncate_text(item, 90) for item in warnings[:3])))
@@ -600,6 +681,10 @@ def write_no_digest_preview(
         would_send=False,
         sent=False,
         status="no_digest_candidates",
+        preview_only=preview_only,
+        send_requested=not preview_only,
+        send_attempted=False,
+        no_send_rehearsal=True,
     )
 
 
@@ -614,6 +699,7 @@ _DeliveryWriter.record_sending = record_sending
 _DeliveryWriter.record_attempt_result = record_attempt_result
 _DeliveryWriter.record_blocked = record_blocked
 _DeliveryWriter.write_preview = write_preview
+_DeliveryWriter.mark_preview_attempt = mark_preview_attempt
 _DeliveryWriter.write_no_digest_preview = write_no_digest_preview
 
 __all__ = (

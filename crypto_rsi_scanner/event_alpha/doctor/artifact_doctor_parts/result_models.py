@@ -297,6 +297,10 @@ class _DoctorResultProviderEvidenceFields:
     cryptopanic_request_ledger_missing_when_used: int = 0
     cryptopanic_success_with_backoff_status: int = 0
     cryptopanic_restore_token_recommendation_when_configured: int = 0
+    cryptopanic_run_coverage_config_mismatch: int = 0
+    cryptopanic_profile_disabled_coverage_mismatch: int = 0
+    cryptopanic_profile_disabled_credential_recommendation: int = 0
+    source_coverage_blocker_summary_inconsistent: int = 0
     evidence_count_mismatch: int = 0
     unconfirmed_narrative_daily_digest: int = 0
     single_source_no_market_fan_token_digest: int = 0
@@ -363,6 +367,15 @@ class _DoctorResultNotificationFields:
     notification_preview_send_guard_status_missing: int = 0
     notification_preview_no_send_status_unclear: int = 0
     notification_preview_api_alerts_wording: int = 0
+    notification_preview_research_candidate_count_mismatch: int = 0
+    notification_preview_source_snapshot_count_mismatch: int = 0
+    notification_preview_rendered_item_count_mismatch: int = 0
+    notification_preview_counter_scope_mismatch: int = 0
+    notification_preview_legacy_counter_scope_mismatch: int = 0
+    daily_brief_counter_scope_confusion: int = 0
+    daily_brief_freshness_scope_missing: int = 0
+    daily_brief_current_core_freshness_total_mismatch: int = 0
+    daily_brief_visible_core_freshness_total_mismatch: int = 0
 
 
 @dataclass(frozen=True)

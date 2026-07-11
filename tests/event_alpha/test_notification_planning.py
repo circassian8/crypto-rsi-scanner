@@ -18,6 +18,7 @@ globals().update({
 
 def test_normal_notification_preview_and_heartbeat_wording_stay_no_send():
     from crypto_rsi_scanner.event_alpha.notifications import pipeline
+    from crypto_rsi_scanner.event_alpha.notifications.pipeline_parts import preview_writer
 
     plan = pipeline.EventAlphaNotificationPlan(
         heartbeat_due=True,
@@ -51,13 +52,19 @@ def test_normal_notification_preview_and_heartbeat_wording_stay_no_send():
         now=datetime(2026, 6, 15, 16, tzinfo=timezone.utc),
         send_guard_status="disabled",
     )
+    preview_result = preview_writer._notification_preview_result(  # noqa: SLF001 - counter contract regression
+        SimpleNamespace(),
+        plan=plan,
+    )
 
     assert "ready_to_send_now: no" in preview
     assert "Preview does not send, trade, paper trade, write normal RSI signals, or alter tiers." in preview
     assert "Strict alerts: 2" in heartbeat
     assert "Research candidates: 3" in heartbeat
-    assert "Raw source candidates: 5" in heartbeat
+    assert "Candidate events: 3" in heartbeat
+    assert "Raw source candidates" not in heartbeat
     assert "Not a trade signal" in heartbeat
+    assert preview_result["preview_rendered_items"] == 1
 
 
 def test_research_review_skip_telemetry_renders_and_delivery_status_fields_persist(tmp_path):
@@ -150,7 +157,8 @@ def test_notification_formatting_facade_smoke():
     assert formatting.format_preview is pipeline.format_preview
     assert "Strict alerts: 0" in heartbeat
     assert "Research candidates: 1" in heartbeat
-    assert "Raw source candidates: 2" in heartbeat
+    assert "Candidate events: 1" in heartbeat
+    assert "Raw source candidates" not in heartbeat
 
 
 def test_final_no_send_check_blocks_when_send_guard_disabled(tmp_path):

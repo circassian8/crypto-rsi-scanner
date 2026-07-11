@@ -16,6 +16,7 @@ def _burn_in_readiness_lines(
     evidence_acquisition_rows: Iterable[Mapping[str, Any]],
     provider_health_rows: Mapping[str, Mapping[str, Any]],
     requested_profile: str | None,
+    source_coverage_report_path: str | Path | None = None,
 ) -> list[str]:
     cores = list(core_opportunities)
     cards = [Path(path) for path in card_paths if Path(path).name != "index.md"]
@@ -29,10 +30,7 @@ def _burn_in_readiness_lines(
             "accepted",
         }
     )
-    send_requested = bool(latest.get("send_requested")) if latest else False
-    sent = bool(latest.get("sent")) if latest else False
-    delivered = int(latest.get("send_items_delivered") or latest.get("deliveries_delivered") or 0) if latest else 0
-    no_send = bool(latest) and not send_requested and not sent and delivered <= 0
+    send_state = event_alpha_run_counters.canonical_send_state(latest)
     health_rows = list((provider_health_rows or {}).values())
     backoff = sum(1 for row in health_rows if row.get("disabled_until"))
     degraded = sum(1 for row in health_rows if int(row.get("consecutive_failures") or 0) > 0 or row.get("last_error_safe"))
@@ -41,9 +39,13 @@ def _burn_in_readiness_lines(
     provider_misses = int(latest.get("provider_cache_misses") or 0) if latest else 0
     warnings = [str(item) for item in (latest.get("warnings") or []) if str(item)] if latest else []
     keys_missing = [item for item in warnings if "missing" in item.lower() or "disabled" in item.lower()]
-    return [
-        f"- Burn-in mode: {'no-send' if no_send else 'send-capable or unknown'} "
+    lines = [
+        f"- burn_in_mode: `{send_state['burn_in_mode']}` "
         f"(profile={requested_profile or latest.get('profile') or 'latest'})",
+        f"- send_guard_status: `{send_state['send_guard_status']}`",
+        f"- send_requested: `{str(send_state['send_requested']).lower()}`",
+        f"- send_attempted: `{str(send_state['send_attempted']).lower()}`",
+        f"- no_send_rehearsal: `{str(send_state['no_send_rehearsal']).lower()}`",
         f"- Provider coverage: health_rows={len(health_rows)} degraded={degraded} backoff={backoff} "
         f"fetches={provider_fetches} cache_hits={provider_hits} cache_misses={provider_misses}",
         f"- Opportunities found: core={len(cores)} high_priority={sum(1 for item in cores if getattr(item, 'is_high_priority', False))} "
@@ -53,6 +55,83 @@ def _burn_in_readiness_lines(
         "- What to review manually: provider gaps, source-pack evidence absence, core opportunity cards, near-miss rows, and feedback targets.",
         "- Missing keys/providers: "
         + ("; ".join(keys_missing[:5]) if keys_missing else "see provider readiness/status report for configured vs missing sources."),
+    ]
+    block_text = str(latest.get("send_block_reason") or send_state["send_guard_status"] or "").casefold()
+    if send_state["no_send_rehearsal"] and not send_state["send_attempted"]:
+        if "event alerts disabled" in block_text and bool(latest.get("send_heartbeat_due")):
+            lines.append("- Notification delivery status: event alerts disabled; heartbeat preview only; no delivery attempted.")
+        else:
+            lines.append("- Notification delivery status: no delivery attempted.")
+    lines.extend(
+        _separated_source_priority_lines(
+            source_coverage_report_path=source_coverage_report_path,
+            core_opportunities=cores,
+        )
+    )
+    return lines
+
+
+def _separated_source_priority_lines(
+    *,
+    source_coverage_report_path: str | Path | None,
+    core_opportunities: Iterable[Any],
+) -> list[str]:
+    from .source_coverage import _load_source_coverage_json, _source_coverage_json_next_source
+
+    coverage = _load_source_coverage_json(source_coverage_report_path)
+    priorities = [row for row in coverage.get("category_priorities") or () if isinstance(row, Mapping)]
+    strategic = priorities[0] if priorities else {
+        "category": "Derivatives/OI/funding",
+        "providers": ("coinalyze",),
+    }
+    strategic_label = str(strategic.get("category") or "Derivatives/OI/funding")
+    strategic_providers = ", ".join(str(item) for item in strategic.get("providers") or () if str(item))
+
+    readiness: Mapping[str, Any] = {}
+    if source_coverage_report_path is not None:
+        readiness_path = Path(source_coverage_report_path).parent / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_JSON
+        try:
+            parsed = json.loads(readiness_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            parsed = {}
+        if isinstance(parsed, Mapping):
+            readiness = parsed
+    ready_rows = [
+        row for row in readiness.get("providers") or ()
+        if isinstance(row, Mapping)
+        and row.get("configured") is True
+        and str(row.get("activation_phase") or "") in {"config_ready_no_live", "ready", "live_ready"}
+    ]
+    fastest = min(ready_rows, key=lambda row: int(row.get("priority_rank") or 999), default={})
+    fastest_name = str(fastest.get("provider") or "not identified")
+    if fastest_name in {"bybit_announcements", "bybit_announcements_public"}:
+        fastest_name = "Bybit official announcements"
+
+    packs = [row for row in coverage.get("packs") or () if isinstance(row, Mapping)]
+    source_pack_gap = _source_coverage_json_next_source(packs, coverage)
+    market_gap_count = 0
+    for opportunity in core_opportunities:
+        if not event_core_opportunities.core_opportunity_is_visible(opportunity):
+            continue
+        primary = getattr(opportunity, "primary_row", {}) or {}
+        components = primary.get("latest_score_components") or primary.get("score_components") or {}
+        status = str(
+            primary.get("market_context_freshness_status")
+            or (components.get("market_context_freshness_status") if isinstance(components, Mapping) else "")
+            or "missing"
+        )
+        if status in {"stale", "unknown", "missing"}:
+            market_gap_count += 1
+    dex_pack = next((row for row in packs if row.get("source_pack") == "dex_liquidity_pack"), {})
+    dex_gap = int(dex_pack.get("candidates_blocked_by_coverage_gap") or 0) if isinstance(dex_pack, Mapping) else 0
+    market_gap = f"targeted market refresh for {market_gap_count} current visible core row(s)"
+    if dex_gap:
+        market_gap += f"; DEX liquidity coverage gap blocks {dex_gap} candidate row(s)"
+    return [
+        f"- Highest strategic activation priority: {strategic_label} ({strategic_providers or 'provider not identified'}).",
+        f"- Fastest currently ready provider: {fastest_name}.",
+        f"- Largest current source-pack coverage gap: {source_pack_gap}.",
+        f"- Largest market-data gap: {market_gap}.",
     ]
 
 def _system_health_summary_lines(latest: Mapping[str, Any]) -> list[str]:
@@ -278,11 +357,12 @@ def _new_since_last_run_lines(runs: list[dict[str, Any]]) -> list[str]:
         return ["- No run history."]
     latest = runs[0]
     previous = runs[1] if len(runs) > 1 else {}
-    fields = ("raw_events", "candidates", "alerts", "watchlist_entries", "alertable")
+    latest_counters = event_alpha_run_counters.canonical_run_counters(latest)
+    previous_counters = event_alpha_run_counters.canonical_run_counters(previous)
     lines = []
-    for field in fields:
-        delta = int(latest.get(field) or 0) - int(previous.get(field) or 0)
-        lines.append(f"- {field}: {int(latest.get(field) or 0)} ({delta:+d} vs previous)")
+    for field in event_alpha_run_counters.COUNTER_FIELDS:
+        delta = latest_counters[field] - previous_counters[field]
+        lines.append(f"- {field}: {latest_counters[field]} ({delta:+d} vs previous)")
     return lines
 
 def _watchlist_hotter_lines(entries: list[event_watchlist.EventWatchlistEntry]) -> list[str]:

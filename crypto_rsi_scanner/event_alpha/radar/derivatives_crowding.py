@@ -214,6 +214,14 @@ def run_derivatives_crowding_scan_from_state_rows(
         )
         candidate["research_only"] = True
         candidate["no_send_rehearsal"] = bool(no_send_rehearsal)
+        for lineage_key in (
+            "provider_generation_id",
+            "provider_request_succeeded",
+            "provider_source_artifact",
+            "request_ledger_path",
+        ):
+            if state.get(lineage_key) not in (None, ""):
+                candidate[lineage_key] = state.get(lineage_key)
         candidate["strict_alerts_created"] = 0
         candidate["telegram_sends"] = 0
         candidate["trades_created"] = 0

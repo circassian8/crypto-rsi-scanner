@@ -46,12 +46,39 @@ def format_integrated_daily_brief(
     outcome_rows: Iterable[Mapping[str, Any]] = (),
     performance_snapshot: Mapping[str, Any] | None = None,
     source_coverage_path: str | Path | None = None,
+    run_id: str | None = None,
+    raw_events: int | None = None,
+    cumulative_store_rows: int | None = None,
 ) -> str:
     rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
     deliveries = [dict(row) for row in delivery_rows if isinstance(row, Mapping)]
     outcomes = [dict(row) for row in outcome_rows if isinstance(row, Mapping)]
     manifest_rows = _manifest_rows(input_manifest, context=context)
-    core_count = len([row for row in core_rows if isinstance(row, Mapping)])
+    materialized_core_rows = [dict(row) for row in core_rows if isinstance(row, Mapping)]
+    visible_core = event_core_opportunities.visible_core_opportunities(materialized_core_rows)
+    visible_core_rows = [item.primary_row for item in visible_core]
+    support_rows = [
+        row
+        for item in visible_core
+        for row in item.supporting_rows
+        if row is not item.primary_row and dict(row) != dict(item.primary_row)
+    ]
+    core_count = len(materialized_core_rows)
+    visible_core_count = len(visible_core_rows)
+    resolved_run_id = _integrated_run_id(
+        run_id,
+        deliveries,
+        materialized_core_rows,
+        rows,
+    )
+    raw_event_count = (
+        int(raw_events)
+        if raw_events is not None
+        else sum(int((item.get("row_counts") or {}).get("rows") or 0) for item in manifest_rows)
+    )
+    if raw_events is None and not manifest_rows:
+        raw_event_count = len(rows)
+    cumulative_core_count = int(cumulative_store_rows) if cumulative_store_rows is not None else core_count
     would_send = sum(1 for row in deliveries if row.get("would_send"))
     rendered = sum(_int(row.get("rendered_item_count")) for row in deliveries)
     skipped = sum(_int(row.get("skipped_item_count")) for row in deliveries)
@@ -63,12 +90,26 @@ def format_integrated_daily_brief(
         "## Executive Summary",
         f"Selected run profile: {context.profile if context else 'unknown'}",
         f"Selected run namespace: {context.artifact_namespace if context else 'unknown'}",
-        f"- Integrated candidates: {len(rows)}",
-        f"- Canonical core opportunities: {core_count}",
-        f"- Core opportunities: {core_count}",
-        f"- Strict alerts: 0",
-        f"- Alertable decisions: 0",
-        "- Telegram: no-send guard enabled for this integrated smoke.",
+        f"run_id: {resolved_run_id or 'unknown'}",
+        (
+            f"- raw_events={raw_event_count}; candidate_events={len(rows)}; "
+            f"research_candidates={len(rows)}; source_alert_snapshots=0"
+        ),
+        (
+            f"- current_generation_core_rows={core_count}; "
+            f"current_generation_visible_core_rows={visible_core_count}; "
+            f"cumulative_store_rows={cumulative_core_count}"
+        ),
+        (
+            f"- alertable_decisions=0; strict_alerts=0; "
+            f"preview_rendered_items={rendered}"
+        ),
+        "- burn_in_mode=no_send_notification_burn_in; send_guard_status=disabled_by_send_guard; "
+        "send_requested=false; send_attempted=false; no_send_rehearsal=true; delivered=false",
+        _freshness_scope_line("current_core_market_freshness", materialized_core_rows),
+        _freshness_scope_line("current_generation_visible_core_freshness", visible_core_rows),
+        _freshness_scope_line("support_row_market_freshness", support_rows),
+        _freshness_scope_line("quality_row_market_freshness", rows),
         f"- Source coverage report: {event_artifact_paths.artifact_display_path(source_coverage_path or SOURCE_COVERAGE_FILENAME)}",
         "",
         "### Input Manifest",
@@ -275,9 +316,21 @@ def format_integrated_notification_preview_from_deliveries(
     candidates: Iterable[Mapping[str, Any]] = (),
     core_rows: Iterable[Mapping[str, Any]] = (),
     context: event_alpha_artifacts.EventAlphaArtifactContext | None = None,
+    run_id: str | None = None,
+    raw_events: int | None = None,
+    cumulative_store_rows: int | None = None,
 ) -> str:
     deliveries = [dict(row) for row in delivery_rows if isinstance(row, Mapping)]
     rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
+    materialized_core_rows = [dict(row) for row in core_rows if isinstance(row, Mapping)]
+    visible_core_count = len(event_core_opportunities.visible_core_opportunities(materialized_core_rows))
+    resolved_run_id = _integrated_run_id(run_id, deliveries, materialized_core_rows, rows)
+    raw_event_count = int(raw_events) if raw_events is not None else len(rows)
+    cumulative_core_count = (
+        int(cumulative_store_rows)
+        if cumulative_store_rows is not None
+        else len(materialized_core_rows)
+    )
     due = sum(1 for row in deliveries if row.get("would_send"))
     rendered = sum(_int(row.get("rendered_item_count")) for row in deliveries)
     eligible = sum(_int(row.get("eligible_item_count")) for row in deliveries)
@@ -292,16 +345,26 @@ def format_integrated_notification_preview_from_deliveries(
         "Research-only / unvalidated. Not a trade signal.",
         f"Profile: {context.profile if context else 'unknown'}",
         f"Namespace: {context.artifact_namespace if context else 'unknown'}",
+        f"run_id: {resolved_run_id or 'unknown'}",
+        "burn_in_mode: no_send_notification_burn_in",
+        "send_guard_status: disabled_by_send_guard",
+        "send_requested: false",
+        "send_attempted: false",
+        "no_send_rehearsal: true",
+        "delivered: false",
+        "Send guard: disabled (no-send rehearsal)",
         "No-send rehearsal: would send, but send guard is disabled.",
         "This is expected in rehearsal mode. No Telegram delivery attempted.",
         "",
         "Summary:",
-        f"- Strict alerts: 0",
-        f"- Alertable decisions: 0",
-        f"- Research candidates: {len(rows)}",
-        f"- Raw source candidates: {len(rows)}",
-        f"- Canonical core opportunities: {len([row for row in core_rows if isinstance(row, Mapping)])}",
-        f"- Preview rendered items: {rendered}",
+        f"Raw events: {raw_event_count} · Candidate events: {len(rows)} · Research candidates: {len(rows)}",
+        (
+            "Source alert snapshots: 0 · "
+            f"Current-generation core rows: {len(materialized_core_rows)} · "
+            f"Current-generation visible core rows: {visible_core_count} · "
+            f"Cumulative store rows: {cumulative_core_count}"
+        ),
+        f"Alertable decisions: 0 · Strict alerts: 0 · Preview-rendered items: {rendered}",
         f"- Preview eligible items: {eligible}",
         f"- Preview skipped items: {skipped}",
         f"- Delivery lanes due/sent/blocked: {due}/0/{due}",
@@ -326,7 +389,7 @@ def format_integrated_notification_preview_from_deliveries(
         if body:
             lines.append(body)
             lines.append("")
-    lines.append("This preview avoids the ambiguous raw 'Alerts' count; raw rows are shown as research candidates.")
+    lines.append("Canonical counter scopes are explicit; no legacy raw Alerts or raw-source-candidate aliases are rendered.")
     return event_artifact_paths.scrub_absolute_paths_from_markdown("\n".join(lines).rstrip() + "\n")
 
 def format_integrated_notification_preview(
@@ -619,6 +682,36 @@ def _source_coverage_lines(rows: list[dict[str, Any]]) -> list[str]:
     lines = [f"- {pack}: {count}" for pack, count in counts.most_common()]
     lines.append(f"- Most useful next source is lane-critical: {_canonical_source_priority_summary()}.")
     return lines
+
+
+def _integrated_run_id(explicit: str | None, *row_groups: Iterable[Mapping[str, Any]]) -> str | None:
+    if str(explicit or "").strip():
+        return str(explicit).strip()
+    run_ids = {
+        str(row.get("run_id") or "").strip()
+        for rows in row_groups
+        for row in rows
+        if str(row.get("run_id") or "").strip()
+    }
+    return next(iter(run_ids)) if len(run_ids) == 1 else None
+
+
+def _freshness_scope_line(scope: str, rows: Iterable[Mapping[str, Any]]) -> str:
+    materialized = [row for row in rows if isinstance(row, Mapping)]
+    statuses = Counter(_integrated_market_freshness(row) for row in materialized)
+    return f"- {scope}: total={len(materialized)}; statuses={_format_counts(statuses) if statuses else 'none'}"
+
+
+def _integrated_market_freshness(row: Mapping[str, Any]) -> str:
+    latest = row.get("latest_market_snapshot") if isinstance(row.get("latest_market_snapshot"), Mapping) else {}
+    return str(
+        row.get("market_context_freshness_status")
+        or row.get("integrated_market_freshness_status")
+        or row.get("market_data_freshness")
+        or latest.get("market_context_freshness_status")
+        or latest.get("freshness_status")
+        or "missing"
+    )
 
 def _canonical_source_priority_labels() -> tuple[str, ...]:
     return tuple(

@@ -20,6 +20,7 @@ import crypto_rsi_scanner.event_alpha.radar.pipeline as event_alpha_pipeline
 import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import paths as event_artifact_paths
+from ...artifacts import run_counters as event_alpha_run_counters
 
 LANE_DAILY_DIGEST = "daily_digest"
 LANE_INSTANT_ESCALATION = "instant_escalation"

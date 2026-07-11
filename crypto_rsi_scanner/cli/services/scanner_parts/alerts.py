@@ -103,21 +103,20 @@ def _event_alpha_preview_summary_result(
     plan: event_alpha_notifications.EventAlphaNotificationPlan,
     profile: str,
 ) -> dict[str, object]:
-    """Return a preview-safe run summary with strict-alert wording normalized."""
+    """Return a preview-safe run summary with canonical counter scopes."""
     data = dict(latest_run or {})
-    strict_alerts = _event_alpha_preview_int(data.get("strict_alerts") or data.get("strict_alert_count") or data.get("alertable"))
-    research_candidates = _event_alpha_preview_int(data.get("candidates") or data.get("research_candidates") or data.get("alerts"))
-    raw_source_candidates = _event_alpha_preview_int(
-        data.get("raw_source_candidates")
-        or data.get("source_candidates")
-        or data.get("candidate_rows")
-        or research_candidates
-    )
     data["profile"] = data.get("profile") or profile
     data["cycle_completed"] = bool(data.get("cycle_completed", bool(latest_run)))
-    data["alerts"] = strict_alerts
-    data["candidates"] = research_candidates
-    data["raw_source_candidates"] = raw_source_candidates
+    data["preview_rendered_items"] = (
+        sum(_event_alpha_preview_int(value) for value in plan.lane_counts.values())
+        + int(bool(plan.heartbeat_due))
+    )
+    counters = event_alpha_run_counters.canonical_run_counters(data)
+    send_state = event_alpha_run_counters.canonical_send_state(data)
+    data["counter_schema_version"] = event_alpha_run_counters.COUNTER_SCHEMA_VERSION
+    data.update(counters)
+    data.update(event_alpha_run_counters.deprecated_counter_aliases(counters))
+    data.update(send_state)
     data["send_lane_items_attempted"] = dict(plan.lane_counts)
     data["send_lane_items_delivered"] = {lane: 0 for lane in event_alpha_notifications.LANES}
     data["send_would_send_items"] = int(plan.would_send_count or 0)

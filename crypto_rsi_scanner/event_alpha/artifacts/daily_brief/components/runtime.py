@@ -19,6 +19,8 @@ import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core
 import crypto_rsi_scanner.event_alpha.radar.evidence_acquisition as event_evidence_acquisition
 import crypto_rsi_scanner.event_alpha.radar.near_miss as event_near_miss
 import crypto_rsi_scanner.event_alpha.artifacts.run_ledger as event_alpha_run_ledger
+import crypto_rsi_scanner.event_alpha.artifacts.run_counters as event_alpha_run_counters
+import crypto_rsi_scanner.event_alpha.artifacts.operator_state as event_alpha_operator_state
 import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 import crypto_rsi_scanner.event_alpha.radar.source_coverage as event_alpha_source_coverage
 import crypto_rsi_scanner.event_alpha.radar.opportunity_verdict as event_opportunity_verdict

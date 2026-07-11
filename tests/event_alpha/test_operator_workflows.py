@@ -763,6 +763,38 @@ def test_event_alpha_explain_last_run_paths():
     ], alert_rows=[{"run_mode": "burn_in", "artifact_namespace": "no_key_live", "tier": "STORE_ONLY", "rejected_reason": "source_noise"}])
     assert "router produced no alertable decisions" in routed
     assert "skipped_budget=1" in routed
+    assert "candidate_events=2 · research_candidates=2 · source_alert_snapshots=0" in routed
+    assert "alertable_decisions=0 · strict_alerts=0" in routed
+    assert " · candidates=" not in routed
+    assert " · alerts=" not in routed
+    assert "top route suppression reasons: source_noise=1" in routed
+
+    canonical = event_alpha_explain.format_last_run_explanation([
+        {
+            "run_id": "r3",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "no_key_live",
+            "success": True,
+            "raw_events": 8,
+            "candidate_events": 4,
+            "research_candidates": 3,
+            "source_alert_snapshots": 2,
+            "current_generation_core_rows": 5,
+            "current_generation_visible_core_rows": 3,
+            "cumulative_store_rows": 21,
+            "routed": 3,
+            "alertable_decisions": 1,
+            "strict_alerts": 0,
+            "preview_rendered_items": 2,
+            "send_requested": False,
+            "send_attempted": False,
+        }
+    ])
+    assert "candidate_events=4 · research_candidates=3 · source_alert_snapshots=2" in canonical
+    assert "current_generation_core_rows=5 · current_generation_visible_core_rows=3 · cumulative_store_rows=21" in canonical
+    assert "alertable_decisions=1 · strict_alerts=0 · preview_rendered_items=2" in canonical
+    assert "burn_in_mode=no_send_notification_burn_in" in canonical
+    assert "none qualified as strict alerts" in canonical
 
     rows = [
         {"run_id": "default-newer", "profile": "default", "run_mode": "burn_in", "artifact_namespace": "default", "started_at": "2026-06-19T12:00:00+00:00", "success": True},

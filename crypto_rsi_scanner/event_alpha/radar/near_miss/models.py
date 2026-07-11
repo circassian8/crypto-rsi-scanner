@@ -44,6 +44,9 @@ class EventTargetedMarketRefreshQueueItem:
     current_market_source: str | None
     current_market_age_seconds: float | None
     priority_score: float
+    canonical_asset_id: str = ""
+    priority_bucket: str = "fresh_candidate"
+    candidate_family_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

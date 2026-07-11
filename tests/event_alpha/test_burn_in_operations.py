@@ -206,8 +206,8 @@ def test_daily_review_inbox_prioritizes_contract_counted_candidates(tmp_path):
     assert payload["items"][0]["contract_counted_candidate"] is True
     md = (ns / review_inbox.INBOX_MD).read_text(encoding="utf-8")
     assert "## Contract-Counted Burn-In Candidates" in md
-    assert "## High-Value Review Candidates Not Contract-Counted" in md
-    assert "## Diagnostic / Support Items" in md
+    assert "## High-Value Non-Counted Review Candidates" in md
+    assert "## Diagnostics / Support" in md
     assert md.index("LIVE / live") < md.index("SUPPORT / support")
 
 
@@ -818,11 +818,11 @@ def test_scorecard_default_policy_excludes_no_key_live_candidates(tmp_path, monk
     payload = scorecard.build_scorecard(profile="live_burn_in_no_send", base_dir=tmp_path)
     assert payload["namespace_scope"] == "policy"
     assert payload["included_namespaces"] == ["live_burn_in_20260705"]
-    assert payload["evidence_scope"] == "real_burn_in_evidence"
+    assert payload["evidence_scope"] == "active_burn_in_no_candidate_evidence"
     assert payload["candidate_rows_seen"] == 1
-    assert payload["real_candidates_seen"] == 1
-    assert payload["real_burn_in_candidate_count"] == 1
-    assert payload["contract_counted_candidate_count"] == 1
+    assert payload["real_candidates_seen"] == 0
+    assert payload["real_burn_in_candidate_count"] == 0
+    assert payload["contract_counted_candidate_count"] == 0
     assert payload["no_key_candidate_count"] == 1
     assert "no_key_live" in payload["excluded_namespaces"]
 
@@ -1305,7 +1305,7 @@ def test_burn_in_doctor_candidate_mode_manifest_and_provenance_checks():
     )
     doctor_operations_checks.apply_checks(ctx, blockers, warnings)
     assert any("daily_burn_in_candidate_mode_manifest_missing" in warning for warning in warnings)
-    assert any("daily_burn_in_contract_candidate_missing_provenance=2" in blocker for blocker in blockers)
+    assert any("daily_burn_in_contract_candidate_missing_provenance=3" in blocker for blocker in blockers)
     assert any("daily_burn_in_live_candidate_missing_request_ledger=1" in blocker for blocker in blockers)
     assert any("daily_burn_in_fixture_candidate_counted_as_real=1" in blocker for blocker in blockers)
     assert any("daily_burn_in_preflight_row_counted_as_candidate=1" in blocker for blocker in blockers)

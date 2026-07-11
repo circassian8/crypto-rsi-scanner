@@ -112,6 +112,16 @@ def _event_alpha_source_coverage_report_locked(context: Any) -> None:
         latest_run=True,
         include_api=True,
     ).rows
+    readiness_path = context.namespace_dir / event_alpha_source_coverage.LIVE_PROVIDER_READINESS_JSON
+    provider_readiness_payload: Mapping[str, Any] = {}
+    if readiness_path.exists():
+        try:
+            parsed_readiness = json.loads(readiness_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            parsed_readiness = {}
+        if isinstance(parsed_readiness, Mapping):
+            provider_readiness_payload = parsed_readiness
+    near_miss_candidates = event_near_miss.detect_near_miss_rows(core_rows)
     report = event_alpha_source_coverage.build_source_coverage_report(
         provider_status_report=provider_report,
         provider_health_rows=provider_rows,
@@ -123,6 +133,13 @@ def _event_alpha_source_coverage_report_locked(context: Any) -> None:
         cryptopanic_weekly_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_WEEKLY_REQUEST_LIMIT,
         cryptopanic_daily_soft_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT,
         artifact_namespace_dir=context.namespace_dir,
+        exact_run_row=operator_run,
+        provider_readiness_payload=provider_readiness_payload,
+        cryptopanic_configured_fallback=bool(
+            config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN
+            or config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
+        ),
+        near_miss_candidates=near_miss_candidates,
     )
     event_alpha_run_ledger.reconcile_cryptopanic_counts(
         context.run_ledger_path,
@@ -658,6 +675,7 @@ def _event_alpha_integrated_radar_fill_outcomes_report_locked(context: Any) -> N
         card_result.card_paths,
     )
     delivery_rows = event_integrated_radar.load_integrated_notification_deliveries(context.namespace_dir)
+    operator_counters = event_alpha_run_counters.canonical_run_counters(operator_run)
     daily_brief_path = context.namespace_dir / event_integrated_radar.DAILY_BRIEF_FILENAME
     daily_brief_path.write_text(
         event_integrated_radar.format_integrated_daily_brief(
@@ -668,6 +686,9 @@ def _event_alpha_integrated_radar_fill_outcomes_report_locked(context: Any) -> N
             outcome_rows=rows,
             performance_snapshot=performance,
             source_coverage_path=context.namespace_dir / event_integrated_radar.SOURCE_COVERAGE_FILENAME,
+            run_id=str((operator_run or {}).get("run_id") or "") or None,
+            raw_events=operator_counters["raw_events"],
+            cumulative_store_rows=operator_counters["cumulative_store_rows"],
         ),
         encoding="utf-8",
     )

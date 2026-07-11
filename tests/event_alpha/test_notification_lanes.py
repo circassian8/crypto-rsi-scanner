@@ -68,7 +68,7 @@ def test_event_alpha_blocked_heartbeat_preview_uses_pipeline_summary():
     assert result.deliveries_blocked == 1
     assert "Completed: yes" in text
     assert "Raw events: 159" in text
-    assert "Core opportunities: 122" in text
+    assert "Current-generation core rows: 122" in text
     assert "Extraction rows: 11" in text
     assert "LLM calls/skips: 8/0" in text
     assert "Delivery lanes: due=1 · sent=0 · would_send_but_guard_disabled=1" in text
@@ -77,7 +77,7 @@ def test_event_alpha_blocked_heartbeat_preview_uses_pipeline_summary():
     assert "would_send_but_guard_disabled" in text
     assert "status_detail=would_send_but_guard_disabled" in report
     assert "Raw events: 0" not in text
-    assert "Core opportunities: 0" not in text
+    assert "Current-generation core rows: 0" not in text
     assert "Completed: no" not in text
 
 

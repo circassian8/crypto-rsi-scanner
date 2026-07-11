@@ -390,17 +390,7 @@ def _notification_preview_consistency_conflicts(
     core_rows: Iterable[Mapping[str, Any]],
     latest_run_id: str | None,
 ) -> dict[str, int]:
-    out = {
-        "notification_preview_run_summary_mismatch": 0,
-        "notification_preview_llm_summary_mismatch": 0,
-        "notification_preview_lane_counts_mismatch": 0,
-        "notification_preview_core_count_mismatch": 0,
-        "notification_preview_alertable_count_mismatch": 0,
-        "notification_preview_missing_send_guard_status": 0,
-        "notification_preview_send_guard_status_missing": 0,
-        "notification_preview_no_send_status_unclear": 0,
-        "notification_preview_api_alerts_wording": 0,
-    }
+    out = _empty_notification_preview_conflicts()
     if not latest_run:
         return out
     path = _latest_preview_path(delivery_rows, latest_run_id=latest_run_id)
@@ -418,6 +408,67 @@ def _notification_preview_consistency_conflicts(
     )
     if not summary:
         return out
+    _add_counter_map(
+        out,
+        _notification_preview_run_field_conflicts(
+            summary,
+            latest_run=latest_run,
+            core_rows=core_rows,
+            latest_run_id=latest_run_id,
+        ),
+    )
+    _add_counter_map(
+        out,
+        _notification_preview_counter_conflicts(
+            summary,
+            text=text,
+            latest_run=latest_run,
+        ),
+    )
+    _add_counter_map(
+        out,
+        _notification_preview_delivery_summary_conflicts(
+            summary,
+            text=text,
+            latest_run=latest_run,
+            delivery_rows=delivery_rows,
+            latest_run_id=latest_run_id,
+        ),
+    )
+    return out
+
+
+def _empty_notification_preview_conflicts() -> dict[str, int]:
+    return {
+        "notification_preview_run_summary_mismatch": 0,
+        "notification_preview_llm_summary_mismatch": 0,
+        "notification_preview_lane_counts_mismatch": 0,
+        "notification_preview_core_count_mismatch": 0,
+        "notification_preview_alertable_count_mismatch": 0,
+        "notification_preview_missing_send_guard_status": 0,
+        "notification_preview_send_guard_status_missing": 0,
+        "notification_preview_no_send_status_unclear": 0,
+        "notification_preview_api_alerts_wording": 0,
+        "notification_preview_research_candidate_count_mismatch": 0,
+        "notification_preview_source_snapshot_count_mismatch": 0,
+        "notification_preview_rendered_item_count_mismatch": 0,
+        "notification_preview_counter_scope_mismatch": 0,
+        "notification_preview_legacy_counter_scope_mismatch": 0,
+    }
+
+
+def _notification_preview_run_field_conflicts(
+    summary: Mapping[str, Any],
+    *,
+    latest_run: Mapping[str, Any],
+    core_rows: Iterable[Mapping[str, Any]],
+    latest_run_id: str | None,
+) -> dict[str, int]:
+    out = {
+        "notification_preview_run_summary_mismatch": 0,
+        "notification_preview_core_count_mismatch": 0,
+        "notification_preview_alertable_count_mismatch": 0,
+    }
     if "completed" in summary:
         expected = bool(latest_run.get("cycle_completed", True))
         if bool(summary["completed"]) != expected:
@@ -441,6 +492,104 @@ def _notification_preview_consistency_conflicts(
     if "alertable" in summary:
         if _as_int(summary["alertable"]) != _as_int(latest_run.get("alertable")):
             out["notification_preview_alertable_count_mismatch"] += 1
+    return out
+
+
+def _notification_preview_counter_conflicts(
+    summary: Mapping[str, Any],
+    *,
+    text: str,
+    latest_run: Mapping[str, Any],
+) -> dict[str, int]:
+    out = {
+        "notification_preview_research_candidate_count_mismatch": 0,
+        "notification_preview_source_snapshot_count_mismatch": 0,
+        "notification_preview_rendered_item_count_mismatch": 0,
+        "notification_preview_counter_scope_mismatch": 0,
+        "notification_preview_legacy_counter_scope_mismatch": 0,
+    }
+    expected_counters = event_alpha_run_counters.canonical_run_counters(latest_run)
+    preview_counter_values = summary.get("_counter_values") or {}
+    counter_scope_keys = (
+        "raw_events",
+        "candidate_events",
+        "current_generation_core_rows",
+        "current_generation_visible_core_rows",
+        "cumulative_store_rows",
+        "alertable_decisions",
+        "strict_alerts",
+    )
+    for key in counter_scope_keys:
+        observed_values = tuple(preview_counter_values.get(key) or ())
+        if (
+            observed_values
+            and any(_as_int(value) != expected_counters[key] for value in observed_values)
+        ) or (
+            not observed_values
+            and key in summary
+            and _as_int(summary[key]) != expected_counters[key]
+        ):
+            out["notification_preview_counter_scope_mismatch"] += 1
+    research_values = tuple(preview_counter_values.get("research_candidates") or ())
+    if (
+        research_values
+        and any(_as_int(value) != expected_counters["research_candidates"] for value in research_values)
+    ) or (
+        not research_values
+        and "research_candidates" in summary
+        and _as_int(summary["research_candidates"]) != expected_counters["research_candidates"]
+    ):
+        out["notification_preview_research_candidate_count_mismatch"] += 1
+    snapshot_values = tuple(preview_counter_values.get("source_alert_snapshots") or ())
+    if (
+        snapshot_values
+        and any(_as_int(value) != expected_counters["source_alert_snapshots"] for value in snapshot_values)
+    ) or (
+        not snapshot_values
+        and "source_alert_snapshots" in summary
+        and _as_int(summary["source_alert_snapshots"]) != expected_counters["source_alert_snapshots"]
+    ):
+        out["notification_preview_source_snapshot_count_mismatch"] += 1
+    rendered_values = tuple(preview_counter_values.get("preview_rendered_items") or ())
+    if (
+        rendered_values
+        and any(_as_int(value) != expected_counters["preview_rendered_items"] for value in rendered_values)
+    ) or (
+        not rendered_values
+        and "preview_rendered_items" in summary
+        and _as_int(summary["preview_rendered_items"]) != expected_counters["preview_rendered_items"]
+    ):
+        out["notification_preview_rendered_item_count_mismatch"] += 1
+    if "core_opportunities" in summary:
+        out["notification_preview_counter_scope_mismatch"] += 1
+    if "raw_source_candidates" in summary:
+        declared_scope = bool(re.search(
+            r"(?i)Raw source candidates\s*\(deprecated alias:\s*candidate_events\):",
+            text,
+        ))
+        if (
+            not declared_scope
+            or _as_int(summary["raw_source_candidates"]) != expected_counters["candidate_events"]
+        ):
+            out["notification_preview_legacy_counter_scope_mismatch"] += 1
+    return out
+
+
+def _notification_preview_delivery_summary_conflicts(
+    summary: Mapping[str, Any],
+    *,
+    text: str,
+    latest_run: Mapping[str, Any],
+    delivery_rows: Iterable[Mapping[str, Any]],
+    latest_run_id: str | None,
+) -> dict[str, int]:
+    out = {
+        "notification_preview_llm_summary_mismatch": 0,
+        "notification_preview_lane_counts_mismatch": 0,
+        "notification_preview_missing_send_guard_status": 0,
+        "notification_preview_send_guard_status_missing": 0,
+        "notification_preview_no_send_status_unclear": 0,
+    }
     if "llm_calls" in summary:
         if _as_int(summary["llm_calls"]) != _as_int(latest_run.get("llm_calls_attempted")):
             out["notification_preview_llm_summary_mismatch"] += 1
@@ -493,7 +642,7 @@ def _active_preview_api_alerts_wording_count(
     return count
 
 def _notification_preview_api_alerts_wording(text: str, *, latest_run: Mapping[str, Any] | None) -> bool:
-    strict_alerts = _as_int((latest_run or {}).get("alerts"))
+    strict_alerts = event_alpha_run_counters.canonical_run_counters(latest_run)["strict_alerts"]
     bodies = "\n".join(_telegram_preview_bodies(text)) or text
     if strict_alerts > 0:
         return False
@@ -530,6 +679,7 @@ def _latest_preview_path(
 def _parse_notification_preview_summary(text: str) -> dict[str, Any]:
     bodies = "\n".join(_telegram_preview_bodies(text)) or text
     out: dict[str, Any] = {}
+    out["_counter_values"] = _notification_preview_counter_values(text)
     completed = re.search(r"(?im)^Completed:\s*(yes|no)\b", bodies)
     if completed:
         out["completed"] = completed.group(1).casefold() == "yes"
@@ -540,6 +690,52 @@ def _parse_notification_preview_summary(text: str) -> dict[str, Any]:
     if raw_core:
         out["raw_events"] = raw_core.group(1)
         out["core_opportunities"] = raw_core.group(2)
+    event_funnel = re.search(
+        r"(?im)^Raw events:\s*(\d+)\s*[·-]\s*Candidate events:\s*(\d+)\s*[·-]\s*Research candidates:\s*(\d+)\b",
+        bodies,
+    )
+    if event_funnel:
+        out["raw_events"] = event_funnel.group(1)
+        out["candidate_events"] = event_funnel.group(2)
+        out["research_candidates"] = event_funnel.group(3)
+    core_scopes = re.search(
+        r"(?im)^Source alert snapshots:\s*(\d+)\s*[·-]\s*Current-generation core rows:\s*(\d+)\s*[·-]\s*Current-generation visible core rows:\s*(\d+)\s*[·-]\s*Cumulative store rows:\s*(\d+)\b",
+        bodies,
+    )
+    if core_scopes:
+        out["source_alert_snapshots"] = core_scopes.group(1)
+        out["current_generation_core_rows"] = core_scopes.group(2)
+        out["current_generation_visible_core_rows"] = core_scopes.group(3)
+        out["cumulative_store_rows"] = core_scopes.group(4)
+    decision_scopes = re.search(
+        r"(?im)^Alertable decisions:\s*(\d+)\s*[·-]\s*Strict alerts:\s*(\d+)\s*[·-]\s*Preview-rendered items:\s*(\d+)\b",
+        bodies,
+    )
+    if decision_scopes:
+        out["alertable_decisions"] = decision_scopes.group(1)
+        out["strict_alerts"] = decision_scopes.group(2)
+        out["preview_rendered_items"] = decision_scopes.group(3)
+    for key, label in (
+        ("research_candidates", "Research candidates"),
+        ("strict_alerts", "Strict alerts"),
+        ("preview_rendered_items", "Preview-rendered items"),
+    ):
+        match = re.search(rf"(?i)(?:^|[·|]\s*){re.escape(label)}:\s*(\d+)\b", bodies, flags=re.MULTILINE)
+        if match:
+            out[key] = match.group(1)
+    rendered_summary = re.search(
+        r"(?im)^-\s*(?:preview_rendered_items|Rendered candidate items):\s*(\d+)\b",
+        text,
+    )
+    if rendered_summary:
+        out["preview_rendered_items"] = rendered_summary.group(1)
+    legacy_raw_source = re.search(
+        r"(?i)(?:^|[·|]\s*)Raw source candidates(?:\s*\([^)]*\))?:\s*(\d+)\b",
+        bodies,
+        flags=re.MULTILINE,
+    )
+    if legacy_raw_source:
+        out["raw_source_candidates"] = legacy_raw_source.group(1)
     alertable = re.search(r"(?im)^Alertable decisions:\s*(\d+)\b", bodies)
     if alertable:
         out["alertable"] = alertable.group(1)
@@ -554,6 +750,95 @@ def _parse_notification_preview_summary(text: str) -> dict[str, Any]:
     if lanes:
         out["lane_due"] = lanes.group(1)
         out["lane_sent"] = lanes.group(2)
+    return out
+
+
+def _notification_preview_counter_values(text: str) -> dict[str, tuple[int, ...]]:
+    labels = {
+        "raw_events": ("raw_events", "Raw events"),
+        "candidate_events": ("candidate_events", "Candidate events"),
+        "research_candidates": ("research_candidates", "Research candidates"),
+        "source_alert_snapshots": ("source_alert_snapshots", "Source alert snapshots"),
+        "current_generation_core_rows": (
+            "current_generation_core_rows",
+            "Current-generation core rows",
+        ),
+        "current_generation_visible_core_rows": (
+            "current_generation_visible_core_rows",
+            "Current-generation visible core rows",
+        ),
+        "cumulative_store_rows": ("cumulative_store_rows", "Cumulative store rows"),
+        "alertable_decisions": ("alertable_decisions", "Alertable decisions"),
+        "strict_alerts": ("strict_alerts", "Strict alerts"),
+        "preview_rendered_items": ("preview_rendered_items", "Preview-rendered items"),
+    }
+    values: dict[str, tuple[int, ...]] = {}
+    for key, aliases in labels.items():
+        alias_pattern = "|".join(re.escape(alias) for alias in aliases)
+        matches = re.findall(
+            rf"(?i)(?:{alias_pattern})\s*[:=]\s*(\d+)\b",
+            text,
+        )
+        if matches:
+            values[key] = tuple(int(value) for value in matches)
+    return values
+
+
+def _daily_brief_operator_semantic_conflicts(
+    path: str | Path | None,
+    *,
+    latest_run: Mapping[str, Any] | None,
+) -> dict[str, int]:
+    out = {
+        "daily_brief_counter_scope_confusion": 0,
+        "daily_brief_freshness_scope_missing": 0,
+        "daily_brief_current_core_freshness_total_mismatch": 0,
+        "daily_brief_visible_core_freshness_total_mismatch": 0,
+    }
+    if path is None or not latest_run:
+        return out
+    try:
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return out
+    required_scopes = (
+        "current_core_market_freshness",
+        "quality_row_market_freshness",
+        "support_row_market_freshness",
+        "current_generation_visible_core_freshness",
+    )
+    for scope in required_scopes:
+        if not re.search(rf"(?im)^-\s*{re.escape(scope)}:\s*total=\d+;\s*statuses=", text):
+            out["daily_brief_freshness_scope_missing"] += 1
+    freshness_lines = re.findall(r"(?im)^-\s*[^\n]*freshness[^\n]*statuses=[^\n]*$", text)
+    out["daily_brief_freshness_scope_missing"] += sum(
+        1 for line in freshness_lines if not any(scope in line for scope in required_scopes)
+    )
+    expected = event_alpha_run_counters.canonical_run_counters(latest_run)["current_generation_core_rows"]
+    current_core = re.search(
+        r"(?im)^-\s*current_core_market_freshness:\s*total=(\d+)\b",
+        text,
+    )
+    if current_core and _as_int(current_core.group(1)) != expected:
+        out["daily_brief_current_core_freshness_total_mismatch"] += 1
+    expected_visible = event_alpha_run_counters.canonical_run_counters(latest_run)[
+        "current_generation_visible_core_rows"
+    ]
+    visible_core = re.search(
+        r"(?im)^-\s*current_generation_visible_core_freshness:\s*total=(\d+)\b",
+        text,
+    )
+    if visible_core and _as_int(visible_core.group(1)) != expected_visible:
+        out["daily_brief_visible_core_freshness_total_mismatch"] += 1
+    if re.search(r"(?im)^-\s*Core opportunities:\s*\d+\b|canonical_store_rows=", text):
+        out["daily_brief_counter_scope_confusion"] += 1
+    for field in (
+        "current_generation_core_rows",
+        "current_generation_visible_core_rows",
+        "cumulative_store_rows",
+    ):
+        if not re.search(rf"\b{field}=\d+\b", text):
+            out["daily_brief_counter_scope_confusion"] += 1
     return out
 
 def _preview_is_no_send_or_blocked(
@@ -876,6 +1161,7 @@ __all__ = (
     '_notification_delivery_conflicts',
     '_delivery_status_field_conflicts',
     '_notification_preview_consistency_conflicts',
+    '_daily_brief_operator_semantic_conflicts',
     '_active_preview_api_alerts_wording_count',
     '_notification_preview_api_alerts_wording',
     '_latest_preview_path',

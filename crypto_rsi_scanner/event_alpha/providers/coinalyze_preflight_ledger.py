@@ -21,12 +21,20 @@ class _LedgeredCoinalyzeOpener:
         max_requests: int,
         opener: Callable[[Request, float], Any] | None,
         now: datetime,
+        provider_generation_id: str = "",
+        run_id: str = "",
+        profile: str | None = None,
+        artifact_namespace: str | None = None,
     ) -> None:
         self.ledger_path = ledger_path
         self.api_key = api_key
         self.max_requests = max_requests
         self.opener = opener
         self.started_now = now
+        self.provider_generation_id = provider_generation_id
+        self.run_id = run_id
+        self.profile = profile
+        self.artifact_namespace = artifact_namespace
         self.used = 0
 
     def __call__(self, request: Request, timeout: float) -> Any:
@@ -51,6 +59,10 @@ class _LedgeredCoinalyzeOpener:
             budget_before=before,
             budget_after=before - 1,
             api_key=self.api_key,
+            provider_generation_id=self.provider_generation_id,
+            run_id=self.run_id,
+            profile=self.profile,
+            artifact_namespace=self.artifact_namespace,
         )
 
     def _append_row(
@@ -63,19 +75,44 @@ class _LedgeredCoinalyzeOpener:
         after: int,
         exc: Exception,
     ) -> None:
-        _append_ledger_row(
-            self.ledger_path,
-            _ledger_row(
-                request,
-                started_at=started_at,
-                finished_at=finished_at,
-                budget_before=before,
-                budget_after=after,
-                success=False,
-                api_key=self.api_key,
-                error=exc,
-            ),
+        _append_failure_row(
+            self,
+            request,
+            started_at=started_at,
+            finished_at=finished_at,
+            before=before,
+            after=after,
+            exc=exc,
         )
+
+
+def _append_failure_row(
+    opener: _LedgeredCoinalyzeOpener,
+    request: Request,
+    *,
+    started_at: datetime,
+    finished_at: datetime,
+    before: int,
+    after: int,
+    exc: Exception,
+) -> None:
+    _append_ledger_row(
+        opener.ledger_path,
+        _ledger_row(
+            request,
+            started_at=started_at,
+            finished_at=finished_at,
+            budget_before=before,
+            budget_after=after,
+            success=False,
+            api_key=opener.api_key,
+            error=exc,
+            provider_generation_id=opener.provider_generation_id,
+            run_id=opener.run_id,
+            profile=opener.profile,
+            artifact_namespace=opener.artifact_namespace,
+        ),
+    )
 
 
 class _LedgeredCoinalyzeResponse:
@@ -89,6 +126,10 @@ class _LedgeredCoinalyzeResponse:
         budget_before: int,
         budget_after: int,
         api_key: str,
+        provider_generation_id: str,
+        run_id: str,
+        profile: str | None,
+        artifact_namespace: str | None,
     ) -> None:
         self.response = response
         self.request = request
@@ -97,6 +138,10 @@ class _LedgeredCoinalyzeResponse:
         self.budget_before = budget_before
         self.budget_after = budget_after
         self.api_key = api_key
+        self.provider_generation_id = provider_generation_id
+        self.run_id = run_id
+        self.profile = profile
+        self.artifact_namespace = artifact_namespace
         self.payload: bytes | None = None
         self.entered: Any = None
 
@@ -121,6 +166,10 @@ class _LedgeredCoinalyzeResponse:
             response=self.entered or self.response,
             payload=self.payload,
             error=exc if isinstance(exc, Exception) else None,
+            provider_generation_id=self.provider_generation_id,
+            run_id=self.run_id,
+            profile=self.profile,
+            artifact_namespace=self.artifact_namespace,
         )
         _append_ledger_row(self.ledger_path, row)
         if hasattr(self.response, "__exit__"):
@@ -156,6 +205,10 @@ def _ledger_row(
     response: Any | None = None,
     payload: bytes | None = None,
     error: Exception | None = None,
+    provider_generation_id: str = "",
+    run_id: str = "",
+    profile: str | None = None,
+    artifact_namespace: str | None = None,
 ) -> dict[str, Any]:
     status_code = _status_code(response, error)
     safe_error = _safe_error_message(error, api_key) if error else None
@@ -178,6 +231,10 @@ def _ledger_row(
         "live_call_allowed": True,
         "token_redacted": True,
         "no_send_rehearsal": True,
+        "provider_generation_id": provider_generation_id,
+        "run_id": run_id,
+        "profile": profile,
+        "artifact_namespace": artifact_namespace,
     }
 
 

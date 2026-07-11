@@ -12,6 +12,7 @@ from . import models as _models
 from . import refresh as _refresh
 from . import candidates as _candidates
 from . import report as _report
+from . import targeted as _targeted
 from . import utils as _utils
 
 _SPLIT_MODULES = (
@@ -19,6 +20,7 @@ _SPLIT_MODULES = (
     _refresh,
     _candidates,
     _report,
+    _targeted,
     _utils,
 )
 

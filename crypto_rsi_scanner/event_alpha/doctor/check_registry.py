@@ -239,6 +239,24 @@ CHECKS: tuple[DoctorCheck, ...] = (
         "Rendered notification bodies must match canonical core opportunity identity.",
     ),
     _check(
+        "notification.preview_counter_scopes",
+        CATEGORY_NOTIFICATION,
+        "blocker",
+        (
+            "candidate_events", "research_candidates", "source_alert_snapshots",
+            "current_generation_core_rows", "current_generation_visible_core_rows",
+            "cumulative_store_rows", "strict_alerts", "preview_rendered_items",
+        ),
+        "Notification previews must preserve exact run-ledger counter scopes.",
+    ),
+    _check(
+        "notification.daily_brief_freshness_scopes",
+        CATEGORY_NOTIFICATION,
+        "blocker",
+        ("run_id", "daily_brief_path"),
+        "Daily briefs must label each freshness population and reconcile current-core totals.",
+    ),
+    _check(
         "integrated_radar.candidate_required_lane",
         CATEGORY_INTEGRATED_RADAR,
         "blocker",
@@ -258,6 +276,23 @@ CHECKS: tuple[DoctorCheck, ...] = (
         "blocker",
         ("market_state_snapshot", "source_url", "source_strength"),
         "Confirmed research lanes require source and market evidence.",
+    ),
+    _check(
+        "integrated_radar.targeted_market_refresh_lineage",
+        CATEGORY_INTEGRATED_RADAR,
+        "blocker",
+        (
+            "targeted_market_refresh_id", "canonical_asset_id", "attempted",
+            "status", "provider", "run_id", "market_refresh_artifact",
+        ),
+        "Targeted market refresh rows must reconcile one bounded provider batch to exact-run snapshots and candidates.",
+    ),
+    _check(
+        "integrated_radar.targeted_market_refresh_budget",
+        CATEGORY_INTEGRATED_RADAR,
+        "blocker",
+        ("request_count", "selected_assets", "timeout_seconds", "duration_seconds"),
+        "Targeted market refresh must remain within its one-batch, twenty-asset, timeout-bounded contract.",
     ),
     _check(
         "integrated_radar.fade_requires_crowding_exhaustion",
@@ -319,6 +354,20 @@ CHECKS: tuple[DoctorCheck, ...] = (
         "blocker",
         ("evidence", "card_path", "source_url"),
         "Accepted evidence must be visible on the corresponding research card.",
+    ),
+    _check(
+        "source_coverage.exact_run_provider_semantics",
+        CATEGORY_SOURCE_COVERAGE,
+        "blocker",
+        ("run_id", "configured", "live_call_allowed", "skip_reason", "status"),
+        "Exact-run ledger, readiness, and source-coverage provider semantics must agree.",
+    ),
+    _check(
+        "source_coverage.blocker_accounting",
+        CATEGORY_SOURCE_COVERAGE,
+        "blocker",
+        ("candidate_count", "source_pack", "status"),
+        "Explicit source blockers cannot be reported as zero merely because acquisition rows are absent.",
     ),
     _check(
         "provider_readiness.live_calls_blocked_in_smoke",

@@ -59,49 +59,85 @@ class EventAlphaNamespaceStatus:
     operator_state_status: str | None = None
     doctor_run_id: str | None = None
     doctor_state_revision: int | None = None
+    counter_schema_version: str | None = None
+    raw_events: int | None = None
+    candidate_events: int | None = None
+    research_candidates: int | None = None
+    source_alert_snapshots: int | None = None
+    current_generation_core_rows: int | None = None
+    current_generation_visible_core_rows: int | None = None
+    cumulative_store_rows: int | None = None
+    alertable_decisions: int | None = None
+    strict_alerts: int | None = None
+    preview_rendered_items: int | None = None
+    burn_in_mode: str | None = None
+    send_guard_status: str | None = None
+    send_requested: bool | None = None
+    send_attempted: bool | None = None
+    no_send_rehearsal: bool | None = None
     marked_at: str | None = None
     marker_path: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        superseded: Any
-        if self.superseded_by and "," in self.superseded_by:
-            superseded = [item.strip() for item in self.superseded_by.split(",") if item.strip()]
-        else:
-            superseded = self.superseded_by
-        return {
-            "schema_id": "namespace_status_v1",
-            "schema_version": schema_v1.EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION,
-            "row_type": "event_alpha_namespace_status",
-            "namespace": self.namespace,
-            "status": self.status,
-            "profile": self.profile,
-            "reason": self.reason,
-            "superseded_by": superseded,
-            "safe_for_send_readiness": bool(self.safe_for_send_readiness),
-            "safe_for_burn_in_measurement": bool(self.safe_for_burn_in_measurement),
-            "safe_for_calibration": bool(self.safe_for_calibration),
-            "created_at": self.created_at,
-            "last_updated_at": self.last_updated_at,
-            "last_verified_at": self.last_verified_at,
-            "retention_policy": self.retention_policy,
-            "archive_after_days": self.archive_after_days,
-            "prune_after_days": self.prune_after_days,
-            "current_doctor_status": self.current_doctor_status,
-            "latest_run_id": self.latest_run_id,
-            "artifact_counts": dict(self.artifact_counts or {}),
-            "key_artifacts_present": list(self.key_artifacts_present),
-            "missing_key_artifacts": list(self.missing_key_artifacts),
-            "readiness_required": bool(self.readiness_required),
-            "readiness_present": bool(self.readiness_present),
-            "operator_state_path": self.operator_state_path,
-            "operator_state_run_id": self.operator_state_run_id,
-            "operator_state_revision": self.operator_state_revision,
-            "operator_state_status": self.operator_state_status,
-            "doctor_run_id": self.doctor_run_id,
-            "doctor_state_revision": self.doctor_state_revision,
-            "marked_at": self.marked_at,
-            "marker_path": self.marker_path,
-        }
+        return _namespace_status_payload(self)
+
+
+def _namespace_status_payload(status: EventAlphaNamespaceStatus) -> dict[str, Any]:
+    superseded: Any
+    if status.superseded_by and "," in status.superseded_by:
+        superseded = [item.strip() for item in status.superseded_by.split(",") if item.strip()]
+    else:
+        superseded = status.superseded_by
+    return {
+        "schema_id": "namespace_status_v1",
+        "schema_version": schema_v1.EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION,
+        "row_type": "event_alpha_namespace_status",
+        "namespace": status.namespace,
+        "status": status.status,
+        "profile": status.profile,
+        "reason": status.reason,
+        "superseded_by": superseded,
+        "safe_for_send_readiness": bool(status.safe_for_send_readiness),
+        "safe_for_burn_in_measurement": bool(status.safe_for_burn_in_measurement),
+        "safe_for_calibration": bool(status.safe_for_calibration),
+        "created_at": status.created_at,
+        "last_updated_at": status.last_updated_at,
+        "last_verified_at": status.last_verified_at,
+        "retention_policy": status.retention_policy,
+        "archive_after_days": status.archive_after_days,
+        "prune_after_days": status.prune_after_days,
+        "current_doctor_status": status.current_doctor_status,
+        "latest_run_id": status.latest_run_id,
+        "artifact_counts": dict(status.artifact_counts or {}),
+        "key_artifacts_present": list(status.key_artifacts_present),
+        "missing_key_artifacts": list(status.missing_key_artifacts),
+        "readiness_required": bool(status.readiness_required),
+        "readiness_present": bool(status.readiness_present),
+        "operator_state_path": status.operator_state_path,
+        "operator_state_run_id": status.operator_state_run_id,
+        "operator_state_revision": status.operator_state_revision,
+        "operator_state_status": status.operator_state_status,
+        "doctor_run_id": status.doctor_run_id,
+        "doctor_state_revision": status.doctor_state_revision,
+        "counter_schema_version": status.counter_schema_version,
+        "raw_events": status.raw_events,
+        "candidate_events": status.candidate_events,
+        "research_candidates": status.research_candidates,
+        "source_alert_snapshots": status.source_alert_snapshots,
+        "current_generation_core_rows": status.current_generation_core_rows,
+        "current_generation_visible_core_rows": status.current_generation_visible_core_rows,
+        "cumulative_store_rows": status.cumulative_store_rows,
+        "alertable_decisions": status.alertable_decisions,
+        "strict_alerts": status.strict_alerts,
+        "preview_rendered_items": status.preview_rendered_items,
+        "burn_in_mode": status.burn_in_mode,
+        "send_guard_status": status.send_guard_status,
+        "send_requested": status.send_requested,
+        "send_attempted": status.send_attempted,
+        "no_send_rehearsal": status.no_send_rehearsal,
+        "marked_at": status.marked_at,
+        "marker_path": status.marker_path,
+    }
 
 
 def mark_namespace_stale(
@@ -258,6 +294,17 @@ def refresh_namespace_status(
             "operator_state_status": str(state.get("manifest_status") or ("invalid" if loaded.exists else "missing")),
             "doctor_run_id": str(doctor.get("run_id") or "") or None,
             "doctor_state_revision": _int_or_none(doctor.get("verified_revision")),
+            **{
+                key: state.get(key)
+                for key in (
+                    "counter_schema_version", "raw_events", "candidate_events",
+                    "research_candidates", "source_alert_snapshots",
+                    "current_generation_core_rows", "current_generation_visible_core_rows",
+                    "cumulative_store_rows", "alertable_decisions", "strict_alerts",
+                    "preview_rendered_items", "burn_in_mode", "send_guard_status",
+                    "send_requested", "send_attempted", "no_send_rehearsal",
+                )
+            },
             "marked_at": str(existing.get("marked_at") or timestamp),
             "marker_path": event_artifact_paths.artifact_display_path(marker),
         }
@@ -353,6 +400,22 @@ def load_namespace_status(namespace_dir: str | Path | None) -> EventAlphaNamespa
         operator_state_status=str(payload.get("operator_state_status") or "") or None,
         doctor_run_id=str(payload.get("doctor_run_id") or "") or None,
         doctor_state_revision=_int_or_none(payload.get("doctor_state_revision")),
+        counter_schema_version=str(payload.get("counter_schema_version") or "") or None,
+        raw_events=_int_or_none(payload.get("raw_events")),
+        candidate_events=_int_or_none(payload.get("candidate_events")),
+        research_candidates=_int_or_none(payload.get("research_candidates")),
+        source_alert_snapshots=_int_or_none(payload.get("source_alert_snapshots")),
+        current_generation_core_rows=_int_or_none(payload.get("current_generation_core_rows")),
+        current_generation_visible_core_rows=_int_or_none(payload.get("current_generation_visible_core_rows")),
+        cumulative_store_rows=_int_or_none(payload.get("cumulative_store_rows")),
+        alertable_decisions=_int_or_none(payload.get("alertable_decisions")),
+        strict_alerts=_int_or_none(payload.get("strict_alerts")),
+        preview_rendered_items=_int_or_none(payload.get("preview_rendered_items")),
+        burn_in_mode=str(payload.get("burn_in_mode") or "") or None,
+        send_guard_status=str(payload.get("send_guard_status") or "") or None,
+        send_requested=payload.get("send_requested") if isinstance(payload.get("send_requested"), bool) else None,
+        send_attempted=payload.get("send_attempted") if isinstance(payload.get("send_attempted"), bool) else None,
+        no_send_rehearsal=payload.get("no_send_rehearsal") if isinstance(payload.get("no_send_rehearsal"), bool) else None,
         marked_at=str(payload.get("marked_at") or "") or None,
         marker_path=event_artifact_paths.artifact_display_path(marker),
     )
@@ -379,6 +442,24 @@ def format_namespace_status(status: EventAlphaNamespaceStatus | None) -> str:
         f"safe_for_burn_in_measurement: {str(status.safe_for_burn_in_measurement).lower()}",
         f"safe_for_calibration: {str(status.safe_for_calibration).lower()}",
         f"current_doctor_status: {status.current_doctor_status or 'unknown'}",
+        (
+            "run_counters: "
+            f"raw_events={status.raw_events or 0} candidate_events={status.candidate_events or 0} "
+            f"research_candidates={status.research_candidates or 0} source_alert_snapshots={status.source_alert_snapshots or 0} "
+            f"current_generation_core_rows={status.current_generation_core_rows or 0} "
+            f"current_generation_visible_core_rows={status.current_generation_visible_core_rows or 0} "
+            f"cumulative_store_rows={status.cumulative_store_rows or 0} "
+            f"alertable_decisions={status.alertable_decisions or 0} strict_alerts={status.strict_alerts or 0} "
+            f"preview_rendered_items={status.preview_rendered_items or 0}"
+        ),
+        (
+            "notification_state: "
+            f"burn_in_mode={status.burn_in_mode or 'unknown'} "
+            f"send_guard_status={status.send_guard_status or 'unknown'} "
+            f"send_requested={str(status.send_requested).lower() if status.send_requested is not None else 'unknown'} "
+            f"send_attempted={str(status.send_attempted).lower() if status.send_attempted is not None else 'unknown'} "
+            f"no_send_rehearsal={str(status.no_send_rehearsal).lower() if status.no_send_rehearsal is not None else 'unknown'}"
+        ),
         f"last_verified_at: {status.last_verified_at or 'unknown'}",
         f"marked_at: {status.marked_at or 'unknown'}",
         f"marker_path: {status.marker_path or 'none'}",

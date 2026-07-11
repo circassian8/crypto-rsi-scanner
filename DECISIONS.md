@@ -16,6 +16,33 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-11 - Count provider burn-in evidence only from an exact guarded attempt
+**Status:** accepted
+**Decision:** Event Alpha provider-backed burn-in candidates count only when the
+current rehearsal report, provider generation id, provider run id, profile,
+artifact namespace, successful no-send request-ledger row, namespace-local
+source artifact, and provider-specific provenance all agree. Every provider
+attempt gets a unique generation even under a fixed research clock; a later
+failed retry cannot reuse an earlier success, and current lineage may update
+only matching current core rows. Provider live authority must already exist in
+the provider-specific environment gate; a CLI boolean cannot grant it.
+Readiness may proceed with any one ready priority provider, while still
+reporting whether all priority providers are ready and preserving the separate
+strategic activation order. Targeted market refresh is one bounded,
+canonical-asset-deduplicated batch (default maximum 20) and cannot promote a
+source-less anomaly; market confirmation still requires strong source evidence.
+Operator artifacts use canonical raw/candidate/research/snapshot/current-core/
+visible-current/cumulative/alertable/strict/preview counters and explicitly
+named freshness scopes rather than legacy `alerts` or unlabeled populations.
+**Why:** Reused fixed-clock identities, legacy counter aliases, and environment-
+local configuration checks could overstate observed evidence or let individually
+reasonable reports contradict the exact run. Exact attempt lineage and scoped
+operator language keep research burn-in measurable without weakening no-send,
+no-trading, no-paper, no-RSI, or no-trigger safety.
+**Revisit when:** Immutable per-attempt artifact directories make the current
+generation/report/ledger joins redundant, or reviewed burn-in evidence justifies
+a deliberate provider-activation or market-confirmation policy change.
+
 ## 2026-07-11 - Treat one exact operator generation as the readiness authority
 **Status:** accepted
 **Decision:** Active Event Alpha namespaces must maintain one atomic operator
