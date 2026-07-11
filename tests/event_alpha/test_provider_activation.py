@@ -29,13 +29,50 @@ def test_live_provider_readiness_smoke_new_package_path_is_no_call():
         )
         json_path, md_path = live_provider_readiness.write_readiness_artifacts(report, tmp)
         payload = json.loads(json_path.read_text(encoding="utf-8"))
+        markdown = md_path.read_text(encoding="utf-8")
 
     providers = {row["provider_name"]: row for row in payload["providers"]}
     assert payload["live_calls_allowed"] is False
     assert providers["coinalyze"]["live_call_allowed"] is False
     assert providers["bybit_announcements_public"]["live_call_allowed"] is False
     assert providers["geckoterminal"]["live_call_allowed"] is False
+    assert [row["category"] for row in payload["recommended_next_activation_order"][:2]] == [
+        "Derivatives/OI/funding",
+        "Official exchange announcements",
+    ]
+    assert [row["category"] for row in payload["recommended_next_activation_order"][-2:]] == [
+        "CryptoPanic context",
+        "RSS/GDELT context only",
+    ]
+    assert [row["provider"] for row in payload["activation_runbook"][:2]] == [
+        "coinalyze",
+        "bybit_announcements_public",
+    ]
+    assert payload["official_exchange_activation_runbook"][0].startswith("Overall activation category #2;")
+    assert markdown.index("- Coinalyze first:") < markdown.index("- Official exchange announcements second:")
     assert md_path.name == live_provider_readiness.READINESS_MD
+
+
+def test_integrated_source_coverage_uses_canonical_activation_order():
+    from crypto_rsi_scanner.event_alpha.radar import source_coverage
+    from crypto_rsi_scanner.event_alpha.radar.integrated.pipeline_parts import report as integrated_report
+
+    markdown = integrated_report.format_integrated_source_coverage(())
+    payload = integrated_report.format_integrated_source_coverage_json(())
+    canonical = source_coverage.SOURCE_COVERAGE_CATEGORY_PRIORITIES
+
+    assert markdown.index("1. Derivatives/OI/funding") < markdown.index("2. Official exchange announcements")
+    assert payload["lane_critical_priority"][:2] == [
+        "derivatives_oi_funding",
+        "official_exchange_announcements",
+    ]
+    assert payload["lane_critical_priority"][-2:] == [
+        "cryptopanic_context",
+        "rss_gdelt_context_only",
+    ]
+    assert [row["category"] for row in payload["category_priorities"]] == [
+        row["category"] for row in canonical
+    ]
 
 
 def test_event_provider_status_blocks_enrichment_only_config():

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Mapping
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import Any
 from .. import check_registry
 from ._utils import Messages, ctx_mapping, ctx_value
 from ...artifacts import paths as event_artifact_paths
+from ...artifacts import operator_state as event_alpha_operator_state
 from ...operations import common
 
 
@@ -26,6 +28,186 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
     _check_source_yield(source_yield, blockers)
     _check_review_inbox(ctx, review_inbox, blockers, warnings)
     _check_archive_manifest(archive_manifest, blockers)
+    _check_operator_state(ctx, blockers, warnings)
+
+
+def _check_operator_state(ctx: object, blockers: Messages, warnings: Messages) -> None:
+    if not hasattr(ctx, "latest_run_id"):
+        return
+    namespace_dir_value = ctx_value(ctx, "namespace_dir", None)
+    if not namespace_dir_value:
+        return
+    namespace_dir = Path(str(namespace_dir_value)).expanduser()
+    loaded = event_alpha_operator_state.load_operator_state(namespace_dir)
+    if not loaded.exists:
+        latest_run_id = str(ctx_value(ctx, "latest_run_id", "") or "")
+        persisted_latest = bool(
+            latest_run_id
+            and _run_ledger_contains(
+                namespace_dir,
+                latest_run_id,
+                run_ledger_path=ctx_value(ctx, "run_ledger_path", None),
+            )
+        )
+        target = blockers if persisted_latest else warnings
+        target.append(
+            check_registry.format_check_message(
+                (
+                    "namespace.operator_state_missing"
+                    if persisted_latest
+                    else "namespace.operator_state_missing_legacy"
+                ),
+                (
+                    f"operator_state_missing_for_latest_run={latest_run_id}"
+                    if persisted_latest
+                    else "operator_state_missing_legacy_namespace"
+                ),
+            )
+        )
+        return
+    if not loaded.valid or loaded.state is None:
+        blockers.append(
+            check_registry.format_check_message(
+                "namespace.operator_state_invalid",
+                f"operator_state_invalid={loaded.error or 'unknown'}",
+            )
+        )
+        return
+    state = loaded.state
+    latest_run_id = str(ctx_value(ctx, "latest_run_id", "") or "")
+    state_run_id = str(state.get("run_id") or "")
+    if latest_run_id and state_run_id != latest_run_id:
+        blockers.append(
+            check_registry.format_check_message(
+                "namespace.operator_state_run_mismatch",
+                f"operator_state_run_id={state_run_id or 'missing'} latest_run_id={latest_run_id}",
+            )
+        )
+    if str(state.get("artifact_namespace") or "") != str(ctx_value(ctx, "artifact_namespace", "") or ""):
+        blockers.append(
+            check_registry.format_check_message(
+                "namespace.operator_state_run_mismatch",
+                "operator_state_artifact_namespace_mismatch",
+            )
+        )
+    expected_profile = str(ctx_value(ctx, "profile", "") or "")
+    if expected_profile and str(state.get("profile") or "") != expected_profile:
+        blockers.append(
+            check_registry.format_check_message(
+                "namespace.operator_state_run_mismatch",
+                "operator_state_profile_mismatch",
+            )
+        )
+    artifacts = state.get("artifacts") if isinstance(state.get("artifacts"), Mapping) else {}
+    for name, entry_value in artifacts.items():
+        if not isinstance(entry_value, Mapping):
+            blockers.append(
+                check_registry.format_check_message(
+                    "namespace.operator_state_invalid",
+                    f"operator_artifact_not_object={name}",
+                )
+            )
+            continue
+        status = str(entry_value.get("status") or "")
+        if str(entry_value.get("run_id") or "") != state_run_id:
+            blockers.append(
+                check_registry.format_check_message(
+                    "namespace.operator_state_run_mismatch",
+                    f"operator_artifact_run_mismatch={name}",
+                )
+            )
+        if status != event_alpha_operator_state.STATUS_CURRENT:
+            if not str(entry_value.get("reason") or "").strip():
+                blockers.append(
+                    check_registry.format_check_message(
+                        "namespace.operator_artifact_coherence",
+                        f"operator_artifact_non_current_missing_reason={name}",
+                    )
+                )
+            continue
+        resolved = _resolve_operator_artifact_path(namespace_dir, entry_value.get("path"))
+        if resolved is None or not resolved.exists():
+            blockers.append(
+                check_registry.format_check_message(
+                    "namespace.operator_artifact_coherence",
+                    f"operator_artifact_current_path_missing={name}",
+                )
+            )
+            continue
+        if name == "notification_preview":
+            try:
+                header = resolved.read_text(encoding="utf-8", errors="replace")[:4096]
+            except OSError:
+                header = ""
+            if not event_alpha_operator_state.text_has_exact_run_id(header, state_run_id):
+                blockers.append(
+                    check_registry.format_check_message(
+                        "namespace.operator_artifact_coherence",
+                        "operator_notification_preview_run_mismatch",
+                    )
+                )
+        elif name in {"source_coverage_json", "provider_readiness_json"}:
+            try:
+                payload = json.loads(resolved.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                payload = {}
+            if not isinstance(payload, Mapping) or str(payload.get("run_id") or "") != state_run_id:
+                blockers.append(
+                    check_registry.format_check_message(
+                        "namespace.operator_artifact_coherence",
+                        f"operator_artifact_embedded_run_mismatch={name}",
+                    )
+                )
+        elif name in {"source_coverage_md", "provider_readiness_md"}:
+            try:
+                header = resolved.read_text(encoding="utf-8", errors="replace")[:8192]
+            except OSError:
+                header = ""
+            if not re.search(rf"(?m)^-?\s*run_id:\s*{re.escape(state_run_id)}\s*$", header):
+                blockers.append(
+                    check_registry.format_check_message(
+                        "namespace.operator_artifact_coherence",
+                        f"operator_artifact_embedded_run_mismatch={name}",
+                    )
+                )
+
+
+def _resolve_operator_artifact_path(namespace_dir: Path, value: object) -> Path | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    raw = Path(text).expanduser()
+    if raw.is_absolute():
+        return raw
+    return namespace_dir / raw
+
+
+def _run_ledger_contains(
+    namespace_dir: Path,
+    run_id: str,
+    *,
+    run_ledger_path: str | Path | None = None,
+) -> bool:
+    path = (
+        Path(run_ledger_path).expanduser()
+        if run_ledger_path not in (None, "")
+        else namespace_dir / "event_alpha_runs.jsonl"
+    )
+    if not path.exists():
+        return False
+    try:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(row, Mapping) and str(row.get("run_id") or "") == run_id:
+                return True
+    except OSError:
+        return False
+    return False
 
 
 def _check_daily_run(ctx: object, daily_run: Mapping[str, Any], blockers: Messages, warnings: Messages) -> None:

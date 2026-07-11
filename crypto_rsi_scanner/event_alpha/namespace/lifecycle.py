@@ -8,12 +8,16 @@ deleting or moving artifacts.
 from __future__ import annotations
 
 import json
+from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Iterable
 
 from ..artifacts import paths as event_artifact_paths
+from ..artifacts import locks as event_alpha_locks
+from ..artifacts import operator_state as event_alpha_operator_state
 from . import status as event_alpha_namespace_status
 
 
@@ -123,17 +127,49 @@ def write_namespace_lifecycle_report(
     target_dir = Path(out_dir).expanduser() if out_dir is not None else base
     target_dir.mkdir(parents=True, exist_ok=True)
     timestamp = now or datetime.now(timezone.utc)
-    registry = build_namespace_registry(base, now=timestamp)
-    _write_namespace_status_markers(base, registry, now=timestamp)
-    registry = build_namespace_registry(base, now=timestamp)
-    registry_path = target_dir / REGISTRY_FILENAME
-    report_path = target_dir / REPORT_FILENAME
-    registry_path.write_text(json.dumps(registry, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    report_path.write_text(format_namespace_lifecycle_report(registry), encoding="utf-8")
+    with ExitStack() as stack:
+        base_lock = stack.enter_context(
+            event_alpha_locks.artifact_mutation_guard(
+                SimpleNamespace(namespace_dir=base),
+                namespace=base.name,
+                command="namespace-lifecycle-report",
+                now=timestamp,
+            )
+        )
+        if not base_lock.owned:
+            raise RuntimeError(f"namespace lifecycle report blocked for {base.name}: {base_lock.status.message}")
+        child_dirs = _lifecycle_child_dirs(base)
+        for namespace_dir in child_dirs:
+            mutation_lock = stack.enter_context(
+                event_alpha_locks.artifact_mutation_guard(
+                    SimpleNamespace(namespace_dir=namespace_dir),
+                    namespace=namespace_dir.name,
+                    command="namespace-lifecycle-report",
+                    now=timestamp,
+                )
+            )
+            if not mutation_lock.owned:
+                raise RuntimeError(
+                    f"namespace lifecycle report blocked for {namespace_dir.name}: "
+                    f"{mutation_lock.status.message}"
+                )
+        if _lifecycle_child_dirs(base) != child_dirs:
+            raise RuntimeError("namespace lifecycle report blocked: namespace set changed while locks were acquired")
+        registry = build_namespace_registry(base, now=timestamp)
+        _write_namespace_status_markers(base, registry, now=timestamp)
+        registry = build_namespace_registry(base, now=timestamp)
+        registry_path = target_dir / REGISTRY_FILENAME
+        report_path = target_dir / REPORT_FILENAME
+        registry_path.write_text(json.dumps(registry, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        report_path.write_text(format_namespace_lifecycle_report(registry), encoding="utf-8")
     out = dict(registry)
     out["registry_path"] = event_artifact_paths.artifact_display_path(registry_path)
     out["report_path"] = event_artifact_paths.artifact_display_path(report_path)
     return out
+
+
+def _lifecycle_child_dirs(base: Path) -> tuple[Path, ...]:
+    return tuple(sorted(path for path in base.iterdir() if path.is_dir())) if base.exists() else ()
 
 
 def format_namespace_lifecycle_report(registry: dict[str, Any]) -> str:
@@ -243,7 +279,8 @@ def _namespace_row(namespace_dir: Path) -> NamespaceLifecycleRow:
     marker = event_alpha_namespace_status.load_namespace_status(namespace_dir)
     status, reason, superseded_by = _classify_namespace(namespace, marker)
     artifact_counts = _artifact_counts(namespace_dir)
-    key_artifacts = _key_artifacts_for_status(namespace, status)
+    operator_state = event_alpha_operator_state.load_operator_state(namespace_dir)
+    key_artifacts = _key_artifacts_for_status(namespace, status, current_generation=operator_state.exists)
     present = [name for name in key_artifacts if (namespace_dir / name).exists()]
     missing = [name for name in key_artifacts if not (namespace_dir / name).exists()]
     readiness_required = status in {
@@ -255,7 +292,7 @@ def _namespace_row(namespace_dir: Path) -> NamespaceLifecycleRow:
     readiness_present = any(
         (namespace_dir / name).exists()
         for name in (
-            "event_live_provider_readiness.json",
+            "event_live_provider_activation_readiness.json",
             "event_coinalyze_preflight.json",
             "event_bybit_announcements_preflight.json",
             "event_alpha_source_coverage.json",
@@ -263,11 +300,12 @@ def _namespace_row(namespace_dir: Path) -> NamespaceLifecycleRow:
     )
     created_at, updated_at = _mtime_window(namespace_dir)
     stale = status in {STATUS_STALE_DEPRECATED, STATUS_ARCHIVED, STATUS_QUARANTINE}
-    fixture_like = status in {STATUS_ACTIVE_FIXTURE_SMOKE, STATUS_ACTIVE_INTEGRATED_SMOKE}
     current_doctor_status = _current_doctor_status(namespace_dir, marker)
-    safe_for_send = False if stale or fixture_like else _safe_for_send_readiness(status, marker, current_doctor_status)
-    safe_for_burn_in = _safe_for_burn_in_measurement(status, latest_run_id=_latest_run_id(namespace_dir), doctor_status=current_doctor_status)
-    safe_for_calibration = _safe_for_calibration(status, artifact_counts, current_doctor_status)
+    doctor_current = current_doctor_status in {"OK", "WARN"}
+    active_live = status == STATUS_ACTIVE_LIVE_REHEARSAL
+    safe_for_send = bool(marker and marker.safe_for_send_readiness) and active_live and doctor_current
+    safe_for_burn_in = bool(marker and marker.safe_for_burn_in_measurement) and active_live and doctor_current
+    safe_for_calibration = bool(marker and marker.safe_for_calibration) and active_live and doctor_current
     return NamespaceLifecycleRow(
         namespace=namespace,
         status=status,
@@ -355,28 +393,6 @@ def _profile_for_namespace(namespace: str, status: str) -> str:
     return namespace
 
 
-def _safe_for_send_readiness(
-    status: str,
-    marker: event_alpha_namespace_status.EventAlphaNamespaceStatus | None,
-    doctor_status: str,
-) -> bool:
-    if marker is not None:
-        return bool(marker.safe_for_send_readiness) and status == STATUS_ACTIVE_LIVE_REHEARSAL and doctor_status != "BLOCKED"
-    return False
-
-
-def _safe_for_burn_in_measurement(status: str, *, latest_run_id: str | None, doctor_status: str) -> bool:
-    return bool(status == STATUS_ACTIVE_LIVE_REHEARSAL and latest_run_id and doctor_status in {"OK", "WARN"})
-
-
-def _safe_for_calibration(status: str, artifact_counts: dict[str, int], doctor_status: str) -> bool:
-    return bool(
-        status == STATUS_ACTIVE_LIVE_REHEARSAL
-        and artifact_counts.get("jsonl", 0) > 0
-        and doctor_status in {"OK", "WARN"}
-    )
-
-
 def _retention_policy(status: str) -> str:
     if status == STATUS_STALE_DEPRECATED:
         return "audit_then_archive"
@@ -393,12 +409,27 @@ def _retention_policy(status: str) -> str:
     return "manual_review"
 
 
-def _key_artifacts_for_status(namespace: str, status: str) -> tuple[str, ...]:
+def _key_artifacts_for_status(
+    namespace: str,
+    status: str,
+    *,
+    current_generation: bool = False,
+) -> tuple[str, ...]:
     if status == STATUS_ACTIVE_INTEGRATED_SMOKE:
-        return (
+        legacy = (
             "event_integrated_radar_candidates.jsonl",
             "event_core_opportunities.jsonl",
             "event_alpha_source_coverage.json",
+        )
+        if not current_generation:
+            return legacy
+        return (
+            event_alpha_operator_state.OPERATOR_STATE_FILENAME,
+            *legacy,
+            "event_live_provider_activation_readiness.json",
+            "event_alpha_daily_brief.md",
+            "event_alpha_notification_preview.md",
+            "research_cards/index.md",
         )
     if status == STATUS_ACTIVE_PROVIDER_PREFLIGHT:
         if "coinalyze" in namespace:
@@ -419,28 +450,41 @@ def _key_artifacts_for_status(namespace: str, status: str) -> tuple[str, ...]:
     if status == STATUS_MANUAL_REVIEW:
         return ()
     if status == STATUS_ACTIVE_LIVE_REHEARSAL:
-        return (
+        legacy = (
             "event_alpha_runs.jsonl",
             "event_alpha_notification_runs.jsonl",
             "event_alpha_notification_preview.md",
             "event_alpha_notification_deliveries.jsonl",
         )
+        if not current_generation:
+            return legacy
+        return (
+            event_alpha_operator_state.OPERATOR_STATE_FILENAME,
+            *legacy,
+            "event_alpha_daily_brief.md",
+            "event_alpha_source_coverage.json",
+            "research_cards/index.md",
+        )
     return ()
 
 
 def _artifact_counts(namespace_dir: Path) -> dict[str, int]:
-    files = [path for path in namespace_dir.rglob("*") if path.is_file()]
+    files = [path for path in namespace_dir.rglob("*") if path.is_file() and path.suffix != ".lock"]
     return {
         "files": len(files),
         "json": sum(1 for path in files if path.suffix == ".json"),
         "jsonl": sum(1 for path in files if path.suffix == ".jsonl"),
         "md": sum(1 for path in files if path.suffix == ".md"),
-        "research_cards": sum(1 for path in files if "research_cards" in path.parts and path.suffix == ".md"),
+        "research_cards": sum(
+            1
+            for path in files
+            if "research_cards" in path.parts and path.suffix == ".md" and path.name != "index.md"
+        ),
     }
 
 
 def _mtime_window(namespace_dir: Path) -> tuple[str | None, str | None]:
-    files = [path for path in namespace_dir.rglob("*") if path.is_file()]
+    files = [path for path in namespace_dir.rglob("*") if path.is_file() and path.suffix != ".lock"]
     if not files:
         return None, None
     mtimes = [path.stat().st_mtime for path in files]
@@ -448,6 +492,9 @@ def _mtime_window(namespace_dir: Path) -> tuple[str | None, str | None]:
 
 
 def _latest_run_id(namespace_dir: Path) -> str | None:
+    operator_state = event_alpha_operator_state.load_operator_state(namespace_dir)
+    if operator_state.valid and operator_state.state and operator_state.state.get("run_id"):
+        return str(operator_state.state["run_id"])
     run_path = namespace_dir / "event_alpha_runs.jsonl"
     if not run_path.exists():
         return None
@@ -468,7 +515,28 @@ def _current_doctor_status(
     namespace_dir: Path,
     marker: event_alpha_namespace_status.EventAlphaNamespaceStatus | None,
 ) -> str:
+    operator_state = event_alpha_operator_state.load_operator_state(namespace_dir)
+    if operator_state.exists and not operator_state.valid:
+        return "BLOCKED"
+    if operator_state.valid and operator_state.state:
+        state = operator_state.state
+        doctor = state.get("doctor") if isinstance(state.get("doctor"), dict) else {}
+        if (
+            str(doctor.get("run_id") or "") == str(state.get("run_id") or "")
+            and _int_or_none(doctor.get("verified_revision")) == _int_or_none(state.get("revision"))
+            and doctor.get("authoritative") is True
+            and doctor.get("strict") is True
+            and doctor.get("schema_only") is False
+            and doctor.get("skip_api_checks") is False
+            and str(doctor.get("status") or "") in {"OK", "WARN", "BLOCKED"}
+        ):
+            return str(doctor["status"])
+        if str(doctor.get("status") or "") in {"not_run", "stale", "STALE"}:
+            return str(doctor.get("status"))
+        return "stale"
     if marker and marker.current_doctor_status:
+        if marker.latest_run_id and marker.latest_run_id != _latest_run_id(namespace_dir):
+            return "stale"
         return str(marker.current_doctor_status)
     run_path = namespace_dir / "event_alpha_runs.jsonl"
     if run_path.exists():
@@ -490,6 +558,13 @@ def _current_doctor_status(
     return "not_run"
 
 
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _write_namespace_status_markers(base: Path, registry: dict[str, Any], *, now: datetime) -> None:
     for row in registry.get("namespaces", []):
         if not isinstance(row, dict):
@@ -498,6 +573,12 @@ def _write_namespace_status_markers(base: Path, registry: dict[str, Any], *, now
         if not namespace:
             continue
         event_alpha_namespace_status.write_namespace_status(base / namespace, row, now=now)
+        event_alpha_namespace_status.refresh_namespace_status(
+            base / namespace,
+            profile=str(row.get("profile") or "") or None,
+            artifact_namespace=namespace,
+            now=now,
+        )
 
 
 def _status_counts(rows: Iterable[dict[str, Any]]) -> dict[str, int]:

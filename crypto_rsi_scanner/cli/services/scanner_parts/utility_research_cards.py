@@ -20,6 +20,7 @@ from .config_reports import (
 )
 from .runtime import *
 from .utility_calibration_exports import _event_alpha_local_artifacts
+from ....event_alpha.artifacts import operator_state as event_alpha_operator_state
 
 def _scanner_compat_global(name: str, fallback: Any) -> Any:
     import sys
@@ -89,7 +90,32 @@ def event_research_cards_write(
     except ValueError as exc:
         print(str(exc))
         return
+    with event_alpha_run_lock.artifact_mutation_guard(
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        command="research-cards-write",
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            print(_event_alpha_context_block(context))
+            print(f"research_cards_write_skipped: {mutation_lock.status.message}")
+            return
+        _event_research_cards_write_locked(context)
+
+
+def _event_research_cards_write_locked(context: Any) -> None:
     _apply_event_alpha_context_to_config(context)
+    run_rows = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=100).rows
+    operator_run = event_alpha_operator_state.latest_matching_run(
+        run_rows,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+    )
+    loaded_state = event_alpha_operator_state.load_operator_state(context.namespace_dir)
+    if loaded_state.exists and operator_run is None:
+        print(_event_alpha_context_block(context))
+        print("research_cards_write_skipped: exact current-generation ownership is unavailable")
+        return
     watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     alerts = event_alpha_alert_store.load_alert_snapshots(
         context.alert_store_path,
@@ -113,7 +139,7 @@ def event_research_cards_write(
         limit=config.EVENT_RESEARCH_CARDS_WRITE_LIMIT,
         now=datetime.now(timezone.utc),
         lineage_context=_event_alpha_card_lineage_context(
-            run_id=_latest_event_alpha_run_id(context.run_ledger_path),
+            run_id=str((operator_run or {}).get("run_id") or "") or None,
             profile=context.profile,
             run_mode=context.run_mode,
             artifact_namespace=context.artifact_namespace,

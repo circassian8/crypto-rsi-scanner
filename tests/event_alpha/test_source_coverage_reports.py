@@ -143,7 +143,8 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert categories[0]["category"] == "Derivatives/OI/funding"
     assert "coinalyze" in categories[0]["providers"]
     assert categories[1]["category"] == "Official exchange announcements"
-    assert categories[-1]["category"] == "Context/news"
+    assert categories[-2]["category"] == "CryptoPanic context"
+    assert categories[-1]["category"] == "RSS/GDELT context only"
     by_pack = {pack.source_pack: pack for pack in report.packs}
     proxy = by_pack["proxy_preipo_rwa_pack"]
     security = by_pack["security_shock_pack"]

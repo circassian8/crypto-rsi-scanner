@@ -261,15 +261,58 @@ def _event_provider_health_config_from_runtime() -> event_provider_health.EventP
 def _event_alpha_notification_mode() -> bool:
     return str(config.EVENT_ALPHA_RUN_MODE or "") == "notification_burn_in"
 
+def _explicit_runtime_config_path(env_name: str, config_name: str) -> Path | None:
+    """Use config's DATA_DIR-resolved path only for an explicit override."""
+    if not os.getenv(env_name, "").strip():
+        return None
+    return Path(getattr(config, config_name)).expanduser()
+
+def _explicit_notification_deliveries_path() -> Path | None:
+    """Resolve the delivery-only override with the same DATA_DIR semantics as config."""
+    raw = os.getenv("RSI_EVENT_ALPHA_NOTIFICATION_DELIVERIES_PATH", "").strip()
+    if not raw:
+        return None
+    path = Path(raw).expanduser()
+    return path if path.is_absolute() else Path(config.DATA_DIR) / path
+
 def _event_alpha_retention_config_from_runtime() -> event_alpha_retention.EventAlphaRetentionConfig:
+    artifact_base = Path(config.EVENT_ALPHA_ARTIFACT_BASE_DIR).expanduser()
+    if not artifact_base.is_absolute():
+        artifact_base = Path(config.DATA_DIR) / artifact_base
+    namespace_dir = (
+        artifact_base / config.EVENT_ALPHA_ARTIFACT_NAMESPACE
+        if config.EVENT_ALPHA_ARTIFACT_NAMESPACE
+        else artifact_base
+    )
     return event_alpha_retention.EventAlphaRetentionConfig(
         runs_path=config.EVENT_ALPHA_RUN_LEDGER_PATH,
         alerts_path=config.EVENT_ALPHA_ALERT_STORE_PATH,
         cards_dir=config.EVENT_RESEARCH_CARDS_DIR,
+        namespace_dir=namespace_dir,
         run_days=config.EVENT_ALPHA_RETENTION_DAYS_RUNS,
         alert_days=config.EVENT_ALPHA_RETENTION_DAYS_ALERTS,
         card_days=config.EVENT_ALPHA_RETENTION_DAYS_CARDS,
+        store_days=config.EVENT_ALPHA_RETENTION_DAYS_STORES,
         keep_eval_cases=config.EVENT_ALPHA_RETENTION_KEEP_EVAL_CASES,
+        core_opportunities_path=_explicit_runtime_config_path(
+            "RSI_EVENT_CORE_OPPORTUNITY_STORE_PATH", "EVENT_CORE_OPPORTUNITY_STORE_PATH"
+        ),
+        impact_hypotheses_path=_explicit_runtime_config_path(
+            "RSI_EVENT_IMPACT_HYPOTHESIS_STORE_PATH", "EVENT_IMPACT_HYPOTHESIS_STORE_PATH"
+        ),
+        incidents_path=_explicit_runtime_config_path(
+            "RSI_EVENT_INCIDENT_STORE_PATH", "EVENT_INCIDENT_STORE_PATH"
+        ),
+        watchlist_path=_explicit_runtime_config_path(
+            "RSI_EVENT_WATCHLIST_STATE_PATH", "EVENT_WATCHLIST_STATE_PATH"
+        ),
+        notification_deliveries_path=_explicit_notification_deliveries_path(),
+        notification_runs_path=_explicit_runtime_config_path(
+            "RSI_EVENT_ALPHA_NOTIFICATION_RUNS_PATH", "EVENT_ALPHA_NOTIFICATION_RUNS_PATH"
+        ),
+        evidence_acquisition_path=_explicit_runtime_config_path(
+            "RSI_EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH", "EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH"
+        ),
     )
 
 def _event_llm_config_from_runtime() -> event_llm_analyzer.EventLLMConfig:

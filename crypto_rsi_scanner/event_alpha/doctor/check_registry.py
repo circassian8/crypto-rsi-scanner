@@ -726,6 +726,41 @@ CHECKS: tuple[DoctorCheck, ...] = (
         (),
         "Shim dependency reports must include scan accounting before they can support old-import finalization gates.",
     ),
+    _check(
+        "namespace.operator_state_missing",
+        CATEGORY_NAMESPACE,
+        "blocker",
+        ("run_id", "artifact_namespace"),
+        "A selected current run without operator state cannot prove artifact coherence.",
+    ),
+    _check(
+        "namespace.operator_state_missing_legacy",
+        CATEGORY_NAMESPACE,
+        "warning",
+        ("artifact_namespace",),
+        "Legacy namespaces with no selected run may lack current-generation operator state.",
+    ),
+    _check(
+        "namespace.operator_state_invalid",
+        CATEGORY_NAMESPACE,
+        "blocker",
+        ("schema_id", "run_id", "revision", "artifacts"),
+        "Current-generation operator state must be readable and internally valid.",
+    ),
+    _check(
+        "namespace.operator_state_run_mismatch",
+        CATEGORY_NAMESPACE,
+        "blocker",
+        ("run_id", "profile", "artifact_namespace"),
+        "Operator state and the selected latest run must have the same identity.",
+    ),
+    _check(
+        "namespace.operator_artifact_coherence",
+        CATEGORY_NAMESPACE,
+        "blocker",
+        ("run_id", "artifacts", "notification_preview_path"),
+        "Artifacts marked current must exist and carry current-run lineage when embedded lineage is available.",
+    ),
 )
 
 CHECK_BY_ID: dict[str, DoctorCheck] = {check.check_id: check for check in CHECKS}

@@ -8,7 +8,9 @@ remain compatible through the public API bridge.
 from __future__ import annotations
 
 from types import ModuleType
-from typing import MutableMapping
+from typing import Any, MutableMapping
+
+from ...event_alpha.artifacts import locks as _artifact_locks
 
 
 _SERVICE_FUNCTION_NAMES = ('bind_scanner_globals', '_refresh_scanner_globals', 'event_alpha_integrated_radar_cycle_report', 'event_alpha_market_anomaly_scan_report', 'event_alpha_official_exchange_report', 'event_alpha_scheduled_catalyst_report', 'event_alpha_derivatives_report', 'event_alpha_replay_report')
@@ -90,6 +92,30 @@ def event_alpha_market_anomaly_scan_report(
     except ValueError as exc:
         print(str(exc))
         return
+    with _artifact_locks.artifact_mutation_guard(
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        command="market-anomaly-scan-report",
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            print(f"market_anomaly_scan_skipped: {mutation_lock.status.message}")
+            return
+        _event_alpha_market_anomaly_scan_report_locked(
+            context,
+            market_rows_path=market_rows_path,
+            asset_registry_path=asset_registry_path,
+            coingecko_universe_path=coingecko_universe_path,
+        )
+
+
+def _event_alpha_market_anomaly_scan_report_locked(
+    context: Any,
+    *,
+    market_rows_path: str | None,
+    asset_registry_path: str | None,
+    coingecko_universe_path: str | None,
+) -> None:
     started_at = datetime.now(timezone.utc)
     run_id = event_alpha_run_ledger.run_id_for(started_at, context.profile)
     path = Path(market_rows_path).expanduser() if market_rows_path else Path(config.EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH)
@@ -173,6 +199,28 @@ def event_alpha_official_exchange_report(
     except ValueError as exc:
         print(str(exc))
         return
+    with _artifact_locks.artifact_mutation_guard(
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        command="official-exchange-report",
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            print(f"official_exchange_scan_skipped: {mutation_lock.status.message}")
+            return
+        _event_alpha_official_exchange_report_locked(
+            context,
+            binance_path=binance_path,
+            bybit_path=bybit_path,
+        )
+
+
+def _event_alpha_official_exchange_report_locked(
+    context: Any,
+    *,
+    binance_path: str | None,
+    bybit_path: str | None,
+) -> None:
     started_at = datetime.now(timezone.utc)
     run_id = event_alpha_run_ledger.run_id_for(started_at, context.profile)
     provider_paths = {
@@ -258,6 +306,32 @@ def event_alpha_scheduled_catalyst_report(
     except ValueError as exc:
         print(str(exc))
         return
+    with _artifact_locks.artifact_mutation_guard(
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        command="scheduled-catalyst-report",
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            print(f"scheduled_catalyst_scan_skipped: {mutation_lock.status.message}")
+            return
+        _event_alpha_scheduled_catalyst_report_locked(
+            context,
+            tokenomist_path=tokenomist_path,
+            messari_path=messari_path,
+            coinmarketcal_path=coinmarketcal_path,
+            include_test_artifacts=include_test_artifacts,
+        )
+
+
+def _event_alpha_scheduled_catalyst_report_locked(
+    context: Any,
+    *,
+    tokenomist_path: str | None,
+    messari_path: str | None,
+    coinmarketcal_path: str | None,
+    include_test_artifacts: bool,
+) -> None:
     started_at = datetime.now(timezone.utc)
     run_id = event_alpha_run_ledger.run_id_for(started_at, context.profile)
     provider_paths = {
@@ -340,6 +414,23 @@ def event_alpha_derivatives_report(
     except ValueError as exc:
         print(str(exc))
         return
+    with _artifact_locks.artifact_mutation_guard(
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        command="derivatives-report",
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            print(f"derivatives_scan_skipped: {mutation_lock.status.message}")
+            return
+        _event_alpha_derivatives_report_locked(context, derivatives_path=derivatives_path)
+
+
+def _event_alpha_derivatives_report_locked(
+    context: Any,
+    *,
+    derivatives_path: str | None,
+) -> None:
     started_at = datetime.now(timezone.utc)
     run_id = event_alpha_run_ledger.run_id_for(started_at, context.profile)
     path = Path(derivatives_path).expanduser() if derivatives_path else Path(config.EVENT_ALPHA_DERIVATIVES_CROWDING_PATH)

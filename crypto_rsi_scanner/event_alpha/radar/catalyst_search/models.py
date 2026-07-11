@@ -171,7 +171,7 @@ class _AnomalyIdentity:
 
     @property
     def is_common_word_symbol(self) -> bool:
-        return bool(self.symbol and self.symbol.upper() in COMMON_WORD_SYMBOLS)
+        return bool(self.symbol and (len(self.symbol.strip()) <= 1 or self.symbol.upper() in COMMON_WORD_SYMBOLS))
 
     @property
     def identity_terms(self) -> tuple[str, ...]:

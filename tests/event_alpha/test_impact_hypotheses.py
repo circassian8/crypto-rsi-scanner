@@ -329,7 +329,7 @@ def test_event_impact_hypothesis_validation_is_identity_safe():
     assert "VELVET SpaceX exposure" in queries
     assert "VELVET SpaceX pre-IPO" in queries
     assert "VELVET SpaceX pre-IPO exposure" in queries
-    assert "HYPE tokenized stock SpaceX" in queries
+    assert "HYPE tokenized stock SpaceX" not in queries
     specs = event_catalyst_search.generate_search_query_specs_for_hypothesis(hypothesis)
     assert any(spec.query_type == "candidate_discovery" and spec.query == "SpaceX crypto exposure" for spec in specs)
 

@@ -17,6 +17,55 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-11 — Close Event Alpha coherence gaps and run the final no-send cycle · Codex
+**Why:** Pro-model review found that the active namespace was safe but not a
+single trustworthy operator generation: lifecycle metadata, coverage, preview,
+cards, and doctor state could describe different runs, artifact-heavy exports
+could affect tests, and retention did not exclude every writer.
+**Changes:**
+- Added an atomic, private, revisioned operator-state manifest keyed by exact
+  run/profile/namespace. Only a full strict doctor for the exact revision is
+  authoritative; copied/corrupt/schema-invalid marker identities, custom-ledger
+  mismatches, prefix-colliding run ids, and unowned preview/report writes now
+  fail closed. Only `OK`/`WARN`/`BLOCKED` can be authoritative doctor results,
+  and impossible or failed send facts remain distinct from no-send rehearsals.
+- Added one namespace mutation lock shared by regular, integrated, fixture,
+  notification, report/card, provider preflight, lifecycle, strict-doctor, and
+  retention writers. Custom ledgers cannot redirect the canonical namespace
+  lock/state. Retention remains dry-run by default, requires confirmation plus
+  both locks, revalidates SHA-256/stat fingerprints, CAS-invalidates the selected
+  state, rejects malformed/ambiguous paths, preserves current-generation cards,
+  and atomically rebuilds their index. Provider stale-state checks repeat inside
+  the lock, and lifecycle fails closed if its exact locked namespace set changes.
+- Expanded 45-day append-store retention coverage; made source-with-artifact
+  tests independent of a poisoned sibling cache; made review export traverse and
+  read through descriptor-relative no-follow handles so static or swapped parent
+  symlinks cannot escape the project; excluded lock files; and kept the
+  architecture gate at zero new violations. A final retention dry-run found no
+  currently eligible rows or cards and changed nothing.
+- Made one-character asset searches use paired project identity instead of a
+  bare ticker or one-character alias, including the live `B/build-on` path, and
+  made every structured activation surface derive all seven North Star ranks:
+  Coinalyze/derivatives first, official exchange announcements second, and
+  CryptoPanic context before RSS/GDELT context-only at ranks six and seven.
+- Regenerated the active run's coverage, readiness, 185 research cards, daily
+  brief, notification preview, namespace marker, and strict doctor state.
+**Verify:** The combined regression gate passed 161 focused tests. Full
+`make verify PYTHON=.venv/bin/python` then passed 835/835 standalone tests, 910
+pytest tests, alert rendering, the 33-observation offline backtest, and the paper
+scoreboard. Compileall, `git diff --check`, the doctor registry, and architecture
+size gate also passed. The final guarded `notify_no_key` cycle completed with
+108 raw events, 48 candidates, 52 hypotheses / 7 validated, 185 core/card rows,
+436 routes, zero alertable routes, zero delivery attempts, and zero trades,
+paper trades, normal RSI rows, or triggered fades. Strict doctor validated 1,056
+schema rows with zero schema/path/safety errors and zero blockers; all nine
+operator artifacts are current for revision 9.
+**Notes/risks:** Public GDELT timeouts and RSS 403s remain truthful fail-soft
+provider noise. Configure the Coinalyze key before its bounded no-send rehearsal;
+official exchange activation follows second. The exposed Telegram bot token
+still requires human rotation before any listener restart or real send. Routine
+GitHub CI was not awaited.
+
 ## 2026-07-10 — Clear active Event Alpha artifact-doctor blockers · Codex
 **Why:** The first real-system run exposed 51 strict schema findings plus stale
 daily-brief, burn-in-scope, incident-link, and market-unit conflicts in the

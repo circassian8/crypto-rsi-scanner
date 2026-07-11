@@ -374,10 +374,22 @@ def event_watchlist_refresh(
             "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 with a CoinGecko universe fixture/live source."
         )
         return
-    now = _event_research_now(event_now)
-    alerts = _event_alerts_from_config(with_llm=with_llm, now=now)
-    result = event_watchlist.refresh_watchlist(alerts, cfg=watch_cfg, now=now)
-    print(event_watchlist.format_watchlist_refresh_result(result))
+    mutation_context = _event_alpha_notify_context_from_runtime(
+        getattr(config, "EVENT_ALPHA_PROFILE", None)
+    )
+    with event_alpha_run_lock.artifact_mutation_guard(
+        mutation_context,
+        profile=mutation_context.profile,
+        namespace=mutation_context.artifact_namespace,
+        command="watchlist-refresh",
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            print(f"Event watchlist refresh skipped: {mutation_lock.status.message}.")
+            return
+        now = _event_research_now(event_now)
+        alerts = _event_alerts_from_config(with_llm=with_llm, now=now)
+        result = event_watchlist.refresh_watchlist(alerts, cfg=watch_cfg, now=now)
+        print(event_watchlist.format_watchlist_refresh_result(result))
 
 def event_watchlist_report(verbose: bool = False) -> None:
     """Print latest research-only Event Alpha Radar watchlist state."""

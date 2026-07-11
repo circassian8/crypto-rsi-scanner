@@ -3,6 +3,20 @@
 from __future__ import annotations
 
 from .runtime import *
+from . import guarded_report_writes as _guarded_report_writes
+from .config_reports import _event_alpha_context_block
+from ....event_alpha.artifacts import operator_state as _operator_state
+from ....event_alpha.doctor import aggregation as _doctor_aggregation
+
+def _run_operator_report_mutation(context: Any, command: str, skip_label: str, action: Callable[[], None]) -> None:
+    with event_alpha_run_lock.artifact_mutation_guard(
+        context, profile=context.profile, namespace=context.artifact_namespace, command=command
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            print(_event_alpha_context_block(context))
+            print(f"{skip_label}: {mutation_lock.status.message}")
+            return
+        action()
 
 def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -> None:
     from .. import event_alpha as _event_alpha_service
@@ -82,6 +96,14 @@ def event_alpha_source_coverage_report(
     except ValueError as exc:
         print(str(exc))
         return
+    _run_operator_report_mutation(context, "source-coverage-report", "source_coverage_report_skipped", lambda: _event_alpha_source_coverage_report_locked(context))
+
+
+def _event_alpha_source_coverage_report_locked(context: Any) -> None:
+    operator_run = _ensure_operator_state_from_latest_run(
+        context,
+        event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=50).rows,
+    )
     provider_report = event_provider_status.build_event_discovery_provider_status(config)
     provider_rows = event_provider_health.load_provider_health(context.provider_health_path)
     acquisition_rows = event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path)
@@ -106,6 +128,7 @@ def event_alpha_source_coverage_report(
         context.run_ledger_path,
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
+        run_id=str((operator_run or {}).get("run_id") or "") or None,
         accepted_evidence=report.cryptopanic_accepted_evidence,
         rejected_evidence=report.cryptopanic_rejected_evidence,
         successful_requests=report.cryptopanic_successful_requests,
@@ -113,18 +136,34 @@ def event_alpha_source_coverage_report(
         effective_provider_status=report.cryptopanic_health_status,
         stale_backoff_reconciled=report.cryptopanic_backoff_reconciled_after_success,
     )
+    operator_run_id = str((operator_run or {}).get("run_id") or "") or None
     report_text = event_alpha_source_coverage.format_source_coverage_report(report)
+    report_text = report_text.replace("profile:", f"run_id: {operator_run_id or 'none'}\nprofile:", 1)
     source_coverage_path = context.namespace_dir / "event_alpha_source_coverage.md"
     source_coverage_json_path = context.namespace_dir / "event_alpha_source_coverage.json"
+    write_succeeded = False
     try:
         context.namespace_dir.mkdir(parents=True, exist_ok=True)
         source_coverage_path.write_text(report_text + "\n", encoding="utf-8")
+        source_coverage_payload = dict(report.to_dict())
+        source_coverage_payload["run_id"] = operator_run_id
         source_coverage_json_path.write_text(
-            json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n",
+            json.dumps(source_coverage_payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+        write_succeeded = True
     except OSError as exc:
         print(f"warning: source coverage artifact write failed: {exc}")
+    _record_operator_artifacts(
+        context,
+        {
+            "source_coverage_md": source_coverage_path,
+            "source_coverage_json": source_coverage_json_path,
+        },
+        succeeded=write_succeeded,
+        failure_reason="source_coverage_write_failed",
+        run_row=operator_run,
+    )
     print(_event_alpha_context_block(context))
     print(f"source_coverage_report_path: {event_artifact_paths.artifact_display_path(source_coverage_path)}")
     print(f"source_coverage_json_path: {event_artifact_paths.artifact_display_path(source_coverage_json_path)}")
@@ -144,13 +183,31 @@ def event_alpha_live_provider_readiness_report(
     except ValueError as exc:
         print(str(exc))
         return
+    _run_operator_report_mutation(context, "live-provider-readiness-report", "live_provider_readiness_report_skipped", lambda: _event_alpha_live_provider_readiness_report_locked(context, smoke_mode=smoke_mode))
+
+
+def _event_alpha_live_provider_readiness_report_locked(context: Any, *, smoke_mode: bool) -> None:
+    operator_run = _ensure_operator_state_from_latest_run(
+        context,
+        event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=50).rows,
+    )
     report = event_live_provider_readiness.build_readiness_report(
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
         smoke_mode=smoke_mode,
+        run_id=str((operator_run or {}).get("run_id") or "") or None,
         now=_event_research_now(),
     )
     json_path, md_path = event_live_provider_readiness.write_readiness_artifacts(report, context.namespace_dir)
+    _record_operator_artifacts(
+        context,
+        {
+            "provider_readiness_json": json_path,
+            "provider_readiness_md": md_path,
+        },
+        succeeded=True,
+        run_row=operator_run,
+    )
     print(_event_alpha_context_block(context))
     print(f"live_provider_readiness_json: {event_artifact_paths.artifact_display_path(json_path)}")
     print(f"live_provider_readiness_report: {event_artifact_paths.artifact_display_path(md_path)}")
@@ -176,22 +233,16 @@ def event_alpha_unlock_calendar_preflight_report(
     except ValueError as exc:
         print(str(exc))
         return
-    report = event_unlock_calendar_preflight.build_preflight_report(
-        namespace_dir=context.namespace_dir,
-        profile=context.profile,
-        artifact_namespace=context.artifact_namespace,
-        provider_filter=provider,
-        tokenomist_path=config.EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH,
-        messari_path=config.EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH,
-        coinmarketcal_path=config.EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH,
-        smoke_mode=smoke_mode,
-        now=_event_research_now(),
+    _run_operator_report_mutation(
+        context,
+        "unlock-calendar-preflight-report",
+        "unlock_calendar_preflight_report_skipped",
+        lambda: _guarded_report_writes.unlock_calendar_preflight(
+            context,
+            provider=provider,
+            smoke_mode=smoke_mode,
+        ),
     )
-    json_path, md_path = event_unlock_calendar_preflight.write_preflight_artifacts(report, context.namespace_dir)
-    print(_event_alpha_context_block(context))
-    print(f"unlock_calendar_preflight_json: {event_artifact_paths.artifact_display_path(json_path)}")
-    print(f"unlock_calendar_preflight_report: {event_artifact_paths.artifact_display_path(md_path)}")
-    print(event_unlock_calendar_preflight.format_preflight_report(report))
 
 def event_alpha_dex_onchain_readiness_report(
     verbose: bool = False,
@@ -212,6 +263,10 @@ def event_alpha_dex_onchain_readiness_report(
     except ValueError as exc:
         print(str(exc))
         return
+    _run_operator_report_mutation(context, "dex-onchain-readiness-report", "dex_onchain_readiness_report_skipped", lambda: _event_alpha_dex_onchain_readiness_report_locked(context, smoke_mode=smoke_mode))
+
+
+def _event_alpha_dex_onchain_readiness_report_locked(context: Any, *, smoke_mode: bool) -> None:
     started_at = datetime.now(timezone.utc)
     run_id = event_alpha_run_ledger.run_id_for(started_at, context.profile)
     result = event_dex_onchain_readiness.run_dex_onchain_readiness(
@@ -269,6 +324,7 @@ def event_alpha_v1_readiness_report(
         return
     artifact_namespace = artifact_namespace or context.artifact_namespace
     artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
+    _ensure_operator_state_from_latest_run(context, artifacts["runs"].rows)
     contract_scorecard = event_alpha_contract_scorecard.build_authoritative_scorecard(
         base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
     )
@@ -356,47 +412,168 @@ def event_alpha_artifact_doctor_report(
     except ValueError as exc:
         print(str(exc))
         return
-    artifact_namespace = artifact_namespace or context.artifact_namespace
-    profile_name = profile_name or (context.profile if context.profile != "default" else None)
-    artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
-    cards_dir = Path(config.EVENT_RESEARCH_CARDS_DIR)
-    delivery_rows = event_alpha_notification_delivery.load_delivery_records(
-        event_alpha_notification_delivery.deliveries_path_for_context(context)
+    doctor_strict = strict or bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT)
+    _run_operator_report_mutation(
+        context,
+        "artifact-doctor-report",
+        "artifact_doctor_report_skipped",
+        lambda: _guarded_report_writes.artifact_doctor(
+            context,
+            profile_name=profile_name,
+            artifact_namespace=artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+            include_api_artifacts=include_api_artifacts,
+            doctor_strict=doctor_strict,
+            strict_api=strict_api,
+            delivery_strict_scope=delivery_strict_scope,
+            include_stale_artifacts=include_stale_artifacts,
+            schema_only=schema_only,
+            skip_api_checks=skip_api_checks,
+        ),
     )
-    result = event_alpha_artifact_doctor.diagnose_artifacts(
-        run_rows=artifacts["runs"].rows,
-        alert_rows=artifacts["alerts"].rows,
-        feedback_rows=artifacts["feedback_rows"],
-        outcome_rows=artifacts["outcome_rows"],
-        hypothesis_rows=artifacts["hypotheses"].rows,
-        core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
-        watchlist_rows=artifacts["watchlist"].entries,
-        incident_rows=artifacts["incidents"].rows,
-        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
-        market_anomaly_rows=event_market_anomaly_scanner.load_market_anomaly_rows(context.namespace_dir),
-        official_exchange_candidate_rows=event_official_exchange.load_official_listing_candidates(context.namespace_dir),
-        scheduled_catalyst_rows=event_scheduled_catalysts.load_scheduled_catalysts(context.namespace_dir),
-        unlock_candidate_rows=event_scheduled_catalysts.load_unlock_candidates(context.namespace_dir),
-        card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
-        provider_health_rows=artifacts["provider_rows"],
-        source_coverage_report_path=context.namespace_dir / "event_alpha_source_coverage.md",
-        daily_brief_path=context.daily_brief_path,
-        llm_budget_rows=artifacts["budget_rows"],
-        delivery_rows=delivery_rows,
-        profile=profile_name,
-        artifact_namespace=artifact_namespace,
-        include_test_artifacts=include_test_artifacts,
-        include_api_artifacts=include_api_artifacts,
-        inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
-        strict=strict or bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT),
-        strict_api=strict_api,
-        delivery_strict_scope=delivery_strict_scope,
-        include_stale_artifacts=include_stale_artifacts,
-        schema_only=schema_only,
-        skip_api_checks=skip_api_checks,
+
+
+def _record_operator_artifacts(
+    context: Any,
+    artifacts: Mapping[str, str | Path],
+    *,
+    succeeded: bool,
+    failure_reason: str = "artifact_write_failed",
+    run_row: Mapping[str, Any] | None,
+) -> None:
+    if run_row is None:
+        return
+    loaded = _operator_state.load_operator_state(context.namespace_dir)
+    state = dict(loaded.state or {}) if loaded.valid else {}
+    if not _operator_state.state_matches_run(
+        state,
+        run_row,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+    ):
+        return
+    run_id = str(run_row.get("run_id") or "")
+    try:
+        for name, path in artifacts.items():
+            _operator_state.record_artifact(
+                context.namespace_dir,
+                run_id=run_id,
+                profile=context.profile,
+                artifact_namespace=context.artifact_namespace,
+                name=name,
+                path=path,
+                status="current" if succeeded else "failed",
+                skip_reason=None if succeeded else failure_reason,
+            )
+        event_alpha_namespace_status.refresh_namespace_status(
+            context.namespace_dir,
+            profile=context.profile,
+            artifact_namespace=context.artifact_namespace,
+            run_mode=str(run_row.get("run_mode") or context.run_mode),
+        )
+    except (OSError, ValueError):
+        return
+
+
+def _ensure_operator_state_from_latest_run(
+    context: Any,
+    run_rows: Iterable[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    latest = _operator_state.latest_matching_run(
+        run_rows,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
     )
-    print(_event_alpha_context_block(context))
-    print(event_alpha_artifact_doctor.format_artifact_doctor_report(result))
+    if latest is None:
+        return None
+    try:
+        state = _operator_state.begin_run_if_newer(
+            context.namespace_dir,
+            latest,
+            run_ledger_path=context.run_ledger_path,
+        )
+        if not _operator_state.state_matches_run(
+            state,
+            latest,
+            profile=context.profile,
+            artifact_namespace=context.artifact_namespace,
+        ):
+            return None
+        event_alpha_namespace_status.refresh_namespace_status(
+            context.namespace_dir,
+            profile=context.profile,
+            artifact_namespace=context.artifact_namespace,
+            run_mode=str(latest.get("run_mode") or context.run_mode),
+        )
+    except (OSError, ValueError):
+        return None
+    return latest
+
+
+def _operator_revision_for_run(
+    context: Any,
+    run_row: Mapping[str, Any] | None,
+) -> int | None:
+    if run_row is None:
+        return None
+    loaded = _operator_state.load_operator_state(context.namespace_dir)
+    if not loaded.valid or not _operator_state.state_matches_run(
+        loaded.state,
+        run_row,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+    ):
+        return None
+    try:
+        return int((loaded.state or {}).get("revision"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _record_operator_doctor_result(
+    context: Any,
+    result: Any,
+    *,
+    run_row: Mapping[str, Any] | None,
+    expected_revision: int | None,
+    strict: bool,
+    schema_only: bool,
+    skip_api_checks: bool,
+) -> None:
+    if run_row is None or expected_revision is None or not strict or schema_only or skip_api_checks:
+        return
+    loaded = _operator_state.load_operator_state(context.namespace_dir)
+    state = dict(loaded.state or {}) if loaded.valid else {}
+    if not _operator_state.state_matches_run(
+        state,
+        run_row,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+    ):
+        return
+    run_id = str(run_row.get("run_id") or "")
+    try:
+        _operator_state.record_doctor_status(
+            context.namespace_dir,
+            run_id=run_id,
+            profile=context.profile,
+            artifact_namespace=context.artifact_namespace,
+            expected_revision=expected_revision,
+            strict=strict,
+            schema_only=schema_only,
+            skip_api_checks=skip_api_checks,
+            status=_doctor_aggregation.determine_doctor_status(result),
+            blocker_count=len(tuple(getattr(result, "blockers", ()) or ())),
+            warning_count=len(tuple(getattr(result, "warnings", ()) or ())),
+        )
+        event_alpha_namespace_status.refresh_namespace_status(
+            context.namespace_dir,
+            profile=context.profile,
+            artifact_namespace=context.artifact_namespace,
+            run_mode=str(run_row.get("run_mode") or context.run_mode),
+        )
+    except (OSError, ValueError):
+        return
 
 def event_alpha_daily_brief_report(
     verbose: bool = False,
@@ -439,6 +616,14 @@ def event_alpha_integrated_radar_fill_outcomes_report(
     except ValueError as exc:
         print(str(exc))
         return
+    _run_operator_report_mutation(context, "integrated-radar-fill-outcomes", "integrated_radar_fill_outcomes_skipped", lambda: _event_alpha_integrated_radar_fill_outcomes_report_locked(context))
+
+
+def _event_alpha_integrated_radar_fill_outcomes_report_locked(context: Any) -> None:
+    operator_run = _ensure_operator_state_from_latest_run(
+        context,
+        event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=50).rows,
+    )
     rows = event_integrated_radar_outcomes.fill_integrated_radar_outcomes(
         context.namespace_dir,
         observed_at=_event_research_now(),
@@ -473,7 +658,8 @@ def event_alpha_integrated_radar_fill_outcomes_report(
         card_result.card_paths,
     )
     delivery_rows = event_integrated_radar.load_integrated_notification_deliveries(context.namespace_dir)
-    (context.namespace_dir / event_integrated_radar.DAILY_BRIEF_FILENAME).write_text(
+    daily_brief_path = context.namespace_dir / event_integrated_radar.DAILY_BRIEF_FILENAME
+    daily_brief_path.write_text(
         event_integrated_radar.format_integrated_daily_brief(
             candidate_rows,
             core_rows=core_rows,
@@ -484,6 +670,15 @@ def event_alpha_integrated_radar_fill_outcomes_report(
             source_coverage_path=context.namespace_dir / event_integrated_radar.SOURCE_COVERAGE_FILENAME,
         ),
         encoding="utf-8",
+    )
+    _record_operator_artifacts(
+        context,
+        {
+            "research_cards": card_result.out_dir,
+            "daily_brief": daily_brief_path,
+        },
+        succeeded=True,
+        run_row=operator_run,
     )
     print(_event_alpha_context_block(context))
     print(
@@ -538,24 +733,15 @@ def event_alpha_integrated_radar_calibration_report(
     except ValueError as exc:
         print(str(exc))
         return
-    rows = event_integrated_radar_outcomes.load_integrated_radar_outcomes(context.namespace_dir)
-    if export_priors:
-        priors = event_integrated_radar_outcomes.build_integrated_radar_calibration_priors(rows)
-        path = context.namespace_dir / event_integrated_radar.INTEGRATED_CALIBRATION_PRIORS_FILENAME
-        path.write_text(json.dumps(priors, sort_keys=True), encoding="utf-8")
-        print(_event_alpha_context_block(context))
-        print(f"integrated_radar_calibration_priors: {path}")
-        return
-    report = event_integrated_radar_outcomes.format_integrated_radar_calibration_report(rows)
-    path = context.namespace_dir / event_integrated_radar.INTEGRATED_CALIBRATION_REPORT_FILENAME
-    path.write_text(report, encoding="utf-8")
-    event_integrated_radar_outcomes.write_radar_performance_dashboard(
-        (context.namespace_dir,),
-        output_namespace_dir=context.namespace_dir,
-        generated_at=_event_research_now(),
+    _run_operator_report_mutation(
+        context,
+        "integrated-radar-calibration-report",
+        "integrated_radar_calibration_report_skipped",
+        lambda: _guarded_report_writes.integrated_radar_calibration(
+            context,
+            export_priors=export_priors,
+        ),
     )
-    print(_event_alpha_context_block(context))
-    print(report)
 
 def event_alpha_market_anomaly_scan_report(
     verbose: bool = False,

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from .runtime import *
+from ...artifacts import operator_state as event_alpha_operator_state
+from ...namespace import status as event_alpha_namespace_status
 
 class _DeliveryWriter:
     """Append-only delivery recorder used by ``send_notifications``.
@@ -27,6 +29,8 @@ class _DeliveryWriter:
         self.now = now
         self.existing = delivery.load_delivery_records(cfg.path)
         self.preview_path = Path(cfg.path).expanduser().parent / "event_alpha_notification_preview.md"
+        self.preview_write_succeeded = False
+        self.require_current_operator_generation = False
         self.preview_sections: list[dict[str, Any]] = []
         self.counts: dict[str, int] = {
             delivery.STATE_DELIVERED: 0,
@@ -429,6 +433,7 @@ def write_preview(
         "# Event Alpha Notification Preview",
         "",
         f"generated_at: {self.now.isoformat()}",
+        f"run_id: {self.run_id}",
         f"profile: {self.profile or 'default'}",
         f"namespace: {self.namespace or 'default'}",
         "",
@@ -475,10 +480,68 @@ def write_preview(
                 "```",
             ]
         )
+    preview_text = "\n".join(body) + "\n"
+    if self.require_current_operator_generation:
+        try:
+            event_alpha_operator_state.write_text_artifact(
+                self.preview_path.parent,
+                run_id=self.run_id,
+                profile=str(self.profile or "default"),
+                artifact_namespace=str(self.namespace or self.preview_path.parent.name),
+                name="notification_preview",
+                path=self.preview_path,
+                text=preview_text,
+                updated_at=self.now,
+            )
+            self.preview_write_succeeded = True
+        except (OSError, ValueError):
+            self.preview_write_succeeded = False
+        return
     try:
         self.preview_path.parent.mkdir(parents=True, exist_ok=True)
-        self.preview_path.write_text("\n".join(body) + "\n", encoding="utf-8")
+        self.preview_path.write_text(preview_text, encoding="utf-8")
+        self.preview_write_succeeded = True
+        _record_preview_operator_state(self)
     except OSError:
+        self.preview_write_succeeded = False
+        return
+
+
+def _record_preview_operator_state(writer: _DeliveryWriter) -> None:
+    loaded = event_alpha_operator_state.load_operator_state(writer.preview_path.parent)
+    state = dict(loaded.state or {}) if loaded.valid else {}
+    expected_profile = str(writer.profile or "default")
+    expected_namespace = str(writer.namespace or writer.preview_path.parent.name)
+    run_identity = {
+        "run_id": writer.run_id,
+        "profile": expected_profile,
+        "artifact_namespace": expected_namespace,
+    }
+    if not event_alpha_operator_state.state_matches_run(
+        state,
+        run_identity,
+        profile=expected_profile,
+        artifact_namespace=expected_namespace,
+    ):
+        return
+    try:
+        event_alpha_operator_state.record_artifact(
+            writer.preview_path.parent,
+            run_id=writer.run_id,
+            profile=expected_profile,
+            artifact_namespace=expected_namespace,
+            name="notification_preview",
+            path=writer.preview_path,
+            updated_at=writer.now,
+        )
+        event_alpha_namespace_status.refresh_namespace_status(
+            writer.preview_path.parent,
+            profile=expected_profile,
+            artifact_namespace=expected_namespace,
+            run_mode=str(state.get("run_mode") or ""),
+            now=writer.now,
+        )
+    except (OSError, ValueError):
         return
 
 def write_no_digest_preview(

@@ -58,6 +58,31 @@ def run_integrated_radar_cycle(
     coinalyze_namespace: str | None = None,
 ) -> EventIntegratedRadarResult:
     """Run one integrated research-only radar cycle and write artifacts."""
+    with event_alpha_locks.artifact_mutation_guard(
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        command="integrated-radar-cycle",
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            raise RuntimeError(f"integrated radar cycle blocked: {mutation_lock.status.message}")
+        return _run_integrated_radar_cycle_locked(
+            context=context,
+            fixture=fixture,
+            observed_at=observed_at,
+            input_mode=input_mode,
+            coinalyze_namespace=coinalyze_namespace,
+        )
+
+
+def _run_integrated_radar_cycle_locked(
+    *,
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    fixture: bool,
+    observed_at: datetime | str | None,
+    input_mode: str,
+    coinalyze_namespace: str | None,
+) -> EventIntegratedRadarResult:
     start = _integrated_cycle_start(
         context=context,
         fixture=fixture,
@@ -283,6 +308,7 @@ def _write_integrated_operator_artifacts(
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
         smoke_mode=fixture,
+        run_id=start.run_id,
         now=start.research_observed_at,
     )
     readiness_json_path, readiness_md_path = event_live_provider_readiness.write_readiness_artifacts(
@@ -293,6 +319,7 @@ def _write_integrated_operator_artifacts(
     source_coverage_path.write_text(
         format_integrated_source_coverage(
             candidates,
+            run_id=start.run_id,
             readiness_json_path=readiness_json_path,
             readiness_md_path=readiness_md_path,
         ),
@@ -303,6 +330,7 @@ def _write_integrated_operator_artifacts(
         source_coverage_json_path,
         format_integrated_source_coverage_json(
             candidates,
+            run_id=start.run_id,
             input_manifest=inputs.input_manifest,
             readiness_json_path=readiness_json_path,
             readiness_md_path=readiness_md_path,

@@ -139,11 +139,13 @@ class LiveProviderReadinessReport:
     live_calls_allowed: bool
     research_only: bool
     providers: tuple[LiveProviderReadinessProvider, ...]
+    run_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": "event_live_provider_activation_readiness_v1",
             "row_type": "event_live_provider_activation_readiness",
+            "run_id": self.run_id,
             "profile": self.profile,
             "artifact_namespace": self.artifact_namespace,
             "generated_at": self.generated_at,
@@ -177,7 +179,7 @@ class LiveProviderReadinessReport:
                 for provider in sorted(self.providers, key=lambda item: item.priority_rank)
             ],
             "official_exchange_activation_runbook": [
-                "Bybit first official exchange live rehearsal: public HTTP, no key, explicit allow flag, no-send, bounded page/limit, request ledger required.",
+                f"Overall activation category #{_category_priority_rank('Official exchange announcements')}; Bybit first within official exchange: public HTTP, no key, explicit allow flag, no-send, bounded page/limit, request ledger required.",
                 "Binance public/fixture second: validate parser/artifact flow without API key or live provider calls.",
                 "Binance signed listener later: signed WebSocket only after explicit API key/secret env vars and bounded listener review.",
             ],
@@ -189,6 +191,7 @@ def build_readiness_report(
     profile: str,
     artifact_namespace: str,
     smoke_mode: bool = False,
+    run_id: str | None = None,
     now: datetime | None = None,
 ) -> LiveProviderReadinessReport:
     observed = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -201,7 +204,15 @@ def build_readiness_report(
         live_calls_allowed=False,
         research_only=True,
         providers=providers,
+        run_id=str(run_id or "") or None,
     )
+
+
+def _category_priority_rank(category: str) -> int:
+    for rank, item in enumerate(event_alpha_source_coverage.SOURCE_COVERAGE_CATEGORY_PRIORITIES, start=1):
+        if str(item.get("category") or "") == category:
+            return rank
+    raise ValueError(f"unknown Event Alpha source-coverage category: {category}")
 
 
 def write_readiness_artifacts(report: LiveProviderReadinessReport, out_dir: str | Path) -> tuple[Path, Path]:
@@ -220,6 +231,7 @@ def format_readiness_report(report: LiveProviderReadinessReport) -> str:
         "=" * 76,
         "EVENT ALPHA LIVE-PROVIDER ACTIVATION READINESS (research-only)",
         "=" * 76,
+        f"run_id: {report.run_id or 'none'}",
         f"profile: {report.profile}",
         f"artifact_namespace: {report.artifact_namespace}",
         f"generated_at: {report.generated_at}",
@@ -284,9 +296,13 @@ def format_readiness_report(report: LiveProviderReadinessReport) -> str:
         if not provider.configured and (provider.sidecar_fixture_available or provider.smoke_target_available):
             lines.append("  note: Live provider not configured, but fixture sidecar coverage exists.")
     lines.extend(["", "Activation Runbook:"])
+    category_priorities = event_alpha_source_coverage.SOURCE_COVERAGE_CATEGORY_PRIORITIES
+    first_category = category_priorities[0]
+    second_category = category_priorities[1]
+    first_provider = _join(first_category.get("providers") or ()).split(",", maxsplit=1)[0].strip().capitalize()
     lines.extend([
-        "- Bybit first official exchange live rehearsal: public HTTP, no key, explicit allow flag, bounded pages/limit, no-send, request ledger required.",
-        "- Binance public/fixture second: fixture/public parser validation, no API key required, no live call by default.",
+        f"- {first_provider} first: configure the required key, then run bounded preflight and no-send derivatives rehearsal with a request ledger.",
+        f"- {second_category.get('category')} second: Bybit public no-send rehearsal, then Binance public/fixture validation.",
         "- Binance signed listener later: signed WebSocket only after explicit env vars and bounded listener command review.",
     ])
     for provider in sorted(report.providers, key=lambda item: item.priority_rank):

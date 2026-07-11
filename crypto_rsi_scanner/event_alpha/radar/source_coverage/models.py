@@ -154,10 +154,16 @@ SOURCE_COVERAGE_CATEGORY_PRIORITIES: tuple[dict[str, Any], ...] = (
         "reason": "adds non-price context for protocol-specific catalysts",
     },
     {
-        "category": "Context/news",
-        "providers": ("cryptopanic", "rss", "gdelt"),
+        "category": "CryptoPanic context",
+        "providers": ("cryptopanic",),
         "enabled_lanes": ("research review", "contextual catalyst discovery"),
-        "reason": "discovers narratives, but cannot alone unlock strict confirmed lanes",
+        "reason": "adds token-tagged narrative context, but cannot alone unlock strict confirmed lanes",
+    },
+    {
+        "category": "RSS/GDELT context only",
+        "providers": ("rss", "gdelt"),
+        "enabled_lanes": ("research review", "broad contextual catalyst discovery"),
+        "reason": "adds broad context after lane-critical and tagged sources; it is not strict confirmation",
     },
 )
 LIVE_PROVIDER_READINESS_JSON = "event_live_provider_activation_readiness.json"

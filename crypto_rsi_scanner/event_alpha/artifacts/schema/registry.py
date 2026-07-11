@@ -676,7 +676,8 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "last_verified_at", "safe_for_burn_in_measurement",
             "safe_for_calibration", "current_doctor_status", "latest_run_id",
             "artifact_counts", "key_artifacts_present", "missing_key_artifacts",
-            "readiness_required", "readiness_present",
+            "readiness_required", "readiness_present", "operator_state_path", "operator_state_run_id",
+            "operator_state_revision", "operator_state_status", "doctor_run_id", "doctor_state_revision",
         ),
         types={
             "safe_for_send_readiness": "bool",
@@ -684,12 +685,33 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "safe_for_calibration": "bool",
             "readiness_required": "bool",
             "readiness_present": "bool",
+            "operator_state_revision": "int", "doctor_state_revision": "int",
         },
         enums={"status": ALLOWED_NAMESPACE_STATUSES},
-        paths=("marker_path",),
+        paths=("marker_path", "operator_state_path"),
         timestamps=("marked_at", "created_at", "last_updated_at", "last_verified_at"),
         safety=("safe_for_send_readiness", "safe_for_burn_in_measurement", "safe_for_calibration"),
         lineage=("profile", "artifact_namespace"),
+    ),
+    "operator_state_v1": _schema(
+        "operator_state_v1",
+        required=("row_type", "run_id", "profile", "artifact_namespace", "revision", "manifest_status", "artifacts", "doctor", "research_only", "no_send_rehearsal", "sent", "send_requested", "send_attempted", "send_success", "send_items_delivered", "trades_created", "paper_trades_created", "normal_rsi_signal_rows_written", "triggered_fade_created"),
+        optional=(
+            "schema_id", "schema_version", "run_mode", "run_started_at", "generated_at", "updated_at",
+            "invalidation_reason",
+        ),
+        types={
+            "revision": "int", "artifacts": "dict", "doctor": "dict",
+            "invalidation_reason": "str", "research_only": "bool",
+            "no_send_rehearsal": "bool", "sent": "bool", "send_requested": "bool",
+            "send_attempted": "bool", "send_success": "bool", "send_items_delivered": "int",
+            "trades_created": "int", "paper_trades_created": "int", "normal_rsi_signal_rows_written": "int", "triggered_fade_created": "int",
+        },
+        enums={"manifest_status": ("complete", "partial", "incoherent")},
+        safety=("research_only", "no_send_rehearsal", "sent", "trades_created", "paper_trades_created", "normal_rsi_signal_rows_written", "triggered_fade_created"),
+        timestamps=("run_started_at", "generated_at", "updated_at"),
+        lineage=COMMON_LINEAGE,
+        allows_guarded_send=True,
     ),
     "run_ledger_v1": _schema(
         "run_ledger_v1",
@@ -700,11 +722,17 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "success", "failure", "with_llm", "send_requested",
             "strict_alerts_created", "telegram_sends", "integrated_candidates",
             "integrated_candidates_path", "source_coverage_json_path_rel",
-            "source_coverage_md_path_rel", *COMMON_SAFETY,
+            "source_coverage_md_path_rel", "daily_brief_path", "notification_preview_path",
+            "source_coverage_path", "live_provider_readiness_json_path",
+            "live_provider_readiness_report_path", *COMMON_SAFETY,
         ),
         safety=("strict_alerts_created", "telegram_sends", *COMMON_SAFETY),
         timestamps=("started_at", "finished_at", "completed_at", "generated_at"),
-        paths=("integrated_candidates_path", "integrated_report_path", "integrated_input_manifest_path", "integrated_source_coverage_json_path"),
+        paths=(
+            "integrated_candidates_path", "integrated_report_path", "integrated_input_manifest_path",
+            "integrated_source_coverage_json_path", "daily_brief_path", "notification_preview_path",
+            "source_coverage_path", "live_provider_readiness_json_path", "live_provider_readiness_report_path",
+        ),
         lineage=COMMON_LINEAGE,
         allows_guarded_send=True,
     ),
@@ -742,6 +770,7 @@ ROW_TYPE_TO_SCHEMA_ID = {
     "event_integrated_radar_calibration_priors": "calibration_prior_v1",
     "event_radar_provider_performance": "calibration_prior_v1",
     "event_alpha_namespace_status": "namespace_status_v1",
+    "event_alpha_operator_state": "operator_state_v1",
     "event_alpha_run": "run_ledger_v1",
     "event_alpha_daily_burn_in_run": "event_alpha_daily_burn_in_run_v1",
     "event_alpha_candidate_mode_manifest": "event_alpha_candidate_mode_manifest_v1",
@@ -783,6 +812,7 @@ FILENAME_TO_SCHEMA_ID = {
     "event_integrated_radar_calibration_priors.json": "calibration_prior_v1",
     "event_radar_provider_performance.json": "calibration_prior_v1",
     "event_alpha_namespace_status.json": "namespace_status_v1",
+    "event_alpha_operator_state.json": "operator_state_v1",
     "event_alpha_runs.jsonl": "run_ledger_v1",
     "event_alpha_daily_burn_in_run.json": "event_alpha_daily_burn_in_run_v1",
     "event_alpha_candidate_mode_manifest.json": "event_alpha_candidate_mode_manifest_v1",
@@ -1151,7 +1181,7 @@ def _guarded_send_claim_is_valid(row: Mapping[str, Any], schema: ArtifactSchema)
             and status in {"sent", "delivered", "partial_delivered"}
             and delivered > 0
         )
-    if row_type == "event_alpha_run":
+    if row_type in {"event_alpha_run", "event_alpha_operator_state"}:
         try:
             delivered = int(row.get("send_items_delivered") or 0)
         except (TypeError, ValueError):
@@ -1159,7 +1189,6 @@ def _guarded_send_claim_is_valid(row: Mapping[str, Any], schema: ArtifactSchema)
         return (
             _truthy(row.get("send_requested"))
             and _truthy(row.get("send_attempted"))
-            and _truthy(row.get("send_success"))
             and delivered > 0
         )
     return False

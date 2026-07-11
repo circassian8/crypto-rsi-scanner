@@ -8,7 +8,11 @@ remain compatible through the public API bridge.
 from __future__ import annotations
 
 from types import ModuleType
-from typing import Any, MutableMapping
+from typing import Any, Mapping, MutableMapping
+
+from ...event_alpha.artifacts import locks as _artifact_locks
+from ...event_alpha.artifacts import operator_state as _operator_state
+from ...event_alpha.namespace import status as _namespace_status
 
 
 _SERVICE_FUNCTION_NAMES = (
@@ -177,9 +181,37 @@ def event_alpha_daily_brief_report(
     except ValueError as exc:
         print(str(exc))
         return
+    with _artifact_locks.artifact_mutation_guard(
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        command="daily-brief-report",
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            print(_event_alpha_context_block(context))
+            print(f"daily_brief_report_skipped: {mutation_lock.status.message}")
+            return
+        _event_alpha_daily_brief_report_locked(
+            context,
+            selected_profile=selected_profile,
+            artifact_namespace=artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+            include_api_artifacts=include_api_artifacts,
+        )
+
+
+def _event_alpha_daily_brief_report_locked(
+    context: Any,
+    *,
+    selected_profile: str | None,
+    artifact_namespace: str | None,
+    include_test_artifacts: bool,
+    include_api_artifacts: bool,
+) -> None:
     profile = event_alpha_profiles.get_profile(selected_profile) if selected_profile else None
     artifact_namespace = artifact_namespace or context.artifact_namespace
-    runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=25)
+    runs = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=25)
+    operator_run = _ensure_daily_operator_state(context, runs.rows)
     alerts = event_alpha_alert_store.load_alert_snapshots(
         _event_alpha_alert_store_config_from_runtime().path,
         latest_only=True,
@@ -216,7 +248,7 @@ def event_alpha_daily_brief_report(
         limit=config.EVENT_RESEARCH_CARDS_WRITE_LIMIT,
         now=datetime.now(timezone.utc),
         lineage_context=_event_alpha_card_lineage_context(
-            run_id=_latest_event_alpha_run_id(context.run_ledger_path),
+            run_id=str((operator_run or {}).get("run_id") or "") or None,
             profile=context.profile,
             run_mode=context.run_mode,
             artifact_namespace=artifact_namespace,
@@ -255,10 +287,90 @@ def event_alpha_daily_brief_report(
         markdown=markdown,
         card_paths=card_write.card_paths,
     )
+    _record_daily_brief_operator_state(context, result, card_write, run_row=operator_run)
     report = _event_alpha_context_block(context) + "\n" + event_alpha_daily_brief.format_daily_brief_result(result)
     if profile:
         report += f"\nprofile_applied: {profile.name}"
     print(report)
+
+
+def _record_daily_brief_operator_state(
+    context: Any,
+    brief_result: Any,
+    card_write: Any,
+    *,
+    run_row: Mapping[str, Any] | None,
+) -> None:
+    if run_row is None:
+        return
+    loaded = _operator_state.load_operator_state(context.namespace_dir)
+    state = dict(loaded.state or {}) if loaded.valid else {}
+    if not _operator_state.state_matches_run(
+        state,
+        run_row,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+    ):
+        return
+    run_id = str(run_row.get("run_id") or "")
+    try:
+        _operator_state.record_artifact(
+            context.namespace_dir,
+            run_id=run_id,
+            profile=context.profile,
+            artifact_namespace=context.artifact_namespace,
+            name="research_cards",
+            path=card_write.out_dir,
+            count=int(card_write.cards_written),
+        )
+        _operator_state.record_artifact(
+            context.namespace_dir,
+            run_id=run_id,
+            profile=context.profile,
+            artifact_namespace=context.artifact_namespace,
+            name="daily_brief",
+            path=brief_result.path,
+        )
+        _namespace_status.refresh_namespace_status(
+            context.namespace_dir,
+            profile=context.profile,
+            artifact_namespace=context.artifact_namespace,
+            run_mode=str(run_row.get("run_mode") or context.run_mode),
+        )
+    except (OSError, ValueError):
+        return
+
+
+def _ensure_daily_operator_state(context: Any, run_rows: Any) -> dict[str, Any] | None:
+    latest = _operator_state.latest_matching_run(
+        run_rows,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+    )
+    if latest is None:
+        return None
+    try:
+        state = _operator_state.begin_run_if_newer(
+            context.namespace_dir,
+            latest,
+            run_ledger_path=context.run_ledger_path,
+        )
+        if not _operator_state.state_matches_run(
+            state,
+            latest,
+            profile=context.profile,
+            artifact_namespace=context.artifact_namespace,
+        ):
+            return None
+        _namespace_status.refresh_namespace_status(
+            context.namespace_dir,
+            profile=context.profile,
+            artifact_namespace=context.artifact_namespace,
+            run_mode=str(latest.get("run_mode") or context.run_mode),
+        )
+    except (OSError, ValueError):
+        return None
+    return latest
 
 
 def event_alpha_source_coverage_report(*args: Any, **kwargs: Any) -> Any:

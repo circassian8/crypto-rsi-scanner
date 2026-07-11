@@ -13,13 +13,16 @@ unreadable lock file degrades to "no lock held" rather than crashing the scan.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import socket
+import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 LOCK_SCHEMA_VERSION = "event_alpha_run_lock_v1"
 
@@ -89,6 +92,22 @@ def lock_path_for_context(context: Any, lock_name: str = "notify") -> Path:
     return namespace_dir / f"event_alpha_{_clean_name(lock_name)}.lock"
 
 
+def artifact_mutation_lock_path_for_context(context: Any) -> Path:
+    """Return a namespace-specific lock path that survives namespace cleanup.
+
+    Fixture and integrated cycles may replace the namespace directory itself, so
+    the shared mutation lock lives beside that directory instead of inside it.
+    The resolved-path digest prevents same-slug namespaces from colliding.
+    """
+    namespace_dir = Path(
+        getattr(context, "namespace_dir", None) or getattr(context, "base_dir", Path("."))
+    ).expanduser()
+    identity = str(namespace_dir.resolve(strict=False))
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:12]
+    slug = _clean_name(namespace_dir.name or "default")
+    return namespace_dir.parent / f".event_alpha_artifact_mutation_{slug}_{digest}.lock"
+
+
 def acquire_run_lock(
     context: Any,
     *,
@@ -101,11 +120,12 @@ def acquire_run_lock(
     now: datetime | None = None,
     pid: int | None = None,
     hostname: str | None = None,
+    path_override: str | Path | None = None,
 ) -> EventAlphaRunLock:
-    """Try to take the notification run lock; never raise on filesystem issues."""
+    """Try to take one namespace-scoped run lock; never raise on filesystem issues."""
     cfg = cfg or EventAlphaRunLockConfig()
     observed = _as_utc(now or datetime.now(timezone.utc))
-    path = lock_path_for_context(context, lock_name)
+    path = Path(path_override).expanduser() if path_override is not None else lock_path_for_context(context, lock_name)
     profile = profile or _clean(getattr(context, "profile", None)) or "default"
     namespace = namespace or _clean(getattr(context, "artifact_namespace", None)) or "default"
     pid = int(pid if pid is not None else os.getpid())
@@ -149,7 +169,7 @@ def acquire_run_lock(
             owned=True,
             stale_recovered=False,
             holder=None,
-            message="notification run lock acquired",
+            message=f"{_lock_label(name)} acquired",
         )
     if created is None:
         return _degraded_run_lock(path, run_id, profile, namespace, name, None, stale_recovered=False)
@@ -170,7 +190,7 @@ def acquire_run_lock(
                 owned=True,
                 stale_recovered=False,
                 holder=None,
-                message="notification run lock acquired",
+                message=f"{_lock_label(name)} acquired",
             )
         holder = _read_lock(path) or {}
 
@@ -186,7 +206,7 @@ def acquire_run_lock(
             owned=True,
             stale_recovered=False,
             holder=holder,
-            message="notification run lock already held by this run",
+            message=f"{_lock_label(name)} already held by this run",
         )
 
     if _is_fresh(holder, observed, cfg.stale_minutes):
@@ -213,6 +233,66 @@ def acquire_run_lock(
         observed=observed,
         cfg=cfg,
     )
+
+
+def acquire_artifact_mutation_lock(
+    context: Any,
+    *,
+    run_id: str,
+    profile: str | None = None,
+    namespace: str | None = None,
+    command: str = "artifact-mutation",
+    now: datetime | None = None,
+) -> EventAlphaRunLock:
+    """Acquire the fail-closed lock shared by every namespace artifact writer."""
+    return acquire_run_lock(
+        context,
+        cfg=EventAlphaRunLockConfig(
+            enabled=True,
+            stale_minutes=24.0 * 60.0,
+            allow_overlap=False,
+        ),
+        run_id=run_id,
+        profile=profile,
+        namespace=namespace,
+        command=command,
+        lock_name="artifact_mutation",
+        now=now,
+        path_override=artifact_mutation_lock_path_for_context(context),
+    )
+
+
+@contextmanager
+def artifact_mutation_guard(
+    context: Any,
+    *,
+    profile: str | None = None,
+    namespace: str | None = None,
+    command: str = "artifact-report",
+    now: datetime | None = None,
+) -> Iterator[EventAlphaRunLock]:
+    """Hold the shared namespace mutation lock for one complete writer action.
+
+    Callers must check ``lock.owned`` and fail closed otherwise. A unique id
+    prevents a different process from being mistaken for a re-entrant owner.
+    """
+    observed = _as_utc(now or datetime.now(timezone.utc))
+    run_id = (
+        f"artifact-{_clean_name(command)}-{observed.strftime('%Y%m%dT%H%M%S%fZ')}-"
+        f"{os.getpid()}-{uuid.uuid4().hex}"
+    )
+    lock = acquire_artifact_mutation_lock(
+        context,
+        run_id=run_id,
+        profile=profile,
+        namespace=namespace,
+        command=command,
+        now=observed,
+    )
+    try:
+        yield lock
+    finally:
+        release_run_lock(lock)
 
 
 def _run_lock_payload(
@@ -327,7 +407,7 @@ def _active_run_lock(
             holder=holder,
             message=message
             or (
-                "active notification lock held by "
+                f"active {_lock_label(name)} held by "
                 f"run_id={holder.get('run_id') or 'unknown'} pid={holder.get('pid') or 'unknown'} "
                 f"acquired_at={holder.get('acquired_at') or 'unknown'}"
             ),
@@ -360,7 +440,7 @@ def _stale_run_lock_recovery_result(
             stale_recovered=True,
             holder=holder,
             message=(
-                "recovered stale notification lock previously held by "
+                f"recovered stale {_lock_label(name)} previously held by "
                 f"run_id={holder.get('run_id') or 'unknown'} pid={holder.get('pid') or 'unknown'}"
             ),
         )
@@ -376,7 +456,7 @@ def _stale_run_lock_recovery_result(
             owned=True,
             stale_recovered=True,
             holder=holder2,
-            message="notification run lock acquired after stale recovery",
+            message=f"{_lock_label(name)} acquired after stale recovery",
         )
     if holder2 is not None and _is_fresh(holder2, observed, cfg.stale_minutes) and not cfg.allow_overlap:
         return _active_run_lock(
@@ -386,7 +466,7 @@ def _stale_run_lock_recovery_result(
             namespace,
             name,
             holder2,
-            message="active notification lock taken over by a concurrent recoverer",
+            message=f"active {_lock_label(name)} taken over by a concurrent recoverer",
         )
     return _degraded_run_lock(path, run_id, profile, namespace, name, holder2, stale_recovered=True)
 
@@ -570,3 +650,7 @@ def _clean_name(value: object) -> str:
     text = str(value or "").strip().lower()
     cleaned = "".join(ch if ch.isalnum() or ch in ("_", "-") else "_" for ch in text).strip("_-")
     return cleaned or "notify"
+
+
+def _lock_label(name: str) -> str:
+    return "notification lock" if name == "notify" else f"{name.replace('_', ' ')} lock"

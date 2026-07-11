@@ -409,7 +409,11 @@ def asset_knowledge_for(
             return _merge_asset_knowledge(item, meta)
     asset_kind = str(meta.get("asset_kind") or _infer_asset_kind(symbol_u, coin, official, category_values)).strip() or ASSET_KIND_UNKNOWN
     caps = _capabilities_for_kind(asset_kind)
-    common = symbol_u in COMMON_WORD_SYMBOLS or any(_clean_text(symbol_u) == _clean_text(term) for term in alias_values)
+    common = (
+        (bool(symbol_u) and len(symbol_u) <= 1)
+        or symbol_u in COMMON_WORD_SYMBOLS
+        or any(_clean_text(symbol_u) == _clean_text(term) for term in alias_values)
+    )
     return AssetKnowledge(
         symbol=symbol_u,
         coin_id=coin,
@@ -718,7 +722,8 @@ def match_asset_identity(identity: AssetIdentity, evidence: IdentityEvidence) ->
     symbol = identity.normalized_symbol
     if not symbol and not identity.terms and not identity.contract_addresses:
         return _none()
-    is_common = identity.is_common_word_symbol or symbol in COMMON_WORD_SYMBOLS
+    is_common = identity.is_common_word_symbol or symbol in COMMON_WORD_SYMBOLS or len(symbol) == 1
+    single_character_symbol = len(symbol) == 1
     strong_texts = _texts(evidence.strong_content)
     strong_blob = " ".join(strong_texts)
     strong_lower = strong_blob.casefold()
@@ -738,9 +743,9 @@ def match_asset_identity(identity: AssetIdentity, evidence: IdentityEvidence) ->
             return _strong("identity_match_pair", "strong_content", _snippet_for(symbol, strong_texts))
         if dollar_symbol_in_text(strong_blob, symbol):
             return _strong("identity_match_strong", "strong_content", _snippet_for(symbol, strong_texts))
-        if case_sensitive_symbol_in_text(strong_blob, symbol):
+        if not single_character_symbol and case_sensitive_symbol_in_text(strong_blob, symbol):
             return _strong("identity_match_strong", "strong_content", _snippet_for(symbol, strong_texts))
-        if token_context_in_text(_clean_text(strong_blob), symbol):
+        if not single_character_symbol and token_context_in_text(_clean_text(strong_blob), symbol):
             return _strong("identity_match_token_context", "strong_content", _snippet_for(symbol, strong_texts))
 
     for term in identity.terms:
@@ -860,8 +865,8 @@ def _quote_mentions_identity(identity: AssetIdentity, quote: str, *, is_common: 
     if symbol and (
         pair_symbol_in_text(quote, symbol)
         or dollar_symbol_in_text(quote, symbol)
-        or case_sensitive_symbol_in_text(quote, symbol)
-        or token_context_in_text(_clean_text(quote), symbol)
+        or (len(symbol) > 1 and case_sensitive_symbol_in_text(quote, symbol))
+        or (len(symbol) > 1 and token_context_in_text(_clean_text(quote), symbol))
     ):
         return True
     for term in identity.terms:

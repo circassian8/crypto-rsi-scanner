@@ -33,6 +33,7 @@ def diagnose_artifacts(
     include_test_artifacts: bool = False,
     include_api_artifacts: bool = False,
     inspected_alert_store_path: str | Path | None = None,
+    run_ledger_path: str | Path | None = None,
     strict: bool = False,
     strict_api: bool = False,
     delivery_strict_scope: str | None = None,

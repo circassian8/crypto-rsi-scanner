@@ -513,6 +513,222 @@ def test_event_catalyst_search_rejects_common_word_symbol_without_strong_identit
     assert score.score < 50
 
 
+def test_event_catalyst_search_single_character_symbol_requires_project_identity():
+    import re
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
+
+    now = datetime(2026, 7, 11, 4, 0, tzinfo=timezone.utc)
+    anomaly = RawDiscoveredEvent(
+        raw_id="market_anomaly:b:2026-07-11",
+        provider="market_anomaly",
+        fetched_at=now,
+        published_at=now,
+        source_url=None,
+        title="B market anomaly",
+        body="No catalyst validated.",
+        raw_json={
+            "market": {
+                "symbol": "B",
+                "coin_id": "build-on",
+                "name": "Build On",
+                "aliases": ("A", "AI", "Build Ecosystem"),
+            },
+            "anomaly": {"score": 61},
+        },
+        source_confidence=0.55,
+        content_hash="anomaly-b",
+    )
+    queries = event_catalyst_search.generate_search_query_objects_for_anomaly(anomaly, max_queries=2)
+    assert queries[0].query == "Build On crypto why up"
+    assert queries[0].is_common_word_symbol is True
+    all_anomaly_queries = event_catalyst_search.generate_search_queries_for_anomaly(anomaly)
+    assert "A crypto catalyst" not in all_anomaly_queries
+    assert "AI crypto catalyst" not in all_anomaly_queries
+    assert "Build Ecosystem crypto catalyst" in all_anomaly_queries
+
+    no_name = RawDiscoveredEvent(
+        raw_id="market_anomaly:build-on:2026-07-11",
+        provider="market_anomaly",
+        fetched_at=now,
+        published_at=now,
+        source_url=None,
+        title="B market anomaly",
+        body="No catalyst validated.",
+        raw_json={"market": {"symbol": "B", "coin_id": "build-on"}, "anomaly": {"score": 61}},
+        source_confidence=0.55,
+        content_hash="anomaly-b-no-name",
+    )
+    no_name_queries = event_catalyst_search.generate_search_query_objects_for_anomaly(no_name, max_queries=6)
+    assert len(no_name_queries) == 6
+    assert all(query.query.startswith("Build On ") for query in no_name_queries)
+    assert not any(re.search(r"(?<![A-Za-z0-9])B(?![A-Za-z0-9])", query.query) for query in no_name_queries)
+
+    bitcoin_noise = RawDiscoveredEvent(
+        raw_id="bitcoin-noise",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/bitcoin",
+        title="B crypto market recap: Bitcoin returns to recent highs",
+        body="Bitcoin-backed lending grows while crypto markets recover.",
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="bitcoin-noise",
+    )
+    score = event_catalyst_search.score_search_result(bitcoin_noise, queries[0], anomaly, now=now)
+    assert "common_word_identity_rejected" in score.reason_codes
+    assert score.score < 50
+
+    project_result = RawDiscoveredEvent(
+        raw_id="build-on-project",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/build-on",
+        title="Build On announces a dated ecosystem catalyst",
+        body="The Build On project published the update.",
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="build-on-project",
+    )
+    project_score = event_catalyst_search.score_search_result(project_result, queries[0], anomaly, now=now)
+    assert "identity_match_project" in project_score.reason_codes
+    assert project_score.score >= 50
+
+    hypothesis_specs = event_catalyst_search.generate_search_query_specs_for_hypothesis(
+        SimpleNamespace(
+            impact_category="market_anomaly_unknown",
+            external_asset="",
+            candidate_symbols=("B",),
+            candidate_coin_ids=("build-on",),
+            candidate_sectors=(),
+        )
+    )
+    assert [spec.query for spec in hypothesis_specs] == ["Build On crypto catalyst"]
+    assert all(not spec.query.startswith("B ") for spec in hypothesis_specs)
+
+    bare_name = SimpleNamespace(
+        impact_category="market_anomaly_unknown",
+        external_asset="",
+        candidate_symbols=("B",),
+        candidate_coin_ids=(),
+        candidate_sectors=(),
+        crypto_candidate_assets=({"symbol": "B", "name": "B"},),
+    )
+    assert event_catalyst_search.generate_search_query_specs_for_hypothesis(bare_name) == ()
+
+    for symbol, collision_label in (("B", "A"), ("HYPE", "AI")):
+        collision_name = SimpleNamespace(
+            impact_category="market_anomaly_unknown",
+            external_asset="",
+            candidate_symbols=(symbol,),
+            candidate_coin_ids=(),
+            candidate_sectors=(),
+            crypto_candidate_assets=({"symbol": symbol, "name": collision_label},),
+        )
+        assert event_catalyst_search.generate_search_query_specs_for_hypothesis(
+            collision_name
+        ) == ()
+
+    bare_anomaly = RawDiscoveredEvent(
+        raw_id="market_anomaly:b-bare:2026-07-11",
+        provider="market_anomaly",
+        fetched_at=now,
+        published_at=now,
+        source_url=None,
+        title="B market anomaly",
+        body="No catalyst validated.",
+        raw_json={"market": {"symbol": "B", "name": "B"}, "anomaly": {"score": 61}},
+        source_confidence=0.55,
+        content_hash="anomaly-b-bare-name",
+    )
+    assert event_catalyst_search.generate_search_queries_for_anomaly(bare_anomaly) == ()
+
+    bare_name_with_coin = RawDiscoveredEvent(
+        raw_id="market_anomaly:b-bare-with-coin:2026-07-11",
+        provider="market_anomaly",
+        fetched_at=now,
+        published_at=now,
+        source_url=None,
+        title="B market anomaly",
+        body="No catalyst validated.",
+        raw_json={
+            "market": {"symbol": "B", "name": "B", "coin_id": "build-on"},
+            "anomaly": {"score": 61},
+        },
+        source_confidence=0.55,
+        content_hash="anomaly-b-bare-name-with-coin",
+    )
+    safe_coin_queries = event_catalyst_search.generate_search_queries_for_anomaly(
+        bare_name_with_coin
+    )
+    assert safe_coin_queries
+    assert all(not query.startswith("B ") for query in safe_coin_queries)
+
+
+def test_hypothesis_query_identity_preserves_multi_asset_symbol_coin_pairing():
+    from types import SimpleNamespace
+    import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
+    from crypto_rsi_scanner.event_alpha.radar.catalyst_search import query_builder
+
+    paired = SimpleNamespace(
+        hypothesis_id="hyp-a-b",
+        impact_category="market_anomaly_unknown",
+        external_asset="",
+        candidate_symbols=("A", "B"),
+        candidate_coin_ids=("build-on",),
+        candidate_sectors=(),
+        crypto_candidate_assets=(
+            {
+                "symbol": "A",
+                "coin_id": "alpha",
+                "name": "Alpha",
+                "aliases": ("A",),
+                "source": "deterministic_resolver",
+            },
+            {
+                "symbol": "B",
+                "coin_id": "build-on",
+                "name": "Build On",
+                "aliases": ("B",),
+                "source": "deterministic_resolver",
+            },
+        ),
+        confidence=0.80,
+        status="hypothesis",
+    )
+    specs = event_catalyst_search.generate_search_query_specs_for_hypothesis(paired)
+    queries = query_builder._queries_for_hypotheses(
+        (paired,),
+        event_catalyst_search.EventImpactHypothesisSearchConfig(
+            max_queries_per_hypothesis=4,
+            candidate_discovery_enabled=False,
+        ),
+    )
+
+    assert [spec.query for spec in specs] == ["Alpha crypto catalyst", "Build On crypto catalyst"]
+    assert [(query.query, query.symbol, query.coin_id) for query in queries] == [
+        ("Alpha crypto catalyst", "A", "alpha"),
+        ("Build On crypto catalyst", "B", "build-on"),
+    ]
+    assert query_builder._hypothesis_query_identities(
+        paired,
+        ("A unrelated discovery text",),
+    ) == {}
+
+    ambiguous = SimpleNamespace(
+        impact_category="market_anomaly_unknown",
+        external_asset="",
+        candidate_symbols=("A", "B"),
+        candidate_coin_ids=("build-on",),
+        candidate_sectors=(),
+    )
+    assert event_catalyst_search.generate_search_query_specs_for_hypothesis(ambiguous) == ()
+
+
 def test_event_catalyst_search_identity_can_come_from_resolver_validated_llm_extraction():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search

@@ -3,6 +3,26 @@
 from __future__ import annotations
 
 from .runtime import *
+from .config_reports import _event_alpha_context_block
+
+
+def _run_provider_artifact_mutation(
+    context: Any,
+    command: str,
+    skip_label: str,
+    action: Callable[[], None],
+) -> None:
+    with event_alpha_run_lock.artifact_mutation_guard(
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        command=command,
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            print(_event_alpha_context_block(context))
+            print(f"{skip_label}: {mutation_lock.status.message}")
+            return
+        action()
 
 def event_alpha_notification_runs_report(
     path: str | None = None,
@@ -168,6 +188,29 @@ def event_alpha_coinalyze_preflight_report(
         return
     if _coinalyze_namespace_write_blocked(context, suggested_namespace=event_coinalyze_preflight.DEFAULT_PREFLIGHT_NAMESPACE):
         return
+    _run_provider_artifact_mutation(
+        context,
+        "coinalyze-preflight-report",
+        "coinalyze_preflight_skipped",
+        lambda: _event_alpha_coinalyze_preflight_report_locked(
+            context,
+            smoke_mode=smoke_mode,
+            allow_live_preflight=allow_live_preflight,
+        ),
+    )
+
+
+def _event_alpha_coinalyze_preflight_report_locked(
+    context: Any,
+    *,
+    smoke_mode: bool,
+    allow_live_preflight: bool,
+) -> None:
+    if _coinalyze_namespace_write_blocked(
+        context,
+        suggested_namespace=event_coinalyze_preflight.DEFAULT_PREFLIGHT_NAMESPACE,
+    ):
+        return
     report = event_coinalyze_preflight.build_preflight_report(
         namespace_dir=context.namespace_dir,
         smoke_mode=smoke_mode,
@@ -195,6 +238,27 @@ def event_alpha_coinalyze_no_send_rehearsal(
         print(str(exc))
         return
     if _coinalyze_namespace_write_blocked(context, suggested_namespace=event_coinalyze_preflight.DEFAULT_REHEARSAL_NAMESPACE):
+        return
+    _run_provider_artifact_mutation(
+        context,
+        "coinalyze-no-send-rehearsal",
+        "coinalyze_rehearsal_skipped",
+        lambda: _event_alpha_coinalyze_no_send_rehearsal_locked(
+            context,
+            allow_live_preflight=allow_live_preflight,
+        ),
+    )
+
+
+def _event_alpha_coinalyze_no_send_rehearsal_locked(
+    context: Any,
+    *,
+    allow_live_preflight: bool,
+) -> None:
+    if _coinalyze_namespace_write_blocked(
+        context,
+        suggested_namespace=event_coinalyze_preflight.DEFAULT_REHEARSAL_NAMESPACE,
+    ):
         return
     preflight, report, paths = event_coinalyze_preflight.run_no_send_rehearsal(
         namespace_dir=context.namespace_dir,
@@ -235,6 +299,30 @@ def event_alpha_bybit_announcements_preflight_report(
         artifact_label="Bybit announcements preflight/rehearsal",
     ):
         return
+    _run_provider_artifact_mutation(
+        context,
+        "bybit-announcements-preflight-report",
+        "bybit_announcements_preflight_skipped",
+        lambda: _event_alpha_bybit_announcements_preflight_report_locked(
+            context,
+            smoke_mode=smoke_mode,
+            allow_live_preflight=allow_live_preflight,
+        ),
+    )
+
+
+def _event_alpha_bybit_announcements_preflight_report_locked(
+    context: Any,
+    *,
+    smoke_mode: bool,
+    allow_live_preflight: bool,
+) -> None:
+    if _event_alpha_namespace_write_blocked(
+        context,
+        suggested_namespace=event_bybit_announcements_preflight.DEFAULT_PREFLIGHT_NAMESPACE,
+        artifact_label="Bybit announcements preflight/rehearsal",
+    ):
+        return
     report = event_bybit_announcements_preflight.build_preflight_report(
         namespace_dir=context.namespace_dir,
         smoke_mode=smoke_mode,
@@ -261,6 +349,28 @@ def event_alpha_bybit_announcements_no_send_rehearsal(
     except ValueError as exc:
         print(str(exc))
         return
+    if _event_alpha_namespace_write_blocked(
+        context,
+        suggested_namespace=event_bybit_announcements_preflight.DEFAULT_REHEARSAL_NAMESPACE,
+        artifact_label="Bybit announcements preflight/rehearsal",
+    ):
+        return
+    _run_provider_artifact_mutation(
+        context,
+        "bybit-announcements-no-send-rehearsal",
+        "bybit_announcements_rehearsal_skipped",
+        lambda: _event_alpha_bybit_announcements_no_send_rehearsal_locked(
+            context,
+            allow_live_preflight=allow_live_preflight,
+        ),
+    )
+
+
+def _event_alpha_bybit_announcements_no_send_rehearsal_locked(
+    context: Any,
+    *,
+    allow_live_preflight: bool,
+) -> None:
     if _event_alpha_namespace_write_blocked(
         context,
         suggested_namespace=event_bybit_announcements_preflight.DEFAULT_REHEARSAL_NAMESPACE,
@@ -331,6 +441,24 @@ def event_alpha_mark_namespace_stale(
     except ValueError as exc:
         print(str(exc))
         return
+    _run_provider_artifact_mutation(
+        context,
+        "mark-namespace-stale",
+        "mark_namespace_stale_skipped",
+        lambda: _event_alpha_mark_namespace_stale_locked(
+            context,
+            reason=reason,
+            superseded_by=superseded_by,
+        ),
+    )
+
+
+def _event_alpha_mark_namespace_stale_locked(
+    context: Any,
+    *,
+    reason: str | None,
+    superseded_by: str | None,
+) -> None:
     marker = event_alpha_namespace_status.mark_namespace_stale(
         context.namespace_dir,
         namespace=context.artifact_namespace,
@@ -360,17 +488,29 @@ def event_alpha_mark_known_stale_namespaces(verbose: bool = False) -> None:
             str(item["profile"]),
             str(item["namespace"]),
         )
-        marker = event_alpha_namespace_status.mark_namespace_stale(
-            context.namespace_dir,
-            namespace=context.artifact_namespace,
-            reason=str(item["reason"]),
-            superseded_by=str(item["superseded_by"]),
-            safe_for_send_readiness=False,
-            now=_event_research_now(),
+        _run_provider_artifact_mutation(
+            context,
+            "mark-known-stale-namespace",
+            "mark_known_stale_namespace_skipped",
+            lambda context=context, item=item: _event_alpha_mark_known_stale_namespace_locked(
+                context,
+                item,
+            ),
         )
-        print(_event_alpha_context_block(context))
-        print(f"namespace_status_marker: {event_artifact_paths.artifact_display_path(marker)}")
-        print(event_alpha_namespace_status.format_namespace_status(event_alpha_namespace_status.load_namespace_status(context.namespace_dir)))
+
+
+def _event_alpha_mark_known_stale_namespace_locked(context: Any, item: Mapping[str, Any]) -> None:
+    marker = event_alpha_namespace_status.mark_namespace_stale(
+        context.namespace_dir,
+        namespace=context.artifact_namespace,
+        reason=str(item["reason"]),
+        superseded_by=str(item["superseded_by"]),
+        safe_for_send_readiness=False,
+        now=_event_research_now(),
+    )
+    print(_event_alpha_context_block(context))
+    print(f"namespace_status_marker: {event_artifact_paths.artifact_display_path(marker)}")
+    print(event_alpha_namespace_status.format_namespace_status(event_alpha_namespace_status.load_namespace_status(context.namespace_dir)))
 
 def event_alpha_prune_or_archive_stale_namespace(
     verbose: bool = False,

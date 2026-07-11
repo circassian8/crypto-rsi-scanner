@@ -10,6 +10,9 @@ from __future__ import annotations
 from types import ModuleType
 from typing import Any, MutableMapping
 
+import crypto_rsi_scanner.event_alpha.artifacts.operator_state as _operator_state
+import crypto_rsi_scanner.event_alpha.namespace.status as _namespace_status
+
 
 _SERVICE_FUNCTION_NAMES = (
     'bind_scanner_globals',
@@ -231,6 +234,22 @@ def event_alpha_cycle(
             "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 with a CoinGecko universe fixture/live source."
         )
         return
+    mutation_context = _event_alpha_notify_context_from_runtime(profile_for_run)
+    with event_alpha_run_lock.artifact_mutation_guard(
+        mutation_context,
+        profile=profile_for_run,
+        namespace=artifact_namespace or mutation_context.artifact_namespace,
+        command="event-alpha-cycle",
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            print(f"Event Alpha cycle skipped: {mutation_lock.status.message}.")
+            return
+        _event_alpha_cycle_locked(with_llm=with_llm, send=send, event_now=event_now, profile=profile,
+                                  profile_for_run=profile_for_run, run_mode=run_mode, artifact_namespace=artifact_namespace)
+
+def _event_alpha_cycle_locked(*, with_llm: bool, send: bool, event_now: str | datetime | None,
+                              profile: Any, profile_for_run: str, run_mode: str,
+                              artifact_namespace: str | None) -> None:
     clock_status, now, started_at, run_id = _event_alpha_cycle_runtime(event_now, profile_for_run)
     alert_cfg = _event_alert_config_from_runtime()
     pipeline_result = _run_event_alpha_cycle_pipeline(
@@ -601,17 +620,43 @@ def _append_event_alpha_cycle_run_record(
     with_llm: bool,
     send: bool,
 ) -> dict[str, Any]:
-    return event_alpha_run_ledger.append_run_record(
+    finished_at = datetime.now(timezone.utc)
+    row = event_alpha_run_ledger.append_run_record(
         pipeline_result,
         cfg=_event_alpha_run_ledger_config_from_runtime(),
         profile=profile_for_run,
         started_at=started_at,
-        finished_at=datetime.now(timezone.utc),
+        finished_at=finished_at,
         with_llm=with_llm,
         send_requested=send,
         notification_burn_in=bool(profile and profile.notification_burn_in),
         success=True,
     )
+    namespace_dir = Path(config.EVENT_ALPHA_RUN_LEDGER_PATH).expanduser().parent
+    preview_path = namespace_dir / "event_alpha_notification_preview.md"
+    if preview_path.exists():
+        try:
+            header = preview_path.read_text(encoding="utf-8", errors="replace")[:4096]
+            if _operator_state.text_has_exact_run_id(header, row.get("run_id")):
+                _operator_state.record_artifact(
+                    namespace_dir,
+                    run_id=str(row.get("run_id") or ""),
+                    profile=profile_for_run,
+                    artifact_namespace=str(row.get("artifact_namespace") or namespace_dir.name),
+                    name="notification_preview",
+                    path=preview_path,
+                    updated_at=finished_at,
+                )
+                _namespace_status.refresh_namespace_status(
+                    namespace_dir,
+                    profile=profile_for_run,
+                    artifact_namespace=str(row.get("artifact_namespace") or namespace_dir.name),
+                    run_mode=str(row.get("run_mode") or ""),
+                    now=finished_at,
+                )
+        except (OSError, ValueError):
+            pass
+    return row
 
 
 def _print_event_alpha_cycle_run_ledger_summary(run_row: dict[str, Any]) -> None:

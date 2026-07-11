@@ -6,6 +6,9 @@ import logging
 from types import ModuleType
 from typing import Any, MutableMapping
 from .bindings import *  # noqa: F403
+import crypto_rsi_scanner.event_alpha.artifacts.locks as _artifact_locks
+import crypto_rsi_scanner.event_alpha.artifacts.operator_state as _operator_state
+import crypto_rsi_scanner.event_alpha.namespace.status as _namespace_status
 
 def _event_alpha_notify_cycle_body(
     *,
@@ -177,6 +180,18 @@ def _prepare_notification_cycle_runtime(
             artifact_namespace=artifact_namespace,
             started_at=started_at,
         )
+        return None
+    mutation_lock = event_alpha_run_lock.acquire_artifact_mutation_lock(
+        lock_context,
+        run_id=run_id,
+        profile=profile,
+        namespace=artifact_namespace or lock_context.artifact_namespace,
+        command="event-alpha-notify-cycle",
+        now=started_at,
+    )
+    lock_holder["mutation_lock"] = mutation_lock
+    if not mutation_lock.owned:
+        print(f"Event Alpha notify cycle skipped: {mutation_lock.status.message}.")
         return None
     if run_lock.stale_recovered:
         print(f"Warning: {event_alpha_run_lock.STALE_LOCK_RECOVERED_WARNING} ({run_lock.status.message}).")
@@ -808,7 +823,46 @@ def _append_notification_cycle_ledgers(
         plan=notification_plan,
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
     )
+    _record_completed_notification_preview(run_row, profile=profile, finished_at=finished_at)
     return run_row, notification_row
+
+
+def _record_completed_notification_preview(
+    run_row: dict[str, Any],
+    *,
+    profile: str,
+    finished_at: datetime,
+) -> None:
+    namespace_dir = Path(config.EVENT_ALPHA_RUN_LEDGER_PATH).expanduser().parent
+    preview_path = namespace_dir / "event_alpha_notification_preview.md"
+    run_id = str(run_row.get("run_id") or "")
+    if not run_id or not preview_path.exists():
+        return
+    try:
+        header = preview_path.read_text(encoding="utf-8", errors="replace")[:4096]
+    except OSError:
+        return
+    if not _operator_state.text_has_exact_run_id(header, run_id):
+        return
+    try:
+        _operator_state.record_artifact(
+            namespace_dir,
+            run_id=run_id,
+            profile=profile,
+            artifact_namespace=str(run_row.get("artifact_namespace") or namespace_dir.name),
+            name="notification_preview",
+            path=preview_path,
+            updated_at=finished_at,
+        )
+        _namespace_status.refresh_namespace_status(
+            namespace_dir,
+            profile=profile,
+            artifact_namespace=str(run_row.get("artifact_namespace") or namespace_dir.name),
+            run_mode=str(run_row.get("run_mode") or "notification_burn_in"),
+            now=finished_at,
+        )
+    except (OSError, ValueError):
+        return
 
 
 def _print_notification_cycle_ledger_summary(
@@ -879,6 +933,20 @@ def event_alpha_notify_preview(
         print(str(exc))
         return
     context = resolve_event_alpha_artifact_context_for_report(profile.name, config.EVENT_ALPHA_ARTIFACT_NAMESPACE or profile.name)
+    with _artifact_locks.artifact_mutation_guard(
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        command="notification-preview",
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            print(_event_alpha_context_block(context))
+            print(f"notification_preview_skipped: {mutation_lock.status.message}")
+            return
+        _event_alpha_notify_preview_locked(context, profile=profile)
+
+
+def _event_alpha_notify_preview_locked(context: Any, *, profile: Any) -> None:
     core_rows = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
         latest_run=True,
@@ -902,7 +970,18 @@ def event_alpha_notify_preview(
         storage.close()
     try:
         run_rows = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=50).rows
-        latest_run = event_alpha_run_ledger.latest_run(run_rows, profile.name) or {}
+        latest_run = _operator_state.latest_matching_run(
+            run_rows,
+            profile=profile.name,
+            artifact_namespace=context.artifact_namespace,
+        ) or {}
+        operator_run = _ensure_preview_operator_state(context, latest_run)
+        operator_state_exists = _operator_state.load_operator_state(context.namespace_dir).exists
+        if operator_run is None and (latest_run or operator_state_exists):
+            print(_event_alpha_context_block(context))
+            print("notification_preview_skipped: exact current-generation ownership is unavailable")
+            return
+        latest_run = operator_run or latest_run
         preview_result = _event_alpha_preview_summary_result(latest_run, plan=plan, profile=profile.name)
         delivery_cfg = event_alpha_notification_delivery.NotificationDeliveryConfig(
             event_alpha_notification_delivery.deliveries_path_for_context(context)
@@ -915,6 +994,7 @@ def event_alpha_notify_preview(
             namespace=context.artifact_namespace,
             now=now,
         )
+        writer.require_current_operator_generation = operator_run is not None
         send_guard_status = (
             "No-send rehearsal: would send, but send guard is disabled. This is expected in rehearsal mode."
             if not config.EVENT_ALERTS_ENABLED and (plan.would_send_count or plan.heartbeat_due)
@@ -968,6 +1048,20 @@ def event_alpha_notify_preview_from_artifacts(
     except ValueError as exc:
         print(str(exc))
         return
+    with _artifact_locks.artifact_mutation_guard(
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        command="notification-preview-from-artifacts",
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            print(_event_alpha_context_block(context))
+            print(f"notification_preview_skipped: {mutation_lock.status.message}")
+            return
+        _event_alpha_notify_preview_from_artifacts_locked(context, profile=profile)
+
+
+def _event_alpha_notify_preview_from_artifacts_locked(context: Any, *, profile: Any) -> None:
     core_rows = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
         latest_run=True,
@@ -990,7 +1084,18 @@ def event_alpha_notify_preview_from_artifacts(
     finally:
         storage.close()
     run_rows = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=50).rows
-    latest_run = event_alpha_run_ledger.latest_run(run_rows, profile.name) or {}
+    latest_run = _operator_state.latest_matching_run(
+        run_rows,
+        profile=profile.name,
+        artifact_namespace=context.artifact_namespace,
+    ) or {}
+    operator_run = _ensure_preview_operator_state(context, latest_run)
+    operator_state_exists = _operator_state.load_operator_state(context.namespace_dir).exists
+    if operator_run is None and (latest_run or operator_state_exists):
+        print(_event_alpha_context_block(context))
+        print("notification_preview_skipped: exact current-generation ownership is unavailable")
+        return
+    latest_run = operator_run or latest_run
     preview_result = _event_alpha_preview_summary_result(latest_run, plan=plan, profile=profile.name)
     delivery_cfg = event_alpha_notification_delivery.NotificationDeliveryConfig(
         event_alpha_notification_delivery.deliveries_path_for_context(context)
@@ -1003,6 +1108,7 @@ def event_alpha_notify_preview_from_artifacts(
         namespace=context.artifact_namespace,
         now=now,
     )
+    writer.require_current_operator_generation = operator_run is not None
     send_guard_status = (
         "No-send rehearsal: would send, but send guard is disabled. This is expected in rehearsal mode."
         if not config.EVENT_ALERTS_ENABLED and (plan.would_send_count or plan.heartbeat_due)
@@ -1033,3 +1139,37 @@ def event_alpha_notify_preview_from_artifacts(
         f"rendered={len(plan.research_review_items)} "
         f"skipped={len(plan.research_review_skipped_items)}"
     )
+
+
+def _ensure_preview_operator_state(context: Any, latest_run: Mapping[str, Any]) -> dict[str, Any] | None:
+    if not latest_run:
+        return None
+    exact_run = _operator_state.latest_matching_run(
+        (latest_run,),
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+    )
+    if exact_run is None:
+        return None
+    try:
+        state = _operator_state.begin_run_if_newer(
+            context.namespace_dir,
+            exact_run,
+            run_ledger_path=context.run_ledger_path,
+        )
+        if not _operator_state.state_matches_run(
+            state,
+            exact_run,
+            profile=context.profile,
+            artifact_namespace=context.artifact_namespace,
+        ):
+            return None
+        _namespace_status.refresh_namespace_status(
+            context.namespace_dir,
+            profile=context.profile,
+            artifact_namespace=context.artifact_namespace,
+            run_mode=str(exact_run.get("run_mode") or context.run_mode),
+        )
+    except (OSError, ValueError):
+        return None
+    return exact_run

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import stat
@@ -16,6 +17,7 @@ from . import paths as event_artifact_paths
 
 
 RUN_LEDGER_SCHEMA_VERSION = "event_alpha_run_ledger_v1"
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -63,6 +65,27 @@ def append_run_record(
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
         fh.write("\n")
+    try:
+        from . import operator_state as event_alpha_operator_state
+        from ..namespace import status as event_alpha_namespace_status
+
+        event_alpha_operator_state.begin_run_if_newer(
+            path.parent,
+            row,
+            run_ledger_path=path,
+            updated_at=finished,
+        )
+        event_alpha_namespace_status.refresh_namespace_status(
+            path.parent,
+            profile=str(row.get("profile") or "default"),
+            artifact_namespace=str(row.get("artifact_namespace") or path.parent.name),
+            run_mode=str(row.get("run_mode") or ""),
+            now=finished,
+        )
+    except (OSError, ValueError) as exc:
+        # The persisted run remains authoritative; a missing/stale state file is
+        # fail-closed by doctor/readiness checks and must never alter routing.
+        LOGGER.warning("Event Alpha operator-state update failed for %s: %s", row.get("run_id"), exc)
     return row
 
 
@@ -690,7 +713,7 @@ def _run_record_notification_fields(
         "artifact_doctor_status": getattr(result, "artifact_doctor_status", None),
         "notification_summary": _notification_summary(result, profile=profile, notify_burn=notify_burn),
         "send_block_reason": getattr(result, "send_block_reason", None),
-        "sent": bool(getattr(result, "send_success", False)),
+        "sent": _int(getattr(result, "send_items_delivered", 0)) > 0,
     }
 
 
@@ -728,6 +751,11 @@ def _run_record_artifact_write_fields(
         "research_cards_written": _int(getattr(result, "research_cards_written", len(card_paths))),
         "research_card_paths": card_paths,
         "research_card_paths_abs_debug": raw_card_paths if raw_card_paths else (),
+        "daily_brief_path": getattr(result, "daily_brief_path", None),
+        "notification_preview_path": getattr(result, "notification_preview_path", None),
+        "source_coverage_path": getattr(result, "source_coverage_path", None),
+        "live_provider_readiness_json_path": getattr(result, "live_provider_readiness_json_path", None),
+        "live_provider_readiness_report_path": getattr(result, "live_provider_readiness_report_path", None),
     }
 
 

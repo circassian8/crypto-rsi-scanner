@@ -186,6 +186,15 @@ def _namespace_send_readiness_blockers(
     elif artifact_namespace:
         namespace_dir = Path("event_fade_cache") / str(artifact_namespace)
     namespace_status = event_alpha_namespace_status.load_namespace_status(namespace_dir)
+    if namespace_status and namespace_dir is not None and namespace_status.namespace != namespace_dir.name:
+        return ["artifact namespace marker identity does not match its directory"]
+    if namespace_status and artifact_namespace and namespace_status.namespace != str(artifact_namespace):
+        return ["artifact namespace marker identity does not match the requested namespace"]
+    if namespace_status and namespace_status.status in {
+        "invalid",
+        event_alpha_namespace_status.STATUS_UNKNOWN,
+    }:
+        return ["artifact namespace status is invalid or unknown and blocked for send-readiness"]
     if event_alpha_namespace_status.is_inactive(namespace_status):
         return ["artifact namespace is stale/deprecated and blocked for send-readiness"]
     if namespace_status and not namespace_status.safe_for_send_readiness:

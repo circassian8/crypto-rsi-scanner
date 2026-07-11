@@ -16,6 +16,47 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-11 - Treat one exact operator generation as the readiness authority
+**Status:** accepted
+**Decision:** Active Event Alpha namespaces must maintain one atomic operator
+state keyed by exact run id, profile, and artifact namespace. Every artifact is
+current, skipped, failed, or stale with an explicit reason. Only a full strict
+doctor (`schema_only=false`, API checks enabled) for that exact state revision
+is authoritative. Runs, reports/cards/previews, and confirmed retention share a
+canonical namespace mutation lock, including strict doctor, lifecycle, and
+provider-preflight writers. A custom ledger path never changes that lock/state
+identity. Retention also holds the notification lock and uses fingerprint
+revalidation plus expected-run/revision invalidation before writes. Missing,
+corrupt, schema-invalid, or unknown state/marker data, custom-ledger ambiguity,
+copied marker identity, and unowned fixed-path writes fail closed for
+send-readiness. A failed attempted live delivery is not a no-send rehearsal even
+when zero items were delivered, impossible send-accounting combinations are
+invalid, and only `OK`, `WARN`, or `BLOCKED` can be authoritative doctor results.
+**Why:** Individually valid artifacts were able to describe different runs, and
+retention could otherwise replace files after another writer advanced the
+namespace. Exact identity, revision CAS, and shared exclusion make lifecycle,
+doctor, report, and retention claims auditable without weakening no-send safety.
+**Revisit when:** Artifact schema v2 replaces fixed namespace paths with an
+immutable per-run directory and atomic `latest` pointer that provides equivalent
+cross-process ownership and retention guarantees.
+
+## 2026-07-11 - Activate lane-critical providers in North Star order
+**Status:** accepted
+**Decision:** The next live-data activation is Coinalyze derivatives/OI/funding,
+followed by official exchange announcements (Bybit public no-send first within
+that category, then Binance public/fixture). Every activation starts with a
+bounded request-ledger-backed no-send rehearsal. Context/news providers do not
+move ahead of lane-critical sources, and no activation enables Telegram sends.
+All Markdown and structured runbooks must derive the full seven-rank order from
+the canonical source-coverage priority tuple, including separate CryptoPanic
+context and lower-priority RSS/GDELT context-only categories.
+**Why:** Derivatives evidence unlocks fade/crowding review and confirmed-long
+warnings, while exchange announcements supply high-authority listing/risk
+identity. Broad news is useful context but cannot be the primary alpha engine.
+**Revisit when:** Measured no-send burn-in evidence shows a different provider
+category produces more contract-counted, reviewable candidates per request and
+the North Star contract is deliberately updated.
+
 ## 2026-07-10 - Scope artifact-doctor semantics to explicit contracts
 **Status:** accepted
 **Decision:** Event Alpha doctor checks must interpret rows using their declared

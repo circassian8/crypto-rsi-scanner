@@ -36,21 +36,38 @@ def generate_search_queries_for_anomaly(raw_market_anomaly_event: RawDiscoveredE
     symbol = identity.symbol
     if not symbol:
         return ()
-    queries: list[str] = [template.format(symbol=symbol) for template in QUERY_TEMPLATES]
-    if identity.project_name:
+    if identity.is_common_word_symbol:
+        search_label = _distinct_common_identity_label(
+            symbol,
+            identity.project_name,
+            identity.coin_id.replace("-", " ").title() if identity.coin_id else None,
+        )
+        if not search_label:
+            return ()
+    else:
+        search_label = symbol
+    queries: list[str] = [template.format(symbol=search_label) for template in QUERY_TEMPLATES]
+    project_label = identity.project_name
+    if identity.is_common_word_symbol:
+        project_label = _distinct_common_identity_label(symbol, identity.project_name)
+    if project_label:
         queries.extend((
-            f"{identity.project_name} crypto catalyst",
-            f"{identity.project_name} Binance listing",
-            f"{identity.project_name} token unlock",
-            f"{identity.project_name} synthetic exposure",
+            f"{project_label} crypto catalyst",
+            f"{project_label} Binance listing",
+            f"{project_label} token unlock",
+            f"{project_label} synthetic exposure",
         ))
     for alias in identity.aliases[:4]:
-        if alias and alias.casefold() not in {symbol.casefold(), (identity.project_name or "").casefold()}:
-            queries.append(f"{alias} crypto catalyst")
-    queries.extend((
-        f"{symbol}USDT Binance listing",
-        f"{symbol}-USDT perp listing",
-    ))
+        if not alias or alias.casefold() in {symbol.casefold(), (identity.project_name or "").casefold()}:
+            continue
+        if identity.is_common_word_symbol and not _safe_common_identity_alias(alias):
+            continue
+        queries.append(f"{alias} crypto catalyst")
+    if not identity.is_common_word_symbol:
+        queries.extend((
+            f"{symbol}USDT Binance listing",
+            f"{symbol}-USDT perp listing",
+        ))
     for address in identity.contract_addresses[:2]:
         queries.append(f"{address} crypto catalyst")
     return tuple(dict.fromkeys(query for query in queries if query.strip()))
@@ -66,50 +83,61 @@ def generate_search_query_specs_for_hypothesis(hypothesis: object) -> tuple[Hypo
     """Return typed validation/discovery query specs for an impact hypothesis."""
     category = str(getattr(hypothesis, "impact_category", "") or "")
     external = str(getattr(hypothesis, "external_asset", "") or "").strip()
-    symbols = tuple(str(symbol).strip().upper() for symbol in getattr(hypothesis, "candidate_symbols", ()) or () if str(symbol).strip())
+    identities = _hypothesis_candidate_identities(hypothesis)
     sectors = tuple(str(sector) for sector in getattr(hypothesis, "candidate_sectors", ()) or ())
     out: list[HypothesisSearchQuerySpec] = []
-    for symbol in symbols[:8]:
+    for identity in identities[:8]:
+        symbol = identity.symbol
+        coin_id = str(identity.coin_id or "")
+        search_label = symbol
+        if len(symbol) <= 1 or symbol.upper() in COMMON_WORD_SYMBOLS:
+            search_label = _distinct_common_identity_label(
+                symbol,
+                identity.project_name,
+                coin_id.replace("-", " ").title() if coin_id else None,
+            )
+            if not search_label:
+                continue
         if external and category in {"rwa_preipo_proxy", "tokenized_stock_venue"}:
             out.extend((
-                HypothesisSearchQuerySpec(f"{symbol} {external} exposure"),
-                HypothesisSearchQuerySpec(f"{symbol} {external} pre-IPO"),
-                HypothesisSearchQuerySpec(f"{symbol} {external} pre-IPO exposure"),
-                HypothesisSearchQuerySpec(f"{symbol} tokenized stock {external}"),
-                HypothesisSearchQuerySpec(f"{symbol} {external} prediction market"),
+                HypothesisSearchQuerySpec(f"{search_label} {external} exposure"),
+                HypothesisSearchQuerySpec(f"{search_label} {external} pre-IPO"),
+                HypothesisSearchQuerySpec(f"{search_label} {external} pre-IPO exposure"),
+                HypothesisSearchQuerySpec(f"{search_label} tokenized stock {external}"),
+                HypothesisSearchQuerySpec(f"{search_label} {external} prediction market"),
             ))
         elif external and category == "ai_ipo_proxy":
             out.extend((
-                HypothesisSearchQuerySpec(f"{symbol} {external} exposure"),
-                HypothesisSearchQuerySpec(f"{symbol} {external} pre-IPO"),
-                HypothesisSearchQuerySpec(f"{symbol} {external} pre-IPO exposure"),
-                HypothesisSearchQuerySpec(f"{symbol} tokenized stock {external}"),
-                HypothesisSearchQuerySpec(f"{symbol} {external} perp"),
-                HypothesisSearchQuerySpec(f"{symbol} AI IPO proxy"),
+                HypothesisSearchQuerySpec(f"{search_label} {external} exposure"),
+                HypothesisSearchQuerySpec(f"{search_label} {external} pre-IPO"),
+                HypothesisSearchQuerySpec(f"{search_label} {external} pre-IPO exposure"),
+                HypothesisSearchQuerySpec(f"{search_label} tokenized stock {external}"),
+                HypothesisSearchQuerySpec(f"{search_label} {external} perp"),
+                HypothesisSearchQuerySpec(f"{search_label} AI IPO proxy"),
             ))
         elif category == "sports_fan_proxy":
             out.extend((
-                HypothesisSearchQuerySpec(f"{symbol} World Cup fan token"),
-                HypothesisSearchQuerySpec(f"{symbol} sports event prediction market"),
+                HypothesisSearchQuerySpec(f"{search_label} World Cup fan token"),
+                HypothesisSearchQuerySpec(f"{search_label} sports event prediction market"),
             ))
         elif category == "stablecoin_regulatory":
             out.extend((
-                HypothesisSearchQuerySpec(f"{symbol} GENIUS Act stablecoin"),
-                HypothesisSearchQuerySpec(f"{symbol} stablecoin reserve regulation"),
+                HypothesisSearchQuerySpec(f"{search_label} GENIUS Act stablecoin"),
+                HypothesisSearchQuerySpec(f"{search_label} stablecoin reserve regulation"),
             ))
         elif category == "listing_liquidity_event":
-            out.extend((HypothesisSearchQuerySpec(f"{symbol} listing"), HypothesisSearchQuerySpec(f"{symbol} Binance listing")))
+            out.extend((HypothesisSearchQuerySpec(f"{search_label} listing"), HypothesisSearchQuerySpec(f"{search_label} Binance listing")))
         elif category == "unlock_supply_pressure":
-            out.extend((HypothesisSearchQuerySpec(f"{symbol} unlock"), HypothesisSearchQuerySpec(f"{symbol} token vesting unlock")))
+            out.extend((HypothesisSearchQuerySpec(f"{search_label} unlock"), HypothesisSearchQuerySpec(f"{search_label} token vesting unlock")))
         elif category == "perp_venue_attention":
-            out.extend((HypothesisSearchQuerySpec(f"{symbol} perp listing"), HypothesisSearchQuerySpec(f"{symbol} futures listing")))
+            out.extend((HypothesisSearchQuerySpec(f"{search_label} perp listing"), HypothesisSearchQuerySpec(f"{search_label} futures listing")))
         elif category == "prediction_market_infra":
-            out.extend((HypothesisSearchQuerySpec(f"{symbol} prediction market oracle"), HypothesisSearchQuerySpec(f"{symbol} polymarket infrastructure")))
+            out.extend((HypothesisSearchQuerySpec(f"{search_label} prediction market oracle"), HypothesisSearchQuerySpec(f"{search_label} polymarket infrastructure")))
         elif category == "security_or_regulatory_shock":
-            out.append(HypothesisSearchQuerySpec(f"{symbol} exploit hack regulatory"))
+            out.append(HypothesisSearchQuerySpec(f"{search_label} exploit hack regulatory"))
         else:
             qtype = "market_confirmation" if category == "market_anomaly_unknown" else "candidate_validation"
-            out.append(HypothesisSearchQuerySpec(f"{symbol} crypto catalyst", qtype))
+            out.append(HypothesisSearchQuerySpec(f"{search_label} crypto catalyst", qtype))
     if external and category in {
         "rwa_preipo_proxy",
         "ai_ipo_proxy",
@@ -192,7 +220,10 @@ def score_search_query(query: SearchQuery, anomaly: RawDiscoveredEvent | None = 
     text = clean_text(query.query)
     score = 15 + min(35, anomaly_score * 0.35)
     reasons = [f"anomaly_score_{int(round(anomaly_score))}"] if anomaly_score else []
-    if query.symbol and query.symbol.casefold() in text:
+    if query.symbol and re.search(
+        rf"(?<![a-z0-9]){re.escape(query.symbol.casefold())}(?![a-z0-9])",
+        text,
+    ):
         score += 10
         reasons.append("symbol_in_query")
     catalyst_hits = _weighted_term_hits(text, CATALYST_TERM_WEIGHTS)
@@ -291,33 +322,139 @@ def _queries_for_hypotheses(
                 project_name=identity.project_name,
                 aliases=identity.aliases,
                 contract_addresses=identity.contract_addresses,
-                is_common_word_symbol=identity.symbol.upper() in COMMON_WORD_SYMBOLS,
+                is_common_word_symbol=len(identity.symbol.strip()) <= 1 or identity.symbol.upper() in COMMON_WORD_SYMBOLS,
                 identity_terms=identity.identity_terms,
             )
             score = score_search_query(base, None)
             out.append(replace(base, score=score.score, score_reasons=score.reason_codes))
     return tuple(out)
 def _hypothesis_query_identities(hypothesis: object, query_texts: Iterable[str]) -> dict[str, _HypothesisIdentity]:
-    symbols = tuple(str(symbol).strip().upper() for symbol in getattr(hypothesis, "candidate_symbols", ()) or () if str(symbol).strip())
-    coin_ids = tuple(str(coin_id).strip() for coin_id in getattr(hypothesis, "candidate_coin_ids", ()) or () if str(coin_id).strip())
+    identities = _hypothesis_candidate_identities(hypothesis)
     out: dict[str, _HypothesisIdentity] = {}
     for query in query_texts:
         query_clean = clean_text(query)
-        for idx, symbol in enumerate(symbols):
-            if not symbol:
-                continue
-            coin_id = coin_ids[idx] if idx < len(coin_ids) else None
-            symbol_pattern = rf"(?<![a-z0-9]){re.escape(symbol.casefold())}(?![a-z0-9])"
-            coin_text = clean_text(coin_id or "")
-            if re.search(symbol_pattern, query_clean) or (coin_text and coin_text in query_clean):
-                out[query] = _HypothesisIdentity(
-                    symbol=symbol,
-                    coin_id=coin_id,
-                    project_name=coin_id.replace("-", " ").title() if coin_id else None,
-                    aliases=(coin_id.replace("-", " ") if coin_id else ""),
-                )
+        for identity in identities:
+            symbol_pattern = rf"(?<![a-z0-9]){re.escape(identity.symbol.casefold())}(?![a-z0-9])"
+            collision_prone = len(identity.symbol) <= 1 or identity.symbol.upper() in COMMON_WORD_SYMBOLS
+            symbol_match = not collision_prone and bool(re.search(symbol_pattern, query_clean))
+            identity_match = any(
+                _identity_term_in_query(term, query_clean)
+                for term in identity.identity_terms
+            )
+            if symbol_match or identity_match:
+                out[query] = identity
                 break
     return out
+
+def _distinct_common_identity_label(symbol: str, *candidates: object) -> str:
+    symbol_clean = clean_text(symbol)
+    for candidate in candidates:
+        label = str(candidate or "").strip()
+        if (
+            label
+            and clean_text(label) != symbol_clean
+            and _safe_common_identity_alias(label)
+        ):
+            return label
+    return ""
+
+def _identity_term_in_query(term: object, query_clean: str) -> bool:
+    normalized = clean_text(term)
+    if len(normalized) <= 1:
+        return False
+    return bool(re.search(
+        rf"(?<![a-z0-9]){re.escape(normalized)}(?![a-z0-9])",
+        query_clean,
+    ))
+
+def _safe_common_identity_alias(alias: object) -> bool:
+    normalized = clean_text(alias)
+    return len(normalized) > 1 and str(alias).strip().upper() not in COMMON_WORD_SYMBOLS
+
+def _hypothesis_candidate_identities(hypothesis: object) -> tuple[_HypothesisIdentity, ...]:
+    symbols = tuple(
+        dict.fromkeys(
+            str(symbol).strip().upper()
+            for symbol in getattr(hypothesis, "candidate_symbols", ()) or ()
+            if str(symbol).strip()
+        )
+    )
+    coin_ids = tuple(
+        dict.fromkeys(
+            str(coin_id).strip()
+            for coin_id in getattr(hypothesis, "candidate_coin_ids", ()) or ()
+            if str(coin_id or "").strip()
+        )
+    )
+    asset_identities: list[_HypothesisIdentity] = []
+    direct_validated = {
+        "symbol": getattr(hypothesis, "validated_symbol", None),
+        "coin_id": getattr(hypothesis, "validated_coin_id", None),
+        "name": getattr(hypothesis, "validated_asset_name", None),
+    }
+    if direct_validated["symbol"]:
+        asset_identities.append(_hypothesis_identity_from_asset(direct_validated))
+    singular_validated = getattr(hypothesis, "validated_asset", None)
+    if isinstance(singular_validated, Mapping):
+        asset_identities.append(_hypothesis_identity_from_asset(singular_validated))
+    for field_name in (
+        "validated_candidate_assets",
+        "crypto_candidate_assets",
+        "suggested_candidate_assets",
+    ):
+        for row in getattr(hypothesis, field_name, ()) or ():
+            if isinstance(row, Mapping):
+                asset_identities.append(_hypothesis_identity_from_asset(row))
+    asset_identities = [identity for identity in asset_identities if identity.symbol]
+
+    by_symbol: dict[str, list[_HypothesisIdentity]] = {}
+    for identity in asset_identities:
+        rows = by_symbol.setdefault(identity.symbol, [])
+        key = (identity.symbol, identity.coin_id or "")
+        if not any((row.symbol, row.coin_id or "") == key for row in rows):
+            rows.append(identity)
+
+    legacy_singleton_pair = coin_ids[0] if len(symbols) == 1 and len(coin_ids) == 1 else None
+    ordered: list[_HypothesisIdentity] = []
+    for symbol in symbols:
+        rows = by_symbol.pop(symbol, [])
+        paired_rows = [row for row in rows if row.coin_id or row.project_name]
+        if paired_rows:
+            ordered.extend(paired_rows)
+        elif rows:
+            ordered.append(rows[0])
+        else:
+            ordered.append(_HypothesisIdentity(
+                symbol=symbol,
+                coin_id=legacy_singleton_pair,
+                project_name=legacy_singleton_pair.replace("-", " ").title() if legacy_singleton_pair else None,
+                aliases=(legacy_singleton_pair.replace("-", " "),) if legacy_singleton_pair else (),
+            ))
+    for rows in by_symbol.values():
+        paired_rows = [row for row in rows if row.coin_id or row.project_name]
+        ordered.extend(paired_rows or rows[:1])
+    return tuple(ordered)
+
+def _hypothesis_identity_from_asset(asset: Mapping[str, Any]) -> _HypothesisIdentity:
+    symbol = str(asset.get("symbol") or asset.get("validated_symbol") or "").strip().upper()
+    coin_id = str(asset.get("coin_id") or asset.get("validated_coin_id") or "").strip() or None
+    project_name = str(asset.get("name") or asset.get("project_name") or "").strip() or None
+    if project_name is None and coin_id:
+        project_name = coin_id.replace("-", " ").title()
+    aliases_value = asset.get("aliases") or ()
+    aliases = (aliases_value,) if isinstance(aliases_value, str) else tuple(aliases_value)
+    contracts_value = asset.get("contract_addresses") or ()
+    contracts = (contracts_value,) if isinstance(contracts_value, str) else tuple(contracts_value)
+    contract = str(asset.get("contract_address") or "").strip()
+    if contract:
+        contracts = (*contracts, contract)
+    return _HypothesisIdentity(
+        symbol=symbol,
+        coin_id=coin_id,
+        project_name=project_name,
+        aliases=tuple(dict.fromkeys(str(value).strip() for value in aliases if str(value).strip())),
+        contract_addresses=tuple(dict.fromkeys(str(value).strip() for value in contracts if str(value).strip())),
+    )
 def _raw_event_matches_query(raw: RawDiscoveredEvent, query: SearchQuery) -> bool:
     if result_mentions_anomaly_identity(raw, query, None):
         return True

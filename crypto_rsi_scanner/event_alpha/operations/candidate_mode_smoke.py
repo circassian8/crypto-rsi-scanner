@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from ..artifacts import locks as event_alpha_locks
 from ..artifacts import paths as event_artifact_paths
 from . import common
 
@@ -17,6 +18,27 @@ def write_candidate_mode_fixture_artifacts(
     base_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     context = common.context_for(profile=profile, artifact_namespace=artifact_namespace, base_dir=base_dir)
+    with event_alpha_locks.artifact_mutation_guard(
+        context,
+        profile=profile,
+        namespace=artifact_namespace,
+        command="candidate-mode-fixture-smoke",
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            raise RuntimeError(f"candidate-mode fixture smoke blocked: {mutation_lock.status.message}")
+        return _write_candidate_mode_fixture_artifacts_locked(
+            context,
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+        )
+
+
+def _write_candidate_mode_fixture_artifacts_locked(
+    context: Any,
+    *,
+    profile: str,
+    artifact_namespace: str,
+) -> dict[str, Any]:
     context.namespace_dir.mkdir(parents=True, exist_ok=True)
     generated = common.utc_now().isoformat()
     run_id = f"{generated}|candidate_mode_fixture_smoke|{artifact_namespace}"

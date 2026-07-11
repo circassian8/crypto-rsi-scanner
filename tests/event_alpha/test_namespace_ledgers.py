@@ -204,6 +204,41 @@ def test_event_alpha_run_lock_release_after_failsoft_and_distinct_profile_paths(
         assert lock.lock_path_for_context(no_key, lock_name="other").name == "event_alpha_other.lock"
 
 
+def test_event_alpha_artifact_mutation_lock_is_shared_and_survives_namespace_cleanup(tmp_path):
+    import shutil
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.artifacts.locks as lock
+
+    ctx = _notify_artifact_context(str(tmp_path), "notify_no_key")
+    ctx.namespace_dir.mkdir(parents=True)
+    now = datetime(2026, 7, 11, 12, 0, tzinfo=timezone.utc)
+    held = lock.acquire_artifact_mutation_lock(
+        ctx,
+        run_id="writer-a",
+        profile=ctx.profile,
+        namespace=ctx.artifact_namespace,
+        now=now,
+    )
+    assert held.owned is True
+    assert held.path.parent == ctx.namespace_dir.parent
+    assert held.path.parent != ctx.namespace_dir
+    shutil.rmtree(ctx.namespace_dir)
+    assert held.path.exists()
+
+    with lock.artifact_mutation_guard(
+        ctx,
+        profile=ctx.profile,
+        namespace=ctx.artifact_namespace,
+        command="writer-b",
+        now=now,
+    ) as blocked:
+        assert blocked.owned is False
+        assert blocked.skipped_due_to_active_lock is True
+
+    assert lock.release_run_lock(held) is True
+    assert not held.path.exists()
+
+
 def test_event_alpha_run_lock_acquisition_is_atomic():
     # Two runs starting at the same instant (both would read "no lock") must not
     # both acquire: O_CREAT|O_EXCL makes exactly one win.

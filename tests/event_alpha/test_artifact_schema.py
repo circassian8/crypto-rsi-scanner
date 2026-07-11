@@ -637,6 +637,10 @@ def test_event_alpha_schema_v1_validation_policy(tmp_path):
         guarded_run,
         schema_v1.get_schema("run_ledger_v1"),
     ) == []
+    assert schema_v1.validate_row_against_schema(
+        dict(guarded_run, send_success=False, send_items_delivered=1),
+        schema_v1.get_schema("run_ledger_v1"),
+    ) == []
     inconsistent_run = dict(guarded_run, send_items_delivered=0)
     assert "unsafe_side_effect_flag:sent" in schema_v1.validate_row_against_schema(
         inconsistent_run,

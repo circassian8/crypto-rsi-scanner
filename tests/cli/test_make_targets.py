@@ -1355,6 +1355,14 @@ def test_export_source_with_artifacts_fallback_and_archive_validation():
         (tree / "local.db").write_text("db\n", encoding="utf-8")
         (tree / "backtest_cache").mkdir()
         (tree / "backtest_cache" / "cached.json").write_text("{}\n", encoding="utf-8")
+        outside = Path(tmp) / "outside-private-material.txt"
+        outside.write_text("unconfigured private material\n", encoding="utf-8")
+        outside_future_ts = time.time() + 172800
+        os.utime(outside, (outside_future_ts, outside_future_ts))
+        outside_mtime_ns = outside.stat().st_mtime_ns
+        artifact_dir = tree / "event_fade_cache" / "unit"
+        artifact_dir.mkdir(parents=True)
+        (artifact_dir / "linked-evidence.txt").symlink_to(outside)
         future_ts = time.time() + 86400
         os.utime(makefile, (future_ts, future_ts))
         out = Path(tmp) / "out.zip"
@@ -1367,6 +1375,9 @@ def test_export_source_with_artifacts_fallback_and_archive_validation():
         assert ".env" not in names
         assert "local.db" not in names
         assert "backtest_cache/cached.json" not in names
+        assert "event_fade_cache/unit/linked-evidence.txt" not in names
+        assert outside.stat().st_mtime_ns == outside_mtime_ns
+        assert outside.read_text(encoding="utf-8") == "unconfigured private material\n"
         assert makefile_ts <= time.time()
         safe_archive = out.read_bytes()
 
@@ -1405,3 +1416,64 @@ def test_export_source_with_artifacts_fallback_and_archive_validation():
             zf.writestr(info, "all:\n\t@true\n")
         bad = export_module._validate_archive_entries(future_zip, safe_export_timestamp=now_ts)
         assert any(item.startswith("future_mtime:Makefile") for item in bad)
+
+
+def test_export_source_with_artifacts_parent_symlink_swap_fails_closed():
+    import importlib.util
+    import os
+    import zipfile
+
+    root = REPO_ROOT
+    spec = importlib.util.spec_from_file_location(
+        "export_source_with_artifacts_race",
+        root / "scripts" / "export_source_with_artifacts.py",
+    )
+    assert spec and spec.loader
+    export_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(export_module)
+
+    with TemporaryDirectory() as tmp:
+        trusted_root = Path(tmp) / "trusted"
+        artifact_root = trusted_root / "event_fade_cache"
+        safe_file = artifact_root / "unit" / "evidence.txt"
+        safe_file.parent.mkdir(parents=True)
+        safe_file.write_text("safe evidence\n", encoding="utf-8")
+        outside_root = Path(tmp) / "outside"
+        outside_file = outside_root / "unit" / "evidence.txt"
+        outside_file.parent.mkdir(parents=True)
+        outside_file.write_text("outside private material\n", encoding="utf-8")
+        displaced = trusted_root / "event_fade_cache.checked"
+        archive = Path(tmp) / "race.zip"
+        original_open = export_module.os.open
+        swapped = False
+
+        def racing_open(path, flags, mode=0o777, *, dir_fd=None):
+            nonlocal swapped
+            if path == "event_fade_cache" and dir_fd is not None and not swapped:
+                artifact_root.rename(displaced)
+                artifact_root.symlink_to(outside_root, target_is_directory=True)
+                swapped = True
+            return original_open(path, flags, mode, dir_fd=dir_fd)
+
+        export_module.os.open = racing_open
+        try:
+            try:
+                with zipfile.ZipFile(archive, "w") as zf:
+                    export_module._write_file_to_zip(
+                        zf,
+                        safe_file,
+                        "event_fade_cache/unit/evidence.txt",
+                        now_ts=__import__("time").time(),
+                        root=trusted_root,
+                    )
+            except OSError:
+                pass
+            else:
+                raise AssertionError("parent symlink swap must fail closed")
+        finally:
+            export_module.os.open = original_open
+
+        assert swapped is True
+        assert outside_file.read_text(encoding="utf-8") == "outside private material\n"
+        with zipfile.ZipFile(archive) as zf:
+            assert "event_fade_cache/unit/evidence.txt" not in zf.namelist()

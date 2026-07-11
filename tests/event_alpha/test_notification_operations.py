@@ -866,3 +866,60 @@ def test_event_alpha_notification_slo_distinguishes_preview_config_and_delivery_
     assert provider_backoff_preview.status == slo.STATUS_DEGRADED
     assert provider_backoff_preview.alertable_delivery_failures == 0
     assert any("provider" in warning for warning in provider_backoff_preview.warnings)
+
+
+def test_event_alpha_retention_runtime_paths_require_explicit_resolved_overrides():
+    import os
+    from tempfile import TemporaryDirectory
+    from unittest.mock import patch
+
+    import crypto_rsi_scanner.cli.services.scanner_parts.config_reports as config_reports
+
+    path_contracts = {
+        "core_opportunities_path": (
+            "RSI_EVENT_CORE_OPPORTUNITY_STORE_PATH",
+            "EVENT_CORE_OPPORTUNITY_STORE_PATH",
+        ),
+        "impact_hypotheses_path": (
+            "RSI_EVENT_IMPACT_HYPOTHESIS_STORE_PATH",
+            "EVENT_IMPACT_HYPOTHESIS_STORE_PATH",
+        ),
+        "incidents_path": ("RSI_EVENT_INCIDENT_STORE_PATH", "EVENT_INCIDENT_STORE_PATH"),
+        "watchlist_path": ("RSI_EVENT_WATCHLIST_STATE_PATH", "EVENT_WATCHLIST_STATE_PATH"),
+        "notification_runs_path": (
+            "RSI_EVENT_ALPHA_NOTIFICATION_RUNS_PATH",
+            "EVENT_ALPHA_NOTIFICATION_RUNS_PATH",
+        ),
+        "evidence_acquisition_path": (
+            "RSI_EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH",
+            "EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH",
+        ),
+    }
+    delivery_env = "RSI_EVENT_ALPHA_NOTIFICATION_DELIVERIES_PATH"
+    cleared_env = {env_name: "" for env_name, _ in path_contracts.values()}
+    cleared_env[delivery_env] = ""
+    with patch.dict(os.environ, cleared_env, clear=False):
+        cfg = config_reports._event_alpha_retention_config_from_runtime()
+    for field_name in (*path_contracts, "notification_deliveries_path"):
+        assert getattr(cfg, field_name) is None
+
+    with TemporaryDirectory() as tmp:
+        data_dir = Path(tmp)
+        resolved_paths = {
+            config_name: data_dir / f"resolved-{index}.jsonl"
+            for index, (_, config_name) in enumerate(path_contracts.values())
+        }
+        explicit_env = {
+            env_name: f"raw-relative-{index}.jsonl"
+            for index, (env_name, _) in enumerate(path_contracts.values())
+        }
+        explicit_env[delivery_env] = "delivery/raw-relative.jsonl"
+        with (
+            patch.dict(os.environ, explicit_env, clear=False),
+            patch.multiple(config_reports.config, DATA_DIR=data_dir, **resolved_paths),
+        ):
+            cfg = config_reports._event_alpha_retention_config_from_runtime()
+
+        for field_name, (_, config_name) in path_contracts.items():
+            assert getattr(cfg, field_name) == resolved_paths[config_name]
+        assert cfg.notification_deliveries_path == data_dir / explicit_env[delivery_env]

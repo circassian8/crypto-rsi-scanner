@@ -31,6 +31,9 @@ def event_alpha_notify_cycle(
             lock_holder=lock_holder,
         )
     finally:
+        mutation_lock = lock_holder.get("mutation_lock")
+        if mutation_lock is not None:
+            event_alpha_run_lock.release_run_lock(mutation_lock)
         run_lock = lock_holder.get("lock")
         if run_lock is not None:
             event_alpha_run_lock.release_run_lock(run_lock)

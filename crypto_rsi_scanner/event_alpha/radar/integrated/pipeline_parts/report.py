@@ -249,7 +249,7 @@ def build_integrated_notification_delivery_rows(
         context=context,
         lane="source_provider_health",
         extra_lines=(
-            "Lane-critical source priority: official exchange, derivatives/OI/funding, structured unlock/calendar, DEX/on-chain, protocol fundamentals, CryptoPanic tagged news, RSS/GDELT context.",
+            f"Lane-critical source priority: {_canonical_source_priority_summary()}.",
             f"Diagnostic rows hidden from candidate lanes: {len(diagnostics)}",
         ),
     )
@@ -491,6 +491,7 @@ def _row_card_path(
 def format_integrated_source_coverage(
     candidates: Iterable[Mapping[str, Any]],
     *,
+    run_id: str | None = None,
     readiness_json_path: str | Path | None = None,
     readiness_md_path: str | Path | None = None,
 ) -> str:
@@ -503,17 +504,15 @@ def format_integrated_source_coverage(
         "",
         RESEARCH_DISCLAIMER,
         "",
-        "## Lane-Critical Source Priority",
-        "1. official exchange announcements",
-        "2. derivatives/OI/funding",
-        "3. structured unlock/calendar data",
-        "4. DEX/on-chain liquidity",
-        "5. protocol fundamentals",
-        "6. CryptoPanic tagged news",
-        "7. RSS/GDELT broad context only",
+        f"- run_id: {run_id or 'none'}",
         "",
-        "## Observed Source Packs",
+        "## Lane-Critical Source Priority",
     ]
+    lines.extend(
+        f"{idx}. {category}"
+        for idx, category in enumerate(_canonical_source_priority_labels(), start=1)
+    )
+    lines.extend(["", "## Observed Source Packs"])
     for pack, count in source_counts.most_common():
         lines.append(f"- {pack}: {count}")
     lines.extend(["", "Most useful next data source categories:"])
@@ -548,6 +547,7 @@ def format_integrated_source_coverage(
 def format_integrated_source_coverage_json(
     candidates: Iterable[Mapping[str, Any]],
     *,
+    run_id: str | None = None,
     input_manifest: Iterable[Mapping[str, Any]] = (),
     readiness_json_path: str | Path | None = None,
     readiness_md_path: str | Path | None = None,
@@ -566,6 +566,7 @@ def format_integrated_source_coverage_json(
     return {
         "schema_version": 1,
         "row_type": "event_alpha_source_coverage",
+        "run_id": str(run_id or "") or None,
         "source": "integrated_radar",
         "candidate_count": len(rows),
         "lane_counts": dict(sorted(lane_counts.items())),
@@ -603,15 +604,7 @@ def format_integrated_source_coverage_json(
             }
             for idx, item in enumerate(event_alpha_source_coverage.SOURCE_COVERAGE_CATEGORY_PRIORITIES)
         ],
-        "lane_critical_priority": [
-            "official_exchange_announcements",
-            "derivatives_oi_funding",
-            "structured_unlock_calendar",
-            "dex_onchain_liquidity",
-            "protocol_fundamentals",
-            "cryptopanic_tagged_news",
-            "rss_gdelt_context",
-        ],
+        "lane_critical_priority": list(_canonical_source_priority_slugs()),
         "input_manifest": manifest_rows,
     }
 
@@ -624,8 +617,31 @@ def load_integrated_notification_deliveries(namespace_dir: str | Path) -> tuple[
 def _source_coverage_lines(rows: list[dict[str, Any]]) -> list[str]:
     counts = Counter(pack for row in rows for pack in (row.get("source_packs") or [row.get("source_pack") or "unknown"]))
     lines = [f"- {pack}: {count}" for pack, count in counts.most_common()]
-    lines.append("- Most useful next source is lane-critical: official exchange, derivatives/OI/funding, structured unlock/calendar, then broader news context.")
+    lines.append(f"- Most useful next source is lane-critical: {_canonical_source_priority_summary()}.")
     return lines
+
+def _canonical_source_priority_labels() -> tuple[str, ...]:
+    return tuple(
+        str(item.get("category") or "unknown")
+        for item in event_alpha_source_coverage.SOURCE_COVERAGE_CATEGORY_PRIORITIES
+    )
+
+def _canonical_source_priority_summary() -> str:
+    return ", ".join(_canonical_source_priority_labels())
+
+def _canonical_source_priority_slugs() -> tuple[str, ...]:
+    compatibility_slugs = {
+        "DEX/on-chain liquidity": ("dex_onchain_liquidity",),
+    }
+    return tuple(
+        slug
+        for label in _canonical_source_priority_labels()
+        for slug in compatibility_slugs.get(label, (_source_priority_slug(label),))
+    )
+
+def _source_priority_slug(value: str) -> str:
+    slug = "".join(character.lower() if character.isalnum() else "_" for character in value)
+    return "_".join(part for part in slug.split("_") if part)
 
 def _input_manifest_lines(
     manifest: Iterable[Mapping[str, Any]],

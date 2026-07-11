@@ -23,8 +23,6 @@ def _prepare_fixture_context(verbose: bool, event_now: str | datetime | None) ->
         base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
         artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "fixture_notify_smoke",
     )
-    if str(context.artifact_namespace or "").endswith("smoke"):
-        shutil.rmtree(context.namespace_dir, ignore_errors=True)
     _apply_event_alpha_context_to_config(context)
     _normalize_profile_paths()
     no_send = str(os.getenv("RSI_EVENT_ALPHA_NOTIFY_FIXTURE_NO_SEND", "0")).strip().lower() in {
@@ -335,6 +333,36 @@ def event_alpha_notify_fixture_smoke(
 ) -> None:
     """Run a local fake-sender Event Alpha notification smoke."""
     context, now, no_send, run_id = _prepare_fixture_context(verbose, event_now)
+    with event_alpha_run_lock.artifact_mutation_guard(
+        context,
+        profile=context.profile,
+        namespace=context.artifact_namespace,
+        command="notification-fixture-smoke",
+        now=now,
+    ) as mutation_lock:
+        if not mutation_lock.owned:
+            print(f"Event Alpha fixture smoke skipped: {mutation_lock.status.message}.")
+            return
+        if str(context.artifact_namespace or "").endswith("smoke"):
+            shutil.rmtree(context.namespace_dir, ignore_errors=True)
+            context.namespace_dir.mkdir(parents=True, exist_ok=True)
+        _event_alpha_notify_fixture_smoke_locked(
+            context,
+            now=now,
+            no_send=no_send,
+            run_id=run_id,
+            event_now=event_now,
+        )
+
+
+def _event_alpha_notify_fixture_smoke_locked(
+    context: Any,
+    *,
+    now: datetime,
+    no_send: bool,
+    run_id: str,
+    event_now: str | datetime | None,
+) -> None:
     primary = build_primary_notification_fixtures(now)
     controls = build_control_notification_fixtures(now)
     core_write, core_rows, card_write = _write_fixture_core_and_cards(

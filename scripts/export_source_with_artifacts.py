@@ -7,16 +7,20 @@ The archive intentionally overwrites the same filename every run:
 
 from __future__ import annotations
 
+import errno
+import os
+from pathlib import Path
 import subprocess
+import stat
 import time
 import zipfile
 from datetime import datetime
-import os
-from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "crypto_rsi_scanner_source_with_artifacts.zip"
+_OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
+_UTIME_SUPPORTS_FD = os.utime in os.supports_fd
 
 SECRET_ENV_FIELDS = {
     "TELEGRAM_BOT_TOKEN": "telegram_bot_token",
@@ -67,6 +71,7 @@ EXCLUDE_SUFFIXES = (
     ".sqlite",
     ".sqlite3",
     ".log",
+    ".lock",
     ".tmp",
     ".swp",
     ".zip",
@@ -92,7 +97,7 @@ def _tracked_paths(root: Path = ROOT) -> set[Path]:
 def _walk_source_paths(root: Path = ROOT) -> set[Path]:
     paths: set[Path] = set()
     for path in root.rglob("*"):
-        if path.is_file() and not _skip(path, root=root):
+        if _safe_regular_file(path, root=root) and not _skip(path, root=root):
             paths.add(path)
     return paths
 
@@ -101,15 +106,17 @@ def _artifact_paths(root: Path = ROOT) -> set[Path]:
     paths: set[Path] = set()
     for name in ARTIFACT_ROOTS:
         artifact_root = root / name
-        if not artifact_root.exists():
+        if artifact_root.is_symlink() or not artifact_root.exists():
             continue
         for path in artifact_root.rglob("*"):
-            if path.is_file():
+            if _safe_regular_file(path, root=root):
                 paths.add(path)
     return paths
 
 
 def _skip(path: Path, root: Path = ROOT) -> bool:
+    if path.is_symlink():
+        return True
     rel = path.relative_to(root)
     parts = rel.parts
     if any(part in EXCLUDE_DIRS for part in parts):
@@ -122,6 +129,70 @@ def _skip(path: Path, root: Path = ROOT) -> bool:
     if path.suffix in EXCLUDE_SUFFIXES or any(path.name.endswith(suffix) for suffix in EXCLUDE_SUFFIXES):
         return True
     return False
+
+
+def _safe_regular_file(path: Path, *, root: Path) -> bool:
+    """Return true only for a regular file reached without an in-root symlink."""
+
+    root_abs = Path(root).expanduser().absolute()
+    path_abs = Path(path).expanduser().absolute()
+    try:
+        rel = path_abs.relative_to(root_abs)
+    except ValueError:
+        return False
+    current = root_abs
+    try:
+        for part in rel.parts:
+            current = current / part
+            mode = current.lstat().st_mode
+            if stat.S_ISLNK(mode):
+                return False
+        return bool(rel.parts) and stat.S_ISREG(mode)
+    except (FileNotFoundError, OSError):
+        return False
+
+
+def _open_verified_regular_file(path: Path, *, root: Path) -> tuple[int, os.stat_result]:
+    """Open one root-relative regular file without following any path symlink."""
+
+    if (
+        not _OPEN_SUPPORTS_DIR_FD
+        or not hasattr(os, "O_DIRECTORY")
+        or not hasattr(os, "O_NOFOLLOW")
+    ):
+        raise OSError(errno.ENOTSUP, "descriptor-relative no-follow export is unsupported")
+    root_abs = Path(root).expanduser().absolute()
+    path_abs = Path(path).expanduser().absolute()
+    try:
+        parts = path_abs.relative_to(root_abs).parts
+    except ValueError as exc:
+        raise OSError(errno.EPERM, "export input is outside the trusted root") from exc
+    if not parts:
+        raise OSError(errno.EISDIR, "export input is the trusted root")
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    file_flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    root_fd = os.open(root_abs, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0))
+    directory_fd = root_fd
+    try:
+        for part in parts[:-1]:
+            next_fd = os.open(part, directory_flags, dir_fd=directory_fd)
+            if directory_fd != root_fd:
+                os.close(directory_fd)
+            directory_fd = next_fd
+        file_fd = os.open(parts[-1], file_flags, dir_fd=directory_fd)
+        try:
+            file_stat = os.fstat(file_fd)
+            if not stat.S_ISREG(file_stat.st_mode):
+                raise OSError(errno.EINVAL, "export input is not a regular file")
+        except BaseException:
+            os.close(file_fd)
+            raise
+        return file_fd, file_stat
+    finally:
+        if directory_fd != root_fd:
+            os.close(directory_fd)
+        os.close(root_fd)
 
 
 def _validate(names: list[str]) -> list[str]:
@@ -235,39 +306,79 @@ def _safe_export_timestamp(*, now_ts: float | None = None) -> float:
     return wall_clock_safe
 
 
-def _zipinfo_for_path(path: Path, arcname: str, *, now_ts: float) -> zipfile.ZipInfo:
+def _zipinfo_for_path(
+    path: Path,
+    arcname: str,
+    *,
+    now_ts: float,
+    root: Path | None = None,
+) -> zipfile.ZipInfo:
     """Create a zip entry while clamping future mtimes to export time."""
 
-    stat = path.stat()
+    safety_root = Path(root) if root is not None else path.parent
+    descriptor, file_stat = _open_verified_regular_file(path, root=safety_root)
+    os.close(descriptor)
+    return _zipinfo_for_stat(file_stat, arcname, now_ts=now_ts)
+
+
+def _zipinfo_for_stat(
+    file_stat: os.stat_result,
+    arcname: str,
+    *,
+    now_ts: float,
+) -> zipfile.ZipInfo:
     # Zip timestamps cannot represent dates before 1980. More importantly for
     # review zips, do not preserve future-dated mtimes from host/archive clock
     # skew because extracted Makefiles can make every `make` command warn.
-    mtime = min(max(stat.st_mtime, MIN_ZIP_TIMESTAMP), now_ts)
+    mtime = min(max(file_stat.st_mtime, MIN_ZIP_TIMESTAMP), now_ts)
     info = zipfile.ZipInfo(arcname, datetime.fromtimestamp(mtime).timetuple()[:6])
     info.compress_type = zipfile.ZIP_DEFLATED
-    info.external_attr = (stat.st_mode & 0xFFFF) << 16
+    info.external_attr = (file_stat.st_mode & 0xFFFF) << 16
     return info
 
 
-def _write_file_to_zip(zf: zipfile.ZipFile, path: Path, arcname: str, *, now_ts: float) -> None:
-    info = _zipinfo_for_path(path, arcname, now_ts=now_ts)
-    with path.open("rb") as src, zf.open(info, "w") as dst:
+def _write_file_to_zip(
+    zf: zipfile.ZipFile,
+    path: Path,
+    arcname: str,
+    *,
+    now_ts: float,
+    root: Path | None = None,
+) -> None:
+    safety_root = Path(root) if root is not None else path.parent
+    descriptor, file_stat = _open_verified_regular_file(path, root=safety_root)
+    info = _zipinfo_for_stat(file_stat, arcname, now_ts=now_ts)
+    with os.fdopen(descriptor, "rb") as src, zf.open(info, "w") as dst:
         dst.write(src.read())
 
 
-def _normalize_input_timestamps(paths: list[Path], *, safe_export_timestamp: float) -> int:
+def _normalize_input_timestamps(
+    paths: list[Path],
+    *,
+    safe_export_timestamp: float,
+    root: Path | None = None,
+) -> int:
     """Clamp source mtimes before archiving so later fallback exports stay safe."""
 
     changed = 0
+    if not _UTIME_SUPPORTS_FD:
+        raise OSError(errno.ENOTSUP, "descriptor timestamp updates are unsupported")
     for path in paths:
+        safety_root = Path(root) if root is not None else path.parent
         try:
-            stat = path.stat()
+            descriptor, file_stat = _open_verified_regular_file(path, root=safety_root)
         except OSError:
             continue
-        if stat.st_mtime <= safe_export_timestamp + 2:
-            continue
-        os.utime(path, (min(stat.st_atime, safe_export_timestamp), safe_export_timestamp))
-        changed += 1
+        try:
+            if file_stat.st_mtime <= safe_export_timestamp + 2:
+                continue
+            os.utime(
+                descriptor,
+                (min(file_stat.st_atime, safe_export_timestamp), safe_export_timestamp),
+            )
+            changed += 1
+        finally:
+            os.close(descriptor)
     return changed
 
 
@@ -276,16 +387,35 @@ def main(root: Path = ROOT, out: Path = OUT) -> int:
     entries = [
         path
         for path in sorted(paths, key=lambda item: item.relative_to(root).as_posix())
-        if path.exists() and path.is_file() and not _skip(path, root=root)
+        if _safe_regular_file(path, root=root) and not _skip(path, root=root)
     ]
 
     now_ts = _safe_export_timestamp()
-    normalized_mtimes = _normalize_input_timestamps(entries, safe_export_timestamp=now_ts)
+    try:
+        normalized_mtimes = _normalize_input_timestamps(
+            entries,
+            safe_export_timestamp=now_ts,
+            root=root,
+        )
+    except OSError as exc:
+        print(f"export_failed_closed={type(exc).__name__}")
+        return 1
     candidate = out.with_name(f"{out.name}.tmp")
     candidate.unlink(missing_ok=True)
-    with zipfile.ZipFile(candidate, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
-        for path in entries:
-            _write_file_to_zip(zf, path, path.relative_to(root).as_posix(), now_ts=now_ts)
+    try:
+        with zipfile.ZipFile(candidate, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+            for path in entries:
+                _write_file_to_zip(
+                    zf,
+                    path,
+                    path.relative_to(root).as_posix(),
+                    now_ts=now_ts,
+                    root=root,
+                )
+    except (OSError, ValueError) as exc:
+        print(f"export_failed_closed={type(exc).__name__}")
+        candidate.unlink(missing_ok=True)
+        return 1
 
     with zipfile.ZipFile(candidate) as zf:
         names = zf.namelist()
