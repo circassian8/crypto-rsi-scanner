@@ -948,6 +948,95 @@ def test_operator_report_mutation_guard_and_fixed_writer_routes_fail_closed(tmp_
         assert "_run_provider_artifact_mutation" in inspect.getsource(function)
 
 
+def test_strict_artifact_doctor_exits_nonzero_on_blocked_or_skipped_result(tmp_path):
+    from unittest.mock import patch
+
+    context = SimpleNamespace(
+        namespace_dir=tmp_path / "fixture",
+        profile="fixture",
+        artifact_namespace="fixture",
+    )
+    blocked = SimpleNamespace(status="BLOCKED", blockers=("schema.validation_errors",))
+    warned = SimpleNamespace(status="WARN", blockers=())
+
+    with (
+        patch.object(scanner_report_service, "resolve_event_alpha_artifact_context_for_report", return_value=context),
+        patch.object(scanner_report_service.config, "EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT", False),
+        patch.object(scanner_report_service, "_run_operator_report_mutation", return_value=blocked),
+    ):
+        try:
+            scanner_report_service.event_alpha_artifact_doctor_report(strict=True)
+        except SystemExit as exc:
+            assert exc.code == 1
+        else:
+            raise AssertionError("strict BLOCKED doctor must exit nonzero")
+
+    with (
+        patch.object(scanner_report_service, "resolve_event_alpha_artifact_context_for_report", return_value=context),
+        patch.object(scanner_report_service.config, "EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT", False),
+        patch.object(scanner_report_service, "_run_operator_report_mutation", return_value=None),
+    ):
+        try:
+            scanner_report_service.event_alpha_artifact_doctor_report(strict=True)
+        except SystemExit as exc:
+            assert exc.code == 1
+        else:
+            raise AssertionError("strict skipped doctor must exit nonzero")
+
+    with (
+        patch.object(scanner_report_service, "resolve_event_alpha_artifact_context_for_report", return_value=context),
+        patch.object(scanner_report_service.config, "EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT", False),
+        patch.object(scanner_report_service, "_run_operator_report_mutation", return_value=warned),
+    ):
+        scanner_report_service.event_alpha_artifact_doctor_report(strict=True)
+
+    unstamped = scanner_report_service._guarded_report_writes.ArtifactDoctorExecution(
+        warned,
+        False,
+    )
+    with (
+        patch.object(scanner_report_service, "resolve_event_alpha_artifact_context_for_report", return_value=context),
+        patch.object(scanner_report_service.config, "EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT", False),
+        patch.object(scanner_report_service, "_run_operator_report_mutation", return_value=unstamped),
+    ):
+        try:
+            scanner_report_service.event_alpha_artifact_doctor_report(strict=True)
+        except SystemExit as exc:
+            assert exc.code == 1
+        else:
+            raise AssertionError("strict doctor without an exact-revision stamp must exit nonzero")
+
+    race_context = SimpleNamespace(
+        namespace_dir=tmp_path / "fixture",
+        profile="fixture",
+        artifact_namespace="fixture",
+        run_mode="fixture",
+    )
+    with (
+        patch.object(
+            scanner_report_service._operator_state,
+            "load_operator_state",
+            return_value=SimpleNamespace(valid=True, state={"revision": 3}),
+        ),
+        patch.object(scanner_report_service._operator_state, "state_matches_run", return_value=True),
+        patch.object(
+            scanner_report_service._operator_state,
+            "record_doctor_status",
+            side_effect=ValueError("operator state revision mismatch"),
+        ),
+    ):
+        recorded = scanner_report_service._record_operator_doctor_result(
+            race_context,
+            warned,
+            run_row={"run_id": "run-race", "run_mode": "fixture"},
+            expected_revision=3,
+            strict=True,
+            schema_only=False,
+            skip_api_checks=False,
+        )
+    assert recorded is False
+
+
 def test_namespace_lifecycle_writer_fails_closed_on_active_namespace_mutation(tmp_path):
     from crypto_rsi_scanner.event_alpha.artifacts import locks as event_alpha_locks
 

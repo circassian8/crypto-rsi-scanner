@@ -10,10 +10,12 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from ..artifacts.schema.decision_model import validate_contract
 from .decision_models import actionability_score_cohort
 
 
 DECISION_MODEL_FIELD_NAMES = (
+    "research_only",
     "decision_model_version",
     "decision_model_enabled",
     "thesis_origin",
@@ -42,6 +44,9 @@ DECISION_MODEL_FIELD_NAMES = (
     "radar_what_invalidates",
     "actionability_score_cohort",
     "anomaly_type",
+    "decision_source_side_effect_safety_failed",
+    "decision_source_secret_safety_failed",
+    "decision_source_path_safety_failed",
 )
 
 PREVIEW_LANE_TITLES = {
@@ -57,24 +62,39 @@ PREVIEW_LANE_ORDER = tuple(PREVIEW_LANE_TITLES)
 
 
 def decision_model_values(*rows: Mapping[str, Any] | None) -> dict[str, Any]:
-    """Return explicit v2 fields from mappings and their component payloads."""
+    """Return one complete, explicit v2 authority without cross-row merging.
 
-    merged: dict[str, Any] = {}
+    Argument order is authority order.  A malformed explicit v2 payload fails
+    closed instead of borrowing fields from a later row or an unversioned
+    mapping.  Explicit empty lists/maps are meaningful canonical values and
+    must survive projection into outcomes and other persisted surfaces.
+    """
+
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        for components_key in ("score_components", "latest_score_components"):
-            components = row.get(components_key)
-            if isinstance(components, Mapping):
-                _copy_fields(merged, components)
-        _copy_fields(merged, row)
-    if not decision_model_is_enabled(merged):
-        return {}
-    if not merged.get("actionability_score_cohort"):
-        cohort = actionability_score_cohort(merged.get("actionability_score"))
-        if cohort:
-            merged["actionability_score_cohort"] = cohort
-    return merged
+        authorities: list[Mapping[str, Any]] = [row]
+        authorities.extend(
+            components
+            for components_key in ("score_components", "latest_score_components")
+            if isinstance((components := row.get(components_key)), Mapping)
+        )
+        for authority in authorities:
+            if not _has_decision_model_marker(authority):
+                continue
+            if not decision_model_is_enabled(authority):
+                return {}
+            projection = _project_fields(authority)
+            if not projection.get("actionability_score_cohort"):
+                cohort = actionability_score_cohort(projection.get("actionability_score"))
+                if cohort:
+                    projection["actionability_score_cohort"] = cohort
+            contract_payload = dict(authority)
+            contract_payload.update(projection)
+            if validate_contract(contract_payload):
+                return {}
+            return projection
+    return {}
 
 
 def decision_model_is_enabled(values: Mapping[str, Any]) -> bool:
@@ -86,11 +106,12 @@ def decision_model_is_enabled(values: Mapping[str, Any]) -> bool:
 def decision_preview_lane(values: Mapping[str, Any]) -> str:
     """Map a v2 route to one operator preview lane without changing routing."""
 
-    if not decision_model_is_enabled(values):
+    projected = decision_model_values(values)
+    if not projected:
         return "decision_diagnostic"
-    route = str(values.get("radar_route") or "diagnostic").strip().casefold()
-    origin = str(values.get("thesis_origin") or "").strip().casefold()
-    confidence = str(values.get("confidence_band") or "").strip().casefold()
+    route = str(projected.get("radar_route") or "diagnostic").strip().casefold()
+    origin = str(projected.get("thesis_origin") or "").strip().casefold()
+    confidence = str(projected.get("confidence_band") or "").strip().casefold()
     if route in {"actionable_watch", "high_confidence_watch"} and origin == "market_led":
         return "actionable_market_led"
     if route == "high_confidence_watch" or (
@@ -120,6 +141,8 @@ def group_decision_rows(
         row = dict(raw)
         values = decision_model_values(row)
         if not values:
+            if include_diagnostics and _row_has_decision_model_marker(row):
+                groups["decision_diagnostic"].append(row)
             continue
         lane = decision_preview_lane(values)
         if lane == "decision_diagnostic" and not include_diagnostics:
@@ -133,8 +156,10 @@ def group_decision_rows(
 def decision_model_markdown_lines(values: Mapping[str, Any]) -> list[str]:
     """Render transparent, non-prescriptive v2 decision details."""
 
-    if not decision_model_is_enabled(values):
+    projected = decision_model_values(values)
+    if not projected:
         return []
+    values = projected
     lines = [
         f"- Decision model: {values.get('decision_model_version')}",
         f"- Radar route: {values.get('radar_route') or 'diagnostic'}",
@@ -184,11 +209,28 @@ def decision_model_markdown_lines(values: Mapping[str, Any]) -> list[str]:
     return lines
 
 
-def _copy_fields(target: dict[str, Any], source: Mapping[str, Any]) -> None:
-    for field in DECISION_MODEL_FIELD_NAMES:
-        value = source.get(field)
-        if value not in (None, "", [], {}, ()):
-            target[field] = value
+def _project_fields(source: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        field: source[field]
+        for field in DECISION_MODEL_FIELD_NAMES
+        if field in source and source.get(field) is not None and source.get(field) != ""
+    }
+
+
+def _has_decision_model_marker(source: Mapping[str, Any]) -> bool:
+    return any(
+        source.get(field) not in (None, "")
+        for field in ("decision_model_version", "decision_model_enabled")
+    )
+
+
+def _row_has_decision_model_marker(row: Mapping[str, Any]) -> bool:
+    if _has_decision_model_marker(row):
+        return True
+    return any(
+        isinstance(row.get(key), Mapping) and _has_decision_model_marker(row[key])
+        for key in ("score_components", "latest_score_components")
+    )
 
 
 def _items(value: Any) -> list[str]:

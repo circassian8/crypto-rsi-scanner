@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ... import decision_model as event_radar_decision_model
+from ... import decision_safety as event_radar_decision_safety
 from .runtime import *
 from .merge_policy import *
 
@@ -126,7 +127,7 @@ def _merge_family(
         reason_codes=context.reason_codes,
         warnings=context.warnings,
     ))
-    candidate.update(_merge_family_safety_fields())
+    candidate.update(_merge_family_safety_fields(rows))
     candidate.update(_merge_family_incident_source_fields(
         rows,
         key=key,
@@ -377,8 +378,10 @@ def _merge_family_source_fields(
         "source_strength": source_strength,
         "provider_generation_id": _best_text(rows, "provider_generation_id"),
         "provider_request_succeeded": any(_truthy(row.get("provider_request_succeeded")) for row in rows),
-        "provider_source_artifact": _best_text(rows, "provider_source_artifact", "coinalyze_source_artifact_path"),
-        "request_ledger_path": _best_text(rows, "request_ledger_path"),
+        "provider_source_artifact": _portable_evidence_path(
+            _best_text(rows, "provider_source_artifact", "coinalyze_source_artifact_path")
+        ),
+        "request_ledger_path": _portable_evidence_path(_best_text(rows, "request_ledger_path")),
     }
 
 def _merge_family_opportunity_fields(
@@ -518,7 +521,7 @@ def _merge_family_evidence_fields(
         "warnings": list(warnings),
     }
 
-def _merge_family_safety_fields() -> dict[str, bool]:
+def _merge_family_safety_fields(rows: Iterable[Mapping[str, Any]]) -> dict[str, bool]:
     return {
         "research_only": True,
         "created_alert": False,
@@ -526,6 +529,7 @@ def _merge_family_safety_fields() -> dict[str, bool]:
         "triggered_fade_created": False,
         "paper_trade_created": False,
         "notification_send_enabled": False,
+        **event_radar_decision_safety.source_safety_attestations(rows),
     }
 
 def _merge_family_incident_source_fields(

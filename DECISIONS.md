@@ -16,6 +16,35 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-12 - Treat one valid v2 authority and strict doctor as fail-closed contracts
+**Status:** accepted
+**Decision:** A projected Decision Model v2 row must come from one individually
+schema-valid authority; consumers may not assemble a stronger-looking row by
+borrowing fields from different candidate/core/card records, and explicit empty
+required containers must survive projection. Promotion requires the exact
+affirmative `research_only is True` contract. Boolean-only provider safety
+attestations survive every reevaluation and downstream projection, must match a
+hard blocker plus diagnostic route, and are derived before unsafe source paths
+are reduced to portable labels; secret values and absolute paths do not persist.
+The first explicit v2 marker is authoritative, so disabled or malformed data
+cannot fall through to nested/later actionable data. Later correction/disproof
+evidence on either the candidate or source rows outranks an earlier derived
+catalyst confirmation. Performance reporting joins exact candidate and core
+aliases into one observation and defines diagnostic cohorts only from
+actual lane/opportunity/route semantics, not unrelated values containing the
+word `diagnostic`. A full strict artifact-doctor CLI run must exit nonzero when
+its context cannot resolve, its lock is skipped, its result is `BLOCKED`, any
+blocker remains, or its exact operator revision cannot be stamped; non-strict,
+schema-only, and API-skipped reports remain observational rather than readiness
+authority.
+**Why:** Research-only does not make misleading operator evidence harmless.
+Single-row authority, durable safety facts, exact denominators, and meaningful
+process exit codes prevent partial artifacts and automation from presenting a
+false green state without changing notification or execution policy.
+**Revisit when:** Immutable per-run artifacts make projection precedence
+unambiguous by construction, or a versioned schema deliberately replaces these
+contracts with equally fail-closed lineage and safety guarantees.
+
 ## 2026-07-12 - Separate Crypto Radar actionability from catalyst confirmation
 **Status:** accepted
 **Decision:** Event Alpha's additive Crypto Radar Decision Model v2 may present

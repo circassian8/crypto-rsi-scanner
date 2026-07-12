@@ -41,8 +41,45 @@ class EventFeedbackConfig:
     path: Path
 
 
+@dataclass(frozen=True, kw_only=True)
+class _EventFeedbackDecisionFields:
+    """Decision Model v2 context shared by every feedback record."""
+
+    research_only: bool = True
+    decision_model_version: str | None = None
+    decision_model_enabled: bool | None = None
+    thesis_origin: str | None = None
+    directional_bias: str | None = None
+    catalyst_status: str | None = None
+    confidence_band: str | None = None
+    timing_state: str | None = None
+    tradability_status: str | None = None
+    radar_route: str | None = None
+    radar_route_reason: str | None = None
+    radar_actionable: bool | None = None
+    actionability_score: float | None = None
+    evidence_confidence_score: float | None = None
+    risk_score: float | None = None
+    actionability_score_cohort: str | None = None
+    anomaly_type: str | None = None
+    actionability_score_components: dict[str, Any] | None = None
+    actionability_penalty_components: dict[str, Any] | None = None
+    evidence_confidence_score_components: dict[str, Any] | None = None
+    risk_score_components: dict[str, Any] | None = None
+    decision_hard_blockers: tuple[str, ...] = ()
+    decision_soft_penalties: tuple[str, ...] = ()
+    decision_missing_data: tuple[str, ...] = ()
+    decision_warnings: tuple[str, ...] = ()
+    why_still_worth_reviewing: tuple[str, ...] = ()
+    radar_what_confirms: tuple[str, ...] = ()
+    radar_what_invalidates: tuple[str, ...] = ()
+    decision_source_side_effect_safety_failed: bool = False
+    decision_source_secret_safety_failed: bool = False
+    decision_source_path_safety_failed: bool = False
+
+
 @dataclass(frozen=True)
-class EventFeedbackRecord:
+class EventFeedbackRecord(_EventFeedbackDecisionFields):
     schema_version: str
     row_type: str
     feedback_id: str
@@ -92,31 +129,6 @@ class EventFeedbackRecord:
     source_provider_domain: str | None = None
     provider_coverage_status: str | None = None
     source_metadata: dict[str, Any] | None = None
-    decision_model_version: str | None = None
-    decision_model_enabled: bool | None = None
-    thesis_origin: str | None = None
-    directional_bias: str | None = None
-    catalyst_status: str | None = None
-    confidence_band: str | None = None
-    timing_state: str | None = None
-    tradability_status: str | None = None
-    radar_route: str | None = None
-    radar_actionable: bool | None = None
-    actionability_score: float | None = None
-    evidence_confidence_score: float | None = None
-    risk_score: float | None = None
-    actionability_score_cohort: str | None = None
-    anomaly_type: str | None = None
-    actionability_score_components: dict[str, Any] | None = None
-    evidence_confidence_score_components: dict[str, Any] | None = None
-    risk_score_components: dict[str, Any] | None = None
-    decision_hard_blockers: tuple[str, ...] = ()
-    decision_soft_penalties: tuple[str, ...] = ()
-    decision_missing_data: tuple[str, ...] = ()
-    decision_warnings: tuple[str, ...] = ()
-    why_still_worth_reviewing: tuple[str, ...] = ()
-    radar_what_confirms: tuple[str, ...] = ()
-    radar_what_invalidates: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -572,7 +584,7 @@ def _record_from_entry(
     components = dict(entry.latest_score_components or {})
     row = dict(context_row or {})
     row_components = _components(row)
-    decision = decision_model_values(components, row_components, row)
+    decision = decision_model_values(row, row_components, components)
     core_id = (
         _row_value(row, "core_opportunity_id", "feedback_target", components=row_components)
         or components.get("core_opportunity_id")
@@ -652,7 +664,7 @@ def _record_from_context_row(
     card_path: str | Path | None,
 ) -> EventFeedbackRecord:
     components = _components(row)
-    decision = decision_model_values(components, row)
+    decision = decision_model_values(row, components)
     core_id = _row_value(row, "core_opportunity_id", "feedback_target", components=components)
     feedback_target = _row_value(row, "feedback_target", components=components) or core_id or target
     feedback_target_type = _row_value(row, "feedback_target_type", components=components)
@@ -721,6 +733,8 @@ def _append_record(path: Path, record: EventFeedbackRecord) -> None:
 
 def _record_from_row(row: Mapping[str, Any]) -> EventFeedbackRecord | None:
     if row.get("row_type") != "event_alpha_feedback":
+        return None
+    if "research_only" in row and row.get("research_only") is not True:
         return None
     try:
         label = _label(str(row.get("label") or ""))
@@ -812,7 +826,7 @@ def _label(value: str | EventFeedbackLabel) -> EventFeedbackLabel:
 def _feedback_decision_fields(values: Mapping[str, Any]) -> dict[str, Any]:
     if not values:
         return {}
-    return {
+    fields = {
         "decision_model_version": _optional_str(values.get("decision_model_version")),
         "decision_model_enabled": bool(values.get("decision_model_enabled", True)),
         "thesis_origin": _optional_str(values.get("thesis_origin")),
@@ -822,6 +836,7 @@ def _feedback_decision_fields(values: Mapping[str, Any]) -> dict[str, Any]:
         "timing_state": _optional_str(values.get("timing_state")),
         "tradability_status": _optional_str(values.get("tradability_status")),
         "radar_route": _optional_str(values.get("radar_route")),
+        "radar_route_reason": _optional_str(values.get("radar_route_reason")),
         "radar_actionable": bool(values.get("radar_actionable")),
         "actionability_score": _optional_float(values.get("actionability_score")),
         "evidence_confidence_score": _optional_float(values.get("evidence_confidence_score")),
@@ -829,6 +844,9 @@ def _feedback_decision_fields(values: Mapping[str, Any]) -> dict[str, Any]:
         "actionability_score_cohort": _optional_str(values.get("actionability_score_cohort")),
         "anomaly_type": _optional_str(values.get("anomaly_type")),
         "actionability_score_components": _optional_mapping(values.get("actionability_score_components")),
+        "actionability_penalty_components": _optional_mapping(
+            values.get("actionability_penalty_components")
+        ),
         "evidence_confidence_score_components": _optional_mapping(
             values.get("evidence_confidence_score_components")
             or values.get("evidence_confidence_components")
@@ -842,6 +860,15 @@ def _feedback_decision_fields(values: Mapping[str, Any]) -> dict[str, Any]:
         "radar_what_confirms": _text_tuple(values.get("radar_what_confirms")),
         "radar_what_invalidates": _text_tuple(values.get("radar_what_invalidates")),
     }
+    for field in (
+        "decision_source_side_effect_safety_failed",
+        "decision_source_secret_safety_failed",
+        "decision_source_path_safety_failed",
+    ):
+        value = _optional_bool(values.get(field))
+        if value is not None:
+            fields[field] = value
+    return fields
 
 
 def _optional_float(value: Any) -> float | None:
@@ -849,6 +876,10 @@ def _optional_float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _optional_bool(value: Any) -> bool | None:
+    return value if isinstance(value, bool) else None
 
 
 def _optional_mapping(value: Any) -> dict[str, Any] | None:

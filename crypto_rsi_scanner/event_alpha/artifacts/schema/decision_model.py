@@ -28,6 +28,8 @@ FIELDS = (
     "decision_soft_penalties", "decision_warnings", "decision_missing_data",
     "why_still_worth_reviewing", "radar_what_confirms", "radar_what_invalidates",
     "actionability_score_cohort", "anomaly_type",
+    "decision_source_side_effect_safety_failed", "decision_source_secret_safety_failed",
+    "decision_source_path_safety_failed",
 )
 TYPES = {
     "decision_model_version": "str", "decision_model_enabled": "bool",
@@ -42,6 +44,9 @@ TYPES = {
     "why_still_worth_reviewing": "list", "radar_what_confirms": "list",
     "radar_what_invalidates": "list",
     "actionability_score_cohort": "str", "anomaly_type": "str",
+    "decision_source_side_effect_safety_failed": "bool",
+    "decision_source_secret_safety_failed": "bool",
+    "decision_source_path_safety_failed": "bool",
 }
 ENUMS = {
     "thesis_origin": ALLOWED_THESIS_ORIGINS,
@@ -95,7 +100,20 @@ def validate_contract(row: Mapping[str, Any]) -> list[str]:
     ):
         if not _is_sequence(row.get(field)):
             errors.append(f"decision_model_invalid_type:{field}")
+    source_safety_blockers = {
+        "decision_source_side_effect_safety_failed": "research_safety_invariant_failed",
+        "decision_source_secret_safety_failed": "secret_safety_failed",
+        "decision_source_path_safety_failed": "operator_path_safety_failed",
+    }
+    hard_blockers = set(_items(row.get("decision_hard_blockers")))
+    for field, blocker in source_safety_blockers.items():
+        if field in row and not isinstance(row.get(field), bool):
+            errors.append(f"decision_model_invalid_type:{field}")
+        if row.get(field) is True and blocker not in hard_blockers:
+            errors.append(f"decision_model_source_safety_attestation_without_blocker:{field}")
     if row.get("decision_model_enabled") is True:
+        if row.get("research_only") is not True:
+            errors.append("decision_model_research_only_required")
         for field in (
             "actionability_score_components", "evidence_confidence_score_components",
             "risk_score_components",
@@ -123,6 +141,15 @@ def validate_contract(row: Mapping[str, Any]) -> list[str]:
             errors.append("decision_model_actionable_not_tradable")
         if str(row.get("confidence_band") or "") not in {"actionable", "high_confidence"}:
             errors.append("decision_model_actionable_band_mismatch")
+    elif str(row.get("confidence_band") or "") in {"actionable", "high_confidence"}:
+        errors.append("decision_model_non_actionable_band_mismatch")
+    route = str(row.get("radar_route") or "")
+    if route in {"actionable_watch", "high_confidence_watch"} and row.get("radar_actionable") is not True:
+        errors.append("decision_model_watch_route_not_actionable")
+    if route == "high_confidence_watch" and str(row.get("confidence_band") or "") != "high_confidence":
+        errors.append("decision_model_high_confidence_route_band_mismatch")
+    if row.get("decision_hard_blockers") and route != "diagnostic":
+        errors.append("decision_model_hard_blocker_non_diagnostic_route")
     if row.get("thesis_origin") == "market_led" and row.get("catalyst_status") == "unknown":
         warnings = {
             item

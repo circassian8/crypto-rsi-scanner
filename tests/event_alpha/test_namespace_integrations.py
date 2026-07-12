@@ -314,6 +314,11 @@ def test_integrated_radar_performance_dashboard_cross_namespace_recommendations(
             row["horizons"] = {}
         return row
 
+    def core(candidate_row: dict[str, object]) -> dict[str, object]:
+        row = dict(candidate_row)
+        row["integrated_candidate_id"] = row.pop("candidate_id")
+        return row
+
     with TemporaryDirectory() as tmp:
         base = Path(tmp)
         ns1 = base / "ns_one"
@@ -370,7 +375,9 @@ def test_integrated_radar_performance_dashboard_cross_namespace_recommendations(
             source_origin="diagnostic",
         )
         write_jsonl(ns1 / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME, [bybit, coinalyze, pending, missing])
-        write_jsonl(ns1 / "event_core_opportunities.jsonl", [bybit, coinalyze, pending, missing])
+        write_jsonl(ns1 / "event_core_opportunities.jsonl", [
+            core(bybit), core(coinalyze), core(pending), core(missing),
+        ])
         write_jsonl(
             ns1 / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME,
             [
@@ -380,7 +387,7 @@ def test_integrated_radar_performance_dashboard_cross_namespace_recommendations(
             ],
         )
         write_jsonl(ns2 / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME, [cryptopanic, diagnostic])
-        write_jsonl(ns2 / "event_core_opportunities.jsonl", [cryptopanic, diagnostic])
+        write_jsonl(ns2 / "event_core_opportunities.jsonl", [core(cryptopanic), core(diagnostic)])
         write_jsonl(
             ns2 / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME,
             [outcome(cryptopanic, "remained_noise"), outcome(diagnostic, "diagnostic_only")],
@@ -466,6 +473,145 @@ def test_integrated_radar_performance_dashboard_cross_namespace_recommendations(
         assert event_alpha_artifact_doctor._integrated_performance_dashboard_conflicts(out)[  # noqa: SLF001
             "integrated_performance_trade_pnl_wording"
         ] == 1
+
+
+def test_integrated_radar_performance_joins_real_core_shape_without_double_counting():
+    import json
+
+    import crypto_rsi_scanner.event_alpha.radar.integrated_radar as event_integrated_radar
+    import crypto_rsi_scanner.event_alpha.outcomes.integrated_radar_outcomes as event_integrated_radar_outcomes
+
+    with TemporaryDirectory() as tmp:
+        namespace = Path(tmp) / "real_core_shape"
+        namespace.mkdir()
+        candidates = []
+        cores = []
+        outcomes = []
+        for index in range(11):
+            candidate_id = f"iar:candidate-{index}"
+            core_id = f"agg:core-{index}"
+            lane = "DIAGNOSTIC" if index >= 9 else "EARLY_LONG_RESEARCH"
+            candidate = {
+                "row_type": "event_integrated_radar_candidate",
+                "candidate_id": candidate_id,
+                "core_opportunity_id": core_id,
+                "symbol": f"TEST{index}",
+                "coin_id": f"test-{index}",
+                "opportunity_type": lane,
+                "provider": "fixture",
+                "source_pack": "fixture_pack",
+                "observed_at": "2026-06-15T16:00:00+00:00",
+            }
+            candidates.append(candidate)
+            if lane != "DIAGNOSTIC":
+                core = dict(candidate)
+                core["row_type"] = "event_core_opportunity"
+                core["integrated_candidate_id"] = core.pop("candidate_id")
+                cores.append(core)
+            outcomes.append({
+                **candidate,
+                "row_type": "event_integrated_radar_outcome",
+                "outcome_status": "filled",
+                "outcome_label": "diagnostic_only" if lane == "DIAGNOSTIC" else "early_good",
+                "return_by_horizon": {
+                    horizon: 0.04 for horizon in event_integrated_radar_outcomes.HORIZONS
+                },
+                "horizons": {
+                    horizon: 0.04 for horizon in event_integrated_radar_outcomes.HORIZONS
+                },
+            })
+
+        for filename, rows in (
+            (event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME, candidates),
+            ("event_core_opportunities.jsonl", cores),
+            (event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME, outcomes),
+        ):
+            (namespace / filename).write_text(
+                "\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\n",
+                encoding="utf-8",
+            )
+
+        inputs = event_integrated_radar_outcomes._namespace_inputs(  # noqa: SLF001
+            namespace,
+            generated_at="2026-06-20T00:00:00+00:00",
+            stale_after_days=14,
+        )
+        payload = event_integrated_radar_outcomes.build_radar_provider_performance(
+            (namespace,),
+            generated_at="2026-06-20T00:00:00+00:00",
+        )
+
+        assert len(inputs["rows"]) == 11
+        assert len({row["candidate_id"] for row in inputs["rows"]}) == 11
+        assert all(
+            sum(row["core_opportunity_id"] == core["core_opportunity_id"] for row in inputs["rows"]) == 1
+            for core in cores
+        )
+        assert payload["rows_evaluated"] == 9
+        assert payload["diagnostic_rows_excluded"] == 2
+        assert payload["main_aggregate"]["rows"] == 9
+
+
+def test_integrated_radar_performance_deduplicates_outcomes_and_joins_idless_fallback():
+    import crypto_rsi_scanner.event_alpha.outcomes.integrated_radar_outcomes as event_integrated_radar_outcomes
+
+    idless = {
+        "symbol": "IDLESS",
+        "coin_id": "idless",
+        "opportunity_type": "EARLY_LONG_RESEARCH",
+        "observed_at": "2026-06-15T16:00:00+00:00",
+    }
+    identified = {
+        "candidate_id": "candidate-duplicate-outcome",
+        "symbol": "DUP",
+        "coin_id": "duplicate",
+        "opportunity_type": "UNCONFIRMED_RESEARCH",
+        "observed_at": "2026-06-15T16:00:00+00:00",
+    }
+    rows = event_integrated_radar_outcomes._performance_observation_rows(  # noqa: SLF001
+        Path("fixture"),
+        candidates=[idless, identified],
+        core_rows=[],
+        outcome_rows=[
+            {**idless, "outcome_status": "filled", "outcome_label": "early_good"},
+            {**identified, "outcome_status": "filled", "outcome_label": "remained_noise"},
+            {**identified, "outcome_status": "filled", "outcome_label": "later_confirmed"},
+        ],
+        delivery_rows=[],
+        generated_at="2026-06-20T00:00:00+00:00",
+        stale_after_days=14,
+    )
+
+    assert len(rows) == 2
+    assert next(row for row in rows if row["symbol"] == "IDLESS")["outcome_label"] == "early_good"
+    assert next(row for row in rows if row["symbol"] == "DUP")["outcome_label"] == "later_confirmed"
+
+
+def test_integrated_performance_doctor_scopes_diagnostic_to_lane_and_route():
+    import json
+
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+
+    valid = {
+        "main_aggregate": {"rows": 4},
+        "lane_summaries": {"EARLY_LONG_RESEARCH": {"rows": 4}},
+        "dimension_summaries": {
+            "confidence_band": {"diagnostic": {"rows": 1}, "actionable": {"rows": 3}},
+            "opportunity_type": {"EARLY_LONG_RESEARCH": {"rows": 4}},
+            "radar_route": {"actionable_watch": {"rows": 4}},
+        },
+        "performance_views": {},
+        "provider_performance": {},
+    }
+    assert not event_alpha_artifact_doctor._performance_main_sections_contain_diagnostic(valid)  # noqa: SLF001
+
+    diagnostic_lane = json.loads(json.dumps(valid))
+    diagnostic_lane["lane_summaries"]["DIAGNOSTIC"] = {"rows": 1}
+    assert event_alpha_artifact_doctor._performance_main_sections_contain_diagnostic(diagnostic_lane)  # noqa: SLF001
+
+    diagnostic_route = json.loads(json.dumps(valid))
+    diagnostic_route["dimension_summaries"]["radar_route"]["diagnostic"] = {"rows": 1}
+    assert event_alpha_artifact_doctor._performance_main_sections_contain_diagnostic(diagnostic_route)  # noqa: SLF001
 
 
 def test_event_alpha_coinalyze_stale_namespace_blocks_without_override():

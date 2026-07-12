@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 
 from crypto_rsi_scanner.event_alpha.radar import decision_model
@@ -449,6 +450,130 @@ def test_nested_and_source_row_safety_failures_hard_block_promotion():
     assert "operator_path_safety_failed" in source_path.decision_hard_blockers
 
 
+def test_integrated_source_safety_attestations_survive_final_reevaluation():
+    from crypto_rsi_scanner.event_alpha.radar.integrated_radar import build_integrated_candidates
+    from crypto_rsi_scanner.event_alpha.radar.decision_safety import source_safety_attestations
+
+    base_source = {
+        "row_type": "event_market_anomaly",
+        "symbol": "MOVE",
+        "coin_id": "move-token",
+        "canonical_asset_id": "move-token",
+        "market_state": "confirmed_breakout",
+        "market_state_class": "confirmed_breakout",
+        "anomaly_bucket": "high_liquidity_breakout",
+        "market_state_snapshot": deepcopy(_market_led_candidate()["market_state_snapshot"]),
+        "source_pack": "market_anomaly_pack",
+        "research_only": True,
+    }
+    cases = (
+        (
+            "side_effect",
+            {"notification_send_enabled": True},
+            "decision_source_side_effect_safety_failed",
+            "research_safety_invariant_failed",
+        ),
+        (
+            "nested_secret",
+            {"provider_payload": {"authorization": "Bearer leaked-source-secret"}},
+            "decision_source_secret_safety_failed",
+            "secret_safety_failed",
+        ),
+        (
+            "absolute_path",
+            {
+                "operator_report_path": "/tmp/unsafe-source-report.md",
+                "provider_source_artifact": "/tmp/private/source-artifact.jsonl",
+                "request_ledger_path": "/tmp/private/request-ledger.jsonl",
+            },
+            "decision_source_path_safety_failed",
+            "operator_path_safety_failed",
+        ),
+    )
+
+    for label, unsafe_fields, attestation, blocker in cases:
+        row = build_integrated_candidates(
+            sidecar_rows={"market_anomaly": [{**base_source, **unsafe_fields}]},
+            profile="fixture",
+            artifact_namespace=f"decision_model_source_safety_{label}",
+            run_mode="fixture",
+            run_id=f"decision-model-source-safety-{label}",
+            observed_at="2026-06-15T16:00:00Z",
+        )[0]
+
+        assert row[attestation] is True
+        assert blocker in row["decision_hard_blockers"]
+        reevaluated = decision_model.reevaluate_radar_decision_fields(row)
+        assert reevaluated["radar_actionable"] is False
+        assert reevaluated["radar_route"] == "diagnostic"
+        assert blocker in reevaluated["decision_hard_blockers"]
+        assert "leaked-source-secret" not in json.dumps(row, sort_keys=True)
+        if label == "absolute_path":
+            assert row["provider_source_artifact"] == "source-artifact.jsonl"
+            assert row["request_ledger_path"] == "request-ledger.jsonl"
+            assert "/tmp/private" not in json.dumps(row, sort_keys=True)
+
+    for path_row in (
+        {"path": "/tmp/private/exact-path.json"},
+        {"artifact_paths": {"candidate": "/tmp/private/nested-path.json"}},
+    ):
+        assert source_safety_attestations([path_row])["decision_source_path_safety_failed"] is True
+
+
+def test_source_safety_attestations_are_fail_closed_schema_contracts():
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import decision_model_values
+
+    base = _market_led_candidate()
+    canonical = {**base, **decision_model.evaluate_radar_decision(base).to_dict()}
+    missing_blocker = {**canonical, "decision_source_secret_safety_failed": True}
+    malformed_attestation = {**canonical, "decision_source_secret_safety_failed": "true"}
+    errors = validate_contract(missing_blocker)
+
+    assert any("source_safety_attestation_without_blocker" in error for error in errors)
+    assert "decision_model_invalid_type:decision_source_secret_safety_failed" in validate_contract(
+        malformed_attestation
+    )
+    assert decision_model_values(missing_blocker) == {}
+    assert decision_model_values(malformed_attestation) == {}
+
+    diagnostic = {
+        **canonical,
+        "confidence_band": "diagnostic",
+        "tradability_status": "blocked",
+        "radar_route": "diagnostic",
+        "radar_route_reason": "source_secret_safety_failed",
+        "radar_actionable": False,
+        "decision_hard_blockers": ["secret_safety_failed"],
+        "decision_source_secret_safety_failed": True,
+    }
+    assert validate_contract(diagnostic) == []
+    assert decision_model_values(diagnostic)["decision_source_secret_safety_failed"] is True
+
+
+def test_research_only_must_be_explicit_true_for_v2_promotion_and_schema():
+    from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+
+    missing = _market_led_candidate()
+    missing.pop("research_only")
+    malformed = _market_led_candidate(research_only="false")
+
+    for row in (missing, malformed):
+        result = decision_model.evaluate_radar_decision(row)
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "research_safety_invariant_failed" in result.decision_hard_blockers
+        artifact = {
+            **row,
+            **result.to_dict(),
+            "candidate_id": "candidate-v2-research-only-contract",
+        }
+        assert "decision_model_research_only_required" in schema_v1.validate_row_against_schema(
+            artifact,
+            "integrated_radar_candidate_v1",
+        )
+
+
 def test_final_decision_reevaluation_invalidates_resolution_and_duplicate_changes():
     initial = {
         **_market_led_candidate(),
@@ -468,6 +593,44 @@ def test_final_decision_reevaluation_invalidates_resolution_and_duplicate_change
     assert "canonical_asset_identity_unresolved" in unresolved_result["decision_hard_blockers"]
     assert duplicate_result["radar_actionable"] is False
     assert "duplicate_family_suppressed" in duplicate_result["decision_hard_blockers"]
+
+
+def test_final_reevaluation_applies_catalyst_disproof_before_derived_status():
+    source = _market_led_candidate(
+        source_origin="official_exchange",
+        source_origins=["official_exchange"],
+        source_pack="official_exchange_listing_pack",
+        source_class="official_exchange",
+        source_strength="official_structured",
+        accepted_evidence_count=1,
+        latest_source_url="https://example.invalid/listing",
+        latest_source_title="Official listing notice",
+        official_exchange_event={
+            "event_type": "spot_listing",
+            "source_url": "https://example.invalid/listing",
+            "title": "Official listing notice",
+        },
+    )
+    initial = {
+        **source,
+        **decision_model.evaluate_radar_decision(source).to_dict(),
+    }
+    assert initial["catalyst_status"] == "confirmed"
+    assert initial["radar_route"] == "high_confidence_watch"
+
+    for correction in ({"catalyst_disproven": True}, {"cause_status": "ruled_out"}):
+        reevaluated = decision_model.reevaluate_radar_decision_fields(
+            {**initial, **correction}
+        )
+        assert reevaluated["catalyst_status"] == "disproven"
+        assert reevaluated["confidence_band"] != "high_confidence"
+        assert reevaluated["radar_route"] != "high_confidence_watch"
+        source_corrected = decision_model.evaluate_radar_decision(
+            source,
+            source_rows=[correction],
+        )
+        assert source_corrected.catalyst_status == "disproven"
+        assert source_corrected.radar_route != "high_confidence_watch"
 
 
 def test_actionability_score_cohort_boundaries_are_canonical():

@@ -689,7 +689,7 @@ def _derivatives_metadata(row: Mapping[str, Any] | None) -> dict[str, Any]:
         "derivatives_warning_codes": warnings,
         "coinalyze_derivatives_attached": bool(coinalyze_namespace or coinalyze_source_path),
         "coinalyze_artifact_namespace": coinalyze_namespace,
-        "coinalyze_source_artifact_path": coinalyze_source_path,
+        "coinalyze_source_artifact_path": _portable_evidence_path(coinalyze_source_path),
         "coinalyze_provider_health_status": coinalyze_provider_status,
         "coinalyze_freshness_status": coinalyze_freshness,
     }
@@ -907,7 +907,25 @@ def _compact_event(row: Mapping[str, Any] | None) -> dict[str, Any] | None:
         "provider_source_artifact",
         "request_ledger_path",
     )
-    return {key: row.get(key) for key in keys if row.get(key) not in (None, "", [], {})}
+    return {
+        key: (
+            _portable_evidence_path(row.get(key))
+            if key in {"provider_source_artifact", "request_ledger_path"}
+            else row.get(key)
+        )
+        for key in keys
+        if row.get(key) not in (None, "", [], {})
+    }
+
+
+def _portable_evidence_path(value: Any) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    path = Path(text).expanduser()
+    if path.is_absolute() or ".." in path.parts:
+        return event_artifact_paths.artifact_display_path(path)
+    return path.as_posix()
 
 
 def _supporting_quotes(rows: list[dict[str, Any]]) -> list[str]:
@@ -1014,6 +1032,7 @@ __all__ = (
     '_candidate_role_for',
     '_canonical_incident_name',
     '_compact_event',
+    '_portable_evidence_path',
     '_supporting_quotes',
     '_candidate_summary_lines',
     '_append_filtered',

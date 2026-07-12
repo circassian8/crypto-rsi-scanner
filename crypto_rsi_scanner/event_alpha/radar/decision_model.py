@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
 
-from .decision_safety import has_unredacted_secret, has_unsafe_operator_path, has_unsafe_side_effect
+from .decision_safety import decision_safety_blockers
 from .decision_results import build_decision_result, disabled_decision
 from .decision_models import (
     DECISION_MODEL_VERSION, CatalystStatus, ConfidenceBand, DirectionalBias, RadarDecision,
@@ -246,13 +246,18 @@ def _thesis_origin(data: Mapping[str, Any], sources: tuple[Mapping[str, Any], ..
 
 def _catalyst_status(data: Mapping[str, Any], sources: tuple[Mapping[str, Any], ...]) -> str:
     explicit = str(data.get("catalyst_status") or "").strip().casefold()
-    if explicit in {item.value for item in CatalystStatus}:
-        return explicit
     text = _row_text(data, sources)
-    if bool(data.get("catalyst_disproven")) or str(data.get("cause_status") or "") == "ruled_out" or any(
+    structured_disproof = any(
+        _truthy(row.get("catalyst_disproven"))
+        or str(row.get("cause_status") or "").strip().casefold() == "ruled_out"
+        for row in (data, *sources)
+    )
+    if structured_disproof or any(
         term in text for term in ("source correction", "official denial", "catalyst_disproven")
     ):
         return CatalystStatus.DISPROVEN.value
+    if explicit in {item.value for item in CatalystStatus}:
+        return explicit
     official = (
         isinstance(data.get("official_exchange_event"), Mapping)
         or str(data.get("source_class") or "") in {"official_exchange", "official_project", "structured_calendar", "structured_unlock"}
@@ -339,7 +344,7 @@ def _hard_blockers(
     origin: str,
     cfg: RadarDecisionConfig,
 ) -> tuple[str, ...]:
-    blockers: list[str] = []
+    blockers = list(decision_safety_blockers(data, sources))
     symbol = str(data.get("symbol") or data.get("validated_symbol") or "").strip().upper()
     canonical = str(data.get("canonical_asset_id") or data.get("coin_id") or "").strip().casefold()
     resolver = str(data.get("instrument_resolver_status") or "").strip().casefold()
@@ -397,13 +402,6 @@ def _hard_blockers(
         blockers.append("suspicious_illiquid_move")
     if _is_duplicate(data):
         blockers.append("duplicate_family_suppressed")
-    safety_rows = (data, *sources)
-    if any(has_unsafe_side_effect(row) for row in safety_rows):
-        blockers.append("research_safety_invariant_failed")
-    if any(has_unredacted_secret(row) for row in safety_rows):
-        blockers.append("secret_safety_failed")
-    if any(has_unsafe_operator_path(row) for row in safety_rows):
-        blockers.append("operator_path_safety_failed")
     return tuple(dict.fromkeys(blockers))
 
 

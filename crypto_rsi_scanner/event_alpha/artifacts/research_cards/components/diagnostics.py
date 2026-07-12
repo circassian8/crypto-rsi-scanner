@@ -166,7 +166,7 @@ def _playbook_copy(
     entry: event_watchlist.EventWatchlistEntry | None = None,
 ) -> str:
     components = _card_components(entry, alert)
-    decision = decision_model_values(components, alert)
+    decision = decision_model_values(alert, components)
     impact_path = str(components.get("impact_path_type") or "").casefold()
     frame = str(components.get("main_frame_type") or components.get("event_archetype") or "").casefold()
     level = str(components.get("opportunity_level") or "").casefold()
@@ -206,7 +206,7 @@ def _why_it_matters(
     alert: Mapping[str, Any] | None = None,
 ) -> str:
     components = _card_components(entry, alert)
-    decision = decision_model_values(components, alert)
+    decision = decision_model_values(alert, components)
     impact_path = str(components.get("impact_path_type") or "").casefold()
     frame = str(components.get("main_frame_type") or components.get("event_archetype") or "").casefold()
     if decision.get("thesis_origin") == "market_led":
@@ -238,7 +238,7 @@ def _default_invalidation(
     entry: event_watchlist.EventWatchlistEntry | None = None,
 ) -> str:
     components = _card_components(entry, alert)
-    decision = decision_model_values(components, alert)
+    decision = decision_model_values(alert, components)
     impact_path = str(components.get("impact_path_type") or "").casefold()
     frame = str(components.get("main_frame_type") or components.get("event_archetype") or "").casefold()
     role = str(components.get("candidate_role") or "").casefold()
@@ -275,7 +275,7 @@ def _trade_readiness_lines(
 ) -> list[str]:
     components = alert.get("score_components") if alert is not None and isinstance(alert.get("score_components"), Mapping) else {}
     rich_components = _card_components(entry, alert)
-    decision = decision_model_values(rich_components, alert)
+    decision = decision_model_values(alert, rich_components)
     timing = _value(entry, alert, "event_time", "event_time") or "unknown"
     direction = _value(None, alert, "", "expected_direction") or _playbook_direction(playbook)
     horizon = _value(None, alert, "", "primary_horizon") or "manual"

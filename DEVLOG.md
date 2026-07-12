@@ -17,6 +17,58 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-12 — Fail closed on Decision Model v2 evidence integrity · Codex
+**Why:** An adversarial post-release audit found a cluster of ways the research
+surface could overstate certainty: final reevaluation could forget provider
+safety failures, projections could combine or override authorities, outcomes
+could double count, and strict artifact doctor commands could still return
+success without an authoritative exact-revision result.
+**Changes:**
+- Persisted boolean-only source safety attestations through integrated and core
+  rows, made `research_only is True` an affirmative promotion contract, and
+  made structured disproof/correction on either candidates or source rows
+  override an earlier derived catalyst confirmation. Attestations are typed,
+  must agree with blockers/diagnostic routing, and propagate into outcomes and
+  feedback; secret values and machine-local paths are never propagated.
+- Made Decision Model surface extraction select one individually schema-valid
+  v2 authority, preserve explicit empty lists/maps, and refuse cross-row field
+  assembly. The first explicit marker now wins fail-closed: a disabled or
+  malformed root cannot fall through to actionable nested/later data. Added
+  route/band/actionability/blocker coherence rules and kept malformed explicit
+  v2 rows diagnostic-only.
+- Joined integrated candidates, core rows, outcomes, and deliveries through
+  exact candidate/core aliases so one opportunity produces one performance
+  observation, restored id-less identity fallback, and deterministically keeps
+  one latest duplicate outcome. Doctor diagnostic-lane detection now inspects
+  actual lane/route dimensions instead of treating a valid
+  `confidence_band=diagnostic` value as contamination; feedback explicitly
+  marked non-research is rejected instead of laundered to `True`.
+- Made strict artifact-doctor CLI execution return nonzero for unresolved
+  context, lock-skipped runs, `BLOCKED` status, any blocker, or a missing/raced
+  exact-revision operator-state stamp while preserving observational non-strict
+  behavior. Feedback artifacts retain the complete v2 route, rationale,
+  penalty, and safety-attestation contract through a bounded dataclass base.
+- Added focused regressions for safety-attestation persistence, explicit
+  research-only authority, confirmed-to-disproven catalyst transitions,
+  single-authority surface projection, required empty containers, exact outcome
+  denominators, valid diagnostic confidence bands, and strict CLI exit status.
+**Verify:** 93 focused Decision Model, surface, outcome, feedback, and operator
+regressions passed, followed by all 780 tests in `tests/event_alpha`;
+`python -m compileall -q crypto_rsi_scanner tests` and `git diff --check`
+passed; `make architecture-cleanliness-check PYTHON=.venv/bin/python` passed
+with zero new size violations; `make
+radar-dashboard-smoke PYTHON=.venv/bin/python` rendered 8 exact-revision pages
+with zero writes; the integrated radar outcome smoke completed with 101/101
+schema-valid rows, 11 unique observations (5 main, 6 diagnostic), an
+authoritative strict-doctor stamp at exact operator revision 3, zero doctor
+blockers, and zero sends/trades/paper/RSI/trigger creation. Full `make verify`
+was intentionally not repeated immediately after the prior release gate; this
+slice used the risk-matched focused contract, architecture, and no-send gates.
+GitHub Actions was not polled or awaited.
+**Notes/risks:** This is the first overnight hardening slice. Next work is exact
+artifact fingerprinting and dashboard doctor/freshness gating, followed by
+calendar rejection telemetry and chronology-aware outcome/calibration quality.
+
 ## 2026-07-12 — Ship Crypto Radar Decision Model v2 and local dashboard · Codex
 **Why:** The legacy Event Alpha alert gate treated a discoverable catalyst as a
 near-universal prerequisite, which hid otherwise useful price/volume-led market

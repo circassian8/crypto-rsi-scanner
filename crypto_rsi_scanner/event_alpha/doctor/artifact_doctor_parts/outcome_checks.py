@@ -251,14 +251,35 @@ def _integrated_performance_dashboard_conflicts(namespace_dir: str | Path | None
     return out
 
 def _performance_main_sections_contain_diagnostic(data: Mapping[str, Any]) -> bool:
-    sections = (
+    lane_summaries = data.get("lane_summaries")
+    if _contains_diagnostic_value(lane_summaries):
+        return True
+    for section in (
         data.get("main_aggregate"),
-        data.get("lane_summaries"),
-        data.get("dimension_summaries"),
         data.get("performance_views"),
         data.get("provider_performance"),
+    ):
+        if _contains_named_diagnostic_route(section):
+            return True
+    dimensions = data.get("dimension_summaries")
+    if not isinstance(dimensions, Mapping):
+        return False
+    return any(
+        _contains_diagnostic_value(dimensions.get(field))
+        for field in ("opportunity_type", "radar_route")
     )
-    return any(_contains_diagnostic_value(section) for section in sections)
+
+def _contains_named_diagnostic_route(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            if str(key).strip().casefold() in {"opportunity_type", "radar_route"}:
+                if _contains_diagnostic_value(nested):
+                    return True
+            elif _contains_named_diagnostic_route(nested):
+                return True
+    elif isinstance(value, (list, tuple, set)):
+        return any(_contains_named_diagnostic_route(item) for item in value)
+    return False
 
 def _contains_diagnostic_value(value: Any) -> bool:
     if isinstance(value, Mapping):

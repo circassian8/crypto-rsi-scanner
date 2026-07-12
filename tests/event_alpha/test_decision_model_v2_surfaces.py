@@ -63,6 +63,7 @@ def _market_led_candidate(**overrides):
         "radar_what_confirms": ("continued volume-backed follow-through",),
         "radar_what_invalidates": ("failed breakout and mean reversion",),
         "anomaly_type": "high_liquidity_breakout",
+        "research_only": True,
         "normal_rsi_signal_written": False,
         "triggered_fade_created": False,
         "paper_trade_created": False,
@@ -119,6 +120,104 @@ def test_v2_fields_propagate_to_core_and_alert_reconciliation_without_legacy_pro
     assert decision_model_values({**candidate, "decision_model_enabled": "true"}) == {}
     assert decision_model_values({**candidate, "decision_model_enabled": None}) == {}
     assert decision_model_values({**candidate, "decision_model_version": "future"}) == {}
+
+
+def test_v2_projection_preserves_explicit_empty_contract_fields_and_one_authority():
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import decision_model_values
+
+    canonical = _market_led_candidate(
+        actionability_penalty_components={},
+        decision_hard_blockers=[],
+        decision_soft_penalties=[],
+        decision_missing_data=[],
+    )
+    unversioned_override = {
+        "radar_actionable": False,
+        "radar_route": "diagnostic",
+        "actionability_score": 1.0,
+        "decision_hard_blockers": ["legacy_override"],
+    }
+
+    projected = decision_model_values(canonical, unversioned_override)
+
+    assert projected["radar_actionable"] is True
+    assert projected["radar_route"] == "actionable_watch"
+    assert projected["actionability_score"] == 84.0
+    assert projected["actionability_penalty_components"] == {}
+    assert projected["decision_hard_blockers"] == []
+    assert projected["decision_soft_penalties"] == []
+    assert projected["decision_missing_data"] == []
+
+    disabled_root = {
+        **canonical,
+        "decision_model_enabled": False,
+        "score_components": canonical,
+    }
+    malformed_root = {
+        **canonical,
+        "radar_actionable": False,
+        "score_components": canonical,
+    }
+    assert decision_model_values(disabled_root) == {}
+    assert decision_model_values(malformed_root) == {}
+    assert decision_model_values(malformed_root, canonical) == {}
+
+
+def test_v2_projection_preserves_source_safety_attestations_and_diagnostic_aggregate():
+    from crypto_rsi_scanner.event_alpha.outcomes.integrated_radar_outcomes import (
+        _performance_observation_rows,
+    )
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import decision_model_values
+
+    diagnostic = _market_led_candidate(
+        confidence_band="diagnostic",
+        tradability_status="blocked",
+        radar_route="diagnostic",
+        radar_route_reason="source_safety_failed",
+        radar_actionable=False,
+        decision_hard_blockers=["secret_safety_failed"],
+        decision_source_secret_safety_failed=True,
+    )
+
+    projected = decision_model_values(diagnostic)
+    rows = _performance_observation_rows(
+        Path("."),
+        candidates=[diagnostic],
+        core_rows=[],
+        outcome_rows=[],
+        delivery_rows=[],
+        generated_at="2026-06-20T00:00:00+00:00",
+        stale_after_days=14,
+    )
+
+    assert projected["decision_source_secret_safety_failed"] is True
+    assert rows[0]["radar_route"] == "diagnostic"
+    assert rows[0]["include_in_main_aggregate"] is False
+
+
+def test_v2_projection_fails_closed_on_malformed_actionable_route():
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
+        decision_preview_lane,
+        group_decision_rows,
+    )
+
+    malformed = _market_led_candidate(
+        radar_actionable=False,
+        confidence_band="diagnostic",
+        tradability_status="blocked",
+        decision_hard_blockers=["canonical_asset_identity_untrusted"],
+    )
+
+    errors = validate_contract(malformed)
+    assert "decision_model_watch_route_not_actionable" in errors
+    assert "decision_model_hard_blocker_non_diagnostic_route" in errors
+    assert decision_model_values(malformed) == {}
+    assert decision_preview_lane(malformed) == "decision_diagnostic"
+    assert all(not rows for rows in group_decision_rows([malformed]).values())
+    diagnostic = group_decision_rows([malformed], include_diagnostics=True)
+    assert diagnostic["decision_diagnostic"] == [malformed]
 
 
 def test_cards_daily_brief_and_preview_render_v2_transparently_and_no_send():

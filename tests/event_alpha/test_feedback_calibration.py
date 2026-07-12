@@ -97,6 +97,41 @@ def test_event_alpha_feedback_marks_watchlist_rows_and_missed_items():
         assert "missed=1" in report
 
 
+def test_feedback_loader_rejects_explicit_non_research_rows_but_keeps_legacy_rows(tmp_path):
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback_labels as event_feedback
+
+    base = {
+        "row_type": "event_alpha_feedback",
+        "schema_version": event_feedback.FEEDBACK_SCHEMA_VERSION,
+        "label": "watch",
+        "marked_at": "2026-07-12T00:00:00+00:00",
+        "marked_by": "tester",
+    }
+    path = tmp_path / "feedback.jsonl"
+    path.write_text(
+        "\n".join(
+            json.dumps(row, sort_keys=True)
+            for row in (
+                {**base, "feedback_id": "legacy", "target": "legacy"},
+                {
+                    **base,
+                    "feedback_id": "unsafe",
+                    "target": "unsafe",
+                    "research_only": False,
+                },
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    loaded = event_feedback.load_feedback(path)
+
+    assert loaded.rows_read == 1
+    assert loaded.records[0].target == "legacy"
+    assert loaded.records[0].research_only is True
+
+
 def test_event_alpha_missed_calibration_and_research_card_reports():
     import crypto_rsi_scanner.event_alpha.outcomes.calibration as event_alpha_calibration
     import crypto_rsi_scanner.event_alpha.radar.missed as event_alpha_missed

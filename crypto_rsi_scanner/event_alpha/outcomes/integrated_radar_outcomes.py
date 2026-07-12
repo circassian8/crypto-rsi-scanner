@@ -498,21 +498,24 @@ def _performance_observation_rows(
     stale_after_days: int,
 ) -> list[dict[str, Any]]:
     merged: dict[str, dict[str, Any]] = {}
+    aliases: dict[str, str] = {}
+    for row in candidates:
+        if not isinstance(row, Mapping):
+            continue
+        key = _observation_key(row, aliases)
+        if not key:
+            continue
+        merged.setdefault(key, {}).update(dict(row))
+        _register_observation_aliases(aliases, row, key)
     for row in core_rows:
         if not isinstance(row, Mapping):
             continue
-        key = _row_key(row)
+        key = _observation_key(row, aliases)
         if not key:
             continue
         merged.setdefault(key, {}).update({f"core_{k}": v for k, v in dict(row).items()})
         _fill_missing(merged[key], dict(row))
-    for row in candidates:
-        if not isinstance(row, Mapping):
-            continue
-        key = _row_key(row)
-        if not key:
-            continue
-        merged.setdefault(key, {}).update(dict(row))
+        _register_observation_aliases(aliases, row, key)
     outcomes_by_key: dict[str, dict[str, Any]] = {}
     for row in outcome_rows:
         if not isinstance(row, Mapping):
@@ -520,6 +523,11 @@ def _performance_observation_rows(
         key = _row_key(row)
         if key:
             outcomes_by_key[key] = dict(row)
+    materialized_outcomes = list(outcomes_by_key.values())
+    outcomes_by_alias: dict[str, tuple[int, dict[str, Any]]] = {}
+    for outcome_index, materialized in enumerate(materialized_outcomes):
+        for alias in _row_aliases(materialized):
+            outcomes_by_alias.setdefault(alias, (outcome_index, materialized))
     delivery_keys: set[str] = set()
     for row in delivery_rows:
         if not isinstance(row, Mapping):
@@ -529,24 +537,33 @@ def _performance_observation_rows(
             if value:
                 delivery_keys.add(f"{key}:{value}")
     out: list[dict[str, Any]] = []
+    matched_outcome_indexes: set[int] = set()
     for key, row in sorted(merged.items()):
-        outcome = outcomes_by_key.get(key) or outcomes_by_key.get(_alternate_key(row)) or {}
+        outcome_match = next(
+            (outcomes_by_alias[alias] for alias in _row_aliases(row) if alias in outcomes_by_alias),
+            None,
+        )
+        if outcome_match is None:
+            outcome: Mapping[str, Any] = {}
+        else:
+            outcome_index, outcome = outcome_match
+            matched_outcome_indexes.add(outcome_index)
         out.append(_performance_observation_row(
             namespace_dir,
             row,
             outcome=outcome,
-            delivered=key in delivery_keys or _alternate_key(row) in delivery_keys,
+            delivered=any(alias in delivery_keys for alias in _row_aliases(row)),
             generated_at=generated_at,
             stale_after_days=stale_after_days,
         ))
-    for key, outcome in sorted(outcomes_by_key.items()):
-        if key in merged:
+    for outcome_index, outcome in enumerate(materialized_outcomes):
+        if outcome_index in matched_outcome_indexes:
             continue
         out.append(_performance_observation_row(
             namespace_dir,
             outcome,
             outcome=outcome,
-            delivered=key in delivery_keys,
+            delivered=any(alias in delivery_keys for alias in _row_aliases(outcome)),
             generated_at=generated_at,
             stale_after_days=stale_after_days,
         ))
@@ -595,12 +612,13 @@ def _performance_observation_row(
         "preview_time": str(outcome.get("preview_time") or ""),
         "include_in_main_aggregate": (
             lane != "DIAGNOSTIC"
+            and str(decision.get("radar_route") or "").strip().casefold() != "diagnostic"
         ),
     }
 
 
 def _row_key(row: Mapping[str, Any]) -> str:
-    candidate_id = str(row.get("candidate_id") or "").strip()
+    candidate_id = str(row.get("candidate_id") or row.get("integrated_candidate_id") or "").strip()
     if candidate_id:
         return f"candidate_id:{candidate_id}"
     core_id = str(row.get("core_opportunity_id") or "").strip()
@@ -614,14 +632,43 @@ def _row_key(row: Mapping[str, Any]) -> str:
     return ""
 
 
-def _alternate_key(row: Mapping[str, Any]) -> str:
-    candidate_id = str(row.get("candidate_id") or "").strip()
+def _row_aliases(row: Mapping[str, Any]) -> tuple[str, ...]:
+    aliases: list[str] = []
+    for field in ("candidate_id", "integrated_candidate_id"):
+        value = str(row.get(field) or "").strip()
+        if value:
+            aliases.append(f"candidate_id:{value}")
     core_id = str(row.get("core_opportunity_id") or "").strip()
-    if candidate_id and _row_key(row).startswith("core_opportunity_id:"):
-        return f"candidate_id:{candidate_id}"
-    if core_id and _row_key(row).startswith("candidate_id:"):
-        return f"core_opportunity_id:{core_id}"
-    return ""
+    if core_id:
+        aliases.append(f"core_opportunity_id:{core_id}")
+    if not aliases:
+        identity = _row_key(row)
+        if identity.startswith("identity:"):
+            aliases.append(identity)
+    return tuple(dict.fromkeys(aliases))
+
+
+def _observation_key(row: Mapping[str, Any], aliases: Mapping[str, str]) -> str:
+    candidate_aliases = tuple(
+        alias for alias in _row_aliases(row) if alias.startswith("candidate_id:")
+    )
+    for alias in candidate_aliases:
+        if alias in aliases:
+            return aliases[alias]
+    if not candidate_aliases:
+        for alias in _row_aliases(row):
+            if alias in aliases:
+                return aliases[alias]
+    return _row_key(row)
+
+
+def _register_observation_aliases(
+    aliases: dict[str, str],
+    row: Mapping[str, Any],
+    key: str,
+) -> None:
+    for alias in _row_aliases(row):
+        aliases.setdefault(alias, key)
 
 
 def _fill_missing(target: dict[str, Any], row: Mapping[str, Any]) -> None:

@@ -82,6 +82,7 @@ _INTEGRATED_SCALAR_TRUTH_FIELDS = (
     "latest_source_title",
     "source_class",
     "supporting_evidence_quotes",
+    "research_only",
     *DECISION_MODEL_FIELD_NAMES,
 )
 

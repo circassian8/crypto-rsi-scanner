@@ -8,15 +8,15 @@ from .config_reports import _event_alpha_context_block
 from ....event_alpha.artifacts import operator_state as _operator_state
 from ....event_alpha.doctor import aggregation as _doctor_aggregation
 
-def _run_operator_report_mutation(context: Any, command: str, skip_label: str, action: Callable[[], None]) -> None:
+def _run_operator_report_mutation(context: Any, command: str, skip_label: str, action: Callable[[], Any]) -> Any:
     with event_alpha_run_lock.artifact_mutation_guard(
         context, profile=context.profile, namespace=context.artifact_namespace, command=command
     ) as mutation_lock:
         if not mutation_lock.owned:
             print(_event_alpha_context_block(context))
             print(f"{skip_label}: {mutation_lock.status.message}")
-            return
-        action()
+            return None
+        return action()
 
 def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -> None:
     from .. import event_alpha as _event_alpha_service
@@ -420,6 +420,7 @@ def event_alpha_artifact_doctor_report(
 ) -> None:
     """Print artifact lineage/namespace diagnostics for Event Alpha."""
     _setup_event_discovery_logging(verbose)
+    doctor_strict = strict or bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT)
     try:
         context = resolve_event_alpha_artifact_context_for_report(
             profile_name,
@@ -428,9 +429,10 @@ def event_alpha_artifact_doctor_report(
         )
     except ValueError as exc:
         print(str(exc))
+        if doctor_strict:
+            raise SystemExit(1) from exc
         return
-    doctor_strict = strict or bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT)
-    _run_operator_report_mutation(
+    result = _run_operator_report_mutation(
         context,
         "artifact-doctor-report",
         "artifact_doctor_report_skipped",
@@ -448,6 +450,20 @@ def event_alpha_artifact_doctor_report(
             skip_api_checks=skip_api_checks,
         ),
     )
+    if isinstance(result, _guarded_report_writes.ArtifactDoctorExecution):
+        doctor_result = result.result
+        exact_revision_recorded = result.exact_revision_recorded
+    else:
+        doctor_result = result
+        exact_revision_recorded = True if result is not None else None
+    exact_revision_required = doctor_strict and not schema_only and not skip_api_checks
+    if doctor_strict and (
+        doctor_result is None
+        or str(getattr(doctor_result, "status", "")).upper() == "BLOCKED"
+        or bool(getattr(doctor_result, "blockers", ()))
+        or exact_revision_required and exact_revision_recorded is not True
+    ):
+        raise SystemExit(1)
 
 
 def _record_operator_artifacts(
@@ -556,9 +572,11 @@ def _record_operator_doctor_result(
     strict: bool,
     schema_only: bool,
     skip_api_checks: bool,
-) -> None:
-    if run_row is None or expected_revision is None or not strict or schema_only or skip_api_checks:
-        return
+) -> bool | None:
+    if not strict or schema_only or skip_api_checks:
+        return None
+    if run_row is None or expected_revision is None:
+        return False
     loaded = _operator_state.load_operator_state(context.namespace_dir)
     state = dict(loaded.state or {}) if loaded.valid else {}
     if not _operator_state.state_matches_run(
@@ -567,7 +585,7 @@ def _record_operator_doctor_result(
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
     ):
-        return
+        return False
     run_id = str(run_row.get("run_id") or "")
     try:
         _operator_state.record_doctor_status(
@@ -589,8 +607,9 @@ def _record_operator_doctor_result(
             artifact_namespace=context.artifact_namespace,
             run_mode=str(run_row.get("run_mode") or context.run_mode),
         )
+        return True
     except (OSError, ValueError):
-        return
+        return False
 
 def event_alpha_daily_brief_report(
     verbose: bool = False,

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from .runtime import *
 from .config_reports import (
     _event_alpha_alert_store_config_from_runtime,
@@ -10,6 +12,12 @@ from .config_reports import (
     _research_card_markdown_paths,
 )
 from .utility_calibration_exports import _event_alpha_local_artifacts
+
+
+@dataclass(frozen=True)
+class ArtifactDoctorExecution:
+    result: Any
+    exact_revision_recorded: bool | None
 
 
 def unlock_calendar_preflight(context: Any, *, provider: str | None, smoke_mode: bool) -> None:
@@ -44,7 +52,7 @@ def artifact_doctor(
     include_stale_artifacts: bool,
     schema_only: bool,
     skip_api_checks: bool,
-) -> None:
+) -> Any:
     from . import reports as report_service
 
     artifact_namespace = artifact_namespace or context.artifact_namespace
@@ -89,7 +97,7 @@ def artifact_doctor(
         schema_only=schema_only,
         skip_api_checks=skip_api_checks,
     )
-    report_service._record_operator_doctor_result(
+    exact_revision_recorded = report_service._record_operator_doctor_result(
         context,
         result,
         run_row=operator_run,
@@ -100,6 +108,7 @@ def artifact_doctor(
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_artifact_doctor.format_artifact_doctor_report(result))
+    return ArtifactDoctorExecution(result, exact_revision_recorded)
 
 
 def integrated_radar_calibration(context: Any, *, export_priors: bool) -> None:
