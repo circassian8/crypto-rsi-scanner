@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ... import decision_model as event_radar_decision_model
 from .runtime import *
+from .sidecars import _load_rsi_signal_context_rows
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,7 @@ class _IntegratedCandidateArtifacts:
     instrument_resolution_path: Path
     asset_resolution_report_path: Path
     targeted_market_refresh_result: Any | None
+    calendar_normalization: event_unified_calendar.UnifiedCalendarNormalizationResult
 
 
 @dataclass(frozen=True)
@@ -51,6 +53,7 @@ class _IntegratedOperatorArtifacts:
     delivery_rows: tuple[dict[str, Any], ...]
     daily_brief_path: Path
     preview_path: Path
+    decision_v2_preview_path: Path
     unified_calendar_path: Path
     unified_calendar_preview_path: Path
     unified_calendar_rows: tuple[dict[str, Any], ...]
@@ -80,6 +83,7 @@ class _IntegratedPresentationArtifacts:
     delivery_rows: tuple[dict[str, Any], ...]
     daily_brief_path: Path
     preview_path: Path
+    decision_v2_preview_path: Path
 
 
 def run_integrated_radar_cycle(
@@ -135,6 +139,7 @@ def _run_integrated_radar_cycle_locked(
         start,
         inputs,
         context=context,
+        fixture=fixture,
         targeted_market_provider=targeted_market_provider,
     )
     operator_artifacts = _write_integrated_operator_artifacts(
@@ -228,6 +233,7 @@ def _write_integrated_candidate_artifacts(
     inputs: _IntegratedCycleInputs,
     *,
     context: event_alpha_artifacts.EventAlphaArtifactContext,
+    fixture: bool,
     targeted_market_provider: object | None,
 ) -> _IntegratedCandidateArtifacts:
     manifest_path = start.namespace_dir / INPUT_MANIFEST_FILENAME
@@ -298,6 +304,17 @@ def _write_integrated_candidate_artifacts(
         source_name="integrated_candidate",
         generated_at=start.research_observed_at,
     )
+    calendar_context = _integrated_unified_calendar_normalization(
+        start,
+        inputs,
+        context=context,
+        fixture=fixture,
+    )
+    candidates = event_unified_calendar.overlay_calendar_context_rows(
+        candidates,
+        calendar_context.rows,
+        now=start.research_observed_at,
+    )
     decision_cfg = event_radar_decision_model.RadarDecisionConfig.from_runtime(config)
     candidates = tuple(
         {
@@ -311,6 +328,15 @@ def _write_integrated_candidate_artifacts(
     )
     candidates_path = start.namespace_dir / INTEGRATED_CANDIDATES_FILENAME
     _write_jsonl(candidates_path, candidates)
+    # Establish truthful pending outcome coverage immediately.  Import here to
+    # keep the radar API and outcomes reader from forming an import cycle.
+    from crypto_rsi_scanner.event_alpha.outcomes import integrated_radar_outcomes
+
+    integrated_radar_outcomes.write_integrated_radar_outcome_placeholders(
+        start.namespace_dir,
+        candidates,
+        observed_at=start.research_observed_at,
+    )
     asset_registry_path = event_asset_registry.write_asset_registry_artifact(
         inputs.asset_registry,
         start.namespace_dir,
@@ -346,6 +372,7 @@ def _write_integrated_candidate_artifacts(
         instrument_resolution_path=instrument_resolution_path,
         asset_resolution_report_path=asset_resolution_report_path,
         targeted_market_refresh_result=refresh_result,
+        calendar_normalization=calendar_context,
     )
 
 
@@ -365,9 +392,7 @@ def _write_integrated_operator_artifacts(
     )
     calendar = _write_integrated_calendar_artifacts(
         start,
-        inputs,
-        context=context,
-        fixture=fixture,
+        candidate_artifacts.calendar_normalization,
     )
     card_result, core_read = _write_integrated_research_cards(
         start,
@@ -406,6 +431,7 @@ def _write_integrated_operator_artifacts(
         delivery_rows=presentation.delivery_rows,
         daily_brief_path=presentation.daily_brief_path,
         preview_path=presentation.preview_path,
+        decision_v2_preview_path=presentation.decision_v2_preview_path,
         unified_calendar_path=calendar.path,
         unified_calendar_preview_path=calendar.preview_path,
         unified_calendar_rows=calendar.rows,
@@ -440,17 +466,8 @@ def _write_integrated_core_store(
 
 def _write_integrated_calendar_artifacts(
     start: _IntegratedCycleStart,
-    inputs: _IntegratedCycleInputs,
-    *,
-    context: event_alpha_artifacts.EventAlphaArtifactContext,
-    fixture: bool,
+    normalization: event_unified_calendar.UnifiedCalendarNormalizationResult,
 ) -> _IntegratedCalendarArtifacts:
-    normalization = _integrated_unified_calendar_normalization(
-        start,
-        inputs,
-        context=context,
-        fixture=fixture,
-    )
     rows = tuple(normalization.rows)
     path = event_unified_calendar.write_unified_calendar_artifact(
         start.namespace_dir / event_unified_calendar.UNIFIED_CALENDAR_FILENAME,
@@ -578,6 +595,7 @@ def _write_integrated_presentations(
 ) -> _IntegratedPresentationArtifacts:
     delivery_path = start.namespace_dir / INTEGRATED_DELIVERIES_FILENAME
     preview_path = start.namespace_dir / NOTIFICATION_PREVIEW_FILENAME
+    decision_v2_preview_path = start.namespace_dir / DECISION_V2_PREVIEW_FILENAME
     delivery_rows = build_integrated_notification_delivery_rows(
         candidates,
         core_rows=core_rows,
@@ -617,11 +635,24 @@ def _write_integrated_presentations(
         ),
         encoding="utf-8",
     )
+    decision_v2_preview_path.write_text(
+        format_decision_v2_notification_preview_from_deliveries(
+            delivery_rows,
+            candidates=candidates,
+            core_rows=core_rows,
+            context=context,
+            run_id=start.run_id,
+            raw_events=raw_events,
+            cumulative_store_rows=cumulative_store_rows,
+        ),
+        encoding="utf-8",
+    )
     return _IntegratedPresentationArtifacts(
         delivery_path=delivery_path,
         delivery_rows=delivery_rows,
         daily_brief_path=daily_brief_path,
         preview_path=preview_path,
+        decision_v2_preview_path=decision_v2_preview_path,
     )
 
 
@@ -718,6 +749,7 @@ def _integrated_cycle_result(
             candidate_artifacts.report_path,
             operator_artifacts.daily_brief_path,
             operator_artifacts.preview_path,
+            operator_artifacts.decision_v2_preview_path,
             operator_artifacts.source_coverage_path,
             operator_artifacts.unified_calendar_path,
             operator_artifacts.unified_calendar_preview_path,
@@ -770,12 +802,15 @@ def _integrated_cycle_result(
         integrated_report_path=candidate_artifacts.report_path,
         daily_brief_path=operator_artifacts.daily_brief_path,
         notification_preview_path=operator_artifacts.preview_path,
+        decision_v2_notification_preview_path=operator_artifacts.decision_v2_preview_path,
         integrated_delivery_path=operator_artifacts.delivery_path,
         run_ledger_path=str(context.run_ledger_path),
         core_opportunity_store_path=str(context.core_opportunity_store_path),
         input_manifest_path=candidate_artifacts.manifest_path,
         source_coverage_json_path=operator_artifacts.source_coverage_json_path,
         source_coverage_path=operator_artifacts.source_coverage_path,
+        live_provider_readiness_json_path=operator_artifacts.readiness_json_path,
+        live_provider_readiness_report_path=operator_artifacts.readiness_md_path,
         unified_calendar_path=operator_artifacts.unified_calendar_path,
         unified_calendar_preview_path=operator_artifacts.unified_calendar_preview_path,
         asset_registry_path=candidate_artifacts.asset_registry_path,
@@ -875,11 +910,17 @@ def build_integrated_candidates(
             asset_registry,
             generated_at=observed,
         )
+    rsi_context_index = _unique_rsi_context_index(
+        sidecar_rows.get("rsi_signal_context", ())
+    )
     coinalyze_index = _coinalyze_match_index(sidecar_rows)
     coinalyze_seen_by_family: dict[str, set[str]] = {}
     grouped: dict[str, list[dict[str, Any]]] = {}
     for origin, rows in sidecar_rows.items():
-        if origin in COINALYZE_EXTERNAL_SIDECARS or origin == "coinalyze":
+        if (
+            origin in COINALYZE_EXTERNAL_SIDECARS
+            or origin in {"coinalyze", "rsi_signal_context"}
+        ):
             continue
         for raw in rows:
             if not isinstance(raw, Mapping):
@@ -896,8 +937,10 @@ def build_integrated_candidates(
                     continue
                 seen.add(match_id)
                 family.append(match)
-    merged = [
-        _merge_family(
+    decision_cfg = event_radar_decision_model.RadarDecisionConfig.from_runtime(config)
+    merged: list[dict[str, Any]] = []
+    for key, rows in grouped.items():
+        candidate = _merge_family(
             key,
             rows,
             profile=profile,
@@ -906,9 +949,99 @@ def build_integrated_candidates(
             run_id=run_id,
             observed_at=observed,
         )
-        for key, rows in grouped.items()
-    ]
+        identity = _exact_rsi_asset_identity(candidate)
+        artifact = rsi_context_index.get(identity) if identity is not None else None
+        if artifact is not None:
+            candidate = event_rsi_technical_context.apply_rsi_technical_context(
+                candidate,
+                artifact,
+                evaluated_at=observed,
+            )
+            candidate.update(
+                event_radar_decision_model.reevaluate_radar_decision_fields(
+                    candidate,
+                    source_rows=rows,
+                    cfg=decision_cfg,
+                )
+            )
+        merged.append(candidate)
     return tuple(sorted(merged, key=_candidate_sort_key, reverse=True))
+
+
+def _unique_rsi_context_index(
+    rows: Iterable[Mapping[str, Any]],
+) -> dict[tuple[str, str], dict[str, Any]]:
+    """Return only unambiguous RSI rows with an exact symbol/coin-id pair."""
+
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        identity = _exact_rsi_asset_identity(row, require_explicit_pair=True)
+        if identity is not None:
+            grouped.setdefault(identity, []).append(dict(row))
+    return {
+        identity: matches[0]
+        for identity, matches in grouped.items()
+        if len(matches) == 1
+    }
+
+
+def _exact_rsi_asset_identity(
+    row: Mapping[str, Any],
+    *,
+    require_explicit_pair: bool = False,
+) -> tuple[str, str] | None:
+    """Extract one internally coherent canonical RSI asset identity.
+
+    Both the canonical symbol and coin id are required.  Multiple conflicting
+    aliases, missing halves, and resolver/raw mismatches fail closed instead of
+    allowing ticker-only context to influence a different asset.
+    """
+
+    explicit_symbols = {
+        str(row.get(field)).strip().upper()
+        for field in ("symbol", "asset_symbol")
+        if row.get(field) not in (None, "")
+    }
+    explicit_coin_ids = {
+        str(row.get(field)).strip().casefold()
+        for field in ("coin_id", "asset_coin_id")
+        if row.get(field) not in (None, "")
+    }
+    if require_explicit_pair and (
+        len(explicit_symbols) != 1 or len(explicit_coin_ids) != 1
+    ):
+        return None
+
+    symbols = {
+        str(row.get(field)).strip().upper()
+        for field in (
+            "symbol",
+            "validated_symbol",
+            "asset_symbol",
+            "asset_registry_symbol",
+        )
+        if row.get(field) not in (None, "")
+    }
+    coin_ids = {
+        str(row.get(field)).strip().casefold()
+        for field in (
+            "coin_id",
+            "validated_coin_id",
+            "asset_coin_id",
+            "asset_registry_coin_id",
+        )
+        if row.get(field) not in (None, "")
+    }
+    if len(symbols) != 1 or len(coin_ids) != 1:
+        return None
+    symbol = next(iter(symbols))
+    coin_id = next(iter(coin_ids))
+    if not symbol or not coin_id:
+        return None
+    return symbol, coin_id
+
 
 def _run_or_load_sidecars(
     *,
@@ -931,13 +1064,20 @@ def _run_or_load_sidecars(
             run_mode=run_mode,
             run_id=run_id,
         )
+        rows["rsi_signal_context"] = _load_rsi_signal_context_rows(
+            config.EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH
+        )
         manifest = tuple(
             _manifest_item(
                 sidecar_name=name,
-                mode="ran_fixture",
+                mode=(
+                    "loaded_local_read_only" if value else "skipped_missing_config"
+                ) if name == "rsi_signal_context" else "ran_fixture",
                 namespace_dir=namespace_dir,
                 rows=value,
-                configured=True,
+                configured=(
+                    config.EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH is not None
+                ) if name == "rsi_signal_context" else True,
                 sidecar_research_observed_at=observed_at,
                 wall_started_at=datetime.now(timezone.utc),
                 wall_finished_at=datetime.now(timezone.utc),
@@ -961,18 +1101,29 @@ def _run_or_load_sidecars(
             "dex_pool_state": (),
             "dex_pool_anomaly": (),
             "protocol_fundamentals": (),
+            "rsi_signal_context": _load_rsi_signal_context_rows(
+                config.EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH
+            ),
         }
         manifest = tuple(
             _manifest_item(
                 sidecar_name=name,
-                mode="skipped_provider_unavailable",
+                mode=(
+                    "loaded_local_read_only" if value else "skipped_missing_config"
+                ) if name == "rsi_signal_context" else "skipped_provider_unavailable",
                 namespace_dir=namespace_dir,
                 rows=value,
-                configured=False,
+                configured=(
+                    config.EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH is not None
+                ) if name == "rsi_signal_context" else False,
                 sidecar_research_observed_at=observed_at,
                 wall_started_at=datetime.now(timezone.utc),
                 wall_finished_at=datetime.now(timezone.utc),
-                warnings=("configured sidecar execution is not enabled in this research-only integrated path",),
+                warnings=(
+                    () if value else ("local RSI signal context path missing or unreadable",)
+                ) if name == "rsi_signal_context" else (
+                    "configured sidecar execution is not enabled in this research-only integrated path",
+                ),
             )
             for name, value in rows.items()
         )
@@ -997,6 +1148,9 @@ def _run_or_load_sidecars(
         "dex_pool_state": tuple(event_dex_onchain_readiness.load_dex_pool_state(namespace_dir)),
         "dex_pool_anomaly": tuple(event_dex_onchain_readiness.load_dex_pool_anomalies(namespace_dir)),
         "protocol_fundamentals": tuple(event_dex_onchain_readiness.load_protocol_fundamentals(namespace_dir)),
+        "rsi_signal_context": _load_rsi_signal_context_rows(
+            config.EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH
+        ),
     }
     manifest = tuple(
         _manifest_item(

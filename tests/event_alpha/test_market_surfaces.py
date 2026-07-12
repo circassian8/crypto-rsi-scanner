@@ -1112,15 +1112,15 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert "SECTOR/ai_theme DIAGNOSTIC" in daily
         assert "TKNC/token-c DIAGNOSTIC" in daily
         assert f"run_id: {result.run_id}" in daily
-        assert "candidate_events=11" in daily
-        assert "research_candidates=11" in daily
-        assert "current_generation_core_rows=9" in daily
-        assert "current_generation_visible_core_rows=9" in daily
-        assert "cumulative_store_rows=9" in daily
-        assert "- current_core_market_freshness: total=9; statuses=" in daily
-        assert "- current_generation_visible_core_freshness: total=9; statuses=" in daily
+        assert "candidate_events=13" in daily
+        assert "research_candidates=13" in daily
+        assert "current_generation_core_rows=10" in daily
+        assert "current_generation_visible_core_rows=10" in daily
+        assert "cumulative_store_rows=10" in daily
+        assert "- current_core_market_freshness: total=10; statuses=" in daily
+        assert "- current_generation_visible_core_freshness: total=10; statuses=" in daily
         assert "- support_row_market_freshness: total=0; statuses=none" in daily
-        assert "- quality_row_market_freshness: total=11; statuses=" in daily
+        assert "- quality_row_market_freshness: total=13; statuses=" in daily
         assert "- Core opportunities:" not in daily
 
         manifest = json.loads(result.input_manifest_path.read_text(encoding="utf-8"))
@@ -1175,8 +1175,8 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert "Alerts:" not in preview
         assert f"run_id: {result.run_id}" in preview
         assert "Send guard: disabled (no-send rehearsal)" in preview
-        assert "Raw events: 20 · Candidate events: 11 · Research candidates: 11" in preview
-        assert "Source alert snapshots: 0 · Current-generation core rows: 9" in preview
+        assert "Raw events: 22 · Candidate events: 13 · Research candidates: 13" in preview
+        assert "Source alert snapshots: 0 · Current-generation core rows: 10" in preview
         assert "Alertable decisions: 0 · Strict alerts: 0 · Preview-rendered items:" in preview
         assert "Raw source candidates:" not in preview
         assert "/Users/" not in preview

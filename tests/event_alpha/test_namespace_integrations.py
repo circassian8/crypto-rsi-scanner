@@ -152,7 +152,12 @@ def test_integrated_calendar_normalization_is_single_pass_exact_and_scope_neutra
                     rows=[run_row],
                 )
             )
-            assert "calendar_normalization: input=12 accepted=10 output=10" in run_report
+            assert (
+                "calendar_normalization: "
+                f"input={telemetry['input_rows']} "
+                f"accepted={telemetry['accepted_rows']} "
+                f"output={telemetry['output_rows']}"
+            ) in run_report
             assert "reasons=unsupported_event_kind=2" in run_report
             assert result.strict_alerts == run_row["strict_alerts"] == 0
             assert result.send_attempted is False

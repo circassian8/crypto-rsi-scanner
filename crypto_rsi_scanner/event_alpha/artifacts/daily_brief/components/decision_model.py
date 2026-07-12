@@ -57,7 +57,7 @@ def decision_model_daily_brief_lines(
         for row in lane_rows[:10]:
             values = decision_model_values(row)
             lines.extend(["", f"#### {_candidate_label(row)}"])
-            lines.extend(decision_model_markdown_lines(values))
+            lines.extend(decision_model_markdown_lines(row))
     return lines
 
 

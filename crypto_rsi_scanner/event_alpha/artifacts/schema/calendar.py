@@ -74,6 +74,8 @@ def schema_specs(
             ),
             optional=(
                 "schema_id", "schema_version", "scheduled_at", "window_start", "window_end",
+                "timezone", "forecast_value", "previous_value", "actual_value", "surprise_value",
+                "impact_window_before", "impact_window_after",
                 "observed_at", "created_alert", "notification_send_enabled", "execution_enabled",
                 "paper_trading_enabled", "normal_rsi_routing_enabled", *operation_safety,
             ),
@@ -82,12 +84,16 @@ def schema_specs(
                 "event_kind": "str", "time_certainty": "str", "importance": "str",
                 "affected_assets": "list", "source": "str", "source_url": "str",
                 "reminder_windows": "list", "post_event_tracking_status": "str",
+                "timezone": "str", "forecast_value": "float", "previous_value": "float",
+                "actual_value": "float", "surprise_value": "float",
+                "impact_window_before": "str", "impact_window_after": "str",
                 "research_only": "bool",
             },
             enums={
                 "event_kind": (
                     "central_bank", "inflation", "employment", "macro_release", "crypto_unlock",
                     "exchange", "project", "protocol", "regulatory",
+                    "options_expiry",
                 ),
                 "time_certainty": ("exact", "window", "estimated", "unknown"),
                 "importance": ("low", "medium", "high", "critical"),

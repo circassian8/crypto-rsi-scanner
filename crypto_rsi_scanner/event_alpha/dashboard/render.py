@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import math
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import quote, urlsplit
 
@@ -27,7 +28,9 @@ def render_dashboard_page(
     path: str,
     *,
     include_diagnostics: bool = False,
+    query: Mapping[str, str] | None = None,
 ) -> DashboardResponse:
+    dashboard_query = _dashboard_query(query)
     current_generation_page = path in {"/", "/anomalies", "/catalysts", "/fade-risk", "/calendar"}
     if current_generation_page and not snapshot.generation_authoritative:
         title = {
@@ -39,14 +42,42 @@ def render_dashboard_page(
         }[path]
         return _ok(snapshot, title, _authority_unavailable(snapshot))
     if path == "/":
-        body = _today(snapshot, include_diagnostics=include_diagnostics)
+        body = _today(
+            snapshot,
+            include_diagnostics=include_diagnostics,
+            query=dashboard_query,
+        )
         return _ok(snapshot, "Today", body)
     if path == "/anomalies":
-        return _ok(snapshot, "Market Anomalies", _anomalies(snapshot, include_diagnostics=include_diagnostics))
+        return _ok(
+            snapshot,
+            "Market Anomalies",
+            _anomalies(
+                snapshot,
+                include_diagnostics=include_diagnostics,
+                query=dashboard_query,
+            ),
+        )
     if path == "/catalysts":
-        return _ok(snapshot, "Catalyst Ideas", _catalysts(snapshot, include_diagnostics=include_diagnostics))
+        return _ok(
+            snapshot,
+            "Catalyst Ideas",
+            _catalysts(
+                snapshot,
+                include_diagnostics=include_diagnostics,
+                query=dashboard_query,
+            ),
+        )
     if path == "/fade-risk":
-        return _ok(snapshot, "Fade / Risk", _fade_risk(snapshot, include_diagnostics=include_diagnostics))
+        return _ok(
+            snapshot,
+            "Fade / Risk",
+            _fade_risk(
+                snapshot,
+                include_diagnostics=include_diagnostics,
+                query=dashboard_query,
+            ),
+        )
     if path == "/calendar":
         return _ok(snapshot, "Calendar", _calendar(snapshot))
     if path == "/health":
@@ -59,7 +90,12 @@ def render_dashboard_page(
     return DashboardResponse(404, "Not Found", _standalone_error("Not Found", "Unknown dashboard page."))
 
 
-def _today(snapshot: DashboardSnapshot, *, include_diagnostics: bool) -> str:
+def _today(
+    snapshot: DashboardSnapshot,
+    *,
+    include_diagnostics: bool,
+    query: Mapping[str, str],
+) -> str:
     rows = tuple(
         row
         for row in snapshot.visible_current_candidates
@@ -67,35 +103,66 @@ def _today(snapshot: DashboardSnapshot, *, include_diagnostics: bool) -> str:
         and row.get("radar_actionable") is True
     )
     sections = [
-        _section("Actionable research ideas", _candidate_table(rows)),
+        _section("Actionable research ideas", _candidate_table(rows, query=query)),
+        _section(
+            "Dashboard watch",
+            _candidate_table(
+                (
+                    row
+                    for row in snapshot.visible_current_candidates
+                    if row.get("_dashboard_route") == "dashboard_watch"
+                ),
+                query=query,
+            ),
+        ),
         _section(
             "Rapid anomalies",
             _candidate_table(
-                row
-                for row in snapshot.visible_current_candidates
-                if row.get("_dashboard_route") == "rapid_market_anomaly"
+                (
+                    row
+                    for row in snapshot.visible_current_candidates
+                    if row.get("_dashboard_route") == "rapid_market_anomaly"
+                ),
+                query=query,
             ),
         ),
         _section(
             "Review queues",
             _candidate_table(
-                row
-                for row in snapshot.visible_current_candidates
-                if row.get("_dashboard_route") in {"fade_exhaustion_review", "calendar_risk"}
+                (
+                    row
+                    for row in snapshot.visible_current_candidates
+                    if row.get("_dashboard_route") in {
+                        "fade_exhaustion_review",
+                        "risk_watch",
+                        "calendar_risk",
+                    }
+                ),
+                query=query,
             ),
         ),
     ]
     if include_diagnostics:
-        sections.append(_section("Diagnostics", _candidate_table(snapshot.diagnostic_candidates)))
+        sections.append(
+            _section(
+                "Diagnostics",
+                _candidate_table(snapshot.diagnostic_candidates, query=query),
+            )
+        )
     else:
         sections.append(
             '<p class="muted">Diagnostics are hidden by default. '
             '<a href="/?include_diagnostics=1">Show current-generation diagnostics</a>.</p>'
         )
-    return "".join(sections)
+    return _candidate_controls(query) + "".join(sections)
 
 
-def _anomalies(snapshot: DashboardSnapshot, *, include_diagnostics: bool) -> str:
+def _anomalies(
+    snapshot: DashboardSnapshot,
+    *,
+    include_diagnostics: bool,
+    query: Mapping[str, str],
+) -> str:
     raw_by_asset = {
         _asset_key(row): row
         for row in snapshot.current_market_anomalies
@@ -106,7 +173,7 @@ def _anomalies(snapshot: DashboardSnapshot, *, include_diagnostics: bool) -> str
         if candidate.get("_decision_model_status") != "v2":
             continue
         if not (
-            str(candidate.get("thesis_origin") or "") == "market_led"
+            "market_led" in _origin_tokens(candidate)
             or candidate.get("anomaly_type")
             or candidate.get("market_anomaly_type")
         ):
@@ -130,28 +197,42 @@ def _anomalies(snapshot: DashboardSnapshot, *, include_diagnostics: bool) -> str
         "Market-led rows may be actionable without a known catalyst when identity, freshness, liquidity, "
         "spread, turnover, and manipulation-risk gates pass. Unknown catalyst remains a warning, not a trade instruction."
     )
-    return f"<p>{_h(text)}</p>" + _candidate_table(rows)
+    return _candidate_controls(query) + f"<p>{_h(text)}</p>" + _candidate_table(rows, query=query)
 
 
-def _catalysts(snapshot: DashboardSnapshot, *, include_diagnostics: bool) -> str:
+def _catalysts(
+    snapshot: DashboardSnapshot,
+    *,
+    include_diagnostics: bool,
+    query: Mapping[str, str],
+) -> str:
     rows = tuple(
         row
         for row in snapshot.current_candidates
-        if str(row.get("thesis_origin") or "") in {"catalyst_led", "mixed"}
+        if "catalyst_led" in _origin_tokens(row)
         and str(row.get("catalyst_status") or "") in {"confirmed", "plausible"}
         and (include_diagnostics or row.get("_dashboard_route") != "diagnostic")
         and row.get("_decision_model_status") == "v2"
     )
-    return _candidate_table(rows)
+    return _candidate_controls(query) + _candidate_table(rows, query=query)
 
 
-def _fade_risk(snapshot: DashboardSnapshot, *, include_diagnostics: bool) -> str:
+def _fade_risk(
+    snapshot: DashboardSnapshot,
+    *,
+    include_diagnostics: bool,
+    query: Mapping[str, str],
+) -> str:
     rows = tuple(
         row
         for row in snapshot.current_candidates
         if (
             str(row.get("directional_bias") or "") in {"fade_short_review", "risk"}
-            or row.get("_dashboard_route") in {"fade_exhaustion_review", "calendar_risk"}
+            or row.get("_dashboard_route") in {
+                "fade_exhaustion_review",
+                "risk_watch",
+                "calendar_risk",
+            }
         )
         and (include_diagnostics or row.get("_dashboard_route") != "diagnostic")
         and row.get("_decision_model_status") == "v2"
@@ -159,12 +240,25 @@ def _fade_risk(snapshot: DashboardSnapshot, *, include_diagnostics: bool) -> str
     return (
         "<p>Fade and risk rows are manual research reviews after a completed or scheduled risk condition. "
         "They never create <code>TRIGGERED_FADE</code>.</p>"
-        + _candidate_table(rows)
+        + _candidate_controls(query)
+        + _candidate_table(rows, query=query)
     )
 
 
 def _calendar(snapshot: DashboardSnapshot) -> str:
-    headers = ("Event", "When", "Window", "Kind", "Importance", "Assets", "Tracking", "Source")
+    headers = (
+        "Event",
+        "When",
+        "Timezone",
+        "Date window",
+        "Kind",
+        "Importance",
+        "Previous / forecast / actual / surprise",
+        "Impact window",
+        "Assets",
+        "Tracking",
+        "Source",
+    )
     body_rows = []
     for row in sorted(
         snapshot.current_calendar_events,
@@ -176,9 +270,12 @@ def _calendar(snapshot: DashboardSnapshot) -> str:
             (
                 _h(row.get("title") or "Untitled event"),
                 scheduled,
+                _h(row.get("timezone") or "UTC"),
                 window,
                 _h(row.get("event_kind") or "unknown"),
                 _h(row.get("importance") or "unknown"),
+                _h(_economic_context_label(row)),
+                _h(_impact_window_label(row)),
                 _h(", ".join(str(item) for item in row.get("affected_assets") or ()) or "market-wide"),
                 _h(row.get("post_event_tracking_status") or "unknown"),
                 _source_link(row),
@@ -259,7 +356,7 @@ def _feedback_outcomes(snapshot: DashboardSnapshot) -> str:
             (
                 _h(row.get("core_opportunity_id") or row.get("target") or row.get("alert_id") or "unknown"),
                 _h(row.get("label") or row.get("feedback_label") or row.get("status") or "unlabeled"),
-                _h(row.get("thesis_origin") or "unclassified"),
+                _h(_origin_display(row)),
                 _h(row.get("catalyst_status") or "unclassified"),
             )
         )
@@ -269,7 +366,7 @@ def _feedback_outcomes(snapshot: DashboardSnapshot) -> str:
             (
                 _h(row.get("core_opportunity_id") or row.get("candidate_id") or "unknown"),
                 _h(row.get("outcome_status") or row.get("maturation_state") or "unknown"),
-                _h(row.get("thesis_origin") or "unclassified"),
+                _h(_origin_display(row)),
                 _h(row.get("confidence_band") or "unclassified"),
                 _h(row.get("actionability_score") if row.get("actionability_score") is not None else "n/a"),
             )
@@ -341,23 +438,37 @@ def _candidate_detail(
             ("Asset", f"{row.get('symbol') or 'unknown'} / {row.get('coin_id') or 'unknown'}"),
             ("Research route", row.get("_dashboard_route") or "diagnostic"),
             ("Legacy opportunity type", row.get("opportunity_type") or "unknown"),
-            ("Thesis origin", row.get("thesis_origin") or "unclassified"),
+            ("Primary thesis origin", row.get("primary_thesis_origin") or row.get("thesis_origin") or "unclassified"),
+            ("Thesis origins", _origin_display(row)),
             ("Directional bias", row.get("directional_bias") or "unclassified"),
             ("Catalyst status", row.get("catalyst_status") or "unclassified"),
             ("Confidence", row.get("confidence_band") or "unclassified"),
             ("Timing", row.get("timing_state") or "unclassified"),
+            ("Market phase", row.get("market_phase") or "unclassified"),
+            ("Preferred horizon", row.get("preferred_horizon") or "unclassified"),
+            ("Expires at", row.get("expires_at") or "not recorded"),
             ("Tradability", row.get("tradability_status") or "unclassified"),
+            ("Spread", row.get("spread_status") or "unclassified"),
             ("Actionability", _score(row.get("actionability_score"))),
+            ("Urgency", _score(row.get("urgency_score"))),
             ("Evidence confidence", _score(row.get("evidence_confidence_score"))),
             ("Risk", _score(row.get("risk_score"))),
+            ("Chase risk", _score(row.get("chase_risk_score"))),
             ("Catalyst warning", "Catalyst unknown" if row.get("catalyst_status") == "unknown" else "none"),
         )
     )
     source = _source_link(row)
     source_block = f"<p><strong>Source:</strong> {source}</p>" if source else ""
+    snapshot_chart = _market_snapshot_sparkline(row)
+    snapshot_block = (
+        _section("Market snapshot trend", snapshot_chart)
+        if snapshot_chart
+        else ""
+    )
     body = (
         dimensions
         + source_block
+        + snapshot_block
         + _text_list(
             "Why still worth reviewing",
             _values(row, "why_still_worth_reviewing", "why_review_worthy", "why_now"),
@@ -382,10 +493,55 @@ def _candidate_detail(
     return _ok(snapshot, f"Candidate {row.get('symbol') or identifier}", body)
 
 
-def _candidate_table(rows: Iterable[Mapping[str, Any]]) -> str:
+def filter_sort_candidates(
+    rows: Iterable[Mapping[str, Any]],
+    query: Mapping[str, str] | None = None,
+) -> tuple[Mapping[str, Any], ...]:
+    """Apply exact, allowlisted dashboard filters and deterministic score sorts."""
+
+    filters = _dashboard_query(query)
+    selected: list[Mapping[str, Any]] = []
+    for row in rows:
+        if filters.get("route") and _token(row.get("_dashboard_route")) != filters["route"]:
+            continue
+        if filters.get("origin") and filters["origin"] not in _origin_tokens(row):
+            continue
+        if filters.get("confidence") and _token(row.get("confidence_band")) != filters["confidence"]:
+            continue
+        if filters.get("catalyst") and _token(row.get("catalyst_status")) != filters["catalyst"]:
+            continue
+        if filters.get("timing") and _token(
+            row.get("market_phase") or row.get("timing_state")
+        ) != filters["timing"]:
+            continue
+        if filters.get("risk") and _risk_band(row) != filters["risk"]:
+            continue
+        selected.append(row)
+    sort_name = filters.get("sort", "")
+    score_field, descending = {
+        "actionability_desc": ("actionability_score", True),
+        "urgency_desc": ("urgency_score", True),
+        "risk_asc": ("risk_score", False),
+        "risk_desc": ("risk_score", True),
+    }.get(sort_name, ("", False))
+    if score_field:
+        selected.sort(
+            key=lambda row: (
+                _missing_sort_value(row.get(score_field), descending=descending),
+                candidate_identifier(row),
+            ),
+        )
+    return tuple(selected)
+
+
+def _candidate_table(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    query: Mapping[str, str] | None = None,
+) -> str:
     body_rows = []
     seen = set()
-    for row in rows:
+    for row in filter_sort_candidates(rows, query):
         identifier = candidate_identifier(row)
         if not identifier or identifier in seen:
             continue
@@ -398,20 +554,204 @@ def _candidate_table(rows: Iterable[Mapping[str, Any]]) -> str:
             (
                 link,
                 _h(row.get("_dashboard_route") or "diagnostic"),
-                _h(row.get("thesis_origin") or "legacy unclassified"),
+                _h(_origin_display(row)),
                 _h(row.get("directional_bias") or "unclassified"),
                 _h(row.get("confidence_band") or "unclassified"),
+                _h(row.get("market_phase") or row.get("timing_state") or "unclassified"),
                 _h(_score(row.get("actionability_score"))),
+                _h(_score(row.get("urgency_score"))),
                 _h(_score(row.get("evidence_confidence_score"))),
                 _h(_score(row.get("risk_score"))),
+                _h(row.get("preferred_horizon") or "unclassified"),
+                _h(row.get("expires_at") or "not recorded"),
+                _h(row.get("spread_status") or "unclassified"),
+                _h(_score(row.get("chase_risk_score"))),
+                _market_snapshot_sparkline(row) or '<span class="muted">n/a</span>',
                 _h(warning),
             )
         )
     return _table(
-        ("Asset", "Route", "Thesis", "Bias", "Confidence", "Actionability", "Evidence", "Risk", "Warning"),
+        (
+            "Asset",
+            "Route",
+            "Thesis",
+            "Bias",
+            "Confidence",
+            "Timing",
+            "Actionability",
+            "Urgency",
+            "Evidence",
+            "Risk",
+            "Horizon",
+            "Expires",
+            "Spread",
+            "Chase risk",
+            "Snapshot",
+            "Warning",
+        ),
         body_rows,
         empty="No rows in this current-generation lane.",
     )
+
+
+def _candidate_controls(query: Mapping[str, str]) -> str:
+    inputs = "".join(
+        f'<label>{_h(label)} <input name="{_h(name)}" value="{_h(query.get(name, ""))}" '
+        'autocomplete="off"></label>'
+        for name, label in (
+            ("route", "Route"),
+            ("origin", "Origin"),
+            ("confidence", "Confidence"),
+            ("catalyst", "Catalyst"),
+            ("risk", "Risk band"),
+            ("timing", "Timing"),
+        )
+    )
+    selected = query.get("sort", "")
+    options = "".join(
+        f'<option value="{_h(value)}"{(" selected" if selected == value else "")}>{_h(label)}</option>'
+        for value, label in (
+            ("", "Artifact order"),
+            ("actionability_desc", "Actionability high to low"),
+            ("urgency_desc", "Urgency high to low"),
+            ("risk_asc", "Risk low to high"),
+            ("risk_desc", "Risk high to low"),
+        )
+    )
+    return (
+        '<form class="candidate-filters" method="get">'
+        + inputs
+        + f'<label>Sort <select name="sort">{options}</select></label>'
+        + '<button type="submit">Apply</button></form>'
+    )
+
+
+def _dashboard_query(query: Mapping[str, str] | None) -> dict[str, str]:
+    if not isinstance(query, Mapping):
+        return {}
+    out: dict[str, str] = {}
+    for field in ("route", "origin", "confidence", "catalyst", "risk", "timing", "sort"):
+        value = query.get(field)
+        text = value.strip() if isinstance(value, str) else ""
+        if text and len(text) <= 80:
+            out[field] = text.casefold()
+    return out
+
+
+def _origin_tokens(row: Mapping[str, Any]) -> set[str]:
+    tokens = {
+        _token(row.get("primary_thesis_origin") or row.get("thesis_origin")),
+    }
+    origins = row.get("thesis_origins")
+    if isinstance(origins, Iterable) and not isinstance(origins, (str, bytes, Mapping)):
+        tokens.update(_token(value) for value in origins)
+    return {token for token in tokens if token}
+
+
+def _origin_display(row: Mapping[str, Any]) -> str:
+    primary = _token(row.get("primary_thesis_origin") or row.get("thesis_origin"))
+    origins = row.get("thesis_origins")
+    ordered = (
+        [_token(value) for value in origins]
+        if isinstance(origins, Iterable) and not isinstance(origins, (str, bytes, Mapping))
+        else []
+    )
+    values = [value for value in (primary, *ordered) if value]
+    return ", ".join(dict.fromkeys(values)) or "legacy unclassified"
+
+
+def _risk_band(row: Mapping[str, Any]) -> str:
+    explicit = _token(row.get("risk_band"))
+    if explicit in {"low", "medium", "high"}:
+        return explicit
+    value = _finite_number(row.get("risk_score"))
+    if value is None:
+        return "unknown"
+    if value < 40:
+        return "low"
+    if value < 70:
+        return "medium"
+    return "high"
+
+
+def _missing_sort_value(value: object, *, descending: bool) -> tuple[int, float]:
+    number = _finite_number(value)
+    if number is None:
+        return (1, 0.0)
+    return (0, -number if descending else number)
+
+
+def _market_snapshot_sparkline(row: Mapping[str, Any]) -> str:
+    values = _market_snapshot_series(row)
+    if len(values) < 2:
+        return ""
+    width = 108.0
+    height = 30.0
+    padding = 2.0
+    low = min(values)
+    high = max(values)
+    span = high - low
+    points = []
+    for index, value in enumerate(values):
+        x = padding + (width - 2 * padding) * index / (len(values) - 1)
+        y = height / 2 if span == 0 else padding + (height - 2 * padding) * (high - value) / span
+        points.append(f"{x:.1f},{y:.1f}")
+    return (
+        '<svg class="sparkline" viewBox="0 0 108 30" role="img" '
+        'aria-label="Existing market snapshot trend">'
+        f'<polyline points="{" ".join(points)}" fill="none" stroke="currentColor" '
+        'stroke-width="2" vector-effect="non-scaling-stroke"></polyline></svg>'
+    )
+
+
+def _market_snapshot_series(row: Mapping[str, Any]) -> tuple[float, ...]:
+    for container_name in ("market_state_snapshot", "market_snapshot"):
+        container = row.get(container_name)
+        if not isinstance(container, Mapping):
+            continue
+        for field in ("price_series", "close_series", "return_series", "sparkline_values"):
+            values = _finite_series(container.get(field))
+            if len(values) >= 2:
+                return values
+    for field in ("market_state_snapshots", "market_snapshots"):
+        snapshots = row.get(field)
+        if not isinstance(snapshots, Iterable) or isinstance(snapshots, (str, bytes, Mapping)):
+            continue
+        values: list[float] = []
+        for snapshot in snapshots:
+            if not isinstance(snapshot, Mapping):
+                continue
+            value = None
+            for name in ("price", "close", "return", "return_1h"):
+                value = _finite_number(snapshot.get(name))
+                if value is not None:
+                    break
+            if value is not None:
+                values.append(value)
+        if len(values) >= 2:
+            return tuple(values)
+    return ()
+
+
+def _finite_series(value: object) -> tuple[float, ...]:
+    if not isinstance(value, Iterable) or isinstance(value, (str, bytes, Mapping)):
+        return ()
+    out = tuple(number for item in value if (number := _finite_number(item)) is not None)
+    return out[:64]
+
+
+def _finite_number(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _token(value: object) -> str:
+    return str(value or "").strip().casefold()
 
 
 def _higher_manipulation_risk(row: Mapping[str, Any]) -> bool:
@@ -486,6 +826,9 @@ header,main{{max-width:1280px;margin:auto;padding:18px}}nav{{display:flex;gap:14
 .banner,.scope,.authority-untrusted,section{{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:14px 0}}
 .banner{{border-color:#725b16;color:#fde68a}}.muted{{color:var(--muted)}}table{{width:100%;border-collapse:collapse;overflow:auto}}
 .authority-untrusted{{border:3px solid var(--danger);color:#fecaca;background:#3f1219}}.authority-untrusted strong{{font-size:1.08em}}
+.candidate-filters{{display:flex;gap:10px;flex-wrap:wrap;align-items:end;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:14px 0}}
+.candidate-filters label{{display:grid;gap:3px;color:var(--muted)}}.candidate-filters input,.candidate-filters select,.candidate-filters button{{background:#0d1528;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 8px}}
+.sparkline{{width:108px;height:30px;color:var(--accent);vertical-align:middle}}
 th,td{{border-bottom:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}}th{{color:var(--muted)}}
 dl{{display:grid;grid-template-columns:minmax(150px,260px) 1fr;gap:6px 14px}}dt{{color:var(--muted)}}dd{{margin:0;overflow-wrap:anywhere}}
 code{{color:#bae6fd}}@media(max-width:760px){{table{{display:block;overflow-x:auto}}dl{{grid-template-columns:1fr}}}}
@@ -561,6 +904,29 @@ def _window_label(row: Mapping[str, Any]) -> str:
     return certainty
 
 
+def _economic_context_label(row: Mapping[str, Any]) -> str:
+    values = (
+        _display_number(row.get("previous_value")),
+        _display_number(row.get("forecast_value")),
+        _display_number(row.get("actual_value")),
+        _display_number(row.get("surprise_value")),
+    )
+    return " / ".join(values)
+
+
+def _impact_window_label(row: Mapping[str, Any]) -> str:
+    before = str(row.get("impact_window_before") or "unknown").strip()
+    after = str(row.get("impact_window_after") or "unknown").strip()
+    return f"-{before} / +{after}"
+
+
+def _display_number(value: object) -> str:
+    number = _finite_number(value)
+    if number is None:
+        return "—"
+    return f"{number:g}"
+
+
 def _asset_key(row: Mapping[str, Any]) -> tuple[str, str]:
     return (
         str(row.get("symbol") or row.get("validated_symbol") or "").strip().upper(),
@@ -590,4 +956,4 @@ def _h(value: object) -> str:
     return html.escape(str(value if value is not None else ""), quote=True)
 
 
-__all__ = ("render_dashboard_page",)
+__all__ = ("filter_sort_candidates", "render_dashboard_page")

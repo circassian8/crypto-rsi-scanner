@@ -265,7 +265,7 @@ def _report_candidate_summary_lines(row: Mapping[str, Any], *, compact: bool = F
     )
     lines.append(score_line)
     if not compact:
-        lines.extend(f"  {item}" for item in decision_model_markdown_lines(decision))
+        lines.extend(f"  {item}" for item in decision_model_markdown_lines(row))
     return lines
 
 def _append_radar_learning_snapshot(lines: list[str], performance_snapshot: Mapping[str, Any] | None) -> None:
@@ -365,29 +365,6 @@ def build_integrated_notification_delivery_rows(
         ("unconfirmed_research", "Unconfirmed Research", event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value),
     )
     out: list[dict[str, Any]] = []
-    for lane, title, opportunity_type in lane_specs:
-        lane_rows = [row for row in rows if row.get("opportunity_type") == opportunity_type]
-        message = _integrated_lane_message(
-            lane_rows,
-            lane_title=title,
-            context=context,
-            lane=lane,
-            core_by_id=core_by_id,
-        )
-        out.append(_integrated_delivery_row(
-            lane=lane,
-            lane_title=title,
-            message_text=message,
-            rendered_rows=lane_rows,
-            skipped_rows=(),
-            core_by_id=core_by_id,
-            context=context,
-            run_id=run_id,
-            observed=observed,
-            send_guard_enabled=send_guard_enabled,
-            preview_path=preview_path,
-            zero_candidate_preview=zero_candidate_preview,
-        ))
     decision_groups = group_decision_rows(rows, include_diagnostics=True)
     v2_preview_enabled = (
         bool(config.EVENT_ALPHA_DECISION_MODEL_V2_PREVIEW_ENABLED)
@@ -421,6 +398,31 @@ def build_integrated_notification_delivery_rows(
                 preview_path=preview_path,
                 zero_candidate_preview=zero_candidate_preview,
             ))
+    # Decision Model v2 is the operator-facing product.  Keep the former
+    # opportunity-type lanes after it as an explicit compatibility view.
+    for lane, title, opportunity_type in lane_specs:
+        lane_rows = [row for row in rows if row.get("opportunity_type") == opportunity_type]
+        message = _integrated_lane_message(
+            lane_rows,
+            lane_title=title,
+            context=context,
+            lane=lane,
+            core_by_id=core_by_id,
+        )
+        out.append(_integrated_delivery_row(
+            lane=lane,
+            lane_title=title,
+            message_text=message,
+            rendered_rows=lane_rows,
+            skipped_rows=(),
+            core_by_id=core_by_id,
+            context=context,
+            run_id=run_id,
+            observed=observed,
+            send_guard_enabled=send_guard_enabled,
+            preview_path=preview_path,
+            zero_candidate_preview=zero_candidate_preview,
+        ))
     diagnostics = [row for row in rows if row.get("opportunity_type") == event_market_reaction.EventOpportunityType.DIAGNOSTIC.value]
     if v2_preview_enabled:
         diagnostics.extend(
@@ -535,6 +537,35 @@ def format_integrated_notification_preview_from_deliveries(
     lines.append("Canonical counter scopes are explicit; no legacy raw Alerts or raw-source-candidate aliases are rendered.")
     return event_artifact_paths.scrub_absolute_paths_from_markdown("\n".join(lines).rstrip() + "\n")
 
+
+def format_decision_v2_notification_preview_from_deliveries(
+    delivery_rows: Iterable[Mapping[str, Any]],
+    **kwargs: Any,
+) -> str:
+    """Render the v2 product lanes without legacy compatibility sections."""
+
+    allowed = set(PREVIEW_LANE_ORDER)
+    v2_rows = tuple(
+        dict(row)
+        for row in delivery_rows
+        if isinstance(row, Mapping) and str(row.get("lane") or "") in allowed
+    )
+    rendered = format_integrated_notification_preview_from_deliveries(
+        v2_rows,
+        **kwargs,
+    )
+    rendered = rendered.replace(
+        "🧭 Event Alpha Integrated Radar Preview",
+        "🧭 Crypto Radar Decision v2 Preview",
+        1,
+    )
+    return rendered.replace(
+        "Canonical counter scopes are explicit; no legacy raw Alerts or raw-source-candidate aliases are rendered.",
+        "Legacy Event Alpha opportunity lanes are excluded from this Decision v2 product view. "
+        "Canonical counter scopes are explicit; no legacy raw Alerts or raw-source-candidate aliases are rendered.",
+        1,
+    )
+
 def format_integrated_notification_preview(
     candidates: Iterable[Mapping[str, Any]],
     *,
@@ -582,7 +613,7 @@ def _integrated_lane_message(
         lines.append("- No candidate items in this lane.")
     for index, row in enumerate(materialized, start=1):
         card_path = _row_card_path(row, core_by_id=core_by_id)
-        decision_lines = decision_model_markdown_lines(decision_model_values(row))
+        decision_lines = decision_model_markdown_lines(row)
         lines.extend([
             f"{index}. {row.get('symbol')}/{row.get('coin_id')}",
             f"   Opportunity: {row.get('opportunity_type') or 'unknown'}",
@@ -1102,6 +1133,7 @@ __all__ = (
     'format_integrated_daily_brief',
     'build_integrated_notification_delivery_rows',
     'format_integrated_notification_preview_from_deliveries',
+    'format_decision_v2_notification_preview_from_deliveries',
     'format_integrated_notification_preview',
     '_integrated_lane_message',
     '_integrated_delivery_row',

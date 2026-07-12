@@ -4,6 +4,36 @@ from __future__ import annotations
 
 from .runtime import *
 
+
+def _load_rsi_signal_context_rows(path: Path | None) -> tuple[dict[str, Any], ...]:
+    """Read an explicitly configured local RSI export without touching SQLite."""
+
+    if path is None:
+        return ()
+    target = Path(path).expanduser()
+    try:
+        if target.suffix.casefold() == ".jsonl":
+            rows = [json.loads(line) for line in target.read_text(encoding="utf-8").splitlines() if line.strip()]
+        else:
+            payload = json.loads(target.read_text(encoding="utf-8"))
+            if isinstance(payload, Mapping):
+                nested = next(
+                    (
+                        payload.get(field)
+                        for field in ("signals", "rows", "items")
+                        if isinstance(payload.get(field), list)
+                    ),
+                    None,
+                )
+                rows = nested if nested is not None else [payload]
+            else:
+                rows = payload
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return ()
+    if not isinstance(rows, list):
+        return ()
+    return tuple(dict(row) for row in rows[:500] if isinstance(row, Mapping))
+
 def _derivatives_manifest_mode(namespace_dir: Path, derivatives_rows: tuple[dict[str, Any], ...]) -> tuple[str, bool, tuple[str, ...]]:
     from ....providers import coinalyze_preflight as event_coinalyze_preflight
 
@@ -407,7 +437,39 @@ def _fixture_market_rows() -> tuple[dict[str, Any], ...]:
     return (
         {"symbol": "BTC", "coin_id": "bitcoin", "price": 65000, "return_unit": "fraction", "return_1h": 0.0, "return_4h": 0.0, "return_24h": 0.0, "volume_zscore_24h": 0.0, "liquidity_usd": 5_000_000_000},
         {"symbol": "ETH", "coin_id": "ethereum", "price": 3200, "return_unit": "fraction", "return_1h": 0.001, "return_4h": 0.002, "return_24h": 0.004, "volume_zscore_24h": 0.2, "liquidity_usd": 2_000_000_000},
-        {"symbol": "TESTPERP", "coin_id": "test-perp", "price": 2.4, "return_unit": "fraction", "return_1h": 0.035, "return_4h": 0.11, "return_24h": 0.18, "relative_return_vs_btc_4h": 10.0, "volume_zscore_24h": 3.4, "volume_to_market_cap": 0.32, "liquidity_usd": 18_000_000, "spread_bps": 18},
+        {
+            "symbol": "TESTFLOW",
+            "coin_id": "test-flow",
+            "price": 1.2,
+            "return_unit": "fraction",
+            "return_1h": 0.04,
+            "return_4h": 0.10,
+            "return_24h": 0.16,
+            "relative_return_vs_btc_4h": 0.10,
+            "relative_return_vs_eth_4h": 0.098,
+            "volume_zscore_24h": 3.4,
+            "volume_to_market_cap": 0.28,
+            "liquidity_usd": 24_000_000,
+            "spread_bps": 16,
+            "freshness_status": "fresh",
+        },
+        {
+            "symbol": "TESTFLOWLOW",
+            "coin_id": "test-flow-low",
+            "price": 0.001,
+            "return_unit": "fraction",
+            "return_1h": 0.09,
+            "return_4h": 0.25,
+            "return_24h": 0.55,
+            "relative_return_vs_btc_4h": 0.25,
+            "relative_return_vs_eth_4h": 0.248,
+            "volume_zscore_24h": 4.5,
+            "volume_to_market_cap": 0.50,
+            "liquidity_usd": 18_000,
+            "spread_bps": 320,
+            "freshness_status": "fresh",
+        },
+        {"symbol": "TESTPERP", "coin_id": "test-perp", "price": 2.4, "return_unit": "fraction", "return_1h": 0.035, "return_4h": 0.11, "return_24h": 0.18, "relative_return_vs_btc_4h": 0.10, "volume_zscore_24h": 3.4, "volume_to_market_cap": 0.32, "liquidity_usd": 18_000_000, "spread_bps": 18},
         {"symbol": "TESTFADE", "coin_id": "test-fade", "price": 5.2, "return_unit": "fraction", "return_1h": 0.06, "return_4h": 0.21, "return_24h": 0.42, "volume_zscore_24h": 4.8, "volume_to_market_cap": 0.45, "liquidity_usd": 3_500_000, "spread_bps": 42, "event_age_hours": 3},
         {"symbol": "TESTRUMOR", "coin_id": "test-rumor", "price": 0.5, "return_unit": "fraction", "return_1h": 0.002, "return_4h": 0.004, "return_24h": 0.01, "volume_zscore_24h": 0.4, "liquidity_usd": 1_200_000, "spread_bps": 55},
     )
@@ -459,7 +521,7 @@ def _fixture_bybit_announcements() -> tuple[dict[str, Any], ...]:
             "source_url": "https://announcements.bybit.com/article/testperp",
             "published_at": "2026-06-15T14:00:00Z",
             "effective_time": "2026-06-15T16:30:00Z",
-            "market_snapshot": {"return_unit": "fraction", "return_4h": 0.11, "return_24h": 0.18, "volume_zscore_24h": 3.4, "relative_return_vs_btc": 10.0, "liquidity_usd": 18_000_000, "spread_bps": 18},
+            "market_snapshot": {"return_unit": "fraction", "return_4h": 0.11, "return_24h": 0.18, "volume_zscore_24h": 3.4, "relative_return_vs_btc": 0.10, "liquidity_usd": 18_000_000, "spread_bps": 18},
         },
     )
 
@@ -512,7 +574,7 @@ def _fixture_derivatives_payload() -> dict[str, Any]:
         ],
         "candidates": [
             {"symbol": "TESTFADE", "coin_id": "test-fade", "event_name": "TESTFADE listing blowoff", "source_class": "official_exchange", "source_pack": "listing_liquidity_pack", "impact_path_type": "listing_liquidity_event", "evidence_quality_score": 92, "accepted_evidence_count": 1, "market_snapshot": {"return_unit": "fraction", "return_4h": 0.21, "return_24h": 0.42, "volume_zscore_24h": 4.8, "volume_to_market_cap": 0.45, "liquidity_usd": 3_500_000, "spread_bps": 42, "event_age_hours": 3}},
-            {"symbol": "TESTPERP", "coin_id": "test-perp", "event_name": "TESTPERP perp breakout", "source_class": "official_exchange", "source_pack": "perp_listing_squeeze_pack", "impact_path_type": "listing_liquidity_event", "evidence_quality_score": 92, "accepted_evidence_count": 1, "market_snapshot": {"return_unit": "fraction", "return_4h": 0.11, "return_24h": 0.18, "volume_zscore_24h": 3.4, "relative_return_vs_btc": 10.0, "liquidity_usd": 18_000_000, "spread_bps": 18, "event_age_hours": -1}},
+            {"symbol": "TESTPERP", "coin_id": "test-perp", "event_name": "TESTPERP perp breakout", "source_class": "official_exchange", "source_pack": "perp_listing_squeeze_pack", "impact_path_type": "listing_liquidity_event", "evidence_quality_score": 92, "accepted_evidence_count": 1, "market_snapshot": {"return_unit": "fraction", "return_4h": 0.11, "return_24h": 0.18, "volume_zscore_24h": 3.4, "relative_return_vs_btc": 0.10, "liquidity_usd": 18_000_000, "spread_bps": 18, "event_age_hours": -1}},
         ],
     }
 

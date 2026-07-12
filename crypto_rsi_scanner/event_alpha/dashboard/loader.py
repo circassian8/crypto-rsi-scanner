@@ -31,10 +31,12 @@ _NAMESPACE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 SUPPORTED_DECISION_MODEL_VERSION = DECISION_MODEL_VERSION
 _ROUTE_FIELDS = ("radar_route", "decision_route", "actionability_route", "research_route")
 _ROUTES = {
+    "dashboard_watch",
     "actionable_watch",
     "high_confidence_watch",
     "rapid_market_anomaly",
     "fade_exhaustion_review",
+    "risk_watch",
     "calendar_risk",
     "diagnostic",
 }

@@ -773,6 +773,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_cli_artifact_authority",
     "tests.event_alpha.test_core_opportunities",
     "tests.event_alpha.test_core_reconciliation",
+    "tests.event_alpha.test_dashboard_readiness",
     "tests.event_alpha.test_decision_model_v2",
     "tests.event_alpha.test_decision_model_v2_surfaces",
     "tests.event_alpha.test_discovery_cache_reports",
@@ -834,6 +835,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_quality_feedback",
     "tests.event_alpha.test_radar_dashboard",
     "tests.event_alpha.test_radar_pipeline",
+    "tests.event_alpha.test_rsi_technical_context",
     "tests.event_alpha.test_scheduled_catalyst_namespaces",
     "tests.event_alpha.test_shim_registry",
     "tests.event_alpha.test_source_coverage_reports",
@@ -854,6 +856,7 @@ _RSI_TEST_MODULES = (
 _CLI_TEST_MODULES = (
     "tests.cli.test_dependency_ci",
     "tests.cli.test_event_alpha_operator_command_smoke",
+    "tests.cli.test_export_source_with_artifacts_security",
     "tests.cli.test_make_targets",
     "tests.cli.test_observed_outcome_cli",
     "tests.cli.test_parser",

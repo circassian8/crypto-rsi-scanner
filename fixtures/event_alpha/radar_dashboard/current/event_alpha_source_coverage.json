@@ -1,0 +1,14 @@
+{
+  "artifact_namespace": "current",
+  "candidate_count": 4,
+  "profile": "fixture",
+  "provider_calls": 0,
+  "research_only": true,
+  "row_type": "event_alpha_source_coverage",
+  "run_id": "dashboard-run-current",
+  "source": "dashboard_fixture",
+  "source_pack_counts": {
+    "fixture_calendar": 2,
+    "fixture_market": 2
+  }
+}

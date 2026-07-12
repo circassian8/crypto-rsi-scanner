@@ -475,7 +475,10 @@ def _recommendations(
     if missed:
         recs.append("review missed-opportunity stages and add resolver/source coverage where repeated")
     if alerts and not feedback:
-        recs.append("mark useful/junk/watch feedback for routed alerts to make calibration actionable")
+        recs.append(
+            "collect 3-5 targeted useful/junk/watch preference labels per day; "
+            "initial review target is 30-50 labels"
+        )
     if not recs:
         recs.append("continue burn-in until feedback and outcomes cover multiple playbooks")
     return tuple(dict.fromkeys(recs))
@@ -784,7 +787,10 @@ def format_burn_in_readiness(result: EventAlphaBurnInReadinessResult) -> str:
     lines.append("manual review checklist:")
     lines.append("- inspect provider gaps and decide whether missing sources make absence evidence meaningful")
     lines.append("- review daily brief Strong/Validated/Watchlist/Near-Miss sections")
-    lines.append("- open research cards and mark useful/junk/watch feedback")
+    lines.append("- verify every current Decision v2 idea has an automatic pending or matured outcome row")
+    lines.append("- label 3-5 targeted research cards per day as useful/junk/watch; keep preference feedback separate from automatic outcomes")
+    lines.append("- treat 30-50 preference labels as the first useful review sample, not as authority for automatic threshold changes")
+    lines.append("- require explicit human approval before any routing-policy or threshold change")
     lines.append("- keep sends disabled until the no-send run has reviewable cards and no strict doctor blockers")
     lines.append("")
     lines.append("review commands:")

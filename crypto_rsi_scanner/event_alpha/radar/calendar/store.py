@@ -284,7 +284,19 @@ def format_unified_calendar_preview(rows: Iterable[Mapping[str, Any]]) -> str:
             (
                 f"## {row.get('title') or 'Untitled event'}",
                 f"- when: {when} ({row.get('time_certainty') or 'unknown'})",
+                f"- timezone: {row.get('timezone') or 'UTC'}",
                 f"- kind / importance: {row.get('event_kind') or 'unknown'} / {row.get('importance') or 'unknown'}",
+                (
+                    "- forecast / previous / actual / surprise: "
+                    f"{_calendar_value(row.get('forecast_value'))} / "
+                    f"{_calendar_value(row.get('previous_value'))} / "
+                    f"{_calendar_value(row.get('actual_value'))} / "
+                    f"{_calendar_value(row.get('surprise_value'))}"
+                ),
+                (
+                    "- impact window: "
+                    f"-{row.get('impact_window_before') or '24h'} / +{row.get('impact_window_after') or '4h'}"
+                ),
                 f"- affected assets: {assets}",
                 f"- tracking: {row.get('post_event_tracking_status') or 'unknown'}",
                 f"- source: {row.get('source_url') or 'unavailable'}",
@@ -293,6 +305,12 @@ def format_unified_calendar_preview(rows: Iterable[Mapping[str, Any]]) -> str:
             )
         )
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _calendar_value(value: Any) -> str:
+    if value is None:
+        return "n/a"
+    return f"{float(value):g}" if isinstance(value, (int, float)) and not isinstance(value, bool) else str(value)
 
 
 def _json_object_without_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:

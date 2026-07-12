@@ -79,6 +79,7 @@ EVENT_ALPHA_INTEGRATED_RADAR_COINALYZE_ARG = $(if $(strip $(EVENT_ALPHA_INTEGRAT
 # --event-alpha-integrated-radar-load-existing
 EVENT_CATALYST_SEARCH_FIXTURE_PATH ?=
 EVENT_ALPHA_ARTIFACT_BASE_DIR ?= $(EVENT_DISCOVERY_CACHE_DIR)
+RADAR_DASHBOARD_EXPLICIT_NAMESPACE := $(if $(filter command line environment override,$(origin ARTIFACT_NAMESPACE)),$(ARTIFACT_NAMESPACE),)
 ARTIFACT_NAMESPACE ?= $(PROFILE)
 EVENT_ALPHA_ARTIFACT_NAMESPACE ?= $(ARTIFACT_NAMESPACE)
 EVENT_ALPHA_PROFILE_DIR ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVENT_ALPHA_ARTIFACT_NAMESPACE)
@@ -86,6 +87,7 @@ RADAR_DASHBOARD_HOST ?= 127.0.0.1
 RADAR_DASHBOARD_PORT ?= 8765
 RADAR_DASHBOARD_FIXTURE_BASE ?= fixtures/event_alpha/radar_dashboard
 RADAR_DASHBOARD_FIXTURE_NAMESPACE ?= current
+RADAR_DASHBOARD_NAMESPACE_ARG = $(if $(strip $(RADAR_DASHBOARD_EXPLICIT_NAMESPACE)),--namespace $(RADAR_DASHBOARD_EXPLICIT_NAMESPACE),)
 PYTEST_RUNTIME_SECONDS ?=
 STANDALONE_RUNTIME_SECONDS ?=
 COINALYZE_LIVE_PREFLIGHT_ARG = $(if $(filter 1 true yes,$(ALLOW_LIVE_PREFLIGHT)),--event-alpha-coinalyze-allow-live-preflight,)
@@ -176,7 +178,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 
 .PHONY: help check-python bootstrap export-src export-src-with-artifacts verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-catalyst-frame-validation-cycle event-alpha-catalyst-frame-e2e-cycle event-alpha-notify-llm-quality-frame-smoke event-alpha-integrated-radar-smoke event-alpha-integrated-radar-doctor event-alpha-integrated-radar-cycle event-alpha-integrated-radar-fill-outcomes event-alpha-integrated-radar-outcome-smoke event-alpha-integrated-radar-outcome-report event-alpha-integrated-radar-calibration-report event-alpha-integrated-radar-calibration-export-priors event-alpha-market-anomaly-scan event-alpha-market-anomaly-smoke event-alpha-official-exchange-report event-alpha-official-exchange-smoke event-alpha-scheduled-catalyst-report event-alpha-scheduled-catalyst-smoke event-alpha-unlock-risk-smoke event-alpha-derivatives-report event-alpha-derivatives-smoke event-alpha-fade-review-smoke event-alpha-market-refresh-smoke event-alpha-evidence-acquisition-smoke event-alpha-quality-frame-live-smoke event-alpha-frame-quality-loop event-alpha-signal-quality-eval event-alpha-quality-review event-alpha-quality-coverage-report event-alpha-quality-validation-cycle event-alpha-notify-llm-quality-validation-cycle event-alpha-notify-llm-quality-fresh-cycle event-alpha-quality-live-smoke event-alpha-live-burn-in-no-send event-alpha-burn-in-readiness event-alpha-policy-simulate event-alpha-export-signal-quality-cases event-alpha-quality-loop event-alpha-quality-loop-llm event-opportunity-audit event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-cycle-profile event-alpha-cycle-profile-send event-alpha-notify-cycle event-alpha-notify-no-key event-alpha-notify-llm event-alpha-notify-preview event-alpha-notify-go-no-go event-alpha-send-go-no-go event-alpha-telegram-no-send-final-check-fast event-alpha-telegram-no-send-final-check event-alpha-telegram-one-cycle-send-preflight event-alpha-telegram-send-one-cycle event-alpha-telegram-post-send-audit event-alpha-notification-pause event-alpha-telegram-send-readiness-final event-alpha-telegram-final-send-checklist event-alpha-environment-doctor event-alpha-pause-notifications event-alpha-resume-notifications event-alpha-scheduler-status event-alpha-generate-launchd event-alpha-notification-slo-report event-alpha-export-notification-pack event-alpha-notification-checklist event-alpha-send-readiness event-alpha-notification-runs-report event-alpha-notification-inbox event-alpha-notification-deliveries-report event-alpha-notification-retry-failed event-alpha-notify-no-key-scheduled event-alpha-notify-llm-scheduled event-alpha-notify-llm-deep-scheduled event-alpha-notify-llm-quality-scheduled event-alpha-provider-health-report event-alpha-cryptopanic-preflight event-alpha-source-coverage-report event-alpha-provider-health-reset event-alpha-day1-start event-alpha-day1-start-llm event-alpha-notify-fixture-smoke event-alpha-research-review-digest-smoke event-alpha-notify-llm-deep-research-review-no-send-smoke event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal event-alpha-notification-format-smoke event-alpha-notify-llm-deep-no-send-smoke event-alpha-notify-llm-deep-fixture-rehearsal-artifacts event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate event-alpha-notify-llm-deep-real-no-send-rehearsal-with-fixture-candidate event-alpha-notify-llm-deep-real-no-send-rehearsal-fast event-alpha-notify-start-no-key event-alpha-notify-start-llm event-alpha-send-test event-alpha-telegram-recipient-check event-alpha-runs-report event-alpha-status event-alpha-preflight event-alpha-daily-report event-alpha-daily-llm-report event-alpha-daily-send event-alpha-health event-alpha-health-guard event-alpha-doctor-check-registry event-alpha-artifact-doctor event-alpha-v1-readiness event-alpha-tuning-worksheet event-alpha-export-burn-in-pack event-alpha-launchd-template event-alpha-open-items event-alpha-daily-brief event-alpha-prune-artifacts event-alpha-replay event-alpha-priors-shadow-report event-alpha-burn-in-no-key event-alpha-burn-in-llm event-alpha-weekly-review event-alpha-burn-in-scorecard event-alpha-burn-in-checklist event-alpha-feedback-readiness event-feedback-useful event-feedback-junk event-feedback-watch event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-watchlist-monitor event-alpha-router-report event-alpha-missed-report event-alpha-near-miss-report event-alpha-calibration-report event-source-reliability-report event-alpha-calibration-export-priors event-alpha-export-eval-cases event-alpha-explain-last-run event-research-cards event-research-cards-write event-feedback-report event-incidents-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 .PHONY: event-alpha-live-provider-readiness event-alpha-live-provider-readiness-smoke event-alpha-dex-onchain-readiness event-alpha-dex-onchain-readiness-smoke event-alpha-coinalyze-preflight event-alpha-coinalyze-preflight-smoke event-alpha-coinalyze-no-send-rehearsal event-alpha-bybit-announcements-preflight event-alpha-bybit-announcements-preflight-smoke event-alpha-bybit-announcements-no-send-rehearsal event-alpha-tokenomist-preflight event-alpha-messari-unlocks-preflight event-alpha-coinmarketcal-preflight event-alpha-notify-preview-from-artifacts event-alpha-mark-namespace-stale event-alpha-mark-known-stale-namespaces event-alpha-prune-or-archive-stale-namespace event-alpha-shim-report event-alpha-shim-dependency-report event-alpha-old-import-check normalize-export-timestamps export-src-with-artifacts-smoke
-.PHONY: verify-fast test-full test-rsi test-cli test-pytest test-pytest-safe test-pytest-timed test-pytest-durations test-pytest-parallel test-event-alpha architecture-baseline architecture-api-inventory architecture-class-ownership-report architecture-size-baseline-update architecture-size-gates architecture-transitional-file-check architecture-terminology-check architecture-naming-check architecture-final-report architecture-completion-map architecture-cleanliness-check event-alpha-radar-north-star event-alpha-namespace-lifecycle-report event-alpha-list-active-namespaces event-alpha-archive-stale-namespaces radar-dashboard radar-dashboard-smoke radar-calendar-preview
+.PHONY: verify-fast test-full test-rsi test-cli test-pytest test-pytest-safe test-pytest-timed test-pytest-durations test-pytest-parallel test-event-alpha architecture-baseline architecture-api-inventory architecture-class-ownership-report architecture-size-baseline-update architecture-size-gates architecture-transitional-file-check architecture-terminology-check architecture-naming-check architecture-final-report architecture-completion-map architecture-cleanliness-check event-alpha-radar-north-star event-alpha-namespace-lifecycle-report event-alpha-list-active-namespaces event-alpha-archive-stale-namespaces radar-dashboard radar-dashboard-readiness radar-dashboard-smoke radar-calendar-preview
 .PHONY: event-alpha-burn-in-contract event-alpha-daily-live-no-send-burn-in event-alpha-daily-live-no-send-burn-in-plan event-alpha-daily-live-no-send-burn-in-smoke event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke-doctor event-alpha-daily-burn-in-readiness event-alpha-daily-review-inbox event-alpha-feedback-progress event-alpha-burn-in-weekly-measurement event-alpha-source-yield-report conviction-priors-shadow-report paper-risk-research event-alpha-archive-burn-in-evidence event-feedback-false-positive event-feedback-late event-feedback-source-noise event-feedback-needs-confirmation event-feedback-duplicate event-feedback-promising-source-type
 .PHONY: event-alpha-observed-outcome-preview event-alpha-observed-outcome-stage
 .PHONY: dependency-tools lock-dependencies dependency-lock-check dependency-audit dependency-verify
@@ -243,6 +245,7 @@ help:
 	@echo "  make event-alpha-no-key-report  Print fixture market-anomaly event alpha radar"
 	@echo "  make event-alpha-market-anomaly-smoke  Write fixture market-state/anomaly artifacts, no sends"
 	@echo "  make radar-dashboard              Serve the local read-only Crypto Radar UI"
+	@echo "  make radar-dashboard-readiness ARTIFACT_NAMESPACE=...  Validate and select one authoritative dashboard generation"
 	@echo "  make radar-dashboard-smoke        Render every dashboard page from fixtures, no server/writes"
 	@echo "  make radar-calendar-preview       Print the fixture-backed unified calendar, no writes/sends"
 	@echo "  make event-alpha-integrated-radar-smoke  Run fixture integrated radar cycle, cards, preview, doctor; no sends"
@@ -807,6 +810,7 @@ event-alpha-integrated-radar-smoke:
 	env $(EVENT_FIXTURE_NOW_ENV) \
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
+	RSI_EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH= \
 	$(PYTHON) main.py --event-alpha-integrated-radar-cycle --event-alpha-integrated-radar-fixture --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	test -s event_fade_cache/$(PROFILE)/event_market_state_snapshots.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_market_anomalies.jsonl
@@ -824,12 +828,14 @@ event-alpha-integrated-radar-smoke:
 	test -s event_fade_cache/$(PROFILE)/event_derivatives_crowding_candidates.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_fade_short_review_candidates.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_integrated_radar_candidates.jsonl
+	test -s event_fade_cache/$(PROFILE)/event_integrated_radar_outcomes.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_integrated_radar_report.md
 	test -s event_fade_cache/$(PROFILE)/event_integrated_radar_input_manifest.json
 	test -s event_fade_cache/$(PROFILE)/event_alpha_source_coverage.json
 	test -s event_fade_cache/$(PROFILE)/event_core_opportunities.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_integrated_radar_notification_deliveries.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_integrated_radar_notification_preview.md
+	test -s event_fade_cache/$(PROFILE)/event_decision_v2_notification_preview.md
 	test -s event_fade_cache/$(PROFILE)/event_alpha_daily_brief.md
 	test -s event_fade_cache/$(PROFILE)/event_unified_calendar_events.jsonl
 	test -s event_fade_cache/$(PROFILE)/event_unified_calendar_preview.md
@@ -842,8 +848,11 @@ event-alpha-integrated-radar-smoke:
 	grep -q "DEX / On-Chain Liquidity" event_fade_cache/$(PROFILE)/event_alpha_daily_brief.md
 	grep -q "Protocol Fundamentals" event_fade_cache/$(PROFILE)/event_alpha_daily_brief.md
 	grep -q "Research-only" event_fade_cache/$(PROFILE)/event_integrated_radar_notification_preview.md
+	grep -q "Crypto Radar Decision v2 Preview" event_fade_cache/$(PROFILE)/event_decision_v2_notification_preview.md
+	! grep -q "Lane: Early Long Research" event_fade_cache/$(PROFILE)/event_decision_v2_notification_preview.md
 	grep -q "would_send_but_guard_disabled" event_fade_cache/$(PROFILE)/event_integrated_radar_notification_deliveries.jsonl
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict
+	$(MAKE) radar-dashboard-readiness PYTHON=$(PYTHON) ARTIFACT_NAMESPACE=$(PROFILE)
 	@echo "Integrated-radar smoke artifacts under event_fade_cache/$(PROFILE)/."
 
 event-alpha-integrated-radar-doctor: PROFILE = integrated_radar_smoke
@@ -939,10 +948,14 @@ event-alpha-market-anomaly-smoke:
 
 radar-dashboard:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.dashboard \
-		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-		--namespace $(ARTIFACT_NAMESPACE) \
+		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) $(RADAR_DASHBOARD_NAMESPACE_ARG) \
 		--host $(RADAR_DASHBOARD_HOST) \
 		--port $(RADAR_DASHBOARD_PORT)
+
+radar-dashboard-readiness:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.dashboard \
+		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) $(RADAR_DASHBOARD_NAMESPACE_ARG) \
+		--readiness
 
 radar-dashboard-smoke:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.dashboard \

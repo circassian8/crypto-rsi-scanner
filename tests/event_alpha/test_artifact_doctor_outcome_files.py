@@ -298,6 +298,63 @@ def test_doctor_missing_explicit_paths_fail_closed_over_supplied_rows(tmp_path):
     assert result.integrated_outcome_missing_for_candidate == 1
 
 
+def test_doctor_requires_v2_diagnostic_placeholder_but_excludes_legacy_diagnostic():
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+
+    legacy = {
+        "row_type": "event_integrated_radar_candidate",
+        "candidate_id": "legacy-diagnostic",
+        "opportunity_type": "DIAGNOSTIC",
+    }
+    explicit_v2 = {
+        "row_type": "event_integrated_radar_candidate",
+        "candidate_id": "v2-diagnostic",
+        "opportunity_type": "DIAGNOSTIC",
+        "decision_model_version": "crypto_radar_decision_model_v2",
+        "decision_model_enabled": True,
+        "radar_route": "diagnostic",
+    }
+
+    conflicts = event_alpha_artifact_doctor._integrated_outcome_conflicts(  # noqa: SLF001
+        [legacy, explicit_v2],
+        [],
+    )
+
+    assert conflicts["integrated_outcome_missing_for_candidate"] == 1
+
+
+def test_doctor_accepts_diagnostic_placeholder_without_core_authority(monkeypatch):
+    from crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_parts import outcome_checks
+
+    identity = {
+        "run_id": "run-v2",
+        "profile": "fixture",
+        "artifact_namespace": "fixture",
+        "candidate_id": "v2-diagnostic",
+        "core_opportunity_id": "diagnostic-core-placeholder",
+        "observed_at": "2026-06-15T16:00:00+00:00",
+    }
+    diagnostic = {
+        **identity,
+        "opportunity_type": "DIAGNOSTIC",
+        "calibration_ineligible_reasons": ["unmatched_outcome_identity"],
+    }
+    monkeypatch.setattr(
+        outcome_checks.outcome_eligibility_contract,
+        "partition_joined_calibration_outcomes",
+        lambda *_args, **_kwargs: ((), (diagnostic,), {"unmatched_outcome_identity": 1}),
+    )
+
+    invalid = outcome_checks._joined_authority_invalid_identities(  # noqa: SLF001
+        [diagnostic],
+        [diagnostic],
+        [],
+        evaluated_at="2026-06-15T16:00:00+00:00",
+    )
+
+    assert invalid == set()
+
+
 def test_alert_loader_uses_explicit_core_authority_over_sibling(tmp_path):
     alert_path = tmp_path / "alert-override" / "alerts.jsonl"
     sibling_core_path = alert_path.parent / "event_core_opportunities.jsonl"

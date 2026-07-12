@@ -68,6 +68,8 @@ def schema_specs(
                 "outcome_evaluated_at", "price_at_observation", "primary_horizon_return",
                 "observation_price_source", "observation_price_id",
                 "observation_price_observed_at",
+                "evidence_confidence_score_cohort", "risk_score_cohort",
+                "automatic_outcome", "human_preference_feedback",
                 *decision_model_fields, *common_safety,
             ),
             types={
@@ -87,6 +89,9 @@ def schema_specs(
                 "observation_price_id": "str",
                 "observation_price_observed_at": "str",
                 "primary_horizon_return": "float",
+                "evidence_confidence_score_cohort": "str",
+                "risk_score_cohort": "str",
+                "automatic_outcome": "bool",
             },
             enums={
                 "opportunity_type": allowed_opportunity_types,

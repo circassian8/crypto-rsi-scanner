@@ -15,7 +15,7 @@ import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from crypto_rsi_scanner.event_alpha.artifacts import json_lines as artifact_json_lines
 from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import decision_model_values
-from crypto_rsi_scanner.event_alpha.outcomes import feedback_eligibility
+from crypto_rsi_scanner.event_alpha.outcomes import feedback_eligibility, feedback_projection
 
 
 FEEDBACK_SCHEMA_VERSION = "event_alpha_feedback_v1"
@@ -51,17 +51,27 @@ class _EventFeedbackDecisionFields:
     decision_model_version: str | None = None
     decision_model_enabled: bool | None = None
     thesis_origin: str | None = None
+    primary_thesis_origin: str | None = None
+    thesis_origins: tuple[str, ...] = ()
     directional_bias: str | None = None
     catalyst_status: str | None = None
     confidence_band: str | None = None
     timing_state: str | None = None
     tradability_status: str | None = None
+    spread_status: str | None = None
     radar_route: str | None = None
     radar_route_reason: str | None = None
     radar_actionable: bool | None = None
     actionability_score: float | None = None
     evidence_confidence_score: float | None = None
     risk_score: float | None = None
+    urgency_score: float | None = None
+    market_phase: str | None = None
+    preferred_horizon: str | None = None
+    expires_at: str | None = None
+    chase_risk_score: float | None = None
+    scheduled_at: str | None = None
+    nearby_calendar_events: tuple[dict[str, Any], ...] = ()
     actionability_score_cohort: str | None = None
     anomaly_type: str | None = None
     actionability_score_components: dict[str, Any] | None = None
@@ -371,10 +381,13 @@ def _decision_model_v2_feedback_cohort_lines(
         f"- explicit_v2_rows: {len(explicit)}",
     ]
     dimensions = (
+        ("primary_thesis_origin", "unknown"),
         ("thesis_origin", "unknown"),
         ("catalyst_status", "unknown"),
         ("confidence_band", "unknown"),
         ("actionability_score_cohort", "unscored"),
+        ("radar_route", "unknown"),
+        ("market_phase", "unknown"),
         ("anomaly_type", "unknown"),
     )
     for field, missing_label in dimensions:
@@ -674,6 +687,11 @@ def _record_from_entry(
     row = dict(context_row or {})
     row_components = _components(row)
     decision = decision_model_values(row, row_components, components)
+    calendar_evidence = feedback_projection.calendar_evidence_fields(
+        row,
+        row_components,
+        components,
+    )
     core_id = (
         _row_value(row, "core_opportunity_id", "feedback_target", components=row_components)
         or components.get("core_opportunity_id")
@@ -738,7 +756,8 @@ def _record_from_entry(
         source_provider_domain=_optional_str(components.get("source_domain") or _row_value(row, "source_domain", "source_provider_domain", components=row_components)),
         provider_coverage_status=_optional_str(components.get("provider_coverage_status") or _row_value(row, "provider_coverage_status", "source_coverage_status", components=row_components)),
         source_metadata=source_meta or None,
-        **_feedback_decision_fields(decision),
+        **calendar_evidence,
+        **feedback_projection.decision_fields(decision),
     )
 
 
@@ -755,6 +774,7 @@ def _record_from_context_row(
 ) -> EventFeedbackRecord:
     components = _components(row)
     decision = decision_model_values(row, components)
+    calendar_evidence = feedback_projection.calendar_evidence_fields(row, components)
     core_id = _row_value(row, "core_opportunity_id", "feedback_target", components=components)
     feedback_target = _row_value(row, "feedback_target", components=components) or core_id or target
     feedback_target_type = _row_value(row, "feedback_target_type", components=components)
@@ -810,7 +830,8 @@ def _record_from_context_row(
         source_provider_domain=_optional_str(_row_value(row, "source_provider_domain", "source_domain", components=components)),
         provider_coverage_status=_optional_str(_row_value(row, "provider_coverage_status", "source_coverage_status", components=components)),
         source_metadata=source_meta or None,
-        **_feedback_decision_fields(decision),
+        **calendar_evidence,
+        **feedback_projection.decision_fields(decision),
     )
 
 
@@ -899,6 +920,22 @@ def _record_with_exact_feedback_contract(
         "source": feedback_eligibility.MANUAL_MATCHED_FEEDBACK_SOURCE,
         "research_only": True,
     }
+    core_decision = decision_model_values(
+        core_authority,
+        _components(core_authority),
+    )
+    if core_decision:
+        row.update(feedback_projection.decision_fields(core_decision))
+    # Prefer the canonical Core authority when it carries calendar context;
+    # otherwise retain the minimal context already copied from the matched
+    # candidate/alert row.  This keeps ``calendar_risk`` feedback independently
+    # schema-valid without persisting titles, URLs, or complete provider rows.
+    row.update(
+        feedback_projection.calendar_evidence_fields(
+            core_authority,
+            _components(core_authority),
+        )
+    )
     row.update(feedback_eligibility.build_feedback_eligibility_fields(row))
     return EventFeedbackRecord(**row)
 
@@ -930,7 +967,8 @@ def _record_from_row(row: Mapping[str, Any]) -> EventFeedbackRecord | None:
             # feedback row unreadable. It remains fail-closed below because
             # the raw safety fields and exact feedback contract are preserved.
             decision_values = {}
-        decision_fields = _feedback_decision_fields(decision_values)
+        decision_fields = feedback_projection.decision_fields(decision_values)
+        calendar_evidence = feedback_projection.calendar_evidence_fields(row)
         for field in (
             "decision_source_side_effect_safety_failed",
             "decision_source_secret_safety_failed",
@@ -1004,6 +1042,7 @@ def _record_from_row(row: Mapping[str, Any]) -> EventFeedbackRecord | None:
                 else row.get("calibration_ineligible_reasons")
             ),
             research_only=row.get("research_only"),
+            **calendar_evidence,
             **decision_fields,
         )
         if feedback_eligibility.has_feedback_eligibility_marker(row):
@@ -1046,69 +1085,6 @@ def _label(value: str | EventFeedbackLabel) -> EventFeedbackLabel:
         return EventFeedbackLabel(str(value).strip())
     except ValueError as exc:
         raise ValueError(f"feedback label must be one of: {', '.join(valid_labels())}") from exc
-
-
-def _feedback_decision_fields(values: Mapping[str, Any]) -> dict[str, Any]:
-    if not values:
-        return {}
-    fields = {
-        "decision_model_version": _optional_str(values.get("decision_model_version")),
-        "decision_model_enabled": bool(values.get("decision_model_enabled", True)),
-        "thesis_origin": _optional_str(values.get("thesis_origin")),
-        "directional_bias": _optional_str(values.get("directional_bias")),
-        "catalyst_status": _optional_str(values.get("catalyst_status")),
-        "confidence_band": _optional_str(values.get("confidence_band")),
-        "timing_state": _optional_str(values.get("timing_state")),
-        "tradability_status": _optional_str(values.get("tradability_status")),
-        "radar_route": _optional_str(values.get("radar_route")),
-        "radar_route_reason": _optional_str(values.get("radar_route_reason")),
-        "radar_actionable": bool(values.get("radar_actionable")),
-        "actionability_score": _optional_float(values.get("actionability_score")),
-        "evidence_confidence_score": _optional_float(values.get("evidence_confidence_score")),
-        "risk_score": _optional_float(values.get("risk_score")),
-        "actionability_score_cohort": _optional_str(values.get("actionability_score_cohort")),
-        "anomaly_type": _optional_str(values.get("anomaly_type")),
-        "actionability_score_components": _optional_mapping(values.get("actionability_score_components")),
-        "actionability_penalty_components": _optional_mapping(
-            values.get("actionability_penalty_components")
-        ),
-        "evidence_confidence_score_components": _optional_mapping(
-            values.get("evidence_confidence_score_components")
-            or values.get("evidence_confidence_components")
-        ),
-        "risk_score_components": _optional_mapping(values.get("risk_score_components")),
-        "decision_hard_blockers": _text_tuple(values.get("decision_hard_blockers")),
-        "decision_soft_penalties": _text_tuple(values.get("decision_soft_penalties")),
-        "decision_missing_data": _text_tuple(values.get("decision_missing_data")),
-        "decision_warnings": _text_tuple(values.get("decision_warnings")),
-        "why_still_worth_reviewing": _text_tuple(values.get("why_still_worth_reviewing")),
-        "radar_what_confirms": _text_tuple(values.get("radar_what_confirms")),
-        "radar_what_invalidates": _text_tuple(values.get("radar_what_invalidates")),
-    }
-    for field in (
-        "decision_source_side_effect_safety_failed",
-        "decision_source_secret_safety_failed",
-        "decision_source_path_safety_failed",
-    ):
-        value = _optional_bool(values.get(field))
-        if value is not None:
-            fields[field] = value
-    return fields
-
-
-def _optional_float(value: Any) -> float | None:
-    try:
-        return float(value)
-    except (OverflowError, TypeError, ValueError):
-        return None
-
-
-def _optional_bool(value: Any) -> bool | None:
-    return value if isinstance(value, bool) else None
-
-
-def _optional_mapping(value: Any) -> dict[str, Any] | None:
-    return dict(value) if isinstance(value, Mapping) else None
 
 
 def _optional_str(value: Any) -> str | None:

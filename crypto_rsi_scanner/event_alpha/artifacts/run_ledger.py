@@ -847,6 +847,9 @@ def _run_record_artifact_write_fields(
         "research_card_paths_abs_debug": raw_card_paths if raw_card_paths else (),
         "daily_brief_path": getattr(result, "daily_brief_path", None),
         "notification_preview_path": getattr(result, "notification_preview_path", None),
+        "decision_v2_notification_preview_path": getattr(
+            result, "decision_v2_notification_preview_path", None
+        ),
         "source_coverage_path": getattr(result, "source_coverage_path", None),
         "live_provider_readiness_json_path": getattr(result, "live_provider_readiness_json_path", None),
         "live_provider_readiness_report_path": getattr(result, "live_provider_readiness_report_path", None),

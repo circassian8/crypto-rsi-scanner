@@ -20,7 +20,10 @@ from datetime import datetime
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "crypto_rsi_scanner_source_with_artifacts.zip"
 _OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
+_STAT_SUPPORTS_DIR_FD = os.stat in os.supports_dir_fd
+_STAT_SUPPORTS_FOLLOW_SYMLINKS = os.stat in os.supports_follow_symlinks
 _UTIME_SUPPORTS_FD = os.utime in os.supports_fd
+_IDENTITY_CHANGED_ERRNO = getattr(errno, "ESTALE", errno.EIO)
 
 SECRET_ENV_FIELDS = {
     "TELEGRAM_BOT_TOKEN": "telegram_bot_token",
@@ -157,6 +160,8 @@ def _open_verified_regular_file(path: Path, *, root: Path) -> tuple[int, os.stat
 
     if (
         not _OPEN_SUPPORTS_DIR_FD
+        or not _STAT_SUPPORTS_DIR_FD
+        or not _STAT_SUPPORTS_FOLLOW_SYMLINKS
         or not hasattr(os, "O_DIRECTORY")
         or not hasattr(os, "O_NOFOLLOW")
     ):
@@ -169,22 +174,70 @@ def _open_verified_regular_file(path: Path, *, root: Path) -> tuple[int, os.stat
         raise OSError(errno.EPERM, "export input is outside the trusted root") from exc
     if not parts:
         raise OSError(errno.EISDIR, "export input is the trusted root")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise OSError(errno.EPERM, "export input contains an unsafe path component")
 
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
     file_flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
-    root_fd = os.open(root_abs, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0))
+    root_stat = os.stat(root_abs, follow_symlinks=False)
+    if not stat.S_ISDIR(root_stat.st_mode):
+        raise OSError(errno.ENOTDIR, "trusted export root is not a directory")
+    root_fd = os.open(root_abs, directory_flags)
+    try:
+        opened_root_stat = os.fstat(root_fd)
+        if (
+            not stat.S_ISDIR(opened_root_stat.st_mode)
+            or (root_stat.st_dev, root_stat.st_ino)
+            != (opened_root_stat.st_dev, opened_root_stat.st_ino)
+        ):
+            raise OSError(_IDENTITY_CHANGED_ERRNO, "trusted export root changed during validation")
+    except BaseException:
+        os.close(root_fd)
+        raise
     directory_fd = root_fd
     try:
         for part in parts[:-1]:
+            component_stat = os.stat(
+                part,
+                dir_fd=directory_fd,
+                follow_symlinks=False,
+            )
+            if not stat.S_ISDIR(component_stat.st_mode):
+                raise OSError(errno.ENOTDIR, "export path component is not a directory")
             next_fd = os.open(part, directory_flags, dir_fd=directory_fd)
+            try:
+                opened_component_stat = os.fstat(next_fd)
+                if (
+                    not stat.S_ISDIR(opened_component_stat.st_mode)
+                    or (component_stat.st_dev, component_stat.st_ino)
+                    != (opened_component_stat.st_dev, opened_component_stat.st_ino)
+                ):
+                    raise OSError(
+                        _IDENTITY_CHANGED_ERRNO,
+                        "export path component changed during validation",
+                    )
+            except BaseException:
+                os.close(next_fd)
+                raise
             if directory_fd != root_fd:
                 os.close(directory_fd)
             directory_fd = next_fd
+        file_pre_stat = os.stat(
+            parts[-1],
+            dir_fd=directory_fd,
+            follow_symlinks=False,
+        )
+        if not stat.S_ISREG(file_pre_stat.st_mode):
+            raise OSError(errno.EINVAL, "export input is not a regular file")
         file_fd = os.open(parts[-1], file_flags, dir_fd=directory_fd)
         try:
             file_stat = os.fstat(file_fd)
-            if not stat.S_ISREG(file_stat.st_mode):
-                raise OSError(errno.EINVAL, "export input is not a regular file")
+            if (
+                not stat.S_ISREG(file_stat.st_mode)
+                or (file_pre_stat.st_dev, file_pre_stat.st_ino)
+                != (file_stat.st_dev, file_stat.st_ino)
+            ):
+                raise OSError(_IDENTITY_CHANGED_ERRNO, "export input changed during validation")
         except BaseException:
             os.close(file_fd)
             raise

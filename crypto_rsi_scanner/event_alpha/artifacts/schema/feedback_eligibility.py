@@ -90,6 +90,8 @@ FEEDBACK_ROW_FIELD_TYPES = {
     "source_provider_domain": "str",
     "provider_coverage_status": "str",
     "source_metadata": "dict",
+    "scheduled_at": "str",
+    "nearby_calendar_events": "list",
     "schema_id": "str",
     "feedback_eligibility_contract_version": "int",
     "feedback_identity": "dict",
@@ -141,7 +143,12 @@ def schema_specs(
             },
             paths=("card_path",),
             safety=common_safety,
-            timestamps=("marked_at", "event_time", "watchlist_last_seen_at"),
+            timestamps=(
+                "marked_at",
+                "event_time",
+                "watchlist_last_seen_at",
+                "scheduled_at",
+            ),
             lineage=common_lineage,
         )
     }

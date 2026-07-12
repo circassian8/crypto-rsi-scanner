@@ -172,6 +172,7 @@ def test_operator_state_fingerprints_current_files_directories_and_mutations(tmp
         **_run_row(),
         "core_opportunity_store_path": core_path,
         "core_opportunity_write_success": True,
+        "current_generation_core_rows": 1,
         "research_cards_dir": cards_dir,
         "research_card_paths": [cards_dir / "one.md"],
         "research_cards_written": 1,
@@ -183,6 +184,9 @@ def test_operator_state_fingerprints_current_files_directories_and_mutations(tmp
     ledger_entry = state["artifacts"]["run_ledger"]
     assert core_entry["fingerprint_kind"] == "jsonl_lines"
     assert core_entry["item_count"] == 1
+    # Exact store authority overrides a caller-supplied count; this deliberately
+    # minimal row is not a current canonical CoreOpportunity.
+    assert core_entry["count"] == state["current_generation_core_rows"] == 0
     assert cards_entry["fingerprint_kind"] == "directory_tree_v1"
     assert cards_entry["item_count"] == 1
     assert ledger_entry["fingerprint_kind"] == "canonical_run_row"

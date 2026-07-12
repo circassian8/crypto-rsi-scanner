@@ -18,6 +18,12 @@ from .artifact_io import (
     write_json as _write_json,
     write_jsonl as _write_jsonl,
 )
+from .integrated_radar_outcome_rows import (
+    _group_by,
+    _outcome_placeholder_row,
+    _outcome_row,
+    _validation_label,
+)
 
 
 HORIZONS = outcome_eligibility.OUTCOME_HORIZONS
@@ -32,11 +38,16 @@ PERFORMANCE_DIMENSIONS = (
     "crowding_class",
     "source_strength",
     "thesis_origin",
+    "primary_thesis_origin",
+    "thesis_origin_contributor",
     "catalyst_status",
     "confidence_band",
     "actionability_score_cohort",
+    "evidence_confidence_score_cohort",
+    "risk_score_cohort",
     "anomaly_type",
     "radar_route",
+    "market_phase",
     "tradability_status",
 )
 PERFORMANCE_LANES = (
@@ -83,6 +94,35 @@ def fill_integrated_radar_outcomes(
         evaluated_at=now,
     )
     _write_json(base / event_integrated_radar.INTEGRATED_CALIBRATION_PRIORS_FILENAME, priors)
+    return rows
+
+
+def write_integrated_radar_outcome_placeholders(
+    namespace_dir: str | Path,
+    candidates: Iterable[Mapping[str, Any]],
+    *,
+    observed_at: datetime | str | None = None,
+) -> tuple[dict[str, Any], ...]:
+    """Write one pending, non-calibration outcome row for every v2 idea.
+
+    This establishes coverage at idea creation time without pretending that
+    future prices or human preference labels exist.  The regular fill command
+    later replaces these rows with observed or explicitly synthetic outcomes.
+    """
+
+    base = Path(namespace_dir)
+    now = _iso(_parse_time(observed_at) or datetime.now(timezone.utc))
+    outcomes_path = base / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
+    rows = tuple(
+        schema_v1.stamp_artifact_row(
+            _outcome_placeholder_row(candidate, now=now),
+            path=outcomes_path,
+        )
+        for candidate in candidates
+        if isinstance(candidate, Mapping)
+        and decision_model_values(candidate)
+    )
+    _write_jsonl(outcomes_path, rows)
     return rows
 
 
@@ -223,6 +263,9 @@ def format_radar_performance_dashboard(payload: Mapping[str, Any]) -> str:
         "# Event Alpha Radar Performance Dashboard",
         "",
         "Research-only dashboard. Recommendations only. Thresholds are not changed automatically.",
+        "Automatic market outcomes and human preference feedback are separate evidence streams.",
+        "Preference review target: 3-5 targeted labels per day; first useful sample 30-50 labels.",
+        "Routing-policy changes require explicit human approval.",
         "",
         "## Summary",
         f"- Namespaces: {len(payload.get('source_namespaces') or ())}",
@@ -429,6 +472,8 @@ def format_integrated_radar_calibration_report(
         event_integrated_radar.RESEARCH_DISCLAIMER,
         "Recommendations only. Thresholds and priors are not changed automatically.",
         "Sample sizes are too small for automatic threshold changes.",
+        "Collect 3-5 targeted preference labels per day; review the first 30-50 before proposing policy changes.",
+        "Any routing-policy or threshold change requires explicit human approval.",
         f"Non-authoritative rows excluded from calibration: {len(excluded_rows)}",
         f"Calibration exclusion reasons: {_format_counts(exclusion_reasons)}",
         "",
@@ -898,6 +943,7 @@ def _dimension_values(row: Mapping[str, Any], outcome: Mapping[str, Any], dimens
         "provider": ("providers", "source_providers"),
         "source_origin": ("source_origins",),
         "source_pack": ("source_packs",),
+        "thesis_origin_contributor": ("thesis_origins",),
     }.get(dimension, ())
     values: list[str] = []
     for source in (outcome, row):
@@ -1116,341 +1162,6 @@ def _rate_text(value: Any) -> str:
 def _number_text(value: Any) -> str:
     number = _safe_number(value)
     return "n/a" if number is None else f"{number:.2f}"
-
-
-def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
-    symbol = str(candidate.get("symbol") or "UNKNOWN")
-    lane = str(candidate.get("opportunity_type") or "UNCONFIRMED_RESEARCH")
-    returns = _fixture_returns(symbol, lane)
-    btc_returns = _benchmark_returns("BTC")
-    eth_returns = _benchmark_returns("ETH")
-    primary_horizon = outcome_eligibility.primary_horizon_for_lane(lane) or "24h"
-    primary_return = returns.get(primary_horizon)
-    label = _label_for(symbol, lane, primary_return)
-    price = _price(candidate)
-    status = "filled" if returns else "missing_data"
-    missing_reason = None if returns else "no_cached_price_fixture"
-    relative_vs_btc = {
-        horizon: _relative_return(returns.get(horizon), btc_returns.get(horizon))
-        for horizon in HORIZONS
-    }
-    thesis_direction = _thesis_direction(lane)
-    thesis_returns = _thesis_returns(returns, lane)
-    thesis_relative_vs_btc = _thesis_returns(relative_vs_btc, lane)
-    thesis_favorable = _window_extremes(thesis_returns, want_peak=True)
-    thesis_adverse = _window_extremes(thesis_returns, want_peak=False)
-    thesis_primary = thesis_returns.get(primary_horizon)
-    numeric_returns = [
-        number
-        for horizon in HORIZONS
-        if (number := outcome_eligibility.finite_number(returns.get(horizon))) is not None
-    ]
-    decision = decision_model_values(candidate)
-    identity_fields = outcome_eligibility.build_outcome_identity_fields(candidate)
-    horizon_metadata = outcome_eligibility.build_synthetic_horizon_metadata(
-        observed_at=identity_fields["observed_at"],
-        evaluated_at=now,
-    )
-    primary_maturity = horizon_metadata[primary_horizon]["maturity_status"]
-    row = {
-        "schema_version": 1,
-        "row_type": "event_integrated_radar_outcome",
-        **identity_fields,
-        "outcome_eligibility_contract_version": (
-            outcome_eligibility.OUTCOME_ELIGIBILITY_CONTRACT_VERSION
-        ),
-        "outcome_data_source": "synthetic_fixture",
-        "outcome_evaluated_at": now,
-        "calibration_eligible": False,
-        "calibration_ineligible_reasons": [],
-        "symbol": symbol,
-        "coin_id": candidate.get("coin_id"),
-        "opportunity_type": lane,
-        "source_origin": candidate.get("source_origin"),
-        "source_pack": candidate.get("source_pack"),
-        "provider": candidate.get("provider") or candidate.get("source_class"),
-        "market_state_class": candidate.get("market_state_class"),
-        "source_strength": candidate.get("source_strength"),
-        "crowding_class": candidate.get("crowding_class"),
-        **decision,
-        "preview_time": now,
-        "price_at_observation": price,
-        "observation_price_source": None,
-        "observation_price_id": None,
-        "observation_price_observed_at": None,
-        "price_source": "candidate_market_snapshot" if price is not None else "missing",
-        "observation_price_provenance_status": "synthetic_fixture",
-        "horizons": {horizon: returns.get(horizon) for horizon in HORIZONS},
-        "horizon_metadata": horizon_metadata,
-        "outcome_horizons": list(HORIZONS),
-        "return_by_horizon": {horizon: returns.get(horizon) for horizon in HORIZONS},
-        "relative_return_vs_btc_by_horizon": relative_vs_btc,
-        "relative_return_vs_eth_by_horizon": {
-            horizon: _relative_return(returns.get(horizon), eth_returns.get(horizon))
-            for horizon in HORIZONS
-        },
-        "benchmark_btc_price_at_observation": 65000.0,
-        "benchmark_eth_price_at_observation": 3500.0,
-        "benchmark_btc_return_by_horizon": {horizon: btc_returns.get(horizon) for horizon in HORIZONS},
-        "benchmark_eth_return_by_horizon": {horizon: eth_returns.get(horizon) for horizon in HORIZONS},
-        "primary_horizon": primary_horizon,
-        "primary_horizon_return": primary_return,
-        "relative_return_vs_btc_24h": returns.get("relative_vs_btc_24h"),
-        "mfe": max(numeric_returns, default=None),
-        "mae": min(numeric_returns, default=None),
-        "max_favorable_excursion_by_window": _window_extremes(returns, want_peak=True),
-        "max_adverse_excursion_by_window": _window_extremes(returns, want_peak=False),
-        "thesis_direction": thesis_direction,
-        "thesis_primary_move": thesis_primary,
-        "thesis_return_by_horizon": thesis_returns,
-        "thesis_relative_return_vs_btc_by_horizon": thesis_relative_vs_btc,
-        "thesis_favorable_excursion_by_window": thesis_favorable,
-        "thesis_adverse_excursion_by_window": thesis_adverse,
-        "thesis_favorable_excursion": _best_mapping_value(thesis_favorable, want_peak=True),
-        "thesis_adverse_excursion": _best_mapping_value(thesis_adverse, want_peak=False),
-        "thesis_outcome_interpretation": (
-            "Synthetic fixture diagnostic only: "
-            + _thesis_interpretation(lane, label, thesis_primary)
-        ),
-        "time_to_peak": _time_to_extreme(returns, want_peak=True),
-        "time_to_trough": _time_to_extreme(returns, want_peak=False),
-        "time_to_peak_hours": _time_to_extreme_hours(returns, want_peak=True),
-        "time_to_trough_hours": _time_to_extreme_hours(returns, want_peak=False),
-        "catalyst_confirmed_after_observation": "unknown",
-        "market_confirmed_after_observation": "unknown",
-        "market_confirmed": False,
-        "fade_confirmed": False,
-        "risk_validated": False,
-        "outcome_label": "inconclusive",
-        "synthetic_diagnostic_label": label,
-        "validation_label": "inconclusive",
-        "outcome_status": primary_maturity,
-        "missing_data_reason": (
-            "primary_horizon_not_observed"
-            if primary_maturity == "missing_data"
-            else missing_reason
-        ),
-        "include_in_performance": False,
-        "research_only": True,
-        "no_send_rehearsal": True,
-        "sent": False,
-        "no_trade_created": True,
-        "no_paper_trade_created": True,
-        "normal_rsi_signal_written": False,
-        "triggered_fade_created": False,
-        "paper_trade_created": False,
-        "trade_created": False,
-    }
-    row["calibration_ineligible_reasons"] = list(
-        outcome_eligibility.calibration_ineligibility_reasons(row)
-    )
-    return row
-
-
-def _fixture_returns(symbol: str, lane: str) -> dict[str, float]:
-    table = {
-        "TESTLIST": {"15m": 0.002, "1h": 0.006, "4h": 0.022, "24h": 0.08, "3d": 0.12, "7d": 0.18, "relative_vs_btc_24h": 0.075},
-        "TESTPERP": {"15m": 0.006, "1h": 0.024, "4h": 0.055, "24h": 0.11, "3d": 0.16, "7d": 0.2, "relative_vs_btc_24h": 0.105},
-        "TESTFADE": {"15m": -0.01, "1h": -0.035, "4h": -0.08, "24h": -0.14, "3d": -0.18, "7d": -0.2, "relative_vs_btc_24h": -0.13},
-        "TESTUNLOCK": {"15m": -0.003, "1h": -0.01, "4h": -0.035, "24h": -0.09, "3d": -0.12, "7d": -0.16, "relative_vs_btc_24h": -0.085},
-        "BTC": {"15m": 0.0, "1h": 0.001, "4h": 0.001, "24h": 0.002, "3d": 0.004, "7d": 0.006, "relative_vs_btc_24h": 0.0},
-        "TESTRUMOR": {"15m": 0.0, "1h": -0.001, "4h": 0.001, "24h": 0.003, "3d": 0.0, "7d": -0.002, "relative_vs_btc_24h": 0.001},
-        "SECTOR": {"15m": 0.0, "1h": 0.0, "4h": 0.0, "24h": 0.0, "3d": 0.0, "7d": 0.0, "relative_vs_btc_24h": 0.0},
-    }
-    return dict(table.get(symbol.upper(), table.get("SECTOR" if lane == "DIAGNOSTIC" else "", {})))
-
-
-def _thesis_direction(lane: str) -> str:
-    return {
-        "EARLY_LONG_RESEARCH": "upside_research",
-        "CONFIRMED_LONG_RESEARCH": "upside_research",
-        "FADE_SHORT_REVIEW": "downside_or_risk_research",
-        "RISK_ONLY": "downside_or_risk_research",
-        "UNCONFIRMED_RESEARCH": "neutral_validation_research",
-        "DIAGNOSTIC": "diagnostic",
-    }.get(str(lane or "").upper(), "neutral_validation_research")
-
-
-def _thesis_multiplier(lane: str) -> float | None:
-    lane_upper = str(lane or "").upper()
-    if lane_upper in {"EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH"}:
-        return 1.0
-    if lane_upper in {"FADE_SHORT_REVIEW", "RISK_ONLY"}:
-        return -1.0
-    return None
-
-
-def _thesis_returns(values: Mapping[str, float | None], lane: str) -> dict[str, float | None]:
-    multiplier = _thesis_multiplier(lane)
-    out: dict[str, float | None] = {}
-    for horizon in HORIZONS:
-        value = outcome_eligibility.finite_number(values.get(horizon))
-        if multiplier is None or value is None:
-            out[horizon] = None
-            continue
-        out[horizon] = value * multiplier
-    return out
-
-
-def _best_mapping_value(values: Mapping[str, float | None], *, want_peak: bool) -> float | None:
-    numeric = [
-        number
-        for value in values.values()
-        if (number := outcome_eligibility.finite_number(value)) is not None
-    ]
-    if not numeric:
-        return None
-    return max(numeric) if want_peak else min(numeric)
-
-
-def _thesis_interpretation(lane: str, label: str, thesis_primary: float | None) -> str:
-    direction = _thesis_direction(lane)
-    lane_upper = str(lane or "").upper()
-    if direction == "upside_research":
-        if thesis_primary is None:
-            return "long research thesis pending; no primary market outcome available"
-        return "validated long-research reaction" if thesis_primary > 0 else "not validated by primary market reaction"
-    if direction == "downside_or_risk_research" and lane_upper == "FADE_SHORT_REVIEW":
-        if thesis_primary is None:
-            return "fade-review thesis pending; no primary market outcome available"
-        return (
-            "validated fade-review thesis: asset fell after the crowded move"
-            if thesis_primary > 0
-            else "not validated: asset return did not favor the fade thesis"
-        )
-    if direction == "downside_or_risk_research":
-        if thesis_primary is None:
-            return "risk thesis pending; no primary market outcome available"
-        return (
-            "validated risk thesis: asset sold off in the evaluation window"
-            if thesis_primary > 0
-            else "not validated: asset did not sell off enough for the risk thesis"
-        )
-    if str(label or "") == "remained_noise":
-        return "neutral/noise validation: no directional research thesis scored"
-    if direction == "diagnostic":
-        return "diagnostic row excluded from performance calibration"
-    return "inconclusive research validation; no directional thesis scored"
-
-
-def _benchmark_returns(symbol: str) -> dict[str, float]:
-    if symbol == "ETH":
-        return {"15m": 0.0005, "1h": 0.0015, "4h": 0.003, "24h": 0.006, "3d": 0.01, "7d": 0.018}
-    return {"15m": 0.0003, "1h": 0.001, "4h": 0.002, "24h": 0.005, "3d": 0.008, "7d": 0.012}
-
-
-def _relative_return(value: float | None, benchmark: float | None) -> float | None:
-    numeric_value = outcome_eligibility.finite_number(value)
-    numeric_benchmark = outcome_eligibility.finite_number(benchmark)
-    if numeric_value is None or numeric_benchmark is None:
-        return None
-    return numeric_value - numeric_benchmark
-
-
-def _window_extremes(returns: Mapping[str, float], *, want_peak: bool) -> dict[str, float | None]:
-    values: dict[str, float | None] = {}
-    ordered: list[float] = []
-    for horizon in HORIZONS:
-        value = outcome_eligibility.finite_number(returns.get(horizon))
-        if value is not None:
-            ordered.append(value)
-            values[horizon] = max(ordered) if want_peak else min(ordered)
-        else:
-            values[horizon] = None
-    return values
-
-
-def _time_to_extreme_hours(returns: Mapping[str, float], *, want_peak: bool) -> float | None:
-    horizon = _time_to_extreme(returns, want_peak=want_peak)
-    return {
-        "15m": 0.25,
-        "1h": 1.0,
-        "4h": 4.0,
-        "24h": 24.0,
-        "3d": 72.0,
-        "7d": 168.0,
-    }.get(str(horizon or ""))
-
-
-def _confirmed_after_observation(label: str, *, kind: str) -> str:
-    if label in {"early_good", "continuation_good", "fade_review_good", "risk_validated"}:
-        return "yes"
-    if label in {"remained_noise", "diagnostic_only"}:
-        return "no"
-    return "unknown"
-
-
-def _group_by(rows: Iterable[Mapping[str, Any]], key: str) -> dict[str, list[dict[str, Any]]]:
-    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in rows:
-        grouped[str(row.get(key) or "unknown")].append(dict(row))
-    return grouped
-
-
-def _primary_horizon(lane: str) -> str:
-    return outcome_eligibility.primary_horizon_for_lane(lane) or "24h"
-
-
-def _label_for(symbol: str, lane: str, primary_return: float | None) -> str:
-    if primary_return is None:
-        return "missing_data"
-    symbol_upper = symbol.upper()
-    if symbol_upper == "TESTLIST":
-        return "early_good"
-    if symbol_upper == "TESTPERP":
-        return "continuation_good"
-    if symbol_upper == "TESTFADE":
-        return "fade_review_good"
-    if symbol_upper == "TESTUNLOCK":
-        return "risk_validated"
-    if symbol_upper in {"BTC", "TESTRUMOR"}:
-        return "remained_noise"
-    if lane in {"EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH"}:
-        return "useful" if primary_return > 0.03 else "junk"
-    if lane in {"FADE_SHORT_REVIEW", "RISK_ONLY"}:
-        return "useful" if primary_return < -0.03 else "junk"
-    if lane == "DIAGNOSTIC":
-        return "diagnostic_only"
-    return "remained_noise" if abs(primary_return) < 0.02 else "watch"
-
-
-def _truth_label(row: Mapping[str, Any]) -> str:
-    label = str(row.get("outcome_label") or "")
-    if label in {"useful", "early_good", "continuation_good", "fade_review_good", "risk_validated", "watch"}:
-        return "useful"
-    if label == "junk":
-        return "junk"
-    if label in {"remained_noise", "diagnostic_only"}:
-        return "junk"
-    return "watch"
-
-
-def _validation_label(row: Mapping[str, Any]) -> str:
-    if row.get("calibration_eligible") is not True:
-        return "inconclusive"
-    return outcome_eligibility.deterministic_validation_status(row)
-
-
-def _time_to_extreme(values: Mapping[str, float], *, want_peak: bool) -> str | None:
-    ordered = [
-        (horizon, number)
-        for horizon in HORIZONS
-        if (number := outcome_eligibility.finite_number(values.get(horizon))) is not None
-    ]
-    if not ordered:
-        return None
-    horizon, _value = max(ordered, key=lambda item: item[1]) if want_peak else min(ordered, key=lambda item: item[1])
-    return horizon
-
-
-def _price(candidate: Mapping[str, Any]) -> float | None:
-    for key in ("latest_market_snapshot", "market_snapshot", "market_state_snapshot"):
-        snapshot = candidate.get(key)
-        if isinstance(snapshot, Mapping):
-            price = outcome_eligibility.finite_number(snapshot.get("price"))
-            if price is not None and price > 0:
-                return price
-    return None
 
 
 def _pct(value: Any) -> str:

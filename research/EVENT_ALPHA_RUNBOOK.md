@@ -146,10 +146,78 @@ including:
 - `event_integrated_radar_candidates.jsonl`
 - `event_integrated_radar_notification_deliveries.jsonl`
 - `event_integrated_radar_notification_preview.md`
+- `event_decision_v2_notification_preview.md` (the v2-first product lanes;
+  legacy opportunity lanes are intentionally absent)
 - `event_integrated_radar_outcomes.jsonl`
 - `event_integrated_radar_outcome_report.md`
 - `event_integrated_radar_calibration_report.md`
 - `event_integrated_radar_calibration_priors.json`
+
+### Decision Model v2 operator vertical
+
+Decision Model v2 is the trader-facing research projection; the uppercase
+legacy `opportunity_type` remains compatibility metadata and does not control
+the v2 display route. The v2-first preview, cards, daily brief, inbox, dashboard,
+feedback, and outcome rows use these ordered operator lanes:
+
+1. High-Confidence Ideas
+2. Actionable Ideas
+3. Rapid Market Anomalies
+4. Dashboard Watch
+5. Fade / Exhaustion Review
+6. Risk Watch
+7. Calendar / Scheduled Risk
+
+The initial configurable actionability thresholds are 45 for dashboard watch,
+65 for actionable review, 68 plus urgency 72 for rapid anomalies, and 80 plus
+evidence confidence 75 for high confidence. Actionable/rapid routes require a
+verified acceptable spread by default. Missing spread may still produce a
+dashboard watch when identity, freshness, liquidity, turnover, venue quality,
+and volume evidence remain strong; verified extreme spread and insufficient
+liquidity stay blocking. `risk_watch` is for unscheduled risk. `calendar_risk`
+requires an attached unified-calendar event or scheduled window. These are
+research presentation routes only and do not relax legacy strict-alert or send
+gates.
+
+New rows preserve `primary_thesis_origin` plus ordered `thesis_origins` and show
+timing state, market phase, urgency, preferred horizon, expiry, chase risk,
+tradability, and spread status. The legacy `thesis_origin` remains readable for
+historical compatibility. Return evidence must declare coherent units; an
+implausible fraction/percent combination fails closed instead of being silently
+scaled.
+
+Run the complete fixture vertical and publish its exact dashboard pointer with:
+
+```sh
+make event-alpha-integrated-radar-smoke PYTHON=python3
+make radar-dashboard-readiness PYTHON=python3
+make radar-dashboard-smoke PYTHON=python3
+```
+
+`radar-dashboard-readiness` publishes `event_fade_cache/radar_current_namespace.json`
+only after the selected generation has a complete fingerprinted product
+manifest, exact current counts, fresh full strict doctor authority, and zero
+blockers. `make radar-dashboard` uses that pointer by default; an explicit
+command-line `ARTIFACT_NAMESPACE=...` selects and validates that namespace.
+Pointer-started serving remains bound to the exact namespace, run id, revision,
+and operator-state hash and returns 503 if the generation drifts after startup.
+It never guesses the newest directory.
+
+Optional RSI context is read only from the explicitly configured local JSON or
+JSONL path `RSI_EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH`. A context can enrich an
+existing Radar candidate only when one unique exact symbol and coin-id pair
+matches. Duplicate, partial, cross-asset, stale, or malformed context contributes
+no score change, and RSI-only input never creates a candidate. This adapter does
+not read/write the RSI database, change RSI alerts/backtests/paper trades, call a
+provider, send, execute, or create `TRIGGERED_FADE`.
+
+Every explicit current Decision v2 idea, including diagnostic controls, receives
+one pending outcome placeholder. Diagnostic placeholders remain outside Core
+and calibration authority by design. Automatic outcomes and human preference
+feedback remain separate. During initial no-send burn-in, collect outcomes for
+every idea and target only 3–5 useful preference labels per day; treat 30–50
+reviewed labels as an initial preference sample, not permission to tune. No
+threshold or routing policy changes are automatic; human approval is required.
 
 Evidence-bearing operator commands must resolve one artifact context and use
 that context's run, alert, feedback, missed, provider-health, watchlist, Core,

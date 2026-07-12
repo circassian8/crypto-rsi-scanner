@@ -14,6 +14,9 @@ class ThesisOrigin(str, Enum):
     MARKET_LED = "market_led"
     CATALYST_LED = "catalyst_led"
     TECHNICAL_LED = "technical_led"
+    DERIVATIVES_LED = "derivatives_led"
+    ONCHAIN_LED = "onchain_led"
+    FUNDAMENTAL_LED = "fundamental_led"
     MACRO_LED = "macro_led"
     MIXED = "mixed"
 
@@ -56,11 +59,38 @@ class TradabilityStatus(str, Enum):
     BLOCKED = "blocked"
 
 
+class SpreadStatus(str, Enum):
+    VERIFIED_GOOD = "verified_good"
+    VERIFIED_ACCEPTABLE = "verified_acceptable"
+    VERIFIED_WIDE = "verified_wide"
+    UNAVAILABLE = "unavailable"
+    STALE = "stale"
+
+
+class MarketPhase(str, Enum):
+    EMERGING = "emerging"
+    BREAKOUT = "breakout"
+    ACCELERATION = "acceleration"
+    ACTIVE = "active"
+    EXTENDED = "extended"
+    EXHAUSTION = "exhaustion"
+    REVERSAL = "reversal"
+
+
+class PreferredHorizon(str, Enum):
+    INTRADAY = "intraday"
+    ONE_TO_THREE_DAYS = "1d_3d"
+    THREE_TO_SEVEN_DAYS = "3d_7d"
+    SCHEDULED_WINDOW = "scheduled_window"
+
+
 class RadarResearchRoute(str, Enum):
+    DASHBOARD_WATCH = "dashboard_watch"
     ACTIONABLE_WATCH = "actionable_watch"
     HIGH_CONFIDENCE_WATCH = "high_confidence_watch"
     RAPID_MARKET_ANOMALY = "rapid_market_anomaly"
     FADE_EXHAUSTION_REVIEW = "fade_exhaustion_review"
+    RISK_WATCH = "risk_watch"
     CALENDAR_RISK = "calendar_risk"
     DIAGNOSTIC = "diagnostic"
 
@@ -79,9 +109,28 @@ _RUNTIME_FIELDS = {
         "float",
         ("EVENT_ALPHA_DECISION_MODEL_V2_ACTIONABLE_THRESHOLD", "EVENT_ALPHA_RADAR_ACTIONABILITY_THRESHOLD"),
     ),
+    "dashboard_watch_threshold": (
+        "float",
+        ("EVENT_ALPHA_DECISION_MODEL_V2_DASHBOARD_WATCH_THRESHOLD",),
+    ),
     "high_confidence_threshold": (
         "float",
         ("EVENT_ALPHA_DECISION_MODEL_V2_HIGH_CONFIDENCE_THRESHOLD", "EVENT_ALPHA_RADAR_HIGH_CONFIDENCE_THRESHOLD"),
+    ),
+    "high_confidence_evidence_threshold": (
+        "float",
+        ("EVENT_ALPHA_DECISION_MODEL_V2_HIGH_CONFIDENCE_EVIDENCE_THRESHOLD",),
+    ),
+    "rapid_anomaly_actionability_threshold": (
+        "float",
+        ("EVENT_ALPHA_DECISION_MODEL_V2_RAPID_ANOMALY_THRESHOLD",),
+    ),
+    "rapid_anomaly_urgency_threshold": (
+        "float",
+        ("EVENT_ALPHA_DECISION_MODEL_V2_RAPID_ANOMALY_URGENCY_THRESHOLD",),
+    ),
+    "dashboard_watch_route_enabled": (
+        "bool", ("EVENT_ALPHA_DECISION_MODEL_V2_ROUTE_DASHBOARD_WATCH_ENABLED",),
     ),
     "actionable_watch_route_enabled": (
         "bool", ("EVENT_ALPHA_DECISION_MODEL_V2_ROUTE_ACTIONABLE_WATCH_ENABLED",),
@@ -97,6 +146,9 @@ _RUNTIME_FIELDS = {
     ),
     "calendar_risk_route_enabled": (
         "bool", ("EVENT_ALPHA_DECISION_MODEL_V2_ROUTE_CALENDAR_RISK_ENABLED",),
+    ),
+    "risk_watch_route_enabled": (
+        "bool", ("EVENT_ALPHA_DECISION_MODEL_V2_ROUTE_RISK_WATCH_ENABLED",),
     ),
     "minimum_liquidity_usd": (
         "float",
@@ -132,13 +184,19 @@ class RadarDecisionConfig:
     enabled: bool = True
     market_led_enabled: bool = True
     catalyst_led_enabled: bool = True
-    actionability_threshold: float = 70.0
-    high_confidence_threshold: float = 85.0
+    dashboard_watch_threshold: float = 45.0
+    actionability_threshold: float = 65.0
+    high_confidence_threshold: float = 80.0
+    high_confidence_evidence_threshold: float = 75.0
+    rapid_anomaly_actionability_threshold: float = 68.0
+    rapid_anomaly_urgency_threshold: float = 72.0
+    dashboard_watch_route_enabled: bool = True
     actionable_watch_route_enabled: bool = True
     high_confidence_route_enabled: bool = True
     rapid_anomaly_route_enabled: bool = True
     fade_exhaustion_route_enabled: bool = True
     calendar_risk_route_enabled: bool = True
+    risk_watch_route_enabled: bool = True
     minimum_liquidity_usd: float = 250_000.0
     good_liquidity_usd: float = 5_000_000.0
     maximum_spread_bps: float = 150.0
@@ -185,11 +243,20 @@ class RadarDecision:
     radar_what_confirms: tuple[str, ...]
     radar_what_invalidates: tuple[str, ...]
     actionability_score_cohort: str
+    primary_thesis_origin: str = ThesisOrigin.MIXED.value
+    thesis_origins: tuple[str, ...] = (ThesisOrigin.MIXED.value,)
+    spread_status: str = SpreadStatus.UNAVAILABLE.value
+    urgency_score: float = 0.0
+    market_phase: str = MarketPhase.ACTIVE.value
+    preferred_horizon: str = PreferredHorizon.ONE_TO_THREE_DAYS.value
+    expires_at: str | None = None
+    chase_risk_score: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         out = asdict(self)
         out["evidence_confidence_score_components"] = out.pop("evidence_confidence_components")
         for key in (
+            "thesis_origins",
             "decision_hard_blockers", "decision_soft_penalties", "decision_missing_data",
             "decision_warnings", "why_still_worth_reviewing", "radar_what_confirms",
             "radar_what_invalidates",
@@ -230,6 +297,7 @@ def actionability_score_cohort(value: object) -> str | None:
 
 __all__ = (
     "DECISION_MODEL_VERSION", "CatalystStatus", "ConfidenceBand", "DirectionalBias",
-    "RadarDecision", "RadarDecisionConfig", "RadarResearchRoute", "ThesisOrigin",
-    "TimingState", "TradabilityStatus", "actionability_score_cohort",
+    "MarketPhase", "PreferredHorizon", "RadarDecision", "RadarDecisionConfig",
+    "RadarResearchRoute", "SpreadStatus", "ThesisOrigin", "TimingState",
+    "TradabilityStatus", "actionability_score_cohort",
 )

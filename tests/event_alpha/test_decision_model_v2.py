@@ -149,14 +149,17 @@ def test_market_led_missing_freshness_or_volume_cannot_be_actionable():
     assert "market_turnover_unverified" in volume_result.decision_soft_penalties
 
 
-def test_market_led_missing_spread_is_not_tradable_or_actionable():
+def test_market_led_missing_spread_is_provisional_dashboard_only():
     row = _market_led_candidate()
     row["market_state_snapshot"].pop("spread_bps")
 
     result = decision_model.evaluate_radar_decision(row)
 
-    assert result.tradability_status == "poor"
+    assert result.tradability_status == "acceptable"
+    assert result.spread_status == "unavailable"
     assert result.radar_actionable is False
+    assert result.radar_route == "dashboard_watch"
+    assert "spread_unavailable_dashboard_only" in result.decision_soft_penalties
     assert "spread_bps" in result.decision_missing_data
 
 
@@ -206,7 +209,7 @@ def test_late_momentum_route_depends_on_derivatives_crowding():
     })
 
     assert without_derivatives.directional_bias == "fade_short_review"
-    assert without_derivatives.radar_route == "rapid_market_anomaly"
+    assert without_derivatives.radar_route == "dashboard_watch"
     assert with_derivatives.directional_bias == "fade_short_review"
     assert with_derivatives.radar_route == "fade_exhaustion_review"
 
@@ -222,7 +225,7 @@ def test_specific_blowoff_anomaly_sets_exhausted_timing_over_shared_bucket():
     assert result.timing_state == "exhausted"
 
 
-def test_selloff_risk_routes_to_calendar_risk():
+def test_unscheduled_selloff_routes_to_risk_watch():
     row = _market_led_candidate(
         market_state_class="risk_off_sell_pressure",
         market_anomaly_bucket="selloff_risk",
@@ -232,7 +235,146 @@ def test_selloff_risk_routes_to_calendar_risk():
     result = decision_model.evaluate_radar_decision(row)
 
     assert result.directional_bias == "risk"
+    assert result.radar_route == "risk_watch"
+    assert result.radar_actionable is False
+
+
+def test_selloff_with_attached_calendar_event_routes_to_calendar_risk():
+    row = _market_led_candidate(
+        market_state_class="risk_off_sell_pressure",
+        market_anomaly_bucket="selloff_risk",
+        market_state_snapshot={"return_4h": -8.0, "return_24h": -15.0},
+        unified_calendar_event={
+            "event_id": "fomc-window",
+            "scheduled_at": "2026-06-15T18:00:00Z",
+        },
+    )
+
+    result = decision_model.evaluate_radar_decision(row)
+
     assert result.radar_route == "calendar_risk"
+    assert result.radar_actionable is False
+    assert result.preferred_horizon == "scheduled_window"
+
+
+def test_calendar_overlay_adds_bounded_risk_warning_and_expiry_without_bias():
+    base_row = _market_led_candidate(observed_at="2026-06-15T16:00:00Z")
+    base = decision_model.evaluate_radar_decision(base_row)
+    overlaid = decision_model.evaluate_radar_decision({
+        **base_row,
+        "nearby_calendar_events": [{
+            "event_id": "fomc-window",
+            "scheduled_at": "2026-06-15T20:00:00Z",
+        }],
+        "calendar_risk_score_adjustment": 12.0,
+        "calendar_context_warning": "FOMC window overlaps the idea horizon.",
+        "expires_at": "2026-06-15T19:00:00Z",
+    })
+
+    assert base.directional_bias == "long"
+    assert overlaid.directional_bias == "long"
+    assert overlaid.radar_route == "calendar_risk"
+    assert overlaid.risk_score == base.risk_score + 12.0
+    assert overlaid.risk_score_components["calendar_risk_adjustment"] == 12.0
+    assert overlaid.expires_at == "2026-06-15T19:00:00Z"
+    assert "FOMC window overlaps the idea horizon." in overlaid.decision_warnings
+
+
+def test_validated_rsi_adapter_deltas_adjust_canonical_scores_transparently():
+    from crypto_rsi_scanner.event_alpha.radar.rsi_technical_context import (
+        apply_rsi_technical_context,
+    )
+
+    base_row = _market_led_candidate(
+        observed_at="2026-07-12T12:00:00Z",
+        directional_bias="long",
+        technical_context={"adapter": "rsi"},
+    )
+    artifact = {
+        "symbol": "MOVE",
+        "coin_id": "move-token",
+        "setup_type": "dip_buy",
+        "rsi_daily": 22.0,
+        "severity": "ALERT",
+        "market_regime": "BULL",
+        "conviction": 74,
+        "expected_dir": "up",
+        "observed_at": "2026-07-12T10:00:00Z",
+        "freshness_status": "fresh",
+    }
+    enriched = apply_rsi_technical_context(
+        base_row,
+        artifact,
+        evaluated_at="2026-07-12T12:00:00Z",
+    )
+    base = decision_model.evaluate_radar_decision(base_row)
+    adjusted = decision_model.evaluate_radar_decision(enriched)
+
+    assert adjusted.primary_thesis_origin == "technical_led"
+    assert adjusted.actionability_score == round(
+        base.actionability_score + enriched["rsi_actionability_adjustment"],
+        2,
+    )
+    assert adjusted.risk_score == round(base.risk_score + enriched["rsi_risk_adjustment"], 2)
+    assert adjusted.actionability_score_components["rsi_technical_context_bonus_points"] == enriched[
+        "rsi_actionability_adjustment"
+    ]
+    assert adjusted.risk_score_components["rsi_technical_context_adjustment"] == enriched[
+        "rsi_risk_adjustment"
+    ]
+    assert any("Validated RSI technical context adjusted" in item for item in adjusted.decision_warnings)
+
+
+def test_rsi_scalar_injection_is_ignored_and_direction_mismatch_fails_closed():
+    from crypto_rsi_scanner.event_alpha.radar.rsi_technical_context import (
+        apply_rsi_technical_context,
+    )
+
+    base_row = _market_led_candidate(
+        directional_bias="long",
+        technical_context={"adapter": "rsi"},
+    )
+    baseline = decision_model.evaluate_radar_decision(base_row)
+    injected = decision_model.evaluate_radar_decision({
+        **base_row,
+        "rsi_actionability_adjustment": 12.0,
+        "rsi_risk_adjustment": -8.0,
+        "rsi_adjustment_reason_codes": ["free_standing_injection"],
+    })
+    artifact = {
+        "setup_type": "dip_buy",
+        "rsi_daily": 22.0,
+        "severity": "ALERT",
+        "market_regime": "BULL",
+        "conviction": 74,
+        "expected_dir": "up",
+        "observed_at": "2026-07-12T10:00:00Z",
+        "freshness_status": "fresh",
+    }
+    mismatched = apply_rsi_technical_context(
+        {**base_row, "directional_bias": "risk"},
+        artifact,
+        evaluated_at="2026-07-12T12:00:00Z",
+    )
+    rejected_mismatch = decision_model.evaluate_radar_decision(mismatched)
+    no_bias_base = dict(base_row)
+    no_bias_base.pop("directional_bias")
+    no_bias = apply_rsi_technical_context(
+        no_bias_base,
+        artifact,
+        evaluated_at="2026-07-12T12:00:00Z",
+    )
+    rejected_unknown_bias = decision_model.evaluate_radar_decision(no_bias)
+    no_bias_baseline = decision_model.evaluate_radar_decision(no_bias_base)
+
+    assert injected.actionability_score == baseline.actionability_score
+    assert injected.risk_score == baseline.risk_score
+    assert "rsi_technical_context_bonus_points" not in injected.actionability_score_components
+    assert rejected_mismatch.actionability_score == baseline.actionability_score
+    assert rejected_mismatch.risk_score == baseline.risk_score
+    assert "rsi_technical_context_adjustment" not in rejected_mismatch.risk_score_components
+    assert rejected_unknown_bias.actionability_score == no_bias_baseline.actionability_score
+    assert rejected_unknown_bias.risk_score == no_bias_baseline.risk_score
 
 
 def test_thresholds_are_configurable_without_runtime_config_fields():
@@ -242,7 +384,7 @@ def test_thresholds_are_configurable_without_runtime_config_fields():
 
     assert result.actionability_score < strict.actionability_threshold
     assert result.radar_actionable is False
-    assert result.radar_route == "diagnostic"
+    assert result.radar_route == "dashboard_watch"
 
 
 def test_actionability_is_not_implicitly_blocked_by_low_evidence_confidence():
@@ -262,7 +404,11 @@ def test_new_routes_and_origin_lanes_are_independently_configurable():
     )
     route_off = decision_model.evaluate_radar_decision(
         late,
-        cfg=decision_model.RadarDecisionConfig(rapid_anomaly_route_enabled=False),
+        cfg=decision_model.RadarDecisionConfig(
+            actionability_threshold=50.0,
+            rapid_anomaly_actionability_threshold=55.0,
+            rapid_anomaly_route_enabled=False,
+        ),
     )
     lane_off = decision_model.evaluate_radar_decision(
         late,
@@ -337,7 +483,7 @@ def test_confirmed_catalyst_missing_source_metadata_is_softly_penalized():
     assert incomplete_result.evidence_confidence_score < complete_result.evidence_confidence_score
 
 
-def test_technical_evidence_does_not_invent_a_plausible_catalyst():
+def test_derivatives_evidence_does_not_invent_a_plausible_catalyst():
     row = _market_led_candidate(
         source_origin="derivatives",
         source_origins=["derivatives"],
@@ -349,7 +495,8 @@ def test_technical_evidence_does_not_invent_a_plausible_catalyst():
 
     result = decision_model.evaluate_radar_decision(row)
 
-    assert result.thesis_origin == "technical_led"
+    assert result.thesis_origin == "derivatives_led"
+    assert result.primary_thesis_origin == "derivatives_led"
     assert result.catalyst_status == "unknown"
     assert "catalyst_unknown_soft_penalty" in result.decision_soft_penalties
 
@@ -646,6 +793,231 @@ def test_actionability_score_cohort_boundaries_are_canonical():
         50: "50_69", 69.99: "50_69", 70: "70_84", 84.99: "70_84",
         85: "85_100", 100: "85_100",
     }
+
+
+def test_multiple_thesis_origins_preserve_primary_and_contributors():
+    market_with_derivatives = decision_model.evaluate_radar_decision({
+        **_market_led_candidate(),
+        "derivatives_state_snapshot": {
+            "freshness_status": "fresh",
+            "funding_zscore": 2.2,
+        },
+    })
+    dex_with_market = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            source_origin="dex_onchain",
+            source_origins=["dex_onchain"],
+            source_pack="dex_liquidity_pack",
+            source_class="dex_onchain",
+            dex_state_snapshot={"freshness_status": "fresh", "volume_change": 2.0},
+        )
+    )
+    technical_with_market = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            technical_context={"setup_type": "mean_reversion", "rsi": 24.0},
+        )
+    )
+    derivatives_only = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            source_origin="derivatives",
+            source_origins=["derivatives"],
+            source_pack="derivatives_pack",
+            source_class="derivatives",
+            market_state_class="",
+            market_anomaly_bucket="",
+            derivatives_state_snapshot={"freshness_status": "fresh"},
+        )
+    )
+
+    assert market_with_derivatives.primary_thesis_origin == "market_led"
+    assert market_with_derivatives.thesis_origins == ("market_led", "derivatives_led")
+    assert dex_with_market.primary_thesis_origin == "onchain_led"
+    assert dex_with_market.thesis_origins == ("onchain_led", "market_led")
+    assert technical_with_market.primary_thesis_origin == "technical_led"
+    assert technical_with_market.thesis_origins == ("technical_led", "market_led")
+    assert derivatives_only.primary_thesis_origin == "derivatives_led"
+    assert derivatives_only.thesis_origins == ("derivatives_led",)
+
+
+def test_middle_score_is_dashboard_visible_without_becoming_actionable():
+    result = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            market_state_class="late_momentum",
+            market_anomaly_bucket="late_momentum_needs_crowding_check",
+        )
+    )
+
+    assert 55.0 <= result.actionability_score < 65.0
+    assert result.confidence_band == "exploratory"
+    assert result.radar_route == "dashboard_watch"
+    assert result.radar_actionable is False
+
+
+def test_explicit_spread_tiers_gate_push_without_hiding_liquid_ideas():
+    good = decision_model.evaluate_radar_decision(_market_led_candidate())
+    acceptable = decision_model.evaluate_radar_decision(
+        _market_led_candidate(market_state_snapshot={"spread_bps": 80.0})
+    )
+    wide = decision_model.evaluate_radar_decision(
+        _market_led_candidate(market_state_snapshot={"spread_bps": 200.0})
+    )
+    stale = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            market_state_snapshot={
+                "spread_bps": 20.0,
+                "spread_freshness_status": "stale",
+            }
+        )
+    )
+
+    assert good.spread_status == "verified_good"
+    assert good.radar_actionable is True
+    assert acceptable.spread_status == "verified_acceptable"
+    assert acceptable.radar_actionable is True
+    assert wide.spread_status == "verified_wide"
+    assert wide.radar_route == "diagnostic"
+    assert "spread_above_maximum" in wide.decision_hard_blockers
+    assert stale.spread_status == "stale"
+    assert stale.radar_route == "dashboard_watch"
+    assert stale.radar_actionable is False
+
+
+def test_timing_profile_is_deterministic_and_expired_ideas_fail_closed():
+    breakout = decision_model.evaluate_radar_decision(
+        _market_led_candidate(observed_at="2026-06-15T16:00:00Z")
+    )
+    exhausted = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            anomaly_type="blowoff_crowded",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+    )
+    expired = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            observed_at="2026-06-15T16:00:00Z",
+            expires_at="2026-06-15T15:59:59Z",
+        )
+    )
+
+    assert breakout.market_phase == "breakout"
+    assert breakout.urgency_score >= 72.0
+    assert breakout.preferred_horizon == "1d_3d"
+    assert breakout.expires_at == "2026-06-16T16:00:00Z"
+    assert 0.0 <= breakout.chase_risk_score <= 100.0
+    assert exhausted.market_phase == "exhaustion"
+    assert exhausted.chase_risk_score > breakout.chase_risk_score
+    assert expired.radar_route == "diagnostic"
+    assert expired.radar_actionable is False
+    assert "idea_expired" in expired.decision_hard_blockers
+
+
+def test_return_units_normalize_exactly_and_mixed_metadata_is_explicit():
+    percent_points = decision_model.evaluate_radar_decision(_market_led_candidate())
+    fraction = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            market_state_snapshot={
+                "return_unit": "fraction",
+                "return_4h": 0.12,
+                "return_24h": 0.20,
+                "relative_return_vs_btc_4h": 0.09,
+            }
+        )
+    )
+    mixed = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            market_state_snapshot={
+                "return_unit": "fraction",
+                "return_units": {"relative_return_vs_btc_4h": "percent_points"},
+                "return_4h": 0.12,
+                "return_24h": 0.20,
+                "relative_return_vs_btc_4h": 9.0,
+            }
+        )
+    )
+
+    assert fraction.actionability_score == percent_points.actionability_score
+    assert mixed.actionability_score == percent_points.actionability_score
+    assert fraction.radar_actionable is True
+    assert mixed.radar_actionable is True
+    assert "invalid_market_return_units" not in fraction.decision_hard_blockers
+    assert "invalid_market_return_units" not in mixed.decision_hard_blockers
+
+
+def test_separate_market_snapshots_normalize_before_precedence_merge():
+    row = _market_led_candidate()
+    row["latest_market_snapshot"] = {
+        "return_unit": "fraction",
+        "return_4h": 0.12,
+        "return_24h": 0.20,
+        "relative_return_vs_btc_4h": 0.09,
+    }
+    row["market_state_snapshot"] = {
+        "volume_zscore_24h": 3.5,
+        "volume_to_market_cap": 0.30,
+        "liquidity_usd": 12_000_000,
+        "spread_bps": 22.0,
+        "freshness_status": "fresh",
+    }
+
+    result = decision_model.evaluate_radar_decision(row)
+
+    assert result.radar_actionable is True
+    assert result.actionability_score == decision_model.evaluate_radar_decision(
+        _market_led_candidate()
+    ).actionability_score
+    assert "invalid_market_return_units" not in result.decision_hard_blockers
+
+
+def test_implausible_fraction_return_fails_model_and_schema_validation():
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
+
+    candidate = _market_led_candidate(
+        market_state_snapshot={
+            "return_unit": "fraction",
+            "return_4h": 0.10,
+            "return_24h": 0.20,
+            "relative_return_vs_btc_4h": 10.0,
+        }
+    )
+    result = decision_model.evaluate_radar_decision(candidate)
+    artifact = {**candidate, **result.to_dict()}
+
+    assert result.radar_actionable is False
+    assert "invalid_market_return_units" in result.decision_hard_blockers
+    assert "decision_model_implausible_fraction_return:market_state_snapshot:relative_return_vs_btc_4h" in validate_contract(
+        artifact
+    )
+
+
+def test_v2_schema_requires_ordered_origins_and_verified_actionable_spread():
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
+
+    candidate = _market_led_candidate()
+    valid = {**candidate, **decision_model.evaluate_radar_decision(candidate).to_dict()}
+    wrong_order = {
+        **valid,
+        "primary_thesis_origin": "derivatives_led",
+        "thesis_origins": ["market_led", "derivatives_led"],
+    }
+    unverified_spread = {**valid, "spread_status": "unavailable"}
+
+    assert validate_contract(valid) == []
+    assert "decision_model_primary_thesis_origin_order_mismatch" in validate_contract(wrong_order)
+    assert "decision_model_actionable_spread_unverified" in validate_contract(unverified_spread)
+
+
+def test_disabled_v2_contract_keeps_unknown_origin_explicit_without_promotion():
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
+
+    disabled = decision_model.evaluate_radar_decision(
+        _market_led_candidate(),
+        cfg=decision_model.RadarDecisionConfig(enabled=False),
+    ).to_dict()
+
+    assert disabled["primary_thesis_origin"] == "mixed"
+    assert disabled["thesis_origins"] == ["mixed"]
+    assert disabled["radar_actionable"] is False
+    assert validate_contract(disabled) == []
 
 
 def test_runtime_config_uses_canonical_decision_model_v2_names():

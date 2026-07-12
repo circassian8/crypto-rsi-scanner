@@ -46,11 +46,11 @@ def test_integrated_radar_fixture_lane_counts_and_core_types_stay_stable():
     assert Counter(row["opportunity_type"] for row in rows) == Counter(
         {
             "CONFIRMED_LONG_RESEARCH": 2,
-            "DIAGNOSTIC": 2,
+            "DIAGNOSTIC": 3,
             "EARLY_LONG_RESEARCH": 1,
             "FADE_SHORT_REVIEW": 1,
             "RISK_ONLY": 2,
-            "UNCONFIRMED_RESEARCH": 3,
+            "UNCONFIRMED_RESEARCH": 4,
         }
     )
     assert Counter(row["opportunity_type"] for row in core_rows) == Counter(
@@ -59,16 +59,193 @@ def test_integrated_radar_fixture_lane_counts_and_core_types_stay_stable():
             "EARLY_LONG_RESEARCH": 1,
             "FADE_SHORT_REVIEW": 1,
             "RISK_ONLY": 2,
-            "UNCONFIRMED_RESEARCH": 3,
+            "UNCONFIRMED_RESEARCH": 4,
         }
     )
     by_symbol = {row["symbol"]: row for row in rows}
     assert by_symbol["TESTPERP"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH"
     assert by_symbol["TESTFADE"]["opportunity_type"] == "FADE_SHORT_REVIEW"
     assert by_symbol["TESTLIST"]["opportunity_type"] == "EARLY_LONG_RESEARCH"
+    assert by_symbol["TESTFLOW"]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+    assert by_symbol["TESTFLOW"]["radar_route"] == "actionable_watch"
+    assert by_symbol["TESTFLOW"]["radar_actionable"] is True
+    assert by_symbol["TESTFLOWLOW"]["opportunity_type"] == "DIAGNOSTIC"
+    assert by_symbol["TESTFLOWLOW"]["radar_route"] == "diagnostic"
+    assert by_symbol["TESTFLOWLOW"]["radar_actionable"] is False
     assert by_symbol["SECTOR"]["opportunity_type"] == "DIAGNOSTIC"
     assert by_symbol["TESTPERP"]["normal_rsi_signal_written"] is False
     assert by_symbol["TESTFADE"]["triggered_fade_created"] is False
+
+
+def test_market_led_fixture_reaches_existing_operator_surfaces_without_legacy_promotion():
+    from pathlib import Path
+
+    from crypto_rsi_scanner.event_alpha.artifacts import context as artifact_context
+    from crypto_rsi_scanner.event_alpha.dashboard.loader import _dashboard_decision_row
+    from crypto_rsi_scanner.event_alpha.dashboard.models import DashboardSnapshot
+    from crypto_rsi_scanner.event_alpha.dashboard.render import render_dashboard_page
+    from crypto_rsi_scanner.event_alpha.notifications.inbox.builder import _inbox_item
+    from crypto_rsi_scanner.event_alpha.outcomes.integrated_radar_outcomes import _outcome_row
+    from crypto_rsi_scanner.event_alpha.radar import integrated_radar
+
+    with TemporaryDirectory() as tmp:
+        context = artifact_context.context_from_profile(
+            "fixture",
+            run_mode="fixture",
+            base_dir=tmp,
+            artifact_namespace="pytest_market_led_vertical",
+        )
+        result = integrated_radar.run_integrated_radar_cycle(
+            context=context,
+            fixture=True,
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        candidates = [
+            json.loads(line)
+            for line in result.integrated_candidates_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        core_rows = [
+            json.loads(line)
+            for line in context.core_opportunity_store_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        by_symbol = {row["symbol"]: row for row in candidates}
+        core_by_symbol = {row["symbol"]: row for row in core_rows}
+        flow = by_symbol["TESTFLOW"]
+        suspicious = by_symbol["TESTFLOWLOW"]
+        official = by_symbol["TESTPERP"]
+        flow_core = core_by_symbol["TESTFLOW"]
+
+        assert flow["source_origins"] == ["market_anomaly"]
+        assert flow["source_origin"] == "market_anomaly"
+        assert flow.get("source_url") is None
+        assert not flow.get("official_exchange_event")
+        assert flow["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+        assert flow["thesis_origin"] == "market_led"
+        assert flow["catalyst_status"] == "unknown"
+        assert flow["confidence_band"] == "actionable"
+        assert flow["radar_route"] == "actionable_watch"
+        assert flow["radar_actionable"] is True
+        assert flow["decision_hard_blockers"] == []
+        assert flow["evidence_confidence_score"] < official["evidence_confidence_score"]
+        assert any("manipulation risk" in warning.casefold() for warning in flow["decision_warnings"])
+        assert flow["market_state_snapshot"]["freshness_status"] == "fresh"
+        assert flow["market_state_snapshot"]["liquidity_usd"] == 24_000_000
+        assert flow["market_state_snapshot"]["spread_bps"] == 16
+
+        assert suspicious["source_origins"] == ["market_anomaly"]
+        assert suspicious["opportunity_type"] == "DIAGNOSTIC"
+        assert suspicious["market_anomaly_bucket"] == "low_liquidity_suspicious"
+        assert suspicious["radar_route"] == "diagnostic"
+        assert suspicious["radar_actionable"] is False
+        assert suspicious["tradability_status"] == "blocked"
+        assert "liquidity_below_minimum" in suspicious["decision_hard_blockers"]
+        assert "suspicious_illiquid_move" in suspicious["decision_hard_blockers"]
+
+        assert flow_core["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+        assert flow_core["thesis_origin"] == "market_led"
+        assert flow_core["catalyst_status"] == "unknown"
+        assert flow_core["confidence_band"] == "actionable"
+        assert flow_core["radar_route"] == "actionable_watch"
+        assert flow_core["radar_actionable"] is True
+        assert flow_core["source_origins"] == ["market_anomaly"]
+
+        flow_card = next(
+            path.read_text(encoding="utf-8")
+            for path in result.research_card_paths
+            if "# TESTFLOW Event Research Card" in path.read_text(encoding="utf-8")
+        )
+        for expected in (
+            "Opportunity type: UNCONFIRMED_RESEARCH",
+            "Radar route: actionable_watch",
+            "Radar actionable: true",
+                "Primary / contributing origins: market_led / market_led",
+                "Directional bias: long",
+            "Catalyst status: unknown",
+            "Higher manipulation risk:",
+            "Research idea, not a trade instruction.",
+        ):
+            assert expected in flow_card
+
+        preview = result.notification_preview_path.read_text(encoding="utf-8")
+        assert "## Lane: Actionable Ideas" in preview
+        assert "TESTFLOW/test-flow" in preview
+        assert "TESTFLOWLOW/test-flow-low" not in preview
+        assert "send_attempted: false" in preview
+        decision_preview = result.decision_v2_notification_preview_path.read_text(
+            encoding="utf-8"
+        )
+        assert "Crypto Radar Decision v2 Preview" in decision_preview
+        assert "## Lane: Actionable Ideas" in decision_preview
+        assert "## Lane: Unconfirmed Research" not in decision_preview
+        assert decision_preview.index("## Lane: High-Confidence Ideas") < decision_preview.index(
+            "## Lane: Actionable Ideas"
+        )
+        delivery_rows = [
+            json.loads(line)
+            for line in result.integrated_delivery_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        assert all(row["sent"] is False for row in delivery_rows)
+        assert all(row["no_send_rehearsal"] is True for row in delivery_rows)
+
+        dashboard_rows = (
+            _dashboard_decision_row(flow_core),
+            _dashboard_decision_row(suspicious),
+        )
+        dashboard = DashboardSnapshot(
+            namespace_dir=Path(tmp),
+            run_id=result.run_id,
+            profile="fixture",
+            artifact_namespace="pytest_market_led_vertical",
+            revision=1,
+            manifest_status="complete",
+            doctor_status="OK",
+            doctor_verified_revision=1,
+            generation_authority_status="authoritative",
+            generation_authority_reasons=(),
+            generation_authority_checked_at="2026-06-15T16:00:00+00:00",
+            operator_state_sha256="fixture",
+            operator_state={"research_only": True, "send_attempted": False},
+            current_candidates=dashboard_rows,
+        )
+        today = render_dashboard_page(dashboard, "/").body
+        anomalies = render_dashboard_page(dashboard, "/anomalies").body
+        diagnostics = render_dashboard_page(
+            dashboard,
+            "/anomalies",
+            include_diagnostics=True,
+        ).body
+        assert "TESTFLOW" in today
+        assert "TESTFLOW" in anomalies
+        assert "TESTFLOWLOW" not in anomalies
+        assert "TESTFLOWLOW" in diagnostics
+
+        inbox_item = _inbox_item(flow_core, None, {}, set(), {})
+        assert inbox_item.radar_route == "actionable_watch"
+        assert inbox_item.radar_actionable is True
+        assert inbox_item.catalyst_status == "unknown"
+        assert inbox_item.sent is False
+        assert inbox_item.would_send is False
+
+        outcome = _outcome_row(flow, now="2026-06-15T17:00:00Z")
+        assert outcome["outcome_status"] == "pending"
+        assert outcome["missing_data_reason"] == "no_cached_price_fixture"
+        assert outcome["outcome_data_source"] == "synthetic_fixture"
+        assert outcome["calibration_eligible"] is False
+        assert outcome["thesis_origin"] == "market_led"
+        assert outcome["radar_route"] == "actionable_watch"
+
+        assert result.strict_alerts == 0
+        assert result.alertable_decisions == 0
+        assert result.send_attempted is False
+        for row in (flow, suspicious, outcome):
+            assert row.get("research_only") is True
+            assert row.get("normal_rsi_signal_written") is not True
+            assert row.get("triggered_fade_created") is not True
+            assert row.get("paper_trade_created") is not True
+            assert row.get("trade_created") is not True
 
 
 def test_event_core_opportunities_aggregate_duplicates_and_hide_controls():

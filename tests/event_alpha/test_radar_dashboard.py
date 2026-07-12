@@ -189,6 +189,24 @@ def test_candidate_detail_renders_v2_explanations_components_and_safe_source_url
     assert "unknown_catalyst_penalty" in page.body
     assert "fixture &lt;wire&gt;" in page.body
     assert "asset=ALPHA&amp;view=1" in page.body
+    for label in (
+        "Primary thesis origin",
+        "Thesis origins",
+        "Timing",
+        "Preferred horizon",
+        "Expires at",
+        "Spread",
+        "Urgency",
+        "Chase risk",
+    ):
+        assert label in page.body
+
+
+def test_dashboard_candidate_table_shows_trader_timing_and_execution_dimensions():
+    page = render_dashboard_page(_snapshot(), "/")
+
+    for label in ("Urgency", "Horizon", "Expires", "Spread", "Chase risk"):
+        assert label in page.body
 
 
 def test_dashboard_calendar_renders_uncertain_window_and_current_scope_labels():
@@ -305,6 +323,7 @@ def test_dashboard_reads_each_current_file_once_and_parses_verified_bytes(monkey
         (_FIXTURE_BASE / _FIXTURE_NAMESPACE / entry["path"]).resolve()
         for entry in state["artifacts"].values()
         if entry["status"] == "current"
+        and entry.get("fingerprint_kind") in {"file_bytes", "jsonl_lines"}
     }
     read_counts = {path: 0 for path in current_paths}
     original = dashboard_loader._read_regular_file_once

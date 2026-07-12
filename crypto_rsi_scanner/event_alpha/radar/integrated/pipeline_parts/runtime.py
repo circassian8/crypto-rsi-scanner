@@ -45,6 +45,7 @@ from ... import instrument_resolver as event_instrument_resolver
 from ... import market_anomaly_scanner as event_market_anomaly_scanner
 from ... import market_confirmation as event_market_confirmation
 from ... import market_reaction as event_market_reaction
+from ... import rsi_technical_context as event_rsi_technical_context
 from ...near_miss import targeted as event_targeted_market_refresh
 from ... import scheduled_catalysts as event_scheduled_catalysts
 from ... import source_coverage as event_alpha_source_coverage
@@ -60,6 +61,7 @@ INTEGRATED_CALIBRATION_PRIORS_FILENAME = "event_integrated_radar_calibration_pri
 RADAR_PERFORMANCE_DASHBOARD_FILENAME = "event_radar_performance_dashboard.md"
 RADAR_PROVIDER_PERFORMANCE_FILENAME = "event_radar_provider_performance.json"
 NOTIFICATION_PREVIEW_FILENAME = "event_integrated_radar_notification_preview.md"
+DECISION_V2_PREVIEW_FILENAME = "event_decision_v2_notification_preview.md"
 DAILY_BRIEF_FILENAME = "event_alpha_daily_brief.md"
 SOURCE_COVERAGE_FILENAME = "event_alpha_source_coverage.md"
 SOURCE_COVERAGE_JSON_FILENAME = "event_alpha_source_coverage.json"

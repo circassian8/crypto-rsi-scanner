@@ -142,7 +142,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   operator artifacts read-only on `127.0.0.1:8765`. Current content requires
   complete v1 file/tree/canonical-run fingerprints plus a fresh immutable run
   and fresh full strict doctor for the exact revision; untrusted current data is
-  suppressed, and the smoke fails rather than rendering a false green. `make
+  suppressed, and the smoke fails rather than rendering a false green. Publish
+  or revalidate the fixed authoritative pointer with `make
+  radar-dashboard-readiness ARTIFACT_NAMESPACE=...`; without an explicit
+  command-line namespace, the dashboard and readiness command use that pointer
+  and never guess the newest directory. Pointer-mode serving is bound to the
+  exact run/revision/operator-state hash and fails closed if it drifts. `make
   radar-dashboard-smoke` renders all fixture pages without starting a server,
   calling providers, sending, or writing artifacts.
 - **Unified calendar no-send preview:** `make radar-calendar-preview` renders
@@ -352,6 +357,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_alpha/radar/llm/` / `llm_providers/` | research-only LLM relationship analysis and raw-event extraction; validates source quotes and keeps extracted assets as deterministic resolver hints only |
 | `event_alpha/radar/market_enrichment.py` / `event_alpha/radar/anomaly_scanner.py` | research-only Event Alpha Radar market evidence and anomaly discovery; catalyst search enriches confidence but is not a universal prerequisite for v2 research actionability |
 | `event_alpha/radar/decision_model.py` / `decision_models.py` | pure Crypto Radar Decision Model v2 scoring and value contracts; separates actionability, evidence confidence, risk, thesis origin, bias, catalyst, timing, and tradability from legacy opportunity routes |
+| `event_alpha/radar/rsi_technical_context.py` | pure/read-only adapter from explicitly supplied existing RSI artifacts into bounded Decision v2 context; exact symbol+coin-id match only, no RSI writes/alerts/paper/backtest/provider/send side effects |
 | `event_alpha/radar/calendar/` | unified fixture-first macro/crypto scheduled-event model and read-only loaders; reminder windows are display metadata only |
 | `event_alpha/dashboard/` | local GET/HEAD-only server-rendered dashboard over one exact operator run/revision; no provider calls, sends, or writes |
 | `event_alpha/radar/integrated/pipeline_parts/merge.py` | integrated-family context and final candidate schema-field assembly |

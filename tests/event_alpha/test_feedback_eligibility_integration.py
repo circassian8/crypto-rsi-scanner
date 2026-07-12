@@ -112,6 +112,90 @@ def test_feedback_producer_persists_exact_core_contract_and_loader_preserves_it(
     assert validation["errors"] == []
 
 
+def test_calendar_risk_feedback_preserves_minimal_core_calendar_evidence(
+    tmp_path: Path,
+):
+    from crypto_rsi_scanner.event_alpha.radar import decision_model
+
+    calendar_event = {
+        "calendar_event_id": "macro:fomc:2026-07-12",
+        "event_kind": "macro_release",
+        "importance": "high",
+        "scheduled_at": "2026-07-12T03:00:00Z",
+        "title": "Sensitive operator-facing title is not feedback evidence",
+        "source_url": "https://calendar.example.test/fomc",
+    }
+    decision = decision_model.evaluate_radar_decision(
+        {
+            "symbol": "BTC",
+            "coin_id": "bitcoin",
+            "canonical_asset_id": "bitcoin",
+            "instrument_resolver_status": "resolved",
+            "instrument_resolver_confidence": 0.95,
+            "instrument_identity_trusted": True,
+            "is_tradable_asset": True,
+            "market_state_class": "risk_off_sell_pressure",
+            "market_anomaly_bucket": "selloff_risk",
+            "market_state_snapshot": {
+                "return_unit": "percent_points",
+                "return_4h": -8.0,
+                "return_24h": -15.0,
+                "volume_zscore_24h": 3.0,
+                "volume_to_market_cap": 0.25,
+                "liquidity_usd": 10_000_000,
+                "spread_bps": 20.0,
+                "freshness_status": "fresh",
+            },
+            "nearby_calendar_events": [calendar_event],
+            "observed_at": "2026-07-12T00:00:00+00:00",
+            "research_only": True,
+        }
+    ).to_dict()
+    assert decision["radar_route"] == "calendar_risk"
+
+    core = _core_row(
+        research_only=True,
+        nearby_calendar_events=[calendar_event],
+        **decision,
+    )
+    path = tmp_path / "event_alpha_feedback.jsonl"
+    record = feedback_labels.mark_feedback(
+        core["core_opportunity_id"],
+        "watch",
+        cfg=feedback_labels.EventFeedbackConfig(path),
+        context_rows=[
+            {
+                **core,
+                "row_type": "event_alpha_alert_snapshot",
+                # Core is the canonical calendar authority for the final row.
+                "nearby_calendar_events": [],
+            }
+        ],
+        core_opportunity_rows=[core],
+        now=datetime(2026, 7, 12, 1, 0, tzinfo=timezone.utc),
+    )
+
+    assert record.radar_route == "calendar_risk"
+    assert record.scheduled_at == "2026-07-12T03:00:00+00:00"
+    assert record.nearby_calendar_events == (
+        {
+            "calendar_event_id": "macro:fomc:2026-07-12",
+            "event_kind": "macro_release",
+            "importance": "high",
+            "scheduled_at": "2026-07-12T03:00:00+00:00",
+        },
+    )
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    assert schema_v1.validate_row_against_schema(
+        persisted, "feedback_row_v1"
+    ) == []
+    assert "title" not in persisted["nearby_calendar_events"][0]
+    assert "source_url" not in persisted["nearby_calendar_events"][0]
+    loaded = feedback_labels.load_feedback(path).records[0]
+    assert loaded.scheduled_at == record.scheduled_at
+    assert loaded.nearby_calendar_events == record.nearby_calendar_events
+
+
 def test_unmatched_and_legacy_feedback_remain_readable_but_ineligible(tmp_path: Path):
     unmatched_path = tmp_path / "unmatched" / "event_alpha_feedback.jsonl"
     record = feedback_labels.mark_feedback(

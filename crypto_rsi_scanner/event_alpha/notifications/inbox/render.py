@@ -159,13 +159,20 @@ def _append_item_section(
         if item.decision_model_version:
             lines.append(
                 f"  radar_decision: route={item.radar_route or 'diagnostic'} "
-                f"origin={item.thesis_origin or 'unknown'} bias={item.directional_bias or 'neutral'} "
+                f"origin={item.primary_thesis_origin or item.thesis_origin or 'unknown'} "
+                f"contributors={','.join(item.thesis_origins) or 'unknown'} "
+                f"bias={item.directional_bias or 'neutral'} "
                 f"catalyst={item.catalyst_status or 'unknown'} confidence={item.confidence_band or 'diagnostic'}"
             )
             lines.append(
                 f"  radar_scores: actionability={_decision_score(item.actionability_score)} "
                 f"evidence={_decision_score(item.evidence_confidence_score)} risk={_decision_score(item.risk_score)} "
-                f"timing={item.timing_state or 'unknown'} tradability={item.tradability_status or 'unknown'}"
+                f"urgency={_decision_score(item.urgency_score)} chase_risk={_decision_score(item.chase_risk_score)}"
+            )
+            lines.append(
+                f"  radar_timing: phase={item.market_phase or 'unknown'} timing={item.timing_state or 'unknown'} "
+                f"horizon={item.preferred_horizon or 'unknown'} expires={item.expires_at or 'not set'} "
+                f"tradability={item.tradability_status or 'unknown'} spread={item.spread_status or 'unavailable'}"
             )
             if item.why_still_worth_reviewing:
                 lines.append("  why_review: " + "; ".join(item.why_still_worth_reviewing))

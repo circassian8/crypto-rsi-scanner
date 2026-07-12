@@ -62,7 +62,7 @@ KNOWN_ARTIFACTS = (
     "provider_readiness_json",
     "provider_readiness_md",
 )
-OPTIONAL_ARTIFACTS = ("unified_calendar",)
+OPTIONAL_ARTIFACTS = ("unified_calendar", "decision_v2_notification_preview")
 
 _RUN_PATH_FIELDS: Mapping[str, tuple[str, ...]] = {
     "core_opportunities": ("core_opportunity_store_path",),
@@ -76,6 +76,7 @@ _RUN_PATH_FIELDS: Mapping[str, tuple[str, ...]] = {
     "provider_readiness_json": ("live_provider_readiness_json_path", "provider_readiness_json_path"),
     "provider_readiness_md": ("live_provider_readiness_report_path", "provider_readiness_md_path"),
     "unified_calendar": ("unified_calendar_path",),
+    "decision_v2_notification_preview": ("decision_v2_notification_preview_path",),
 }
 
 
@@ -874,7 +875,9 @@ def _initial_artifact_entry(
             path=path,
             now=now,
             count=(
-                _nonnegative_int(run_row.get("unified_calendar_rows"))
+                _nonnegative_int(run_row.get("current_generation_core_rows"))
+                if name == "core_opportunities"
+                else _nonnegative_int(run_row.get("unified_calendar_rows"))
                 if name == "unified_calendar"
                 else None
             ),

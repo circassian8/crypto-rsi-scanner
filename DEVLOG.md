@@ -17,6 +17,73 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-12 — Productize Crypto Radar Decision Model v2 end to end · Codex
+**Why:** The pure v2 evaluator could recognize a liquid market-led idea, but the
+real integrated fixture did not carry one through cards, preview, dashboard,
+calendar context, and outcomes. The release gate also exposed a source-export
+TOCTOU race in which a checked parent directory could be replaced by a symlink.
+**Changes:**
+- Hardened `scripts/export_source_with_artifacts.py` with descriptor-relative
+  no-follow pre-stat/open/fstat device+inode validation for the root, every
+  directory component, and final file; unsupported platforms fail closed with
+  `ENOTSUP`. Added adversarial parent/intermediate/final swap, outside-root,
+  safe-file, and archive non-inclusion regressions.
+- Added integrated TESTFLOW (liquid market-only, catalyst unknown, actionable)
+  and TESTFLOWLOW (suspicious/illiquid, diagnostic) evidence. Decision v2 now
+  preserves ordered primary/contributing market, catalyst, technical,
+  derivatives, on-chain, fundamental, and macro origins; adds dashboard watch,
+  rapid anomaly, risk watch, and calendar-only risk policy; applies explicit
+  spread tiers, normalized return units, timing/phase/urgency/horizon/expiry/
+  chase-risk fields, and keeps legacy opportunity lanes additive.
+- Made v2 the first operator view across Core rows, cards, daily brief, inbox,
+  feedback, outcomes, dashboard tables/details/filters/sorts/sparklines, and a
+  separate `event_decision_v2_notification_preview.md`. Legacy lane preview
+  remains a compatibility artifact. Pre-extension v2 rows stay readable.
+- Added a complete fingerprinted dashboard replay fixture plus
+  `radar-dashboard-readiness` and the fixed `radar_current_namespace.json`
+  authority pointer. Publication requires the full current product artifact
+  set, exact counts, fresh full strict doctor, and zero blockers. Pointer-mode
+  serving binds namespace/run/revision/operator-state hash and returns 503 on
+  post-start drift; explicit namespaces remain supported and no latest-folder
+  guessing was added.
+- Extended the unified calendar with timezone, forecast/previous/actual/
+  surprise, before/after impact windows, options expiry, and deterministic
+  risk/expiry overlays that never invent direction. Integrated normalization
+  now occurs exactly once.
+- Added an explicitly configured local JSON/JSONL RSI context adapter with
+  unique exact symbol+coin-id matching, freshness and registry-edge validation,
+  bounded transparent score deltas, and zero RSI DB/alert/backtest/paper/provider/
+  send/trade/trigger side effects. RSI-only, duplicate, partial, or cross-asset
+  rows cannot create or alter a candidate.
+- Write one pending outcome placeholder for every explicit current v2 idea,
+  including diagnostic controls, with route/origin/score/risk/catalyst/phase
+  cohorts. Calendar-risk feedback retains minimal canonical calendar evidence;
+  diagnostic placeholders remain outside Core/calibration authority. Burn-in
+  guidance is outcomes for every idea, 3–5 preference labels per day, 30–50 as
+  an initial reviewed sample, and human approval for every routing change.
+- Kept the new implementation inside existing package homes and split cohesive
+  helpers to preserve architecture gates. Updated `AGENTS.md`, `ROADMAP.md`,
+  `DECISIONS.md`, the runbook, environment example, schemas, doctor checks,
+  fixture artifacts, Make targets, standalone registration, and static health
+  reports.
+**Verify:** The export security regression passed first, followed by 9 related
+export tests. The focused vertical passed 213 tests; later outcome/architecture
+regressions passed 62, 40, and 4 targeted tests. Compileall and `git diff
+--check` passed. Market-anomaly smoke, integrated-radar smoke, integrated
+outcome smoke, strict integrated doctor, dashboard fixture smoke/readiness,
+calendar preview, and architecture cleanliness all passed; the fresh integrated
+run has 13 candidates, 10 Core rows/cards, 13 outcome rows, zero schema errors,
+zero missing outcomes, zero doctor blockers, and only the expected fixture
+CryptoPanic configured-not-observed warning. `make verify-fast PYTHON=python3`
+passed 1,315 tests plus its smokes. Final `make verify PYTHON=python3` passed
+1,244/1,244 standalone tests, 1,315 pytest tests, alert rendering, the
+33-observation offline backtest, and paper scoreboard. GitHub Actions was not
+polled or awaited.
+**Notes/risks:** No live provider call, Telegram send, trade, paper trade,
+normal RSI write, or Event Alpha `TRIGGERED_FADE` was enabled. Thresholds are
+initial research policy, not learned truth; collect exact no-send outcomes and
+human labels before proposing a separately approved change.
+
 ## 2026-07-12 — Make burn-in evidence windows and cohorts exact · Codex
 **Why:** Burn-in reports could read one wall clock per row, accept unstamped or
 future documents, apply only part of the North Star readiness contract, and

@@ -77,10 +77,38 @@ class DashboardSnapshot:
 
 
 @dataclass(frozen=True)
+class DashboardGenerationBinding:
+    """Exact operator generation accepted by a pointer-started dashboard."""
+
+    artifact_namespace: str
+    run_id: str
+    revision: int
+    operator_state_sha256: str
+
+    @classmethod
+    def from_snapshot(cls, snapshot: DashboardSnapshot) -> "DashboardGenerationBinding":
+        """Capture the authority identity that was validated before serving."""
+
+        if not snapshot.generation_authoritative:
+            raise ValueError("dashboard generation binding requires an authoritative snapshot")
+        return cls(
+            artifact_namespace=snapshot.artifact_namespace,
+            run_id=snapshot.run_id,
+            revision=snapshot.revision,
+            operator_state_sha256=snapshot.operator_state_sha256,
+        )
+
+
+@dataclass(frozen=True)
 class DashboardResponse:
     status_code: int
     reason: str
     body: str
 
 
-__all__ = ("DashboardLoadError", "DashboardResponse", "DashboardSnapshot")
+__all__ = (
+    "DashboardGenerationBinding",
+    "DashboardLoadError",
+    "DashboardResponse",
+    "DashboardSnapshot",
+)

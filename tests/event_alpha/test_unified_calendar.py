@@ -26,6 +26,7 @@ from crypto_rsi_scanner.event_alpha.radar.calendar import (
     normalize_unified_calendar_event,
     normalize_unified_calendar_rows,
     normalize_unified_calendar_rows_with_telemetry,
+    overlay_calendar_context,
     write_unified_calendar_artifact,
 )
 
@@ -118,6 +119,61 @@ def test_unified_calendar_fixture_covers_all_kinds_and_canonical_fields():
     assert all("tracking_state" not in row for row in rows)
     assert all(schema_v1.validate_row_against_schema(row, "unified_calendar_event_v1") == [] for row in rows)
     assert hashlib.sha256(_SOURCE_FIXTURE.read_bytes()).hexdigest() == before
+
+
+def test_unified_calendar_v2_values_and_impact_windows_are_normalized():
+    rows = load_unified_calendar_fixture(_SOURCE_FIXTURE)
+    cpi = next(row for row in rows if row["calendar_event_id"] == "calendar-us-cpi-june-2026")
+    fomc = next(row for row in rows if row["calendar_event_id"] == "calendar-fomc-june-2026")
+
+    assert cpi["timezone"] == "America/New_York"
+    assert cpi["forecast_value"] == 2.7
+    assert cpi["previous_value"] == 2.8
+    assert cpi["actual_value"] == 2.6
+    assert cpi["surprise_value"] == -0.1
+    assert cpi["impact_window_before"] == "12h"
+    assert cpi["impact_window_after"] == "6h"
+    assert fomc["impact_window_before"] == "24h"
+    assert schema_v1.validate_row_against_schema(cpi, "unified_calendar_event_v1") == []
+
+
+def test_calendar_context_adds_risk_and_expiry_without_directional_bias():
+    event = normalize_unified_calendar_event(
+        _calendar_row(
+            id="calendar-nearby-cpi",
+            event_kind="cpi",
+            scheduled_at="2026-08-01T12:00:00Z",
+            affected_assets=["CRYPTO_MARKET"],
+            impact_window_before="24h",
+            impact_window_after="6h",
+        )
+    ).to_dict()
+    candidate = {
+        "symbol": "TESTFLOW",
+        "coin_id": "testflow",
+        "directional_bias": "long",
+        "expires_at": "2026-08-03T00:00:00+00:00",
+    }
+
+    enriched = overlay_calendar_context(
+        candidate,
+        (event,),
+        now="2026-08-01T10:00:00Z",
+    )
+
+    assert enriched["calendar_event_attached"] is True
+    assert enriched["calendar_context_count"] == 1
+    assert enriched["calendar_risk_score_adjustment"] == 14.0
+    assert enriched["expires_at"] == "2026-08-01T12:00:00+00:00"
+    assert enriched["directional_bias"] == "long"
+    assert "nearby_calendar_risk" in enriched["decision_warnings"][0]
+
+    unaffected = overlay_calendar_context(
+        {"symbol": "OTHER", "directional_bias": "neutral"},
+        ({**event, "affected_assets": ["TESTFLOW"]},),
+        now="2026-08-01T10:00:00Z",
+    )
+    assert unaffected == {"symbol": "OTHER", "directional_bias": "neutral"}
 
 
 def test_unified_calendar_uncertain_date_uses_bounded_window():

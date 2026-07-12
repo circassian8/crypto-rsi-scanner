@@ -152,6 +152,7 @@ COMMON_PATHS = (
     "card_path",
     "research_card_path",
     "notification_preview_path",
+    "decision_v2_notification_preview_path",
     "marker_path",
 )
 COMMON_TIMESTAMPS = (
@@ -746,6 +747,7 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "burn_in_mode", "send_guard_status", "send_attempted", "no_send_rehearsal",
             "integrated_candidates_path", "source_coverage_json_path_rel",
             "source_coverage_md_path_rel", "daily_brief_path", "notification_preview_path",
+            "decision_v2_notification_preview_path",
             "source_coverage_path", "live_provider_readiness_json_path",
             "live_provider_readiness_report_path", "decision_model_version",
             "decision_model_v2_enabled", "decision_model_v2_row_count", "radar_route_counts", "confidence_band_counts",
@@ -765,6 +767,7 @@ SCHEMAS: dict[str, ArtifactSchema] = {
         paths=(
             "integrated_candidates_path", "integrated_report_path", "integrated_input_manifest_path",
             "integrated_source_coverage_json_path", "daily_brief_path", "notification_preview_path",
+            "decision_v2_notification_preview_path",
             "source_coverage_path", "live_provider_readiness_json_path", "live_provider_readiness_report_path", "unified_calendar_path", "unified_calendar_preview_path",
         ),
         lineage=COMMON_LINEAGE,

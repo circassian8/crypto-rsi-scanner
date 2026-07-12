@@ -250,7 +250,9 @@ def _research_card_summary_lines(context: Mapping[str, Any]) -> list[str]:
         lines.extend(["", "## Opportunity Lane"])
         lines.extend(lane_lines)
     decision_values = decision_model_values(alert, _card_components(entry, alert))
-    decision_lines = decision_model_markdown_lines(decision_values)
+    decision_source = dict(core) if isinstance(core, Mapping) else {}
+    decision_source.update(decision_values)
+    decision_lines = decision_model_markdown_lines(decision_source)
     if decision_lines:
         lines.extend(["", "## Crypto Radar Decision"])
         lines.extend(decision_lines)

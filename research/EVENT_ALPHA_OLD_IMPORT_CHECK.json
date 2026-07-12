@@ -2201,7 +2201,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 1221,
+          "line": 1264,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2239,7 +2239,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 1221,
+          "line": 1264,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2452,16 +2452,17 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-12T13:41:52.901692+00:00",
+  "generated_at": "2026-07-12T17:25:08.290755+00:00",
   "include_runtime_artifacts": false,
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1783863669",
-    "research/ARCHITECTURE_SIZE_GATES.md:1783863668",
-    "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1783863711",
-    "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1783863711"
+    "AGENTS.md:1783876867",
+    "DECISIONS.md:1783876813",
+    "Makefile:1783876731",
+    "ROADMAP.md:1783876797",
+    "crypto_rsi_scanner/event_alpha/dashboard/__init__.py:1783876797"
   ],
-  "newest_source_mtime": 1783863711.2785685,
+  "newest_source_mtime": 1783877106.4254844,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2473,7 +2474,7 @@
   "old_path_text_references": 61,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1783863665.036235,
+  "report_mtime": 1783876617.383907,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2482,22 +2483,23 @@
     "include_runtime_artifacts": false,
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1783863669",
-      "research/ARCHITECTURE_SIZE_GATES.md:1783863668",
-      "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1783863711",
-      "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1783863711"
+      "AGENTS.md:1783876867",
+      "DECISIONS.md:1783876813",
+      "Makefile:1783876731",
+      "ROADMAP.md:1783876797",
+      "crypto_rsi_scanner/event_alpha/dashboard/__init__.py:1783876797"
     ],
-    "newest_source_mtime": 1783863711.2785685,
+    "newest_source_mtime": 1783877106.4254844,
     "regex_compile_count": 124,
-    "report_mtime": 1783863665.036235,
-    "scan_duration_seconds": 1.4952,
+    "report_mtime": 1783876617.383907,
+    "scan_duration_seconds": 1.7109,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 51,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
-    "scanned_source_files": 685,
-    "scanned_test_files": 108,
-    "skipped_artifact_files": 1624,
+    "scanned_source_files": 690,
+    "scanned_test_files": 111,
+    "skipped_artifact_files": 1622,
     "skipped_binary_files": 0,
     "skipped_dir_samples": [
       "crypto_rsi_scanner/__pycache__",
@@ -2518,12 +2520,12 @@
     "skipped_large_files": 1,
     "skipped_suffix_files": 1
   },
-  "scan_duration_seconds": 1.4952,
+  "scan_duration_seconds": 1.7109,
   "scanned_doc_files": 51,
-  "scanned_source_files": 685,
-  "scanned_test_files": 108,
+  "scanned_source_files": 690,
+  "scanned_test_files": 111,
   "schema_version": "event_alpha_old_import_check_v1",
-  "skipped_artifact_files": 1624,
+  "skipped_artifact_files": 1622,
   "skipped_dirs": 66,
   "skipped_large_files": 1,
   "status": "OK",

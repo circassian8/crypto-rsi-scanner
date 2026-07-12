@@ -1,5 +1,7 @@
 """Fixture-first unified calendar model and local research artifact helpers."""
 
+from .context import overlay_calendar_context, overlay_calendar_context_rows
+
 from .models import (
     CALENDAR_EVENT_KINDS,
     CALENDAR_IMPORTANCE_LEVELS,
@@ -53,5 +55,7 @@ __all__ = (
     "normalize_unified_calendar_event",
     "normalize_unified_calendar_rows",
     "normalize_unified_calendar_rows_with_telemetry",
+    "overlay_calendar_context",
+    "overlay_calendar_context_rows",
     "write_unified_calendar_artifact",
 )

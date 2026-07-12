@@ -16,6 +16,49 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-12 - Make Decision Model v2 the complete no-send operator projection
+**Status:** accepted
+**Decision:** New Crypto Radar operator surfaces use Decision Model v2 as the
+primary research projection while retaining legacy `opportunity_type` and
+`thesis_origin` only for compatibility. New rows carry one
+`primary_thesis_origin`, an ordered `thesis_origins` list, independent
+actionability/evidence/risk/urgency scores, market phase, horizon, expiry,
+chase risk, tradability, and explicit spread status. The configurable initial
+route floors are dashboard watch 45, actionable 65, rapid anomaly 68 with
+urgency 72, and high confidence 80 with evidence confidence 75. Missing spread
+may support dashboard watch through strong provisional execution-quality
+evidence but cannot support actionable/rapid routing; insufficient liquidity
+and verified extreme spread remain blockers. `risk_watch` owns unscheduled
+risk, while `calendar_risk` requires actual attached calendar evidence.
+
+The product preview is `event_decision_v2_notification_preview.md` with seven
+v2 lanes; legacy lanes stay in the separate integrated compatibility preview.
+Dashboard authority may be published only through the fixed current-namespace
+pointer after the complete product artifact set is current and fingerprinted,
+current counts match, and a fresh full strict doctor reports zero blockers.
+Pointer-mode serving stays bound to the exact namespace/run/revision/operator-
+state hash and fails closed on later drift; it never guesses a latest directory.
+
+Calendar evidence may adjust risk/expiry but cannot create direction. Optional
+RSI context may adjust an existing idea only from one unique exact symbol plus
+coin-id match loaded read-only from the explicitly configured local artifact;
+it cannot create an RSI-only idea or touch RSI storage, alerts, backtests, paper,
+sends, execution, or triggers. Every explicit v2 idea receives a pending outcome
+placeholder, including diagnostic controls, but diagnostic rows remain outside
+Core/calibration authority. Automatic outcomes remain separate from preference
+feedback. Initial burn-in targets outcomes for every idea and 3–5 targeted human
+labels per day until roughly 30–50 reviewed labels exist; threshold or route
+changes always require human approval and are never auto-applied.
+**Why:** One vertically consistent operator contract makes a liquid unknown-
+catalyst move visible without weakening tradability or safety, keeps scheduled
+and unscheduled risk distinct, and produces measurable evidence instead of
+another parallel architecture. Exact pointer authority and read-only context
+adapters prevent stale or cross-asset data from becoming trader-facing truth.
+**Revisit when:** Exact observed outcomes and reviewed preference cohorts are
+large enough to justify a human-approved threshold experiment, or a versioned
+Decision Model v3 deliberately replaces these fields while preserving legacy
+readability, fail-closed authority, and all research-only boundaries.
+
 ## 2026-07-12 - Use one closed evidence clock for burn-in measurement
 **Status:** accepted
 **Decision:** Event Alpha burn-in measurement, scorecard, source-yield, evidence

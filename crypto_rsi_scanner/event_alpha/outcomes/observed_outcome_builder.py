@@ -77,7 +77,7 @@ def build_observed_outcome(
     errors: set[str] = set()
     if evaluation is None:
         errors.add("invalid_evaluated_at")
-    if price_data_kind not in outcome_eligibility.OUTCOME_DATA_SOURCES:
+    if price_data_kind not in {"observed_market_prices", "synthetic_fixture"}:
         errors.add("invalid_price_data_kind")
     if len(candidates) != 1:
         errors.add("candidate_authority_count_invalid")

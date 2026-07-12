@@ -8,14 +8,17 @@ lower-case ``radar_route`` is an operator-facing research grouping only.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Iterable, Mapping
 
+from . import decision_policy
 from .decision_safety import decision_safety_blockers
 from .decision_results import build_decision_result, disabled_decision
+from .rsi_technical_context import validated_rsi_score_adjustments
 from .decision_models import (
     DECISION_MODEL_VERSION, CatalystStatus, ConfidenceBand, DirectionalBias, RadarDecision,
-    RadarDecisionConfig, RadarResearchRoute, ThesisOrigin, TimingState, TradabilityStatus,
-    actionability_score_cohort,
+    RadarDecisionConfig, RadarResearchRoute, SpreadStatus, ThesisOrigin, TimingState,
+    TradabilityStatus,
 )
 
 
@@ -27,116 +30,110 @@ def evaluate_radar_decision(
 ) -> RadarDecision:
     """Evaluate one integrated candidate without mutating it or causing I/O."""
 
+    return _evaluate_radar_decision(candidate, source_rows=source_rows, cfg=cfg)
+
+
+def _evaluate_radar_decision(
+    candidate: Mapping[str, Any],
+    *,
+    source_rows: Iterable[Mapping[str, Any]] = (),
+    cfg: RadarDecisionConfig | None = None,
+) -> RadarDecision:
+    """Private implementation kept separate from the stable public API."""
+
     cfg = cfg or RadarDecisionConfig()
     data = dict(candidate)
     sources = tuple(dict(row) for row in source_rows if isinstance(row, Mapping))
     if not cfg.enabled:
         return disabled_decision(data)
 
-    market = _market_snapshot(data)
-    origin = _thesis_origin(data, sources)
+    market = decision_policy.market_snapshot(data)
+    bias = decision_policy.directional_bias(data)
+    rsi_actionability_delta, rsi_risk_delta, rsi_reasons = validated_rsi_score_adjustments(data)
+    explicit_bias = str(data.get("directional_bias") or "").strip().casefold()
+    if not explicit_bias or explicit_bias != bias:
+        rsi_actionability_delta, rsi_risk_delta, rsi_reasons = 0.0, 0.0, ()
+    primary_origin, origins, origin = decision_policy.thesis_origin_values(
+        data,
+        sources,
+        rsi_context_authoritative=bool(rsi_reasons),
+    )
     catalyst = _catalyst_status(data, sources)
-    bias = _directional_bias(data)
-    timing = _timing_state(data, market)
+    timing_profile = decision_policy.timing_profile(data, market)
+    calendar_risk = decision_policy.has_calendar_risk(data)
+    timing = decision_policy.timing_state_for_profile(
+        timing_profile,
+        scheduled=calendar_risk,
+    )
+    if _freshness(data, market) in {"stale", "expired", "invalid", "future"}:
+        timing = TimingState.STALE.value
     missing = _missing_data(data, market)
-    blockers = _hard_blockers(data, market, sources=sources, origin=origin, cfg=cfg)
-    tradability = _tradability_status(market, blockers, cfg=cfg)
+    spread = decision_policy.spread_status(
+        market,
+        good_spread_bps=cfg.good_spread_bps,
+        maximum_spread_bps=cfg.maximum_spread_bps,
+    )
+    blockers = _hard_blockers(
+        data,
+        market,
+        sources=sources,
+        origin=primary_origin,
+        spread_status=spread,
+        timing_profile=timing_profile,
+        cfg=cfg,
+    )
+    tradability = _tradability_status(
+        market,
+        blockers,
+        spread_status=spread,
+        cfg=cfg,
+    )
     market_led_gate = _market_led_actionability_gate(
         data,
         market,
-        origin=origin,
+        origin=primary_origin,
         cfg=cfg,
     )
 
-    action_components = _actionability_components(
-        data,
-        market,
-        catalyst=catalyst,
-        timing=timing,
-        cfg=cfg,
-    )
-    evidence_components = _evidence_components(data, market, catalyst=catalyst)
-    risk_components = _risk_components(
-        data,
-        market,
-        catalyst=catalyst,
-        timing=timing,
-        missing=missing,
-        blockers=blockers,
-        cfg=cfg,
-    )
-    penalties, penalty_points = _soft_penalties(
-        data,
-        market,
-        origin=origin,
-        catalyst=catalyst,
-        timing=timing,
-        tradability=tradability,
-        missing=missing,
-        cfg=cfg,
-    )
-    actionability, evidence_confidence, risk = _aggregate_scores(
-        action_components=action_components,
-        evidence_components=evidence_components,
-        risk_components=risk_components,
-        penalty_points=penalty_points,
-        origin=origin,
-        blockers=blockers,
-    )
-
-    lane_enabled = (
-        cfg.market_led_enabled
-        if origin in {ThesisOrigin.MARKET_LED.value, ThesisOrigin.TECHNICAL_LED.value}
-        else cfg.catalyst_led_enabled
-    )
-    actionable = bool(
-        lane_enabled
-        and not blockers
-        and market_led_gate
-        and tradability in {TradabilityStatus.GOOD.value, TradabilityStatus.ACCEPTABLE.value}
-        and actionability >= cfg.actionability_threshold
-    )
-    confidence = _confidence_band(
+    (
+        action_components,
+        evidence_components,
+        risk_components,
+        penalties,
+        penalty_points,
         actionability,
         evidence_confidence,
         risk,
-        catalyst=catalyst,
-        actionable=actionable,
-        blockers=blockers,
-        cfg=cfg,
+    ) = _score_candidate(
+        data=data, market=market, origin=primary_origin, catalyst=catalyst,
+        timing=timing, tradability=tradability, spread=spread, missing=missing,
+        blockers=blockers, cfg=cfg, rsi_actionability_delta=rsi_actionability_delta,
+        rsi_risk_delta=rsi_risk_delta, rsi_reasons=rsi_reasons,
     )
-    radar_route, route_reason = _radar_route(
-        data,
-        origin=origin,
-        bias=bias,
-        catalyst=catalyst,
-        confidence=confidence,
-        timing=timing,
-        actionable=actionable,
-        blockers=blockers,
-        cfg=cfg,
+
+    actionable, confidence, radar_route, route_reason = _resolve_route(
+        data=data, origin=primary_origin, bias=bias, catalyst=catalyst,
+        actionability=actionability, evidence_confidence=evidence_confidence,
+        risk=risk, urgency=timing_profile.urgency_score, calendar_risk=calendar_risk,
+        market_led_gate=market_led_gate, tradability=tradability, spread=spread,
+        blockers=blockers, cfg=cfg,
     )
-    if radar_route == RadarResearchRoute.DIAGNOSTIC.value and route_reason.endswith("_route_disabled"):
-        actionable = False
-        confidence = _confidence_band(
-            actionability,
-            evidence_confidence,
-            risk,
-            catalyst=catalyst,
-            actionable=False,
-            blockers=blockers,
-            cfg=cfg,
-        )
-    warnings = _decision_warnings(
+    warnings = decision_policy.decision_warnings(
         data,
         catalyst=catalyst,
         tradability=tradability,
+        spread_status_value=spread,
         blockers=blockers,
         risk_components=risk_components,
     )
-    why_review, confirms, invalidates = _review_copy(
+    if rsi_reasons:
+        warnings = tuple(dict.fromkeys((*warnings, (
+            "Validated RSI technical context adjusted research scores: "
+            f"actionability={rsi_actionability_delta:+.2f}; risk={rsi_risk_delta:+.2f}."
+        ))))
+    why_review, confirms, invalidates = decision_policy.review_copy(
         data,
-        origin=origin,
+        origin=primary_origin,
         bias=bias,
         catalyst=catalyst,
         timing=timing,
@@ -144,16 +141,100 @@ def evaluate_radar_decision(
         blockers=blockers,
     )
     return build_decision_result(
-        origin=origin, bias=bias, catalyst=catalyst, confidence=confidence,
-        timing=timing, tradability=tradability, radar_route=radar_route,
+        origin=origin, primary_origin=primary_origin, origins=origins, bias=bias,
+        catalyst=catalyst, confidence=confidence,
+        timing=timing, tradability=tradability, spread=spread, radar_route=radar_route,
         route_reason=route_reason, actionable=actionable, actionability=actionability,
         evidence_confidence=evidence_confidence, risk=risk,
+        urgency=timing_profile.urgency_score, market_phase=timing_profile.market_phase,
+        preferred_horizon=timing_profile.preferred_horizon,
+        expires_at=timing_profile.expires_at, chase_risk=timing_profile.chase_risk_score,
         action_components=action_components, evidence_components=evidence_components,
         risk_components=risk_components, penalty_points=penalty_points,
         blockers=blockers, penalties=penalties, missing=missing, warnings=warnings,
         why_review=why_review, confirms=confirms,
         invalidates=invalidates,
     )
+
+
+def _score_candidate(
+    *,
+    data: Mapping[str, Any], market: Mapping[str, Any], origin: str,
+    catalyst: str, timing: str, tradability: str, spread: str,
+    missing: tuple[str, ...], blockers: tuple[str, ...], cfg: RadarDecisionConfig,
+    rsi_actionability_delta: float, rsi_risk_delta: float,
+    rsi_reasons: tuple[str, ...],
+) -> tuple[
+    dict[str, float], dict[str, float], dict[str, float], tuple[str, ...],
+    dict[str, float], float, float, float,
+]:
+    action_components = _actionability_components(
+        data, market, catalyst=catalyst, timing=timing, cfg=cfg,
+    )
+    evidence_components = _evidence_components(data, market, catalyst=catalyst)
+    risk_components = _risk_components(
+        data, market, catalyst=catalyst, timing=timing, missing=missing,
+        blockers=blockers, cfg=cfg,
+    )
+    penalties, penalty_points = _soft_penalties(
+        data, market, origin=origin, catalyst=catalyst, timing=timing,
+        tradability=tradability, spread_status=spread, missing=missing, cfg=cfg,
+    )
+    actionability, evidence_confidence, risk = _aggregate_scores(
+        action_components=action_components, evidence_components=evidence_components,
+        risk_components=risk_components, penalty_points=penalty_points,
+        origin=origin, blockers=blockers,
+    )
+    actionability, risk = decision_policy.apply_validated_rsi_adjustments(
+        actionability=actionability, risk=risk,
+        actionability_delta=rsi_actionability_delta, risk_delta=rsi_risk_delta,
+        reasons=rsi_reasons, action_components=action_components,
+        risk_components=risk_components, penalty_points=penalty_points,
+        blockers=blockers,
+    )
+    return (
+        action_components, evidence_components, risk_components, penalties,
+        penalty_points, actionability, evidence_confidence, risk,
+    )
+
+
+def _resolve_route(
+    *,
+    data: Mapping[str, Any], origin: str, bias: str, catalyst: str,
+    actionability: float, evidence_confidence: float, risk: float, urgency: float,
+    calendar_risk: bool, market_led_gate: bool, tradability: str, spread: str,
+    blockers: tuple[str, ...], cfg: RadarDecisionConfig,
+) -> tuple[bool, str, str, str]:
+    lane_enabled = cfg.market_led_enabled if decision_policy.uses_market_lane(origin) else cfg.catalyst_led_enabled
+    actionable = bool(
+        lane_enabled
+        and not blockers
+        and market_led_gate
+        and tradability in {TradabilityStatus.GOOD.value, TradabilityStatus.ACCEPTABLE.value}
+        and spread in {SpreadStatus.VERIFIED_GOOD.value, SpreadStatus.VERIFIED_ACCEPTABLE.value}
+        and actionability >= cfg.actionability_threshold
+    )
+    confidence = _confidence_band(
+        actionability, evidence_confidence, risk, catalyst=catalyst,
+        actionable=actionable, blockers=blockers, cfg=cfg,
+    )
+    radar_route, route_reason = _radar_route(
+        data, origin=origin, bias=bias, catalyst=catalyst, confidence=confidence,
+        actionability=actionability, urgency=urgency, calendar_risk=calendar_risk,
+        actionable=actionable, blockers=blockers, cfg=cfg,
+    )
+    if radar_route in {
+        RadarResearchRoute.DASHBOARD_WATCH.value,
+        RadarResearchRoute.RISK_WATCH.value,
+        RadarResearchRoute.CALENDAR_RISK.value,
+        RadarResearchRoute.DIAGNOSTIC.value,
+    }:
+        actionable = False
+        confidence = _confidence_band(
+            actionability, evidence_confidence, risk, catalyst=catalyst,
+            actionable=False, blockers=blockers, cfg=cfg,
+        )
+    return actionable, confidence, radar_route, route_reason
 
 
 def reevaluate_radar_decision_fields(
@@ -176,7 +257,10 @@ def _aggregate_scores(
     origin: str,
     blockers: tuple[str, ...],
 ) -> tuple[float, float, float]:
-    actionability = _weighted_actionability(action_components, origin=origin) - sum(penalty_points.values())
+    actionability = decision_policy.weighted_actionability(
+        action_components,
+        origin=origin,
+    ) - sum(penalty_points.values())
     if blockers:
         actionability = min(actionability, 20.0)
     evidence_confidence = _weighted_score(
@@ -200,48 +284,10 @@ def _aggregate_scores(
             "data_gap_risk": 0.10,
         },
     )
+    risk += float(risk_components.get("calendar_risk_adjustment") or 0.0)
     if blockers:
         risk = max(risk, 85.0)
-    return _clamp(actionability), evidence_confidence, risk
-
-
-def _thesis_origin(data: Mapping[str, Any], sources: tuple[Mapping[str, Any], ...]) -> str:
-    origins = _texts(data.get("source_origins"))
-    origins.extend(_texts(data.get("source_origin")))
-    origins.extend(str(row.get("_source_origin") or "") for row in sources)
-    packs = _texts(data.get("source_packs")) + _texts(data.get("source_pack"))
-    packs.extend(str(row.get("source_pack") or "") for row in sources)
-    classes = _texts(data.get("source_class"))
-    classes.extend(str(row.get("source_class") or "") for row in sources)
-    text = " ".join((*origins, *packs, *classes, str(data.get("event_type") or ""))).casefold()
-    has_market = "market_anomaly" in text
-    has_macro = any(term in text for term in ("macro", "central_bank", "inflation", "employment"))
-    has_catalyst = any(
-        term in text
-        for term in ("official_exchange", "official_project", "scheduled_catalyst", "unlock", "news", "regulatory")
-    ) or isinstance(data.get("official_exchange_event"), Mapping) or isinstance(data.get("scheduled_catalyst_event"), Mapping)
-    has_technical = any(term in text for term in ("derivatives", "dex_", "protocol_fundamentals", "technical"))
-    if not (has_market or has_macro or has_catalyst or has_technical):
-        has_market = str(data.get("market_state_class") or "") in {
-            "confirmed_breakout",
-            "stealth_accumulation",
-            "late_momentum",
-            "blowoff_crowded",
-            "risk_off_sell_pressure",
-        }
-    if has_macro and (has_market or has_catalyst or has_technical):
-        return ThesisOrigin.MIXED.value
-    if has_macro:
-        return ThesisOrigin.MACRO_LED.value
-    if has_market and has_catalyst:
-        return ThesisOrigin.MIXED.value
-    if has_catalyst:
-        return ThesisOrigin.CATALYST_LED.value
-    if has_market:
-        return ThesisOrigin.MARKET_LED.value
-    if has_technical:
-        return ThesisOrigin.TECHNICAL_LED.value
-    return ThesisOrigin.MIXED.value
+    return _clamp(actionability), evidence_confidence, _clamp(risk)
 
 
 def _catalyst_status(data: Mapping[str, Any], sources: tuple[Mapping[str, Any], ...]) -> str:
@@ -307,41 +353,14 @@ def _catalyst_status(data: Mapping[str, Any], sources: tuple[Mapping[str, Any], 
     return CatalystStatus.UNKNOWN.value
 
 
-def _directional_bias(data: Mapping[str, Any]) -> str:
-    state = " ".join(dict.fromkeys((_specific_market_label(data), _market_label(data))))
-    opportunity = str(data.get("opportunity_type") or "").upper()
-    text = f"{state} {opportunity} {data.get('impact_path_type') or ''}".casefold()
-    if any(term in text for term in ("post_event_fade", "blowoff", "late_momentum", "fade_short")):
-        return DirectionalBias.FADE_SHORT_REVIEW.value
-    if any(term in text for term in ("risk_off", "selloff", "risk_only", "unlock", "delisting", "exploit")):
-        return DirectionalBias.RISK.value
-    if any(term in text for term in ("confirmed_breakout", "high_liquidity_breakout", "stealth_accumulation", "early_long", "confirmed_long")):
-        return DirectionalBias.LONG.value
-    return DirectionalBias.NEUTRAL.value
-
-
-def _timing_state(data: Mapping[str, Any], market: Mapping[str, Any]) -> str:
-    freshness = _freshness(data, market)
-    if freshness in {"stale", "expired", "invalid", "future"}:
-        return TimingState.STALE.value
-    if isinstance(data.get("scheduled_catalyst_event"), Mapping) or bool(data.get("scheduled_at")):
-        return TimingState.SCHEDULED.value
-    state = _specific_market_label(data) or _market_label(data)
-    if any(term in state for term in ("post_event_fade", "blowoff")):
-        return TimingState.EXHAUSTED.value
-    if "late_momentum" in state:
-        return TimingState.EXTENDED.value
-    if any(term in state for term in ("stealth_accumulation", "no_reaction")):
-        return TimingState.EARLY.value
-    return TimingState.ACTIVE.value
-
-
 def _hard_blockers(
     data: Mapping[str, Any],
     market: Mapping[str, Any],
     *,
     sources: tuple[Mapping[str, Any], ...],
     origin: str,
+    spread_status: str,
+    timing_profile: decision_policy.TimingProfile,
     cfg: RadarDecisionConfig,
 ) -> tuple[str, ...]:
     blockers = list(decision_safety_blockers(data, sources))
@@ -369,7 +388,7 @@ def _hard_blockers(
         freshness == "fixture_allowed_stale" and run_mode not in {"fixture", "test", "replay"}
     ):
         blockers.append("market_data_stale")
-    elif origin == ThesisOrigin.MARKET_LED.value and freshness not in {
+    elif decision_policy.uses_market_lane(origin) and freshness not in {
         "fresh",
         "fixture_allowed_stale",
     }:
@@ -389,16 +408,21 @@ def _hard_blockers(
         blockers.append("market_return_unit_missing")
     elif return_unit and return_unit not in {"percent_points", "percentage_points"}:
         blockers.append("invalid_market_return_unit")
+    if any(item.startswith("return_unit_missing:") for item in unit_warnings):
+        blockers.append("market_return_unit_missing")
     if unit_warnings:
         blockers.append("invalid_market_return_units")
+    if timing_profile.expiry_invalid:
+        blockers.append("idea_expiry_invalid")
+    if timing_profile.expired:
+        blockers.append("idea_expired")
 
     liquidity = _first_number(market, "liquidity_usd", "order_book_depth_2pct", "depth_2pct_usd")
-    spread = _first_number(market, "spread_bps", "bid_ask_spread_bps")
     if liquidity is not None and liquidity < cfg.minimum_liquidity_usd:
         blockers.append("liquidity_below_minimum")
-    if spread is not None and spread > cfg.maximum_spread_bps:
+    if spread_status == SpreadStatus.VERIFIED_WIDE.value:
         blockers.append("spread_above_maximum")
-    if _is_suspicious_illiquid(data):
+    if decision_policy.is_suspicious_illiquid(data):
         blockers.append("suspicious_illiquid_move")
     if _is_duplicate(data):
         blockers.append("duplicate_family_suppressed")
@@ -409,19 +433,24 @@ def _tradability_status(
     market: Mapping[str, Any],
     blockers: tuple[str, ...],
     *,
+    spread_status: str,
     cfg: RadarDecisionConfig,
 ) -> str:
     if blockers:
         return TradabilityStatus.BLOCKED.value
     liquidity = _first_number(market, "liquidity_usd", "order_book_depth_2pct", "depth_2pct_usd")
-    spread = _first_number(market, "spread_bps", "bid_ask_spread_bps")
     if liquidity is None:
         return TradabilityStatus.POOR.value
-    if spread is None:
+    if liquidity < cfg.minimum_liquidity_usd:
         return TradabilityStatus.POOR.value
-    if liquidity >= cfg.good_liquidity_usd and spread <= cfg.good_spread_bps:
+    if spread_status == SpreadStatus.VERIFIED_GOOD.value and liquidity >= cfg.good_liquidity_usd:
         return TradabilityStatus.GOOD.value
-    if liquidity >= cfg.minimum_liquidity_usd and spread <= cfg.maximum_spread_bps:
+    if spread_status in {
+        SpreadStatus.VERIFIED_GOOD.value,
+        SpreadStatus.VERIFIED_ACCEPTABLE.value,
+        SpreadStatus.UNAVAILABLE.value,
+        SpreadStatus.STALE.value,
+    }:
         return TradabilityStatus.ACCEPTABLE.value
     return TradabilityStatus.POOR.value
 
@@ -545,50 +574,6 @@ def _actionability_components(
     }
 
 
-def _weighted_actionability(components: Mapping[str, float], *, origin: str) -> float:
-    if origin == ThesisOrigin.MARKET_LED.value:
-        weights = {
-            "market_strength": 0.30,
-            "volume_confirmation": 0.20,
-            "relative_strength": 0.10,
-            "liquidity_tradability": 0.15,
-            "timing_freshness": 0.10,
-            "asset_identity": 0.10,
-            "catalyst_evidence": 0.05,
-        }
-    elif origin == ThesisOrigin.TECHNICAL_LED.value:
-        weights = {
-            "market_strength": 0.25,
-            "volume_confirmation": 0.15,
-            "relative_strength": 0.10,
-            "liquidity_tradability": 0.15,
-            "timing_freshness": 0.10,
-            "asset_identity": 0.10,
-            "derivatives_confirmation": 0.15,
-        }
-    elif origin == ThesisOrigin.MACRO_LED.value:
-        weights = {
-            "market_strength": 0.15,
-            "volume_confirmation": 0.05,
-            "liquidity_tradability": 0.10,
-            "timing_freshness": 0.25,
-            "asset_identity": 0.10,
-            "catalyst_evidence": 0.30,
-            "derivatives_confirmation": 0.05,
-        }
-    else:
-        weights = {
-            "market_strength": 0.20,
-            "volume_confirmation": 0.10,
-            "liquidity_tradability": 0.15,
-            "timing_freshness": 0.15,
-            "asset_identity": 0.10,
-            "catalyst_evidence": 0.25,
-            "derivatives_confirmation": 0.05,
-        }
-    return _weighted_score(components, weights)
-
-
 def _evidence_components(
     data: Mapping[str, Any],
     market: Mapping[str, Any],
@@ -667,7 +652,7 @@ def _risk_components(
         manipulation = max(manipulation, 35.0)
     elif spread > cfg.good_spread_bps:
         manipulation = max(manipulation, min(100.0, 35.0 + spread / 2.0))
-    if _is_suspicious_illiquid(data):
+    if decision_policy.is_suspicious_illiquid(data):
         manipulation = 100.0
     freshness = _freshness(data, market)
     staleness = 10.0 if freshness in {"fresh", "fixture_allowed_stale"} else 45.0 if not freshness or freshness == "unknown" else 100.0
@@ -690,6 +675,8 @@ def _risk_components(
     data_gap = min(100.0, len(missing) * 14.0)
     if blockers:
         data_gap = max(data_gap, 80.0)
+    calendar_adjustment = _number(data.get("calendar_risk_score_adjustment")) or 0.0
+    calendar_adjustment = max(0.0, min(25.0, calendar_adjustment))
     return {
         "manipulation_risk": manipulation,
         "staleness_risk": staleness,
@@ -697,6 +684,7 @@ def _risk_components(
         "catalyst_uncertainty_risk": catalyst_risk,
         "crowding_risk": crowding,
         "data_gap_risk": data_gap,
+        "calendar_risk_adjustment": calendar_adjustment,
     }
 
 
@@ -708,6 +696,7 @@ def _soft_penalties(
     catalyst: str,
     timing: str,
     tradability: str,
+    spread_status: str,
     missing: tuple[str, ...],
     cfg: RadarDecisionConfig,
 ) -> tuple[tuple[str, ...], dict[str, float]]:
@@ -729,6 +718,12 @@ def _soft_penalties(
     if tradability == TradabilityStatus.POOR.value:
         penalties.append("tradability_data_or_depth_insufficient")
         points["tradability_poor"] = 15.0
+    if spread_status == SpreadStatus.UNAVAILABLE.value:
+        penalties.append("spread_unavailable_dashboard_only")
+        points["spread_unavailable"] = 8.0
+    elif spread_status == SpreadStatus.STALE.value:
+        penalties.append("spread_stale_dashboard_only")
+        points["spread_stale"] = 10.0
     volume_z = _first_number(market, "volume_zscore_24h", "volume_turnover_zscore", "turnover_zscore")
     volume_mcap = _first_number(market, "volume_to_market_cap", "volume_mcap", "volume_mcap_ratio")
     if volume_z is None and volume_mcap is None:
@@ -754,7 +749,7 @@ def _soft_penalties(
     elif timing == TimingState.EXHAUSTED.value:
         penalties.append("move_exhausted")
         points["move_exhausted"] = 10.0
-    if _derivatives_score(data) <= 30.0 and _directional_bias(data) == DirectionalBias.FADE_SHORT_REVIEW.value:
+    if _derivatives_score(data) <= 30.0 and decision_policy.directional_bias(data) == DirectionalBias.FADE_SHORT_REVIEW.value:
         penalties.append("derivatives_confirmation_missing_for_fade_review")
         points["fade_derivatives_missing"] = 8.0
     return tuple(dict.fromkeys(penalties)), points
@@ -774,7 +769,7 @@ def _confidence_band(
         return ConfidenceBand.DIAGNOSTIC.value
     if (
         actionable
-        and evidence >= 85
+        and evidence >= cfg.high_confidence_evidence_threshold
         and risk <= 45
         and actionability >= cfg.high_confidence_threshold
     ):
@@ -793,141 +788,84 @@ def _radar_route(
     bias: str,
     catalyst: str,
     confidence: str,
-    timing: str,
+    actionability: float,
+    urgency: float,
+    calendar_risk: bool,
     actionable: bool,
     blockers: tuple[str, ...],
     cfg: RadarDecisionConfig,
 ) -> tuple[str, str]:
     if blockers:
         return RadarResearchRoute.DIAGNOSTIC.value, "hard_gate_blocked_research_promotion"
-    if origin in {ThesisOrigin.MARKET_LED.value, ThesisOrigin.TECHNICAL_LED.value} and not cfg.market_led_enabled:
+    if decision_policy.uses_market_lane(origin) and not cfg.market_led_enabled:
         return RadarResearchRoute.DIAGNOSTIC.value, "market_led_route_disabled"
-    if origin not in {ThesisOrigin.MARKET_LED.value, ThesisOrigin.TECHNICAL_LED.value} and not cfg.catalyst_led_enabled:
+    if not decision_policy.uses_market_lane(origin) and not cfg.catalyst_led_enabled:
         return RadarResearchRoute.DIAGNOSTIC.value, "catalyst_led_route_disabled"
-    if timing == TimingState.SCHEDULED.value or bias == DirectionalBias.RISK.value:
-        return _configured_route(
+    if calendar_risk:
+        return decision_policy.configured_route(
             RadarResearchRoute.CALENDAR_RISK.value,
-            "scheduled_or_downside_risk_research",
+            "attached_calendar_or_scheduled_risk_research",
             enabled=cfg.calendar_risk_route_enabled,
+        )
+    if bias == DirectionalBias.RISK.value:
+        return decision_policy.configured_route(
+            RadarResearchRoute.RISK_WATCH.value,
+            "unscheduled_downside_risk_research",
+            enabled=cfg.risk_watch_route_enabled,
         )
     if bias == DirectionalBias.FADE_SHORT_REVIEW.value:
         if _has_crowding(data):
-            return _configured_route(
+            return decision_policy.configured_route(
                 RadarResearchRoute.FADE_EXHAUSTION_REVIEW.value,
                 "extended_move_with_crowding_evidence",
                 enabled=cfg.fade_exhaustion_route_enabled,
             )
-        return _configured_route(
-            RadarResearchRoute.RAPID_MARKET_ANOMALY.value,
-            "late_move_needs_rapid_crowding_review",
-            enabled=cfg.rapid_anomaly_route_enabled,
-        )
+        if (
+            actionable
+            and actionability >= cfg.rapid_anomaly_actionability_threshold
+            and urgency >= cfg.rapid_anomaly_urgency_threshold
+        ):
+            return decision_policy.configured_route(
+                RadarResearchRoute.RAPID_MARKET_ANOMALY.value,
+                "late_move_needs_rapid_crowding_review",
+                enabled=cfg.rapid_anomaly_route_enabled,
+            )
+        if actionability >= cfg.dashboard_watch_threshold:
+            return decision_policy.configured_route(
+                RadarResearchRoute.DASHBOARD_WATCH.value,
+                "late_move_below_rapid_research_gate",
+                enabled=cfg.dashboard_watch_route_enabled,
+            )
+        return RadarResearchRoute.DIAGNOSTIC.value, "below_dashboard_watch_threshold"
     if not actionable:
-        return RadarResearchRoute.DIAGNOSTIC.value, "below_configured_actionability_gate"
+        if actionability >= cfg.dashboard_watch_threshold:
+            return decision_policy.configured_route(
+                RadarResearchRoute.DASHBOARD_WATCH.value,
+                "useful_research_below_actionable_push_gate",
+                enabled=cfg.dashboard_watch_route_enabled,
+            )
+        return RadarResearchRoute.DIAGNOSTIC.value, "below_dashboard_watch_threshold"
     if (
         confidence == ConfidenceBand.HIGH_CONFIDENCE.value
         and catalyst == CatalystStatus.CONFIRMED.value
-        and origin in {ThesisOrigin.CATALYST_LED.value, ThesisOrigin.MIXED.value}
+        and origin in {ThesisOrigin.CATALYST_LED.value, ThesisOrigin.FUNDAMENTAL_LED.value}
     ):
-        return _configured_route(
+        return decision_policy.configured_route(
             RadarResearchRoute.HIGH_CONFIDENCE_WATCH.value,
             "confirmed_catalyst_and_high_confidence_scores",
             enabled=cfg.high_confidence_route_enabled,
         )
     state = _market_label(data)
     if state in {"confirmed_breakout", "high_liquidity_breakout", "stealth_accumulation"}:
-        return _configured_route(
+        return decision_policy.configured_route(
             RadarResearchRoute.ACTIONABLE_WATCH.value,
             "fresh_market_led_long_research",
             enabled=cfg.actionable_watch_route_enabled,
         )
-    return _configured_route(
+    return decision_policy.configured_route(
         RadarResearchRoute.ACTIONABLE_WATCH.value,
         "configured_research_actionability_gate_passed",
         enabled=cfg.actionable_watch_route_enabled,
-    )
-
-
-def _configured_route(route: str, reason: str, *, enabled: bool) -> tuple[str, str]:
-    if enabled:
-        return route, reason
-    return RadarResearchRoute.DIAGNOSTIC.value, f"{route}_route_disabled"
-
-
-def _decision_warnings(
-    data: Mapping[str, Any],
-    *,
-    catalyst: str,
-    tradability: str,
-    blockers: tuple[str, ...],
-    risk_components: Mapping[str, float],
-) -> tuple[str, ...]:
-    warnings = ["Research idea only; not a trade instruction."]
-    if catalyst == CatalystStatus.UNKNOWN.value:
-        warnings.append(
-            "Catalyst unknown: evidence confidence is lower and manipulation risk is higher; this is not an automatic hard block."
-        )
-    if tradability in {TradabilityStatus.POOR.value, TradabilityStatus.BLOCKED.value}:
-        warnings.append("Tradability is poor or blocked; review liquidity, turnover, and spread before relying on the idea.")
-    if _is_suspicious_illiquid(data):
-        warnings.append("Suspicious illiquid move: manipulation risk is high and promotion is blocked.")
-    elif float(risk_components.get("manipulation_risk") or 0.0) >= 50.0:
-        warnings.append(
-            "Higher manipulation risk: manually review liquidity, spread, turnover, and venue concentration."
-        )
-    if blockers:
-        warnings.append("One or more deterministic hard gates blocked actionable research routing.")
-    return tuple(dict.fromkeys(warnings))
-
-
-def _review_copy(
-    data: Mapping[str, Any],
-    *,
-    origin: str,
-    bias: str,
-    catalyst: str,
-    timing: str,
-    radar_route: str,
-    blockers: tuple[str, ...],
-) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
-    state = _market_label(data).replace("_", " ") or "market change"
-    why: list[str] = []
-    confirms: list[str] = []
-    invalidates: list[str] = []
-    if origin == ThesisOrigin.MARKET_LED.value:
-        why.append(f"Fresh market-led evidence shows {state}; catalyst search is enrichment, not a prerequisite.")
-    elif origin in {ThesisOrigin.CATALYST_LED.value, ThesisOrigin.MIXED.value}:
-        why.append(f"Catalyst and market context combine into a {timing.replace('_', ' ')} research thesis.")
-    elif origin == ThesisOrigin.MACRO_LED.value:
-        why.append("A scheduled macro window can change broad crypto risk even before asset-specific confirmation.")
-    else:
-        why.append(f"Technical/derivatives evidence makes the {state} worth human review.")
-    if catalyst == CatalystStatus.UNKNOWN.value:
-        why.append("The catalyst is unknown, so evidence confidence is discounted rather than hard-blocked.")
-    if blockers:
-        why.append("Diagnostic evidence remains useful even though hard gates prevent actionable promotion.")
-    elif radar_route != RadarResearchRoute.DIAGNOSTIC.value:
-        why.append(f"Research route: {radar_route.replace('_', ' ')}.")
-
-    if bias == DirectionalBias.LONG.value:
-        confirms.extend(("fresh volume and relative-strength follow-through", "liquidity and spread remain within configured limits"))
-        invalidates.extend(("breakout or relative strength fails", "volume anomaly fades without follow-through"))
-    elif bias == DirectionalBias.FADE_SHORT_REVIEW.value:
-        confirms.extend(("fresh derivatives crowding or exhaustion evidence", "failed reclaim after the extended move"))
-        invalidates.extend(("funding and open interest normalize", "price consolidates without failure"))
-    elif bias == DirectionalBias.RISK.value:
-        confirms.extend(("downside catalyst or sell-pressure evidence strengthens", "risk window and affected assets remain current"))
-        invalidates.extend(("source correction or event cancellation", "market absorbs the risk without adverse reaction"))
-    else:
-        confirms.append("fresh identity, market, liquidity, and source evidence")
-        invalidates.append("stale data, identity conflict, or deteriorating tradability")
-    if catalyst == CatalystStatus.UNKNOWN.value:
-        confirms.append("a credible catalyst source would raise evidence confidence but is not required for market-led review")
-    invalidates.extend(("market snapshot becomes stale", "liquidity or spread breaches a hard gate"))
-    return (
-        tuple(dict.fromkeys(why)),
-        tuple(dict.fromkeys(confirms)),
-        tuple(dict.fromkeys(invalidates)),
     )
 
 
@@ -963,15 +901,6 @@ def _catalyst_source_fields(data: Mapping[str, Any]) -> tuple[str, str]:
         url = url or str(nested.get("source_url") or nested.get("url") or "").strip()
         title = title or str(nested.get("title") or nested.get("event_name") or "").strip()
     return url, title
-
-
-def _market_snapshot(data: Mapping[str, Any]) -> dict[str, Any]:
-    out: dict[str, Any] = {}
-    for key in ("latest_market_snapshot", "market_snapshot", "market_state_snapshot"):
-        value = data.get(key)
-        if isinstance(value, Mapping):
-            out.update(dict(value))
-    return out
 
 
 def _market_label(data: Mapping[str, Any]) -> str:
@@ -1053,22 +982,6 @@ def _has_crowding(data: Mapping[str, Any]) -> bool:
     return bool((oi is not None and abs(oi) >= 25) or (funding_z is not None and abs(funding_z) >= 2))
 
 
-def _is_suspicious_illiquid(data: Mapping[str, Any]) -> bool:
-    text = " ".join(
-        str(data.get(key) or "")
-        for key in (
-            "market_anomaly_bucket",
-            "anomaly_bucket",
-            "market_anomaly_type",
-            "anomaly_type",
-            "market_state_class",
-            "dex_onchain_classification",
-            "diagnostics_reason",
-        )
-    ).casefold()
-    return any(term in text for term in ("low_liquidity_suspicious", "suspicious_illiquid", "suspicious_low_liquidity"))
-
-
 def _is_source_noise_or_control(data: Mapping[str, Any]) -> bool:
     text = " ".join(
         str(data.get(key) or "")
@@ -1138,9 +1051,10 @@ def _first_number(row: Mapping[str, Any], *keys: str) -> float | None:
 
 def _number(value: object) -> float | None:
     try:
-        return float(value)  # type: ignore[arg-type]
+        parsed = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+    return parsed if math.isfinite(parsed) else None
 
 
 def _truthy(value: object) -> bool:
@@ -1174,7 +1088,7 @@ def _clamp(value: float) -> float:
 
 __all__ = (
     "DECISION_MODEL_VERSION", "CatalystStatus", "ConfidenceBand", "DirectionalBias",
-    "RadarDecision", "RadarDecisionConfig", "RadarResearchRoute", "ThesisOrigin",
-    "TimingState", "TradabilityStatus", "evaluate_radar_decision",
+    "RadarDecision", "RadarDecisionConfig", "RadarResearchRoute", "SpreadStatus",
+    "ThesisOrigin", "TimingState", "TradabilityStatus", "evaluate_radar_decision",
     "reevaluate_radar_decision_fields",
 )

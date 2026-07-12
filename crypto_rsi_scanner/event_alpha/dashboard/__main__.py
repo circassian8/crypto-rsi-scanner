@@ -5,29 +5,91 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 
 from .app import serve_dashboard
 from .loader import candidate_identifier, load_dashboard_snapshot
+from .models import DashboardGenerationBinding, DashboardLoadError
+from .readiness import (
+    DashboardReadinessError,
+    publish_current_namespace_pointer,
+    read_current_namespace_pointer,
+    resolve_authoritative_dashboard,
+)
 from .render import render_dashboard_page
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Serve the local read-only Event Alpha radar dashboard.")
     parser.add_argument("--artifact-base", default="event_fade_cache")
-    parser.add_argument("--namespace", default="no_key_live")
+    parser.add_argument("--namespace", default=None)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--smoke", action="store_true", help="Render every page without starting a server or writing files.")
     parser.add_argument(
+        "--readiness",
+        action="store_true",
+        help="Validate one exact authoritative generation and atomically update the current pointer.",
+    )
+    parser.add_argument(
         "--smoke-now",
         default=None,
-        help="Deterministic as-of timestamp for smoke loading only; serving always uses wall UTC.",
+        help="Deterministic as-of timestamp for smoke/readiness tests only; serving uses wall UTC.",
     )
     args = parser.parse_args(argv)
-    if args.smoke:
-        return _smoke(Path(args.artifact_base), args.namespace, now=args.smoke_now)
-    serve_dashboard(args.artifact_base, args.namespace, host=args.host, port=args.port)
-    return 0
+    try:
+        if args.readiness:
+            result = publish_current_namespace_pointer(
+                args.artifact_base,
+                args.namespace,
+                now=args.smoke_now,
+            )
+            snapshot = result.snapshot
+            print(
+                "radar_dashboard_readiness: READY "
+                f"namespace={snapshot.artifact_namespace} run_id={snapshot.run_id} "
+                f"revision={snapshot.revision} pointer={result.pointer_path.name}"
+            )
+            return 0
+        effective_smoke_now = args.smoke_now
+        if args.smoke and effective_smoke_now is None:
+            namespace_hint = str(args.namespace or "").strip()
+            if not namespace_hint:
+                namespace_hint = str(
+                    read_current_namespace_pointer(args.artifact_base)["artifact_namespace"]
+                )
+            effective_smoke_now = _fixture_smoke_now(
+                Path(args.artifact_base),
+                namespace_hint,
+            )
+        result = resolve_authoritative_dashboard(
+            args.artifact_base,
+            args.namespace,
+            now=effective_smoke_now if args.smoke else None,
+        )
+        namespace = result.snapshot.artifact_namespace
+        if args.smoke:
+            try:
+                return _smoke(Path(args.artifact_base), namespace, now=effective_smoke_now)
+            except SystemExit as exc:
+                raise DashboardReadinessError(str(exc)) from exc
+        generation_binding = (
+            DashboardGenerationBinding.from_snapshot(result.snapshot)
+            if result.namespace_source == "pointer"
+            else None
+        )
+        serve_dashboard(
+            args.artifact_base,
+            namespace,
+            host=args.host,
+            port=args.port,
+            generation_binding=generation_binding,
+        )
+        return 0
+    except (DashboardReadinessError, DashboardLoadError, OSError, ValueError) as exc:
+        reason = " ".join(str(exc).split()) or type(exc).__name__
+        print(f"radar_dashboard_readiness: NOT_READY reason={reason}", file=sys.stderr)
+        return 1
 
 
 def _smoke(artifact_base: Path, namespace: str, *, now: str | None = None) -> int:

@@ -7,6 +7,7 @@ notification instructions and carry explicit zero-side-effect facts.
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -26,6 +27,7 @@ CALENDAR_EVENT_KINDS = frozenset(
         "project",
         "protocol",
         "regulatory",
+        "options_expiry",
     }
 )
 DATE_CERTAINTY_LEVELS = frozenset({"exact", "window", "estimated", "unknown"})
@@ -42,6 +44,7 @@ CALENDAR_TRACKING_STATES = frozenset(
 )
 
 _REMINDER_RE = re.compile(r"^[1-9][0-9]*(?:m|h|d|w)$")
+_TIMEZONE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_+.-]*(?:/[A-Za-z0-9_+.-]+)*$")
 _EVENT_KIND_ALIASES = {
     "cpi": "inflation",
     "ppi": "inflation",
@@ -61,6 +64,8 @@ _EVENT_KIND_ALIASES = {
     "testnet": "protocol",
     "governance_vote": "protocol",
     "airdrop": "project",
+    "options_expiration": "options_expiry",
+    "options_expiry": "options_expiry",
 }
 _FORBIDDEN_TRUE_FIELDS = (
     "created_alert",
@@ -134,6 +139,13 @@ class UnifiedCalendarEvent:
     source_url: str
     reminder_windows: tuple[str, ...]
     post_event_tracking_status: str
+    timezone: str = "UTC"
+    forecast_value: float | None = None
+    previous_value: float | None = None
+    actual_value: float | None = None
+    surprise_value: float | None = None
+    impact_window_before: str = "24h"
+    impact_window_after: str = "4h"
     profile: str | None = None
     artifact_namespace: str | None = None
     run_mode: str | None = None
@@ -146,50 +158,61 @@ class UnifiedCalendarEvent:
     def to_dict(self) -> dict[str, Any]:
         """Return the stable research-artifact representation."""
 
-        return {
-            "schema_version": 1,
-            "row_type": "event_unified_calendar_event",
-            "calendar_event_id": self.calendar_event_id,
-            "title": self.title,
-            "event_kind": self.event_kind,
-            "scheduled_at": self.scheduled_at,
-            "window_start": self.window_start,
-            "window_end": self.window_end,
-            "time_certainty": self.time_certainty,
-            "importance": self.importance,
-            "affected_assets": list(self.affected_assets),
-            "source": self.source,
-            "source_url": self.source_url,
-            "reminder_windows": list(self.reminder_windows),
-            "post_event_tracking_status": self.post_event_tracking_status,
-            "profile": self.profile,
-            "artifact_namespace": self.artifact_namespace,
-            "run_mode": self.run_mode,
-            "run_id": self.run_id,
-            "observed_at": self.observed_at,
-            "research_only": True,
-            "no_send_rehearsal": True,
-            "sent": False,
-            "created_alert": False,
-            "notification_send_enabled": False,
-            "execution_enabled": False,
-            "paper_trading_enabled": False,
-            "normal_rsi_routing_enabled": False,
-            "trade_created": False,
-            "paper_trade_created": False,
-            "normal_rsi_signal_written": False,
-            "strict_alerts_created": 0,
-            "telegram_sends": 0,
-            "trades_created": 0,
-            "paper_trades_created": 0,
-            "normal_rsi_signal_rows_written": 0,
-            "triggered_fade_created": 0,
-        }
+        return _calendar_event_to_dict(self)
 
     @classmethod
     def from_mapping(cls, row: Mapping[str, Any]) -> "UnifiedCalendarEvent":
         _validate_input_safety(row)
         return normalize_unified_calendar_event(row)
+
+
+def _calendar_event_to_dict(event: UnifiedCalendarEvent) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "row_type": "event_unified_calendar_event",
+        "calendar_event_id": event.calendar_event_id,
+        "title": event.title,
+        "event_kind": event.event_kind,
+        "scheduled_at": event.scheduled_at,
+        "window_start": event.window_start,
+        "window_end": event.window_end,
+        "time_certainty": event.time_certainty,
+        "importance": event.importance,
+        "affected_assets": list(event.affected_assets),
+        "source": event.source,
+        "source_url": event.source_url,
+        "reminder_windows": list(event.reminder_windows),
+        "post_event_tracking_status": event.post_event_tracking_status,
+        "timezone": event.timezone,
+        "forecast_value": event.forecast_value,
+        "previous_value": event.previous_value,
+        "actual_value": event.actual_value,
+        "surprise_value": event.surprise_value,
+        "impact_window_before": event.impact_window_before,
+        "impact_window_after": event.impact_window_after,
+        "profile": event.profile,
+        "artifact_namespace": event.artifact_namespace,
+        "run_mode": event.run_mode,
+        "run_id": event.run_id,
+        "observed_at": event.observed_at,
+        "research_only": True,
+        "no_send_rehearsal": True,
+        "sent": False,
+        "created_alert": False,
+        "notification_send_enabled": False,
+        "execution_enabled": False,
+        "paper_trading_enabled": False,
+        "normal_rsi_routing_enabled": False,
+        "trade_created": False,
+        "paper_trade_created": False,
+        "normal_rsi_signal_written": False,
+        "strict_alerts_created": 0,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "paper_trades_created": 0,
+        "normal_rsi_signal_rows_written": 0,
+        "triggered_fade_created": 0,
+    }
 
 
 def normalize_unified_calendar_event(
@@ -228,6 +251,15 @@ def normalize_unified_calendar_event(
     source_url = _text(item.get("source_url") or item.get("url") or item.get("link"))
     reminders = _reminder_windows(item, importance=importance)
     tracking = _post_event_tracking_status(item, certainty=certainty)
+    timezone_name = _text(item.get("timezone") or item.get("source_timezone") or "UTC")
+    forecast_value = _optional_finite_number(_first_present_nonempty(item, "forecast_value", "forecast"))
+    previous_value = _optional_finite_number(_first_present_nonempty(item, "previous_value", "previous"))
+    actual_value = _optional_finite_number(_first_present_nonempty(item, "actual_value", "actual"))
+    surprise_value = _optional_finite_number(_first_present_nonempty(item, "surprise_value", "surprise"))
+    if surprise_value is None and actual_value is not None and forecast_value is not None:
+        surprise_value = round(actual_value - forecast_value, 12)
+    impact_window_before = _impact_window(item.get("impact_window_before"), default="24h")
+    impact_window_after = _impact_window(item.get("impact_window_after"), default="4h")
     observed = _timestamp_text(observed_at if observed_at is not None else item.get("observed_at"))
     event_id = _text(item.get("calendar_event_id") or item.get("event_id") or item.get("id"))
     if not event_id:
@@ -247,6 +279,13 @@ def normalize_unified_calendar_event(
         source_url=source_url,
         reminder_windows=reminders,
         post_event_tracking_status=tracking,
+        timezone=timezone_name,
+        forecast_value=forecast_value,
+        previous_value=previous_value,
+        actual_value=actual_value,
+        surprise_value=surprise_value,
+        impact_window_before=impact_window_before,
+        impact_window_after=impact_window_after,
         profile=_optional_text(profile if profile is not None else item.get("profile")),
         artifact_namespace=_optional_text(
             artifact_namespace if artifact_namespace is not None else item.get("artifact_namespace")
@@ -287,6 +326,11 @@ def _validate_event(event: UnifiedCalendarEvent) -> None:
         raise CalendarValidationError(
             "unsupported post_event_tracking_status",
             code=CalendarRejectionCode.UNSUPPORTED_TRACKING_STATUS,
+        )
+    if not _TIMEZONE_RE.fullmatch(event.timezone):
+        raise CalendarValidationError(
+            "invalid calendar timezone",
+            code=CalendarRejectionCode.INVALID_TIMESTAMP,
         )
     if not event.source:
         raise CalendarValidationError(
@@ -329,6 +373,23 @@ def _validate_event(event: UnifiedCalendarEvent) -> None:
             raise CalendarValidationError(
                 "invalid reminder window",
                 code=CalendarRejectionCode.INVALID_REMINDER_WINDOW,
+            )
+    for impact_window in (event.impact_window_before, event.impact_window_after):
+        if not _REMINDER_RE.fullmatch(impact_window):
+            raise CalendarValidationError(
+                "invalid calendar impact window",
+                code=CalendarRejectionCode.INVALID_REMINDER_WINDOW,
+            )
+    for value in (
+        event.forecast_value,
+        event.previous_value,
+        event.actual_value,
+        event.surprise_value,
+    ):
+        if value is not None and not math.isfinite(value):
+            raise CalendarValidationError(
+                "invalid calendar economic value",
+                code=CalendarRejectionCode.INVALID_TIMESTAMP,
             )
 
 
@@ -430,6 +491,39 @@ def _reminder_windows(item: Mapping[str, Any], *, importance: str) -> tuple[str,
     else:
         values = ["7d", "24h", "1h"] if importance in {"high", "critical"} else ["24h"]
     return tuple(dict.fromkeys(value.casefold() for value in values if value))
+
+
+def _impact_window(value: object, *, default: str) -> str:
+    text = _text(value or default).casefold()
+    if not _REMINDER_RE.fullmatch(text):
+        raise CalendarValidationError(
+            "invalid calendar impact window",
+            code=CalendarRejectionCode.INVALID_REMINDER_WINDOW,
+        )
+    return text
+
+
+def _optional_finite_number(value: object) -> float | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        raise CalendarValidationError(
+            "invalid calendar economic value",
+            code=CalendarRejectionCode.INVALID_TIMESTAMP,
+        )
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise CalendarValidationError(
+            "invalid calendar economic value",
+            code=CalendarRejectionCode.INVALID_TIMESTAMP,
+        ) from None
+    if not math.isfinite(number):
+        raise CalendarValidationError(
+            "invalid calendar economic value",
+            code=CalendarRejectionCode.INVALID_TIMESTAMP,
+        )
+    return number
 
 
 def _post_event_tracking_status(item: Mapping[str, Any], *, certainty: str) -> str:

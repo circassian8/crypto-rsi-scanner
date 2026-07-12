@@ -59,6 +59,24 @@ _NON_AUTHORITATIVE_OUTCOME_LABELS = frozenset({
     "unknown",
     "unvalidated",
 })
+_INTEGRATED_OUTCOME_CONFLICT_KEYS = (
+    "integrated_outcome_missing_for_candidate",
+    "integrated_outcome_side_effect_flag",
+    "integrated_outcome_schema_missing",
+    "integrated_outcome_missing_identity",
+    "integrated_outcome_returns_without_price",
+    "integrated_outcome_diagnostic_in_performance",
+    "integrated_outcome_return_double_scaled",
+    "integrated_outcome_missing_data_unlabeled",
+    "integrated_outcome_thesis_move_missing",
+    "integrated_outcome_eligibility_contract_invalid",
+    "integrated_outcome_synthetic_evidence_leak",
+    "integrated_outcome_immature_validation_claim",
+    "integrated_outcome_duplicate_exact_identity",
+    "integrated_outcome_ambiguous_exact_identity",
+    "integrated_outcome_eligible_provenance_missing",
+    "integrated_outcome_identity_mismatch",
+)
 
 
 def _joined_authority_invalid_identities(
@@ -86,15 +104,22 @@ def _joined_authority_invalid_identities(
         "identity_mismatch",
         "unmatched_outcome_identity",
     }
-    return {
-        identity
-        for row in excluded
-        if authority_reasons & set(row.get("calibration_ineligible_reasons") or ())
-        and (
-            identity := outcome_eligibility_contract.canonical_join_identity(row)
+    invalid: set[tuple[str, ...]] = set()
+    for row in excluded:
+        reasons = authority_reasons & set(
+            row.get("calibration_ineligible_reasons") or ()
         )
-        is not None
-    }
+        # Explicit v2 diagnostics still require a truthful pending outcome,
+        # but diagnostics intentionally have no canonical CoreOpportunity.
+        # Their expected unmatched-core join must not turn that placeholder
+        # into an artifact-doctor contract failure. Candidate/core contract
+        # corruption and identity mismatches remain blockers.
+        if str(row.get("opportunity_type") or "").upper() == "DIAGNOSTIC":
+            reasons.discard("unmatched_outcome_identity")
+        identity = outcome_eligibility_contract.canonical_join_identity(row)
+        if reasons and identity is not None:
+            invalid.add(identity)
+    return invalid
 
 def _integrated_delivery_conflicts(
     rows: Iterable[Mapping[str, Any]],
@@ -194,6 +219,10 @@ def _materialize_outcome_conflict_authority(
     return outcome_rows, candidate_rows, evaluation_clock, invalid_identities
 
 
+def _empty_integrated_outcome_conflicts() -> dict[str, int]:
+    return dict.fromkeys(_INTEGRATED_OUTCOME_CONFLICT_KEYS, 0)
+
+
 def _integrated_outcome_conflicts(
     candidates: Iterable[Mapping[str, Any]],
     outcomes: Iterable[Mapping[str, Any]],
@@ -201,24 +230,7 @@ def _integrated_outcome_conflicts(
     core_rows: Iterable[Mapping[str, Any]] | None = None,
     evaluated_at: Any = None,
 ) -> dict[str, int]:
-    out = {
-        "integrated_outcome_missing_for_candidate": 0,
-        "integrated_outcome_side_effect_flag": 0,
-        "integrated_outcome_schema_missing": 0,
-        "integrated_outcome_missing_identity": 0,
-        "integrated_outcome_returns_without_price": 0,
-        "integrated_outcome_diagnostic_in_performance": 0,
-        "integrated_outcome_return_double_scaled": 0,
-        "integrated_outcome_missing_data_unlabeled": 0,
-        "integrated_outcome_thesis_move_missing": 0,
-        "integrated_outcome_eligibility_contract_invalid": 0,
-        "integrated_outcome_synthetic_evidence_leak": 0,
-        "integrated_outcome_immature_validation_claim": 0,
-        "integrated_outcome_duplicate_exact_identity": 0,
-        "integrated_outcome_ambiguous_exact_identity": 0,
-        "integrated_outcome_eligible_provenance_missing": 0,
-        "integrated_outcome_identity_mismatch": 0,
-    }
+    out = _empty_integrated_outcome_conflicts()
     outcome_rows, candidate_rows, evaluation_clock, authority_invalid_identities = (
         _materialize_outcome_conflict_authority(
             candidates, outcomes, core_rows, evaluated_at
@@ -257,7 +269,15 @@ def _integrated_outcome_conflicts(
             candidates_by_id[candidate_id].append(candidate)
     outcome_by_candidate = {str(row.get("candidate_id") or ""): row for row in outcome_rows if row.get("candidate_id")}
     for candidate in candidate_rows:
-        if str(candidate.get("opportunity_type") or "") == "DIAGNOSTIC":
+        legacy_diagnostic = (
+            str(candidate.get("opportunity_type") or "") == "DIAGNOSTIC"
+            and not (
+                str(candidate.get("decision_model_version") or "")
+                == "crypto_radar_decision_model_v2"
+                and candidate.get("decision_model_enabled") is True
+            )
+        )
+        if legacy_diagnostic:
             continue
         if str(candidate.get("candidate_id") or "") not in outcome_by_candidate:
             out["integrated_outcome_missing_for_candidate"] += 1

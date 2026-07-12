@@ -35,8 +35,11 @@ class _IntegratedRadarOptionalArtifactFields:
     input_manifest_path: Path | None = None
     source_coverage_json_path: Path | None = None
     source_coverage_path: Path | None = None
+    live_provider_readiness_json_path: Path | None = None
+    live_provider_readiness_report_path: Path | None = None
     unified_calendar_path: Path | None = None
     unified_calendar_preview_path: Path | None = None
+    decision_v2_notification_preview_path: Path | None = None
     asset_registry_path: Path | None = None
     instrument_resolution_path: Path | None = None
     asset_resolution_report_path: Path | None = None

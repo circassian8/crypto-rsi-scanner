@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from typing import Any
+from urllib.parse import quote
 
 from ..artifacts.schema.decision_model import validate_contract
 from .decision_models import actionability_score_cohort
@@ -19,17 +20,25 @@ DECISION_MODEL_FIELD_NAMES = (
     "decision_model_version",
     "decision_model_enabled",
     "thesis_origin",
+    "primary_thesis_origin",
+    "thesis_origins",
     "directional_bias",
     "catalyst_status",
     "confidence_band",
     "timing_state",
     "tradability_status",
+    "spread_status",
     "radar_route",
     "radar_route_reason",
     "radar_actionable",
     "actionability_score",
     "evidence_confidence_score",
     "risk_score",
+    "urgency_score",
+    "market_phase",
+    "preferred_horizon",
+    "expires_at",
+    "chase_risk_score",
     "actionability_score_components",
     "actionability_penalty_components",
     "evidence_confidence_components",
@@ -50,11 +59,13 @@ DECISION_MODEL_FIELD_NAMES = (
 )
 
 PREVIEW_LANE_TITLES = {
-    "actionable_market_led": "Actionable Market-Led Ideas",
-    "high_confidence_catalyst": "High-Confidence Catalyst Ideas",
-    "rapid_market_anomaly": "Rapid Anomalies",
+    "high_confidence": "High-Confidence Ideas",
+    "actionable": "Actionable Ideas",
+    "rapid_market_anomaly": "Rapid Market Anomalies",
+    "dashboard_watch": "Dashboard Watch",
     "fade_exhaustion_review": "Fade / Exhaustion Review",
-    "calendar_risk": "Calendar / Risk",
+    "risk_watch": "Risk Watch",
+    "calendar_risk": "Calendar / Scheduled Risk",
     "decision_diagnostic": "Decision Diagnostics",
 }
 
@@ -110,22 +121,20 @@ def decision_preview_lane(values: Mapping[str, Any]) -> str:
     if not projected:
         return "decision_diagnostic"
     route = str(projected.get("radar_route") or "diagnostic").strip().casefold()
-    origin = str(projected.get("thesis_origin") or "").strip().casefold()
-    confidence = str(projected.get("confidence_band") or "").strip().casefold()
-    if route in {"actionable_watch", "high_confidence_watch"} and origin == "market_led":
-        return "actionable_market_led"
-    if route == "high_confidence_watch" or (
-        route == "actionable_watch" and origin in {"catalyst_led", "mixed"} and confidence == "high_confidence"
-    ):
-        return "high_confidence_catalyst"
+    if route == "high_confidence_watch":
+        return "high_confidence"
+    if route == "actionable_watch":
+        return "actionable"
     if route == "rapid_market_anomaly":
         return "rapid_market_anomaly"
+    if route == "dashboard_watch":
+        return "dashboard_watch"
     if route == "fade_exhaustion_review":
         return "fade_exhaustion_review"
+    if route == "risk_watch":
+        return "risk_watch"
     if route == "calendar_risk":
         return "calendar_risk"
-    if route == "actionable_watch":
-        return "actionable_market_led" if origin in {"market_led", "technical_led"} else "high_confidence_catalyst"
     return "decision_diagnostic"
 
 
@@ -156,6 +165,7 @@ def group_decision_rows(
 def decision_model_markdown_lines(values: Mapping[str, Any]) -> list[str]:
     """Render transparent, non-prescriptive v2 decision details."""
 
+    raw_values = values
     projected = decision_model_values(values)
     if not projected:
         return []
@@ -164,14 +174,35 @@ def decision_model_markdown_lines(values: Mapping[str, Any]) -> list[str]:
         f"- Decision model: {values.get('decision_model_version')}",
         f"- Radar route: {values.get('radar_route') or 'diagnostic'}",
         f"- Radar actionable: {str(bool(values.get('radar_actionable'))).lower()}",
-        f"- Thesis origin / directional bias: {values.get('thesis_origin') or 'unknown'} / {values.get('directional_bias') or 'neutral'}",
+        (
+            "- Primary / contributing origins: "
+            f"{values.get('primary_thesis_origin') or values.get('thesis_origin') or 'unknown'} / "
+            f"{', '.join(_items(values.get('thesis_origins'))) or values.get('thesis_origin') or 'unknown'}"
+        ),
+        f"- Directional bias: {values.get('directional_bias') or 'neutral'}",
         f"- Catalyst status: {values.get('catalyst_status') or 'unknown'}",
-        f"- Confidence / timing / tradability: {values.get('confidence_band') or 'diagnostic'} / {values.get('timing_state') or 'stale'} / {values.get('tradability_status') or 'blocked'}",
+        (
+            "- Confidence / phase / timing: "
+            f"{values.get('confidence_band') or 'diagnostic'} / "
+            f"{values.get('market_phase') or 'unknown'} / {values.get('timing_state') or 'stale'}"
+        ),
+        (
+            "- Tradability / spread: "
+            f"{values.get('tradability_status') or 'blocked'} / {values.get('spread_status') or 'unavailable'}"
+        ),
         (
             "- Actionability / evidence confidence / risk: "
             f"{_score(values.get('actionability_score'))} / "
             f"{_score(values.get('evidence_confidence_score'))} / "
             f"{_score(values.get('risk_score'))}"
+        ),
+        (
+            "- Urgency / chase risk: "
+            f"{_score(values.get('urgency_score'))} / {_score(values.get('chase_risk_score'))}"
+        ),
+        (
+            "- Preferred horizon / expiry: "
+            f"{values.get('preferred_horizon') or 'unknown'} / {values.get('expires_at') or 'not set'}"
         ),
     ]
     reason = str(values.get("radar_route_reason") or "").strip()
@@ -205,6 +236,16 @@ def decision_model_markdown_lines(values: Mapping[str, Any]) -> list[str]:
         lines.append("- Catalyst unknown: this lowers evidence confidence but is not, by itself, a hard blocker for a market-led idea.")
     if any("manip" in item.casefold() or "illiquid" in item.casefold() for item in _items(values.get("decision_warnings"))):
         lines.append("- Higher manipulation risk: review liquidity, spread, turnover, and venue concentration manually.")
+    dashboard_id = next(
+        (
+            str(raw_values.get(field) or "").strip()
+            for field in ("core_opportunity_id", "candidate_id", "integrated_candidate_id")
+            if str(raw_values.get(field) or "").strip()
+        ),
+        "",
+    )
+    if dashboard_id:
+        lines.append(f"- Dashboard: /candidate/{quote(dashboard_id, safe='')}")
     lines.append("- Research idea, not a trade instruction.")
     return lines
 
