@@ -10,6 +10,7 @@ import hashlib
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import StrEnum
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlsplit
 
@@ -82,8 +83,40 @@ _ZERO_SIDE_EFFECT_FIELDS = (
 )
 
 
+class CalendarRejectionCode(StrEnum):
+    """Closed payload-free reason codes for rejected calendar mappings."""
+
+    MISSING_EVENT_ID = "missing_event_id"
+    MISSING_TITLE = "missing_title"
+    UNSUPPORTED_EVENT_KIND = "unsupported_event_kind"
+    UNSUPPORTED_TIME_CERTAINTY = "unsupported_time_certainty"
+    UNSUPPORTED_IMPORTANCE = "unsupported_importance"
+    UNSUPPORTED_TRACKING_STATUS = "unsupported_tracking_status"
+    MISSING_SOURCE = "missing_source"
+    INVALID_SOURCE_URL = "invalid_source_url"
+    INVALID_TIMESTAMP = "invalid_timestamp"
+    EXACT_MISSING_SCHEDULED_AT = "exact_missing_scheduled_at"
+    WINDOW_MISSING_BOUNDS = "window_missing_bounds"
+    WINDOW_END_BEFORE_START = "window_end_before_start"
+    INVALID_REMINDER_WINDOW = "invalid_reminder_window"
+    UNSAFE_RESEARCH_ONLY = "unsafe_research_only"
+    UNSAFE_NO_SEND_REHEARSAL = "unsafe_no_send_rehearsal"
+    UNSAFE_SIDE_EFFECT_FLAG = "unsafe_side_effect_flag"
+    INVALID_SIDE_EFFECT_COUNTER = "invalid_side_effect_counter"
+    NONZERO_SIDE_EFFECT_COUNTER = "nonzero_side_effect_counter"
+
+
+CALENDAR_REJECTION_CODES = frozenset(code.value for code in CalendarRejectionCode)
+
+
 class CalendarValidationError(ValueError):
     """Raised when a calendar row violates its data or safety contract."""
+
+    def __init__(self, message: str, *, code: CalendarRejectionCode) -> None:
+        if not isinstance(code, CalendarRejectionCode):
+            raise TypeError("calendar validation errors require a registered rejection code")
+        self.code = code
+        super().__init__(message)
 
 
 @dataclass(frozen=True)
@@ -174,16 +207,19 @@ def normalize_unified_calendar_event(
     title = _text(item.get("title") or item.get("event_name") or item.get("name"))
     kind = _event_kind(item)
     scheduled_at = _timestamp_text(
-        item.get("scheduled_at")
-        or item.get("event_start_time")
-        or item.get("event_time")
-        or item.get("date_event")
+        _first_present_nonempty(
+            item,
+            "scheduled_at",
+            "event_start_time",
+            "event_time",
+            "date_event",
+        )
     )
     window_start = _timestamp_text(
-        item.get("window_start") or item.get("window_start_at") or item.get("date_window_start")
+        _first_present_nonempty(item, "window_start", "window_start_at", "date_window_start")
     )
     window_end = _timestamp_text(
-        item.get("window_end") or item.get("window_end_at") or item.get("date_window_end")
+        _first_present_nonempty(item, "window_end", "window_end_at", "date_window_end")
     )
     certainty = _time_certainty(item, scheduled_at=scheduled_at, window_start=window_start, window_end=window_end)
     importance = _token(item.get("importance") or "medium")
@@ -192,7 +228,7 @@ def normalize_unified_calendar_event(
     source_url = _text(item.get("source_url") or item.get("url") or item.get("link"))
     reminders = _reminder_windows(item, importance=importance)
     tracking = _post_event_tracking_status(item, certainty=certainty)
-    observed = _timestamp_text(observed_at or item.get("observed_at"))
+    observed = _timestamp_text(observed_at if observed_at is not None else item.get("observed_at"))
     event_id = _text(item.get("calendar_event_id") or item.get("event_id") or item.get("id"))
     if not event_id:
         seed = "|".join((title, kind, scheduled_at or window_start or "unknown", source))
@@ -223,58 +259,117 @@ def normalize_unified_calendar_event(
 
 def _validate_event(event: UnifiedCalendarEvent) -> None:
     if not event.calendar_event_id:
-        raise CalendarValidationError("calendar_event_id is required")
+        raise CalendarValidationError(
+            "calendar_event_id is required",
+            code=CalendarRejectionCode.MISSING_EVENT_ID,
+        )
     if not event.title:
-        raise CalendarValidationError("calendar title is required")
+        raise CalendarValidationError(
+            "calendar title is required",
+            code=CalendarRejectionCode.MISSING_TITLE,
+        )
     if event.event_kind not in CALENDAR_EVENT_KINDS:
-        raise CalendarValidationError(f"unsupported event_kind: {event.event_kind}")
+        raise CalendarValidationError(
+            "unsupported event_kind",
+            code=CalendarRejectionCode.UNSUPPORTED_EVENT_KIND,
+        )
     if event.time_certainty not in DATE_CERTAINTY_LEVELS:
-        raise CalendarValidationError(f"unsupported time_certainty: {event.time_certainty}")
+        raise CalendarValidationError(
+            "unsupported time_certainty",
+            code=CalendarRejectionCode.UNSUPPORTED_TIME_CERTAINTY,
+        )
     if event.importance not in CALENDAR_IMPORTANCE_LEVELS:
-        raise CalendarValidationError(f"unsupported importance: {event.importance}")
+        raise CalendarValidationError(
+            "unsupported importance",
+            code=CalendarRejectionCode.UNSUPPORTED_IMPORTANCE,
+        )
     if event.post_event_tracking_status not in CALENDAR_TRACKING_STATES:
         raise CalendarValidationError(
-            f"unsupported post_event_tracking_status: {event.post_event_tracking_status}"
+            "unsupported post_event_tracking_status",
+            code=CalendarRejectionCode.UNSUPPORTED_TRACKING_STATUS,
         )
     if not event.source:
-        raise CalendarValidationError("calendar source is required")
-    parsed_url = urlsplit(event.source_url)
+        raise CalendarValidationError(
+            "calendar source is required",
+            code=CalendarRejectionCode.MISSING_SOURCE,
+        )
+    try:
+        parsed_url = urlsplit(event.source_url)
+        parsed_url.port
+    except ValueError:
+        raise CalendarValidationError(
+            "calendar source_url must be an absolute http(s) URL",
+            code=CalendarRejectionCode.INVALID_SOURCE_URL,
+        ) from None
     if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
-        raise CalendarValidationError("calendar source_url must be an absolute http(s) URL")
+        raise CalendarValidationError(
+            "calendar source_url must be an absolute http(s) URL",
+            code=CalendarRejectionCode.INVALID_SOURCE_URL,
+        )
     scheduled = _parse_timestamp(event.scheduled_at)
     window_start = _parse_timestamp(event.window_start)
     window_end = _parse_timestamp(event.window_end)
     if event.time_certainty == "exact" and scheduled is None:
-        raise CalendarValidationError("exact calendar date requires scheduled_at")
+        raise CalendarValidationError(
+            "exact calendar date requires scheduled_at",
+            code=CalendarRejectionCode.EXACT_MISSING_SCHEDULED_AT,
+        )
     if event.time_certainty == "window" and (window_start is None or window_end is None):
-        raise CalendarValidationError("window calendar date requires window_start and window_end")
+        raise CalendarValidationError(
+            "window calendar date requires window_start and window_end",
+            code=CalendarRejectionCode.WINDOW_MISSING_BOUNDS,
+        )
     if window_start is not None and window_end is not None and window_end < window_start:
-        raise CalendarValidationError("calendar window_end precedes window_start")
+        raise CalendarValidationError(
+            "calendar window_end precedes window_start",
+            code=CalendarRejectionCode.WINDOW_END_BEFORE_START,
+        )
     for reminder in event.reminder_windows:
         if not _REMINDER_RE.fullmatch(reminder):
-            raise CalendarValidationError(f"invalid reminder window: {reminder}")
+            raise CalendarValidationError(
+                "invalid reminder window",
+                code=CalendarRejectionCode.INVALID_REMINDER_WINDOW,
+            )
 
 
 def _validate_input_safety(row: Mapping[str, Any]) -> None:
     if "research_only" in row and row.get("research_only") is not True:
-        raise CalendarValidationError("calendar row cannot disable or ambiguously encode research_only")
+        raise CalendarValidationError(
+            "calendar row cannot disable or ambiguously encode research_only",
+            code=CalendarRejectionCode.UNSAFE_RESEARCH_ONLY,
+        )
     if "no_send_rehearsal" in row and row.get("no_send_rehearsal") is not True:
-        raise CalendarValidationError("calendar row cannot disable or ambiguously encode no_send_rehearsal")
+        raise CalendarValidationError(
+            "calendar row cannot disable or ambiguously encode no_send_rehearsal",
+            code=CalendarRejectionCode.UNSAFE_NO_SEND_REHEARSAL,
+        )
     for field in _FORBIDDEN_TRUE_FIELDS:
         if field in row and row.get(field) is not False:
-            raise CalendarValidationError(f"calendar row cannot enable or ambiguously encode {field}")
+            raise CalendarValidationError(
+                "calendar row cannot enable or ambiguously encode side-effect fields",
+                code=CalendarRejectionCode.UNSAFE_SIDE_EFFECT_FLAG,
+            )
     for field in _ZERO_SIDE_EFFECT_FIELDS:
         if field not in row:
             continue
         raw = row.get(field)
         if isinstance(raw, bool) or not isinstance(raw, (int, float)):
-            raise CalendarValidationError(f"invalid safety counter: {field}")
+            raise CalendarValidationError(
+                "invalid safety counter",
+                code=CalendarRejectionCode.INVALID_SIDE_EFFECT_COUNTER,
+            )
         try:
             value = int(raw)
-        except (TypeError, ValueError) as exc:
-            raise CalendarValidationError(f"invalid safety counter: {field}") from exc
+        except (OverflowError, TypeError, ValueError):
+            raise CalendarValidationError(
+                "invalid safety counter",
+                code=CalendarRejectionCode.INVALID_SIDE_EFFECT_COUNTER,
+            ) from None
         if value != 0 or float(raw) != 0.0:
-            raise CalendarValidationError(f"calendar row cannot report side effects: {field}")
+            raise CalendarValidationError(
+                "calendar row cannot report side effects",
+                code=CalendarRejectionCode.NONZERO_SIDE_EFFECT_COUNTER,
+            )
 
 
 def _event_kind(item: Mapping[str, Any]) -> str:
@@ -282,7 +377,10 @@ def _event_kind(item: Mapping[str, Any]) -> str:
     raw = _EVENT_KIND_ALIASES.get(raw, raw)
     if raw in CALENDAR_EVENT_KINDS:
         return raw
-    raise CalendarValidationError(f"unsupported event_kind: {raw or 'missing'}")
+    raise CalendarValidationError(
+        "unsupported event_kind",
+        code=CalendarRejectionCode.UNSUPPORTED_EVENT_KIND,
+    )
 
 
 def _time_certainty(
@@ -358,28 +456,54 @@ def _timestamp_text(value: object) -> str | None:
         return None
     parsed = _parse_timestamp(value)
     if parsed is None:
-        raise CalendarValidationError(f"invalid calendar timestamp: {value}")
+        raise CalendarValidationError(
+            "invalid calendar timestamp",
+            code=CalendarRejectionCode.INVALID_TIMESTAMP,
+        )
     return parsed.isoformat()
 
 
 def _parse_timestamp(value: object) -> datetime | None:
     if value in (None, ""):
         return None
+    if isinstance(value, bool):
+        return None
     if isinstance(value, datetime):
         parsed = value
     elif isinstance(value, (int, float)):
-        seconds = float(value) / 1000.0 if float(value) > 10_000_000_000 else float(value)
-        parsed = datetime.fromtimestamp(seconds, tz=timezone.utc)
+        try:
+            numeric = float(value)
+            seconds = numeric / 1000.0 if numeric > 10_000_000_000 else numeric
+            parsed = datetime.fromtimestamp(seconds, tz=timezone.utc)
+        except (OSError, OverflowError, ValueError):
+            return None
     else:
         try:
             parsed = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
-        except ValueError:
+        except (OverflowError, ValueError):
             return None
-    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+    try:
+        return (
+            parsed.replace(tzinfo=timezone.utc)
+            if parsed.tzinfo is None
+            else parsed.astimezone(timezone.utc)
+        )
+    except (OSError, OverflowError, ValueError):
+        return None
 
 
 def _token(value: object) -> str:
     return _text(value).casefold().replace("-", "_").replace(" ", "_")
+
+
+def _first_present_nonempty(item: Mapping[str, Any], *keys: str) -> object:
+    for key in keys:
+        if key not in item:
+            continue
+        value = item.get(key)
+        if value is not None and value != "":
+            return value
+    return None
 
 
 def _text(value: object) -> str:
@@ -394,8 +518,10 @@ def _optional_text(value: object) -> str | None:
 __all__ = (
     "CALENDAR_EVENT_KINDS",
     "CALENDAR_IMPORTANCE_LEVELS",
+    "CALENDAR_REJECTION_CODES",
     "CALENDAR_TRACKING_STATES",
     "DATE_CERTAINTY_LEVELS",
+    "CalendarRejectionCode",
     "CalendarValidationError",
     "UnifiedCalendarEvent",
     "normalize_unified_calendar_event",

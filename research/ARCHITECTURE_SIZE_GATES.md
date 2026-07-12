@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-12T07:04:57.257834+00:00`
+- generated_at: `2026-07-12T07:30:12.898765+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -110,6 +110,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
 | `crypto_rsi_scanner/event_alpha/radar/decision_model.py` | 1180 |
 | `crypto_rsi_scanner/event_alpha/artifacts/operator_state.py` | 1177 |
+| `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 1177 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1169 |
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1168 |
 | `crypto_rsi_scanner/event_alpha/operations/review_inbox.py` | 1156 |
@@ -118,7 +119,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py` | 1138 |
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1136 |
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 1135 |
-| `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 1129 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/rsi_scan.py` | 1103 |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py` | 1086 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py` | 1078 |
@@ -129,9 +129,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py` | 1055 |
 | `crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py` | 1044 |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge_policy.py` | 1039 |
+| `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py` | 1027 |
 | `crypto_rsi_scanner/event_alpha/radar/llm/extractor.py` | 1025 |
 | `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/source_coverage_checks.py` | 1024 |
-| `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py` | 1020 |
 
 ## Accepted Production Files Over 1200 Lines
 
@@ -162,12 +162,12 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_market_surfaces.py` | 1483 |
 | `tests/event_alpha/test_burn_in_operations.py` | 1477 |
 | `tests/event_alpha/test_provider_activation.py` | 1447 |
+| `tests/event_alpha/test_artifact_schema.py` | 1377 |
 | `tests/event_alpha/test_core_opportunities.py` | 1337 |
 | `tests/event_alpha/test_fade_review_workflows.py` | 1309 |
 | `tests/event_alpha/test_evidence_acquisition.py` | 1214 |
 | `tests/event_alpha/test_news_providers.py` | 1210 |
 | `tests/event_alpha/test_watchlist_router.py` | 1207 |
-| `tests/event_alpha/test_artifact_schema.py` | 1181 |
 | `tests/event_alpha/test_burn_in_outcomes.py` | 1166 |
 | `tests/event_alpha/test_doctor_notifications.py` | 1146 |
 | `tests/event_alpha/test_catalyst_frames.py` | 1127 |
@@ -180,6 +180,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_quality_feedback.py` | 1023 |
 | `tests/event_alpha/test_discovery_pipeline.py` | 993 |
 | `tests/event_alpha/test_doctor_provider_conflicts.py` | 979 |
+| `tests/event_alpha/test_namespace_integrations.py` | 951 |
 | `tests/event_alpha/test_feedback_calibration.py` | 940 |
 | `tests/event_alpha/test_notification_operations.py` | 925 |
 | `tests/event_alpha/test_impact_hypotheses.py` | 920 |
@@ -193,7 +194,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_doctor_reconciliation.py` | 805 |
 | `tests/event_alpha/test_notification_readiness.py` | 797 |
 | `tests/event_alpha/test_core_reconciliation.py` | 786 |
-| `tests/event_alpha/test_namespace_integrations.py` | 774 |
 | `tests/event_alpha/test_notification_routing.py` | 773 |
 | `tests/event_alpha/test_alert_outcomes.py` | 758 |
 | `tests/event_alpha/test_doctor_core.py` | 756 |

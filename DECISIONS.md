@@ -16,6 +16,32 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-12 - Count calendar normalization without retaining rejected payloads
+**Status:** accepted
+**Decision:** The integrated unified calendar must merge raw scheduled and raw
+fixture rows before exactly one normalization pass. Normalization contract v1
+uses `last_valid_row_wins` and records only nine closed fields: contract version,
+dedupe policy, input/accepted/output/duplicate-overwrite/non-mapping/rejected
+counts, and sorted counts from the registered payload-free rejection enum. It
+must satisfy `input = accepted + non_mapping + rejected`, `accepted = output +
+duplicate_overwrite`, and `rejected = sum(reason_counts)`. Invalid duplicates
+cannot replace a prior valid row. No rejected title, id, URL, source, field name,
+sample, exception, traceback, hash, or raw value may enter telemetry. Duplicate
+JSON keys and nonempty unknown fixture containers fail closed before a false
+zero-row result. New integrated runs snapshot and validate the exact nested
+mapping before writing it to the canonical run ledger, reject extra/missing or
+malformed fields before persistence, and require its output count to equal both
+the calendar artifact and outer run-row count. Legacy rows may omit the mapping;
+they do not gain inferred telemetry.
+**Why:** An output-only count hides whether upstream data was absent, rejected,
+or overwritten, while storing rejected samples would create privacy, secret,
+and operator-noise risks. Closed aggregate accounting makes source quality and
+normalizer regressions observable without turning bad payloads into durable
+artifacts or changing any research route.
+**Revisit when:** A versioned immutable raw-event quarantine with explicit
+retention/redaction policy is approved, or a telemetry schema v2 adds a new
+aggregate dimension with the same payload-free and exact-accounting guarantees.
+
 ## 2026-07-12 - Require exact evidence for current dashboard authority
 **Status:** accepted
 **Decision:** A current Event Alpha operator artifact from a new generation must

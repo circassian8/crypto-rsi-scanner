@@ -478,6 +478,29 @@ def _append_run_ledger_write_lines(rows: list[str], row: Mapping[str, Any]) -> N
         f"success={str(bool(row.get('core_opportunity_write_success'))).lower()} "
         f"block={row.get('core_opportunity_write_block_reason') or 'none'}"
     )
+    calendar_normalization = row.get("unified_calendar_normalization")
+    if isinstance(calendar_normalization, Mapping):
+        from .schema.calendar import CALENDAR_NORMALIZATION_REJECTION_CODES
+
+        raw_reasons = calendar_normalization.get("rejected_reason_counts")
+        reason_counts = raw_reasons if isinstance(raw_reasons, Mapping) else {}
+        safe_reasons = ",".join(
+            f"{reason}={int(reason_counts.get(reason) or 0)}"
+            for reason in sorted(CALENDAR_NORMALIZATION_REJECTION_CODES)
+            if isinstance(reason_counts.get(reason), int)
+            and not isinstance(reason_counts.get(reason), bool)
+            and int(reason_counts.get(reason) or 0) > 0
+        )
+        rows.append(
+            "  calendar_normalization: "
+            f"input={int(calendar_normalization.get('input_rows') or 0)} "
+            f"accepted={int(calendar_normalization.get('accepted_rows') or 0)} "
+            f"output={int(calendar_normalization.get('output_rows') or 0)} "
+            f"duplicates={int(calendar_normalization.get('duplicate_overwrite_rows') or 0)} "
+            f"non_mapping={int(calendar_normalization.get('non_mapping_rows') or 0)} "
+            f"rejected={int(calendar_normalization.get('rejected_rows') or 0)} "
+            f"reasons={safe_reasons or 'none'}"
+        )
 
 
 def _run_record(
@@ -628,7 +651,7 @@ def _run_record_source_fields(
     catalyst_frame_counts: Mapping[str, Any],
     warnings: list[str],
 ) -> dict[str, Any]:
-    return {
+    fields = {
         "market_state_snapshots": _int(getattr(result, "market_state_snapshots", 0)),
         "unified_calendar_rows": _int(getattr(result, "unified_calendar_rows", 0)),
         "unified_calendar_path": getattr(result, "unified_calendar_path", None),
@@ -677,6 +700,31 @@ def _run_record_source_fields(
         "hypothesis_search_skip_reasons": _hypothesis_search_skip_reasons(result, warnings=warnings),
         "hypothesis_promotions": _int(getattr(result, "hypothesis_promotions", 0)),
     }
+    calendar_normalization = getattr(result, "unified_calendar_normalization", None)
+    if calendar_normalization is not None:
+        from .schema.calendar import validate_run_ledger_normalization_contract
+
+        if not isinstance(calendar_normalization, Mapping):
+            raise ValueError("invalid unified calendar normalization telemetry")
+        try:
+            persisted_normalization = dict(calendar_normalization)
+            reason_counts = persisted_normalization.get("rejected_reason_counts")
+            if isinstance(reason_counts, Mapping):
+                persisted_normalization["rejected_reason_counts"] = dict(reason_counts)
+        except Exception:
+            raise ValueError("invalid unified calendar normalization telemetry") from None
+        validation_row = {
+            "unified_calendar_rows": fields["unified_calendar_rows"],
+            "unified_calendar_normalization": persisted_normalization,
+        }
+        try:
+            validation_errors = validate_run_ledger_normalization_contract(validation_row)
+        except Exception:
+            raise ValueError("invalid unified calendar normalization telemetry") from None
+        if validation_errors:
+            raise ValueError("invalid unified calendar normalization telemetry") from None
+        fields["unified_calendar_normalization"] = persisted_normalization
+    return fields
 
 
 def _run_record_evidence_and_provider_fields(result: Any, *, acquisition: Any) -> dict[str, Any]:

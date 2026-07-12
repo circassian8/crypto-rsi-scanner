@@ -700,13 +700,13 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "source_coverage_path", "live_provider_readiness_json_path",
             "live_provider_readiness_report_path", "decision_model_version",
             "decision_model_v2_enabled", "decision_model_v2_row_count", "radar_route_counts", "confidence_band_counts",
-            "unified_calendar_rows", "unified_calendar_path", "unified_calendar_preview_path",
+            "unified_calendar_rows", "unified_calendar_normalization", "unified_calendar_path", "unified_calendar_preview_path",
             "thesis_origin_counts", "directional_bias_counts", "catalyst_status_counts", "timing_state_counts",
             "tradability_status_counts", "actionable_research_ideas",
             "high_confidence_research_ideas", *COMMON_SAFETY,
         ),
         types={
-            "decision_model_v2_enabled": "bool", "decision_model_v2_row_count": "int", "unified_calendar_rows": "int",
+            "decision_model_v2_enabled": "bool", "decision_model_v2_row_count": "int", "unified_calendar_rows": "int", "unified_calendar_normalization": "dict",
             "radar_route_counts": "dict", "confidence_band_counts": "dict", "thesis_origin_counts": "dict",
             "directional_bias_counts": "dict", "catalyst_status_counts": "dict", "timing_state_counts": "dict", "tradability_status_counts": "dict",
             "actionable_research_ideas": "int", "high_confidence_research_ideas": "int",
@@ -844,8 +844,8 @@ def validate_row_against_schema(row: Mapping[str, Any], schema: str | ArtifactSc
     errors.extend(validate_path_fields(row, schema_obj))
     errors.extend(validate_safety_fields(row, schema_obj))
     errors.extend(validate_secret_redaction_fields(row, schema_obj))
-    if schema_obj.schema_id == "unified_calendar_event_v1":
-        errors.extend(calendar_specs.validate_contract(row))
+    if schema_obj.schema_id == "unified_calendar_event_v1": errors.extend(calendar_specs.validate_contract(row))
+    if schema_obj.schema_id == "run_ledger_v1": errors.extend(calendar_specs.validate_run_ledger_normalization_contract(row))
     if schema_obj.schema_id == "operator_state_v1": errors.extend(operator_state_specs.validate_contract(row))
     if row.get("decision_model_version") not in (None, "") and schema_obj.schema_id in {"core_opportunity_v1", "integrated_radar_candidate_v1", "outcome_row_v1"}:
         errors.extend(decision_model_specs.validate_contract(row))

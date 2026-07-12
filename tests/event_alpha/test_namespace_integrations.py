@@ -16,6 +16,183 @@ globals().update({
 })
 
 
+def test_integrated_calendar_normalization_is_single_pass_exact_and_scope_neutral():
+    import json
+    from collections import Counter
+    from tempfile import TemporaryDirectory
+
+    import crypto_rsi_scanner.event_alpha.artifacts.context as event_alpha_artifacts
+    import crypto_rsi_scanner.event_alpha.radar.integrated.pipeline_parts.cycle as event_integrated_cycle
+    import crypto_rsi_scanner.event_alpha.radar.integrated_radar as event_integrated_radar
+    from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+
+    original_fixture_path = event_integrated_cycle.config.EVENT_ALPHA_UNIFIED_CALENDAR_FIXTURE_PATH
+    original_normalize = (
+        event_integrated_cycle.event_unified_calendar.normalize_unified_calendar_rows_with_telemetry
+    )
+    original_legacy_fixture_loader = (
+        event_integrated_cycle.event_unified_calendar.load_unified_calendar_fixture
+    )
+    normalization_calls = 0
+
+    def counted_normalize(*args, **kwargs):
+        nonlocal normalization_calls
+        normalization_calls += 1
+        return original_normalize(*args, **kwargs)
+
+    def reject_legacy_fixture_loader(*args, **kwargs):
+        raise AssertionError("integrated cycle pre-normalized the calendar fixture")
+
+    event_integrated_cycle.event_unified_calendar.normalize_unified_calendar_rows_with_telemetry = (
+        counted_normalize
+    )
+    event_integrated_cycle.event_unified_calendar.load_unified_calendar_fixture = (
+        reject_legacy_fixture_loader
+    )
+    try:
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            baseline_context = event_alpha_artifacts.context_from_profile(
+                "fixture",
+                run_mode="fixture",
+                base_dir=base,
+                artifact_namespace="calendar_scope_baseline",
+            )
+            event_integrated_cycle.config.EVENT_ALPHA_UNIFIED_CALENDAR_FIXTURE_PATH = (
+                base / "missing-unified-calendar-fixture.json"
+            )
+            baseline = event_integrated_radar.run_integrated_radar_cycle(
+                context=baseline_context,
+                fixture=True,
+                observed_at="2026-06-15T16:00:00Z",
+            )
+            assert normalization_calls == 1
+
+            actual_context = event_alpha_artifacts.context_from_profile(
+                "fixture",
+                run_mode="fixture",
+                base_dir=base,
+                artifact_namespace="calendar_scope_actual",
+            )
+            event_integrated_cycle.config.EVENT_ALPHA_UNIFIED_CALENDAR_FIXTURE_PATH = (
+                original_fixture_path
+            )
+            result = event_integrated_radar.run_integrated_radar_cycle(
+                context=actual_context,
+                fixture=True,
+                observed_at="2026-06-15T16:00:00Z",
+            )
+            assert normalization_calls == 2
+
+            telemetry = dict(result.unified_calendar_normalization or {})
+            expected_fields = {
+                "contract_version",
+                "dedupe_policy",
+                "input_rows",
+                "accepted_rows",
+                "output_rows",
+                "duplicate_overwrite_rows",
+                "non_mapping_rows",
+                "rejected_rows",
+                "rejected_reason_counts",
+            }
+            assert set(telemetry) == expected_fields
+            assert telemetry["contract_version"] == 1
+            assert telemetry["dedupe_policy"] == "last_valid_row_wins"
+            assert telemetry["input_rows"] == (
+                result.scheduled_catalysts
+                + len(
+                    event_integrated_cycle.event_unified_calendar.load_unified_calendar_fixture_raw_rows(
+                        original_fixture_path
+                    )
+                )
+            )
+            assert telemetry["input_rows"] == (
+                telemetry["accepted_rows"]
+                + telemetry["non_mapping_rows"]
+                + telemetry["rejected_rows"]
+            )
+            assert telemetry["accepted_rows"] == (
+                telemetry["output_rows"] + telemetry["duplicate_overwrite_rows"]
+            )
+            assert telemetry["rejected_rows"] == sum(
+                telemetry["rejected_reason_counts"].values()
+            )
+
+            calendar_lines = [
+                line
+                for line in result.unified_calendar_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            calendar_rows = [json.loads(line) for line in calendar_lines]
+            assert telemetry["output_rows"] == result.unified_calendar_rows == len(calendar_lines)
+            assert all(
+                row[counter] == 0
+                for row in calendar_rows
+                for counter in (
+                    "strict_alerts_created",
+                    "telegram_sends",
+                    "trades_created",
+                    "paper_trades_created",
+                    "normal_rsi_signal_rows_written",
+                    "triggered_fade_created",
+                )
+            )
+
+            run_row = json.loads(
+                actual_context.run_ledger_path.read_text(encoding="utf-8").splitlines()[-1]
+            )
+            assert run_row["unified_calendar_normalization"] == telemetry
+            assert run_row["unified_calendar_rows"] == telemetry["output_rows"]
+            assert schema_v1.validate_row_against_schema(run_row, "run_ledger_v1") == []
+            run_report = event_integrated_cycle.event_alpha_run_ledger.format_run_ledger_report(
+                event_integrated_cycle.event_alpha_run_ledger.EventAlphaRunLedgerReadResult(
+                    path=actual_context.run_ledger_path,
+                    rows_read=1,
+                    rows=[run_row],
+                )
+            )
+            assert "calendar_normalization: input=12 accepted=10 output=10" in run_report
+            assert "reasons=unsupported_event_kind=2" in run_report
+            assert result.strict_alerts == run_row["strict_alerts"] == 0
+            assert result.send_attempted is False
+            assert result.send_items_delivered == 0
+            assert run_row["sent"] is False
+
+            baseline_manifest = json.loads(
+                baseline.input_manifest_path.read_text(encoding="utf-8")
+            )
+            actual_manifest = json.loads(result.input_manifest_path.read_text(encoding="utf-8"))
+            assert result.raw_events == baseline.raw_events == sum(actual_manifest["row_counts"].values())
+            assert result.scheduled_catalysts == baseline.scheduled_catalysts == actual_manifest[
+                "row_counts"
+            ]["scheduled_catalyst"]
+            assert baseline_manifest["row_counts"] == actual_manifest["row_counts"]
+            assert result.candidates == baseline.candidates
+            assert result.integrated_candidates == baseline.integrated_candidates
+
+            def lane_counts(path):
+                return Counter(
+                    json.loads(line)["opportunity_type"]
+                    for line in path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                )
+
+            assert lane_counts(result.integrated_candidates_path) == lane_counts(
+                baseline.integrated_candidates_path
+            )
+    finally:
+        event_integrated_cycle.config.EVENT_ALPHA_UNIFIED_CALENDAR_FIXTURE_PATH = (
+            original_fixture_path
+        )
+        event_integrated_cycle.event_unified_calendar.normalize_unified_calendar_rows_with_telemetry = (
+            original_normalize
+        )
+        event_integrated_cycle.event_unified_calendar.load_unified_calendar_fixture = (
+            original_legacy_fixture_loader
+        )
+
+
 def test_integrated_radar_loads_external_coinalyze_namespace():
     import json
     from datetime import datetime, timezone

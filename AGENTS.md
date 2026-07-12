@@ -147,6 +147,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   calling providers, sending, or writing artifacts.
 - **Unified calendar no-send preview:** `make radar-calendar-preview` renders
   checked macro/crypto fixture rows without providers, artifact writes, or sends.
+  Integrated cycles normalize raw scheduled/fixture rows exactly once and bind
+  payload-free rejection/dedupe counters to the canonical run-ledger row; use
+  `main.py --event-alpha-runs` to inspect the closed accounting contract.
 - **Backtest fixture smoke (no network):** `make backtest-fixture` runs the
   default Binance-style backtest path from checked-in BTC/ETH/SOL kline fixtures.
 - **Backtest research smoke:** `make backtest-costs` runs the fixture backtest

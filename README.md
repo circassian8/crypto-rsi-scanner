@@ -15,6 +15,10 @@ trade, write normal RSI rows, or create `TRIGGERED_FADE`. Run
 `make radar-dashboard-smoke` for the deterministic fixture/no-write render gate.
 `make radar-calendar-preview` prints the unified macro/crypto calendar fixture
 without provider calls, artifact writes, or sends.
+Integrated runs normalize scheduled and fixture rows once and persist only
+payload-free accepted/rejected/deduplicated counters in the exact canonical run
+row; `main.py --event-alpha-runs` shows that accounting without retaining
+rejected titles, URLs, sources, or exception text.
 
 Crypto Radar Decision Model v2 may surface transparent market-led research
 ideas without a known catalyst when freshness, identity, liquidity, spread,

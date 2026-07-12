@@ -9,6 +9,50 @@ from urllib.parse import urlsplit
 
 SCHEMA_IDS = ("unified_calendar_event_v1",)
 
+# This is the closed, persisted v1 telemetry contract.  It is mirrored here
+# instead of importing the radar package so the artifact schema layer remains
+# independent of its producer.
+CALENDAR_NORMALIZATION_CONTRACT_VERSION = 1
+CALENDAR_NORMALIZATION_DEDUPE_POLICY = "last_valid_row_wins"
+CALENDAR_NORMALIZATION_COUNTER_FIELDS = (
+    "input_rows",
+    "accepted_rows",
+    "output_rows",
+    "duplicate_overwrite_rows",
+    "non_mapping_rows",
+    "rejected_rows",
+)
+CALENDAR_NORMALIZATION_FIELDS = frozenset(
+    {
+        "contract_version",
+        "dedupe_policy",
+        *CALENDAR_NORMALIZATION_COUNTER_FIELDS,
+        "rejected_reason_counts",
+    }
+)
+CALENDAR_NORMALIZATION_REJECTION_CODES = frozenset(
+    {
+        "missing_event_id",
+        "missing_title",
+        "unsupported_event_kind",
+        "unsupported_time_certainty",
+        "unsupported_importance",
+        "unsupported_tracking_status",
+        "missing_source",
+        "invalid_source_url",
+        "invalid_timestamp",
+        "exact_missing_scheduled_at",
+        "window_missing_bounds",
+        "window_end_before_start",
+        "invalid_reminder_window",
+        "unsafe_research_only",
+        "unsafe_no_send_rehearsal",
+        "unsafe_side_effect_flag",
+        "invalid_side_effect_counter",
+        "nonzero_side_effect_counter",
+    }
+)
+
 
 def schema_specs(
     schema_factory: Callable[..., Any],
@@ -77,6 +121,87 @@ def validate_contract(row: Mapping[str, Any]) -> list[str]:
     return errors
 
 
+def validate_run_ledger_normalization_contract(row: Mapping[str, Any]) -> list[str]:
+    """Validate optional closed calendar-normalization telemetry on a run row."""
+
+    if "unified_calendar_normalization" not in row:
+        return []
+    normalization = row.get("unified_calendar_normalization")
+    if not isinstance(normalization, Mapping):
+        return ["calendar_normalization_not_mapping"]
+
+    errors: list[str] = []
+    actual_fields = set(normalization)
+    for field_name in sorted(CALENDAR_NORMALIZATION_FIELDS - actual_fields):
+        errors.append(f"calendar_normalization_missing_field:{field_name}")
+    if actual_fields - CALENDAR_NORMALIZATION_FIELDS:
+        # Do not echo unknown field names: telemetry validation must not turn a
+        # raw payload, URL, exception, or secret-shaped key into diagnostics.
+        errors.append("calendar_normalization_unknown_field")
+
+    contract_version = normalization.get("contract_version")
+    if (
+        not _literal_nonnegative_int(contract_version)
+        or contract_version != CALENDAR_NORMALIZATION_CONTRACT_VERSION
+    ):
+        errors.append("calendar_normalization_contract_version_invalid")
+    if normalization.get("dedupe_policy") != CALENDAR_NORMALIZATION_DEDUPE_POLICY:
+        errors.append("calendar_normalization_dedupe_policy_invalid")
+
+    counters: dict[str, int] = {}
+    for field_name in CALENDAR_NORMALIZATION_COUNTER_FIELDS:
+        value = normalization.get(field_name)
+        if not _literal_nonnegative_int(value):
+            errors.append(f"calendar_normalization_counter_invalid:{field_name}")
+            continue
+        counters[field_name] = value
+
+    reason_counts = normalization.get("rejected_reason_counts")
+    reason_total: int | None = None
+    if not isinstance(reason_counts, Mapping):
+        errors.append("calendar_normalization_rejected_reason_counts_invalid")
+    else:
+        reason_total = 0
+        for reason, value in reason_counts.items():
+            if not isinstance(reason, str) or reason not in CALENDAR_NORMALIZATION_REJECTION_CODES:
+                errors.append("calendar_normalization_rejected_reason_unknown")
+            if not _literal_nonnegative_int(value) or value == 0:
+                errors.append("calendar_normalization_rejected_reason_count_invalid")
+                continue
+            reason_total += value
+
+    if all(
+        field_name in counters
+        for field_name in ("input_rows", "accepted_rows", "non_mapping_rows", "rejected_rows")
+    ) and counters["input_rows"] != (
+        counters["accepted_rows"] + counters["non_mapping_rows"] + counters["rejected_rows"]
+    ):
+        errors.append("calendar_normalization_input_counter_mismatch")
+    if all(
+        field_name in counters
+        for field_name in ("accepted_rows", "output_rows", "duplicate_overwrite_rows")
+    ) and counters["accepted_rows"] != (
+        counters["output_rows"] + counters["duplicate_overwrite_rows"]
+    ):
+        errors.append("calendar_normalization_accepted_counter_mismatch")
+    if (
+        "rejected_rows" in counters
+        and reason_total is not None
+        and counters["rejected_rows"] != reason_total
+    ):
+        errors.append("calendar_normalization_rejected_counter_mismatch")
+
+    unified_calendar_rows = row.get("unified_calendar_rows")
+    if not _literal_nonnegative_int(unified_calendar_rows):
+        errors.append("calendar_normalization_unified_calendar_rows_invalid")
+    elif (
+        "output_rows" in counters
+        and unified_calendar_rows != counters["output_rows"]
+    ):
+        errors.append("calendar_normalization_output_rows_mismatch")
+    return errors
+
+
 def _timestamp(value: Any) -> datetime | None:
     text = str(value or "").strip()
     if not text:
@@ -88,4 +213,18 @@ def _timestamp(value: Any) -> datetime | None:
     return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
 
 
-__all__ = ("SCHEMA_IDS", "schema_specs", "validate_contract")
+def _literal_nonnegative_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+__all__ = (
+    "CALENDAR_NORMALIZATION_CONTRACT_VERSION",
+    "CALENDAR_NORMALIZATION_COUNTER_FIELDS",
+    "CALENDAR_NORMALIZATION_DEDUPE_POLICY",
+    "CALENDAR_NORMALIZATION_FIELDS",
+    "CALENDAR_NORMALIZATION_REJECTION_CODES",
+    "SCHEMA_IDS",
+    "schema_specs",
+    "validate_contract",
+    "validate_run_ledger_normalization_contract",
+)

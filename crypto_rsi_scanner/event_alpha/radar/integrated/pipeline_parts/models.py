@@ -45,6 +45,7 @@ class _IntegratedRadarOptionalArtifactFields:
     wall_finished_at: datetime | None = None
     market_anomalies: int = 0
     unified_calendar_rows: int = 0
+    unified_calendar_normalization: Mapping[str, Any] | None = None
     market_state_snapshots: int = 0
     official_exchange_events: int = 0
     official_listing_candidates: int = 0

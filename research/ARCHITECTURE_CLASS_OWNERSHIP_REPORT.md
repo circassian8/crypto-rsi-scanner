@@ -2,8 +2,8 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-12T07:04:58.406202+00:00`
-- public_class_count: `432`
+- generated_at: `2026-07-12T07:30:14.057057+00:00`
+- public_class_count: `435`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `0`
 - production_classes_over_limit: `3`
@@ -143,7 +143,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.providers.source_registry` | 6 | 47 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight` | 2 | 49 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.anomaly_state` | 3 | 15 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
-| `crypto_rsi_scanner.event_alpha.radar.calendar.models` | 2 | 70 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.calendar.models` | 3 | 70 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.catalyst_search.models` | 7 | 22 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers` | 8 | 52 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.claim_semantics` | 3 | 12 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
@@ -236,7 +236,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.providers.source_registry` | 6 | 47 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.providers.unlock_calendar_preflight` | 2 | 49 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.anomaly_state` | 3 | 15 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
-| `crypto_rsi_scanner.event_alpha.radar.calendar.models` | 2 | 70 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.calendar.models` | 3 | 70 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.catalyst_search.models` | 7 | 22 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.catalyst_search.providers` | 8 | 52 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.claim_semantics` | 3 | 12 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |

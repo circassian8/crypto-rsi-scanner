@@ -6,6 +6,7 @@ import json
 from copy import deepcopy
 
 from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+from crypto_rsi_scanner.event_alpha.artifacts.schema import calendar as calendar_schema
 from crypto_rsi_scanner.event_alpha.doctor import check_registry, schema_doctor
 
 
@@ -42,6 +43,201 @@ def _current_artifact_fingerprint(kind, *, item_count=1):
         "size_bytes": 42,
         "item_count": item_count,
     }
+
+
+def _valid_calendar_normalization():
+    return {
+        "contract_version": 1,
+        "dedupe_policy": "last_valid_row_wins",
+        "input_rows": 7,
+        "accepted_rows": 5,
+        "output_rows": 4,
+        "duplicate_overwrite_rows": 1,
+        "non_mapping_rows": 1,
+        "rejected_rows": 1,
+        "rejected_reason_counts": {"missing_title": 1},
+    }
+
+
+def _calendar_run_row():
+    return {
+        "row_type": "event_alpha_run",
+        "run_id": "calendar-normalization-run",
+        "profile": "fixture",
+        "unified_calendar_rows": 4,
+        "unified_calendar_normalization": _valid_calendar_normalization(),
+    }
+
+
+def test_run_ledger_calendar_normalization_schema_accepts_v1_and_legacy_rows():
+    schema = schema_v1.get_schema("run_ledger_v1")
+    assert "unified_calendar_normalization" in schema.optional_fields
+    assert schema.field_types["unified_calendar_normalization"] == "dict"
+    assert schema_v1.validate_row_against_schema(_calendar_run_row(), schema) == []
+    assert schema_v1.validate_row_against_schema(
+        {
+            "row_type": "event_alpha_run",
+            "run_id": "legacy-calendar-run",
+            "profile": "fixture",
+            "unified_calendar_rows": 2,
+        },
+        schema,
+    ) == []
+
+
+def test_run_ledger_calendar_normalization_schema_rejects_shape_and_contract_tampering():
+    missing = _calendar_run_row()
+    missing["unified_calendar_normalization"].pop("accepted_rows")
+    errors = schema_v1.validate_row_against_schema(missing, "run_ledger_v1")
+    assert "calendar_normalization_missing_field:accepted_rows" in errors
+
+    extra = _calendar_run_row()
+    extra["unified_calendar_normalization"]["raw_payload"] = "SECRET"
+    errors = schema_v1.validate_row_against_schema(extra, "run_ledger_v1")
+    assert "calendar_normalization_unknown_field" in errors
+    assert "SECRET" not in " ".join(errors)
+
+    for field_name, value, expected_error in (
+        ("contract_version", True, "calendar_normalization_contract_version_invalid"),
+        ("contract_version", 2, "calendar_normalization_contract_version_invalid"),
+        ("dedupe_policy", "first_row_wins", "calendar_normalization_dedupe_policy_invalid"),
+        ("input_rows", True, "calendar_normalization_counter_invalid:input_rows"),
+        ("output_rows", -1, "calendar_normalization_counter_invalid:output_rows"),
+    ):
+        tampered = _calendar_run_row()
+        tampered["unified_calendar_normalization"][field_name] = value
+        assert expected_error in schema_v1.validate_row_against_schema(
+            tampered,
+            "run_ledger_v1",
+        )
+
+
+def test_run_ledger_calendar_normalization_schema_rejects_reason_and_counter_tampering():
+    for reason_counts, expected_error in (
+        ({"not_a_registered_reason": 1}, "calendar_normalization_rejected_reason_unknown"),
+        ({"missing_title": 0}, "calendar_normalization_rejected_reason_count_invalid"),
+        ({"missing_title": True}, "calendar_normalization_rejected_reason_count_invalid"),
+    ):
+        tampered = _calendar_run_row()
+        tampered["unified_calendar_normalization"]["rejected_reason_counts"] = reason_counts
+        assert expected_error in schema_v1.validate_row_against_schema(
+            tampered,
+            "run_ledger_v1",
+        )
+
+    input_mismatch = _calendar_run_row()
+    input_mismatch["unified_calendar_normalization"]["input_rows"] = 8
+    assert "calendar_normalization_input_counter_mismatch" in schema_v1.validate_row_against_schema(
+        input_mismatch,
+        "run_ledger_v1",
+    )
+
+    accepted_mismatch = _calendar_run_row()
+    accepted_mismatch["unified_calendar_normalization"]["duplicate_overwrite_rows"] = 0
+    assert "calendar_normalization_accepted_counter_mismatch" in schema_v1.validate_row_against_schema(
+        accepted_mismatch,
+        "run_ledger_v1",
+    )
+
+    rejected_mismatch = _calendar_run_row()
+    rejected_mismatch["unified_calendar_normalization"]["rejected_reason_counts"] = {
+        "missing_title": 2
+    }
+    assert "calendar_normalization_rejected_counter_mismatch" in schema_v1.validate_row_against_schema(
+        rejected_mismatch,
+        "run_ledger_v1",
+    )
+
+    output_mismatch = _calendar_run_row()
+    output_mismatch["unified_calendar_rows"] = 5
+    assert "calendar_normalization_output_rows_mismatch" in schema_v1.validate_row_against_schema(
+        output_mismatch,
+        "run_ledger_v1",
+    )
+
+
+def test_calendar_normalization_schema_constants_match_the_producer_contract():
+    from crypto_rsi_scanner.event_alpha.radar import calendar as calendar_producer
+
+    assert (
+        calendar_schema.CALENDAR_NORMALIZATION_CONTRACT_VERSION
+        == calendar_producer.CALENDAR_NORMALIZATION_CONTRACT_VERSION
+    )
+    assert (
+        calendar_schema.CALENDAR_NORMALIZATION_DEDUPE_POLICY
+        == calendar_producer.CALENDAR_DEDUPE_POLICY
+    )
+    assert (
+        calendar_schema.CALENDAR_NORMALIZATION_REJECTION_CODES
+        == calendar_producer.CALENDAR_REJECTION_CODES
+    )
+
+
+def test_run_ledger_writer_rejects_calendar_telemetry_before_secret_bearing_data_is_written(
+    tmp_path,
+):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    from crypto_rsi_scanner.event_alpha.artifacts import run_ledger
+
+    ledger_path = tmp_path / "event_alpha_runs.jsonl"
+    malformed = _valid_calendar_normalization()
+    malformed["dedupe_policy"] = "SECRET_BAD_POLICY"
+    malformed["raw_payload"] = "SECRET"
+    result = SimpleNamespace(
+        run_id="malformed-calendar-run",
+        profile="fixture",
+        unified_calendar_rows=4,
+        unified_calendar_normalization=malformed,
+    )
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+
+    try:
+        run_ledger.append_run_record(
+            result,
+            cfg=run_ledger.EventAlphaRunLedgerConfig(path=ledger_path),
+            profile="fixture",
+            started_at=now,
+            finished_at=now,
+            with_llm=False,
+            send_requested=False,
+        )
+    except ValueError as exc:
+        assert str(exc) == "invalid unified calendar normalization telemetry"
+    else:
+        raise AssertionError("malformed calendar telemetry was accepted")
+
+    ledger_bytes = ledger_path.read_bytes() if ledger_path.exists() else b""
+    assert b"SECRET" not in ledger_bytes
+    assert ledger_bytes == b""
+
+    class SecretLeakingValue:
+        def __eq__(self, other):
+            raise RuntimeError("SECRET")
+
+        def __ne__(self, other):
+            raise RuntimeError("SECRET")
+
+    hostile = _valid_calendar_normalization()
+    hostile["dedupe_policy"] = SecretLeakingValue()
+    result.unified_calendar_normalization = hostile
+    try:
+        run_ledger.append_run_record(
+            result,
+            cfg=run_ledger.EventAlphaRunLedgerConfig(path=ledger_path),
+            profile="fixture",
+            started_at=now,
+            finished_at=now,
+            with_llm=False,
+            send_requested=False,
+        )
+    except ValueError as exc:
+        assert str(exc) == "invalid unified calendar normalization telemetry"
+        assert "SECRET" not in str(exc)
+    else:
+        raise AssertionError("hostile calendar telemetry was accepted")
+    assert not ledger_path.exists()
 
 
 def test_operator_state_schema_keeps_fingerprintless_and_sha_only_legacy_entries_readable():

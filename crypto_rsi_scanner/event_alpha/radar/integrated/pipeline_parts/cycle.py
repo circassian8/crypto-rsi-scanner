@@ -54,6 +54,7 @@ class _IntegratedOperatorArtifacts:
     unified_calendar_path: Path
     unified_calendar_preview_path: Path
     unified_calendar_rows: tuple[dict[str, Any], ...]
+    unified_calendar_normalization: Mapping[str, Any]
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,7 @@ class _IntegratedCalendarArtifacts:
     path: Path
     preview_path: Path
     rows: tuple[dict[str, Any], ...]
+    normalization: Mapping[str, Any]
 
 
 @dataclass(frozen=True)
@@ -407,6 +409,7 @@ def _write_integrated_operator_artifacts(
         unified_calendar_path=calendar.path,
         unified_calendar_preview_path=calendar.preview_path,
         unified_calendar_rows=calendar.rows,
+        unified_calendar_normalization=calendar.normalization,
     )
 
 
@@ -442,12 +445,13 @@ def _write_integrated_calendar_artifacts(
     context: event_alpha_artifacts.EventAlphaArtifactContext,
     fixture: bool,
 ) -> _IntegratedCalendarArtifacts:
-    rows = _integrated_unified_calendar_rows(
+    normalization = _integrated_unified_calendar_normalization(
         start,
         inputs,
         context=context,
         fixture=fixture,
     )
+    rows = tuple(normalization.rows)
     path = event_unified_calendar.write_unified_calendar_artifact(
         start.namespace_dir / event_unified_calendar.UNIFIED_CALENDAR_FILENAME,
         rows,
@@ -457,7 +461,12 @@ def _write_integrated_calendar_artifacts(
         event_unified_calendar.format_unified_calendar_preview(rows),
         encoding="utf-8",
     )
-    return _IntegratedCalendarArtifacts(path=path, preview_path=preview_path, rows=rows)
+    return _IntegratedCalendarArtifacts(
+        path=path,
+        preview_path=preview_path,
+        rows=rows,
+        normalization=normalization.telemetry.to_dict(),
+    )
 
 
 def _write_integrated_research_cards(
@@ -615,26 +624,21 @@ def _write_integrated_presentations(
     )
 
 
-def _integrated_unified_calendar_rows(
+def _integrated_unified_calendar_normalization(
     start: _IntegratedCycleStart,
     inputs: _IntegratedCycleInputs,
     *,
     context: event_alpha_artifacts.EventAlphaArtifactContext,
     fixture: bool,
-) -> tuple[dict[str, Any], ...]:
-    source_rows: list[Mapping[str, Any]] = list(inputs.sidecars.get("scheduled_catalyst", ()))
+) -> event_unified_calendar.UnifiedCalendarNormalizationResult:
+    source_rows: list[Any] = list(inputs.sidecars.get("scheduled_catalyst", ()))
     if fixture and config.EVENT_ALPHA_UNIFIED_CALENDAR_FIXTURE_PATH.exists():
         source_rows.extend(
-            event_unified_calendar.load_unified_calendar_fixture(
-                config.EVENT_ALPHA_UNIFIED_CALENDAR_FIXTURE_PATH,
-                profile=context.profile,
-                artifact_namespace=context.artifact_namespace,
-                run_mode=context.run_mode,
-                run_id=start.run_id,
-                observed_at=start.research_observed_at.isoformat(),
+            event_unified_calendar.load_unified_calendar_fixture_raw_rows(
+                config.EVENT_ALPHA_UNIFIED_CALENDAR_FIXTURE_PATH
             )
         )
-    return event_unified_calendar.normalize_unified_calendar_rows(
+    return event_unified_calendar.normalize_unified_calendar_rows_with_telemetry(
         source_rows,
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
@@ -734,6 +738,9 @@ def _integrated_cycle_result(
         raw_events=sum(len(rows) for rows in inputs.sidecars.values()),
         market_anomalies=sidecar_counts["market_anomalies"],
         unified_calendar_rows=len(operator_artifacts.unified_calendar_rows),
+        unified_calendar_normalization=dict(
+            operator_artifacts.unified_calendar_normalization
+        ),
         market_state_snapshots=(
             candidate_artifacts.targeted_market_refresh_result.persisted_snapshot_rows
             if candidate_artifacts.targeted_market_refresh_result else 0

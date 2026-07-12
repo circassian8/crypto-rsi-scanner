@@ -17,6 +17,53 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-12 — Make calendar normalization losses measurable · Codex
+**Why:** The unified calendar silently discarded non-mapping and invalid rows,
+silently overwrote duplicate identities, and normalized fixture rows before the
+integrated cycle could count the raw input. A clean output count therefore
+could not distinguish a healthy empty feed from rejected or deduplicated data.
+**Changes:**
+- Added a closed, payload-free calendar rejection-code enum and static validation
+  errors for identity, timing, URL, reminder, classification, research-only,
+  and side-effect failures. Boolean/non-finite/overflowing timestamps, malformed
+  URL ports, non-finite counters, duplicate JSON keys, unknown nonempty fixture
+  containers, and exception tracebacks now fail closed without echoing inputs.
+- Added a one-pass deterministic normalization result with exact v1 counters:
+  input, accepted, output, duplicate overwrite, non-mapping, rejected, and
+  sorted rejection-reason counts. The contract enforces all accounting
+  equations, uses `last_valid_row_wins`, preserves a valid row when a later
+  duplicate is invalid, and keeps the existing tuple-returning APIs compatible.
+- Changed the integrated cycle to merge raw scheduled and fixture rows before
+  exactly one normalization pass. The exact nine-field telemetry mapping is
+  carried by `EventIntegratedRadarResult`, validated and snapshotted before any
+  run-ledger write, bound into the canonical run-row fingerprint, checked by
+  schema/doctor against the outer calendar row count, and rendered in the
+  operator run report. Legacy run rows without telemetry remain valid.
+- Added adversarial coverage for one-shot iterables, duplicate ordering,
+  invalid containers/JSON, hostile mappings, payload and traceback nonleakage,
+  every closed reason, counter/shape tampering, producer/schema drift,
+  pre-write rejection, and integrated scope neutrality. No standalone artifact,
+  provider call, notification, trade, paper trade, RSI write, or trigger was
+  added.
+**Verify:** 64 merged calendar, artifact-schema, namespace-integration, and
+run-ledger tests passed; the new integration assertion also passed after the
+payload-free run-report rendering was added. `python -m compileall -q
+crypto_rsi_scanner tests` and `git diff --check` passed. The fixture integrated
+radar smoke and full strict doctor completed with 12 calendar inputs (9 fixture
++ 3 scheduled), 10 accepted/output rows, 2 `unsupported_event_kind`
+rejections, exact result/artifact/ledger agreement, 88 schema-valid doctor rows,
+zero blockers, one expected fixture CryptoPanic warning, and zero sends/trades/
+paper/RSI/triggered-fade writes. Full pytest was not repeated after the prior
+846-test shared-authority gate; this slice used the risk-matched focused,
+schema, integrated no-send, and architecture gates. `make
+architecture-cleanliness-check PYTHON=.venv/bin/python` passed with zero new
+size/class-ownership violations; the telemetry and result classes each have a
+focused module. GitHub Actions was not polled or awaited.
+**Notes/risks:** Calendar loss is now measurable without retaining rejected
+payloads. The next and higher-risk slice is the outcome eligibility firewall:
+synthetic fixture returns, immature primary horizons, broad identity joins, and
+unproven price provenance must not count as calibration truth.
+
 ## 2026-07-12 — Bind dashboard authority to exact artifact evidence · Codex
 **Why:** The first Decision Model v2 dashboard release still trusted paths,
 counts, revision labels, and doctor timestamps without proving that every

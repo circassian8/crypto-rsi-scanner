@@ -631,6 +631,7 @@
       "accepted": true,
       "accepted_model_bundle": true,
       "class_names": [
+        "CalendarRejectionCode",
         "CalendarValidationError",
         "UnifiedCalendarEvent"
       ],
@@ -638,7 +639,7 @@
       "max_class_line_count": 70,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.calendar.models",
-      "public_class_count": 2,
+      "public_class_count": 3,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
@@ -1646,7 +1647,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 754,
+  "file_count": 755,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1654,7 +1655,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-12T07:04:57.257834+00:00",
+  "generated_at": "2026-07-12T07:30:12.898765+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1768,6 +1769,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1177,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1169,
       "path": "crypto_rsi_scanner/event_alpha/shims.py",
       "source_kind": "production"
@@ -1812,12 +1819,6 @@
       "limit": 1500,
       "line_count": 1135,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_confirmation.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1129,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py",
       "source_kind": "production"
     },
     {
@@ -1882,6 +1883,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1027,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1025,
       "path": "crypto_rsi_scanner/event_alpha/radar/llm/extractor.py",
       "source_kind": "production"
@@ -1890,12 +1897,6 @@
       "limit": 1500,
       "line_count": 1024,
       "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/source_coverage_checks.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1020,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py",
       "source_kind": "production"
     }
   ],
@@ -1932,6 +1933,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1377,
+      "path": "tests/event_alpha/test_artifact_schema.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1337,
       "path": "tests/event_alpha/test_core_opportunities.py",
       "source_kind": "test"
@@ -1958,12 +1965,6 @@
       "limit": 1500,
       "line_count": 1207,
       "path": "tests/event_alpha/test_watchlist_router.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1181,
-      "path": "tests/event_alpha/test_artifact_schema.py",
       "source_kind": "test"
     },
     {
@@ -2036,6 +2037,12 @@
       "limit": 1500,
       "line_count": 979,
       "path": "tests/event_alpha/test_doctor_provider_conflicts.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 951,
+      "path": "tests/event_alpha/test_namespace_integrations.py",
       "source_kind": "test"
     },
     {
@@ -2114,12 +2121,6 @@
       "limit": 1500,
       "line_count": 786,
       "path": "tests/event_alpha/test_core_reconciliation.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 774,
-      "path": "tests/event_alpha/test_namespace_integrations.py",
       "source_kind": "test"
     },
     {
@@ -2733,6 +2734,7 @@
       "accepted": true,
       "accepted_model_bundle": true,
       "class_names": [
+        "CalendarRejectionCode",
         "CalendarValidationError",
         "UnifiedCalendarEvent"
       ],
@@ -2740,7 +2742,7 @@
       "max_class_line_count": 70,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.calendar.models",
-      "public_class_count": 2,
+      "public_class_count": 3,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
