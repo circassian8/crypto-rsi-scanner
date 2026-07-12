@@ -50,9 +50,9 @@ ARCHITECTURE_COMPONENTS: dict[str, dict[str, Any]] = {
         "north_star_requirement": "Provider rows must preserve source URL, title/body evidence, published time, provider health, and no-live-default request posture.",
     },
     "market_anomaly_scanner": {
-        "role": "Finds broad market-first moves and creates catalyst-search queue items before promotion.",
+        "role": "Finds broad market-first moves, evaluates market-led actionability, and creates catalyst-search enrichment queue items.",
         "primary_artifacts": ["event_market_anomalies.jsonl", "event_market_anomaly_catalyst_search_queue.jsonl"],
-        "north_star_requirement": "Market anomaly alone remains unconfirmed until structured or official evidence confirms the why-now.",
+        "north_star_requirement": "A fresh, liquid, identity-safe anomaly may become actionable research without a known catalyst; unknown catalyst remains explicit and lowers evidence confidence.",
     },
     "resolver": {
         "role": "Maps tickers, coin ids, exchange symbols, Coinalyze markets, and future contract/pool ids into canonical asset identity.",
@@ -83,6 +83,11 @@ ARCHITECTURE_COMPONENTS: dict[str, dict[str, Any]] = {
         "primary_artifacts": ["event_integrated_radar_candidates.jsonl", "event_core_opportunities.jsonl"],
         "north_star_requirement": "A lane is a research workflow label, not an instruction to trade.",
     },
+    "crypto_radar_decision_model_v2": {
+        "role": "Separates thesis origin, directional bias, catalyst status, evidence confidence, timing, tradability, actionability, and risk from legacy opportunity lanes.",
+        "primary_artifacts": ["event_integrated_radar_candidates.jsonl", "event_core_opportunities.jsonl", "event_alpha_operator_state.json"],
+        "north_star_requirement": "New lowercase radar routes are explicit research-only metadata; they do not replace legacy alert routes or authorize delivery, paper trading, execution, RSI writes, or TRIGGERED_FADE.",
+    },
     "policy_routing_gates": {
         "role": "Applies quality, freshness, dedupe, source-strength, no-send, and safety blockers before any preview or delivery row.",
         "primary_artifacts": ["event_alpha_notification_deliveries.jsonl"],
@@ -107,6 +112,55 @@ ARCHITECTURE_COMPONENTS: dict[str, dict[str, Any]] = {
         "role": "Reports lane/provider/source-pack usefulness, noise, and maturation rates as recommendations-only priors.",
         "primary_artifacts": ["event_integrated_radar_calibration_report.md", "event_radar_performance_dashboard.md"],
         "north_star_requirement": "All prior and threshold suggestions must carry auto_apply=false until a separate explicit decision changes policy.",
+    },
+}
+
+DECISION_MODEL_V2: dict[str, Any] = {
+    "schema_version": "crypto_radar_decision_model_v2",
+    "enabled_by_default_for_research_preview": True,
+    "legacy_opportunity_type_preserved": True,
+    "legacy_alert_routes_preserved": True,
+    "old_artifacts_auto_promoted": False,
+    "dimensions": {
+        "thesis_origin": ["market_led", "catalyst_led", "technical_led", "macro_led", "mixed"],
+        "directional_bias": ["long", "fade_short_review", "risk", "neutral"],
+        "catalyst_status": ["confirmed", "plausible", "unknown", "not_required", "disproven"],
+        "confidence_band": ["diagnostic", "exploratory", "actionable", "high_confidence"],
+        "timing_state": ["early", "active", "extended", "exhausted", "scheduled", "stale"],
+        "tradability_status": ["good", "acceptable", "poor", "blocked"],
+    },
+    "operator_routes": [
+        "actionable_watch",
+        "high_confidence_watch",
+        "rapid_market_anomaly",
+        "fade_exhaustion_review",
+        "calendar_risk",
+        "diagnostic",
+    ],
+    "hard_blockers": [
+        "unresolved identity",
+        "stale data",
+        "invalid market units",
+        "insufficient liquidity",
+        "extreme spread",
+        "suspicious illiquid move",
+        "duplicate",
+        "quote/theme/control entity",
+        "secret/path/safety failure",
+    ],
+    "soft_penalties": [
+        "unknown catalyst",
+        "missing official source or article",
+        "missing derivatives",
+        "missing optional confirmation",
+    ],
+    "market_led_actionability": {
+        "catalyst_required": False,
+        "requires_fresh_market_snapshot": True,
+        "requires_canonical_identity": True,
+        "requires_adequate_liquidity_and_spread": True,
+        "requires_relative_move_or_stealth_accumulation": True,
+        "requires_meaningful_volume_anomaly": True,
     },
 }
 OPPORTUNITY_LANES: dict[str, dict[str, Any]] = {
@@ -257,7 +311,7 @@ OPPORTUNITY_LANES: dict[str, dict[str, Any]] = {
         "required_evidence": [
             "market anomaly, context, or weak catalyst evidence",
             "explicit source plan or catalyst-search queue item",
-            "no_alert_until_evidence=true when anomaly-only",
+            "legacy strict-alert gate keeps no_alert_until_evidence=true when anomaly-only; v2 research previews are separate",
         ],
         "market_requirements": [
             "market move can be observed but does not prove catalyst identity",
@@ -393,6 +447,7 @@ def build_north_star(*, generated_at: datetime | None = None) -> dict[str, Any]:
         "api_keys_required_for_tests": False,
         "purpose": "Align future Event Alpha work around a measurable crypto market radar and 30-day no-send burn-in contract.",
         "architecture": deepcopy(ARCHITECTURE_COMPONENTS),
+        "decision_model_v2": deepcopy(DECISION_MODEL_V2),
         "opportunity_lanes": deepcopy(OPPORTUNITY_LANES),
         "human_labeling": deepcopy(HUMAN_LABELING_ROLE),
         "burn_in_contract": deepcopy(BURN_IN_CONTRACT),
@@ -701,7 +756,33 @@ def format_north_star(payload: Mapping[str, Any]) -> str:
                 "",
             ]
         )
-    lines.extend(["## Opportunity Lanes", ""])
+    decision = payload.get("decision_model_v2") if isinstance(payload.get("decision_model_v2"), Mapping) else {}
+    lines.extend([
+        "## Crypto Radar Decision Model v2",
+        "",
+        f"- schema_version: `{decision.get('schema_version')}`",
+        f"- enabled_by_default_for_research_preview: `{decision.get('enabled_by_default_for_research_preview')}`",
+        f"- legacy_opportunity_type_preserved: `{decision.get('legacy_opportunity_type_preserved')}`",
+        f"- legacy_alert_routes_preserved: `{decision.get('legacy_alert_routes_preserved')}`",
+        f"- old_artifacts_auto_promoted: `{decision.get('old_artifacts_auto_promoted')}`",
+        "- dimensions:",
+    ])
+    for key, values in (decision.get("dimensions") or {}).items():
+        lines.append(f"  - {key}: {', '.join(str(value) for value in values)}")
+    lines.append("- operator_routes:")
+    for item in decision.get("operator_routes", []):
+        lines.append(f"  - {item}")
+    lines.append("- hard_blockers:")
+    for item in decision.get("hard_blockers", []):
+        lines.append(f"  - {item}")
+    lines.append("- soft_penalties:")
+    for item in decision.get("soft_penalties", []):
+        lines.append(f"  - {item}")
+    market_led = decision.get("market_led_actionability") if isinstance(decision.get("market_led_actionability"), Mapping) else {}
+    lines.append("- market_led_actionability:")
+    for key, value in market_led.items():
+        lines.append(f"  - {key}: `{value}`")
+    lines.extend(["", "## Opportunity Lanes", ""])
     lanes = payload.get("opportunity_lanes") if isinstance(payload.get("opportunity_lanes"), Mapping) else {}
     for lane_name in LANE_NAMES:
         lane = lanes.get(lane_name)

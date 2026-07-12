@@ -1,0 +1,124 @@
+{
+  "schema_id": "operator_state_v1",
+  "schema_version": "event_alpha_schema_v1",
+  "row_type": "event_alpha_operator_state",
+  "run_id": "dashboard-run-current",
+  "profile": "fixture",
+  "artifact_namespace": "current",
+  "run_mode": "fixture",
+  "run_started_at": "2026-07-12T06:00:00+00:00",
+  "generated_at": "2026-07-12T06:01:00+00:00",
+  "updated_at": "2026-07-12T06:02:00+00:00",
+  "revision": 7,
+  "manifest_status": "complete",
+  "research_only": true,
+  "raw_events": 8,
+  "candidate_events": 5,
+  "research_candidates": 4,
+  "source_alert_snapshots": 0,
+  "current_generation_core_rows": 4,
+  "current_generation_visible_core_rows": 3,
+  "cumulative_store_rows": 5,
+  "alertable_decisions": 0,
+  "strict_alerts": 0,
+  "preview_rendered_items": 0,
+  "burn_in_mode": false,
+  "send_guard_status": "no_send",
+  "no_send_rehearsal": true,
+  "sent": false,
+  "send_requested": false,
+  "send_attempted": false,
+  "send_success": false,
+  "send_items_delivered": 0,
+  "trades_created": 0,
+  "paper_trades_created": 0,
+  "normal_rsi_signal_rows_written": 0,
+  "triggered_fade_created": 0,
+  "artifacts": {
+    "run_ledger": {
+      "status": "skipped",
+      "run_id": "dashboard-run-current",
+      "path": null,
+      "generated_at": "2026-07-12T06:01:00+00:00",
+      "reason": "fixture_has_no_run_ledger"
+    },
+    "core_opportunities": {
+      "status": "current",
+      "run_id": "dashboard-run-current",
+      "path": "event_core_opportunities.jsonl",
+      "generated_at": "2026-07-12T06:01:00+00:00",
+      "reason": null,
+      "count": 4
+    },
+    "research_cards": {
+      "status": "skipped",
+      "run_id": "dashboard-run-current",
+      "path": null,
+      "generated_at": "2026-07-12T06:01:00+00:00",
+      "reason": "fixture_has_no_cards"
+    },
+    "daily_brief": {
+      "status": "skipped",
+      "run_id": "dashboard-run-current",
+      "path": null,
+      "generated_at": "2026-07-12T06:01:00+00:00",
+      "reason": "fixture_has_no_daily_brief"
+    },
+    "notification_preview": {
+      "status": "skipped",
+      "run_id": "dashboard-run-current",
+      "path": null,
+      "generated_at": "2026-07-12T06:01:00+00:00",
+      "reason": "fixture_has_no_preview"
+    },
+    "source_coverage_json": {
+      "status": "skipped",
+      "run_id": "dashboard-run-current",
+      "path": null,
+      "generated_at": "2026-07-12T06:01:00+00:00",
+      "reason": "fixture_has_no_source_coverage"
+    },
+    "source_coverage_md": {
+      "status": "skipped",
+      "run_id": "dashboard-run-current",
+      "path": null,
+      "generated_at": "2026-07-12T06:01:00+00:00",
+      "reason": "fixture_has_no_source_coverage"
+    },
+    "provider_readiness_json": {
+      "status": "current",
+      "run_id": "dashboard-run-current",
+      "path": "event_live_provider_activation_readiness.json",
+      "generated_at": "2026-07-12T06:01:00+00:00",
+      "reason": null
+    },
+        "provider_readiness_md": {
+            "status": "skipped",
+            "run_id": "dashboard-run-current",
+            "path": null,
+            "generated_at": "2026-07-12T06:01:00+00:00",
+            "reason": "fixture_has_no_provider_markdown"
+        },
+        "unified_calendar": {
+            "status": "current",
+            "run_id": "dashboard-run-current",
+            "path": "event_unified_calendar_events.jsonl",
+            "generated_at": "2026-07-12T06:01:00+00:00",
+            "reason": null,
+            "count": 2,
+            "sha256": "ba70d5f747402c93ae175a29b50a53f2d12fe33753bbeab07d8842cb9aea22f5"
+        }
+  },
+  "doctor": {
+    "status": "OK",
+    "run_id": "dashboard-run-current",
+    "authoritative": true,
+    "strict": true,
+    "schema_only": false,
+    "skip_api_checks": false,
+    "verified_at": "2026-07-12T06:02:00+00:00",
+    "verified_revision": 7,
+    "blocker_count": 0,
+    "warning_count": 0
+  }
+}

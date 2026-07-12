@@ -13,6 +13,7 @@ import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 import crypto_rsi_scanner.event_alpha.radar.core_opportunities as event_core_opportunities
 import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
+from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import decision_model_values
 
 
 FEEDBACK_SCHEMA_VERSION = "event_alpha_feedback_v1"
@@ -26,6 +27,8 @@ class EventFeedbackLabel(str, Enum):
     LATE = "late"
     SOURCE_NOISE = "source_noise"
     NEEDS_CONFIRMATION = "needs_confirmation"
+    MISSING_CONFIRMATION = "missing_confirmation"
+    MANIPULATION_RISK = "manipulation_risk"
     DUPLICATE = "duplicate"
     PROMISING_SOURCE_TYPE = "promising_source_type"
     MISSED = "missed"
@@ -89,6 +92,31 @@ class EventFeedbackRecord:
     source_provider_domain: str | None = None
     provider_coverage_status: str | None = None
     source_metadata: dict[str, Any] | None = None
+    decision_model_version: str | None = None
+    decision_model_enabled: bool | None = None
+    thesis_origin: str | None = None
+    directional_bias: str | None = None
+    catalyst_status: str | None = None
+    confidence_band: str | None = None
+    timing_state: str | None = None
+    tradability_status: str | None = None
+    radar_route: str | None = None
+    radar_actionable: bool | None = None
+    actionability_score: float | None = None
+    evidence_confidence_score: float | None = None
+    risk_score: float | None = None
+    actionability_score_cohort: str | None = None
+    anomaly_type: str | None = None
+    actionability_score_components: dict[str, Any] | None = None
+    evidence_confidence_score_components: dict[str, Any] | None = None
+    risk_score_components: dict[str, Any] | None = None
+    decision_hard_blockers: tuple[str, ...] = ()
+    decision_soft_penalties: tuple[str, ...] = ()
+    decision_missing_data: tuple[str, ...] = ()
+    decision_warnings: tuple[str, ...] = ()
+    why_still_worth_reviewing: tuple[str, ...] = ()
+    radar_what_confirms: tuple[str, ...] = ()
+    radar_what_invalidates: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -202,6 +230,11 @@ def format_feedback_record(record: EventFeedbackRecord, *, path: Path | None = N
         f"playbook: {record.playbook_type or 'unknown'} · score={record.latest_score if record.latest_score is not None else 0}",
         f"quality: impact={record.impact_path_type or 'unknown'} role={record.candidate_role or 'unknown'} "
         f"level={record.opportunity_level or 'unknown'} source_pack={record.source_pack or 'unknown'}",
+        f"radar_decision: route={record.radar_route or 'legacy'} origin={record.thesis_origin or 'unknown'} "
+        f"catalyst={record.catalyst_status or 'unknown'} confidence={record.confidence_band or 'unknown'}",
+        f"radar_scores: actionability={record.actionability_score if record.actionability_score is not None else 'n/a'} "
+        f"evidence={record.evidence_confidence_score if record.evidence_confidence_score is not None else 'n/a'} "
+        f"risk={record.risk_score if record.risk_score is not None else 'n/a'}",
         f"marked_by: {record.marked_by} · marked_at: {record.marked_at}",
     ])
     if record.notes:
@@ -240,7 +273,49 @@ def format_feedback_report(read_result: EventFeedbackReadResult) -> str:
         )
         if record.notes:
             rows.append(f"  notes: {record.notes}")
+    rows.extend(_decision_model_v2_feedback_cohort_lines(read_result.records))
     return "\n".join(rows)
+
+
+def _decision_model_v2_feedback_cohort_lines(
+    records: Iterable[EventFeedbackRecord],
+) -> list[str]:
+    """Summarize human labels by explicit v2 decision dimensions only."""
+
+    explicit: list[tuple[EventFeedbackRecord, dict[str, Any]]] = []
+    for record in records:
+        values = decision_model_values(asdict(record))
+        if values:
+            explicit.append((record, values))
+    if not explicit:
+        return []
+    lines = [
+        "",
+        "Crypto Radar Decision Model v2 feedback cohorts (explicit v2 rows only):",
+        f"- explicit_v2_rows: {len(explicit)}",
+    ]
+    dimensions = (
+        ("thesis_origin", "unknown"),
+        ("catalyst_status", "unknown"),
+        ("confidence_band", "unknown"),
+        ("actionability_score_cohort", "unscored"),
+        ("anomaly_type", "unknown"),
+    )
+    for field, missing_label in dimensions:
+        buckets: dict[str, list[EventFeedbackRecord]] = {}
+        for record, values in explicit:
+            value = str(values.get(field) or missing_label)
+            buckets.setdefault(value, []).append(record)
+        lines.append(f"- {field}:")
+        for value, bucket in sorted(buckets.items()):
+            label_counts: dict[str, int] = {}
+            for record in bucket:
+                label_counts[record.label] = label_counts.get(record.label, 0) + 1
+            labels = ", ".join(
+                f"{label}={count}" for label, count in sorted(label_counts.items())
+            )
+            lines.append(f"  - {value}: rows={len(bucket)} labels={labels}")
+    return lines
 
 
 def valid_labels() -> tuple[str, ...]:
@@ -497,6 +572,7 @@ def _record_from_entry(
     components = dict(entry.latest_score_components or {})
     row = dict(context_row or {})
     row_components = _components(row)
+    decision = decision_model_values(components, row_components, row)
     core_id = (
         _row_value(row, "core_opportunity_id", "feedback_target", components=row_components)
         or components.get("core_opportunity_id")
@@ -560,6 +636,7 @@ def _record_from_entry(
         source_provider_domain=_optional_str(components.get("source_domain") or _row_value(row, "source_domain", "source_provider_domain", components=row_components)),
         provider_coverage_status=_optional_str(components.get("provider_coverage_status") or _row_value(row, "provider_coverage_status", "source_coverage_status", components=row_components)),
         source_metadata=source_meta or None,
+        **_feedback_decision_fields(decision),
     )
 
 
@@ -575,6 +652,7 @@ def _record_from_context_row(
     card_path: str | Path | None,
 ) -> EventFeedbackRecord:
     components = _components(row)
+    decision = decision_model_values(components, row)
     core_id = _row_value(row, "core_opportunity_id", "feedback_target", components=components)
     feedback_target = _row_value(row, "feedback_target", components=components) or core_id or target
     feedback_target_type = _row_value(row, "feedback_target_type", components=components)
@@ -629,6 +707,7 @@ def _record_from_context_row(
         source_provider_domain=_optional_str(_row_value(row, "source_provider_domain", "source_domain", components=components)),
         provider_coverage_status=_optional_str(_row_value(row, "provider_coverage_status", "source_coverage_status", components=components)),
         source_metadata=source_meta or None,
+        **_feedback_decision_fields(decision),
     )
 
 
@@ -699,6 +778,7 @@ def _record_from_row(row: Mapping[str, Any]) -> EventFeedbackRecord | None:
             source_provider_domain=_optional_str(row.get("source_provider_domain")),
             provider_coverage_status=_optional_str(row.get("provider_coverage_status")),
             source_metadata=dict(row.get("source_metadata")) if isinstance(row.get("source_metadata"), Mapping) else None,
+            **_feedback_decision_fields(decision_model_values(row)),
         )
     except (TypeError, ValueError):
         return None
@@ -727,6 +807,52 @@ def _label(value: str | EventFeedbackLabel) -> EventFeedbackLabel:
         return EventFeedbackLabel(str(value).strip())
     except ValueError as exc:
         raise ValueError(f"feedback label must be one of: {', '.join(valid_labels())}") from exc
+
+
+def _feedback_decision_fields(values: Mapping[str, Any]) -> dict[str, Any]:
+    if not values:
+        return {}
+    return {
+        "decision_model_version": _optional_str(values.get("decision_model_version")),
+        "decision_model_enabled": bool(values.get("decision_model_enabled", True)),
+        "thesis_origin": _optional_str(values.get("thesis_origin")),
+        "directional_bias": _optional_str(values.get("directional_bias")),
+        "catalyst_status": _optional_str(values.get("catalyst_status")),
+        "confidence_band": _optional_str(values.get("confidence_band")),
+        "timing_state": _optional_str(values.get("timing_state")),
+        "tradability_status": _optional_str(values.get("tradability_status")),
+        "radar_route": _optional_str(values.get("radar_route")),
+        "radar_actionable": bool(values.get("radar_actionable")),
+        "actionability_score": _optional_float(values.get("actionability_score")),
+        "evidence_confidence_score": _optional_float(values.get("evidence_confidence_score")),
+        "risk_score": _optional_float(values.get("risk_score")),
+        "actionability_score_cohort": _optional_str(values.get("actionability_score_cohort")),
+        "anomaly_type": _optional_str(values.get("anomaly_type")),
+        "actionability_score_components": _optional_mapping(values.get("actionability_score_components")),
+        "evidence_confidence_score_components": _optional_mapping(
+            values.get("evidence_confidence_score_components")
+            or values.get("evidence_confidence_components")
+        ),
+        "risk_score_components": _optional_mapping(values.get("risk_score_components")),
+        "decision_hard_blockers": _text_tuple(values.get("decision_hard_blockers")),
+        "decision_soft_penalties": _text_tuple(values.get("decision_soft_penalties")),
+        "decision_missing_data": _text_tuple(values.get("decision_missing_data")),
+        "decision_warnings": _text_tuple(values.get("decision_warnings")),
+        "why_still_worth_reviewing": _text_tuple(values.get("why_still_worth_reviewing")),
+        "radar_what_confirms": _text_tuple(values.get("radar_what_confirms")),
+        "radar_what_invalidates": _text_tuple(values.get("radar_what_invalidates")),
+    }
+
+
+def _optional_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_mapping(value: Any) -> dict[str, Any] | None:
+    return dict(value) if isinstance(value, Mapping) else None
 
 
 def _optional_str(value: Any) -> str | None:

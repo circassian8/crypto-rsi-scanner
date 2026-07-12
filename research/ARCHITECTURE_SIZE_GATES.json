@@ -222,6 +222,22 @@
       "accepted": true,
       "accepted_model_bundle": true,
       "class_names": [
+        "DashboardLoadError",
+        "DashboardResponse",
+        "DashboardSnapshot"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 46,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
         "EnvironmentCheck",
         "EventAlphaEnvironmentDoctorResult"
       ],
@@ -258,7 +274,7 @@
         "EventAlphaReviewQueueItem"
       ],
       "exception_reason": "",
-      "max_class_line_count": 34,
+      "max_class_line_count": 48,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.notifications.inbox.models",
       "public_class_count": 3,
@@ -403,7 +419,7 @@
         "EventFeedbackRecord"
       ],
       "exception_reason": "",
-      "max_class_line_count": 50,
+      "max_class_line_count": 75,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.feedback_labels",
       "public_class_count": 4,
@@ -615,6 +631,21 @@
       "accepted": true,
       "accepted_model_bundle": true,
       "class_names": [
+        "CalendarValidationError",
+        "UnifiedCalendarEvent"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 70,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.calendar.models",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
         "CatalystSearchRunResult",
         "CatalystSearchScore",
         "EventCatalystSearchConfig",
@@ -700,6 +731,28 @@
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.core_opportunities",
       "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "CatalystStatus",
+        "ConfidenceBand",
+        "DirectionalBias",
+        "RadarDecision",
+        "RadarDecisionConfig",
+        "RadarResearchRoute",
+        "ThesisOrigin",
+        "TimingState",
+        "TradabilityStatus"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 38,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.decision_models",
+      "public_class_count": 9,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
@@ -1386,8 +1439,17 @@
       "resolution": "accepted_model_bundle"
     }
   ],
-  "accepted_model_bundles_count": 79,
+  "accepted_model_bundles_count": 82,
   "accepted_production_files_over_1200_line_rows": [
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1421,
+      "path": "crypto_rsi_scanner/config.py",
+      "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
+      "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+      "source_kind": "production"
+    },
     {
       "accepted": true,
       "limit": 1500,
@@ -1404,15 +1466,6 @@
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
       "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
       "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
-      "line_count": 1353,
-      "path": "crypto_rsi_scanner/config.py",
-      "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
-      "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
       "source_kind": "production"
     },
     {
@@ -1454,19 +1507,19 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1247,
-      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-      "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
-      "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+      "line_count": 1254,
+      "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+      "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
+      "revisit_condition": "When outcome performance views gain new sections.",
       "source_kind": "production"
     },
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1233,
-      "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
-      "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
-      "revisit_condition": "When outcome performance views gain new sections.",
+      "line_count": 1247,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+      "revisit_condition": "When adding a new derivatives metric family or crowding class.",
       "source_kind": "production"
     }
   ],
@@ -1593,7 +1646,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 728,
+  "file_count": 750,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1601,10 +1654,16 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-12T02:07:37.982158+00:00",
+  "generated_at": "2026-07-12T05:09:21.944049+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
+    {
+      "limit": 1500,
+      "line_count": 1421,
+      "path": "crypto_rsi_scanner/config.py",
+      "source_kind": "production"
+    },
     {
       "limit": 1500,
       "line_count": 1398,
@@ -1615,12 +1674,6 @@
       "limit": 1500,
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1353,
-      "path": "crypto_rsi_scanner/config.py",
       "source_kind": "production"
     },
     {
@@ -1649,14 +1702,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1247,
-      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "line_count": 1254,
+      "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1233,
-      "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+      "line_count": 1247,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
       "source_kind": "production"
     },
     {
@@ -1673,6 +1726,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1199,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1189,
       "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/notification_delivery_checks.py",
       "source_kind": "production"
@@ -1681,6 +1740,12 @@
       "limit": 1500,
       "line_count": 1189,
       "path": "crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1182,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "source_kind": "production"
     },
     {
@@ -1715,26 +1780,20 @@
     },
     {
       "limit": 1500,
-      "line_count": 1146,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1145,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1138,
-      "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py",
+      "line_count": 1141,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1136,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py",
+      "line_count": 1138,
+      "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py",
       "source_kind": "production"
     },
     {
@@ -1751,7 +1810,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1117,
+      "line_count": 1129,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py",
       "source_kind": "production"
     },
@@ -1759,6 +1818,12 @@
       "limit": 1500,
       "line_count": 1103,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/rsi_scan.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1086,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py",
       "source_kind": "production"
     },
     {
@@ -1775,14 +1840,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1069,
-      "path": "crypto_rsi_scanner/event_alpha/notifications/delivery.py",
+      "line_count": 1070,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1059,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+      "line_count": 1069,
+      "path": "crypto_rsi_scanner/event_alpha/notifications/delivery.py",
       "source_kind": "production"
     },
     {
@@ -1795,6 +1860,12 @@
       "limit": 1500,
       "line_count": 1055,
       "path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1049,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
       "source_kind": "production"
     },
     {
@@ -1818,45 +1889,27 @@
     {
       "limit": 1500,
       "line_count": 1020,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1020,
       "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge_policy.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 995,
-      "path": "crypto_rsi_scanner/event_alpha/radar/scheduled_catalysts.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 989,
-      "path": "crypto_rsi_scanner/event_alpha/providers/source_registry.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 987,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/alerts.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 980,
-      "path": "crypto_rsi_scanner/event_alpha/radar/impact_hypothesis_store.py",
       "source_kind": "production"
     }
   ],
   "largest_test_files": [
     {
       "limit": 1500,
-      "line_count": 1481,
-      "path": "tests/event_alpha/test_market_surfaces.py",
+      "line_count": 1484,
+      "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1479,
-      "path": "tests/cli/test_make_targets.py",
+      "line_count": 1483,
+      "path": "tests/event_alpha/test_market_surfaces.py",
       "source_kind": "test"
     },
     {
@@ -1999,7 +2052,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 915,
+      "line_count": 919,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },
@@ -2271,6 +2324,22 @@
       "accepted": true,
       "accepted_model_bundle": true,
       "class_names": [
+        "DashboardLoadError",
+        "DashboardResponse",
+        "DashboardSnapshot"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 46,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
+      "public_class_count": 3,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
         "EnvironmentCheck",
         "EventAlphaEnvironmentDoctorResult"
       ],
@@ -2307,7 +2376,7 @@
         "EventAlphaReviewQueueItem"
       ],
       "exception_reason": "",
-      "max_class_line_count": 34,
+      "max_class_line_count": 48,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.notifications.inbox.models",
       "public_class_count": 3,
@@ -2452,7 +2521,7 @@
         "EventFeedbackRecord"
       ],
       "exception_reason": "",
-      "max_class_line_count": 50,
+      "max_class_line_count": 75,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.feedback_labels",
       "public_class_count": 4,
@@ -2664,6 +2733,21 @@
       "accepted": true,
       "accepted_model_bundle": true,
       "class_names": [
+        "CalendarValidationError",
+        "UnifiedCalendarEvent"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 70,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.calendar.models",
+      "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
         "CatalystSearchRunResult",
         "CatalystSearchScore",
         "EventCatalystSearchConfig",
@@ -2749,6 +2833,28 @@
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.core_opportunities",
       "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "CatalystStatus",
+        "ConfidenceBand",
+        "DirectionalBias",
+        "RadarDecision",
+        "RadarDecisionConfig",
+        "RadarResearchRoute",
+        "ThesisOrigin",
+        "TimingState",
+        "TradabilityStatus"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 38,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.radar.decision_models",
+      "public_class_count": 9,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
@@ -3459,8 +3565,15 @@
       "resolution": "accepted_model_bundle"
     }
   ],
-  "multi_public_class_modules_count": 80,
+  "multi_public_class_modules_count": 83,
   "near_threshold_file_status": [
+    {
+      "line_count": 1421,
+      "path": "crypto_rsi_scanner/config.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
     {
       "line_count": 1398,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
@@ -3471,13 +3584,6 @@
     {
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
-      "line_count": 1353,
-      "path": "crypto_rsi_scanner/config.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3556,6 +3662,12 @@
   "production_files_over_1200_line_rows": [
     {
       "limit": 1500,
+      "line_count": 1421,
+      "path": "crypto_rsi_scanner/config.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1398,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "source_kind": "production"
@@ -3564,12 +3676,6 @@
       "limit": 1500,
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1353,
-      "path": "crypto_rsi_scanner/config.py",
       "source_kind": "production"
     },
     {
@@ -3598,14 +3704,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1247,
-      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "line_count": 1254,
+      "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1233,
-      "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+      "line_count": 1247,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
       "source_kind": "production"
     }
   ],
@@ -3858,6 +3964,15 @@
         {
           "accepted": true,
           "limit": 1500,
+          "line_count": 1421,
+          "path": "crypto_rsi_scanner/config.py",
+          "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
+          "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
           "line_count": 1398,
           "path": "crypto_rsi_scanner/project_health/architecture_report.py",
           "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
@@ -3871,15 +3986,6 @@
           "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
           "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
           "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1353,
-          "path": "crypto_rsi_scanner/config.py",
-          "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
-          "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
           "source_kind": "production"
         },
         {
@@ -3921,19 +4027,19 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1247,
-          "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-          "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
-          "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+          "line_count": 1254,
+          "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+          "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
+          "revisit_condition": "When outcome performance views gain new sections.",
           "source_kind": "production"
         },
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1233,
-          "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
-          "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
-          "revisit_condition": "When outcome performance views gain new sections.",
+          "line_count": 1247,
+          "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+          "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+          "revisit_condition": "When adding a new derivatives metric family or crowding class.",
           "source_kind": "production"
         }
       ]
@@ -3979,6 +4085,11 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
+        "line_count": 1421,
+        "path": "crypto_rsi_scanner/config.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1398,
         "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "threshold": 1200
@@ -3986,11 +4097,6 @@
       {
         "line_count": 1387,
         "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1353,
-        "path": "crypto_rsi_scanner/config.py",
         "threshold": 1200
       },
       {
@@ -4014,13 +4120,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1247,
-        "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+        "line_count": 1254,
+        "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
         "threshold": 1200
       },
       {
-        "line_count": 1233,
-        "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+        "line_count": 1247,
+        "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
         "threshold": 1200
       }
     ],
@@ -4086,6 +4192,15 @@
           {
             "accepted": true,
             "limit": 1500,
+            "line_count": 1421,
+            "path": "crypto_rsi_scanner/config.py",
+            "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
+            "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
             "line_count": 1398,
             "path": "crypto_rsi_scanner/project_health/architecture_report.py",
             "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
@@ -4099,15 +4214,6 @@
             "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
             "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
             "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1353,
-            "path": "crypto_rsi_scanner/config.py",
-            "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
-            "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
             "source_kind": "production"
           },
           {
@@ -4149,19 +4255,19 @@
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1247,
-            "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-            "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
-            "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+            "line_count": 1254,
+            "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+            "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
+            "revisit_condition": "When outcome performance views gain new sections.",
             "source_kind": "production"
           },
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1233,
-            "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
-            "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
-            "revisit_condition": "When outcome performance views gain new sections.",
+            "line_count": 1247,
+            "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+            "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+            "revisit_condition": "When adding a new derivatives metric family or crowding class.",
             "source_kind": "production"
           }
         ]

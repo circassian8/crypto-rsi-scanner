@@ -17,6 +17,55 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-12 — Ship Crypto Radar Decision Model v2 and local dashboard · Codex
+**Why:** The legacy Event Alpha alert gate treated a discoverable catalyst as a
+near-universal prerequisite, which hid otherwise useful price/volume-led market
+structure from the human operator. The research surface needed independent
+actionability, evidence, risk, timing, catalyst, and tradability semantics while
+preserving every no-send/no-trading boundary.
+**Changes:**
+- Added the additive Decision Model v2 with explicit thesis origin, directional
+  bias, catalyst status, confidence band, timing state, tradability status,
+  0–100 actionability/evidence/risk scores, transparent score and penalty
+  components, missing-evidence disclosures, confirmation/invalidation criteria,
+  and separately configurable research routes. Unknown catalyst is a visible
+  soft penalty rather than a hard block; market-led promotion remains fail-closed
+  on canonical identity, snapshot freshness, units, liquidity, spread, turnover,
+  relative/stealth/breakout structure, deduplication, control, manipulation, and
+  safety gates.
+- Re-evaluated v2 after final resolver/market refresh and propagated the exact
+  result through integrated candidates, CoreOpportunity rows, research cards,
+  daily briefs, previews, outcome snapshots, feedback inbox/report cohorts, run
+  ledgers, and operator state. Legacy opportunity types, strict alert gates, and
+  notification routing are unchanged; unversioned/old artifacts are never
+  silently promoted.
+- Added an exact-revision, loopback-only, GET/HEAD-only local dashboard for
+  overview, actionable, anomalies, calendar, feedback, diagnostics, and detail
+  views. Diagnostic rows are hidden by default, artifact count/digest/run
+  lineage is verified, and the server performs no writes or provider calls.
+- Added the fixture-backed unified calendar schema/store/preview and integrated
+  artifact output, plus v2 configuration, Make targets, checked-in fixtures,
+  focused tests, architecture ownership/size registrations, and updated active
+  North Star, README, `AGENTS.md`, `ROADMAP.md`, and `DECISIONS.md` guidance.
+  Event Alpha remains research-only: no live trading, execution, paper trading,
+  normal RSI writes, default Telegram sends, provider activation, or v2-created
+  `TRIGGERED_FADE` state.
+**Verify:** `python -m compileall -q crypto_rsi_scanner tests` passed; 51 focused
+decision-model/dashboard/calendar tests and 171 broader Event Alpha tests passed;
+`make radar-calendar-preview`, `make event-alpha-market-anomaly-smoke`,
+`make event-alpha-integrated-radar-smoke`,
+`make event-alpha-integrated-radar-doctor`, and both fixture/integrated dashboard
+smokes passed with zero sends/writes/trades/paper/RSI/trigger creation and zero
+doctor blockers; `make architecture-cleanliness-check` passed with zero new
+violations; `make verify-fast PYTHON=.venv/bin/python` passed 980 tests plus all
+smokes; final `make verify PYTHON=.venv/bin/python` passed 899/899 standalone
+tests, 980/980 pytest tests, alert rendering, the 33-observation offline backtest,
+and paper scoreboard. GitHub Actions was not polled or awaited.
+**Notes/risks:** Public-provider readiness warnings remain honest operational
+state, not v2 regressions. Thresholds and routes should stay research-only until
+outcome and feedback cohorts show measured edge by thesis origin, catalyst
+status, actionability cohort, and anomaly type.
+
 ## 2026-07-12 — Stabilize live provider failures and stop retry storms · Codex
 **Why:** The full live-system run exposed repeated RSS 403s, duplicate GDELT
 429s, an opaque Bybit 403, a retired CryptoPanic route, and 150 OpenAI attempts

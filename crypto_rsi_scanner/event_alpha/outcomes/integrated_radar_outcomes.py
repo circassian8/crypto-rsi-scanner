@@ -12,6 +12,7 @@ from typing import Any, Iterable, Mapping
 from ..artifacts import paths as event_artifact_paths
 from ..artifacts import schema_v1
 from ..radar import integrated_radar as event_integrated_radar
+from ..radar.decision_model_surfaces import decision_model_values
 
 
 HORIZONS = ("15m", "1h", "4h", "24h", "3d", "7d")
@@ -25,6 +26,13 @@ PERFORMANCE_DIMENSIONS = (
     "market_state_class",
     "crowding_class",
     "source_strength",
+    "thesis_origin",
+    "catalyst_status",
+    "confidence_band",
+    "actionability_score_cohort",
+    "anomaly_type",
+    "radar_route",
+    "tradability_status",
 )
 PERFORMANCE_LANES = (
     "EARLY_LONG_RESEARCH",
@@ -95,7 +103,11 @@ def build_radar_provider_performance(
     generated = _iso(_parse_time(generated_at) or datetime.now(timezone.utc))
     namespace_inputs = [_namespace_inputs(Path(path), generated_at=generated, stale_after_days=stale_after_days) for path in namespace_dirs]
     rows = [row for inputs in namespace_inputs for row in inputs["rows"]]
-    main_rows = [row for row in rows if row.get("opportunity_type") != "DIAGNOSTIC"]
+    main_rows = [
+        row for row in rows
+        if row.get("opportunity_type") != "DIAGNOSTIC"
+        and str(row.get("radar_route") or "").casefold() != "diagnostic"
+    ]
     diagnostic_count = len(rows) - len(main_rows)
     maturation_counts = Counter(str(row.get("maturation_state") or "unknown") for row in main_rows)
     lane_summaries = _dimension_summary(main_rows, "opportunity_type")
@@ -337,7 +349,7 @@ def format_integrated_radar_calibration_report(rows: Iterable[Mapping[str, Any]]
         f"Diagnostics excluded from performance: {excluded}",
         "",
     ]
-    for dimension in ("opportunity_type", "source_pack", "source_origin", "market_state_class", "source_strength", "crowding_class"):
+    for dimension in PERFORMANCE_DIMENSIONS:
         lines.extend([f"## By {dimension}", ""])
         groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for row in materialized:
@@ -559,6 +571,7 @@ def _performance_observation_row(
     provider = _dimension_primary(row, outcome, "provider")
     source_pack = _dimension_primary(row, outcome, "source_pack")
     source_origin = _dimension_primary(row, outcome, "source_origin")
+    decision = decision_model_values(outcome, row)
     return {
         "namespace": namespace_dir.name,
         "candidate_id": _first_text(outcome, row, "candidate_id", default=""),
@@ -572,6 +585,7 @@ def _performance_observation_row(
         "market_state_class": _dimension_primary(row, outcome, "market_state_class"),
         "crowding_class": _dimension_primary(row, outcome, "crowding_class"),
         "source_strength": _dimension_primary(row, outcome, "source_strength"),
+        **decision,
         "maturation_state": maturation_state,
         "outcome_label": label or ("pending" if maturation_state == "pending" else maturation_state),
         "validation_label": validation,
@@ -579,7 +593,9 @@ def _performance_observation_row(
         "time_to_confirmation_hours": _time_to_confirmation_hours(lane, outcome),
         "observed_at": _first_text(outcome, row, "observed_at", default=""),
         "preview_time": str(outcome.get("preview_time") or ""),
-        "include_in_main_aggregate": lane != "DIAGNOSTIC",
+        "include_in_main_aggregate": (
+            lane != "DIAGNOSTIC"
+        ),
     }
 
 
@@ -870,6 +886,7 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
     thesis_favorable = _window_extremes(thesis_returns, want_peak=True)
     thesis_adverse = _window_extremes(thesis_returns, want_peak=False)
     thesis_primary = thesis_returns.get(primary_horizon)
+    decision = decision_model_values(candidate)
     return {
         "schema_version": 1,
         "row_type": "event_integrated_radar_outcome",
@@ -887,6 +904,7 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
         "market_state_class": candidate.get("market_state_class"),
         "source_strength": candidate.get("source_strength"),
         "crowding_class": candidate.get("crowding_class"),
+        **decision,
         "observed_at": candidate.get("observed_at"),
         "preview_time": now,
         "price_at_observation": price,
@@ -931,7 +949,10 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
         "outcome_label": label,
         "outcome_status": status,
         "missing_data_reason": missing_reason,
-        "include_in_performance": lane != "DIAGNOSTIC" and status == "filled",
+        "include_in_performance": (
+            lane != "DIAGNOSTIC"
+            and status == "filled"
+        ),
         "research_only": True,
         "no_trade_created": True,
         "no_paper_trade_created": True,

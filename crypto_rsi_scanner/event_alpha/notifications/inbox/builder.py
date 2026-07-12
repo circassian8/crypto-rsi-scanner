@@ -14,6 +14,7 @@ import crypto_rsi_scanner.event_alpha.radar.core_opportunities as event_core_opp
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import research_cards as event_research_cards
 from ...radar import core_opportunity_store as event_core_opportunity_store
+from ...radar.decision_model_surfaces import decision_model_values
 from .. import delivery
 from .. import pipeline as event_alpha_notifications
 from .models import *  # noqa: F403
@@ -450,6 +451,7 @@ def _inbox_item_from_core(
         feedback_target_type=str(core_row.get("feedback_target_type") or "core_opportunity_id"),
         final_state_after_quality_gate=final_state,
         opportunity_level=opportunity_level,
+        **_inbox_decision_fields(core_row, row),
     )
 def _diagnostic_item_from_alert(
     alert: Mapping[str, Any],
@@ -676,6 +678,7 @@ def _inbox_item(
         feedback_target_type=str(alert.get("feedback_target_type") or "alert_id"),
         final_state_after_quality_gate=str(alert.get("final_state_after_quality_gate") or alert.get("state") or ""),
         opportunity_level=str(alert.get("final_opportunity_level") or alert.get("opportunity_level") or ""),
+        **_inbox_decision_fields(alert),
     )
 def _digest_delivery_items(
     deliveries: Iterable[Mapping[str, Any]],
@@ -733,8 +736,54 @@ def _digest_delivery_items(
                 core_opportunity_id=core_id,
                 feedback_target=str(row.get("feedback_target") or core_id or alert_id),
                 feedback_target_type=str(row.get("feedback_target_type") or ("core_opportunity_id" if core_id else "alert_id")),
+                **_inbox_decision_fields(row),
             ))
     return items
+
+def _inbox_decision_fields(*rows: Mapping[str, Any]) -> dict[str, Any]:
+    values = decision_model_values(*rows)
+    if not values:
+        return {}
+    return {
+        "decision_model_version": str(values.get("decision_model_version") or ""),
+        "decision_model_enabled": bool(values.get("decision_model_enabled", True)),
+        "thesis_origin": str(values.get("thesis_origin") or ""),
+        "directional_bias": str(values.get("directional_bias") or ""),
+        "catalyst_status": str(values.get("catalyst_status") or ""),
+        "confidence_band": str(values.get("confidence_band") or ""),
+        "timing_state": str(values.get("timing_state") or ""),
+        "tradability_status": str(values.get("tradability_status") or ""),
+        "radar_route": str(values.get("radar_route") or ""),
+        "radar_route_reason": str(values.get("radar_route_reason") or ""),
+        "radar_actionable": bool(values.get("radar_actionable")),
+        "actionability_score": _optional_float(values.get("actionability_score")),
+        "evidence_confidence_score": _optional_float(values.get("evidence_confidence_score")),
+        "risk_score": _optional_float(values.get("risk_score")),
+        "actionability_score_cohort": str(values.get("actionability_score_cohort") or ""),
+        "anomaly_type": str(values.get("anomaly_type") or ""),
+        "decision_missing_data": _decision_text_tuple(values.get("decision_missing_data")),
+        "decision_warnings": _decision_text_tuple(values.get("decision_warnings")),
+        "why_still_worth_reviewing": _decision_text_tuple(values.get("why_still_worth_reviewing")),
+        "radar_what_confirms": _decision_text_tuple(values.get("radar_what_confirms")),
+        "radar_what_invalidates": _decision_text_tuple(values.get("radar_what_invalidates")),
+    }
+
+def _decision_text_tuple(value: Any) -> tuple[str, ...]:
+    if value in (None, "", [], {}, ()):
+        return ()
+    if isinstance(value, str):
+        return tuple(item.strip() for item in value.replace(";", ",").split(",") if item.strip())
+    if isinstance(value, Mapping):
+        return tuple(f"{key}={child}" for key, child in value.items())
+    if isinstance(value, Iterable):
+        return tuple(str(item) for item in value if str(item))
+    return (str(value),)
+
+def _optional_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 def _latest_delivery_state_by_run(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
     by_run: dict[str, str] = {}
     priority = {

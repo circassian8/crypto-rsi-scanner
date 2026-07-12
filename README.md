@@ -1,6 +1,23 @@
 # crypto-rsi-scanner
 
-Research-oriented crypto RSI scanner and Event Alpha artifact pipeline.
+Research-oriented crypto RSI scanner and human-decided Event Alpha Crypto Radar.
+
+## Local Crypto Radar dashboard
+
+`make radar-dashboard` serves the current Event Alpha operator generation at
+`http://127.0.0.1:8765/`. It reads the exact run/revision manifest and local
+artifacts only; it does not call providers, send notifications, trade, paper
+trade, write normal RSI rows, or create `TRIGGERED_FADE`. Run
+`make radar-dashboard-smoke` for the deterministic fixture/no-write render gate.
+`make radar-calendar-preview` prints the unified macro/crypto calendar fixture
+without provider calls, artifact writes, or sends.
+
+Crypto Radar Decision Model v2 may surface transparent market-led research
+ideas without a known catalyst when freshness, identity, liquidity, spread,
+turnover, volume, dedupe, and safety gates pass. These are research ideas, not
+trade instructions. Legacy Event Alpha routes remain separate.
+Each v2 route has its own `RSI_EVENT_ALPHA_DECISION_MODEL_V2_ROUTE_*_ENABLED`
+switch; these switches never authorize legacy routing or delivery.
 
 ## CI safety
 

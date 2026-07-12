@@ -43,6 +43,11 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "EVENT_RESEARCH_NOW_ENV = $(if $(strip $(EVENT_RESEARCH_NOW)),RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW),)" in makefile
     assert "event-incidents-report:" in makefile
     assert "--event-incidents-report" in makefile
+    assert "radar-dashboard:" in makefile
+    assert "radar-dashboard-smoke:" in makefile
+    assert "radar-calendar-preview:" in makefile
+    assert "crypto_rsi_scanner.event_alpha.radar.calendar" in makefile
+    assert "crypto_rsi_scanner.event_alpha.dashboard" in makefile
     assert "RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \\" not in makefile
     notify_dry = subprocess.check_output(
         ["make", "-n", "event-alpha-notify-no-key", "PYTHON=python3"],

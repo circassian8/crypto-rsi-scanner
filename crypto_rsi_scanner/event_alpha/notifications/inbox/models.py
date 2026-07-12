@@ -49,6 +49,27 @@ class EventAlphaNotificationInboxItem:
     feedback_target_type: str = ""
     final_state_after_quality_gate: str = ""
     opportunity_level: str = ""
+    decision_model_version: str = ""
+    decision_model_enabled: bool = False
+    thesis_origin: str = ""
+    directional_bias: str = ""
+    catalyst_status: str = ""
+    confidence_band: str = ""
+    timing_state: str = ""
+    tradability_status: str = ""
+    radar_route: str = ""
+    radar_route_reason: str = ""
+    radar_actionable: bool = False
+    actionability_score: float | None = None
+    evidence_confidence_score: float | None = None
+    risk_score: float | None = None
+    actionability_score_cohort: str = ""
+    anomaly_type: str = ""
+    decision_missing_data: tuple[str, ...] = ()
+    decision_warnings: tuple[str, ...] = ()
+    why_still_worth_reviewing: tuple[str, ...] = ()
+    radar_what_confirms: tuple[str, ...] = ()
+    radar_what_invalidates: tuple[str, ...] = ()
 @dataclass(frozen=True)
 class EventAlphaReviewQueueItem:
     category: str

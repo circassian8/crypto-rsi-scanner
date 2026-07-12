@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .runtime import *
+from ....radar.decision_model_surfaces import DECISION_MODEL_FIELD_NAMES
 
 _CORE_SCORE_COMPONENT_KEYS = (
     "core_opportunity_id",
@@ -144,6 +145,7 @@ _CORE_SCORE_COMPONENT_KEYS = (
     "negated_frame_ids",
     "corrective_frame_ids",
     "frame_summary",
+    *DECISION_MODEL_FIELD_NAMES,
 )
 
 def _find_entry(key: str, entries: list[event_watchlist.EventWatchlistEntry]) -> event_watchlist.EventWatchlistEntry | None:

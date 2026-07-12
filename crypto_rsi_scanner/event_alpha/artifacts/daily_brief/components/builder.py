@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .runtime import *
+from .decision_model import decision_model_daily_brief_lines
 from .run_health import _latest_notification_health_lines, _latest_run_health_lines
 
 
@@ -402,7 +403,7 @@ def _daily_brief_opportunity_lines(rows: _DailyBriefRows, context: _DailyBriefCo
         "## Live Confirmation Gated Candidates",
         *_live_confirmation_gated_core_lines(context.core_opportunities, limit=8),
         "",
-        "## Top Market Anomalies Needing Catalyst Search",
+        "## Market Anomalies / Catalyst Enrichment Queue (legacy alert gate)",
         *_market_anomaly_daily_lines(rows.market_anomalies, limit=10),
         "",
         "## Fresh Official Exchange Catalysts",
@@ -1072,6 +1073,10 @@ def build_daily_brief(
         provider_health_rows=provider_health_rows,
     )
     lines.extend(_daily_brief_opportunity_lines(rows, context))
+    lines.extend(decision_model_daily_brief_lines(
+        rows.stored_core_rows,
+        include_diagnostics=include_diagnostics,
+    ))
     lines.extend(_daily_brief_source_intro_lines(
         rows=rows,
         context=context,

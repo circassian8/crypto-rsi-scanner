@@ -17,6 +17,15 @@
       ],
       "role": "Reports lane/provider/source-pack usefulness, noise, and maturation rates as recommendations-only priors."
     },
+    "crypto_radar_decision_model_v2": {
+      "north_star_requirement": "New lowercase radar routes are explicit research-only metadata; they do not replace legacy alert routes or authorize delivery, paper trading, execution, RSI writes, or TRIGGERED_FADE.",
+      "primary_artifacts": [
+        "event_integrated_radar_candidates.jsonl",
+        "event_core_opportunities.jsonl",
+        "event_alpha_operator_state.json"
+      ],
+      "role": "Separates thesis origin, directional bias, catalyst status, evidence confidence, timing, tradability, actionability, and risk from legacy opportunity lanes."
+    },
     "derivatives_crowding_layer": {
       "north_star_requirement": "Crowding warnings and fade-review evidence must be derived from deterministic derivatives state rows.",
       "primary_artifacts": [
@@ -42,12 +51,12 @@
       "role": "Focuses human review on active-learning gaps, near-misses, duplicates, source noise, and missing confirmation."
     },
     "market_anomaly_scanner": {
-      "north_star_requirement": "Market anomaly alone remains unconfirmed until structured or official evidence confirms the why-now.",
+      "north_star_requirement": "A fresh, liquid, identity-safe anomaly may become actionable research without a known catalyst; unknown catalyst remains explicit and lowers evidence confidence.",
       "primary_artifacts": [
         "event_market_anomalies.jsonl",
         "event_market_anomaly_catalyst_search_queue.jsonl"
       ],
-      "role": "Finds broad market-first moves and creates catalyst-search queue items before promotion."
+      "role": "Finds broad market-first moves, evaluates market-led actionability, and creates catalyst-search enrichment queue items."
     },
     "market_state_builder": {
       "north_star_requirement": "Freshness and unit metadata must travel with state; stale state cannot promote fade-review or confirmed lanes.",
@@ -149,7 +158,89 @@
       ]
     }
   },
-  "generated_at": "2026-07-06T12:50:37.343429+00:00",
+  "decision_model_v2": {
+    "dimensions": {
+      "catalyst_status": [
+        "confirmed",
+        "plausible",
+        "unknown",
+        "not_required",
+        "disproven"
+      ],
+      "confidence_band": [
+        "diagnostic",
+        "exploratory",
+        "actionable",
+        "high_confidence"
+      ],
+      "directional_bias": [
+        "long",
+        "fade_short_review",
+        "risk",
+        "neutral"
+      ],
+      "thesis_origin": [
+        "market_led",
+        "catalyst_led",
+        "technical_led",
+        "macro_led",
+        "mixed"
+      ],
+      "timing_state": [
+        "early",
+        "active",
+        "extended",
+        "exhausted",
+        "scheduled",
+        "stale"
+      ],
+      "tradability_status": [
+        "good",
+        "acceptable",
+        "poor",
+        "blocked"
+      ]
+    },
+    "enabled_by_default_for_research_preview": true,
+    "hard_blockers": [
+      "unresolved identity",
+      "stale data",
+      "invalid market units",
+      "insufficient liquidity",
+      "extreme spread",
+      "suspicious illiquid move",
+      "duplicate",
+      "quote/theme/control entity",
+      "secret/path/safety failure"
+    ],
+    "legacy_alert_routes_preserved": true,
+    "legacy_opportunity_type_preserved": true,
+    "market_led_actionability": {
+      "catalyst_required": false,
+      "requires_adequate_liquidity_and_spread": true,
+      "requires_canonical_identity": true,
+      "requires_fresh_market_snapshot": true,
+      "requires_meaningful_volume_anomaly": true,
+      "requires_relative_move_or_stealth_accumulation": true
+    },
+    "old_artifacts_auto_promoted": false,
+    "operator_routes": [
+      "actionable_watch",
+      "high_confidence_watch",
+      "rapid_market_anomaly",
+      "fade_exhaustion_review",
+      "calendar_risk",
+      "diagnostic"
+    ],
+    "schema_version": "crypto_radar_decision_model_v2",
+    "soft_penalties": [
+      "unknown catalyst",
+      "missing official source or article",
+      "missing derivatives",
+      "missing optional confirmation"
+    ]
+  },
+  "generated_at": "2026-07-12T05:04:45.541497+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",
@@ -446,7 +537,7 @@
       "required_evidence": [
         "market anomaly, context, or weak catalyst evidence",
         "explicit source plan or catalyst-search queue item",
-        "no_alert_until_evidence=true when anomaly-only"
+        "legacy strict-alert gate keeps no_alert_until_evidence=true when anomaly-only; v2 research previews are separate"
       ],
       "strict_blockers": [
         "promoted to confirmed without evidence",

@@ -1,0 +1,13 @@
+{
+  "row_type": "event_live_provider_activation_readiness",
+  "run_id": "dashboard-run-current",
+  "profile": "fixture",
+  "artifact_namespace": "current",
+  "providers": [
+    {"provider": "fixture_market", "status": "ready", "reason": "local fixture only"},
+    {"provider": "fixture_calendar", "status": "ready", "reason": "no live calls"}
+  ],
+  "research_only": true,
+  "live_calls_attempted": 0,
+  "telegram_sends": 0
+}

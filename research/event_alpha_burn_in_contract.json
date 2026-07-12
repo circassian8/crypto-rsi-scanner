@@ -7,7 +7,7 @@
     "minimum cycles/candidates/labels/outcomes are not met",
     "provider evidence is missing from cards or source coverage"
   ],
-  "generated_at": "2026-07-09T03:39:07.855620+00:00",
+  "generated_at": "2026-07-12T05:04:45.542717+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",
@@ -309,7 +309,7 @@
       "required_evidence": [
         "market anomaly, context, or weak catalyst evidence",
         "explicit source plan or catalyst-search queue item",
-        "no_alert_until_evidence=true when anomaly-only"
+        "legacy strict-alert gate keeps no_alert_until_evidence=true when anomaly-only; v2 research previews are separate"
       ],
       "strict_blockers": [
         "promoted to confirmed without evidence",

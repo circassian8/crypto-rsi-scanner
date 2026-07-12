@@ -73,7 +73,8 @@ When a choice should prevent future relitigation, add or update `DECISIONS.md`.
 
 ## Project in one paragraph
 
-A top-100 crypto multi-timeframe **RSI overextension scanner**. Each day it pulls
+A top-100 crypto multi-timeframe **RSI overextension scanner** plus a
+research-only **Crypto Radar** for human trader assistance. Each day it pulls
 the top coins from CoinGecko, computes Wilder RSI (daily/4H/weekly) plus context
 (z-score, volume, divergence, BTC correlation, trend regime), classifies each
 signal into a **setup type** (mean_reversion / dip_buy / trend_continuation /
@@ -137,6 +138,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   changes, compileall for Python import/syntax risk, and matching Event Alpha
   smoke/doctor targets for artifact behavior.
 - **Alert render smoke (no sends/network):** `make smoke-alerts`
+- **Local Crypto Radar dashboard:** `make radar-dashboard` serves exact-current
+  operator artifacts read-only on `127.0.0.1:8765`; `make
+  radar-dashboard-smoke` renders all fixture pages without starting a server,
+  calling providers, sending, or writing artifacts.
+- **Unified calendar no-send preview:** `make radar-calendar-preview` renders
+  checked macro/crypto fixture rows without providers, artifact writes, or sends.
 - **Backtest fixture smoke (no network):** `make backtest-fixture` runs the
   default Binance-style backtest path from checked-in BTC/ETH/SOL kline fixtures.
 - **Backtest research smoke:** `make backtest-costs` runs the fixture backtest
@@ -173,8 +180,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   source-noise drift or quote-validation regressions) ·
   `main.py --event-alpha-radar-report` / `make event-alpha-no-key-report`
   (research-only Event Alpha Radar view with opt-in market enrichment and
-  market-anomaly rows; anomalies without catalyst evidence stay low-authority
-  review evidence) · `main.py --event-alpha-cycle` / `make event-alpha-cycle`
+  market-anomaly rows; Decision Model v2 may surface a catalyst-unknown anomaly
+  as actionable research only after strict identity, freshness, liquidity,
+  spread, turnover, manipulation, dedupe, and safety gates pass) ·
+  `main.py --event-alpha-cycle` / `make event-alpha-cycle`
   / `make event-alpha-cycle-llm` / `make event-alpha-cycle-send` (one unified
   research-only Event Alpha cycle: discovery/anomaly inputs, optional
   quote-checked LLM extraction hints rerun through deterministic
@@ -335,7 +344,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_alpha/artifacts/alerts.py` | pure research-alert ranking/tiering for discovery candidates; no labels, paper trades, normal RSI routing, or execution |
 | `event_alpha/radar/playbooks.py` | deterministic Event Alpha Radar playbook scoring; labels candidates as proxy fade/attention, listings, unlocks, airdrops/TGEs, fan/sports, political memes, RWA/AI IPO proxies, security/regulatory shocks, infrastructure, market anomalies, source-noise, or ambiguous controls without creating trades or triggers |
 | `event_alpha/radar/llm/` / `llm_providers/` | research-only LLM relationship analysis and raw-event extraction; validates source quotes and keeps extracted assets as deterministic resolver hints only |
-| `event_alpha/radar/market_enrichment.py` / `event_alpha/radar/anomaly_scanner.py` | research-only Event Alpha Radar market evidence and anomaly discovery; anomalies without catalyst evidence remain store-only/radar evidence and cannot create event-fade triggers |
+| `event_alpha/radar/market_enrichment.py` / `event_alpha/radar/anomaly_scanner.py` | research-only Event Alpha Radar market evidence and anomaly discovery; catalyst search enriches confidence but is not a universal prerequisite for v2 research actionability |
+| `event_alpha/radar/decision_model.py` / `decision_models.py` | pure Crypto Radar Decision Model v2 scoring and value contracts; separates actionability, evidence confidence, risk, thesis origin, bias, catalyst, timing, and tradability from legacy opportunity routes |
+| `event_alpha/radar/calendar/` | unified fixture-first macro/crypto scheduled-event model and read-only loaders; reminder windows are display metadata only |
+| `event_alpha/dashboard/` | local GET/HEAD-only server-rendered dashboard over one exact operator run/revision; no provider calls, sends, or writes |
 | `event_alpha/radar/integrated/pipeline_parts/merge.py` | integrated-family context and final candidate schema-field assembly |
 | `event_alpha/radar/integrated/pipeline_parts/merge_policy.py` | pure source normalization, identity selection, opportunity scoring, market/derivatives policy, and merge summaries; exported through the integrated API compatibility wrapper |
 | `event_alpha/radar/graph.py` | research-only catalyst clustering by external asset/event type/event-date bucket; used for watchlist identity while preserving rejected/noise asset links |
@@ -511,12 +523,18 @@ work.
   DB rows, or event-fade eligibility unless deterministic resolver/classifier
   gates validate the asset and event through the normal discovery path.
 - Event Alpha Radar market enrichment, anomaly scanning, and watchlist state are
-  research-only and disabled by default. Market enrichment may fill candidate
+  research-only; live provider acquisition remains disabled without its existing
+  explicit authorization. Market enrichment may fill candidate
   market snapshots from CoinGecko-style fixture/live rows, but raw reviewed
   event payloads win when both exist. The market anomaly scanner may create
   low-authority raw research events from top movers, volume/mcap spikes, or
-  volume z-scores, but anomalies without dated catalyst/source evidence must
-  stay store-only or local radar evidence. The watchlist may append JSONL state
+  volume z-scores. Under Crypto Radar Decision Model v2, a fresh canonical,
+  liquid, adequately traded, non-duplicate market anomaly with meaningful
+  relative/structure and volume evidence may enter an explicit research route
+  without a known catalyst. Unknown catalyst lowers evidence confidence, raises
+  risk, and stays visible; it is not a universal hard block. Legacy opportunity
+  lanes and strict alert gates remain unchanged and old artifacts are never
+  silently promoted. The watchlist may append JSONL state
   rows under the research cache for `RAW_EVIDENCE`, `RADAR`, `WATCHLIST`,
   `HIGH_PRIORITY`, `EVENT_PASSED`, `ARMED`, `TRIGGERED_FADE`, `INVALIDATED`,
   and `EXPIRED`, and may mark duplicate rows as suppressed unless state
@@ -528,7 +546,8 @@ work.
   watchlist state and produce local route decisions such as store-only,
   duplicate suppression, research digest, high-priority research, or
   triggered-fade research, but this is report metadata only. Feedback labels
-  (`useful`, `junk`, `watch`, `missed`, `traded_elsewhere`, `ignored`) may be
+  (`useful`, `late`, `manipulation_risk`, `missing_confirmation`, `junk`,
+  `watch`, `missed`, `traded_elsewhere`, `ignored`) may be
   appended as JSONL review artifacts and inspected/evaluated offline, but they
   do not mutate watchlist state or alert tiers. None of these paths can create
   proxy eligibility, create `TRIGGERED_FADE`, send Telegram alerts, route normal

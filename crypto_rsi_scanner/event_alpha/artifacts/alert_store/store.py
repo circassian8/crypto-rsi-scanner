@@ -168,6 +168,12 @@ def format_alert_snapshot_report(
         ("by source", "source"),
         ("by BTC regime", "btc_regime"),
         ("by market anomaly score", "market_anomaly_bucket"),
+        ("by thesis origin", "thesis_origin"),
+        ("by catalyst status", "catalyst_status"),
+        ("by confidence band", "confidence_band"),
+        ("by actionability score cohort", "actionability_score_cohort"),
+        ("by anomaly type", "anomaly_type"),
+        ("by radar route", "radar_route"),
         ("by feedback label", "feedback_label"),
     ):
         out.append(_cohort_line(label, rows, field))

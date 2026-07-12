@@ -37,6 +37,7 @@ from ....providers import live_provider_readiness as event_live_provider_readine
 from ....providers import official_exchange as event_official_exchange
 from ....providers import provider_health as event_provider_health
 from ... import asset_registry as event_asset_registry
+from ... import calendar as event_unified_calendar
 from ... import core_opportunity_store as event_core_opportunity_store
 from ... import core_opportunities as event_core_opportunities
 from ... import derivatives_crowding as event_derivatives_crowding

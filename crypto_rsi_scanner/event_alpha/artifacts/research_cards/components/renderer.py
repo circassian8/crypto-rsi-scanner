@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from .runtime import *
+from ....radar.decision_model_surfaces import (
+    decision_model_markdown_lines,
+    decision_model_values,
+)
 
 def render_research_card(
     key: str,
@@ -144,6 +148,7 @@ def _research_card_summary_lines(context: Mapping[str, Any]) -> list[str]:
         f"# {symbol} Event Research Card",
         "",
         "Research artifact only. Not a trade signal, paper trade, live RSI signal, or execution.",
+        "Research idea, not a trade instruction.",
         "",
         "## Summary",
         *summary_identity_lines,
@@ -155,6 +160,11 @@ def _research_card_summary_lines(context: Mapping[str, Any]) -> list[str]:
     if lane_lines:
         lines.extend(["", "## Opportunity Lane"])
         lines.extend(lane_lines)
+    decision_values = decision_model_values(_card_components(entry, alert), alert)
+    decision_lines = decision_model_markdown_lines(decision_values)
+    if decision_lines:
+        lines.extend(["", "## Crypto Radar Decision"])
+        lines.extend(decision_lines)
     analyst_lines = _analyst_summary_lines(entry, alert)
     if analyst_lines:
         lines.extend(["", "## Analyst Summary"])
@@ -458,18 +468,7 @@ def _render_index(
     *,
     card_groups: Mapping[Path | str, str] | None = None,
 ) -> str:
-    grouped: dict[str, list[Path]] = {
-        "Early Long Research Cards": [],
-        "Confirmed Long Research Cards": [],
-        "Fade / Short-Review Cards": [],
-        "Risk Only Cards": [],
-        "Unconfirmed Research Cards": [],
-        "Core Opportunity Cards": [],
-        "Near-Miss Cards": [],
-        "Local-Only / Quality-Capped Cards": [],
-        "Diagnostic / Source-Noise / Control Cards": [],
-        "Legacy Cards": [],
-    }
+    grouped: dict[str, list[Path]] = {group: [] for group in CARD_INDEX_GROUPS}
     for path in paths:
         grouped[_card_index_group(path, card_groups=card_groups)].append(path)
     lines = [

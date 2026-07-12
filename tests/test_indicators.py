@@ -763,6 +763,8 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_claim_semantics",
     "tests.event_alpha.test_core_opportunities",
     "tests.event_alpha.test_core_reconciliation",
+    "tests.event_alpha.test_decision_model_v2",
+    "tests.event_alpha.test_decision_model_v2_surfaces",
     "tests.event_alpha.test_discovery_cache_reports",
     "tests.event_alpha.test_discovery_pipeline",
     "tests.event_alpha.test_doctor_core",
@@ -804,12 +806,14 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_playbooks_graph",
     "tests.event_alpha.test_provider_activation",
     "tests.event_alpha.test_quality_feedback",
+    "tests.event_alpha.test_radar_dashboard",
     "tests.event_alpha.test_radar_pipeline",
     "tests.event_alpha.test_scheduled_catalyst_namespaces",
     "tests.event_alpha.test_shim_registry",
     "tests.event_alpha.test_source_coverage_reports",
     "tests.event_alpha.test_source_registry",
     "tests.event_alpha.test_targeted_market_refresh",
+    "tests.event_alpha.test_unified_calendar",
     "tests.event_alpha.test_watchlist_router",
 )
 

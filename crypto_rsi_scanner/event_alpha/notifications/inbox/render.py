@@ -150,12 +150,43 @@ def _append_item_section(
             )
         if item.snapshot_quality_classification:
             lines.append(f"  snapshot_classification: {item.snapshot_quality_classification}")
+        if item.decision_model_version:
+            lines.append(
+                f"  radar_decision: route={item.radar_route or 'diagnostic'} "
+                f"origin={item.thesis_origin or 'unknown'} bias={item.directional_bias or 'neutral'} "
+                f"catalyst={item.catalyst_status or 'unknown'} confidence={item.confidence_band or 'diagnostic'}"
+            )
+            lines.append(
+                f"  radar_scores: actionability={_decision_score(item.actionability_score)} "
+                f"evidence={_decision_score(item.evidence_confidence_score)} risk={_decision_score(item.risk_score)} "
+                f"timing={item.timing_state or 'unknown'} tradability={item.tradability_status or 'unknown'}"
+            )
+            if item.why_still_worth_reviewing:
+                lines.append("  why_review: " + "; ".join(item.why_still_worth_reviewing))
+            if item.decision_missing_data:
+                lines.append("  missing_data: " + "; ".join(item.decision_missing_data))
+            if item.decision_warnings:
+                lines.append("  decision_warnings: " + "; ".join(item.decision_warnings))
+            if any("manip" in warning.casefold() or "illiquid" in warning.casefold() for warning in item.decision_warnings):
+                lines.append("  manipulation_warning: verify liquidity, spread, and venue concentration manually")
         lines.append(f"  reason: {item.reason}")
         target = item.feedback_target or item.alert_id
         lines.append(f"  feedback_target: {target}")
         lines.append(f"  feedback_useful: make event-feedback-useful PROFILE={profile} FEEDBACK_TARGET='{target}'")
+        lines.append(f"  feedback_late: make event-feedback-late PROFILE={profile} FEEDBACK_TARGET='{target}'")
+        lines.append(
+            f"  feedback_missing_confirmation: .venv/bin/python main.py --event-feedback-mark '{target}' "
+            f"--event-feedback-label missing_confirmation --event-alpha-profile {profile}"
+        )
+        lines.append(
+            f"  feedback_manipulation_risk: .venv/bin/python main.py --event-feedback-mark '{target}' "
+            f"--event-feedback-label manipulation_risk --event-alpha-profile {profile}"
+        )
         lines.append(f"  feedback_junk: make event-feedback-junk PROFILE={profile} FEEDBACK_TARGET='{target}'")
     lines.append("")
+
+def _decision_score(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.1f}/100"
 def _append_compact_item_section(
     lines: list[str],
     title: str,

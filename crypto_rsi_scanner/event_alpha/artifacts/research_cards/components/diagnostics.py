@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .runtime import *
+from ....radar.decision_model_surfaces import decision_model_values
 
 def _outcome_tracking_lines(outcome: Mapping[str, Any] | None) -> list[str]:
     if outcome is None:
@@ -71,7 +72,15 @@ def _verify_lines(alert: Mapping[str, Any] | None, playbook: str) -> list[str]:
         if isinstance(raw, (list, tuple)):
             items.extend(str(item) for item in raw if str(item))
     if not items:
-        if "listing" in playbook:
+        decision = decision_model_values(alert)
+        if decision.get("thesis_origin") == "market_led":
+            items = [
+                "verify canonical asset and instrument identity",
+                "check liquidity, spread, turnover, and venue concentration",
+                "confirm move freshness, volume expansion, and relative strength",
+                "treat catalyst discovery as supporting enrichment rather than a prerequisite",
+            ]
+        elif "listing" in playbook:
             items = ["confirm listing venue/mechanics", "check opening liquidity and spread"]
         elif "unlock" in playbook:
             items = ["confirm unlock size", "compare unlock size to liquidity"]
@@ -157,10 +166,17 @@ def _playbook_copy(
     entry: event_watchlist.EventWatchlistEntry | None = None,
 ) -> str:
     components = _card_components(entry, alert)
+    decision = decision_model_values(components, alert)
     impact_path = str(components.get("impact_path_type") or "").casefold()
     frame = str(components.get("main_frame_type") or components.get("event_archetype") or "").casefold()
     level = str(components.get("opportunity_level") or "").casefold()
     role = str(components.get("candidate_role") or "").casefold()
+    if decision.get("thesis_origin") == "market_led":
+        catalyst = str(decision.get("catalyst_status") or "unknown")
+        return (
+            "- Hypothesis: a fresh, liquid market move may warrant human research review from market structure alone; "
+            f"catalyst status={catalyst} is an evidence-confidence input, not an automatic veto."
+        )
     if impact_path == "strategic_investment_or_valuation" or frame == "acquisition_or_stake":
         return "- Hypothesis: validated strategic investment / valuation catalyst may change market expectations for the token or protocol."
     if impact_path in {"venue_value_capture", "proxy_exposure"} or role == "proxy_venue":
@@ -190,8 +206,14 @@ def _why_it_matters(
     alert: Mapping[str, Any] | None = None,
 ) -> str:
     components = _card_components(entry, alert)
+    decision = decision_model_values(components, alert)
     impact_path = str(components.get("impact_path_type") or "").casefold()
     frame = str(components.get("main_frame_type") or components.get("event_archetype") or "").casefold()
+    if decision.get("thesis_origin") == "market_led":
+        return (
+            "Fresh market structure, liquidity, volume, and relative strength can make a move worth prompt human review "
+            "even while catalyst discovery remains incomplete."
+        )
     if impact_path == "strategic_investment_or_valuation" or frame == "acquisition_or_stake":
         return "Strategic investment or valuation news can alter perceived protocol value, governance expectations, and token risk appetite."
     if impact_path == "exploit_security_event":
@@ -216,9 +238,15 @@ def _default_invalidation(
     entry: event_watchlist.EventWatchlistEntry | None = None,
 ) -> str:
     components = _card_components(entry, alert)
+    decision = decision_model_values(components, alert)
     impact_path = str(components.get("impact_path_type") or "").casefold()
     frame = str(components.get("main_frame_type") or components.get("event_archetype") or "").casefold()
     role = str(components.get("candidate_role") or "").casefold()
+    if decision.get("thesis_origin") == "market_led":
+        return (
+            "The move becomes stale, liquidity or spread deteriorates, venue concentration suggests manipulation, "
+            "the breakout fails, or relative strength mean-reverts. Missing catalyst evidence alone does not invalidate it."
+        )
     if impact_path == "strategic_investment_or_valuation" or frame == "acquisition_or_stake":
         return "Talks are denied, the source is corrected, no market reaction appears, or the valuation/stake is not relevant to token value."
     if impact_path in {"venue_value_capture", "proxy_exposure"} or role == "proxy_venue":
@@ -247,6 +275,7 @@ def _trade_readiness_lines(
 ) -> list[str]:
     components = alert.get("score_components") if alert is not None and isinstance(alert.get("score_components"), Mapping) else {}
     rich_components = _card_components(entry, alert)
+    decision = decision_model_values(rich_components, alert)
     timing = _value(entry, alert, "event_time", "event_time") or "unknown"
     direction = _value(None, alert, "", "expected_direction") or _playbook_direction(playbook)
     horizon = _value(None, alert, "", "primary_horizon") or "manual"
@@ -274,7 +303,7 @@ def _trade_readiness_lines(
     else:
         supply_risk = _score(entry, alert, "supply_pressure")
     lines = [
-        f"- Catalyst clarity: {_check_value(components, 'external_catalyst')}",
+        f"- Catalyst clarity: {decision.get('catalyst_status') or _check_value(components, 'external_catalyst')}",
         f"- Event timing quality: {timing} / {_check_value(components, 'event_time_quality')}",
         f"- Market confirmation: {market_confirmation}",
         f"- Derivatives crowding: {derivatives_crowding}",
@@ -284,7 +313,12 @@ def _trade_readiness_lines(
         f"- Expected direction / horizon: {direction} / {horizon}",
         f"- Invalidation / why wrong: {invalidation}",
     ]
-    if playbook == "proxy_fade":
+    if decision.get("thesis_origin") == "market_led":
+        lines.append(
+            "- Manual verification: confirm identity, freshness, liquidity, spread, turnover, venue concentration, "
+            "volume anomaly, and relative move; catalyst discovery is optional enrichment."
+        )
+    elif playbook == "proxy_fade":
         lines.append("- Manual verification: confirm post-event failure, failed reclaim, and invalidation level before treating as research-actionable.")
     elif "listing" in playbook:
         lines.append("- Manual verification: confirm venue, listing mechanics, opening liquidity, spread, and whether the event is already priced.")

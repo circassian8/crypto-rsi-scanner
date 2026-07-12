@@ -403,6 +403,8 @@ def build_catalyst_search_queue(
             "search_queries": search_queries,
             "search_deadline": search_deadline.astimezone(timezone.utc).isoformat(),
             "no_alert_until_evidence": True,
+            "decision_model_v2_catalyst_required": False,
+            "catalyst_search_role": "confidence_enrichment",
             "source_plan_status": "planned" if suggested_packs and search_queries else "missing_plan",
             "created_alert": False,
             "strict_alerts_created": 0,
@@ -616,11 +618,11 @@ def format_market_anomaly_report(
         f"Artifact namespace: {artifact_namespace or 'unknown'}",
         f"Market state snapshots: {snapshot_count}",
         f"Anomalies: {len(rows)}",
-        f"Catalyst search queue: {len(queue_rows)}",
+        f"Catalyst enrichment queue: {len(queue_rows)}",
         "Counts: " + (", ".join(f"{key}={value}" for key, value in sorted(counts.items())) if counts else "none"),
         "Buckets: " + (", ".join(f"{key}={value}" for key, value in sorted(bucket_counts.items())) if bucket_counts else "none"),
         "",
-        "## Top Market Anomalies Needing Catalyst Search",
+        "## Top Market Anomalies for Catalyst Enrichment",
     ]
     if not rows:
         lines.append("- None.")
@@ -635,7 +637,8 @@ def format_market_anomaly_report(
             f"return_24h={_format_pct(snapshot.get('return_24h'))} "
             f"volume_z={_format_number(snapshot.get('volume_zscore_24h'))} "
             f"priority={_format_number(row.get('priority'))} "
-            f"needs_catalyst_search={str(bool(row.get('needs_catalyst_search'))).lower()}"
+            f"catalyst_search_role={row.get('catalyst_search_role') or 'confidence_enrichment'} "
+            f"catalyst_required={str(bool(row.get('decision_model_v2_catalyst_required'))).lower()}"
         )
         confirms = row.get("what_confirms") if isinstance(row.get("what_confirms"), list) else []
         invalidates = row.get("what_invalidates") if isinstance(row.get("what_invalidates"), list) else []
@@ -646,7 +649,7 @@ def format_market_anomaly_report(
     if len(rows) > limit:
         lines.append(f"- +{len(rows) - limit} more in local artifacts.")
     if queue_rows:
-        lines.extend(["", "## Catalyst Search Queue"])
+        lines.extend(["", "## Catalyst Enrichment Queue"])
         for row in queue_rows[: max(0, limit)]:
             queries = _string_list(row.get("search_queries"))
             packs = _string_list(row.get("suggested_source_packs"))
@@ -708,6 +711,8 @@ def _anomaly_row(
         "market_state_class": anomaly_type,
         "market_state_snapshot": dict(snapshot),
         "needs_catalyst_search": True,
+        "decision_model_v2_catalyst_required": False,
+        "catalyst_search_role": "confidence_enrichment",
         "priority": round(max(0.0, min(100.0, priority)), 2),
         "priority_components": {key: round(value, 2) for key, value in priority_components.items()},
         "derivatives_available": _derivatives_available(snapshot, source_row),
@@ -716,8 +721,8 @@ def _anomaly_row(
         "search_queries": search_queries,
         "why_interesting": _why_interesting(snapshot, anomaly_type),
         "why_not_alertable_yet": [
-            "market_anomaly_needs_catalyst_evidence",
-            "no_confirmed_catalyst",
+            "legacy_strict_alert_route_needs_catalyst_evidence",
+            "awaiting_crypto_radar_decision_model_v2_evaluation",
             "scanner_is_research_only",
         ],
         "what_confirms": _what_confirms(anomaly_type, packs),
@@ -749,7 +754,10 @@ def _why_interesting(snapshot: Mapping[str, Any], anomaly_type: str) -> list[str
 
 
 def _what_confirms(anomaly_type: str, packs: list[str]) -> list[str]:
-    base = ["independent source evidence explaining the move", "validated asset identity and catalyst link"]
+    base = [
+        "fresh identity/liquidity/spread/volume gates continue to pass",
+        "independent catalyst evidence would raise confidence but is not universally required",
+    ]
     if anomaly_type in {CONFIRMED_BREAKOUT, STEALTH_ACCUMULATION, LATE_MOMENTUM}:
         base.append("official project/exchange or token-tagged news confirmation")
     if anomaly_type in {BLOWOFF_CROWDED, POST_EVENT_FADE_SETUP, RISK_OFF_SELL_PRESSURE}:
@@ -760,7 +768,10 @@ def _what_confirms(anomaly_type: str, packs: list[str]) -> list[str]:
 
 
 def _what_invalidates(anomaly_type: str) -> list[str]:
-    out = ["no independent catalyst after bounded search", "stale or missing market data"]
+    out = [
+        "market snapshot becomes stale or invalid",
+        "identity, liquidity, spread, turnover, volume, or dedupe gate fails",
+    ]
     if anomaly_type == SUSPICIOUS_ILLIQUID_MOVE:
         out.append("thin liquidity or wide spread makes move non-actionable")
     elif anomaly_type == CONFIRMED_BREAKOUT:

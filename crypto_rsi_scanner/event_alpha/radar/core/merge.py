@@ -15,9 +15,105 @@ import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import paths as event_artifact_paths
 from .. import core_opportunities as event_core_opportunities
+from .. import decision_model as event_radar_decision_model
+from ..decision_model_surfaces import DECISION_MODEL_FIELD_NAMES
 from .. import market_reaction as event_market_reaction
 from .. import opportunity_verdict as event_opportunity_verdict
 from .models import *  # noqa: F403 - split modules share historical model names
+
+
+_INTEGRATED_SCALAR_TRUTH_FIELDS = (
+    "symbol",
+    "validated_symbol",
+    "coin_id",
+    "validated_coin_id",
+    "opportunity_type",
+    "market_state_class",
+    "market_state",
+    "final_opportunity_level",
+    "opportunity_level",
+    "route",
+    "tier",
+    "latest_tier",
+    "final_route_after_quality_gate",
+    "final_tier_after_quality_gate",
+    "state",
+    "final_state_after_quality_gate",
+    "score",
+    "opportunity_score_final",
+    "final_opportunity_score",
+    "source_strength",
+    "candidate_role",
+    "asset_role",
+    "source_requirements_met",
+    "market_requirements_met",
+    "fade_requirements_met",
+    "risk_requirements_met",
+    "canonical_asset_id",
+    "asset_registry_symbol",
+    "asset_registry_coin_id",
+    "asset_registry_name",
+    "asset_registry_liquidity_tier",
+    "asset_registry_source",
+    "instrument_resolver_status",
+    "instrument_resolver_confidence",
+    "instrument_resolver_match_reason",
+    "instrument_identity_trusted",
+    "is_tradable_asset",
+    "is_theme_or_sector",
+    "is_quote_asset",
+    "quote_asset_excluded",
+    "base_asset_excluded",
+    "diagnostics_reason",
+    "integrated_market_confirmation_level",
+    "integrated_market_confirmation_score",
+    "integrated_market_reaction_confirmation",
+    "integrated_market_context_source",
+    "integrated_market_freshness_status",
+    "crowding_class",
+    "fade_readiness",
+    "why_now",
+    "source_origin",
+    "source_origins",
+    "source_pack",
+    "source_packs",
+    "source_url",
+    "latest_source_url",
+    "latest_source_title",
+    "source_class",
+    "supporting_evidence_quotes",
+    *DECISION_MODEL_FIELD_NAMES,
+)
+
+_INTEGRATED_SEQUENCE_TRUTH_FIELDS = (
+    ("what_confirms", "what_confirms"),
+    ("what_invalidates", "what_invalidates"),
+    ("why_not_alertable", "why_not_alertable"),
+    ("reason_codes", "reason_codes"),
+    ("warnings", "warnings"),
+    ("crowding_exhaustion_evidence", "crowding_exhaustion_evidence"),
+    ("what_confirms_fade_review", "what_confirms_fade_review"),
+    ("what_invalidates_fade_review", "what_invalidates_fade_review"),
+    ("derivatives_warning_codes", "derivatives_warning_codes"),
+    ("instrument_resolver_warnings", "instrument_resolver_warnings"),
+    ("asset_registry_venues", "asset_registry_venues"),
+    ("asset_registry_spot_symbols", "asset_registry_spot_symbols"),
+    ("asset_registry_perp_symbols", "asset_registry_perp_symbols"),
+    ("asset_registry_coinalyze_symbols", "asset_registry_coinalyze_symbols"),
+    ("asset_registry_bybit_symbols", "asset_registry_bybit_symbols"),
+    ("asset_registry_binance_symbols", "asset_registry_binance_symbols"),
+)
+
+_INTEGRATED_MAPPING_TRUTH_FIELDS = (
+    "market_state_snapshot",
+    "latest_market_snapshot",
+    "market_snapshot",
+    "official_exchange_event",
+    "scheduled_catalyst_event",
+    "unlock_event",
+    "derivatives_state_snapshot",
+    "derivatives_snapshot",
+)
 
 
 def merge_core_opportunity_verdict(
@@ -121,90 +217,23 @@ def _apply_integrated_candidate_truth(
     store may add stricter quality/live-confirmation caps, but it must not
     recompute a generic market-reaction lane and silently upgrade capped rows.
     """
-    integrated = _first_integrated_candidate(primary, all_rows)
+    materialized_rows = tuple(row for row in all_rows if isinstance(row, Mapping))
+    integrated = _first_integrated_candidate(primary, materialized_rows)
     if integrated is None:
         return row
+    core_duplicate_suppressed = str(row.get("final_route_after_quality_gate") or "").upper() == (
+        event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE.value
+    )
     row["source_row_type"] = "event_integrated_radar_candidate"
     row["integrated_candidate_id"] = integrated.get("candidate_id")
     row["integrated_candidate_family_id"] = integrated.get("candidate_family_id")
     row["generic_recomputed_opportunity_type"] = reaction.opportunity_type
     row["generic_recomputed_market_state_class"] = reaction.market_state
-    for key in (
-        "opportunity_type",
-        "market_state_class",
-        "market_state",
-        "final_opportunity_level",
-        "opportunity_level",
-        "route",
-        "tier",
-        "latest_tier",
-        "final_route_after_quality_gate",
-        "final_tier_after_quality_gate",
-        "state",
-        "final_state_after_quality_gate",
-        "score",
-        "opportunity_score_final",
-        "final_opportunity_score",
-        "source_strength",
-        "candidate_role",
-        "asset_role",
-        "source_requirements_met",
-        "market_requirements_met",
-        "fade_requirements_met",
-        "risk_requirements_met",
-        "canonical_asset_id",
-        "asset_registry_symbol",
-        "asset_registry_coin_id",
-        "asset_registry_name",
-        "asset_registry_liquidity_tier",
-        "instrument_resolver_status",
-        "instrument_resolver_confidence",
-        "instrument_resolver_match_reason",
-        "is_tradable_asset",
-        "is_theme_or_sector",
-        "is_quote_asset",
-        "quote_asset_excluded",
-        "base_asset_excluded",
-        "diagnostics_reason",
-        "integrated_market_confirmation_level",
-        "integrated_market_confirmation_score",
-        "integrated_market_reaction_confirmation",
-        "integrated_market_context_source",
-        "integrated_market_freshness_status",
-        "crowding_class",
-        "fade_readiness",
-        "why_now",
-        "source_origin",
-        "source_origins",
-        "source_pack",
-        "source_packs",
-        "source_url",
-        "latest_source_url",
-        "latest_source_title",
-        "source_class",
-        "supporting_evidence_quotes",
-    ):
+    for key in _INTEGRATED_SCALAR_TRUTH_FIELDS:
         value = integrated.get(key)
         if value not in (None, "", [], {}, ()):
             row[key] = value
-    for src_key, dst_key in (
-        ("what_confirms", "what_confirms"),
-        ("what_invalidates", "what_invalidates"),
-        ("why_not_alertable", "why_not_alertable"),
-        ("reason_codes", "reason_codes"),
-        ("warnings", "warnings"),
-        ("crowding_exhaustion_evidence", "crowding_exhaustion_evidence"),
-        ("what_confirms_fade_review", "what_confirms_fade_review"),
-        ("what_invalidates_fade_review", "what_invalidates_fade_review"),
-        ("derivatives_warning_codes", "derivatives_warning_codes"),
-        ("instrument_resolver_warnings", "instrument_resolver_warnings"),
-        ("asset_registry_venues", "asset_registry_venues"),
-        ("asset_registry_spot_symbols", "asset_registry_spot_symbols"),
-        ("asset_registry_perp_symbols", "asset_registry_perp_symbols"),
-        ("asset_registry_coinalyze_symbols", "asset_registry_coinalyze_symbols"),
-        ("asset_registry_bybit_symbols", "asset_registry_bybit_symbols"),
-        ("asset_registry_binance_symbols", "asset_registry_binance_symbols"),
-    ):
+    for src_key, dst_key in _INTEGRATED_SEQUENCE_TRUTH_FIELDS:
         value = integrated.get(src_key)
         if value not in (None, "", [], {}, ()):
             row[dst_key] = list(value) if isinstance(value, (list, tuple, set)) else [value]
@@ -214,16 +243,7 @@ def _apply_integrated_candidate_truth(
     row["opportunity_type_why_not_alertable"] = list(integrated.get("why_not_alertable") or row.get("opportunity_type_why_not_alertable") or ())
     row["opportunity_type_reason_codes"] = list(integrated.get("reason_codes") or row.get("opportunity_type_reason_codes") or ())
     row["opportunity_type_warnings"] = list(integrated.get("warnings") or row.get("opportunity_type_warnings") or ())
-    for key in (
-        "market_state_snapshot",
-        "latest_market_snapshot",
-        "market_snapshot",
-        "official_exchange_event",
-        "scheduled_catalyst_event",
-        "unlock_event",
-        "derivatives_state_snapshot",
-        "derivatives_snapshot",
-    ):
+    for key in _INTEGRATED_MAPPING_TRUTH_FIELDS:
         value = integrated.get(key)
         if isinstance(value, Mapping) and value:
             row[key] = dict(value)
@@ -242,6 +262,16 @@ def _apply_integrated_candidate_truth(
         row["latest_source_title"] = row.get("latest_source_title") or row.get("official_exchange_title")
     if _opportunity_rank_value(str(row.get("opportunity_type") or "")) > _opportunity_rank_value(str(integrated.get("opportunity_type") or "")):
         row["integrated_core_silent_upgrade"] = True
+    if core_duplicate_suppressed:
+        row["final_route_after_quality_gate"] = event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE.value
+        row["duplicate_suppressed"] = True
+    row.update(
+        event_radar_decision_model.reevaluate_radar_decision_fields(
+            row,
+            source_rows=materialized_rows,
+            cfg=event_radar_decision_model.RadarDecisionConfig.from_runtime(config),
+        )
+    )
     return row
 
 

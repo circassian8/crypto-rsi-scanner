@@ -4,19 +4,15 @@ This module intentionally uses lightweight Python objects instead of a
 jsonschema dependency. It is the field registry that future artifact writers
 and doctor checks should reference before adding new validation behavior.
 """
-
 from __future__ import annotations
-
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping
-
+from . import calendar as calendar_specs
+from . import decision_model as decision_model_specs
 from . import provider_lineage_specs
-
-
 EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION = "event_alpha_schema_v1"
-
 ALLOWED_OPPORTUNITY_TYPES = (
     "EARLY_LONG_RESEARCH",
     "CONFIRMED_LONG_RESEARCH",
@@ -65,8 +61,9 @@ ALLOWED_NAMESPACE_STATUSES = (
     "quarantine",
     "unknown",
 )
-
-
+DECISION_MODEL_V2_FIELDS = decision_model_specs.FIELDS
+DECISION_MODEL_V2_TYPES = decision_model_specs.TYPES
+DECISION_MODEL_V2_ENUMS = decision_model_specs.ENUMS
 @dataclass(frozen=True)
 class ArtifactSchema:
     schema_id: str
@@ -220,7 +217,6 @@ def _schema(
         allows_guarded_send=bool(allows_guarded_send),
     )
 
-
 SCHEMAS: dict[str, ArtifactSchema] = {
     "core_opportunity_v1": _schema(
         "core_opportunity_v1",
@@ -238,6 +234,7 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "market_refresh_status", "market_refresh_provider", "market_refresh_observed_at",
             "market_refresh_artifact", "targeted_market_refresh_id",
             "targeted_market_refresh_ledger_path",
+            *DECISION_MODEL_V2_FIELDS,
             *COMMON_SAFETY,
         ),
         types={
@@ -245,8 +242,13 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "core_opportunity_id": "str",
             "symbol": "str",
             "opportunity_type": "str",
+            **DECISION_MODEL_V2_TYPES,
         },
-        enums={"opportunity_type": ALLOWED_OPPORTUNITY_TYPES, "final_level": ALLOWED_FINAL_LEVELS},
+        enums={
+            "opportunity_type": ALLOWED_OPPORTUNITY_TYPES,
+            "final_level": ALLOWED_FINAL_LEVELS,
+            **DECISION_MODEL_V2_ENUMS,
+        },
         safety=COMMON_SAFETY,
         paths=(
             "card_path", "research_card_path", "canonical_card_path",
@@ -274,6 +276,7 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "market_refresh_attempted", "market_refresh_success", "market_refresh_status",
             "market_refresh_provider", "market_refresh_observed_at", "market_refresh_artifact",
             "targeted_market_refresh_id", "targeted_market_refresh_ledger_path",
+            *DECISION_MODEL_V2_FIELDS,
             *COMMON_SAFETY, *OPERATION_SAFETY,
         ),
         types={
@@ -281,8 +284,9 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "candidate_id": "str",
             "symbol": "str",
             "opportunity_type": "str",
+            **DECISION_MODEL_V2_TYPES,
         },
-        enums={"opportunity_type": ALLOWED_OPPORTUNITY_TYPES},
+        enums={"opportunity_type": ALLOWED_OPPORTUNITY_TYPES, **DECISION_MODEL_V2_ENUMS},
         safety=tuple(dict.fromkeys((*COMMON_SAFETY, *OPERATION_SAFETY))),
         paths=(
             "provider_source_artifact", "request_ledger_path", "card_path", "research_card_path",
@@ -510,7 +514,9 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "coin_id", "canonical_asset_id", "anomaly_type", "anomaly_bucket",
             "priority", "source_plan", "source_plan_status",
             "suggested_source_packs", "suggested_source_packs_to_search",
-            "search_queries", "no_alert_until_evidence", *COMMON_SAFETY,
+            "search_queries", "no_alert_until_evidence",
+            "decision_model_v2_catalyst_required", "catalyst_search_role",
+            *COMMON_SAFETY,
         ),
         safety=COMMON_SAFETY,
         timestamps=("observed_at", "search_deadline"),
@@ -546,6 +552,11 @@ SCHEMAS: dict[str, ArtifactSchema] = {
         timestamps=("event_time", "event_start_time", "event_end_time", "unlock_time"),
         lineage=COMMON_LINEAGE,
     ),
+    **calendar_specs.schema_specs(
+        _schema,
+        operation_safety=OPERATION_SAFETY,
+        common_lineage=COMMON_LINEAGE,
+    ),
     "unlock_event_v1": _schema(
         "unlock_event_v1",
         required=("row_type", "symbol", "source_url"),
@@ -568,9 +579,10 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "outcome_status", "outcome_label", "maturation_state",
             "return_by_horizon", "max_favorable_excursion",
             "max_adverse_excursion", "price_data_status", "market_state_class",
-            "crowding_class", *COMMON_SAFETY,
+            "crowding_class", *DECISION_MODEL_V2_FIELDS, *COMMON_SAFETY,
         ),
-        enums={"opportunity_type": ALLOWED_OPPORTUNITY_TYPES},
+        types={**DECISION_MODEL_V2_TYPES},
+        enums={"opportunity_type": ALLOWED_OPPORTUNITY_TYPES, **DECISION_MODEL_V2_ENUMS},
         safety=COMMON_SAFETY,
         timestamps=("observed_at", "matured_at"),
         lineage=COMMON_LINEAGE,
@@ -605,7 +617,11 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "current_generation_visible_core_rows", "cumulative_store_rows",
             "alertable_decisions", "strict_alerts", "preview_rendered_items",
             "burn_in_mode", "send_guard_status", "send_requested", "send_attempted",
-            "no_send_rehearsal",
+            "no_send_rehearsal", "decision_model_version", "decision_model_v2_enabled", "decision_model_v2_row_count",
+            "radar_route_counts", "confidence_band_counts", "thesis_origin_counts",
+            "directional_bias_counts", "catalyst_status_counts", "timing_state_counts",
+            "tradability_status_counts",
+            "actionable_research_ideas", "high_confidence_research_ideas",
         ),
         types={
             "safe_for_send_readiness": "bool",
@@ -619,6 +635,9 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "current_generation_visible_core_rows": "int", "cumulative_store_rows": "int",
             "alertable_decisions": "int", "strict_alerts": "int", "preview_rendered_items": "int",
             "send_requested": "bool", "send_attempted": "bool", "no_send_rehearsal": "bool",
+            "decision_model_v2_enabled": "bool", "decision_model_v2_row_count": "int", "radar_route_counts": "dict",
+            "confidence_band_counts": "dict", "thesis_origin_counts": "dict", "directional_bias_counts": "dict",
+            "catalyst_status_counts": "dict", "timing_state_counts": "dict", "tradability_status_counts": "dict",
         },
         enums={"status": ALLOWED_NAMESPACE_STATUSES},
         paths=("marker_path", "operator_state_path"),
@@ -636,6 +655,11 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "current_generation_core_rows", "current_generation_visible_core_rows",
             "cumulative_store_rows", "alertable_decisions", "strict_alerts",
             "preview_rendered_items", "burn_in_mode", "send_guard_status",
+            "decision_model_version", "decision_model_v2_enabled", "decision_model_v2_row_count",
+            "radar_route_counts", "confidence_band_counts", "thesis_origin_counts",
+            "directional_bias_counts", "catalyst_status_counts", "timing_state_counts",
+            "tradability_status_counts",
+            "actionable_research_ideas", "high_confidence_research_ideas",
         ),
         types={
             "revision": "int", "artifacts": "dict", "doctor": "dict",
@@ -646,6 +670,10 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "source_alert_snapshots": "int", "current_generation_core_rows": "int",
             "current_generation_visible_core_rows": "int", "cumulative_store_rows": "int",
             "alertable_decisions": "int", "strict_alerts": "int", "preview_rendered_items": "int",
+            "decision_model_v2_enabled": "bool", "decision_model_v2_row_count": "int", "radar_route_counts": "dict",
+            "confidence_band_counts": "dict", "thesis_origin_counts": "dict", "directional_bias_counts": "dict",
+            "catalyst_status_counts": "dict", "timing_state_counts": "dict", "tradability_status_counts": "dict",
+            "actionable_research_ideas": "int", "high_confidence_research_ideas": "int",
             "trades_created": "int", "paper_trades_created": "int", "normal_rsi_signal_rows_written": "int", "triggered_fade_created": "int",
         },
         enums={"manifest_status": ("complete", "partial", "incoherent")},
@@ -671,14 +699,25 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "integrated_candidates_path", "source_coverage_json_path_rel",
             "source_coverage_md_path_rel", "daily_brief_path", "notification_preview_path",
             "source_coverage_path", "live_provider_readiness_json_path",
-            "live_provider_readiness_report_path", *COMMON_SAFETY,
+            "live_provider_readiness_report_path", "decision_model_version",
+            "decision_model_v2_enabled", "decision_model_v2_row_count", "radar_route_counts", "confidence_band_counts",
+            "unified_calendar_rows", "unified_calendar_path", "unified_calendar_preview_path",
+            "thesis_origin_counts", "directional_bias_counts", "catalyst_status_counts", "timing_state_counts",
+            "tradability_status_counts", "actionable_research_ideas",
+            "high_confidence_research_ideas", *COMMON_SAFETY,
         ),
+        types={
+            "decision_model_v2_enabled": "bool", "decision_model_v2_row_count": "int", "unified_calendar_rows": "int",
+            "radar_route_counts": "dict", "confidence_band_counts": "dict", "thesis_origin_counts": "dict",
+            "directional_bias_counts": "dict", "catalyst_status_counts": "dict", "timing_state_counts": "dict", "tradability_status_counts": "dict",
+            "actionable_research_ideas": "int", "high_confidence_research_ideas": "int",
+        },
         safety=("strict_alerts_created", "telegram_sends", *COMMON_SAFETY),
         timestamps=("started_at", "finished_at", "completed_at", "generated_at"),
         paths=(
             "integrated_candidates_path", "integrated_report_path", "integrated_input_manifest_path",
             "integrated_source_coverage_json_path", "daily_brief_path", "notification_preview_path",
-            "source_coverage_path", "live_provider_readiness_json_path", "live_provider_readiness_report_path",
+            "source_coverage_path", "live_provider_readiness_json_path", "live_provider_readiness_report_path", "unified_calendar_path", "unified_calendar_preview_path",
         ),
         lineage=COMMON_LINEAGE,
         allows_guarded_send=True,
@@ -713,6 +752,7 @@ ROW_TYPE_TO_SCHEMA_ID = {
     "exchange_announcement": "official_exchange_event_v1",
     "event_scheduled_catalyst": "scheduled_catalyst_event_v1",
     "scheduled_catalyst": "scheduled_catalyst_event_v1",
+    "event_unified_calendar_event": "unified_calendar_event_v1",
     "event_unlock_candidate": "unlock_event_v1",
     "unlock_candidate": "unlock_event_v1",
     "event_integrated_radar_outcome": "outcome_row_v1",
@@ -759,6 +799,7 @@ FILENAME_TO_SCHEMA_ID = {
     "event_exchange_announcements.jsonl": "official_exchange_event_v1",
     "event_official_exchange_events.jsonl": "official_exchange_event_v1",
     "event_scheduled_catalysts.jsonl": "scheduled_catalyst_event_v1",
+    "event_unified_calendar_events.jsonl": "unified_calendar_event_v1",
     "event_unlock_candidates.jsonl": "unlock_event_v1",
     "event_integrated_radar_outcomes.jsonl": "outcome_row_v1",
     "event_integrated_radar_calibration_priors.json": "calibration_prior_v1",
@@ -804,6 +845,10 @@ def validate_row_against_schema(row: Mapping[str, Any], schema: str | ArtifactSc
     errors.extend(validate_path_fields(row, schema_obj))
     errors.extend(validate_safety_fields(row, schema_obj))
     errors.extend(validate_secret_redaction_fields(row, schema_obj))
+    if schema_obj.schema_id == "unified_calendar_event_v1":
+        errors.extend(calendar_specs.validate_contract(row))
+    if row.get("decision_model_version") not in (None, "") and schema_obj.schema_id in {"core_opportunity_v1", "integrated_radar_candidate_v1", "outcome_row_v1"}:
+        errors.extend(decision_model_specs.validate_contract(row))
     return errors
 
 
@@ -863,6 +908,14 @@ def validate_safety_fields(row: Mapping[str, Any], schema: ArtifactSchema) -> li
         if field_name == "research_only" and value is False:
             out.append("unsafe_research_only:false")
         if field_name in {"normal_rsi_signal_written", "triggered_fade_created", "trade_created", "paper_trade_created"} and _truthy(value):
+            out.append(f"unsafe_side_effect_flag:{field_name}")
+        if field_name in {
+            "created_alert",
+            "notification_send_enabled",
+            "execution_enabled",
+            "paper_trading_enabled",
+            "normal_rsi_routing_enabled",
+        } and _truthy(value):
             out.append(f"unsafe_side_effect_flag:{field_name}")
         if field_name in {
             "trades_created",

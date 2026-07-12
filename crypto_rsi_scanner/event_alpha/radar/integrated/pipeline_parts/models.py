@@ -35,6 +35,8 @@ class _IntegratedRadarOptionalArtifactFields:
     input_manifest_path: Path | None = None
     source_coverage_json_path: Path | None = None
     source_coverage_path: Path | None = None
+    unified_calendar_path: Path | None = None
+    unified_calendar_preview_path: Path | None = None
     asset_registry_path: Path | None = None
     instrument_resolution_path: Path | None = None
     asset_resolution_report_path: Path | None = None
@@ -42,6 +44,7 @@ class _IntegratedRadarOptionalArtifactFields:
     wall_started_at: datetime | None = None
     wall_finished_at: datetime | None = None
     market_anomalies: int = 0
+    unified_calendar_rows: int = 0
     market_state_snapshots: int = 0
     official_exchange_events: int = 0
     official_listing_candidates: int = 0
@@ -114,6 +117,9 @@ class _IntegratedRadarSnapshotFields:
     cryptopanic_skip_reason: str | None = None
     warnings: tuple[str, ...] = ()
     cycle_completed: bool = True
+    decision_model_version: str | None = None
+    decision_model_v2_enabled: bool = False
+    decision_model_v2_row_count: int = 0
 
 
 @dataclass(frozen=True)

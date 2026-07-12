@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ... import decision_model as event_radar_decision_model
 from .runtime import *
 from .merge_policy import *
 
@@ -146,6 +147,13 @@ def _merge_family(
     ))
     if context.opportunity == event_market_reaction.EventOpportunityType.DIAGNOSTIC.value:
         candidate["diagnostic_row_count"] = max(1, len(rows))
+    candidate.update(
+        event_radar_decision_model.evaluate_radar_decision(
+            candidate,
+            source_rows=rows,
+            cfg=event_radar_decision_model.RadarDecisionConfig.from_runtime(config),
+        ).to_dict()
+    )
     return candidate
 
 def _merge_family_context(key: str, rows: list[dict[str, Any]], *, observed_at: str) -> _MergedFamilyContext:
@@ -329,6 +337,7 @@ def _merge_family_identity_fields(
         "asset_registry_coin_id": _best_text(rows, "asset_registry_coin_id"),
         "asset_registry_name": _best_text(rows, "asset_registry_name"),
         "asset_registry_liquidity_tier": _best_text(rows, "asset_registry_liquidity_tier"),
+        "asset_registry_source": _best_text(rows, "asset_registry_source"),
         "asset_registry_venues": list(dict.fromkeys(_merged_list(rows, "asset_registry_venues"))),
         "asset_registry_spot_symbols": list(dict.fromkeys(_merged_list(rows, "asset_registry_spot_symbols"))),
         "asset_registry_perp_symbols": list(dict.fromkeys(_merged_list(rows, "asset_registry_perp_symbols"))),
@@ -339,6 +348,9 @@ def _merge_family_identity_fields(
         "instrument_resolver_confidence": max(resolver_confidences) if resolver_confidences else 0.0,
         "instrument_resolver_match_reason": _best_text(rows, "instrument_resolver_match_reason"),
         "instrument_resolver_warnings": list(resolver_warnings),
+        "instrument_identity_trusted": any(
+            row.get("instrument_identity_trusted") is True for row in rows
+        ),
         "is_tradable_asset": is_tradable_asset,
         "is_theme_or_sector": is_theme_or_sector,
         "is_quote_asset": is_quote_asset,
@@ -381,10 +393,26 @@ def _merge_family_opportunity_fields(
     score: float,
     source_strength: str,
 ) -> dict[str, Any]:
+    anomaly_rows = [
+        row
+        for row in rows
+        if str(row.get("row_type") or "") == "event_market_anomaly"
+        or str(row.get("_source_origin") or "") == "market_anomaly"
+    ]
+    anomaly_type = _best_text(anomaly_rows, "anomaly_type", "market_state_class")
+    anomaly_bucket = _best_text(
+        anomaly_rows,
+        "anomaly_bucket",
+        "market_anomaly_bucket",
+    )
     return {
         "opportunity_type": opportunity,
         "market_state_class": raw_reaction.market_state,
         "market_state": raw_reaction.market_state,
+        "anomaly_type": anomaly_type,
+        "anomaly_bucket": anomaly_bucket,
+        "market_anomaly_bucket": anomaly_bucket,
+        "market_anomaly_id": _best_text(anomaly_rows, "market_anomaly_id", "anomaly_id"),
         "final_opportunity_level": level,
         "opportunity_level": level,
         "opportunity_score_final": score,

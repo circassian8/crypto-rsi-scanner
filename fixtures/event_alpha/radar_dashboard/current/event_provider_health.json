@@ -1,0 +1,6 @@
+{
+  "providers": {
+    "fixture_market": {"status": "healthy", "reason": "local fixture"},
+    "fixture_calendar": {"status": "healthy", "reason": "local fixture"}
+  }
+}

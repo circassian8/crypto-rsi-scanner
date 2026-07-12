@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ... import decision_model as event_radar_decision_model
 from .runtime import *
 
 
@@ -46,6 +47,33 @@ class _IntegratedOperatorArtifacts:
     source_coverage_path: Path
     source_coverage_json_path: Path
     source_coverage_report: Any
+    delivery_path: Path
+    delivery_rows: tuple[dict[str, Any], ...]
+    daily_brief_path: Path
+    preview_path: Path
+    unified_calendar_path: Path
+    unified_calendar_preview_path: Path
+    unified_calendar_rows: tuple[dict[str, Any], ...]
+
+
+@dataclass(frozen=True)
+class _IntegratedCalendarArtifacts:
+    path: Path
+    preview_path: Path
+    rows: tuple[dict[str, Any], ...]
+
+
+@dataclass(frozen=True)
+class _IntegratedCoverageArtifacts:
+    readiness_json_path: Path
+    readiness_md_path: Path
+    source_coverage_path: Path
+    source_coverage_json_path: Path
+    source_coverage_report: Any
+
+
+@dataclass(frozen=True)
+class _IntegratedPresentationArtifacts:
     delivery_path: Path
     delivery_rows: tuple[dict[str, Any], ...]
     daily_brief_path: Path
@@ -268,6 +296,17 @@ def _write_integrated_candidate_artifacts(
         source_name="integrated_candidate",
         generated_at=start.research_observed_at,
     )
+    decision_cfg = event_radar_decision_model.RadarDecisionConfig.from_runtime(config)
+    candidates = tuple(
+        {
+            **candidate,
+            **event_radar_decision_model.reevaluate_radar_decision_fields(
+                candidate,
+                cfg=decision_cfg,
+            ),
+        }
+        for candidate in candidates
+    )
     candidates_path = start.namespace_dir / INTEGRATED_CANDIDATES_FILENAME
     _write_jsonl(candidates_path, candidates)
     asset_registry_path = event_asset_registry.write_asset_registry_artifact(
@@ -317,9 +356,71 @@ def _write_integrated_operator_artifacts(
     fixture: bool,
 ) -> _IntegratedOperatorArtifacts:
     candidates = candidate_artifacts.candidates
+    core_result, core_read = _write_integrated_core_store(
+        start,
+        candidates,
+        context=context,
+    )
+    calendar = _write_integrated_calendar_artifacts(
+        start,
+        inputs,
+        context=context,
+        fixture=fixture,
+    )
+    card_result, core_read = _write_integrated_research_cards(
+        start,
+        core_rows=core_read.rows,
+        context=context,
+    )
+    core_rows = core_read.rows
+    coverage = _write_integrated_coverage_artifacts(
+        start,
+        candidates=candidates,
+        core_rows=core_rows,
+        input_manifest=inputs.input_manifest,
+        context=context,
+        fixture=fixture,
+    )
+    presentation = _write_integrated_presentations(
+        start,
+        inputs,
+        candidates,
+        core_rows=core_rows,
+        cumulative_store_rows=core_read.total_rows_read,
+        source_coverage_path=coverage.source_coverage_path,
+        context=context,
+    )
+    return _IntegratedOperatorArtifacts(
+        core_result=core_result,
+        core_rows=core_rows,
+        cumulative_core_rows=core_read.total_rows_read,
+        card_result=card_result,
+        readiness_json_path=coverage.readiness_json_path,
+        readiness_md_path=coverage.readiness_md_path,
+        source_coverage_path=coverage.source_coverage_path,
+        source_coverage_json_path=coverage.source_coverage_json_path,
+        source_coverage_report=coverage.source_coverage_report,
+        delivery_path=presentation.delivery_path,
+        delivery_rows=presentation.delivery_rows,
+        daily_brief_path=presentation.daily_brief_path,
+        preview_path=presentation.preview_path,
+        unified_calendar_path=calendar.path,
+        unified_calendar_preview_path=calendar.preview_path,
+        unified_calendar_rows=calendar.rows,
+    )
+
+
+def _write_integrated_core_store(
+    start: _IntegratedCycleStart,
+    candidates: tuple[dict[str, Any], ...],
+    *,
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+) -> tuple[Any, Any]:
     core_result = event_core_opportunity_store.write_core_opportunities(
         candidates,
-        cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=context.core_opportunity_store_path),
+        cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(
+            path=context.core_opportunity_store_path
+        ),
         now=start.research_observed_at,
         run_id=start.run_id,
         profile=context.profile,
@@ -331,7 +432,40 @@ def _write_integrated_operator_artifacts(
         latest_run=True,
         include_api=True,
     )
-    core_rows = core_read.rows
+    return core_result, core_read
+
+
+def _write_integrated_calendar_artifacts(
+    start: _IntegratedCycleStart,
+    inputs: _IntegratedCycleInputs,
+    *,
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    fixture: bool,
+) -> _IntegratedCalendarArtifacts:
+    rows = _integrated_unified_calendar_rows(
+        start,
+        inputs,
+        context=context,
+        fixture=fixture,
+    )
+    path = event_unified_calendar.write_unified_calendar_artifact(
+        start.namespace_dir / event_unified_calendar.UNIFIED_CALENDAR_FILENAME,
+        rows,
+    )
+    preview_path = start.namespace_dir / event_unified_calendar.UNIFIED_CALENDAR_PREVIEW_FILENAME
+    preview_path.write_text(
+        event_unified_calendar.format_unified_calendar_preview(rows),
+        encoding="utf-8",
+    )
+    return _IntegratedCalendarArtifacts(path=path, preview_path=preview_path, rows=rows)
+
+
+def _write_integrated_research_cards(
+    start: _IntegratedCycleStart,
+    *,
+    core_rows: tuple[dict[str, Any], ...],
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+) -> tuple[Any, Any]:
     card_result = event_research_cards.write_research_cards(
         context.research_cards_dir,
         watchlist_entries=(),
@@ -356,7 +490,18 @@ def _write_integrated_operator_artifacts(
         latest_run=True,
         include_api=True,
     )
-    core_rows = core_read.rows
+    return card_result, core_read
+
+
+def _write_integrated_coverage_artifacts(
+    start: _IntegratedCycleStart,
+    *,
+    candidates: tuple[dict[str, Any], ...],
+    core_rows: tuple[dict[str, Any], ...],
+    input_manifest: tuple[dict[str, Any], ...],
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    fixture: bool,
+) -> _IntegratedCoverageArtifacts:
     readiness_report = event_live_provider_readiness.build_readiness_report(
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
@@ -368,17 +513,17 @@ def _write_integrated_operator_artifacts(
         readiness_report,
         start.namespace_dir,
     )
-    source_coverage_report = _build_integrated_source_coverage_report(
+    coverage_report = _build_integrated_source_coverage_report(
         start,
         candidates=candidates,
         core_rows=core_rows,
         context=context,
         readiness_payload=readiness_report.to_dict(),
     )
-    source_coverage_path = start.namespace_dir / SOURCE_COVERAGE_FILENAME
-    source_coverage_path.write_text(
+    coverage_path = start.namespace_dir / SOURCE_COVERAGE_FILENAME
+    coverage_path.write_text(
         f"run_id: {start.run_id}\n"
-        + event_alpha_source_coverage.format_source_coverage_report(source_coverage_report).rstrip()
+        + event_alpha_source_coverage.format_source_coverage_report(coverage_report).rstrip()
         + "\n\n"
         + format_integrated_source_coverage(
             candidates,
@@ -388,21 +533,40 @@ def _write_integrated_operator_artifacts(
         ),
         encoding="utf-8",
     )
-    source_coverage_json_path = start.namespace_dir / SOURCE_COVERAGE_JSON_FILENAME
-    source_coverage_payload = format_integrated_source_coverage_json(
+    coverage_json_path = start.namespace_dir / SOURCE_COVERAGE_JSON_FILENAME
+    coverage_payload = format_integrated_source_coverage_json(
         candidates,
         run_id=start.run_id,
-        input_manifest=inputs.input_manifest,
+        input_manifest=input_manifest,
         readiness_json_path=readiness_json_path,
         readiness_md_path=readiness_md_path,
     )
-    source_coverage_payload.update(source_coverage_report.to_dict())
-    source_coverage_payload.update({
+    coverage_payload.update(coverage_report.to_dict())
+    coverage_payload.update({
         "run_id": start.run_id,
         "source": "integrated_radar",
         "candidate_count": len(candidates),
     })
-    _write_json(source_coverage_json_path, source_coverage_payload)
+    _write_json(coverage_json_path, coverage_payload)
+    return _IntegratedCoverageArtifacts(
+        readiness_json_path=readiness_json_path,
+        readiness_md_path=readiness_md_path,
+        source_coverage_path=coverage_path,
+        source_coverage_json_path=coverage_json_path,
+        source_coverage_report=coverage_report,
+    )
+
+
+def _write_integrated_presentations(
+    start: _IntegratedCycleStart,
+    inputs: _IntegratedCycleInputs,
+    candidates: tuple[dict[str, Any], ...],
+    *,
+    core_rows: tuple[dict[str, Any], ...],
+    cumulative_store_rows: int,
+    source_coverage_path: Path,
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+) -> _IntegratedPresentationArtifacts:
     delivery_path = start.namespace_dir / INTEGRATED_DELIVERIES_FILENAME
     preview_path = start.namespace_dir / NOTIFICATION_PREVIEW_FILENAME
     delivery_rows = build_integrated_notification_delivery_rows(
@@ -415,6 +579,7 @@ def _write_integrated_operator_artifacts(
         preview_path=preview_path,
     )
     _write_jsonl(delivery_path, delivery_rows)
+    raw_events = sum(len(rows) for rows in inputs.sidecars.values())
     daily_brief_path = start.namespace_dir / DAILY_BRIEF_FILENAME
     daily_brief_path.write_text(
         format_integrated_daily_brief(
@@ -425,8 +590,8 @@ def _write_integrated_operator_artifacts(
             delivery_rows=delivery_rows,
             source_coverage_path=source_coverage_path,
             run_id=start.run_id,
-            raw_events=sum(len(rows) for rows in inputs.sidecars.values()),
-            cumulative_store_rows=core_read.total_rows_read,
+            raw_events=raw_events,
+            cumulative_store_rows=cumulative_store_rows,
         ),
         encoding="utf-8",
     )
@@ -437,25 +602,45 @@ def _write_integrated_operator_artifacts(
             core_rows=core_rows,
             context=context,
             run_id=start.run_id,
-            raw_events=sum(len(rows) for rows in inputs.sidecars.values()),
-            cumulative_store_rows=core_read.total_rows_read,
+            raw_events=raw_events,
+            cumulative_store_rows=cumulative_store_rows,
         ),
         encoding="utf-8",
     )
-    return _IntegratedOperatorArtifacts(
-        core_result=core_result,
-        core_rows=core_rows,
-        cumulative_core_rows=core_read.total_rows_read,
-        card_result=card_result,
-        readiness_json_path=readiness_json_path,
-        readiness_md_path=readiness_md_path,
-        source_coverage_path=source_coverage_path,
-        source_coverage_json_path=source_coverage_json_path,
-        source_coverage_report=source_coverage_report,
+    return _IntegratedPresentationArtifacts(
         delivery_path=delivery_path,
         delivery_rows=delivery_rows,
         daily_brief_path=daily_brief_path,
         preview_path=preview_path,
+    )
+
+
+def _integrated_unified_calendar_rows(
+    start: _IntegratedCycleStart,
+    inputs: _IntegratedCycleInputs,
+    *,
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    fixture: bool,
+) -> tuple[dict[str, Any], ...]:
+    source_rows: list[Mapping[str, Any]] = list(inputs.sidecars.get("scheduled_catalyst", ()))
+    if fixture and config.EVENT_ALPHA_UNIFIED_CALENDAR_FIXTURE_PATH.exists():
+        source_rows.extend(
+            event_unified_calendar.load_unified_calendar_fixture(
+                config.EVENT_ALPHA_UNIFIED_CALENDAR_FIXTURE_PATH,
+                profile=context.profile,
+                artifact_namespace=context.artifact_namespace,
+                run_mode=context.run_mode,
+                run_id=start.run_id,
+                observed_at=start.research_observed_at.isoformat(),
+            )
+        )
+    return event_unified_calendar.normalize_unified_calendar_rows(
+        source_rows,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        run_mode=context.run_mode,
+        run_id=start.run_id,
+        observed_at=start.research_observed_at.isoformat(),
     )
 
 
@@ -529,6 +714,8 @@ def _integrated_cycle_result(
             operator_artifacts.daily_brief_path,
             operator_artifacts.preview_path,
             operator_artifacts.source_coverage_path,
+            operator_artifacts.unified_calendar_path,
+            operator_artifacts.unified_calendar_preview_path,
             *operator_artifacts.card_result.card_paths,
         )
         if _artifact_has_absolute_operator_path(path)
@@ -546,6 +733,7 @@ def _integrated_cycle_result(
         wall_finished_at=finished,
         raw_events=sum(len(rows) for rows in inputs.sidecars.values()),
         market_anomalies=sidecar_counts["market_anomalies"],
+        unified_calendar_rows=len(operator_artifacts.unified_calendar_rows),
         market_state_snapshots=(
             candidate_artifacts.targeted_market_refresh_result.persisted_snapshot_rows
             if candidate_artifacts.targeted_market_refresh_result else 0
@@ -580,6 +768,8 @@ def _integrated_cycle_result(
         input_manifest_path=candidate_artifacts.manifest_path,
         source_coverage_json_path=operator_artifacts.source_coverage_json_path,
         source_coverage_path=operator_artifacts.source_coverage_path,
+        unified_calendar_path=operator_artifacts.unified_calendar_path,
+        unified_calendar_preview_path=operator_artifacts.unified_calendar_preview_path,
         asset_registry_path=candidate_artifacts.asset_registry_path,
         instrument_resolution_path=candidate_artifacts.instrument_resolution_path,
         asset_resolution_report_path=candidate_artifacts.asset_resolution_report_path,
@@ -628,6 +818,14 @@ def _integrated_cycle_result(
             *_integrated_warnings(candidates),
             *(candidate_artifacts.targeted_market_refresh_result.warnings if candidate_artifacts.targeted_market_refresh_result else ()),
         ))),
+        decision_model_version=event_radar_decision_model.DECISION_MODEL_VERSION,
+        decision_model_v2_enabled=bool(config.EVENT_ALPHA_DECISION_MODEL_V2_ENABLED),
+        decision_model_v2_row_count=sum(
+            1
+            for row in operator_artifacts.core_rows
+            if row.get("decision_model_enabled") is True
+            and row.get("decision_model_version") == event_radar_decision_model.DECISION_MODEL_VERSION
+        ),
     )
 
 def _build_integrated_asset_registry(

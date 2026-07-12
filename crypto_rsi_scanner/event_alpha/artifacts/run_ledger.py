@@ -62,6 +62,12 @@ def append_run_record(
     )
     path = cfg.path.expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        from . import operator_state as event_alpha_operator_state
+
+        row = event_alpha_operator_state.enrich_run_row_from_core_store(path.parent, row)
+    except (OSError, ValueError, TypeError):
+        pass
     rewrite_normalized_run_records(path)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
@@ -624,6 +630,12 @@ def _run_record_source_fields(
 ) -> dict[str, Any]:
     return {
         "market_state_snapshots": _int(getattr(result, "market_state_snapshots", 0)),
+        "unified_calendar_rows": _int(getattr(result, "unified_calendar_rows", 0)),
+        "unified_calendar_path": getattr(result, "unified_calendar_path", None),
+        "unified_calendar_preview_path": getattr(result, "unified_calendar_preview_path", None),
+        "decision_model_version": getattr(result, "decision_model_version", None),
+        "decision_model_v2_enabled": getattr(result, "decision_model_v2_enabled", False) is True,
+        "decision_model_v2_row_count": _int(getattr(result, "decision_model_v2_row_count", 0)),
         "official_exchange_events": _int(getattr(result, "official_exchange_events", 0)),
         "official_listing_candidates": _int(getattr(result, "official_listing_candidates", 0)),
         "scheduled_catalysts": _int(getattr(result, "scheduled_catalysts", 0)),

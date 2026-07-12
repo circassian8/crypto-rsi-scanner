@@ -18,6 +18,7 @@ import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
 import crypto_rsi_scanner.event_alpha.radar.playbooks as event_playbooks
+from ...radar.decision_model_surfaces import decision_model_values
 from ....event_alpha.notifications import delivery as event_alpha_notification_delivery
 from .models import *  # noqa: F403
 
@@ -102,6 +103,7 @@ def reconcile_alert_snapshot_with_core_store(
     for key, value in mirror_fields.items():
         if value is not None:
             out[key] = value
+    out.update(decision_model_values(core))
 
     out["alertable_after_quality_gate"] = event_alpha_router.route_value_is_alertable(final_route)
     out["route_alertable"] = out["alertable_after_quality_gate"]
@@ -239,6 +241,7 @@ def _snapshot_opportunity_quality_fields(components: Mapping[str, Any]) -> dict[
         "why_local_only": components.get("why_local_only"),
         "why_not_watchlist": components.get("why_not_watchlist"),
         "manual_verification_items": components.get("manual_verification_items") or (),
+        **decision_model_values(components),
     }
 
 
@@ -401,6 +404,7 @@ def _route_context_by_key(router_result: Any | None) -> dict[str, dict[str, Any]
             "route_alertable": alertable_after_quality,
             "alertable_after_quality_gate": alertable_after_quality,
             "route_reason": str(getattr(decision, "reason", "") or ""),
+            **decision_model_values(components),
             **_state_cap_context(entry),
         }
     return out

@@ -98,12 +98,18 @@ def resolve_row(
     reason_codes = list(dict.fromkeys(_list(enriched.get("reason_codes"))))
     asset = match.asset
     status = "unresolved"
+    identity_trusted = _trusted_identity_match(
+        original,
+        asset,
+        source_name=source_name,
+    )
     if asset is not None:
         enriched["canonical_asset_id"] = asset.canonical_asset_id
         enriched["asset_registry_symbol"] = asset.symbol
         enriched["asset_registry_coin_id"] = asset.coin_id
         enriched["asset_registry_name"] = asset.name
         enriched["asset_registry_liquidity_tier"] = asset.liquidity_tier
+        enriched["asset_registry_source"] = asset.source
         enriched["asset_registry_venues"] = list(asset.venues)
         enriched["asset_registry_spot_symbols"] = list(asset.spot_symbols)
         enriched["asset_registry_perp_symbols"] = list(asset.perp_symbols)
@@ -163,6 +169,7 @@ def resolve_row(
     enriched["instrument_resolver_confidence"] = match.confidence
     enriched["instrument_resolver_match_reason"] = match.reason
     enriched["instrument_resolver_input_identifier"] = match.input_identifier
+    enriched["instrument_identity_trusted"] = bool(identity_trusted and status == "resolved")
     enriched["instrument_resolver_warnings"] = resolver_warnings
     if resolver_warnings:
         enriched["warnings"] = warnings
@@ -186,6 +193,8 @@ def resolve_row(
         "resolver_confidence": match.confidence,
         "resolver_match_reason": match.reason,
         "resolver_input_identifier": match.input_identifier,
+        "instrument_identity_trusted": enriched["instrument_identity_trusted"],
+        "asset_registry_source": enriched.get("asset_registry_source"),
         "resolver_warnings": resolver_warnings,
         "is_tradable_asset": enriched.get("is_tradable_asset"),
         "is_theme_or_sector": enriched.get("is_theme_or_sector"),
@@ -198,6 +207,25 @@ def resolve_row(
         "opportunity_type": _text(enriched.get("opportunity_type")),
     }
     return enriched, resolution
+
+
+def _trusted_identity_match(
+    row: Mapping[str, Any],
+    asset: event_asset_registry.CanonicalAsset | None,
+    *,
+    source_name: str | None,
+) -> bool:
+    explicit = row.get("instrument_identity_trusted")
+    if isinstance(explicit, bool):
+        return explicit and asset is not None
+    if asset is None or str(source_name or "") == "integrated_candidate":
+        return False
+    if asset.source in {"fixture_registry", "coingecko_universe_cache"}:
+        return True
+    if any(_text(row.get(key)) for key in ("canonical_asset_id", "coin_id", "validated_coin_id", "asset_coin_id")):
+        return True
+    contracts = row.get("contracts") or row.get("contracts_by_chain") or row.get("platforms")
+    return bool(contracts)
 
 
 def write_resolution_artifacts(

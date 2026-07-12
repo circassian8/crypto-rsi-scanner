@@ -15,6 +15,7 @@ import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import paths as event_artifact_paths
 from .. import core_opportunities as event_core_opportunities
+from ..decision_model_surfaces import decision_model_values
 from .. import market_reaction as event_market_reaction
 from .. import opportunity_verdict as event_opportunity_verdict
 from .models import *  # noqa: F403 - split modules share historical model names
@@ -47,6 +48,7 @@ def _row_from_core_opportunity(
         _core_row_verdict_fields,
     ):
         row.update(section(context))
+    row.update(decision_model_values(*context["all_rows"]))
     if card_path and event_artifact_paths.has_operator_absolute_path(card_path):
         row["card_path_abs_debug"] = str(card_path)
         row["research_card_path_abs_debug"] = str(card_path)

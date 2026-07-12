@@ -355,8 +355,10 @@ def test_market_anomaly_artifacts_are_research_only_and_seed_search():
             "coinalyze_derivatives",
         ]
         report_text = result.report_path.read_text(encoding="utf-8")
-        assert "Top Market Anomalies Needing Catalyst Search" in report_text
-        assert "Catalyst Search Queue" in report_text
+        assert "Top Market Anomalies for Catalyst Enrichment" in report_text
+        assert "Catalyst Enrichment Queue" in report_text
+        assert "catalyst_required=false" in report_text
+        assert "no independent catalyst after bounded search" not in report_text
 
 
 def test_market_anomaly_scanner_uses_registry_and_cached_universe_rows():

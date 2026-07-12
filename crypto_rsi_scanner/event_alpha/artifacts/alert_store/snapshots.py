@@ -18,6 +18,7 @@ import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
 import crypto_rsi_scanner.event_alpha.radar.playbooks as event_playbooks
+from ...radar.decision_model_surfaces import decision_model_values
 from ....event_alpha.notifications import delivery as event_alpha_notification_delivery
 from .models import *  # noqa: F403
 
@@ -154,6 +155,7 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
     row["core_opportunity_id"] = core_id
     row["feedback_target"] = core_id or row["alert_key"]
     row["feedback_target_type"] = "core_opportunity_id" if core_id else "alert_key"
+    row.update(decision_model_values(alert.score_components))
     return _with_canonical_quality_route(row)
 def _state_cap_context(entry: event_watchlist.EventWatchlistEntry) -> dict[str, Any]:
     requested = event_watchlist.requested_state_value(entry)

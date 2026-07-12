@@ -126,6 +126,9 @@ def _item_is_diagnostic_control(item: EventAlphaNotificationInboxItem) -> bool:
         "control",
     ))
 def _item_score_hint(item: EventAlphaNotificationInboxItem) -> float:
+    if item.actionability_score is not None:
+        evidence_bonus = (item.evidence_confidence_score or 0.0) * 0.1
+        return float(item.actionability_score) + evidence_bonus
     text = " ".join(str(part or "") for part in (
         item.reason,
         item.tier,
@@ -162,6 +165,9 @@ def _missing_evidence_penalty(item: EventAlphaNotificationInboxItem) -> float:
     for token in ("missing", "unconfirmed", "no_results", "rejected", "source_noise", "generic"):
         if token in text:
             penalty += 4.0
+    penalty += min(12.0, len(item.decision_missing_data) * 2.0)
+    if item.risk_score is not None:
+        penalty += max(0.0, float(item.risk_score) - 50.0) * 0.1
     return min(20.0, penalty)
 def _human_queue_category(category: str) -> str:
     return {

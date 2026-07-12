@@ -8,10 +8,12 @@ generation.  It is research metadata only and cannot route or send anything.
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
 import re
 import tempfile
+from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -25,6 +27,7 @@ OPERATOR_STATE_FILENAME = "event_alpha_operator_state.json"
 _LOCK_FILENAME = ".event_alpha_operator_state.lock"
 OPERATOR_STATE_SCHEMA_ID = "operator_state_v1"
 OPERATOR_STATE_ROW_TYPE = "event_alpha_operator_state"
+DECISION_MODEL_V2_VERSION = "crypto_radar_decision_model_v2"
 
 STATUS_CURRENT = "current"
 STATUS_SKIPPED = "skipped"
@@ -54,6 +57,7 @@ KNOWN_ARTIFACTS = (
     "provider_readiness_json",
     "provider_readiness_md",
 )
+OPTIONAL_ARTIFACTS = ("unified_calendar",)
 
 _RUN_PATH_FIELDS: Mapping[str, tuple[str, ...]] = {
     "core_opportunities": ("core_opportunity_store_path",),
@@ -66,6 +70,7 @@ _RUN_PATH_FIELDS: Mapping[str, tuple[str, ...]] = {
     "source_coverage_md": ("source_coverage_md_path_rel", "source_coverage_path"),
     "provider_readiness_json": ("live_provider_readiness_json_path", "provider_readiness_json_path"),
     "provider_readiness_md": ("live_provider_readiness_report_path", "provider_readiness_md_path"),
+    "unified_calendar": ("unified_calendar_path",),
 }
 
 
@@ -274,6 +279,10 @@ def enrich_run_row_from_core_store(
             "current_generation_core_rows": int(current.rows_read),
             "current_generation_visible_core_rows": len(visible),
             "cumulative_store_rows": int(current.total_rows_read),
+            **_decision_model_summary(
+                current.rows,
+                configured_enabled=run_row.get("decision_model_v2_enabled") is True,
+            ),
         }
     )
     preview_path = _resolve_namespace_artifact_path(
@@ -332,6 +341,7 @@ def _build_run_state(
         raise ValueError("operator state requires run_id")
     now = _as_utc(updated_at or datetime.now(timezone.utc)).isoformat()
     counters = run_counters.canonical_run_counters(run_row)
+    decision_summary = _decision_model_summary_from_run(run_row)
     send_state = run_counters.canonical_send_state(run_row)
     send_requested = send_state["send_requested"] is True
     send_attempted = send_state["send_attempted"] is True
@@ -345,6 +355,10 @@ def _build_run_state(
         name: _initial_artifact_entry(name, base=base, run_id=run_id, run_row=artifact_run_row, now=now)
         for name in KNOWN_ARTIFACTS
     }
+    for name in OPTIONAL_ARTIFACTS:
+        entry = _initial_artifact_entry(name, base=base, run_id=run_id, run_row=artifact_run_row, now=now)
+        if entry["status"] != STATUS_SKIPPED:
+            artifacts[name] = entry
     state = {
         "schema_id": OPERATOR_STATE_SCHEMA_ID,
         "schema_version": schema_v1.EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION,
@@ -366,6 +380,7 @@ def _build_run_state(
         "research_only": True,
         "counter_schema_version": run_counters.COUNTER_SCHEMA_VERSION,
         **counters,
+        **decision_summary,
         "burn_in_mode": send_state["burn_in_mode"],
         "send_guard_status": send_state["send_guard_status"],
         "no_send_rehearsal": send_state["no_send_rehearsal"],
@@ -415,6 +430,7 @@ def _backfill_same_run_state(
     projection: dict[str, Any] = {
         "counter_schema_version": run_counters.COUNTER_SCHEMA_VERSION,
         **counters,
+        **_decision_model_summary_from_run(run_row),
         "burn_in_mode": send_state["burn_in_mode"],
         "send_guard_status": send_state["send_guard_status"],
         "send_requested": send_state["send_requested"],
@@ -443,6 +459,71 @@ def _backfill_same_run_state(
     }
     write_json_atomic(operator_state_path(base), state)
     return state
+
+
+def _decision_model_summary(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    configured_enabled: bool | None = None,
+) -> dict[str, Any]:
+    """Summarize only explicitly versioned v2 rows from one exact generation."""
+
+    versioned = [
+        dict(row)
+        for row in rows
+        if isinstance(row, Mapping)
+        and str(row.get("decision_model_version") or "").strip()
+        == DECISION_MODEL_V2_VERSION
+        and row.get("decision_model_enabled") is True
+        and str(row.get("radar_route") or "").strip()
+        and str(row.get("confidence_band") or "").strip()
+    ]
+    route_counts = Counter(str(row.get("radar_route")) for row in versioned)
+    confidence_counts = Counter(str(row.get("confidence_band")) for row in versioned)
+    thesis_counts = Counter(str(row.get("thesis_origin") or "unknown") for row in versioned)
+    catalyst_counts = Counter(str(row.get("catalyst_status") or "unknown") for row in versioned)
+    bias_counts = Counter(str(row.get("directional_bias") or "neutral") for row in versioned)
+    timing_counts = Counter(str(row.get("timing_state") or "unknown") for row in versioned)
+    tradability_counts = Counter(str(row.get("tradability_status") or "unknown") for row in versioned)
+    enabled = bool(versioned) if configured_enabled is None else configured_enabled
+    return {
+        "decision_model_version": DECISION_MODEL_V2_VERSION if enabled else None,
+        "decision_model_v2_enabled": enabled,
+        "decision_model_v2_row_count": len(versioned),
+        "radar_route_counts": dict(sorted(route_counts.items())),
+        "confidence_band_counts": dict(sorted(confidence_counts.items())),
+        "thesis_origin_counts": dict(sorted(thesis_counts.items())),
+        "directional_bias_counts": dict(sorted(bias_counts.items())),
+        "catalyst_status_counts": dict(sorted(catalyst_counts.items())),
+        "timing_state_counts": dict(sorted(timing_counts.items())),
+        "tradability_status_counts": dict(sorted(tradability_counts.items())),
+        "actionable_research_ideas": sum(
+            1
+            for row in versioned
+            if row.get("radar_actionable") is True
+        ),
+        "high_confidence_research_ideas": confidence_counts.get("high_confidence", 0),
+    }
+
+
+def _decision_model_summary_from_run(run_row: Mapping[str, Any]) -> dict[str, Any]:
+    """Project persisted v2 summary fields without inferring them for old runs."""
+
+    enabled = run_row.get("decision_model_v2_enabled") is True
+    return {
+        "decision_model_version": run_row.get("decision_model_version") if enabled else None,
+        "decision_model_v2_enabled": enabled,
+        "decision_model_v2_row_count": _nonnegative_int(run_row.get("decision_model_v2_row_count")) if enabled else 0,
+        "radar_route_counts": dict(run_row.get("radar_route_counts") or {}) if enabled else {},
+        "confidence_band_counts": dict(run_row.get("confidence_band_counts") or {}) if enabled else {},
+        "thesis_origin_counts": dict(run_row.get("thesis_origin_counts") or {}) if enabled else {},
+        "directional_bias_counts": dict(run_row.get("directional_bias_counts") or {}) if enabled else {},
+        "catalyst_status_counts": dict(run_row.get("catalyst_status_counts") or {}) if enabled else {},
+        "timing_state_counts": dict(run_row.get("timing_state_counts") or {}) if enabled else {},
+        "tradability_status_counts": dict(run_row.get("tradability_status_counts") or {}) if enabled else {},
+        "actionable_research_ideas": _nonnegative_int(run_row.get("actionable_research_ideas")) if enabled else 0,
+        "high_confidence_research_ideas": _nonnegative_int(run_row.get("high_confidence_research_ideas")) if enabled else 0,
+    }
 
 
 def invalidate_operator_state(
@@ -769,13 +850,19 @@ def _initial_artifact_entry(
             None,
         )
     if path:
-        return {
+        entry = {
             "status": STATUS_CURRENT,
             "run_id": run_id,
             "path": _portable_path(path, base=base),
             "generated_at": now,
             "reason": None,
         }
+        if name == "unified_calendar":
+            entry["count"] = _nonnegative_int(run_row.get("unified_calendar_rows"))
+            resolved = _resolve_namespace_artifact_path(base, str(path))
+            if resolved is not None:
+                entry["sha256"] = hashlib.sha256(resolved.read_bytes()).hexdigest()
+        return entry
     return {
         "status": STATUS_SKIPPED,
         "run_id": run_id,
@@ -830,7 +917,7 @@ def _state_validation_error(state: Mapping[str, Any], *, base: Path) -> str | No
         return f"missing_artifact_entry:{sorted(missing_artifacts)[0]}"
     state_run_id = str(state.get("run_id") or "")
     for name, entry in artifacts.items():
-        if name not in KNOWN_ARTIFACTS or not isinstance(entry, Mapping):
+        if name not in {*KNOWN_ARTIFACTS, *OPTIONAL_ARTIFACTS} or not isinstance(entry, Mapping):
             return "invalid_artifact_entry"
         status = str(entry.get("status") or "")
         if status not in ARTIFACT_STATUSES:

@@ -16,6 +16,33 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-12 - Separate Crypto Radar actionability from catalyst confirmation
+**Status:** accepted
+**Decision:** Event Alpha's additive Crypto Radar Decision Model v2 may present
+an explicit research-only market-led idea without a known catalyst. Actionability,
+evidence confidence, risk, thesis origin, directional bias, catalyst status,
+timing, and tradability are independent fields. Market-led promotion requires a
+canonical asset, proven-fresh snapshot, adequate liquidity, observed acceptable
+spread, meaningful turnover/volume anomaly, strong relative move or classified
+breakout/stealth structure, and no duplicate/control/suspicious/safety blocker.
+Unknown catalyst is a disclosed soft penalty; missing official source/article
+or derivatives evidence is also soft unless a specific lane inherently requires
+it. The lowercase v2 radar routes are separately configurable presentation and
+operator metadata. They do not replace `opportunity_type`, legacy strict-alert
+gates, or notification routing, and old/unversioned artifacts are never inferred
+as v2. Event Alpha still cannot trade, paper trade, execute, write normal RSI
+signals, send Telegram by default, or create `TRIGGERED_FADE`; actual
+`TRIGGERED_FADE` remains exclusive to `event_fade.py` plus `proxy_fade`.
+**Why:** Price/volume structure, squeezes, positioning, liquidity shifts, and
+unexplained momentum can be useful to a human operator before a discoverable
+event exists. Treating catalyst discovery as confidence enrichment preserves
+that information while explicit tradability and safety gates contain
+manipulation risk.
+**Revisit when:** Measured outcomes by thesis origin, catalyst status,
+actionability cohort, and anomaly type justify changing thresholds or when a
+separate reviewed decision authorizes any notification policy beyond no-send
+preview.
+
 ## 2026-07-12 - Treat provider access failures as bounded operational state
 **Status:** accepted
 **Decision:** Live research providers must identify themselves honestly, retain

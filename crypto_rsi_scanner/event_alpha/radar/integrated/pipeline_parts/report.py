@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 from .runtime import *
+from ...decision_model_surfaces import (
+    PREVIEW_LANE_ORDER,
+    PREVIEW_LANE_TITLES,
+    decision_model_markdown_lines,
+    decision_model_values,
+    group_decision_rows,
+)
 
 def format_integrated_radar_report(
     candidates: Iterable[Mapping[str, Any]],
@@ -29,7 +36,7 @@ def format_integrated_radar_report(
         "## Unified Candidate Stream",
     ])
     for row in rows:
-        lines.extend(_candidate_summary_lines(row))
+        lines.extend(_report_candidate_summary_lines(row))
     lines.extend([
         "",
         "No live Telegram sends, paper trades, normal RSI rows, execution, or Event Alpha TRIGGERED_FADE were created.",
@@ -141,6 +148,45 @@ def format_integrated_daily_brief(
     counts = Counter(str(row.get("opportunity_type") or "unknown") for row in rows)
     for lane in lane_order:
         lines.append(f"- {lane}: {counts.get(lane, 0)}")
+    decision_groups = (
+        group_decision_rows(rows, include_diagnostics=True)
+        if config.EVENT_ALPHA_DECISION_MODEL_V2_PREVIEW_ENABLED
+        else {lane: [] for lane in PREVIEW_LANE_ORDER}
+    )
+    decision_row_count = sum(len(items) for items in decision_groups.values())
+    if decision_row_count:
+        lines.extend([
+            "",
+            "## Crypto Radar v2 Preview Lanes",
+            "- These research lanes are presentation-only and do not change legacy opportunity types or Telegram routing.",
+        ])
+        for lane in PREVIEW_LANE_ORDER:
+            lines.append(f"- {PREVIEW_LANE_TITLES[lane]}: {len(decision_groups[lane])}")
+        for lane in PREVIEW_LANE_ORDER:
+            if lane == "decision_diagnostic" and not config.EVENT_ALPHA_DECISION_MODEL_V2_SHOW_DIAGNOSTICS:
+                continue
+            lines.extend(["", f"## {PREVIEW_LANE_TITLES[lane]}"])
+            lane_rows = decision_groups[lane]
+            if not lane_rows:
+                lines.append("- None.")
+            for row in lane_rows[:10]:
+                lines.extend(_report_candidate_summary_lines(row, compact=False))
+    _append_daily_brief_sections(
+        lines,
+        rows,
+        outcomes=outcomes,
+        performance_snapshot=performance_snapshot,
+    )
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _append_daily_brief_sections(
+    lines: list[str],
+    rows: list[dict[str, Any]],
+    *,
+    outcomes: list[dict[str, Any]],
+    performance_snapshot: Mapping[str, Any] | None,
+) -> None:
     sections = (
         ("Early Long Research", event_market_reaction.EventOpportunityType.EARLY_LONG_RESEARCH.value),
         ("Confirmed Long Research", event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value),
@@ -154,7 +200,7 @@ def format_integrated_daily_brief(
         if not lane_rows:
             lines.append("- None.")
         for row in lane_rows[:10]:
-            lines.extend(_candidate_summary_lines(row, compact=True))
+            lines.extend(_report_candidate_summary_lines(row, compact=True))
     lines.extend(["", "## Market Anomalies Without Confirmed Catalyst"])
     _append_filtered(lines, rows, lambda row: row.get("source_origin") == "market_anomaly")
     lines.extend(["", "## Fresh Official Exchange Catalysts"])
@@ -180,8 +226,24 @@ def format_integrated_daily_brief(
     if not diagnostics:
         lines.append("- None.")
     for row in diagnostics[:10]:
-        lines.extend(_candidate_summary_lines(row, compact=True))
-    return "\n".join(lines).rstrip() + "\n"
+        lines.extend(_report_candidate_summary_lines(row, compact=True))
+
+def _report_candidate_summary_lines(row: Mapping[str, Any], *, compact: bool = False) -> list[str]:
+    lines = list(_candidate_summary_lines(row, compact=compact))
+    decision = decision_model_values(row)
+    if not decision:
+        return lines
+    score_line = (
+        "  - Crypto Radar v2: "
+        f"route={decision.get('radar_route') or 'diagnostic'} "
+        f"actionability={decision.get('actionability_score') if decision.get('actionability_score') is not None else 'n/a'} "
+        f"evidence={decision.get('evidence_confidence_score') if decision.get('evidence_confidence_score') is not None else 'n/a'} "
+        f"risk={decision.get('risk_score') if decision.get('risk_score') is not None else 'n/a'}"
+    )
+    lines.append(score_line)
+    if not compact:
+        lines.extend(f"  {item}" for item in decision_model_markdown_lines(decision))
+    return lines
 
 def _append_radar_learning_snapshot(lines: list[str], performance_snapshot: Mapping[str, Any] | None) -> None:
     if not isinstance(performance_snapshot, Mapping):
@@ -247,6 +309,7 @@ def build_integrated_notification_delivery_rows(
     generated_at: datetime | str | None = None,
     send_guard_enabled: bool = False,
     preview_path: str | Path | None = None,
+    decision_preview_enabled: bool | None = None,
 ) -> tuple[dict[str, Any], ...]:
     rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
     core_by_id = {str(row.get("core_opportunity_id") or ""): dict(row) for row in core_rows if isinstance(row, Mapping)}
@@ -283,7 +346,45 @@ def build_integrated_notification_delivery_rows(
             preview_path=preview_path,
             zero_candidate_preview=zero_candidate_preview,
         ))
+    decision_groups = group_decision_rows(rows, include_diagnostics=True)
+    v2_preview_enabled = (
+        bool(config.EVENT_ALPHA_DECISION_MODEL_V2_PREVIEW_ENABLED)
+        if decision_preview_enabled is None
+        else bool(decision_preview_enabled)
+    )
+    if v2_preview_enabled and sum(len(items) for items in decision_groups.values()):
+        for lane in PREVIEW_LANE_ORDER:
+            if lane == "decision_diagnostic" and not config.EVENT_ALPHA_DECISION_MODEL_V2_SHOW_DIAGNOSTICS:
+                continue
+            lane_rows = decision_groups[lane]
+            title = PREVIEW_LANE_TITLES[lane]
+            message = _integrated_lane_message(
+                lane_rows,
+                lane_title=title,
+                context=context,
+                lane=lane,
+                core_by_id=core_by_id,
+            )
+            out.append(_integrated_delivery_row(
+                lane=lane,
+                lane_title=title,
+                message_text=message,
+                rendered_rows=lane_rows,
+                skipped_rows=(),
+                core_by_id=core_by_id,
+                context=context,
+                run_id=run_id,
+                observed=observed,
+                send_guard_enabled=send_guard_enabled,
+                preview_path=preview_path,
+                zero_candidate_preview=zero_candidate_preview,
+            ))
     diagnostics = [row for row in rows if row.get("opportunity_type") == event_market_reaction.EventOpportunityType.DIAGNOSTIC.value]
+    if v2_preview_enabled:
+        diagnostics.extend(
+            row for row in decision_groups["decision_diagnostic"]
+            if row not in diagnostics
+        )
     health_message = _integrated_lane_message(
         (),
         lane_title="Source / Provider Health",
@@ -429,6 +530,7 @@ def _integrated_lane_message(
     lines = [
         f"🧭 Event Alpha {lane_title}",
         "Research-only / unvalidated. Not a trade signal.",
+        "Research idea, not a trade instruction.",
         f"Profile: {context.profile if context else 'unknown'}",
         f"Lane: {lane}",
         f"Items: {len(materialized)}",
@@ -438,6 +540,7 @@ def _integrated_lane_message(
         lines.append("- No candidate items in this lane.")
     for index, row in enumerate(materialized, start=1):
         card_path = _row_card_path(row, core_by_id=core_by_id)
+        decision_lines = decision_model_markdown_lines(decision_model_values(row))
         lines.extend([
             f"{index}. {row.get('symbol')}/{row.get('coin_id')}",
             f"   Opportunity: {row.get('opportunity_type') or 'unknown'}",
@@ -448,8 +551,11 @@ def _integrated_lane_message(
             f"   What invalidates: {_list_label(row.get('what_invalidates') or ())}",
             f"   Why not alertable: {_list_label(row.get('why_not_alertable') or ())}",
             f"   Card: {card_path or 'not generated'}",
-            "",
         ])
+        if decision_lines:
+            lines.append("   Crypto Radar decision:")
+            lines.extend(f"   {line}" for line in decision_lines)
+        lines.append("")
     for extra in extra_lines:
         text = str(extra or "").strip()
         if text:
