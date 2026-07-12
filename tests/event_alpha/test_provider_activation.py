@@ -1220,7 +1220,8 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
     )
     worksheet_text = event_alpha_tuning.format_tuning_worksheet(worksheet)
     assert "resolver_missed_asset" in worksheet_text
-    assert "source_noise_control" in worksheet_text
+    assert "feedback authority: supplied=3 eligible=0 excluded=3" in worksheet_text
+    assert "source_noise_control" not in worksheet_text
     assert "No thresholds" in worksheet_text
 
     entry = _test_watchlist_entry(state="HIGH_PRIORITY", symbol="VELVET", coin_id="velvet")
@@ -1233,8 +1234,11 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
     )
     assert "## Lifecycle Timeline" in card.markdown
     assert "## Artifact Lineage" in card.markdown
-    assert "feedback: useful" in card.markdown
-    assert "outcome:" in card.markdown
+    assert "Feedback rows supplied: 3" in card.markdown
+    assert "Eligible exact-Core feedback rows: 0" in card.markdown
+    assert "legacy_feedback_contract=3" in card.markdown
+    assert "feedback: useful" not in card.markdown
+    assert "outcome: not filled" in card.markdown
 
     tmp = Path(tempfile.mkdtemp())
     cards = tmp / "cards"

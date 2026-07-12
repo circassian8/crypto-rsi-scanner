@@ -26,6 +26,7 @@ import crypto_rsi_scanner.event_alpha.radar.impact_path_validator as event_impac
 import crypto_rsi_scanner.event_alpha.radar.market_confirmation as event_market_confirmation
 from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
 from ...radar import incidents as event_incident_store
+from .. import feedback_eligibility
 from .models import *  # noqa: F403
 
 def export_signal_quality_cases(
@@ -33,18 +34,28 @@ def export_signal_quality_cases(
     *,
     alert_rows: Iterable[Mapping[str, Any]] = (),
     feedback_rows: Iterable[Mapping[str, Any]] = (),
+    core_rows: Iterable[Mapping[str, Any]] = (),
     missed_rows: Iterable[Mapping[str, Any]] = (),
     hypothesis_rows: Iterable[Mapping[str, Any]] = (),
     generated_at: datetime | None = None,
+    now: Any = None,
 ) -> EventAlphaSignalQualityExportResult:
     """Write proposed benchmark cases from local artifacts only."""
-    feedback_by_key = _feedback_by_key(feedback_rows)
+    supplied_feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
+    eligible_feedback, excluded_feedback, feedback_reasons = (
+        feedback_eligibility.partition_joined_alert_feedback(
+            supplied_feedback,
+            core_rows,
+            alerts,
+            now=now if now is not None else generated_at,
+        )
+    )
+    feedback_by_identity = _feedback_by_identity(eligible_feedback)
     cases: list[dict[str, Any]] = []
     reasons: list[str] = []
-    for row in alert_rows:
-        if not isinstance(row, Mapping):
-            continue
-        feedback = _matching_feedback(row, feedback_by_key)
+    for row in alerts:
+        feedback = _matching_feedback(row, feedback_by_identity)
         reason = _case_reason(row, feedback=feedback)
         if not reason:
             continue
@@ -68,6 +79,10 @@ def export_signal_quality_cases(
         "schema_version": "event_alpha_signal_quality_proposed_cases_v1",
         "generated_at": (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(),
         "research_only": True,
+        "feedback_rows_supplied": len(supplied_feedback),
+        "feedback_rows_eligible": len(eligible_feedback),
+        "feedback_rows_excluded": len(excluded_feedback),
+        "feedback_exclusion_reason_counts": feedback_reasons,
         "cases": deduped,
     }
     target.write_text(json.dumps(_json_ready(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -75,6 +90,10 @@ def export_signal_quality_cases(
         path=target,
         cases_written=len(deduped),
         reasons=tuple(dict.fromkeys(reasons)),
+        feedback_rows_supplied=len(supplied_feedback),
+        feedback_rows_eligible=len(eligible_feedback),
+        feedback_rows_excluded=len(excluded_feedback),
+        feedback_exclusion_reason_counts=feedback_reasons,
     )
 def format_signal_quality_export_result(result: EventAlphaSignalQualityExportResult) -> str:
     return "\n".join([
@@ -83,21 +102,30 @@ def format_signal_quality_export_result(result: EventAlphaSignalQualityExportRes
         "=" * 76,
         f"path: {result.path}",
         f"cases_written: {result.cases_written}",
+        f"feedback: supplied={result.feedback_rows_supplied} eligible={result.feedback_rows_eligible} excluded={result.feedback_rows_excluded}",
+        "feedback_exclusions: " + _format_reason_counts(result.feedback_exclusion_reason_counts),
         "reasons: " + (", ".join(result.reasons) or "none"),
         "Canonical fixtures were not modified. No sends, trades, paper rows, live RSI rows, or watchlist state were written.",
     ])
-def _feedback_by_key(rows: Iterable[Mapping[str, Any]]) -> dict[str, Mapping[str, Any]]:
-    out: dict[str, Mapping[str, Any]] = {}
+def _feedback_by_identity(
+    rows: Iterable[Mapping[str, Any]],
+) -> dict[tuple[str, ...], Mapping[str, Any]]:
+    out: dict[tuple[str, ...], Mapping[str, Any]] = {}
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        for key in _row_keys(row):
-            out[key] = row
+        identity = feedback_eligibility.canonical_feedback_join_identity(row)
+        if identity is not None:
+            out[identity] = row
     return out
-def _matching_feedback(row: Mapping[str, Any], feedback_by_key: Mapping[str, Mapping[str, Any]]) -> Mapping[str, Any] | None:
-    return next((feedback_by_key[key] for key in _row_keys(row) if key in feedback_by_key), None)
+def _matching_feedback(
+    row: Mapping[str, Any],
+    feedback_by_identity: Mapping[tuple[str, ...], Mapping[str, Any]],
+) -> Mapping[str, Any] | None:
+    identity = feedback_eligibility.canonical_feedback_join_identity(row)
+    return feedback_by_identity.get(identity) if identity is not None else None
 def _case_reason(row: Mapping[str, Any], *, feedback: Mapping[str, Any] | None) -> str | None:
-    label = str((feedback or {}).get("label") or (feedback or {}).get("feedback") or "").lower()
+    label = str((feedback or {}).get("feedback_label") or "").lower()
     if label == "useful":
         return "useful_feedback_positive_case"
     if label == "junk":
@@ -115,7 +143,7 @@ def _case_from_row(row: Mapping[str, Any], *, reason: str, feedback: Mapping[str
     components = event_alpha_quality_fields.quality_components(row)
     symbol = row.get("symbol") or row.get("validated_symbol")
     coin_id = row.get("coin_id") or row.get("validated_coin_id")
-    feedback_label = (feedback or {}).get("label") or (feedback or {}).get("feedback")
+    feedback_label = (feedback or {}).get("feedback_label")
     expected_level = _expected_level_for_case(row, reason=reason, feedback_label=feedback_label)
     return {
         "case_id": _safe_case_id(row, reason),
@@ -124,7 +152,7 @@ def _case_from_row(row: Mapping[str, Any], *, reason: str, feedback: Mapping[str
         "candidate_symbol": symbol,
         "candidate_coin_id": coin_id,
         "core_opportunity_id": row.get("core_opportunity_id") or (feedback or {}).get("core_opportunity_id"),
-        "feedback_target": (feedback or {}).get("feedback_target") or (feedback or {}).get("target") or row.get("feedback_target"),
+        "feedback_target": (feedback or {}).get("feedback_target") or row.get("feedback_target"),
         "external_asset": row.get("external_asset"),
         "source_metadata": {
             "source": row.get("source") or row.get("latest_source"),
@@ -182,7 +210,7 @@ def _expected_route_behavior(level: str) -> str:
         return "high_priority_if_quality_gates_pass"
     return "research_digest_if_quality_gates_pass"
 def _why_eval_case(reason: str, *, feedback: Mapping[str, Any] | None) -> str:
-    note = str((feedback or {}).get("notes") or "").strip()
+    note = str((feedback or {}).get("feedback_notes") or "").strip()
     if note:
         return f"{reason}: {note}"
     if reason == "missed_opportunity_recall_case":
@@ -200,34 +228,6 @@ def _safe_case_id(row: Mapping[str, Any], reason: str) -> str:
     return f"{cleaned}_{reason}"
 def _key(row: Mapping[str, Any]) -> str:
     return str(row.get("alert_key") or row.get("alert_id") or row.get("key") or row.get("hypothesis_id") or "")
-def _row_keys(row: Mapping[str, Any]) -> tuple[str, ...]:
-    keys: list[str] = []
-    for field in (
-        "key",
-        "target",
-        "feedback_target",
-        "core_opportunity_id",
-        "alert_key",
-        "alert_id",
-        "card_id",
-        "hypothesis_id",
-        "incident_id",
-        "symbol",
-        "coin_id",
-        "asset_symbol",
-        "asset_coin_id",
-        "validated_symbol",
-        "validated_coin_id",
-    ):
-        value = str(row.get(field) or "").strip()
-        if not value:
-            continue
-        keys.append(value)
-        if value.startswith("ea:"):
-            keys.append(value[3:])
-        else:
-            keys.append(f"ea:{value}")
-    return tuple(dict.fromkeys(keys))
 def _dedupe_cases(cases: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     seen: set[str] = set()
     out: list[dict[str, Any]] = []
@@ -246,3 +246,9 @@ def _json_ready(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)
     return value
+
+
+def _format_reason_counts(counts: Mapping[str, int] | None) -> str:
+    if not counts:
+        return "none"
+    return ", ".join(f"{reason}={count}" for reason, count in sorted(counts.items()))

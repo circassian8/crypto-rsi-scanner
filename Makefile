@@ -853,7 +853,10 @@ event-alpha-integrated-radar-outcome-smoke: event-alpha-integrated-radar-smoke e
 	test -s event_fade_cache/$(PROFILE)/event_integrated_radar_calibration_priors.json
 	test -s event_fade_cache/$(PROFILE)/event_radar_performance_dashboard.md
 	test -s event_fade_cache/$(PROFILE)/event_radar_provider_performance.json
-	grep -q "early_good\|useful" event_fade_cache/$(PROFILE)/event_integrated_radar_outcomes.jsonl
+	grep -q '"synthetic_diagnostic_label":"early_good"\|"synthetic_diagnostic_label":"fade_review_good"' event_fade_cache/$(PROFILE)/event_integrated_radar_outcomes.jsonl
+	! grep -q '"calibration_eligible":true' event_fade_cache/$(PROFILE)/event_integrated_radar_outcomes.jsonl
+	! grep -q '"include_in_performance":true' event_fade_cache/$(PROFILE)/event_integrated_radar_outcomes.jsonl
+	! grep -q '"outcome_label":"early_good"\|"outcome_label":"useful"' event_fade_cache/$(PROFILE)/event_integrated_radar_outcomes.jsonl
 	grep -q "Radar Learning Snapshot" event_fade_cache/$(PROFILE)/event_alpha_daily_brief.md
 	grep -q '"auto_apply": false' event_fade_cache/$(PROFILE)/event_radar_provider_performance.json
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict

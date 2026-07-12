@@ -446,6 +446,56 @@ def test_schema_registry_contains_required_ids():
     assert schema_doctor.check_registry_schema_dependency_errors() == ()
 
 
+def test_single_json_schema_and_strict_doctor_surface_document_integrity_errors(
+    tmp_path,
+):
+    from crypto_rsi_scanner.event_alpha.doctor import artifact_doctor
+
+    documents = {
+        "malformed": (
+            '{"row_type":"event_alpha_calibration_priors",',
+            "invalid_json_document",
+        ),
+        "duplicate": (
+            '{"row_type":"event_alpha_calibration_priors",'
+            '"auto_apply":false,"auto_apply":true}',
+            "duplicate_json_object_key",
+        ),
+    }
+    for case_name, (document, expected_error) in documents.items():
+        namespace = tmp_path / case_name
+        namespace.mkdir()
+        path = namespace / "event_alpha_priors.json"
+        path.write_text(document, encoding="utf-8")
+
+        validation = schema_v1.validate_artifact_file(path)
+        assert validation["rows_read"] == 0
+        assert validation["rows_validated"] == 0
+        assert validation["errors"] == [
+            {
+                "row_index": None,
+                "schema_id": "feedback_calibration_prior_v2",
+                "error": expected_error,
+            }
+        ]
+
+        phase = schema_doctor.validate_namespace_artifacts(namespace)
+        assert phase.schema_rows_validated == 0
+        assert phase.schema_validation_errors == 1
+        assert phase.validated_files == (str(path),)
+        assert phase.errors[0]["error"] == expected_error
+
+        doctor = artifact_doctor.diagnose_artifacts(
+            inspected_alert_store_path=namespace / "event_alpha_alerts.jsonl",
+            schema_only=True,
+            strict=True,
+        )
+        assert doctor.status == "BLOCKED"
+        assert doctor.schema_rows_validated == 0
+        assert doctor.schema_validation_errors == 1
+        assert any("schema_validation_errors=1" in blocker for blocker in doctor.blockers)
+
+
 def test_provider_lineage_schema_specs_preserve_registry_order_and_api():
     expected = [
         "provider_readiness_v1",

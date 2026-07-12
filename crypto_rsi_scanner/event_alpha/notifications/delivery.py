@@ -28,6 +28,7 @@ from typing import Any, Iterable, Mapping
 from ..artifacts import paths as event_artifact_paths
 
 DELIVERY_SCHEMA_VERSION = "event_alpha_notification_delivery_v1"
+NOTIFICATION_PREVIEW_FILENAME = "event_alpha_notification_preview.md"
 
 STATE_PLANNED = "planned"
 STATE_SENDING = "sending"
@@ -267,6 +268,26 @@ def deliveries_path_for_context(context: Any) -> Path:
         return Path(override).expanduser()
     namespace_dir = Path(getattr(context, "namespace_dir", None) or getattr(context, "base_dir", Path(".")))
     return namespace_dir / "event_alpha_notification_deliveries.jsonl"
+
+
+def notification_preview_path_for_context(context: Any) -> Path:
+    """Return the exact namespace-owned notification preview authority.
+
+    Unlike portable delivery-row fallbacks, readiness and doctor checks must
+    not consult process environment or the historical ``event_fade_cache``
+    default after an artifact context has already been resolved.
+    """
+
+    raw_namespace_dir = getattr(context, "namespace_dir", None)
+    if raw_namespace_dir is not None:
+        namespace_dir = Path(raw_namespace_dir).expanduser()
+    else:
+        raw_base_dir = getattr(context, "base_dir", None)
+        namespace = str(getattr(context, "artifact_namespace", "") or "").strip()
+        if raw_base_dir is None or not namespace:
+            raise ValueError("notification preview authority requires an artifact namespace context")
+        namespace_dir = Path(raw_base_dir).expanduser() / namespace
+    return namespace_dir / NOTIFICATION_PREVIEW_FILENAME
 
 
 def config_for_context(
@@ -697,7 +718,7 @@ def default_notification_preview_relpath(
 ) -> str:
     namespace = str(artifact_namespace or "default").strip() or "default"
     base = Path(artifact_base_dir or os.getenv("RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR", "event_fade_cache")).expanduser()
-    path = base / namespace / "event_alpha_notification_preview.md"
+    path = base / namespace / NOTIFICATION_PREVIEW_FILENAME
     return notification_preview_relpath_for_path(path) or path.as_posix()
 
 

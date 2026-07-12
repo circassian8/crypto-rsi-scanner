@@ -18,12 +18,14 @@ def render_research_card(
     monitor_rows: Iterable[event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any]] = (),
     feedback_rows: Iterable[Mapping[str, Any]] = (),
     outcome_rows: Iterable[Mapping[str, Any]] = (),
+    candidate_rows: Iterable[Mapping[str, Any]] = (),
     generated_at: datetime | None = None,
     lineage_context: Mapping[str, Any] | None = None,
     card_path: str | Path | None = None,
 ) -> EventResearchCardResult:
     """Render one Markdown card from local research artifacts."""
     clean_key = str(key or "").strip()
+    observed = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
     context = _research_card_context(
         clean_key,
         watchlist_entries=watchlist_entries,
@@ -33,6 +35,8 @@ def render_research_card(
         monitor_rows=monitor_rows,
         feedback_rows=feedback_rows,
         outcome_rows=outcome_rows,
+        candidate_rows=candidate_rows,
+        evaluated_at=observed,
         card_path=card_path,
     )
     if context["entry"] is None and context["alert"] is None:
@@ -41,7 +45,7 @@ def render_research_card(
             markdown=f"# Event Research Card\n\nNo watchlist or alert snapshot matched `{clean_key}`.",
             found=False,
         )
-    context["generated_iso"] = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
+    context["generated_iso"] = observed.isoformat()
     context["lineage_context"] = lineage_context
     context["card_path"] = card_path
     lines = _research_card_summary_lines(context)
@@ -60,6 +64,8 @@ def _research_card_context(
     monitor_rows: Iterable[event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any]],
     feedback_rows: Iterable[Mapping[str, Any]],
     outcome_rows: Iterable[Mapping[str, Any]],
+    candidate_rows: Iterable[Mapping[str, Any]],
+    evaluated_at: datetime,
     card_path: str | Path | None,
 ) -> dict[str, Any]:
     entry_rows = list(watchlist_entries)
@@ -74,14 +80,27 @@ def _research_card_context(
         for row in alert_row_list
         if isinstance(row, Mapping) and row.get("row_type") == "event_core_opportunity"
     ]
+    eligible_feedback, excluded_feedback, feedback_reason_counts = (
+        event_feedback_eligibility.partition_joined_calibration_feedback(
+            feedback_row_list,
+            core_rows,
+            now=evaluated_at,
+        )
+    )
+    integrated_candidate_rows = [
+        dict(row)
+        for row in (*candidate_rows, *alert_row_list)
+        if isinstance(row, Mapping)
+        and row.get("row_type") == "event_integrated_radar_candidate"
+    ]
     core_view = _research_card_core_view(
         clean_key,
         core_rows=core_rows,
         alert_rows=alert_row_list,
         decision_rows=decision_rows,
         entry_rows=entry_rows,
-        feedback_rows=feedback_row_list,
         card_path=card_path,
+        evaluated_at=evaluated_at,
     )
     core = (
         core_view.core_opportunity
@@ -93,6 +112,21 @@ def _research_card_context(
             entry = _entry_from_core_opportunity(core)
         canonical_row = core_view.canonical_core_row if core_view is not None and core_view.canonical_core_row else alert
         alert = _canonical_card_alert(core, canonical_row)
+    matching_feedback = _matching_rows(
+        clean_key,
+        list(eligible_feedback),
+        entry,
+        alert,
+    )
+    outcome = _authoritative_card_outcome(
+        clean_key,
+        outcome_rows=outcome_rows,
+        candidate_rows=integrated_candidate_rows,
+        core_rows=core_rows,
+        entry=entry,
+        alert=alert,
+        evaluated_at=evaluated_at,
+    )
     return {
         "clean_key": clean_key,
         "entry": entry,
@@ -101,9 +135,64 @@ def _research_card_context(
         "core": core,
         "cluster": _find_cluster(clean_key, list(clusters), entry, alert),
         "monitor_row": _find_monitor_row(clean_key, list(monitor_rows), entry, alert),
-        "feedback": _matching_rows(clean_key, feedback_row_list, entry, alert),
-        "outcome": _find_outcome(clean_key, list(outcome_rows), entry, alert) or alert,
+        "feedback": matching_feedback,
+        "feedback_evidence_diagnostics": {
+            "feedback_rows_supplied": len(feedback_row_list),
+            "feedback_rows_eligible": len(eligible_feedback),
+            "feedback_rows_matched_to_card": len(matching_feedback),
+            "feedback_rows_eligible_other_core": (
+                len(eligible_feedback) - len(matching_feedback)
+            ),
+            "feedback_rows_excluded": len(excluded_feedback),
+            "feedback_exclusion_reason_counts": dict(feedback_reason_counts),
+        },
+        "outcome": outcome,
     }
+
+
+def _authoritative_card_outcome(
+    clean_key: str,
+    *,
+    outcome_rows: Iterable[Mapping[str, Any]],
+    candidate_rows: Iterable[Mapping[str, Any]],
+    core_rows: Iterable[Mapping[str, Any]],
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+    evaluated_at: datetime,
+) -> Mapping[str, Any] | None:
+    supplied = [dict(row) for row in outcome_rows if isinstance(row, Mapping)]
+    if not supplied:
+        return None
+    eligible, excluded, _reason_counts = (
+        event_outcome_eligibility.partition_joined_calibration_outcomes(
+            supplied,
+            candidate_rows,
+            core_rows,
+            evaluated_at=evaluated_at,
+        )
+    )
+    exact = _find_outcome(clean_key, list(eligible), entry, alert)
+    if exact is not None:
+        return {
+            **dict(exact),
+            "outcome_display_status": "eligible_performance_evidence",
+            "outcome_display_maturation_state": (
+                event_outcome_eligibility.primary_horizon_maturation_state(exact)
+                or "unknown"
+            ),
+            "outcome_display_validation_status": (
+                event_outcome_eligibility.deterministic_validation_status(exact)
+            ),
+        }
+    diagnostic = _find_outcome(clean_key, list(excluded), entry, alert)
+    if diagnostic is not None:
+        return {
+            **dict(diagnostic),
+            "outcome_display_status": "excluded_non_performance_diagnostic",
+            "outcome_display_maturation_state": "excluded",
+            "outcome_display_validation_status": "inconclusive",
+        }
+    return None
 
 
 def _research_card_core_view(
@@ -113,8 +202,8 @@ def _research_card_core_view(
     alert_rows: list[Mapping[str, Any]],
     decision_rows: list[event_alpha_router.EventAlphaRouteDecision],
     entry_rows: list[event_watchlist.EventWatchlistEntry],
-    feedback_rows: list[Mapping[str, Any]],
     card_path: str | Path | None,
+    evaluated_at: datetime,
 ) -> Any | None:
     if not core_rows:
         return None
@@ -123,8 +212,8 @@ def _research_card_core_view(
         core_rows=core_rows,
         supporting_rows=[*alert_rows, *decision_rows, *entry_rows],
         alert_rows=alert_rows,
-        feedback_rows=feedback_rows,
         card_paths=[card_path] if card_path is not None else (),
+        now=evaluated_at,
     )
 
 
@@ -311,6 +400,13 @@ def _append_research_card_review_sections(lines: list[str], context: Mapping[str
         "## Lifecycle Timeline",
     ])
     lines.extend(_lifecycle_lines(entry, alert, monitor_row, feedback, outcome))
+    if context["feedback_evidence_diagnostics"].get("feedback_rows_supplied"):
+        lines.extend(["", "## Feedback Evidence Diagnostics"])
+        lines.extend(
+            _feedback_evidence_diagnostic_lines(
+                context["feedback_evidence_diagnostics"]
+            )
+        )
     lines.extend([
         "",
         "## Why This Matters",
@@ -348,10 +444,13 @@ def render_selected_cards(
     monitor_rows: Iterable[event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any]] = (),
     feedback_rows: Iterable[Mapping[str, Any]] = (),
     outcome_rows: Iterable[Mapping[str, Any]] = (),
+    candidate_rows: Iterable[Mapping[str, Any]] = (),
+    generated_at: datetime | None = None,
     limit: int = 10,
 ) -> str:
     cluster_rows = list(clusters)
     monitor = list(monitor_rows)
+    observed = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
     entries = [
         entry for entry in watchlist_entries
         if event_watchlist.final_state_value(entry) in {
@@ -372,6 +471,8 @@ def render_selected_cards(
             monitor_rows=monitor,
             feedback_rows=feedback_rows,
             outcome_rows=outcome_rows,
+            candidate_rows=candidate_rows,
+            generated_at=observed,
         ).markdown
         for entry in entries
     ]
@@ -387,6 +488,7 @@ def write_research_cards(
     monitor_rows: Iterable[event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any]] = (),
     feedback_rows: Iterable[Mapping[str, Any]] = (),
     outcome_rows: Iterable[Mapping[str, Any]] = (),
+    candidate_rows: Iterable[Mapping[str, Any]] = (),
     include_all_alertable: bool = True,
     selected_tiers: Iterable[str] | None = None,
     limit: int = 25,
@@ -421,6 +523,7 @@ def write_research_cards(
             monitor_rows=monitor_rows,
             feedback_rows=feedback_rows,
             outcome_rows=outcome_rows,
+            candidate_rows=candidate_rows,
             generated_at=observed,
             lineage_context=lineage_context,
             card_path=path,

@@ -231,7 +231,11 @@ def _event_alpha_health_guard_status_for_context(
     context: event_alpha_artifacts.EventAlphaArtifactContext,
     profile_name: str | None,
 ) -> str:
-    artifacts = _event_alpha_local_artifacts(run_limit=100, latest_alerts=True)
+    artifacts = _event_alpha_local_artifacts(
+        context=context,
+        run_limit=100,
+        latest_alerts=True,
+    )
     result = event_alpha_health_guard.evaluate_health_guard(
         run_rows=artifacts["runs"].rows,
         alert_rows=artifacts["alerts"].rows,
@@ -244,6 +248,7 @@ def _event_alpha_health_guard_status_for_context(
             require_profile=profile_name or config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE,
         ),
         artifact_namespace=context.artifact_namespace,
+        now=_event_research_now(),
     )
     return result.status
 
@@ -395,7 +400,7 @@ def event_alpha_notification_checklist_report(
     now = _event_research_now()
     storage = Storage(config.DB_PATH)
     try:
-        watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
+        watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
         routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
         plan = event_alpha_notifications.build_notification_plan(
             routed.decisions,
@@ -406,15 +411,19 @@ def event_alpha_notification_checklist_report(
         )
     finally:
         storage.close()
-    artifacts = _event_alpha_local_artifacts(run_limit=250, latest_alerts=False)
-    cards_dir = Path(config.EVENT_RESEARCH_CARDS_DIR)
+    artifacts = _event_alpha_local_artifacts(
+        context=context,
+        run_limit=250,
+        latest_alerts=False,
+    )
+    cards_dir = context.research_cards_dir
     doctor = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=artifacts["runs"].rows,
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
         hypothesis_rows=artifacts["hypotheses"].rows,
-        core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
+        core_opportunity_rows=artifacts["core_opportunities"].rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
@@ -430,8 +439,23 @@ def event_alpha_notification_checklist_report(
         llm_budget_rows=artifacts["budget_rows"],
         profile=profile.name,
         artifact_namespace=context.artifact_namespace,
-        inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
+        artifact_namespace_dir=context.namespace_dir,
+        inspected_alert_store_path=context.alert_store_path,
+        feedback_path=context.feedback_path,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+        outcomes_path=context.outcomes_path,
+        integrated_candidate_path=(
+            context.namespace_dir / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME
+        ),
+        integrated_outcomes_path=(
+            context.namespace_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
+        ),
+        notification_preview_path=(
+            event_alpha_notification_delivery.notification_preview_path_for_context(context)
+        ),
+        run_ledger_path=context.run_ledger_path,
         strict=False,
+        evaluated_at=now,
     )
     result = event_alpha_notification_checklist.build_notification_checklist(
         profile=profile.name,
@@ -684,7 +708,11 @@ def event_alpha_send_readiness_report(
         return
     artifact_namespace = artifact_namespace or context.artifact_namespace
     profile_name = profile_name or (context.profile if context.profile != "default" else None)
-    artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
+    artifacts = _event_alpha_local_artifacts(
+        context=context,
+        run_limit=500,
+        latest_alerts=False,
+    )
     delivery_rows = event_alpha_notification_delivery.load_delivery_records(
         event_alpha_notification_delivery.deliveries_path_for_context(context)
     )
@@ -694,6 +722,7 @@ def event_alpha_send_readiness_report(
         include_api=True,
     ).rows
     card_paths = [str(path) for path in _research_card_markdown_paths(context.research_cards_dir, include_index=True)]
+    evaluation_now = _event_research_now()
     doctor = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=artifacts["runs"].rows,
         alert_rows=artifacts["alerts"].rows,
@@ -714,9 +743,24 @@ def event_alpha_send_readiness_report(
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
+        artifact_namespace_dir=context.namespace_dir,
         inspected_alert_store_path=context.alert_store_path,
+        feedback_path=context.feedback_path,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+        outcomes_path=context.outcomes_path,
+        integrated_candidate_path=(
+            context.namespace_dir / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME
+        ),
+        integrated_outcomes_path=(
+            context.namespace_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
+        ),
+        notification_preview_path=(
+            event_alpha_notification_delivery.notification_preview_path_for_context(context)
+        ),
+        run_ledger_path=context.run_ledger_path,
         strict=True,
         delivery_strict_scope="latest_run",
+        evaluated_at=evaluation_now,
     )
     result = event_alpha_send_readiness.build_send_readiness(
         profile=profile_name,
@@ -730,6 +774,9 @@ def event_alpha_send_readiness_report(
         telegram_ready=bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS),
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
+        preview_path=event_alpha_notification_delivery.notification_preview_path_for_context(
+            context
+        ),
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_send_readiness.format_send_readiness(result))
@@ -755,7 +802,11 @@ def event_alpha_telegram_final_check_report(
         raise SystemExit(1) from exc
     artifact_namespace = artifact_namespace or context.artifact_namespace
     profile_name = profile_name or context.profile
-    artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
+    artifacts = _event_alpha_local_artifacts(
+        context=context,
+        run_limit=500,
+        latest_alerts=False,
+    )
     delivery_path = event_alpha_notification_delivery.deliveries_path_for_context(context)
     delivery_rows = event_alpha_notification_delivery.load_delivery_records(delivery_path)
     core_rows = event_core_opportunity_store.load_core_opportunities(
@@ -764,6 +815,7 @@ def event_alpha_telegram_final_check_report(
         include_api=True,
     ).rows
     card_paths = [str(path) for path in _research_card_markdown_paths(context.research_cards_dir, include_index=True)]
+    evaluation_now = _event_research_now()
     doctor = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=artifacts["runs"].rows,
         alert_rows=artifacts["alerts"].rows,
@@ -782,9 +834,24 @@ def event_alpha_telegram_final_check_report(
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
+        artifact_namespace_dir=context.namespace_dir,
         inspected_alert_store_path=context.alert_store_path,
+        feedback_path=context.feedback_path,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+        outcomes_path=context.outcomes_path,
+        integrated_candidate_path=(
+            context.namespace_dir / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME
+        ),
+        integrated_outcomes_path=(
+            context.namespace_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
+        ),
+        notification_preview_path=(
+            event_alpha_notification_delivery.notification_preview_path_for_context(context)
+        ),
+        run_ledger_path=context.run_ledger_path,
         strict=True,
         delivery_strict_scope="latest_run",
+        evaluated_at=evaluation_now,
     )
     readiness = event_alpha_send_readiness.build_send_readiness(
         profile=profile_name,
@@ -798,6 +865,9 @@ def event_alpha_telegram_final_check_report(
         telegram_ready=bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS),
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
+        preview_path=event_alpha_notification_delivery.notification_preview_path_for_context(
+            context
+        ),
     )
     latest_delivery_rows = [
         row for row in event_alpha_notification_delivery.latest_rows_by_delivery(delivery_rows)
@@ -816,7 +886,9 @@ def event_alpha_telegram_final_check_report(
         send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
         lock_status=lock_status,
         provider_status=provider_status,
-        provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
+        provider_health_rows=event_provider_health.load_provider_health(
+            context.provider_health_path
+        ),
         delivery_ledger_path=delivery_path,
         notification_run_ledger_path=context.notification_runs_path,
         research_cards_dir=context.research_cards_dir,

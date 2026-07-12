@@ -7,6 +7,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from crypto_rsi_scanner.event_alpha.artifacts import research_cards
 from crypto_rsi_scanner.event_alpha.outcomes import outcome_eligibility as eligibility
 from crypto_rsi_scanner.event_alpha.outcomes import integrated_radar_outcomes as outcomes
 from crypto_rsi_scanner.event_alpha.radar import integrated_radar
@@ -61,6 +62,7 @@ def _observed_outcome(
         "price_at_observation": 10.0,
         "observation_price_source": "binance_ohlcv",
         "observation_price_id": f"binance:{index}:entry",
+        "observation_price_observed_at": _iso(observed),
         "primary_horizon": primary_horizon,
         "primary_horizon_return": return_by_horizon[primary_horizon],
         "return_by_horizon": return_by_horizon,
@@ -135,6 +137,12 @@ def _write_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
         "\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\n",
         encoding="utf-8",
     )
+
+
+def _seal_outcome(row: dict[str, object]) -> None:
+    reasons = eligibility.calibration_ineligibility_reasons(row)
+    row["calibration_ineligible_reasons"] = list(reasons)
+    row["calibration_eligible"] = not reasons
 
 
 def test_synthetic_fixture_rows_are_truthful_diagnostics_without_default_price():
@@ -488,6 +496,188 @@ def test_performance_join_requires_exact_identity_unique_outcome_and_unique_core
     )
     assert len(no_fallback) == 2
     assert all(row["calibration_eligible"] is False for row in no_fallback)
+
+
+def test_performance_projection_grades_the_authoritative_candidate_lane():
+    outcome = _observed_outcome()
+    candidate = _candidate(outcome)
+    core = _core(outcome)
+    outcome["outcome_label"] = "junk"
+    for horizon in eligibility.OUTCOME_HORIZONS:
+        metadata = outcome["horizon_metadata"][horizon]
+        if metadata["maturity_status"] != "matured":
+            continue
+        metadata["price_at_horizon"] = 9.9
+        outcome["return_by_horizon"][horizon] = -0.01
+        outcome["horizons"][horizon] = -0.01
+    outcome["primary_horizon_return"] = -0.01
+    _seal_outcome(outcome)
+    assert outcome["calibration_eligible"] is True
+    outcome["opportunity_type"] = "RISK_ONLY"
+    assert eligibility.deterministic_validation_status(outcome) == "validated"
+
+    rows = outcomes._performance_observation_rows(  # noqa: SLF001
+        Path("fixture"),
+        candidates=[candidate],
+        core_rows=[core],
+        outcome_rows=[outcome],
+        delivery_rows=[],
+        generated_at=outcome["outcome_evaluated_at"],
+        stale_after_days=14,
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["calibration_eligible"] is True
+    assert rows[0]["opportunity_type"] == "EARLY_LONG_RESEARCH"
+    assert rows[0]["validation_label"] == "invalidated/noise"
+
+
+def test_daily_brief_partitions_exact_authority_and_ignores_include_flag():
+    valid = _observed_outcome()
+    candidate = _candidate(valid)
+    core = _core(valid)
+    forged = {
+        "row_type": "event_integrated_radar_outcome",
+        "candidate_id": "forged-candidate",
+        "core_opportunity_id": "forged-core",
+        "symbol": valid["symbol"],
+        "coin_id": valid["coin_id"],
+        "opportunity_type": "EARLY_LONG_RESEARCH",
+        "outcome_status": "filled",
+        "outcome_label": "early_good",
+        "primary_horizon_return": 9.0,
+        "include_in_performance": True,
+    }
+
+    brief = integrated_radar.format_integrated_daily_brief(
+        [candidate],
+        core_rows=[core],
+        outcome_rows=[valid, forged],
+        evaluated_at=valid["outcome_evaluated_at"],
+    )
+
+    assert "Outcome rows supplied: 2" in brief
+    assert "Performance rows: 1" in brief
+    assert "Diagnostics excluded as non-performance evidence: 1" in brief
+    assert "validated=1 invalidated/noise=0" in brief
+    assert "+900.00%" not in brief
+    assert "Non-performance diagnostic: candidate=forged-candidate" in brief
+
+
+def test_research_card_requires_exact_authority_and_labels_excluded_diagnostics():
+    valid = _observed_outcome()
+    candidate = _candidate(valid)
+    core = _core(valid)
+    unrelated = _observed_outcome(1)
+    unrelated["symbol"] = valid["symbol"]
+    unrelated["coin_id"] = valid["coin_id"]
+    _seal_outcome(unrelated)
+    evaluated_at = eligibility.parse_aware_time(valid["outcome_evaluated_at"])
+    assert evaluated_at is not None
+
+    card = research_cards.render_research_card(
+        str(valid["core_opportunity_id"]),
+        alert_rows=[core],
+        candidate_rows=[candidate],
+        outcome_rows=[valid, unrelated],
+        generated_at=evaluated_at,
+    )
+
+    assert card.found is True
+    assert "exact candidate/Core authority; eligible performance evidence" in card.markdown
+    assert "Deterministic validation: validated" in card.markdown
+    assert "Persisted outcome labels do not determine validation" in card.markdown
+    assert "Asset primary return: +4.00%" in card.markdown
+
+    same_symbol_other_identity = research_cards.render_research_card(
+        str(valid["core_opportunity_id"]),
+        alert_rows=[core, _core(unrelated)],
+        candidate_rows=[candidate, _candidate(unrelated)],
+        outcome_rows=[unrelated],
+        generated_at=evaluated_at,
+    )
+    assert "Outcome status: pending" in same_symbol_other_identity.markdown
+    assert "Asset primary return: +4.00%" not in same_symbol_other_identity.markdown
+
+    future_clock = evaluated_at - timedelta(seconds=1)
+    excluded_card = research_cards.render_research_card(
+        str(valid["core_opportunity_id"]),
+        alert_rows=[core],
+        candidate_rows=[candidate],
+        outcome_rows=[valid],
+        generated_at=future_clock,
+    )
+    assert "excluded diagnostic; not performance evidence" in excluded_card.markdown
+    assert "outcome_evaluated_in_future" in excluded_card.markdown
+
+    no_authority = research_cards.render_research_card(
+        str(valid["core_opportunity_id"]),
+        alert_rows=[core],
+        outcome_rows=[valid],
+        generated_at=evaluated_at,
+    )
+    assert "excluded diagnostic; not performance evidence" in no_authority.markdown
+    assert "unmatched_outcome_identity" in no_authority.markdown
+
+
+def test_joined_partition_requires_full_authority_schemas_and_external_clock():
+    valid = _observed_outcome()
+    candidate = _candidate(valid)
+    core = _core(valid)
+    evaluated_at = eligibility.parse_aware_time(valid["outcome_evaluated_at"])
+    assert evaluated_at is not None
+
+    for malformed_candidate in (
+        {key: value for key, value in candidate.items() if key != "symbol"},
+        {**candidate, "symbol": 123},
+    ):
+        eligible, excluded, reasons = eligibility.partition_joined_calibration_outcomes(
+            [valid], [malformed_candidate], [core], evaluated_at=evaluated_at
+        )
+        assert eligible == ()
+        assert len(excluded) == 1
+        assert reasons["candidate_authority_contract_invalid"] == 1
+
+    for malformed_core in (
+        {key: value for key, value in core.items() if key != "symbol"},
+        {**core, "symbol": 123},
+    ):
+        eligible, excluded, reasons = eligibility.partition_joined_calibration_outcomes(
+            [valid], [candidate], [malformed_core], evaluated_at=evaluated_at
+        )
+        assert eligible == ()
+        assert len(excluded) == 1
+        assert reasons["core_authority_contract_invalid"] == 1
+
+    future_core = {
+        **core,
+        "generated_at": _iso(evaluated_at + timedelta(seconds=1)),
+    }
+    eligible, excluded, reasons = eligibility.partition_joined_calibration_outcomes(
+        [valid], [candidate], [future_core], evaluated_at=evaluated_at
+    )
+    assert eligible == ()
+    assert len(excluded) == 1
+    assert reasons["core_authority_generated_in_future"] == 1
+
+    from crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_parts.outcome_checks import (
+        _integrated_outcome_conflicts,
+    )
+
+    future_conflicts = _integrated_outcome_conflicts(
+        [candidate],
+        [valid],
+        core_rows=[future_core],
+        evaluated_at=evaluated_at,
+    )
+    assert future_conflicts["integrated_outcome_eligibility_contract_invalid"] == 1
+    malformed_conflicts = _integrated_outcome_conflicts(
+        [{key: value for key, value in candidate.items() if key != "symbol"}],
+        [valid],
+        core_rows=[core],
+        evaluated_at=evaluated_at,
+    )
+    assert malformed_conflicts["integrated_outcome_eligibility_contract_invalid"] == 1
 
 
 def test_joined_partition_rejects_duplicates_and_uses_only_authoritative_attribution():

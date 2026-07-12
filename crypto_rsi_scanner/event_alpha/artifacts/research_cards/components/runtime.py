@@ -22,6 +22,8 @@ import crypto_rsi_scanner.event_alpha.providers.source_packs as event_source_pac
 import crypto_rsi_scanner.event_alpha.providers.source_registry as event_source_registry
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 import crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor as event_watchlist_monitor
+import crypto_rsi_scanner.event_alpha.outcomes.feedback_eligibility as event_feedback_eligibility
+import crypto_rsi_scanner.event_alpha.outcomes.outcome_eligibility as event_outcome_eligibility
 from ... import reason_text as event_alpha_reason_text
 
 CARD_INDEX_GROUPS = (

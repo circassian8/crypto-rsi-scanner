@@ -17,6 +17,59 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-12 — Make Decision Model v2 learning evidence exact · Codex
+**Why:** Feedback, alert-return aliases, synthetic fixture returns, implicit
+artifact siblings, and process-global paths could still manufacture apparent
+learning evidence or make one namespace inspect another. Runtime calibration
+also retained an environment-controlled application path despite the accepted
+research-only, review-first policy.
+**Changes:**
+- Added exact four-field Core-authorized feedback partitioning, chronology and
+  duplicate/history guards, secret-safe feedback writes, raw malformed-row
+  diagnostics, schema/doctor telemetry, and rewired every feedback, card,
+  brief, inbox, quality, calibration, reliability, policy, scorecard, and
+  burn-in consumer to use only the exact eligible projection.
+- Closed alert and outcome authority around exact run/profile/namespace/
+  candidate/Core identities. Alert-return aliases remain diagnostic only;
+  observed outcomes require independently recomputable entry/horizon prices,
+  maturity under one external UTC clock, bounded timestamp lineage, and
+  lane-aware deterministic grading.
+- Added a pure timestamp-aligned observed-price builder and dense OHLCV fixture.
+  Fixture input now defaults to `synthetic_fixture`, can never enter calibration,
+  and cannot be relabeled as observed lineage; observed mode is explicit, fixture
+  markers are rejected, and the final projection strips Core/debug path fields.
+- Made feedback-derived priors unconditionally shadow/recommendation-only with
+  `auto_apply=false`; the old environment flag is compatibility-only and cannot
+  alter alert scores, tiers, or routing.
+- Isolated cards, briefs, readiness, notification previews, doctor, feedback,
+  outcomes, calibration, source reliability, scorecards, and burn-in to the
+  resolved artifact context. Canonical paths are explicit, missing explicit
+  files fail closed, stale sibling previews are not adopted, and one captured
+  evaluation clock governs each report. Fresh candidates without outcomes are
+  visible as a strict-doctor warning rather than an unsafe blocker; malformed,
+  ambiguous, synthetic, or falsely eligible outcomes still block.
+- Split near-threshold implementation files into focused artifact-input,
+  notification-preview, schema-mapping, and operator-report-state modules,
+  plus a dedicated scorecard-clock test module. Updated the runbook, roadmap,
+  durable decisions, environment guidance, architecture reports, standalone
+  registration, and the integrated outcome smoke's diagnostic-only assertions.
+**Verify:** The full local release gate passed with
+`make verify PYTHON=.venv/bin/python`: 1,136/1,136 standalone tests, 1,204 pytest
+tests, alert rendering, a 33-observation fixture backtest, and the paper
+scoreboard. Before that gate, all 979 Event Alpha tests and the 151-test combined
+authority/context regression set passed. After the final smoke-driven fixes,
+18 doctor/outcome firewall tests and 10 observed-builder tests passed. The
+fixture-backed `make event-alpha-integrated-radar-outcome-smoke` completed with
+11 candidates, 9 canonical Core rows/cards, zero blockers, all 11 synthetic
+outcome rows excluded from calibration/performance, and only expected missing-
+outcome/CryptoPanic fixture-coverage warnings. Architecture size/class/import
+gates, compileall, and diff checks passed with zero new violations. No GitHub
+check was polled or awaited.
+**Notes/risks:** The observed builder is pure and has no operator write surface
+yet. The next slice adds an explicit preview-first offline command with
+create-only, confirm-gated noncanonical staging; it must not write canonical
+stores, run ledgers, cards, sends, trades, paper rows, RSI rows, or triggers.
+
 ## 2026-07-12 — Count only exact observed outcome evidence · Codex
 **Why:** Decision Model v2 reports could treat synthetic fixture returns,
 immature horizons, broad identity matches, or caller-supplied positive labels as

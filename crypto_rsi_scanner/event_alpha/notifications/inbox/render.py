@@ -48,6 +48,12 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult, *, burn
             f"diagnostics_hidden={len(result.diagnostic_review_items_hidden)} "
             f"diagnostics_visible={len(result.diagnostic_review_items)}"
         ),
+        (
+            "feedback_authority: "
+            f"supplied={result.feedback_rows_supplied} "
+            f"eligible={result.feedback_rows_eligible} "
+            f"excluded={result.feedback_rows_excluded}"
+        ),
         "",
     ]
     _append_item_section(

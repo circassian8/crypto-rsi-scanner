@@ -1,14 +1,58 @@
-"""Opt-in Event Alpha calibration-prior application for research alerts."""
+"""Shadow-only Event Alpha calibration-prior review for research alerts."""
 
 from __future__ import annotations
 
-import json
 import math
+import unicodedata
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
+from ..artifacts import json_lines as artifact_json_lines
+from . import feedback_eligibility
+from .calibration import (
+    CALIBRATION_PRIORS_ROW_TYPE,
+    CALIBRATION_PRIORS_SCHEMA_VERSION,
+    PRIOR_GROUP_NAMES,
+)
+
+
+PRIOR_ROW_FIELDS = frozenset(
+    {
+        "samples",
+        "useful",
+        "junk",
+        "watch",
+        "median_primary_horizon_return",
+        "score_adjustment",
+        "min_sample_warning",
+    }
+)
+MAX_PRIOR_GROUP_KEY_CHARS = 512
+PRIOR_PAYLOAD_FIELDS = frozenset(
+    {
+        "schema_version",
+        "row_type",
+        "generated_at",
+        "feedback_firewall_evaluated_at",
+        "feedback_firewall_applied",
+        "feedback_eligibility_contract_version",
+        "alert_rows_supplied",
+        "feedback_rows_supplied",
+        "feedback_rows_eligible",
+        "feedback_rows_excluded",
+        "feedback_exclusion_reason_counts",
+        "min_sample",
+        "min_sample_warning",
+        *PRIOR_GROUP_NAMES,
+        "research_only",
+        "recommendation_only",
+        "eligible_for_auto_apply",
+        "auto_apply",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -49,16 +93,18 @@ class EventAlphaPriorsShadowResult:
 
 
 def load_priors(cfg: EventAlphaPriorsConfig) -> EventAlphaPriors | None:
-    if not cfg.enabled or cfg.path is None:
-        return None
-    path = cfg.path.expanduser()
-    if not path.exists():
+    if not _valid_config(cfg) or cfg.path is None:
         return None
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        path = cfg.path.expanduser()
+        if not path.exists():
+            return None
+        payload = artifact_json_lines.loads_no_duplicate_keys(
+            path.read_text(encoding="utf-8")
+        )
+    except (OSError, UnicodeError, ValueError, RuntimeError):
         return None
-    if not isinstance(payload, dict):
+    if not isinstance(payload, dict) or not prior_payload_is_valid(payload):
         return None
     return EventAlphaPriors(
         path=path,
@@ -74,6 +120,19 @@ def apply_priors_to_alerts(
     cfg: EventAlphaPriorsConfig,
     alert_cfg: event_alerts.EventAlertConfig | None = None,
 ) -> list[event_alerts.EventAlertCandidate]:
+    """Return alerts unchanged while accepted policy keeps priors shadow-only."""
+
+    return list(alerts)
+
+
+def apply_priors_shadow(
+    alerts: Iterable[event_alerts.EventAlertCandidate],
+    *,
+    cfg: EventAlphaPriorsConfig,
+    alert_cfg: event_alerts.EventAlertConfig | None = None,
+) -> list[event_alerts.EventAlertCandidate]:
+    """Apply reviewed recommendation priors in memory for comparison only."""
+
     priors = load_priors(cfg)
     data = list(alerts)
     if priors is None:
@@ -107,7 +166,7 @@ def compare_priors_shadow(
             prior_file=str(cfg.path) if cfg.path else None,
             warnings=(f"priors file not found or invalid: {cfg.path}" if cfg.path else "priors path is not configured",),
         )
-    adjusted = apply_priors_to_alerts(data, cfg=enabled_cfg, alert_cfg=alert_cfg)
+    adjusted = apply_priors_shadow(data, cfg=enabled_cfg, alert_cfg=alert_cfg)
     adjusted_by_key = {_alert_key(alert): alert for alert in adjusted}
     rows: list[EventAlphaPriorsShadowRow] = []
     for alert in data:
@@ -171,8 +230,20 @@ def _apply_to_alert(
     cfg: EventAlphaPriorsConfig,
     alert_cfg: event_alerts.EventAlertConfig,
 ) -> event_alerts.EventAlertCandidate:
+    if (
+        alert.tier in {
+            event_alerts.EventAlertTier.TRIGGERED_FADE,
+            event_alerts.EventAlertTier.STORE_ONLY,
+        }
+        or alert.rejected_reason
+        or alert.llm_asset_role in {"source_noise", "ticker_word_collision"}
+        or alert.effective_playbook_type == "source_noise_control"
+    ):
+        return alert
     before = int(alert.opportunity_score)
     multipliers = _multipliers_for(alert, priors.payload, cfg=cfg)
+    if not multipliers:
+        return alert
     combined = 1.0
     for value in multipliers.values():
         combined *= value
@@ -266,23 +337,201 @@ def _multipliers_for(
 
 
 def _row_multiplier(row: Mapping[str, Any]) -> float | None:
-    for key in ("multiplier", "score_multiplier", "prior_multiplier"):
-        value = _float(row.get(key))
-        if value is not None:
-            return value
-    adjustment = _float(row.get("score_adjustment"))
-    if adjustment is not None:
-        return 1.0 + (adjustment / 100.0)
-    useful = _float(row.get("useful")) or 0.0
-    junk = _float(row.get("junk")) or 0.0
-    if useful or junk:
-        return 1.0 + max(-0.15, min(0.15, (useful - junk) / max(10.0, useful + junk) * 0.20))
-    return None
+    if row.get("min_sample_warning") is not False:
+        return None
+    adjustment = row.get("score_adjustment")
+    if type(adjustment) is not int or adjustment == 0:
+        return None
+    return 1.0 + (adjustment / 100.0)
 
 
 def _provider(alert: event_alerts.EventAlertCandidate) -> str:
     event = alert.discovery_candidate.event
     return str(event.source or alert.source or "unknown")
+
+
+def _valid_config(cfg: EventAlphaPriorsConfig) -> bool:
+    if cfg.enabled is not True or not isinstance(cfg.path, Path):
+        return False
+    low = _strict_finite_number(cfg.min_multiplier)
+    high = _strict_finite_number(cfg.max_multiplier)
+    return (
+        low is not None
+        and high is not None
+        and 0.0 < low <= 1.0 <= high <= 2.0
+    )
+
+
+def prior_payload_is_valid(payload: Mapping[str, Any]) -> bool:
+    """Return the exact fail-closed acceptance decision used by the loader.
+
+    Artifact schema validation calls this public contract too, so a prior file
+    cannot pass doctor validation while the runtime loader would reject it.
+    """
+
+    return _valid_prior_payload(payload)
+
+
+def _valid_prior_payload(payload: Mapping[str, Any]) -> bool:
+    if set(payload) != PRIOR_PAYLOAD_FIELDS:
+        return False
+    if (
+        payload.get("schema_version") != CALIBRATION_PRIORS_SCHEMA_VERSION
+        or payload.get("row_type") != CALIBRATION_PRIORS_ROW_TYPE
+        or payload.get("research_only") is not True
+        or payload.get("recommendation_only") is not True
+        or payload.get("feedback_firewall_applied") is not True
+        or payload.get("feedback_eligibility_contract_version")
+        != feedback_eligibility.FEEDBACK_ELIGIBILITY_CONTRACT_VERSION
+        or type(payload.get("eligible_for_auto_apply")) is not bool
+        or payload.get("auto_apply") is not False
+    ):
+        return False
+
+    generated_at = _valid_timestamp(payload.get("generated_at"))
+    evaluated_at = _valid_timestamp(payload.get("feedback_firewall_evaluated_at"))
+    if generated_at is None or evaluated_at is None or generated_at < evaluated_at:
+        return False
+
+    min_sample = payload.get("min_sample")
+    if type(min_sample) is not int or min_sample < 1:
+        return False
+    telemetry_names = (
+        "alert_rows_supplied",
+        "feedback_rows_supplied",
+        "feedback_rows_eligible",
+        "feedback_rows_excluded",
+    )
+    if any(
+        type(payload.get(name)) is not int or payload.get(name) < 0
+        for name in telemetry_names
+    ):
+        return False
+    supplied = payload["feedback_rows_supplied"]
+    eligible = payload["feedback_rows_eligible"]
+    excluded = payload["feedback_rows_excluded"]
+    if supplied != eligible + excluded:
+        return False
+    if payload.get("min_sample_warning") is not (eligible < min_sample):
+        return False
+    if not _valid_exclusion_counts(
+        payload.get("feedback_exclusion_reason_counts"),
+        excluded=excluded,
+    ):
+        return False
+
+    has_adjustment = False
+    for group_name in PRIOR_GROUP_NAMES:
+        group = payload.get(group_name)
+        if not _valid_prior_group(group, min_sample=min_sample, expected_samples=eligible):
+            return False
+        has_adjustment |= any(
+            row["score_adjustment"] != 0
+            for row in group.values()
+        )
+    return payload.get("eligible_for_auto_apply") is has_adjustment
+
+
+def _valid_prior_group(
+    value: Any,
+    *,
+    min_sample: int,
+    expected_samples: int,
+) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    samples_seen = 0
+    for key, row in value.items():
+        if not _safe_group_key(key) or not isinstance(row, Mapping):
+            return False
+        if set(row) != PRIOR_ROW_FIELDS:
+            return False
+        counts = tuple(row.get(name) for name in ("samples", "useful", "junk", "watch"))
+        if any(type(count) is not int or count < 0 for count in counts):
+            return False
+        samples, useful, junk, watch = counts
+        if useful + junk + watch > samples:
+            return False
+        warning = row.get("min_sample_warning")
+        if type(warning) is not bool or warning is not (samples < min_sample):
+            return False
+        median_return = row.get("median_primary_horizon_return")
+        if median_return is not None and _strict_finite_number(median_return) is None:
+            return False
+        adjustment = row.get("score_adjustment")
+        if type(adjustment) is not int:
+            return False
+        expected_adjustment = 0
+        if key != "unknown" and samples >= min_sample:
+            if useful > junk and useful >= 2:
+                expected_adjustment = 3
+            elif junk > useful and junk >= 2:
+                expected_adjustment = -5
+        if adjustment != expected_adjustment:
+            return False
+        samples_seen += samples
+    return samples_seen == expected_samples
+
+
+def _valid_exclusion_counts(value: Any, *, excluded: int) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    total = 0
+    for reason, count in value.items():
+        if (
+            type(reason) is not str
+            or reason not in feedback_eligibility.FEEDBACK_INELIGIBLE_REASONS
+            or type(count) is not int
+            or count < 1
+            or count > excluded
+        ):
+            return False
+        total += count
+    return (total == 0) if excluded == 0 else (total >= excluded)
+
+
+def _valid_timestamp(value: Any) -> datetime | None:
+    if (
+        type(value) is not str
+        or not value
+        or value != value.strip()
+        or unicodedata.normalize("NFC", value) != value
+        or any(unicodedata.category(character).startswith("C") for character in value)
+    ):
+        return None
+    parsed = feedback_eligibility.parse_aware_feedback_time(value)
+    if parsed is None:
+        return None
+    # UTC conversion can raise on platform-edge datetime values.  Keep loading
+    # fail-closed even when a hand-edited artifact contains one.
+    try:
+        parsed.astimezone(timezone.utc)
+    except (OverflowError, OSError, ValueError):
+        return None
+    if parsed.isoformat() != value:
+        return None
+    return parsed
+
+
+def _safe_group_key(value: Any) -> bool:
+    return (
+        type(value) is str
+        and bool(value)
+        and len(value) <= MAX_PRIOR_GROUP_KEY_CHARS
+        and value == value.strip()
+        and unicodedata.normalize("NFC", value) == value
+        and not any(unicodedata.category(character).startswith("C") for character in value)
+    )
+
+
+def _strict_finite_number(value: Any) -> float | None:
+    if type(value) not in (int, float):
+        return None
+    try:
+        number = float(value)
+    except (OverflowError, TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
 
 
 def _float(value: object) -> float | None:

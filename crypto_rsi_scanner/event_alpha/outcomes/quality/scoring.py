@@ -26,19 +26,31 @@ import crypto_rsi_scanner.event_alpha.radar.impact_path_validator as event_impac
 import crypto_rsi_scanner.event_alpha.radar.market_confirmation as event_market_confirmation
 from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
 from ...radar import incidents as event_incident_store
+from .. import feedback_eligibility
 from .models import *  # noqa: F403
 
 def build_tuning_worksheet(
     *,
     alert_rows: Iterable[Mapping[str, Any]] = (),
     feedback_rows: Iterable[Mapping[str, Any]] = (),
+    core_rows: Iterable[Mapping[str, Any]] = (),
     missed_rows: Iterable[Mapping[str, Any]] = (),
     run_rows: Iterable[Mapping[str, Any]] = (),
     priors_shadow_rows: Iterable[Mapping[str, Any]] = (),
+    now: Any = None,
 ) -> EventAlphaTuningWorksheet:
     """Build deterministic threshold/source suggestions without applying them."""
     alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
-    feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    supplied_feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    feedback, excluded_feedback, feedback_reasons = (
+        feedback_eligibility.partition_joined_alert_feedback(
+            supplied_feedback,
+            core_rows,
+            alerts,
+            now=now,
+        )
+    )
+    feedback = list(feedback)
     missed = [dict(row) for row in missed_rows if isinstance(row, Mapping)]
     runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
     suggestions: list[EventAlphaTuningSuggestion] = []
@@ -59,6 +71,9 @@ def build_tuning_worksheet(
         missed_rows=len(missed),
         run_rows=len(runs),
         suggestions=tuple(dict.fromkeys(suggestions)),
+        feedback_rows_supplied=len(supplied_feedback),
+        feedback_rows_excluded=len(excluded_feedback),
+        feedback_exclusion_reason_counts=feedback_reasons,
     )
 def format_tuning_worksheet(worksheet: EventAlphaTuningWorksheet) -> str:
     lines = [
@@ -69,6 +84,12 @@ def format_tuning_worksheet(worksheet: EventAlphaTuningWorksheet) -> str:
             "inputs: "
             f"alerts={worksheet.alert_rows} feedback={worksheet.feedback_rows} "
             f"missed={worksheet.missed_rows} runs={worksheet.run_rows}"
+        ),
+        (
+            "feedback authority: "
+            f"supplied={worksheet.feedback_rows_supplied} "
+            f"eligible={worksheet.feedback_rows} "
+            f"excluded={worksheet.feedback_rows_excluded}"
         ),
         "",
         "suggestions:",
@@ -83,18 +104,13 @@ def _playbook_feedback_suggestions(
     alerts: list[dict[str, Any]],
     feedback: list[dict[str, Any]],
 ) -> tuple[EventAlphaTuningSuggestion, ...]:
-    feedback_by_key = _feedback_labels_by_key(feedback)
     counts: dict[str, dict[str, int]] = {}
-    for row in alerts:
-        key = str(row.get("alert_key") or row.get("key") or "")
-        labels = feedback_by_key.get(key, ())
-        if not labels:
-            continue
+    for row in feedback:
         playbook = str(row.get("playbook_type") or row.get("effective_playbook_type") or "unknown")
         bucket = counts.setdefault(playbook, {"useful": 0, "junk": 0, "watch": 0})
-        for label in labels:
-            if label in bucket:
-                bucket[label] += 1
+        label = str(row.get("feedback_label") or "")
+        if label in bucket:
+            bucket[label] += 1
     out: list[EventAlphaTuningSuggestion] = []
     for playbook, bucket in sorted(counts.items()):
         useful = bucket.get("useful", 0) + bucket.get("watch", 0)
@@ -118,18 +134,13 @@ def _source_feedback_suggestions(
     alerts: list[dict[str, Any]],
     feedback: list[dict[str, Any]],
 ) -> tuple[EventAlphaTuningSuggestion, ...]:
-    feedback_by_key = _feedback_labels_by_key(feedback)
     counts: dict[str, dict[str, int]] = {}
-    for row in alerts:
-        key = str(row.get("alert_key") or row.get("key") or "")
-        labels = feedback_by_key.get(key, ())
-        if not labels:
-            continue
-        source = str(row.get("source") or row.get("source_provider") or "unknown")
+    for row in feedback:
+        source = str(row.get("source_provider") or row.get("source_domain") or "unknown")
         bucket = counts.setdefault(source, {"useful": 0, "junk": 0, "watch": 0})
-        for label in labels:
-            if label in bucket:
-                bucket[label] += 1
+        label = str(row.get("feedback_label") or "")
+        if label in bucket:
+            bucket[label] += 1
     out: list[EventAlphaTuningSuggestion] = []
     for source, bucket in sorted(counts.items()):
         useful = bucket.get("useful", 0) + bucket.get("watch", 0)
@@ -191,15 +202,8 @@ def _priors_suggestions(rows: Iterable[Mapping[str, Any]]) -> tuple[EventAlphaTu
     if changed:
         return (EventAlphaTuningSuggestion(
             area="priors_shadow",
-            recommendation="review priors shadow rows before applying calibration priors",
+            recommendation="review priors shadow rows; runtime prior application remains policy-disabled",
             evidence=f"tier_changes={changed}",
             action_type="prior_review",
         ),)
     return ()
-def _feedback_labels_by_key(feedback: list[dict[str, Any]]) -> dict[str, tuple[str, ...]]:
-    out: dict[str, list[str]] = {}
-    for row in feedback:
-        key = str(row.get("key") or row.get("target") or "")
-        if key:
-            out.setdefault(key, []).append(str(row.get("label") or ""))
-    return {key: tuple(value for value in values if value) for key, values in out.items()}

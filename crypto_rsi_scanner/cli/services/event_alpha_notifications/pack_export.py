@@ -25,7 +25,11 @@ def event_alpha_export_notification_pack(
     runs = event_alpha_notification_runs.load_notification_runs(context.notification_runs_path, limit=200)
     delivery_path = event_alpha_notification_delivery.deliveries_path_for_context(context)
     deliveries = event_alpha_notification_delivery.load_delivery_records(delivery_path)
-    alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=False)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        context.alert_store_path,
+        latest_only=False,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+    )
     provider_rows = event_provider_health.load_provider_health(context.provider_health_path)
     daily_brief = ""
     try:

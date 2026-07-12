@@ -57,20 +57,25 @@ def artifact_doctor(
 
     artifact_namespace = artifact_namespace or context.artifact_namespace
     profile_name = profile_name or (context.profile if context.profile != "default" else None)
-    artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
+    artifacts = _event_alpha_local_artifacts(
+        context=context,
+        run_limit=500,
+        latest_alerts=False,
+    )
     operator_run = report_service._ensure_operator_state_from_latest_run(context, artifacts["runs"].rows)
     operator_revision = report_service._operator_revision_for_run(context, operator_run)
-    cards_dir = Path(config.EVENT_RESEARCH_CARDS_DIR)
+    cards_dir = context.research_cards_dir
     delivery_rows = event_alpha_notification_delivery.load_delivery_records(
         event_alpha_notification_delivery.deliveries_path_for_context(context)
     )
+    evaluation_now = _event_research_now()
     result = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=artifacts["runs"].rows,
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
         hypothesis_rows=artifacts["hypotheses"].rows,
-        core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
+        core_opportunity_rows=artifacts["core_opportunities"].rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
@@ -88,7 +93,20 @@ def artifact_doctor(
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
-        inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
+        artifact_namespace_dir=context.namespace_dir,
+        inspected_alert_store_path=context.alert_store_path,
+        feedback_path=context.feedback_path,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+        outcomes_path=context.outcomes_path,
+        integrated_candidate_path=(
+            context.namespace_dir / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME
+        ),
+        integrated_outcomes_path=(
+            context.namespace_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
+        ),
+        notification_preview_path=(
+            event_alpha_notification_delivery.notification_preview_path_for_context(context)
+        ),
         run_ledger_path=context.run_ledger_path,
         strict=doctor_strict,
         strict_api=strict_api,
@@ -96,6 +114,7 @@ def artifact_doctor(
         include_stale_artifacts=include_stale_artifacts,
         schema_only=schema_only,
         skip_api_checks=skip_api_checks,
+        evaluated_at=evaluation_now,
     )
     exact_revision_recorded = report_service._record_operator_doctor_result(
         context,

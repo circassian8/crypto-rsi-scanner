@@ -15,6 +15,83 @@ globals().update({
 })
 
 
+def _write_exact_reviewed_priors(path, alert):
+    """Write the strict v2 artifact used by positive prior/replay tests."""
+    import crypto_rsi_scanner.event_alpha.outcomes.calibration as calibration
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback_eligibility as firewall
+
+    core_rows = []
+    feedback_rows = []
+    for index in range(2):
+        core_id = f"core-prior-{index}"
+        core_rows.append({
+            "schema_id": "core_opportunity_v1",
+            "schema_version": "event_core_opportunity_store_v1",
+            "row_type": "event_core_opportunity",
+            "run_id": "run-prior-replay",
+            "profile": "fixture",
+            "artifact_namespace": "prior_replay",
+            "core_opportunity_id": core_id,
+            "feedback_target": core_id,
+            "feedback_target_type": "core_opportunity_id",
+            "generated_at": "2026-06-18T00:00:00+00:00",
+            "research_only": True,
+            "symbol": alert.symbol,
+            "coin_id": alert.coin_id,
+            "opportunity_type": "UNCONFIRMED_RESEARCH",
+            "source_provider": alert.discovery_candidate.event.source,
+            "source_provider_domain": "fixture.example",
+            "source_domain": "fixture.example",
+            "source_pack": "fixture-pack",
+            "source_class": "fixture",
+            "lane": "research",
+            "playbook_type": alert.effective_playbook_type,
+            "effective_playbook_type": alert.effective_playbook_type,
+            "impact_path_type": "fixture",
+            "opportunity_level": "watchlist",
+            "final_opportunity_level": "watchlist",
+            "final_route_after_quality_gate": alert.tier.value,
+            "thesis_origin": "catalyst_led",
+            "directional_bias": "long",
+            "catalyst_status": "confirmed",
+            "confidence_band": "exploratory",
+            "timing_state": "early",
+            "tradability_status": "acceptable",
+            "radar_route": "diagnostic",
+            "actionability_score_cohort": "70_79",
+            "anomaly_type": "none",
+        })
+        feedback = {
+            "run_id": "run-prior-replay",
+            "profile": "fixture",
+            "artifact_namespace": "prior_replay",
+            "core_opportunity_id": core_id,
+            "feedback_id": f"feedback-prior-{index}",
+            "feedback_target_type": "core_opportunity_id",
+            "feedback_target": core_id,
+            "target": core_id,
+            "label": "useful",
+            "marked_at": "2026-06-18T01:00:00+00:00",
+            "marked_by": "human-reviewer",
+            "source": "manual_cli",
+            "research_only": True,
+            "notes": "reviewed fixture",
+        }
+        feedback.update(firewall.build_feedback_eligibility_fields(feedback))
+        feedback_rows.append(feedback)
+    payload = calibration.build_calibration_priors(
+        [],
+        feedback_rows=feedback_rows,
+        core_rows=core_rows,
+        generated_at=datetime(2026, 6, 18, 2, 0, tzinfo=timezone.utc),
+        now=datetime(2026, 6, 18, 2, 0, tzinfo=timezone.utc),
+        min_sample=2,
+    )
+    assert payload["eligible_for_auto_apply"] is True
+    path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    return payload
+
+
 def test_event_alpha_feedback_marks_watchlist_rows_and_missed_items():
     import tempfile
     from datetime import datetime, timezone
@@ -97,7 +174,7 @@ def test_event_alpha_feedback_marks_watchlist_rows_and_missed_items():
         assert "missed=1" in report
 
 
-def test_feedback_loader_rejects_explicit_non_research_rows_but_keeps_legacy_rows(tmp_path):
+def test_feedback_loader_keeps_non_research_and_legacy_rows_readable_but_ineligible(tmp_path):
     import crypto_rsi_scanner.event_alpha.outcomes.feedback_labels as event_feedback
 
     base = {
@@ -127,9 +204,12 @@ def test_feedback_loader_rejects_explicit_non_research_rows_but_keeps_legacy_row
 
     loaded = event_feedback.load_feedback(path)
 
-    assert loaded.rows_read == 1
-    assert loaded.records[0].target == "legacy"
-    assert loaded.records[0].research_only is True
+    assert loaded.rows_read == 2
+    by_target = {record.target: record for record in loaded.records}
+    assert by_target["legacy"].research_only is None
+    assert by_target["legacy"].calibration_eligible is None
+    assert by_target["unsafe"].research_only is False
+    assert by_target["unsafe"].calibration_eligible is None
 
 
 def test_event_alpha_missed_calibration_and_research_card_reports():
@@ -326,7 +406,10 @@ def test_event_alpha_missed_calibration_and_research_card_reports():
         feedback_rows=[{"key": entry.key, "label": "useful"}],
         missed_rows=[row.__dict__ for row in [*missed.rows, manual_missing_source, manual_quality_blocked]],
     )
-    assert "feedback by playbook" in calibration
+    assert "feedback_supplied=1" in calibration
+    assert "feedback_eligible=0" in calibration
+    assert "feedback_excluded=1" in calibration
+    assert "legacy_feedback_contract=1" in calibration
     assert "missed opportunities by failure stage" in calibration
     assert "source_not_ingested=1" in calibration
     assert "quality_gate_too_strict=1" in calibration
@@ -803,8 +886,13 @@ def test_event_alpha_calibration_priors_export():
     out = Path(tempfile.mkdtemp()) / "priors.json"
     payload = event_alpha_calibration.write_calibration_priors(out, alerts, feedback_rows=feedback, min_sample=3)
     assert out.exists()
-    assert payload["playbook_priors"]["proxy_attention"]["score_adjustment"] == 3
-    assert payload["playbook_priors"]["proxy_attention"]["min_sample_warning"] is True
+    assert payload["feedback_rows_supplied"] == 2
+    assert payload["feedback_rows_eligible"] == 0
+    assert payload["feedback_rows_excluded"] == 2
+    assert payload["feedback_exclusion_reason_counts"]["legacy_feedback_contract"] == 2
+    assert payload["playbook_priors"] == {}
+    assert payload["eligible_for_auto_apply"] is False
+    assert payload["auto_apply"] is False
 
 
 def test_event_alpha_eval_export_from_feedback_and_missed():
@@ -820,9 +908,13 @@ def test_event_alpha_eval_export_from_feedback_and_missed():
         [{"key": "k1", "label": "junk", "notes": "publisher noise"}],
         out_dir,
     )
-    assert feedback_result.proposed_cases == 1
+    assert feedback_result.proposed_cases == 0
+    assert feedback_result.feedback_rows_supplied == 1
+    assert feedback_result.feedback_rows_eligible == 0
+    assert feedback_result.feedback_rows_excluded == 1
     llm_cases = json.loads((out_dir / "proposed_llm_golden_cases.json").read_text())
-    assert llm_cases["cases"][0]["expected_asset_role"] == "source_noise"
+    assert llm_cases["cases"] == []
+    assert llm_cases["feedback_exclusion_reason_counts"]["legacy_feedback_contract"] == 1
 
     missed_result = event_alpha_eval_export.export_cases_from_missed(
         [{"symbol": "XYZ", "coin_id": "xyz", "name": "XYZ", "move_window": "24h", "return_pct": 1.5, "failure_stage": "resolver_missed_asset", "suggested_queries": ["XYZ catalyst"]}],
@@ -833,7 +925,7 @@ def test_event_alpha_eval_export_from_feedback_and_missed():
     assert extraction["cases"][0]["expected_crypto_asset_mentions"][0]["symbol"] == "XYZ"
 
 
-def test_event_alpha_priors_adjust_research_score_but_not_triggered_fade():
+def test_event_alpha_priors_reject_legacy_multiplier_payload():
     import json
     import tempfile
     from pathlib import Path
@@ -862,11 +954,13 @@ def test_event_alpha_priors_adjust_research_score_but_not_triggered_fade():
     )
     adjusted_triggered = next(alert for alert in adjusted if alert.symbol == triggered.symbol)
     adjusted_other = next(alert for alert in adjusted if alert.symbol == non_triggered.symbol)
+    assert adjusted_triggered == triggered
     assert adjusted_triggered.tier == event_alerts.EventAlertTier.TRIGGERED_FADE
-    assert adjusted_triggered.score_after_priors >= int(triggered.opportunity_score * 0.69)
-    assert adjusted_other.score_before_priors == non_triggered.opportunity_score
-    assert adjusted_other.score_after_priors >= adjusted_other.score_before_priors
-    assert adjusted_other.prior_file == str(path)
+    assert adjusted_triggered.score_after_priors is None
+    assert adjusted_other == non_triggered
+    assert adjusted_other.score_before_priors is None
+    assert adjusted_other.score_after_priors is None
+    assert adjusted_other.prior_file is None
 
 
 def test_event_alpha_priors_shadow_report_and_raw_replay_are_local():
@@ -882,14 +976,18 @@ def test_event_alpha_priors_shadow_report_and_raw_replay_are_local():
 
     result = _full_event_discovery_fixture_result()
     alerts = event_alerts.build_event_alert_candidates(result)
-    non_triggered = next(alert for alert in alerts if alert.tier != event_alerts.EventAlertTier.TRIGGERED_FADE)
+    non_triggered = next(
+        alert
+        for alert in alerts
+        if alert.tier not in {
+            event_alerts.EventAlertTier.TRIGGERED_FADE,
+            event_alerts.EventAlertTier.STORE_ONLY,
+        }
+        and alert.opportunity_score < 95
+    )
     tmp = Path(tempfile.mkdtemp())
     priors_path = tmp / "priors.json"
-    priors_path.write_text(json.dumps({
-        "schema_version": "event_alpha_priors_v1",
-        "generated_at": "2026-06-18T00:00:00+00:00",
-        "playbook_priors": {non_triggered.effective_playbook_type: {"multiplier": 1.2}},
-    }), encoding="utf-8")
+    _write_exact_reviewed_priors(priors_path, non_triggered)
     shadow = event_alpha_priors.compare_priors_shadow(
         alerts,
         cfg=event_alpha_priors.EventAlphaPriorsConfig(enabled=False, path=priors_path),
@@ -938,3 +1036,34 @@ def test_event_alpha_priors_shadow_report_and_raw_replay_are_local():
     assert "candidate diffs:" in comparison_text
     assert "local-only" in comparison_text
     assert "router_threshold_variant" in comparison_text
+
+
+def test_replay_comparison_quarantines_loose_historical_annotations():
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.artifacts.replay as event_alpha_replay
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
+
+    result = _full_event_discovery_fixture_result()
+    _events_path, aliases_path = _event_discovery_fixture_paths()
+    assets = event_discovery.load_discovery_assets(
+        aliases_path,
+        universe_path=_coingecko_universe_fixture_path(),
+    )
+    comparison = event_alpha_replay.compare_replay_policies(
+        raw_events=result.raw_events,
+        assets=assets,
+        policies=("baseline", "router_threshold_variant"),
+        feedback_rows=[{"alert_key": "forged", "label": "useful"}],
+        outcome_rows=[{"watchlist_key": "forged", "primary_horizon_return": 9.0}],
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert event_alpha_replay._feedback_by_key(  # noqa: SLF001
+        [{"alert_key": "forged", "label": "useful"}]
+    ) == {}
+    assert event_alpha_replay._outcome_by_key(  # noqa: SLF001
+        [{"watchlist_key": "forged", "primary_horizon_return": 9.0}]
+    ) == {}
+    assert all(diff.feedback_label is None for diff in comparison.diffs)
+    assert all(diff.primary_return is None for diff in comparison.diffs)
+    assert any("exact canonical Core identity" in warning for warning in comparison.warnings)

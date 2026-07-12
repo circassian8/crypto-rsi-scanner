@@ -349,13 +349,6 @@ def _research_card_path(
     return None
 
 
-def _feedback_matches(row: Mapping[str, Any], identifiers: set[str], feedback_target: str | None) -> bool:
-    explicit_target = str(row.get("target") or "").strip()
-    if explicit_target and (explicit_target == feedback_target or explicit_target in identifiers):
-        return True
-    return _row_matches_identifiers(row, identifiers)
-
-
 def _unique_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[str] = set()

@@ -45,7 +45,7 @@ def validate_artifact_files(paths: Iterable[str | Path]) -> SchemaDoctorResult:
         result = schema_v1.validate_artifact_file(path)
         rows_validated += int(result.get("rows_validated") or 0)
         deprecated += int(result.get("deprecated_field_usage") or 0)
-        if int(result.get("rows_validated") or 0):
+        if int(result.get("rows_validated") or 0) or result.get("errors"):
             files.append(str(path))
         for error in result.get("errors") or ():
             if isinstance(error, dict):

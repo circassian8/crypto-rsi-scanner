@@ -26,13 +26,18 @@ _OUTCOME_PROVENANCE_FAILURE_REASONS = frozenset({
     "invalid_observation_price",
     "missing_observation_price",
     "missing_observation_price_id",
+    "missing_observation_price_observed_at",
     "missing_observation_price_provenance",
     "missing_observation_price_source",
     "missing_outcome_evaluated_at",
     "missing_primary_horizon",
     "missing_primary_horizon_metadata",
+    "observation_price_after_candidate",
+    "observation_price_after_evaluation",
+    "observation_price_stale",
     "primary_horizon_due_in_future",
     "primary_horizon_due_mismatch",
+    "primary_horizon_lane_mismatch",
     "primary_horizon_missing_due_at",
     "primary_horizon_missing_price_observed_at",
     "primary_horizon_missing_provenance",
@@ -54,6 +59,42 @@ _NON_AUTHORITATIVE_OUTCOME_LABELS = frozenset({
     "unknown",
     "unvalidated",
 })
+
+
+def _joined_authority_invalid_identities(
+    outcomes: list[dict[str, Any]],
+    candidates: list[dict[str, Any]],
+    core_rows: Iterable[Mapping[str, Any]] | None,
+    *,
+    evaluated_at: Any,
+) -> set[tuple[str, ...]]:
+    if core_rows is None:
+        return set()
+    _eligible, excluded, _reasons = (
+        outcome_eligibility_contract.partition_joined_calibration_outcomes(
+            outcomes,
+            candidates,
+            core_rows,
+            evaluated_at=evaluated_at,
+        )
+    )
+    authority_reasons = {
+        "ambiguous_outcome_identity",
+        "candidate_authority_contract_invalid",
+        "core_authority_contract_invalid",
+        "core_authority_generated_in_future",
+        "identity_mismatch",
+        "unmatched_outcome_identity",
+    }
+    return {
+        identity
+        for row in excluded
+        if authority_reasons & set(row.get("calibration_ineligible_reasons") or ())
+        and (
+            identity := outcome_eligibility_contract.canonical_join_identity(row)
+        )
+        is not None
+    }
 
 def _integrated_delivery_conflicts(
     rows: Iterable[Mapping[str, Any]],
@@ -132,10 +173,32 @@ def _tuple_value(value: object) -> tuple[object, ...]:
         return tuple(sorted(value, key=str))
     return (value,)
 
+
+def _materialize_outcome_conflict_authority(
+    candidates: Iterable[Mapping[str, Any]],
+    outcomes: Iterable[Mapping[str, Any]],
+    core_rows: Iterable[Mapping[str, Any]] | None,
+    evaluated_at: Any,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], Any, set[tuple[str, ...]]]:
+    outcome_rows = [dict(row) for row in outcomes if isinstance(row, Mapping)]
+    candidate_rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
+    evaluation_clock = (
+        evaluated_at if evaluated_at is not None else datetime.now(timezone.utc)
+    )
+    invalid_identities = _joined_authority_invalid_identities(
+        outcome_rows,
+        candidate_rows,
+        core_rows,
+        evaluated_at=evaluation_clock,
+    )
+    return outcome_rows, candidate_rows, evaluation_clock, invalid_identities
+
+
 def _integrated_outcome_conflicts(
     candidates: Iterable[Mapping[str, Any]],
     outcomes: Iterable[Mapping[str, Any]],
     *,
+    core_rows: Iterable[Mapping[str, Any]] | None = None,
     evaluated_at: Any = None,
 ) -> dict[str, int]:
     out = {
@@ -156,9 +219,11 @@ def _integrated_outcome_conflicts(
         "integrated_outcome_eligible_provenance_missing": 0,
         "integrated_outcome_identity_mismatch": 0,
     }
-    outcome_rows = [dict(row) for row in outcomes if isinstance(row, Mapping)]
-    candidate_rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
-    evaluation_clock = evaluated_at or datetime.now(timezone.utc)
+    outcome_rows, candidate_rows, evaluation_clock, authority_invalid_identities = (
+        _materialize_outcome_conflict_authority(
+            candidates, outcomes, core_rows, evaluated_at
+        )
+    )
     exact_identity_keys: list[str] = []
     candidate_identity_counts: Counter[str] = Counter()
     for candidate in candidate_rows:
@@ -201,6 +266,10 @@ def _integrated_outcome_conflicts(
             out,
             row,
             candidates_by_id,
+            joined_authority_invalid=(
+                outcome_eligibility_contract.canonical_join_identity(row)
+                in authority_invalid_identities
+            ),
             evaluated_at=evaluation_clock,
         )
         for key in ("normal_rsi_signal_written", "triggered_fade_created", "paper_trade_created", "trade_created"):
@@ -282,11 +351,12 @@ def _update_outcome_eligibility_conflicts(
     row: Mapping[str, Any],
     candidates_by_id: Mapping[str, list[dict[str, Any]]],
     *,
+    joined_authority_invalid: bool = False,
     evaluated_at: Any,
 ) -> None:
     has_firewall = outcome_eligibility_contract.has_outcome_eligibility_marker(row)
     contract_errors = outcome_eligibility_contract.validate_contract(row) if has_firewall else ()
-    contract_invalid = bool(contract_errors)
+    contract_invalid = bool(contract_errors) or joined_authority_invalid
     effective_eligible, effective_reasons = (
         outcome_eligibility_contract.effective_calibration_state(
             row,

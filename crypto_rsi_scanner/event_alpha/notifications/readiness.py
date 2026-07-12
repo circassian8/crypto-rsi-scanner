@@ -189,12 +189,10 @@ def _namespace_send_readiness_blockers(
     send_guard_enabled: bool = True,
 ) -> list[str]:
     namespace_dir = None
-    if resolved_preview_path is not None:
-        namespace_dir = resolved_preview_path.expanduser().parent
-    elif preview_path:
+    if preview_path:
         namespace_dir = Path(preview_path).expanduser().parent
-    elif artifact_namespace:
-        namespace_dir = Path("event_fade_cache") / str(artifact_namespace)
+    elif resolved_preview_path is not None:
+        namespace_dir = resolved_preview_path.expanduser().parent
     namespace_status = event_alpha_namespace_status.load_namespace_status(namespace_dir)
     if namespace_status and namespace_dir is not None and namespace_status.namespace != namespace_dir.name:
         return ["artifact namespace marker identity does not match its directory"]
@@ -222,12 +220,10 @@ def _namespace_send_readiness_warnings(
     if send_guard_enabled:
         return []
     namespace_dir = None
-    if resolved_preview_path is not None:
-        namespace_dir = resolved_preview_path.expanduser().parent
-    elif preview_path:
+    if preview_path:
         namespace_dir = Path(preview_path).expanduser().parent
-    elif artifact_namespace:
-        namespace_dir = Path("event_fade_cache") / str(artifact_namespace)
+    elif resolved_preview_path is not None:
+        namespace_dir = resolved_preview_path.expanduser().parent
     namespace_status = event_alpha_namespace_status.load_namespace_status(namespace_dir)
     if (
         namespace_status
@@ -452,9 +448,10 @@ def _resolve_preview_path(
     artifact_namespace: str | None,
 ) -> tuple[Path | None, str]:
     if explicit_path:
-        path = Path(explicit_path).expanduser()
-        if path.exists():
-            return path, "explicit"
+        # A resolved artifact context is the authority even when its preview is
+        # missing. Falling through here can silently adopt a stale same-named
+        # preview from the legacy default artifact base.
+        return Path(explicit_path).expanduser(), "explicit"
     candidates: list[tuple[str, Path, str]] = []
     for row in rows:
         path, source = delivery.resolve_notification_preview_path(

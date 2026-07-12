@@ -9,6 +9,7 @@ from ...outcomes.outcome_eligibility import (
     OUTCOME_ELIGIBILITY_CONTRACT_VERSION,
     OUTCOME_ELIGIBILITY_MARKERS,
     OUTCOME_ELIGIBILITY_REQUIRED_FIELDS,
+    OUTCOME_ENTRY_PRICE_MAX_STALENESS_SECONDS,
     OUTCOME_HORIZONS,
     OUTCOME_HORIZON_METADATA_FIELDS,
     OUTCOME_HORIZON_SECONDS,
@@ -21,6 +22,7 @@ from ...outcomes.outcome_eligibility import (
     canonical_outcome_identity_key,
     effective_calibration_eligible,
     has_outcome_eligibility_marker,
+    primary_horizon_for_lane,
     validate_contract,
 )
 
@@ -65,6 +67,7 @@ def schema_specs(
                 "primary_horizon", "horizon_metadata", "observation_price_provenance_status",
                 "outcome_evaluated_at", "price_at_observation", "primary_horizon_return",
                 "observation_price_source", "observation_price_id",
+                "observation_price_observed_at",
                 *decision_model_fields, *common_safety,
             ),
             types={
@@ -82,6 +85,7 @@ def schema_specs(
                 "price_at_observation": "float",
                 "observation_price_source": "str",
                 "observation_price_id": "str",
+                "observation_price_observed_at": "str",
                 "primary_horizon_return": "float",
             },
             enums={
@@ -92,7 +96,10 @@ def schema_specs(
                 **decision_model_enums,
             },
             safety=common_safety,
-            timestamps=("observed_at", "matured_at", "outcome_evaluated_at"),
+            timestamps=(
+                "observed_at", "matured_at", "outcome_evaluated_at",
+                "observation_price_observed_at",
+            ),
             lineage=common_lineage,
         )
     }
@@ -103,6 +110,7 @@ __all__ = (
     "OUTCOME_ELIGIBILITY_CONTRACT_VERSION",
     "OUTCOME_ELIGIBILITY_MARKERS",
     "OUTCOME_ELIGIBILITY_REQUIRED_FIELDS",
+    "OUTCOME_ENTRY_PRICE_MAX_STALENESS_SECONDS",
     "OUTCOME_EVIDENCE_TELEMETRY_FIELDS",
     "OUTCOME_EVIDENCE_TELEMETRY_TYPES",
     "OUTCOME_HORIZONS",
@@ -117,6 +125,7 @@ __all__ = (
     "canonical_outcome_identity_key",
     "effective_calibration_eligible",
     "has_outcome_eligibility_marker",
+    "primary_horizon_for_lane",
     "schema_specs",
     "validate_contract",
 )

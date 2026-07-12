@@ -567,6 +567,128 @@ def test_event_alpha_send_readiness_resolves_preview_relpath_over_stale_absolute
     assert "notification preview path" not in "\n".join(result.blockers).lower()
 
 
+def test_notification_preview_authority_uses_explicit_context_not_environment(
+    tmp_path,
+    monkeypatch,
+):
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as event_alpha_notification_delivery
+
+    namespace = "context_preview_authority"
+    explicit_base = tmp_path / "explicit_artifact_base"
+    monkeypatch.setenv(
+        "RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        str(tmp_path / "legacy_environment_base"),
+    )
+
+    with_namespace_dir = SimpleNamespace(
+        base_dir=explicit_base,
+        artifact_namespace=namespace,
+        namespace_dir=explicit_base / namespace,
+    )
+    from_base_and_namespace = SimpleNamespace(
+        base_dir=explicit_base,
+        artifact_namespace=namespace,
+    )
+    expected = (
+        explicit_base
+        / namespace
+        / event_alpha_notification_delivery.NOTIFICATION_PREVIEW_FILENAME
+    )
+
+    assert (
+        event_alpha_notification_delivery.notification_preview_path_for_context(
+            with_namespace_dir
+        )
+        == expected
+    )
+    assert (
+        event_alpha_notification_delivery.notification_preview_path_for_context(
+            from_base_and_namespace
+        )
+        == expected
+    )
+
+
+def test_event_alpha_send_readiness_explicit_context_preview_rejects_legacy_same_namespace(
+    tmp_path,
+    monkeypatch,
+):
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.notifications.delivery as event_alpha_notification_delivery
+    import crypto_rsi_scanner.event_alpha.notifications.readiness as event_alpha_send_readiness
+
+    monkeypatch.chdir(tmp_path)
+    namespace = "same_namespace_preview_authority"
+    legacy_preview = (
+        tmp_path
+        / "event_fade_cache"
+        / namespace
+        / "event_alpha_notification_preview.md"
+    )
+    legacy_preview.parent.mkdir(parents=True)
+    legacy_preview.write_text("# stale legacy preview\n", encoding="utf-8")
+    context_preview = (
+        tmp_path
+        / "explicit_artifact_base"
+        / namespace
+        / "event_alpha_notification_preview.md"
+    )
+    context_preview.parent.mkdir(parents=True)
+
+    delivery_row = event_alpha_notification_delivery.build_record(
+        run_id="run-context-preview",
+        alert_id="heartbeat",
+        profile="notify_llm_deep",
+        namespace=namespace,
+        lane="health_heartbeat",
+        route="HEALTH_HEARTBEAT",
+        content_hash="hash-context-preview",
+        state=event_alpha_notification_delivery.STATE_BLOCKED,
+        now=datetime(2026, 7, 12, 4, 30, tzinfo=timezone.utc),
+        error_class="guard_blocked",
+        error_message="event alerts disabled",
+        notification_preview_path=str(legacy_preview),
+        notification_preview_relpath=legacy_preview.relative_to(tmp_path).as_posix(),
+    ).to_row()
+    delivery_row["run_mode"] = "notification_burn_in"
+    doctor = event_alpha_artifact_doctor.EventAlphaArtifactDoctorResult(
+        status="OK",
+        profile="notify_llm_deep",
+        artifact_namespace=namespace,
+        run_rows=1,
+        alert_rows=0,
+        feedback_rows=0,
+        outcome_rows=0,
+        card_files=0,
+    )
+    result = event_alpha_send_readiness.build_send_readiness(
+        profile="notify_llm_deep",
+        artifact_namespace=namespace,
+        run_rows=[{
+            "row_type": "event_alpha_run",
+            "run_id": "run-context-preview",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": namespace,
+            "started_at": "2026-07-12T04:30:00+00:00",
+            "cycle_completed": True,
+            "success": True,
+        }],
+        core_opportunity_rows=[],
+        alert_rows=[],
+        delivery_rows=[delivery_row],
+        artifact_doctor=doctor,
+        send_guard_enabled=False,
+        telegram_ready=False,
+        preview_path=context_preview,
+    )
+
+    assert result.preview_path == str(context_preview)
+    assert result.preview_path_source == "explicit"
+    assert "notification preview path does not exist" in result.blockers
+    assert str(legacy_preview) != result.preview_path
+
+
 def test_event_alpha_send_readiness_accepts_clean_no_send_rehearsal():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor

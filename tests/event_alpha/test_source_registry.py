@@ -32,8 +32,12 @@ def test_event_source_reliability_report_recommendations():
     ]
     missed = [{"failure_stage": "no_source_event"}, {"failure_stage": "no_source_event"}]
     report = event_source_reliability.format_source_reliability_report(alerts, feedback_rows=feedback, missed_rows=missed)
-    assert "positive prior for rss" in report
-    assert "tighten or demote bad" in report
+    assert "feedback_supplied=4" in report
+    assert "feedback_eligible=0" in report
+    assert "feedback_excluded=4" in report
+    assert "legacy_feedback_contract=4" in report
+    assert "positive prior for rss" not in report
+    assert "tighten or demote bad" not in report
     assert "coverage warning" in report
 
 

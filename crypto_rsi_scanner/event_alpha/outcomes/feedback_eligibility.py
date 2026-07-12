@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
@@ -53,7 +54,36 @@ FEEDBACK_ELIGIBILITY_REQUIRED_FIELDS = tuple(
 MANUAL_MATCHED_FEEDBACK_SOURCE = "manual_cli"
 FEEDBACK_TARGET_TYPE = "core_opportunity_id"
 CORE_OPPORTUNITY_ROW_TYPE = "event_core_opportunity"
+ALERT_AUTHORITY_ROW_TYPE = "event_alpha_alert_snapshot"
+ALERT_AUTHORITY_SCHEMA_VERSION = "event_alpha_alert_snapshot_v1"
+ALERT_AUTHORITY_ID_FIELDS = ("snapshot_id", "alert_id", "alert_key")
 MAX_FEEDBACK_NOTES_CHARS = 4_096
+_FEEDBACK_SECRET_ASSIGNMENT_RE = re.compile(
+    r"(?i)\b(?:api[_ -]?key|api[_ -]?secret|auth[_ -]?token|api[_ -]?token|"
+    r"telegram[_ -]?(?:bot[_ -]?)?token|provider[_ -]?token|authorization|password)\b"
+    r"\s*[:=]\s*['\"]?(?P<value>[^\s,'\"}]+)"
+)
+_FEEDBACK_SECRET_VALUE_RE = re.compile(
+    r"(?i)(?:\bbearer\s+[a-z0-9._-]{12,}\b|\bsk-(?:proj-)?[a-z0-9_-]{12,}\b|"
+    r"\b(?:ghp|gho|ghu|github_pat|xoxb|xoxp)_[a-z0-9_]{16,}\b|"
+    r"\b\d{6,12}:[a-z0-9_-]{20,}\b)"
+)
+_SAFE_FEEDBACK_SECRET_VALUES = frozenset(
+    {
+        "",
+        "0",
+        "***",
+        "<redacted>",
+        "[redacted]",
+        "false",
+        "missing",
+        "missing_api_key",
+        "no",
+        "none",
+        "not_configured",
+        "redacted",
+    }
+)
 VALID_FEEDBACK_LABELS = frozenset(
     {
         "useful",
@@ -75,12 +105,14 @@ VALID_FEEDBACK_LABELS = frozenset(
 FEEDBACK_INELIGIBLE_REASONS = frozenset(
     {
         "ambiguous_core_authority",
+        "ambiguous_alert_authority",
         "ambiguous_feedback_history",
         "ambiguous_feedback_timestamp",
         "core_authority_generated_in_future",
         "core_authority_identity_mismatch",
         "core_authority_safety_contract_invalid",
         "duplicate_core_authority",
+        "duplicate_alert_authority",
         "duplicate_feedback_id",
         "duplicate_feedback_row",
         "feedback_before_core_generation",
@@ -94,12 +126,15 @@ FEEDBACK_INELIGIBLE_REASONS = frozenset(
         "invalid_calibration_eligible_flag",
         "invalid_calibration_ineligible_reasons",
         "invalid_feedback_contract_version",
+        "invalid_feedback_projection",
         "invalid_feedback_label",
         "invalid_feedback_marked_at",
         "invalid_feedback_notes",
         "invalid_feedback_source",
         "invalid_feedback_target_type",
         "legacy_feedback_contract",
+        "invalid_alert_authority_contract",
+        "missing_alert_authority",
         "missing_core_authority",
         "missing_exact_feedback_identity",
         "missing_feedback_id",
@@ -121,6 +156,15 @@ CORE_CALIBRATION_ATTRIBUTION_FIELDS = (
     "source_domain",
     "source_pack",
     "source_class",
+    "candidate_role",
+    "incident_id",
+    "evidence_specificity",
+    "market_confirmation_level",
+    "market_context_freshness_status",
+    "catalyst_frame_status",
+    "main_frame_type",
+    "llm_asset_role",
+    "tier",
     "lane",
     "playbook_type",
     "effective_playbook_type",
@@ -173,6 +217,12 @@ def has_feedback_eligibility_marker(row: Mapping[str, Any]) -> bool:
     """Return whether any v1 contract marker is present."""
 
     return any(field in row for field in FEEDBACK_ELIGIBILITY_MARKERS)
+
+
+def feedback_notes_are_safe(value: Any) -> bool:
+    """Return whether optional notes are bounded text without secret values."""
+
+    return _safe_feedback_notes(value)
 
 
 def canonical_feedback_identity(row: Mapping[str, Any]) -> dict[str, str]:
@@ -419,6 +469,108 @@ def partition_joined_calibration_feedback(
         added_reasons,
         matched_core_by_index=matched_core_by_index,
     )
+
+
+def partition_joined_alert_feedback(
+    feedback_rows: Iterable[Mapping[str, Any]],
+    core_rows: Iterable[Mapping[str, Any]],
+    alert_rows: Iterable[Mapping[str, Any]],
+    *,
+    now: Any = None,
+) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...], dict[str, int]]:
+    """Partition feedback through both exact Core and alert authority.
+
+    Core authority proves who owns the human attribution.  Alert authority
+    separately proves that exactly one canonical alert projection may consume
+    it.  This second join prevents a single exact label from being copied onto
+    duplicate alert rows by eval, quality, or policy consumers.
+    """
+
+    core_eligible, core_excluded, core_reason_counts = (
+        partition_joined_calibration_feedback(feedback_rows, core_rows, now=now)
+    )
+    alert_eligible, alert_excluded, alert_reason_counts = (
+        partition_alert_authorized_feedback(core_eligible, alert_rows)
+    )
+    excluded = sorted(
+        (*core_excluded, *alert_excluded),
+        key=_stable_row_json,
+    )
+    reason_counts: Counter[str] = Counter(core_reason_counts)
+    reason_counts.update(alert_reason_counts)
+    return (
+        tuple(alert_eligible),
+        tuple(excluded),
+        dict(sorted(reason_counts.items())),
+    )
+
+
+def partition_alert_authorized_feedback(
+    feedback_rows: Iterable[Mapping[str, Any]],
+    alert_rows: Iterable[Mapping[str, Any]],
+) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...], dict[str, int]]:
+    """Require one unique canonical alert for each Core-authorized projection."""
+
+    feedback = sorted(
+        (dict(row) for row in feedback_rows if isinstance(row, Mapping)),
+        key=_stable_row_json,
+    )
+    alerts = sorted(
+        (dict(row) for row in alert_rows if isinstance(row, Mapping)),
+        key=_stable_row_json,
+    )
+    alerts_by_identity: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    alert_authority_key_counts: Counter[str] = Counter()
+    for alert in alerts:
+        identity = canonical_feedback_join_identity(alert)
+        if identity is not None:
+            alerts_by_identity.setdefault(identity, []).append(alert)
+        authority_key = _alert_authority_key(alert)
+        if authority_key is not None:
+            alert_authority_key_counts[authority_key] += 1
+
+    eligible: list[dict[str, Any]] = []
+    excluded: list[dict[str, Any]] = []
+    reason_counts: Counter[str] = Counter()
+    for projection in feedback:
+        reasons: set[str] = set()
+        identity = canonical_feedback_join_identity(projection)
+        if not _valid_joined_feedback_projection(projection):
+            reasons.add("invalid_feedback_projection")
+        matches = alerts_by_identity.get(identity, ()) if identity is not None else ()
+        if len(matches) > 1:
+            reasons.add("duplicate_alert_authority")
+        elif len(matches) == 1:
+            alert = matches[0]
+            if _alert_authority_ineligibility_reasons(alert):
+                reasons.add("invalid_alert_authority_contract")
+            authority_key = _alert_authority_key(alert)
+            if authority_key is not None and alert_authority_key_counts[authority_key] > 1:
+                reasons.add("ambiguous_alert_authority")
+            if identity is not None and any(
+                _alert_identity_overlaps(other, identity)
+                and canonical_feedback_join_identity(other) != identity
+                for other in alerts
+            ):
+                reasons.add("ambiguous_alert_authority")
+        elif identity is not None and any(
+            _alert_identity_overlaps(alert, identity) for alert in alerts
+        ):
+            reasons.add("ambiguous_alert_authority")
+        else:
+            reasons.add("missing_alert_authority")
+
+        if not reasons:
+            eligible.append(copy.deepcopy(projection))
+            continue
+        materialized = copy.deepcopy(projection)
+        materialized["calibration_eligible"] = False
+        materialized["calibration_ineligible_reasons"] = sorted(reasons)
+        excluded.append(materialized)
+        reason_counts.update(reasons)
+    eligible.sort(key=_stable_row_json)
+    excluded.sort(key=_stable_row_json)
+    return tuple(eligible), tuple(excluded), dict(sorted(reason_counts.items()))
 
 
 def _collect_feedback_history_reasons(
@@ -696,7 +848,15 @@ def _safe_feedback_notes(value: Any) -> bool:
         return False
     if unicodedata.normalize("NFC", value) != value:
         return False
-    return not _has_unsafe_unicode(value, allowed_controls="\t\n\r")
+    if _has_unsafe_unicode(value, allowed_controls="\t\n\r"):
+        return False
+    if _FEEDBACK_SECRET_VALUE_RE.search(value):
+        return False
+    return all(
+        match.group("value").strip("'\".,;)").casefold()
+        in _SAFE_FEEDBACK_SECRET_VALUES
+        for match in _FEEDBACK_SECRET_ASSIGNMENT_RE.finditer(value)
+    )
 
 
 def _has_unsafe_unicode(value: str, *, allowed_controls: str = "") -> bool:
@@ -813,6 +973,103 @@ def _core_attribution_contract_valid(row: Mapping[str, Any]) -> bool:
         if unicodedata.normalize("NFC", value) != value or _has_unsafe_unicode(value):
             return False
     return True
+
+
+def _valid_joined_feedback_projection(row: Mapping[str, Any]) -> bool:
+    identity = canonical_feedback_identity(row)
+    return (
+        row.get("feedback_eligibility_contract_version")
+        == FEEDBACK_ELIGIBILITY_CONTRACT_VERSION
+        and canonical_feedback_join_identity(row) is not None
+        and row.get("feedback_identity") == identity
+        and row.get("feedback_identity_key")
+        == canonical_feedback_identity_key(identity)
+        and row.get("feedback_target_type") == FEEDBACK_TARGET_TYPE
+        and row.get("feedback_target") == identity["core_opportunity_id"]
+        and row.get("target") == identity["core_opportunity_id"]
+        and row.get("feedback_label") in VALID_FEEDBACK_LABELS
+        and _canonical_text(row.get("feedback_id")) is not None
+        and parse_aware_feedback_time(row.get("feedback_marked_at")) is not None
+        and _canonical_text(row.get("feedback_marked_by")) is not None
+        and row.get("feedback_source") == MANUAL_MATCHED_FEEDBACK_SOURCE
+        and _safe_feedback_notes(row.get("feedback_notes"))
+        and row.get("research_only") is True
+        and row.get("calibration_eligible") is True
+        and row.get("calibration_ineligible_reasons") == []
+        and isinstance(row.get("core_attribution"), Mapping)
+    )
+
+
+def _alert_authority_ineligibility_reasons(
+    row: Mapping[str, Any],
+) -> tuple[str, ...]:
+    reasons: set[str] = set()
+    identity = canonical_feedback_identity(row)
+    if (
+        row.get("row_type") != ALERT_AUTHORITY_ROW_TYPE
+        or canonical_feedback_join_identity(row) is None
+        or row.get("feedback_target_type") != FEEDBACK_TARGET_TYPE
+        or row.get("feedback_target") != identity["core_opportunity_id"]
+    ):
+        reasons.add("invalid_alert_authority_contract")
+    if "schema_version" in row and row.get("schema_version") != ALERT_AUTHORITY_SCHEMA_VERSION:
+        reasons.add("invalid_alert_authority_contract")
+    if "research_only" in row and row.get("research_only") is not True:
+        reasons.add("invalid_alert_authority_contract")
+    identifiers = [
+        row.get(field)
+        for field in ALERT_AUTHORITY_ID_FIELDS
+        if row.get(field) not in (None, "")
+    ]
+    if not identifiers or any(_canonical_text(value) is None for value in identifiers):
+        reasons.add("invalid_alert_authority_contract")
+    if (
+        row.get("is_diagnostic_snapshot") is True
+        or row.get("snapshot_class")
+        in {
+            "diagnostic_support_snapshot",
+            "legacy_snapshot",
+            "external_snapshot",
+            "orphan_snapshot",
+        }
+        or row.get("feedback_target_type")
+        in {
+            "diagnostic_row_id",
+            "diagnostic_support_for_core_opportunity_id",
+        }
+    ):
+        reasons.add("invalid_alert_authority_contract")
+    for field in (
+        "normal_rsi_signal_written",
+        "paper_trade_created",
+        "trade_created",
+        "triggered_fade_created",
+    ):
+        if field in row and row.get(field) is not False:
+            reasons.add("invalid_alert_authority_contract")
+    return tuple(sorted(reasons))
+
+
+def _alert_authority_key(row: Mapping[str, Any]) -> str | None:
+    for field in ALERT_AUTHORITY_ID_FIELDS:
+        value = _canonical_text(row.get(field))
+        if value is not None:
+            return f"{field}:{value}"
+    return None
+
+
+def _alert_identity_overlaps(
+    alert: Mapping[str, Any],
+    identity: tuple[str, ...],
+) -> bool:
+    values = {
+        field: _loose_identity_text(alert.get(field))
+        for field in FEEDBACK_IDENTITY_FIELDS
+    }
+    if values["core_opportunity_id"] != identity[-1]:
+        return False
+    expected = dict(zip(FEEDBACK_IDENTITY_FIELDS, identity, strict=True))
+    return all(value is None or value == expected[field] for field, value in values.items())
 
 
 def _loose_identity_text(value: Any) -> str | None:

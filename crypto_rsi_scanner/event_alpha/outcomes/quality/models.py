@@ -77,6 +77,10 @@ class EventAlphaSignalQualityExportResult:
     path: Path
     cases_written: int
     reasons: tuple[str, ...]
+    feedback_rows_supplied: int = 0
+    feedback_rows_eligible: int = 0
+    feedback_rows_excluded: int = 0
+    feedback_exclusion_reason_counts: dict[str, int] | None = None
 @dataclass(frozen=True)
 class EventAlphaTuningSuggestion:
     area: str
@@ -90,3 +94,6 @@ class EventAlphaTuningWorksheet:
     missed_rows: int
     run_rows: int
     suggestions: tuple[EventAlphaTuningSuggestion, ...]
+    feedback_rows_supplied: int = 0
+    feedback_rows_excluded: int = 0
+    feedback_exclusion_reason_counts: dict[str, int] | None = None

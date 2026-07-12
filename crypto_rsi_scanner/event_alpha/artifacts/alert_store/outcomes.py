@@ -171,33 +171,111 @@ def _mfe_mae_by_playbook(rows: Iterable[Mapping[str, Any]]) -> str:
         avg_mae = sum(item[1] for item in values) / len(values)
         parts.append(f"{playbook}: MFE={avg_mfe * 100:+.1f}% MAE={avg_mae * 100:+.1f}% n={len(values)}")
     return "MFE/MAE by playbook: " + "; ".join(parts)
-def _feedback_by_key(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
-    out: dict[str, str] = {}
+_SNAPSHOT_OUTCOME_ALIAS_FIELDS = (
+    "primary_horizon_return",
+    "return_15m",
+    "return_1h",
+    "return_4h",
+    "return_24h",
+    "return_72h",
+    "return_3d",
+    "return_7d",
+    "return_by_horizon",
+    "horizons",
+    "max_favorable_excursion",
+    "max_adverse_excursion",
+    "mfe_mae_ratio",
+    "direction_hit",
+    "volatility_hit",
+    "up_then_fade_hit",
+)
+
+
+def _feedback_by_identity(
+    rows: Iterable[Mapping[str, Any]],
+) -> dict[tuple[str, ...], Mapping[str, Any]]:
+    from ...outcomes import feedback_eligibility
+
+    out: dict[tuple[str, ...], Mapping[str, Any]] = {}
     for row in rows:
-        label = str(row.get("label") or "")
-        if not label:
+        if not isinstance(row, Mapping):
             continue
-        for field in ("key", "target", "alert_id", "event_id", "coin_id", "symbol", "card_id"):
-            key = str(row.get(field) or "").strip()
-            if not key:
-                continue
-            out[key] = label
-            if key.startswith("ea:"):
-                out[key[3:]] = label
-            else:
-                out[f"ea:{key}"] = label
+        identity = feedback_eligibility.canonical_feedback_join_identity(row)
+        if identity is not None and row.get("calibration_eligible") is True:
+            out[identity] = row
     return out
-def _with_feedback(row: Mapping[str, Any], feedback_by_key: Mapping[str, str]) -> dict[str, Any]:
+
+
+def _with_feedback(
+    row: Mapping[str, Any],
+    feedback_by_identity: Mapping[tuple[str, ...], Mapping[str, Any]],
+) -> dict[str, Any]:
+    from ...outcomes import feedback_eligibility
+
     out = dict(row)
-    label = (
-        feedback_by_key.get(str(row.get("alert_id") or ""))
-        or feedback_by_key.get(str(row.get("alert_key") or ""))
-        or feedback_by_key.get(str(row.get("event_id") or ""))
-        or out.get("feedback_label")
+    identity = feedback_eligibility.canonical_feedback_join_identity(out)
+    feedback = (
+        feedback_by_identity.get(identity)
+        if identity is not None
+        else None
     )
+    label = (feedback or {}).get("feedback_label")
     out["feedback_label"] = label
-    out["feedback_status"] = "reviewed" if label else out.get("feedback_status") or "pending"
+    out["feedback_status"] = "reviewed" if label else "pending"
     return out
+
+
+def _has_feedback_alias(row: Mapping[str, Any]) -> bool:
+    return bool(
+        row.get("feedback_label") not in (None, "")
+        or str(row.get("feedback_status") or "").strip().casefold()
+        not in {"", "pending", "unknown"}
+    )
+
+
+def _has_outcome_alias(row: Mapping[str, Any]) -> bool:
+    return any(row.get(field) not in (None, "", (), [], {}) for field in _SNAPSHOT_OUTCOME_ALIAS_FIELDS)
+
+
+def _without_feedback_aliases(row: Mapping[str, Any]) -> dict[str, Any]:
+    from ...outcomes import outcome_eligibility
+
+    out = dict(row)
+    for field in (
+        "feedback",
+        "feedback_label",
+        "feedback_status",
+        "label",
+        "marked_at",
+        "marked_by",
+        "notes",
+        "outcome_label",
+        "validation_label",
+        "volatility_hit",
+        "up_then_fade_hit",
+        "mfe_mae_ratio",
+        "max_favorable_excursion",
+        "max_adverse_excursion",
+    ):
+        out.pop(field, None)
+    validation_status = outcome_eligibility.deterministic_validation_status(out)
+    out["validation_status"] = validation_status
+    out["direction_hit"] = (
+        True
+        if validation_status == "validated"
+        else False
+        if validation_status == "invalidated/noise"
+        else None
+    )
+    return out
+
+
+def _format_reason_counts(counts: Mapping[str, int]) -> str:
+    if not counts:
+        return "none"
+    return ", ".join(
+        f"{reason}={count}" for reason, count in sorted(counts.items())
+    )
 def _market_anomaly_bucket(score: object) -> str:
     value = _num(score) or 0.0
     if value >= 80:

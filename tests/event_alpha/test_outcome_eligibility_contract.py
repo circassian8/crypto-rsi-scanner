@@ -73,7 +73,7 @@ def _outcome(
     core_opportunity_id: str = "core-observed",
     observed_at: datetime | None = None,
     evaluated_at: datetime | None = None,
-    primary_horizon: str = "1h",
+    primary_horizon: str = "3d",
 ) -> dict[str, object]:
     observed = observed_at or datetime(2026, 6, 1, tzinfo=timezone.utc)
     evaluated = evaluated_at or observed + timedelta(days=8, hours=1)
@@ -108,6 +108,7 @@ def _outcome(
         "price_at_observation": 100.0,
         "observation_price_source": "fixture_ohlcv",
         "observation_price_id": f"fixture:entry:{candidate_id}:{_iso(observed)}",
+        "observation_price_observed_at": _iso(observed),
         "primary_horizon": primary_horizon,
         "primary_horizon_return": returns[primary_horizon],
         "return_by_horizon": returns,
@@ -191,6 +192,7 @@ def test_outcome_schema_is_legacy_readable_and_uses_one_canonical_contract():
     assert schema_contract.validate_contract is contract.validate_contract
     assert schema_contract.OUTCOME_INELIGIBLE_REASONS is contract.OUTCOME_INELIGIBLE_REASONS
     assert schema_contract.OUTCOME_HORIZON_SECONDS is contract.OUTCOME_HORIZON_SECONDS
+    assert contract.primary_horizon_for_lane(row["opportunity_type"]) == row["primary_horizon"]
 
     partial = {**legacy, "calibration_eligible": False}
     errors = schema_v1.validate_row_against_schema(partial, "outcome_row_v1")
@@ -254,6 +256,12 @@ def test_outcome_contract_rejects_concealed_reasons_and_adversarial_time_evidenc
     concealed["calibration_ineligible_reasons"] = ["synthetic_fixture"]
     assert "outcome_eligibility_reasons_mismatch" in contract.validate_contract(concealed)
 
+    wrong_lane_horizon = _outcome(primary_horizon="24h")
+    assert "primary_horizon_lane_mismatch" in (
+        contract.calibration_ineligibility_reasons(wrong_lane_horizon)
+    )
+    assert contract.effective_calibration_eligible(wrong_lane_horizon) is False
+
     due_mismatch = _outcome(primary_horizon="15m")
     due_mismatch["horizon_metadata"]["15m"]["due_at"] = _iso(
         datetime(2026, 6, 1, tzinfo=timezone.utc) + timedelta(minutes=16)
@@ -311,7 +319,7 @@ def test_outcome_contract_rejects_concealed_reasons_and_adversarial_time_evidenc
     )
 
     return_mismatch = _outcome()
-    return_mismatch["return_by_horizon"]["1h"] = 0.5
+    return_mismatch["return_by_horizon"]["3d"] = 0.5
     assert "primary_horizon_return_mismatch" in contract.calibration_ineligibility_reasons(
         return_mismatch
     )
@@ -497,12 +505,26 @@ def test_exact_identity_distinguishes_runs_and_registered_doctor_counter_blocks_
     ]
 
 
+def test_missing_outcomes_are_visible_but_do_not_block_fresh_strict_radar_smoke():
+    blockers: list[str] = []
+    warnings: list[str] = []
+    apply_integrated_artifact_checks(
+        SimpleNamespace(
+            strict=True,
+            integrated_conflicts={"integrated_outcome_missing_for_candidate": 9},
+        ),
+        blockers,
+        warnings,
+    )
+    assert blockers == []
+    assert warnings == ["integrated_outcome_missing_for_candidate=9"]
+
+
 def test_calibration_priors_attribute_lane_from_exact_candidate_core_authority():
     outcome = _outcome()
     candidate = _candidate(outcome)
     core = _core(outcome)
     outcome["opportunity_type"] = "RISK_ONLY"
-    _seal(outcome)
 
     payload = integrated_radar_outcomes.build_integrated_radar_calibration_priors(
         [outcome],

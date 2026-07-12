@@ -327,7 +327,11 @@ def event_opportunity_audit_report(
     )
     core_store = event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True)
     watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
-    alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=True)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        context.alert_store_path,
+        latest_only=True,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+    )
     incidents = event_incident_store.load_incidents(context.incident_store_path, limit=500, include_api=True)
     feedback = event_feedback.load_feedback(context.feedback_path)
     routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
@@ -356,7 +360,11 @@ def _event_alpha_quality_artifacts(
         include_api=True,
     )
     watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
-    alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=True)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        context.alert_store_path,
+        latest_only=True,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+    )
     core_opportunities = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
         latest_run=True,
@@ -517,7 +525,9 @@ def event_alpha_policy_simulate_report(
         rows,
         profile=context.profile,
         feedback_rows=artifacts["feedback_rows"],
+        core_rows=artifacts["core_opportunities"].rows,
         missed_rows=artifacts["missed_rows"],
+        now=_event_research_now(),
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_policy_simulator.format_policy_simulation(result))
@@ -542,8 +552,10 @@ def event_alpha_export_signal_quality_cases(
         target,
         alert_rows=[*artifacts["alerts"].rows, *artifacts["core_opportunities"].rows],
         feedback_rows=artifacts["feedback_rows"],
+        core_rows=artifacts["core_opportunities"].rows,
         missed_rows=artifacts["missed_rows"],
         hypothesis_rows=artifacts["hypotheses"].rows,
+        now=_event_research_now(),
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_signal_quality_export.format_signal_quality_export_result(result))
@@ -570,34 +582,46 @@ def event_feedback_mark(
     if not label:
         print(f"Event feedback mark failed: --event-feedback-label is required ({', '.join(event_feedback.valid_labels())})")
         return
-    if profile_name or artifact_namespace:
-        try:
-            context = resolve_event_alpha_artifact_context_for_report(profile_name, artifact_namespace)
-        except ValueError as exc:
-            print(f"Event feedback mark failed: {exc}")
-            return
-    else:
-        context = None
-    watch_cfg = _event_watchlist_config_from_runtime()
-    watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
-    feedback_cfg = _event_feedback_config_from_runtime(path)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name,
+            artifact_namespace,
+        )
+    except ValueError as exc:
+        print(f"Event feedback mark failed: {exc}")
+        return
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
+    feedback_cfg = event_feedback.EventFeedbackConfig(
+        path=_event_alpha_report_path(path, context.feedback_path)
+    )
     context_rows: list[dict[str, Any]] = []
+    core_rows: list[dict[str, Any]] = []
     card_paths: tuple[Path, ...] = ()
-    if context is not None:
-        try:
-            alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path).rows
-            cores = event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows
-            hypotheses = event_impact_hypothesis_store.load_impact_hypotheses(
-                context.impact_hypothesis_store_path,
-                limit=500,
-                latest_run=True,
-                include_api=True,
-            ).rows
-            context_rows = [*alerts, *cores, *hypotheses]
-            card_paths = tuple(path for path in Path(context.research_cards_dir).glob("*.md") if path.name != "index.md")
-        except Exception as exc:  # noqa: BLE001 - feedback marking should still allow manual unmatched rows.
-            if verbose:
-                print(f"Event feedback context warning: {exc}")
+    try:
+        alerts = event_alpha_alert_store.load_alert_snapshots(
+            context.alert_store_path,
+            core_opportunity_store_path=context.core_opportunity_store_path,
+        ).rows
+        cores = event_core_opportunity_store.load_core_opportunities(
+            context.core_opportunity_store_path,
+            latest_run=True,
+        ).rows
+        hypotheses = event_impact_hypothesis_store.load_impact_hypotheses(
+            context.impact_hypothesis_store_path,
+            limit=500,
+            latest_run=True,
+            include_api=True,
+        ).rows
+        context_rows = [*alerts, *cores, *hypotheses]
+        core_rows = [dict(row) for row in cores]
+        card_paths = tuple(
+            candidate
+            for candidate in Path(context.research_cards_dir).glob("*.md")
+            if candidate.name != "index.md"
+        )
+    except Exception as exc:  # noqa: BLE001 - unmatched feedback remains readable and ineligible.
+        if verbose:
+            print(f"Event feedback context warning: {exc}")
     try:
         record = event_feedback.mark_feedback(
             target,
@@ -608,6 +632,7 @@ def event_feedback_mark(
             notes=notes,
             allow_unmatched=allow_unmatched,
             context_rows=context_rows,
+            core_opportunity_rows=core_rows,
             card_paths=card_paths,
         )
     except ValueError as exc:
@@ -683,8 +708,43 @@ def event_alpha_alerts_report(
     )
     feedback = event_feedback.load_feedback(feedback_cfg.path)
     feedback_rows = [record.__dict__ for record in feedback.records]
+    evaluation_now = _event_research_now()
+    candidate_rows, core_rows, outcome_rows = _event_alpha_exact_outcome_authority(
+        context
+    )
     print(_event_alpha_context_block(context))
-    print(event_alpha_alert_store.format_alert_snapshot_report(result, feedback_rows=feedback_rows))
+    print(event_alpha_alert_store.format_alert_snapshot_report(
+        result,
+        feedback_rows=feedback_rows,
+        core_rows=core_rows,
+        candidate_rows=candidate_rows,
+        outcome_rows=outcome_rows,
+        evaluated_at=evaluation_now,
+    ))
+
+
+def _event_alpha_exact_outcome_authority(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Load both outcome families and their exact candidate/Core authority."""
+
+    candidates = list(
+        event_integrated_radar.load_integrated_candidates(context.namespace_dir)
+    )
+    cores = list(
+        event_core_opportunity_store.load_core_opportunities(
+            context.core_opportunity_store_path,
+            latest_run=False,
+            include_api=True,
+        ).rows
+    )
+    outcomes = [
+        *event_integrated_radar_outcomes.load_integrated_radar_outcomes(
+            context.namespace_dir
+        ),
+        *event_alpha_outcome_artifact_io.read_jsonl(context.outcomes_path),
+    ]
+    return candidates, cores, outcomes
 
 def event_alpha_notification_inbox_report(
     verbose: bool = False,
@@ -706,7 +766,10 @@ def event_alpha_notification_inbox_report(
         context.notification_runs_path,
         limit=250,
     )
-    alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        context.alert_store_path,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+    )
     core_opportunities = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
         latest_run=True,
@@ -731,6 +794,7 @@ def event_alpha_notification_inbox_report(
         alert_store_path=context.alert_store_path,
         feedback_path=context.feedback_path,
         outcomes_path=context.outcomes_path,
+        now=_event_research_now(),
         include_diagnostics=include_diagnostics,
     )
     print(event_alpha_notification_inbox.format_notification_inbox(result, burn_in_review=burn_in_review))
@@ -753,7 +817,10 @@ def event_alpha_feedback_readiness_report(
         context.notification_runs_path,
         limit=250,
     )
-    alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        context.alert_store_path,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+    )
     core_opportunities = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
         latest_run=True,
@@ -764,6 +831,7 @@ def event_alpha_feedback_readiness_report(
         event_alpha_notification_delivery.deliveries_path_for_context(context)
     )
     watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
+    evaluation_now = _event_research_now()
     inbox = event_alpha_notification_inbox.build_notification_inbox(
         notification_runs=notification_runs.rows,
         alert_rows=alerts.rows,
@@ -778,6 +846,7 @@ def event_alpha_feedback_readiness_report(
         alert_store_path=context.alert_store_path,
         feedback_path=context.feedback_path,
         outcomes_path=context.outcomes_path,
+        now=evaluation_now,
     )
     result = event_alpha_feedback_readiness.build_feedback_readiness(
         profile=context.profile,
@@ -788,6 +857,7 @@ def event_alpha_feedback_readiness_report(
         watchlist_entries=watchlist.entries,
         core_opportunity_rows=core_opportunities.rows,
         inbox_result=inbox,
+        now=evaluation_now,
     )
     print(event_alpha_feedback_readiness.format_feedback_readiness(result))
 
@@ -838,10 +908,11 @@ def event_alpha_missed_report(
         print(str(exc))
         return
     market_rows = event_alpha_missed.load_market_rows(config.EVENT_DISCOVERY_UNIVERSE_PATH)
-    store_cfg = _event_alpha_alert_store_config_from_runtime()
-    alerts = event_alpha_alert_store.load_alert_snapshots(store_cfg.path)
-    watch_cfg = _event_watchlist_config_from_runtime()
-    watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        context.alert_store_path,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+    )
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     raw_events: tuple[RawDiscoveredEvent, ...] = ()
     if _event_discovery_paths_configured() or _event_alpha_inputs_configured():
         try:
@@ -855,12 +926,12 @@ def event_alpha_missed_report(
         raw_events=raw_events,
     )
     if result.rows:
-        event_alpha_missed.write_missed_rows(config.EVENT_ALPHA_MISSED_PATH, result.rows)
+        event_alpha_missed.write_missed_rows(context.missed_path, result.rows)
     print(_event_alpha_context_block(context))
     print(event_alpha_missed.format_missed_report(result))
     if result.rows:
         print("")
-        print(f"Missed-opportunity rows appended: {config.EVENT_ALPHA_MISSED_PATH}")
+        print(f"Missed-opportunity rows appended: {context.missed_path}")
 
 def event_alpha_calibration_report(
     verbose: bool = False,
@@ -880,18 +951,25 @@ def event_alpha_calibration_report(
     except ValueError as exc:
         print(str(exc))
         return
-    store_cfg = _event_alpha_alert_store_config_from_runtime()
-    alerts = event_alpha_alert_store.load_alert_snapshots(store_cfg.path)
-    feedback_cfg = _event_feedback_config_from_runtime()
-    feedback = event_feedback.load_feedback(feedback_cfg.path)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        context.alert_store_path,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+    )
+    feedback = event_feedback.load_feedback(context.feedback_path)
     feedback_rows = [record.__dict__ for record in feedback.records]
-    missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
+    missed_rows = event_alpha_missed.load_missed_rows(context.missed_path)
+    cores = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=False,
+    )
     print(_event_alpha_context_block(context))
     print(
         event_alpha_calibration.format_calibration_report(
             alerts.rows,
             feedback_rows=feedback_rows,
+            core_rows=cores.rows,
             missed_rows=missed_rows,
+            now=_event_research_now(),
         )
     )
 
@@ -914,20 +992,27 @@ def event_source_reliability_report(
         print(str(exc))
         return
     alerts = event_alpha_alert_store.load_alert_snapshots(
-        _event_alpha_alert_store_config_from_runtime().path,
+        context.alert_store_path,
         latest_only=False,
+        core_opportunity_store_path=context.core_opportunity_store_path,
     )
-    feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
+    feedback = event_feedback.load_feedback(context.feedback_path)
     feedback_rows = [record.__dict__ for record in feedback.records]
-    missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
-    runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=50)
+    missed_rows = event_alpha_missed.load_missed_rows(context.missed_path)
+    runs = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=50)
+    cores = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=False,
+    )
     print(_event_alpha_context_block(context))
     print(
         event_source_reliability.format_source_reliability_report(
             alerts.rows,
             feedback_rows=feedback_rows,
+            core_rows=cores.rows,
             missed_rows=missed_rows,
             run_rows=runs.rows,
+            now=_event_research_now(),
         )
     )
 
@@ -953,15 +1038,24 @@ def event_alpha_burn_in_scorecard(
         return
     artifact_namespace = artifact_namespace or context.artifact_namespace
     profile_name = profile_name or (context.profile if context.profile != "default" else None)
-    runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=500)
+    runs = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=500)
     alerts = event_alpha_alert_store.load_alert_snapshots(
-        _event_alpha_alert_store_config_from_runtime().path,
+        context.alert_store_path,
         latest_only=False,
+        core_opportunity_store_path=context.core_opportunity_store_path,
     )
-    feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
-    missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
-    provider_rows = event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH)
-    budget_rows = event_alpha_burn_in.load_llm_budget_rows(config.EVENT_LLM_BUDGET_LEDGER_PATH)
+    feedback = event_feedback.load_feedback(context.feedback_path)
+    missed_rows = event_alpha_missed.load_missed_rows(context.missed_path)
+    provider_rows = event_provider_health.load_provider_health(
+        context.provider_health_path
+    )
+    budget_rows = event_alpha_burn_in.load_llm_budget_rows(
+        context.llm_budget_ledger_path
+    )
+    evaluation_now = _event_research_now()
+    candidate_rows, core_rows, outcome_rows = _event_alpha_exact_outcome_authority(
+        context
+    )
     scorecard = event_alpha_burn_in.build_burn_in_scorecard(
         run_rows=runs.rows,
         alert_rows=alerts.rows,
@@ -969,11 +1063,15 @@ def event_alpha_burn_in_scorecard(
         missed_rows=missed_rows,
         provider_health_rows=provider_rows,
         llm_budget_rows=budget_rows,
+        outcome_rows=outcome_rows,
+        candidate_rows=candidate_rows,
+        core_rows=core_rows,
         profile=profile_name,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
         days=days,
+        now=evaluation_now,
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_burn_in.format_burn_in_scorecard(scorecard))

@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-12T09:11:23.235396+00:00`
+- generated_at: `2026-07-12T11:22:01.872180+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -92,7 +92,7 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1497 |
+| `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1487 |
 | `crypto_rsi_scanner/config.py` | 1421 |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1398 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 |
@@ -101,43 +101,43 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1247 |
-| `crypto_rsi_scanner/cli/services/scanner_parts/reports.py` | 1200 |
 | `crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py` | 1199 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 1199 |
-| `crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py` | 1194 |
-| `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/notification_delivery_checks.py` | 1190 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1189 |
-| `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py` | 1183 |
+| `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1187 |
+| `crypto_rsi_scanner/event_alpha/outcomes/outcome_eligibility.py` | 1185 |
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
 | `crypto_rsi_scanner/event_alpha/radar/decision_model.py` | 1180 |
 | `crypto_rsi_scanner/event_alpha/artifacts/operator_state.py` | 1177 |
 | `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 1177 |
+| `crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py` | 1176 |
+| `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py` | 1176 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1169 |
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1168 |
+| `crypto_rsi_scanner/event_alpha/outcomes/feedback_labels.py` | 1162 |
 | `crypto_rsi_scanner/event_alpha/operations/review_inbox.py` | 1156 |
-| `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1145 |
-| `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py` | 1141 |
+| `crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py` | 1153 |
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1136 |
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 1135 |
-| `crypto_rsi_scanner/event_alpha/outcomes/outcome_eligibility.py` | 1126 |
+| `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py` | 1128 |
+| `crypto_rsi_scanner/event_alpha/outcomes/feedback_eligibility.py` | 1120 |
+| `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/notification_delivery_checks.py` | 1115 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/rsi_scan.py` | 1103 |
-| `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py` | 1086 |
-| `crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py` | 1078 |
+| `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1090 |
+| `crypto_rsi_scanner/cli/services/scanner_parts/reports.py` | 1078 |
 | `crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py` | 1078 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1070 |
-| `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1069 |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1056 |
 | `crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py` | 1055 |
 | `crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py` | 1044 |
-| `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/merge_policy.py` | 1039 |
-| `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/source_coverage_checks.py` | 1027 |
-| `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py` | 1027 |
+| `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py` | 1042 |
+| `crypto_rsi_scanner/event_alpha/outcomes/burn_in.py` | 1039 |
 
 ## Accepted Production Files Over 1200 Lines
 
 | path | lines | reason | revisit |
 |---|---:|---|---|
-| `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1497 | Outcome maturation/report code is stable and below the blocker threshold. | When outcome performance views gain new sections. |
+| `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1487 | Outcome maturation/report code is stable and below the blocker threshold. | When outcome performance views gain new sections. |
 | `crypto_rsi_scanner/config.py` | 1421 | Central environment/config contract; splitting risks import-time default and env-var behavior drift. | When a dedicated config-v2 migration freeze and env snapshot tests exist. |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1398 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | Route-gate decision logic is dense and behavior-critical for no-send notification eligibility. | When route-decision/gate snapshots cover every lane and quality-gate cap. |
@@ -160,43 +160,43 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_operator_state.py` | 1493 |
 | `tests/cli/test_make_targets.py` | 1484 |
 | `tests/event_alpha/test_market_surfaces.py` | 1483 |
-| `tests/event_alpha/test_burn_in_operations.py` | 1477 |
-| `tests/event_alpha/test_provider_activation.py` | 1448 |
-| `tests/event_alpha/test_artifact_schema.py` | 1377 |
+| `tests/event_alpha/test_burn_in_operations.py` | 1482 |
+| `tests/event_alpha/test_provider_activation.py` | 1452 |
+| `tests/event_alpha/test_operator_workflows.py` | 1449 |
+| `tests/event_alpha/test_artifact_schema.py` | 1427 |
 | `tests/event_alpha/test_core_opportunities.py` | 1337 |
 | `tests/event_alpha/test_fade_review_workflows.py` | 1309 |
-| `tests/event_alpha/test_burn_in_outcomes.py` | 1266 |
+| `tests/event_alpha/test_doctor_notifications.py` | 1298 |
+| `tests/event_alpha/test_burn_in_outcomes.py` | 1289 |
 | `tests/event_alpha/test_evidence_acquisition.py` | 1214 |
 | `tests/event_alpha/test_news_providers.py` | 1210 |
 | `tests/event_alpha/test_watchlist_router.py` | 1207 |
-| `tests/event_alpha/test_doctor_notifications.py` | 1146 |
 | `tests/event_alpha/test_catalyst_frames.py` | 1127 |
 | `tests/event_alpha/test_catalyst_search.py` | 1107 |
 | `tests/event_alpha/test_radar_pipeline.py` | 1088 |
 | `tests/event_alpha/test_fade_validation.py` | 1081 |
+| `tests/event_alpha/test_feedback_calibration.py` | 1069 |
 | `tests/event_alpha/test_notification_inbox_rehearsals.py` | 1068 |
 | `tests/event_alpha/test_llm_radar.py` | 1040 |
-| `tests/event_alpha/test_operator_workflows.py` | 1038 |
-| `tests/event_alpha/test_quality_feedback.py` | 1024 |
+| `tests/event_alpha/test_quality_feedback.py` | 1040 |
+| `tests/test_indicators.py` | 1012 |
 | `tests/event_alpha/test_discovery_pipeline.py` | 993 |
 | `tests/event_alpha/test_doctor_provider_conflicts.py` | 979 |
-| `tests/test_indicators.py` | 970 |
 | `tests/event_alpha/test_namespace_integrations.py` | 956 |
-| `tests/event_alpha/test_feedback_calibration.py` | 940 |
 | `tests/event_alpha/test_notification_operations.py` | 925 |
 | `tests/event_alpha/test_impact_hypotheses.py` | 920 |
-| `tests/event_alpha/test_evidence_quality.py` | 872 |
+| `tests/event_alpha/test_notification_routing.py` | 895 |
+| `tests/event_alpha/test_evidence_quality.py` | 874 |
 | `tests/event_alpha/test_claim_semantics.py` | 867 |
 | `tests/event_alpha/test_burn_in_candidate_mode.py` | 857 |
 | `tests/event_alpha/_api_helpers.py` | 825 |
+| `tests/event_alpha/test_feedback_alert_authority.py` | 818 |
 | `tests/event_alpha/test_discovery_cache_reports.py` | 817 |
+| `tests/event_alpha/test_core_reconciliation.py` | 810 |
 | `tests/event_alpha/test_source_coverage_reports.py` | 807 |
 | `tests/event_alpha/test_doctor_reconciliation.py` | 805 |
 | `tests/event_alpha/test_notification_readiness.py` | 797 |
-| `tests/event_alpha/test_core_reconciliation.py` | 786 |
-| `tests/event_alpha/test_notification_routing.py` | 773 |
-| `tests/event_alpha/test_alert_outcomes.py` | 758 |
-| `tests/event_alpha/test_doctor_core.py` | 756 |
+| `tests/event_alpha/test_outcome_eligibility_firewall.py` | 785 |
 
 ## Files Over 1500 Lines
 

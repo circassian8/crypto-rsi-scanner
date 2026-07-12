@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 from .runtime import *
+from .notification_preview_io import (
+    _active_preview_api_alerts_wording_count,
+    _delivery_preview_body,
+    _latest_preview_path,
+    _notification_preview_api_alerts_wording,
+    _telegram_preview_bodies,
+)
 from .outcome_checks import _tuple_value
 
 def _notification_delivery_conflicts(
@@ -11,6 +18,7 @@ def _notification_delivery_conflicts(
     core_rows_by_id: Mapping[str, Mapping[str, Any]],
     latest_run_id: str | None = None,
     strict_scope: str = "all_rows",
+    notification_preview_path: str | Path | None = None,
 ) -> dict[str, int]:
     out = _empty_notification_delivery_conflicts()
     scope = _normalize_delivery_strict_scope(strict_scope, latest_run_id=latest_run_id, strict=True)
@@ -22,7 +30,12 @@ def _notification_delivery_conflicts(
             continue
 
         _add_counter_map(out, _delivery_status_field_conflicts(row))
-        telegram_body = _delivery_preview_body(row, out, is_latest_run=is_latest_run)
+        telegram_body = _delivery_preview_body(
+            row,
+            out,
+            is_latest_run=is_latest_run,
+            notification_preview_path=notification_preview_path,
+        )
         lane = str(row.get("lane") or "")
         scalar_core_ids = _tuple_value(row.get("core_opportunity_id"))
         core_ids = _tuple_value(row.get("core_opportunity_ids")) or scalar_core_ids
@@ -110,31 +123,6 @@ def _add_delivery_scope_counts(
         out["stale_delivery_identity_missing_core"] += 1
         if _delivery_is_api_pre_core_identity(row):
             out["legacy_pre_core_delivery_identity"] += 1
-
-def _delivery_preview_body(row: Mapping[str, Any], out: dict[str, int], *, is_latest_run: bool) -> str:
-    preview_relpath = str(row.get("notification_preview_relpath") or "").strip()
-    if not preview_relpath and is_latest_run:
-        out["notification_preview_relpath_missing"] += 1
-    path, _source = _delivery.resolve_notification_preview_path(
-        row,
-        artifact_namespace=row.get("artifact_namespace") or row.get("namespace"),
-    )
-    if path is None:
-        out["notification_preview_missing"] += 1
-        out["notification_preview_path_unresolvable"] += 1
-        return ""
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        out["notification_preview_missing"] += 1
-        out["notification_preview_path_unresolvable"] += 1
-        return ""
-    telegram_body = "\n".join(_telegram_preview_bodies(text)) or text
-    if re.search(r"/Users/|/tmp/|/private/tmp/", telegram_body):
-        out["telegram_message_contains_absolute_path"] += 1
-    if re.search(r"\b(alert_id|card_id|research_card|route|lane)=", telegram_body):
-        out["telegram_message_contains_raw_debug_dump"] += 1
-    return telegram_body
 
 def _add_research_review_digest_conflicts(
     out: dict[str, int],
@@ -390,11 +378,16 @@ def _notification_preview_consistency_conflicts(
     latest_run: Mapping[str, Any] | None,
     core_rows: Iterable[Mapping[str, Any]],
     latest_run_id: str | None,
+    notification_preview_path: str | Path | None = None,
 ) -> dict[str, int]:
     out = _empty_notification_preview_conflicts()
     if not latest_run:
         return out
-    path = _latest_preview_path(delivery_rows, latest_run_id=latest_run_id)
+    path = _latest_preview_path(
+        delivery_rows,
+        latest_run_id=latest_run_id,
+        notification_preview_path=notification_preview_path,
+    )
     if path is None:
         return out
     try:
@@ -406,6 +399,7 @@ def _notification_preview_consistency_conflicts(
         delivery_rows,
         latest_run=latest_run,
         latest_run_id=latest_run_id,
+        notification_preview_path=notification_preview_path,
     )
     if not summary:
         return out
@@ -615,67 +609,6 @@ def _notification_preview_delivery_summary_conflicts(
     ):
         out["notification_preview_no_send_status_unclear"] += 1
     return out
-
-def _active_preview_api_alerts_wording_count(
-    delivery_rows: Iterable[Mapping[str, Any]],
-    *,
-    latest_run: Mapping[str, Any] | None,
-    latest_run_id: str | None,
-) -> int:
-    paths: set[Path] = set()
-    for row in _delivery.latest_rows_by_delivery(delivery_rows):
-        if latest_run_id and str(row.get("run_id") or "") != str(latest_run_id):
-            continue
-        path, _source = _delivery.resolve_notification_preview_path(
-            row,
-            artifact_namespace=row.get("artifact_namespace") or row.get("namespace"),
-        )
-        if path is not None:
-            paths.add(path)
-    count = 0
-    for path in paths:
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        if _notification_preview_api_alerts_wording(text, latest_run=latest_run):
-            count += 1
-    return count
-
-def _notification_preview_api_alerts_wording(text: str, *, latest_run: Mapping[str, Any] | None) -> bool:
-    strict_alerts = event_alpha_run_counters.canonical_run_counters(latest_run)["strict_alerts"]
-    bodies = "\n".join(_telegram_preview_bodies(text)) or text
-    if strict_alerts > 0:
-        return False
-    return bool(
-        re.search(
-            r"(?im)^Alertable decisions:\s*\d+\s*(?:·|-|\|)\s*Alerts:\s*[1-9]\d*\b",
-            bodies,
-        )
-    )
-
-def _latest_preview_path(
-    delivery_rows: Iterable[Mapping[str, Any]],
-    *,
-    latest_run_id: str | None,
-) -> Path | None:
-    latest = _delivery.latest_rows_by_delivery(delivery_rows)
-    candidates: list[tuple[str, str]] = []
-    for row in latest:
-        if latest_run_id and str(row.get("run_id") or "") != str(latest_run_id):
-            continue
-        path, _source = _delivery.resolve_notification_preview_path(
-            row,
-            artifact_namespace=row.get("artifact_namespace") or row.get("namespace"),
-        )
-        if path is None:
-            continue
-        stamp = str(row.get("attempted_at") or row.get("delivered_at") or "")
-        candidates.append((stamp, str(path)))
-    if not candidates:
-        return None
-    candidates.sort()
-    return Path(candidates[-1][1])
 
 def _parse_notification_preview_summary(text: str) -> dict[str, Any]:
     bodies = "\n".join(_telegram_preview_bodies(text)) or text
@@ -909,14 +842,6 @@ def _delivery_requires_core_identity(row: Mapping[str, Any]) -> bool:
     if str(row.get("legacy") or "").casefold() in {"1", "true", "yes"}:
         return False
     return True
-
-def _telegram_preview_bodies(text: str) -> tuple[str, ...]:
-    bodies = re.findall(r"```html\n(.*?)```", text, flags=re.DOTALL)
-    if bodies:
-        return tuple(bodies)
-    if "Telegram Body" in text:
-        return (text.split("Telegram Body", 1)[-1],)
-    return ()
 
 def _delivery_core_lacks_live_confirmation(core: Mapping[str, Any]) -> bool:
     if not event_alpha_router.route_value_is_alertable(core.get("final_route_after_quality_gate") or core.get("route")):

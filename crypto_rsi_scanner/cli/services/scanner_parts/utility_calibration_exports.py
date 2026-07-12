@@ -17,35 +17,48 @@ from .config_reports import (
 )
 from .runtime import *
 
-def _event_alpha_local_artifacts(*, run_limit: int = 500, latest_alerts: bool = False) -> dict[str, Any]:
-    runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=run_limit)
+def _event_alpha_local_artifacts(
+    *,
+    context: Any,
+    run_limit: int = 500,
+    latest_alerts: bool = False,
+) -> dict[str, Any]:
+    """Load one resolved namespace without consulting legacy global paths.
+
+    Alert snapshot return aliases remain diagnostics only. Exact observed
+    outcome authority comes from the namespace's registered outcome artifacts,
+    joined to the integrated candidate and Core opportunity stores.
+    """
+    runs = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=run_limit)
     alerts = event_alpha_alert_store.load_alert_snapshots(
-        _event_alpha_alert_store_config_from_runtime().path,
+        context.alert_store_path,
         latest_only=latest_alerts,
+        core_opportunity_store_path=context.core_opportunity_store_path,
     )
-    feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
-    missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
-    provider_rows = event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH)
-    budget_rows = event_alpha_burn_in.load_llm_budget_rows(config.EVENT_LLM_BUDGET_LEDGER_PATH)
-    watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
+    feedback = event_feedback.load_feedback(context.feedback_path)
+    missed_rows = event_alpha_missed.load_missed_rows(context.missed_path)
+    provider_rows = event_provider_health.load_provider_health(context.provider_health_path)
+    budget_rows = event_alpha_burn_in.load_llm_budget_rows(context.llm_budget_ledger_path)
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     hypotheses = event_impact_hypothesis_store.load_impact_hypotheses(
-        config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH,
+        context.impact_hypothesis_store_path,
         limit=500,
         latest_run=True,
         include_api=True,
     )
     core_opportunities = event_core_opportunity_store.load_core_opportunities(
-        _event_core_opportunity_store_config_from_runtime().path,
-        latest_run=True,
+        context.core_opportunity_store_path,
+        latest_run=False,
+        include_api=True,
     )
     incidents = event_incident_store.load_incidents(
-        config.EVENT_INCIDENT_STORE_PATH,
+        context.incident_store_path,
         limit=500,
         latest_run=True,
         include_api=True,
     )
     feedback_rows = [record.__dict__ for record in feedback.records]
-    outcome_rows = [row for row in alerts.rows if any(row.get(field) not in (None, "") for field in (
+    diagnostic_alert_outcome_rows = [row for row in alerts.rows if any(row.get(field) not in (None, "") for field in (
         "primary_horizon_return",
         "return_1h",
         "return_4h",
@@ -58,6 +71,18 @@ def _event_alpha_local_artifacts(*, run_limit: int = 500, latest_alerts: bool = 
         "direction_hit",
         "volatility_hit",
     ))]
+    candidate_rows, integrated_core_rows = (
+        event_integrated_radar_outcomes.load_integrated_radar_outcome_authority(
+            context.namespace_dir
+        )
+    )
+    integrated_outcome_rows = event_integrated_radar_outcomes.load_integrated_radar_outcomes(
+        context.namespace_dir
+    )
+    event_alpha_outcome_rows = event_alpha_outcome_artifact_io.read_jsonl(
+        context.outcomes_path
+    )
+    outcome_rows = [*event_alpha_outcome_rows, *integrated_outcome_rows]
     return {
         "runs": runs,
         "alerts": alerts,
@@ -69,8 +94,13 @@ def _event_alpha_local_artifacts(*, run_limit: int = 500, latest_alerts: bool = 
         "watchlist": watchlist,
         "hypotheses": hypotheses,
         "core_opportunities": core_opportunities,
+        "candidate_rows": candidate_rows,
+        "integrated_core_rows": integrated_core_rows,
         "incidents": incidents,
         "outcome_rows": outcome_rows,
+        "event_alpha_outcome_rows": event_alpha_outcome_rows,
+        "integrated_outcome_rows": integrated_outcome_rows,
+        "diagnostic_alert_outcome_rows": diagnostic_alert_outcome_rows,
     }
 
 
@@ -92,12 +122,18 @@ def event_alpha_tuning_worksheet_report(
     except ValueError as exc:
         print(str(exc))
         return
-    artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
+    artifacts = _event_alpha_local_artifacts(
+        context=context,
+        run_limit=500,
+        latest_alerts=False,
+    )
     worksheet = event_alpha_tuning.build_tuning_worksheet(
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
+        core_rows=artifacts["core_opportunities"].rows,
         missed_rows=artifacts["missed_rows"],
         run_rows=artifacts["runs"].rows,
+        now=_event_research_now(),
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_tuning.format_tuning_worksheet(worksheet))
@@ -121,6 +157,10 @@ def event_alpha_calibration_export_priors(out_path: str | None = None, verbose: 
     alerts = event_alpha_alert_store.load_alert_snapshots(_event_alpha_alert_store_config_from_runtime().path)
     feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
     feedback_rows = [record.__dict__ for record in feedback.records]
+    cores = event_core_opportunity_store.load_core_opportunities(
+        _event_core_opportunity_store_config_from_runtime().path,
+        latest_run=False,
+    )
     path = Path(out_path).expanduser() if out_path else config.EVENT_ALPHA_PRIORS_PATH
     if not path.is_absolute():
         path = config.DATA_DIR / path
@@ -128,7 +168,8 @@ def event_alpha_calibration_export_priors(out_path: str | None = None, verbose: 
         path,
         alerts.rows,
         feedback_rows=feedback_rows,
-        generated_at=datetime.now(timezone.utc),
+        core_rows=cores.rows,
+        generated_at=_event_research_now(),
     )
     print(event_alpha_calibration.format_priors_export(path, payload))
 
@@ -153,10 +194,16 @@ def event_alpha_export_eval_cases_from_feedback(out_dir: str | None = None, verb
     _setup_event_discovery_logging(verbose)
     alerts = event_alpha_alert_store.load_alert_snapshots(_event_alpha_alert_store_config_from_runtime().path)
     feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
+    cores = event_core_opportunity_store.load_core_opportunities(
+        _event_core_opportunity_store_config_from_runtime().path,
+        latest_run=False,
+    )
     result = event_alpha_eval_export.export_cases_from_feedback(
         alerts.rows,
         [record.__dict__ for record in feedback.records],
         out_dir or config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR,
+        core_rows=cores.rows,
+        now=_event_research_now(),
     )
     print(event_alpha_eval_export.format_eval_export_result(result))
 

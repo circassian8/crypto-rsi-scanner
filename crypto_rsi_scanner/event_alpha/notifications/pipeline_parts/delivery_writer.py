@@ -28,7 +28,7 @@ class _DeliveryWriter:
         self.namespace = namespace
         self.now = now
         self.existing = delivery.load_delivery_records(cfg.path)
-        self.preview_path = Path(cfg.path).expanduser().parent / "event_alpha_notification_preview.md"
+        self.preview_path = Path(cfg.path).expanduser().parent / delivery.NOTIFICATION_PREVIEW_FILENAME
         self.preview_write_succeeded = False
         self.require_current_operator_generation = False
         self.preview_sections: list[dict[str, Any]] = []

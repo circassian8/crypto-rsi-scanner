@@ -8,7 +8,9 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from . import common
+from . import feedback_evidence
 from .review_inbox import INBOX_JSON
+from ..outcomes import feedback_eligibility
 
 
 PROGRESS_JSON = "event_alpha_feedback_progress.json"
@@ -25,7 +27,16 @@ def build_feedback_progress(
 ) -> dict[str, Any]:
     generated = now or common.utc_now()
     context = common.context_for(profile=profile, artifact_namespace=artifact_namespace or profile, base_dir=base_dir)
-    feedback = common.read_jsonl(context.feedback_path)
+    supplied_feedback = common.read_jsonl(context.feedback_path)
+    core_rows = common.read_jsonl(context.core_opportunity_store_path)
+    eligible_feedback, excluded_feedback, feedback_exclusion_reason_counts = (
+        feedback_eligibility.partition_joined_calibration_feedback(
+            supplied_feedback,
+            core_rows,
+            now=generated,
+        )
+    )
+    feedback = list(eligible_feedback)
     inbox = common.read_json(context.namespace_dir / INBOX_JSON)
     generated = generated.astimezone(timezone.utc)
     today_cutoff = generated - timedelta(days=1)
@@ -61,7 +72,7 @@ def build_feedback_progress(
             "labels_this_week": len(week),
             "window_days": max(1, int(days or 7)),
             "labels_total": len(feedback),
-            "labels_by_type": common.count_by(feedback, "label"),
+            "labels_by_type": common.count_by(feedback, "feedback_label"),
             "labels_by_opportunity_type": common.count_by(feedback, "opportunity_type", "lane"),
             "labels_by_source_pack": common.count_by(feedback, "source_pack"),
             "labels_by_provider": common.count_by(feedback, "source_provider", "provider"),
@@ -69,6 +80,12 @@ def build_feedback_progress(
             "unlabeled_review_items": max(0, len(inbox_targets - feedback_targets)),
             "label_coverage_pct": round(coverage, 2),
             "stale_unresolved_feedback_targets": stale_targets,
+            **feedback_evidence.telemetry(
+                supplied_feedback,
+                feedback,
+                excluded_feedback,
+                feedback_exclusion_reason_counts,
+            ),
         }
     )
     common.write_json(context.namespace_dir / PROGRESS_JSON, payload)
@@ -88,6 +105,9 @@ def format_feedback_progress(payload: Mapping[str, Any]) -> str:
         f"- labels_today: `{payload.get('labels_today')}`",
         f"- labels_this_week: `{payload.get('labels_this_week')}`",
         f"- labels_total: `{payload.get('labels_total')}`",
+        f"- feedback_rows_supplied: `{payload.get('feedback_rows_supplied')}`",
+        f"- feedback_rows_eligible: `{payload.get('feedback_rows_eligible')}`",
+        f"- feedback_rows_excluded: `{payload.get('feedback_rows_excluded')}`",
         f"- unlabeled_review_items: `{payload.get('unlabeled_review_items')}`",
         f"- label_coverage_pct: `{payload.get('label_coverage_pct')}`",
         "",

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
 from . import common
 from . import evidence_semantics
+from . import feedback_evidence
 from . import outcome_evidence
 from .daily_burn_in import RUN_JSON
 from . import namespace_policy
@@ -21,9 +23,11 @@ AUTHORITATIVE_PROFILE = "live_burn_in_no_send"
 def build_authoritative_scorecard(
     *,
     base_dir: str | Path | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """Build the policy-scoped scorecard using the North Star contract window."""
 
+    evaluation_now = _evaluation_now(now)
     contract = common.load_contract()
     days = max(1, int(contract.get("duration_days") or 30))
     return build_scorecard(
@@ -31,6 +35,7 @@ def build_authoritative_scorecard(
         artifact_namespace=None,
         base_dir=base_dir,
         days=days,
+        now=evaluation_now,
     )
 
 
@@ -48,11 +53,12 @@ def build_scorecard(
     include_live_rehearsals_without_burn_in_run: bool = False,
     include_namespaces: tuple[str, ...] = (),
     count_explicit_namespace_for_burn_in: bool = False,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     context = common.context_for(profile=profile, artifact_namespace=artifact_namespace or profile, base_dir=base_dir)
     base = context.base_dir
     contract = common.load_contract()
-    evaluation_now = common.utc_now()
+    evaluation_now = _evaluation_now(now)
     cutoff = common.date_window(days, now=evaluation_now)
     policy = namespace_policy.build_namespace_policy(
         profile=profile,
@@ -67,13 +73,18 @@ def build_scorecard(
         include_namespaces=((artifact_namespace,) if artifact_namespace else include_namespaces),
     )
     included_namespaces = namespace_policy.included_namespace_names(policy)
-    daily_runs = _daily_runs(base, cutoff=cutoff, namespaces=included_namespaces)
+    daily_runs = _daily_runs(
+        base,
+        cutoff=cutoff,
+        namespaces=included_namespaces,
+        now=evaluation_now,
+    )
     (candidate_rows, core_rows, supplied_outcome_rows, outcome_rows,
-     excluded_outcome_rows, outcome_exclusion_reason_counts) = (
-        outcome_evidence.load_exact_namespace_outcomes(
-            base, cutoff, included_namespaces, _all_rows, evaluation_now))
-    alert_rows = _all_rows(base, "event_alpha_alerts.jsonl", cutoff=cutoff, namespaces=included_namespaces)
-    feedback_rows = _all_rows(base, "event_alpha_feedback.jsonl", cutoff=cutoff, namespaces=included_namespaces)
+     excluded_outcome_rows, outcome_exclusion_reason_counts, alert_rows,
+     supplied_feedback_rows, feedback_rows, excluded_feedback_rows,
+     feedback_exclusion_reason_counts, feedback_evidence_telemetry,
+     outcome_evidence_telemetry) = (
+        _load_scorecard_learning_evidence(base, cutoff, included_namespaces, evaluation_now))
     source_coverage_rows = [common.read_json(base / namespace / "event_alpha_source_coverage.json") for namespace in included_namespaces]
     evidence_summaries = evidence_semantics.namespace_summaries(base, included_namespaces, cutoff=cutoff, policy=policy)
     evidence_aggregate = evidence_semantics.aggregate_namespace_summaries(evidence_summaries)
@@ -159,9 +170,10 @@ def build_scorecard(
             "labels_collected": len(feedback_rows),
             "labels": len(feedback_rows),
             "labeled_near_misses": len(labeled_near_misses),
+            **feedback_evidence_telemetry,
             "outcome_rows": len(outcome_rows),
             "outcomes": len(outcome_rows),
-            **outcome_evidence.telemetry(supplied_outcome_rows, outcome_rows, excluded_outcome_rows, outcome_exclusion_reason_counts),
+            **outcome_evidence_telemetry,
             "provider_categories_observed": provider_categories,
             "provider_categories_observed_count": len(provider_categories),
             "enough_data": enough_data,
@@ -176,6 +188,39 @@ def build_scorecard(
     common.write_json(context.namespace_dir / SCORECARD_JSON, payload)
     common.write_text(context.namespace_dir / SCORECARD_MD, format_scorecard(payload))
     return payload
+
+
+def _load_scorecard_learning_evidence(
+    base: Path,
+    cutoff: Any,
+    included_namespaces: list[str],
+    evaluation_now: Any,
+) -> tuple[Any, ...]:
+    outcome_rows = outcome_evidence.load_exact_namespace_outcomes(
+        base, cutoff, included_namespaces, _all_rows, evaluation_now)
+    _candidates, cores, supplied_outcomes, outcomes, excluded_outcomes, reason_counts = outcome_rows
+    alert_rows = _all_rows(
+        base,
+        "event_alpha_alerts.jsonl",
+        cutoff=cutoff,
+        namespaces=included_namespaces,
+    )
+    feedback_rows = feedback_evidence.load_exact_namespace_feedback(
+        base,
+        cutoff,
+        included_namespaces,
+        _all_rows,
+        evaluation_now,
+        core_rows=cores,
+    )
+    feedback_telemetry = feedback_evidence.telemetry(*feedback_rows)
+    outcome_telemetry = outcome_evidence.telemetry(
+        supplied_outcomes,
+        outcomes,
+        excluded_outcomes,
+        reason_counts,
+    )
+    return (*outcome_rows, alert_rows, *feedback_rows, feedback_telemetry, outcome_telemetry)
 
 
 def format_scorecard(payload: Mapping[str, Any]) -> str:
@@ -206,6 +251,13 @@ def format_scorecard(payload: Mapping[str, Any]) -> str:
         f"- near_misses_seen: `{payload.get('near_misses_seen')}`",
         f"- quality_capped_rows: `{payload.get('quality_capped_rows')}`",
         f"- labels_collected: `{payload.get('labels_collected')}`",
+        f"- feedback_rows_supplied: `{payload.get('feedback_rows_supplied')}`",
+        f"- feedback_rows_eligible: `{payload.get('feedback_rows_eligible')}`",
+        f"- feedback_rows_excluded: `{payload.get('feedback_rows_excluded')}`",
+        common.table_line(
+            "feedback_exclusion_reason_counts",
+            payload.get("feedback_exclusion_reason_counts") or {},
+        ),
         f"- labeled_near_misses: `{payload.get('labeled_near_misses')}`",
         f"- outcome_rows: `{payload.get('outcome_rows')}`",
         f"- outcome_rows_supplied: `{payload.get('outcome_rows_supplied')}`",
@@ -244,12 +296,26 @@ def format_scorecard(payload: Mapping[str, Any]) -> str:
     return "\n".join(lines).rstrip()
 
 
-def _daily_runs(base: Path, *, cutoff, namespaces: list[str] | tuple[str, ...]) -> list[dict[str, Any]]:
+def _evaluation_now(value: datetime | None) -> datetime:
+    if value is None:
+        return common.utc_now()
+    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("scorecard now must be a timezone-aware datetime")
+    return value.astimezone(timezone.utc)
+
+
+def _daily_runs(
+    base: Path,
+    *,
+    cutoff,
+    namespaces: list[str] | tuple[str, ...],
+    now: datetime,
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for namespace in namespaces:
         path = base / namespace / RUN_JSON
         row = common.read_json(path)
-        if row and (common.parse_utc(row.get("generated_at")) or common.utc_now()) >= cutoff:
+        if row and (common.parse_utc(row.get("generated_at")) or now) >= cutoff:
             rows.append(row)
     return rows
 

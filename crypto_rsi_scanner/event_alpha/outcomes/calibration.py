@@ -9,23 +9,56 @@ from pathlib import Path
 from statistics import median
 from typing import Any, Iterable, Mapping
 
+from . import feedback_eligibility
+
+
+CALIBRATION_PRIORS_SCHEMA_VERSION = "event_alpha_calibration_priors_v2"
+CALIBRATION_PRIORS_ROW_TYPE = "event_alpha_calibration_priors"
+PRIOR_GROUP_NAMES = (
+    "playbook_priors",
+    "provider_priors",
+    "llm_role_priors",
+    "tier_priors",
+    "source_pack_priors",
+    "source_domain_priors",
+    "market_confirmation_priors",
+    "catalyst_frame_priors",
+)
+
 
 def format_calibration_report(
     alert_rows: Iterable[Mapping[str, Any]],
     *,
     feedback_rows: Iterable[Mapping[str, Any]] = (),
+    core_rows: Iterable[Mapping[str, Any]] = (),
     missed_rows: Iterable[Mapping[str, Any]] = (),
+    now: Any = None,
 ) -> str:
     """Print deterministic calibration guidance without changing thresholds."""
     alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
     feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    cores = [dict(row) for row in core_rows if isinstance(row, Mapping)]
     missed = [dict(row) for row in missed_rows if isinstance(row, Mapping)]
-    merged = _merge_feedback(alerts, feedback)
+    evaluated_at = _trusted_now(now)
+    eligible, excluded, reason_counts = (
+        feedback_eligibility.partition_joined_calibration_feedback(
+            feedback,
+            cores,
+            now=evaluated_at,
+        )
+    )
+    merged = [_prepare_feedback_projection(row) for row in eligible]
     lines = [
         "=" * 76,
         "EVENT ALPHA CALIBRATION REPORT (research-only; recommendations only)",
         "=" * 76,
-        f"alerts={len(alerts)} · feedback={len(feedback)} · missed={len(missed)}",
+        f"alerts={len(alerts)} · feedback_supplied={len(feedback)} · "
+        f"feedback_eligible={len(eligible)} · feedback_excluded={len(excluded)} · "
+        f"missed={len(missed)}",
+        "feedback_firewall="
+        f"v{feedback_eligibility.FEEDBACK_ELIGIBILITY_CONTRACT_VERSION} · "
+        f"evaluated_at={evaluated_at.isoformat()}",
+        "feedback_exclusion_reasons=" + _format_reason_counts(reason_counts),
     ]
     if not merged and not missed:
         lines.append("")
@@ -33,14 +66,13 @@ def format_calibration_report(
         return "\n".join(lines)
     for title, field in (
         ("feedback by playbook", "playbook_type"),
-        ("feedback by source", "source"),
+        ("feedback by source", "feedback_source"),
         ("feedback by provider", "source_provider"),
         ("feedback by source domain", "source_domain"),
         ("feedback by provider/domain", "provider_domain_key"),
-        ("feedback by tier", "tier"),
+        ("feedback by tier", "final_route_after_quality_gate"),
         ("feedback by route/lane", "route_lane_key"),
         ("LLM role usefulness", "llm_asset_role"),
-        ("cluster confidence bucket", "cluster_confidence_bucket"),
         ("feedback by impact path type", "impact_path_type"),
         ("feedback by candidate role", "candidate_role"),
         ("feedback by source class", "source_class"),
@@ -87,28 +119,77 @@ def build_calibration_priors(
     alert_rows: Iterable[Mapping[str, Any]],
     *,
     feedback_rows: Iterable[Mapping[str, Any]] = (),
-    generated_at: datetime | None = None,
+    core_rows: Iterable[Mapping[str, Any]] = (),
+    generated_at: Any = None,
+    now: Any = None,
     min_sample: int = 5,
 ) -> dict[str, Any]:
     """Build reviewable priors from artifacts without applying them."""
+    if type(min_sample) is not int or min_sample < 1:
+        raise ValueError("min_sample must be a positive integer")
     alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
     feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
-    merged = _merge_feedback(alerts, feedback)
-    generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
-    payload = {
-        "schema_version": "event_alpha_calibration_priors_v1",
-        "generated_at": generated,
-        "min_sample": int(min_sample),
-        "min_sample_warning": len(merged) < int(min_sample),
+    cores = [dict(row) for row in core_rows if isinstance(row, Mapping)]
+    evaluated_at = _trusted_now(now if now is not None else generated_at)
+    generated_dt = _trusted_now(generated_at if generated_at is not None else evaluated_at)
+    if generated_dt < evaluated_at:
+        raise ValueError("generated_at must not precede the feedback firewall evaluation time")
+    eligible, excluded, reason_counts = (
+        feedback_eligibility.partition_joined_calibration_feedback(
+            feedback,
+            cores,
+            now=evaluated_at,
+        )
+    )
+    merged = [_prepare_feedback_projection(row) for row in eligible]
+    groups = {
         "playbook_priors": _prior_group(merged, "playbook_type", min_sample=min_sample),
-        "provider_priors": _prior_group(merged, "source_provider", fallback_field="source", min_sample=min_sample),
+        "provider_priors": _prior_group(merged, "source_provider", min_sample=min_sample),
         "llm_role_priors": _prior_group(merged, "llm_asset_role", min_sample=min_sample),
-        "tier_priors": _prior_group(merged, "tier", min_sample=min_sample),
+        "tier_priors": _prior_group(
+            merged,
+            "final_route_after_quality_gate",
+            min_sample=min_sample,
+        ),
         "source_pack_priors": _prior_group(merged, "source_pack", min_sample=min_sample),
         "source_domain_priors": _prior_group(merged, "source_domain", min_sample=min_sample),
-        "market_confirmation_priors": _prior_group(merged, "market_confirmation_level", min_sample=min_sample),
-        "catalyst_frame_priors": _prior_group(merged, "main_frame_type", fallback_field="catalyst_frame_status", min_sample=min_sample),
+        "market_confirmation_priors": _prior_group(
+            merged,
+            "market_confirmation_level",
+            min_sample=min_sample,
+        ),
+        "catalyst_frame_priors": _prior_group(
+            merged,
+            "main_frame_type",
+            min_sample=min_sample,
+        ),
+    }
+    eligible_for_auto_apply = any(
+        row.get("score_adjustment") not in (None, 0)
+        for group in groups.values()
+        for row in group.values()
+    )
+    payload = {
+        "schema_version": CALIBRATION_PRIORS_SCHEMA_VERSION,
+        "row_type": CALIBRATION_PRIORS_ROW_TYPE,
+        "generated_at": generated_dt.isoformat(),
+        "feedback_firewall_evaluated_at": evaluated_at.isoformat(),
+        "feedback_firewall_applied": True,
+        "feedback_eligibility_contract_version": (
+            feedback_eligibility.FEEDBACK_ELIGIBILITY_CONTRACT_VERSION
+        ),
+        "alert_rows_supplied": len(alerts),
+        "feedback_rows_supplied": len(feedback),
+        "feedback_rows_eligible": len(eligible),
+        "feedback_rows_excluded": len(excluded),
+        "feedback_exclusion_reason_counts": dict(reason_counts),
+        "min_sample": min_sample,
+        "min_sample_warning": len(merged) < min_sample,
+        **groups,
         "research_only": True,
+        "recommendation_only": True,
+        "eligible_for_auto_apply": eligible_for_auto_apply,
+        "auto_apply": False,
     }
     return payload
 
@@ -118,13 +199,17 @@ def write_calibration_priors(
     alert_rows: Iterable[Mapping[str, Any]],
     *,
     feedback_rows: Iterable[Mapping[str, Any]] = (),
-    generated_at: datetime | None = None,
+    core_rows: Iterable[Mapping[str, Any]] = (),
+    generated_at: Any = None,
+    now: Any = None,
     min_sample: int = 5,
 ) -> dict[str, Any]:
     payload = build_calibration_priors(
         alert_rows,
         feedback_rows=feedback_rows,
+        core_rows=core_rows,
         generated_at=generated_at,
+        now=now,
         min_sample=min_sample,
     )
     p = Path(path).expanduser()
@@ -148,91 +233,24 @@ def format_priors_export(path: str | Path, payload: Mapping[str, Any]) -> str:
         f"path: {Path(path).expanduser()}",
         f"generated_at: {payload.get('generated_at')}",
         "groups: " + ", ".join(groups),
+        "feedback: "
+        f"supplied={payload.get('feedback_rows_supplied')} "
+        f"eligible={payload.get('feedback_rows_eligible')} "
+        f"excluded={payload.get('feedback_rows_excluded')}",
+        "feedback_exclusion_reasons: "
+        + _format_reason_counts(payload.get("feedback_exclusion_reason_counts") or {}),
         f"min_sample_warning: {warning}",
+        f"eligible_for_auto_apply: {'yes' if payload.get('eligible_for_auto_apply') is True else 'no'}",
+        f"auto_apply: {'yes' if payload.get('auto_apply') is True else 'no'}",
         "No thresholds, alert tiers, paper trades, live DB rows, or execution were changed.",
     ])
 
 
-def _merge_feedback(
-    alert_rows: list[dict[str, Any]],
-    feedback_rows: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    feedback_by_key: dict[str, dict[str, Any]] = {}
-    for row in feedback_rows:
-        for key in _row_keys(row):
-            feedback_by_key[key] = row
-    out: list[dict[str, Any]] = []
-    matched_feedback_keys: set[str] = set()
-    for row in alert_rows:
-        merged = dict(row)
-        keys = _row_keys(row)
-        feedback = next((feedback_by_key[key] for key in keys if key in feedback_by_key), None)
-        if feedback:
-            matched_feedback_keys.update(keys)
-            merged["feedback_label"] = feedback.get("label")
-            merged["feedback_notes"] = feedback.get("notes")
-            for key in (
-                "impact_path_type",
-                "candidate_role",
-                "incident_id",
-                "evidence_specificity",
-                "market_confirmation_level",
-                "opportunity_level",
-                "source_class",
-                "source_domain",
-                "source_pack",
-                "source_provider",
-                "source_provider_domain",
-                "market_context_freshness_status",
-                "catalyst_frame_status",
-                "main_frame_type",
-                "final_route_after_quality_gate",
-                "lane",
-                "accepted_evidence_reason_codes",
-            ):
-                if not merged.get(key) and feedback.get(key):
-                    merged[key] = feedback.get(key)
-        merged["cluster_confidence_bucket"] = _cluster_bucket(row)
-        merged["provider_domain_key"] = _provider_domain_key(merged)
-        merged["route_lane_key"] = _route_lane_key(merged)
-        out.append(merged)
-    for row in feedback_rows:
-        keys = _row_keys(row)
-        if keys and any(key in matched_feedback_keys for key in keys):
-            continue
-        feedback_only = {
-            "playbook_type": row.get("playbook_type") or "unmatched",
-            "source": row.get("source") or "feedback",
-            "tier": row.get("final_route_after_quality_gate") or row.get("route") or "feedback",
-            "feedback_label": row.get("label"),
-            "llm_asset_role": row.get("llm_asset_role"),
-            "impact_path_type": row.get("impact_path_type"),
-            "candidate_role": row.get("candidate_role"),
-            "incident_id": row.get("incident_id"),
-            "source_class": row.get("source_class"),
-            "source_domain": row.get("source_domain") or row.get("source_provider_domain"),
-            "source_pack": row.get("source_pack"),
-            "source_provider": row.get("source_provider"),
-            "source_provider_domain": row.get("source_provider_domain"),
-            "accepted_evidence_reason_codes": row.get("accepted_evidence_reason_codes"),
-            "evidence_specificity": row.get("evidence_specificity"),
-            "market_confirmation_level": row.get("market_confirmation_level"),
-            "market_context_freshness_status": row.get("market_context_freshness_status"),
-            "catalyst_frame_status": row.get("catalyst_frame_status"),
-            "main_frame_type": row.get("main_frame_type"),
-            "final_route_after_quality_gate": row.get("final_route_after_quality_gate") or row.get("route"),
-            "lane": row.get("lane"),
-            "opportunity_level": row.get("opportunity_level"),
-            "cluster_confidence_bucket": "unknown",
-        }
-        feedback_only["provider_domain_key"] = _provider_domain_key(feedback_only)
-        feedback_only["route_lane_key"] = _route_lane_key(feedback_only)
-        out.append(feedback_only)
-    return out
-
-
 def _feedback_line(title: str, rows: list[Mapping[str, Any]], field: str) -> str:
-    grouped = _group(rows, field)
+    grouped = _group(
+        (row for row in rows if _has_group_value(row.get(field))),
+        field,
+    )
     parts: list[str] = []
     for key, items in sorted(grouped.items()):
         useful = sum(1 for row in items if row.get("feedback_label") == "useful")
@@ -304,44 +322,14 @@ def _recommendations(rows: list[Mapping[str, Any]], missed: list[Mapping[str, An
     return tuple(dict.fromkeys(recs))
 
 
-def _row_keys(row: Mapping[str, Any]) -> tuple[str, ...]:
-    keys: list[str] = []
-    for field in (
-        "key",
-        "target",
-        "feedback_target",
-        "core_opportunity_id",
-        "alert_id",
-        "alert_key",
-        "card_id",
-        "hypothesis_id",
-        "incident_id",
-        "symbol",
-        "coin_id",
-        "asset_symbol",
-        "asset_coin_id",
-        "validated_symbol",
-        "validated_coin_id",
-    ):
-        value = str(row.get(field) or "").strip()
-        if not value:
-            continue
-        keys.append(value)
-        if value.startswith("ea:"):
-            keys.append(value[3:])
-        else:
-            keys.append(f"ea:{value}")
-    return tuple(dict.fromkeys(keys))
-
-
 def _provider_domain_key(row: Mapping[str, Any]) -> str:
-    provider = str(row.get("source_provider") or row.get("source") or "unknown")
+    provider = str(row.get("source_provider") or "unknown")
     domain = str(row.get("source_provider_domain") or row.get("source_domain") or "unknown")
     return f"{provider}/{domain}"
 
 
 def _route_lane_key(row: Mapping[str, Any]) -> str:
-    route = str(row.get("final_route_after_quality_gate") or row.get("route") or row.get("tier") or "unknown")
+    route = str(row.get("final_route_after_quality_gate") or "unknown")
     lane = str(row.get("lane") or "unknown")
     return f"{route}/{lane}"
 
@@ -352,9 +340,6 @@ def _sample_targets(rows: Iterable[Mapping[str, Any]], *, limit: int) -> tuple[s
         value = str(
             row.get("feedback_target")
             or row.get("core_opportunity_id")
-            or row.get("alert_key")
-            or row.get("key")
-            or row.get("symbol")
             or ""
         ).strip()
         if value:
@@ -367,7 +352,7 @@ def _sample_targets(rows: Iterable[Mapping[str, Any]], *, limit: int) -> tuple[s
 def _sample_reasons(rows: Iterable[Mapping[str, Any]], *, limit: int) -> tuple[str, ...]:
     out: list[str] = []
     for row in rows:
-        value = str(row.get("feedback_notes") or row.get("notes") or row.get("why_local_only") or "").strip()
+        value = str(row.get("feedback_notes") or "").strip()
         if value:
             out.append(value[:80])
         if len(out) >= limit:
@@ -379,12 +364,11 @@ def _prior_group(
     rows: list[Mapping[str, Any]],
     field: str,
     *,
-    fallback_field: str | None = None,
     min_sample: int,
 ) -> dict[str, Any]:
     grouped: dict[str, list[Mapping[str, Any]]] = {}
     for row in rows:
-        key = str(row.get(field) or (row.get(fallback_field) if fallback_field else "") or "unknown")
+        key = str(row.get(field) or "unknown")
         grouped.setdefault(key, []).append(row)
     out: dict[str, Any] = {}
     for key, items in sorted(grouped.items()):
@@ -394,10 +378,11 @@ def _prior_group(
         primary = [_float(row.get("primary_horizon_return")) for row in items]
         primary = [value for value in primary if value is not None]
         score_adjustment = 0
-        if useful > junk and useful >= 2:
-            score_adjustment = 3
-        elif junk > useful and junk >= 2:
-            score_adjustment = -5
+        if key != "unknown" and len(items) >= min_sample:
+            if useful > junk and useful >= 2:
+                score_adjustment = 3
+            elif junk > useful and junk >= 2:
+                score_adjustment = -5
         out[key] = {
             "samples": len(items),
             "useful": useful,
@@ -408,6 +393,31 @@ def _prior_group(
             "min_sample_warning": len(items) < min_sample,
         }
     return out
+
+
+def _prepare_feedback_projection(row: Mapping[str, Any]) -> dict[str, Any]:
+    prepared = dict(row)
+    prepared["provider_domain_key"] = _provider_domain_key(prepared)
+    prepared["route_lane_key"] = _route_lane_key(prepared)
+    return prepared
+
+
+def _trusted_now(value: Any) -> datetime:
+    if value is None:
+        return datetime.now(timezone.utc)
+    parsed = feedback_eligibility.parse_aware_feedback_time(value)
+    if parsed is None:
+        raise ValueError("calibration now must be a finite timezone-aware timestamp")
+    return parsed
+
+
+def _format_reason_counts(values: Mapping[str, Any]) -> str:
+    parts = [
+        f"{key}={value}"
+        for key, value in sorted(values.items())
+        if type(key) is str and type(value) is int and value > 0
+    ]
+    return ", ".join(parts) if parts else "none"
 
 
 def _group(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, list[Mapping[str, Any]]]:
@@ -423,18 +433,12 @@ def _group(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, list[Mapp
     return grouped
 
 
-def _cluster_bucket(row: Mapping[str, Any]) -> str:
-    value = _float(row.get("cluster_confidence"))
-    if value is None:
-        components = row.get("score_components")
-        value = _float(components.get("cluster_confidence")) if isinstance(components, Mapping) else None
-    if value is None:
-        return "unknown"
-    if value >= 75:
-        return "high"
-    if value >= 45:
-        return "medium"
-    return "low"
+def _has_group_value(value: Any) -> bool:
+    if value is None or value == "":
+        return False
+    if isinstance(value, Iterable) and not isinstance(value, (str, bytes, Mapping)):
+        return any(str(item) for item in value)
+    return True
 
 
 def _float(value: object) -> float | None:

@@ -13,6 +13,9 @@ class _DailyBriefRows:
     runs: list[dict[str, Any]]
     alerts: list[dict[str, Any]]
     feedback: list[dict[str, Any]]
+    eligible_feedback: list[dict[str, Any]]
+    feedback_rows_excluded: int
+    feedback_exclusion_reason_counts: dict[str, int]
     missed: list[dict[str, Any]]
     stored_core_rows: list[dict[str, Any]]
     hypotheses: list[dict[str, Any]]
@@ -111,6 +114,7 @@ def _load_daily_brief_rows(
     run_ledger_path: str | Path | None,
     include_test_artifacts: bool,
     include_api_artifacts: bool,
+    evaluated_at: datetime,
 ) -> _DailyBriefRows:
     artifact_dir = _daily_brief_artifact_dir(run_ledger_path)
     raw_runs = _materialize_mapping_rows(run_rows)
@@ -120,13 +124,28 @@ def _load_daily_brief_rows(
         "include_test_artifacts": include_test_artifacts,
         "include_api_artifacts": include_api_artifacts,
     }
+    filtered_feedback = _filter_daily_brief_rows(feedback_rows, **filter_kwargs)
+    filtered_core_rows = _filter_daily_brief_rows(
+        _materialize_mapping_rows(core_opportunity_rows),
+        **filter_kwargs,
+    )
+    eligible_feedback, excluded_feedback, feedback_reason_counts = (
+        event_feedback_eligibility.partition_joined_calibration_feedback(
+            filtered_feedback,
+            filtered_core_rows,
+            now=evaluated_at,
+        )
+    )
     return _DailyBriefRows(
         legacy_available=any(event_alpha_artifacts.is_api_row(row) for row in raw_runs),
         runs=_filter_daily_brief_rows(raw_runs, **filter_kwargs),
         alerts=_filter_daily_brief_rows(alert_rows, **filter_kwargs),
-        feedback=_filter_daily_brief_rows(feedback_rows, **filter_kwargs),
+        feedback=filtered_feedback,
+        eligible_feedback=[dict(row) for row in eligible_feedback],
+        feedback_rows_excluded=len(excluded_feedback),
+        feedback_exclusion_reason_counts=dict(feedback_reason_counts),
         missed=_filter_daily_brief_rows(missed_rows, **filter_kwargs),
-        stored_core_rows=_filter_daily_brief_rows(_materialize_mapping_rows(core_opportunity_rows), **filter_kwargs),
+        stored_core_rows=filtered_core_rows,
         hypotheses=_filter_daily_brief_rows(_materialize_mapping_rows(hypothesis_rows), **filter_kwargs),
         incidents=_filter_daily_brief_rows(_materialize_mapping_rows(incident_rows), **filter_kwargs),
         acquisition_rows=_filter_daily_brief_rows(_materialize_mapping_rows(evidence_acquisition_rows), **filter_kwargs),
@@ -761,7 +780,16 @@ def _append_signal_quality_lines(lines: list[str], rows: _DailyBriefRows, contex
     lines.append("- Top Upgrade Candidates: " + (_upgrade_candidate_line(context.decisions) or "none"))
     lines.append("- Top Downgrade Risks: " + (_downgrade_risk_line(context.decisions) or "none"))
     lines.append("- Candidate Discovery Funnel: " + _candidate_discovery_funnel_line(rows.hypotheses))
-    lines.append("- Feedback by Impact Path: " + _feedback_by_impact_path(rows.alerts, rows.feedback))
+    lines.append(
+        "- Feedback eligibility: "
+        f"supplied={len(rows.feedback)}; eligible={len(rows.eligible_feedback)}; "
+        f"excluded={rows.feedback_rows_excluded}; reasons="
+        + _format_counts(rows.feedback_exclusion_reason_counts)
+    )
+    lines.append(
+        "- Feedback by Impact Path: "
+        + _feedback_by_impact_path(rows.alerts, rows.eligible_feedback)
+    )
     lines.extend(["", "### Quality Gate Downgrades"])
     downgraded = _quality_gate_downgrades(context.decisions)
     lines.append("- Downgraded items: " + (_brief_decisions(downgraded[:5]) or "none"))
@@ -955,6 +983,7 @@ def _append_tail_sections(
     include_test_artifacts: bool,
     include_api_artifacts: bool,
     include_diagnostics: bool,
+    generated: datetime,
 ) -> None:
     lines.extend(["", "### Missed Opportunities"])
     if rows.missed:
@@ -966,14 +995,18 @@ def _append_tail_sections(
     lines.append(_compact(event_source_reliability.format_source_reliability_report(
         rows.alerts,
         feedback_rows=rows.feedback,
+        core_rows=rows.stored_core_rows,
         missed_rows=rows.missed,
         run_rows=rows.runs[:10],
+        now=generated,
     )))
     lines.extend(["", "### Calibration Recommendations"])
     lines.append(_compact(event_alpha_calibration.format_calibration_report(
         rows.alerts,
         feedback_rows=rows.feedback,
+        core_rows=rows.stored_core_rows,
         missed_rows=rows.missed,
+        now=generated,
     )))
     lines.extend(["", "### Top Suppression Reasons"])
     lines.extend(_suppression_lines(context.decisions, context.entries))
@@ -1050,6 +1083,7 @@ def build_daily_brief(
         run_ledger_path=run_ledger_path,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
+        evaluated_at=generated,
     )
     context = _prepare_daily_brief_context(
         rows,
@@ -1106,6 +1140,7 @@ def build_daily_brief(
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
         include_diagnostics=include_diagnostics,
+        generated=generated,
     )
     return _strip_sensitive("\n".join(lines).rstrip() + "\n")
 

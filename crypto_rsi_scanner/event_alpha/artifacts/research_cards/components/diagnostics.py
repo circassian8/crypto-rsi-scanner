@@ -12,6 +12,27 @@ def _outcome_tracking_lines(outcome: Mapping[str, Any] | None) -> list[str]:
             "- Outcome label: not filled",
             "- Research-only outcome; not PnL, not a trade, not a paper trade.",
         ]
+    display_status = str(outcome.get("outcome_display_status") or "")
+    if display_status == "eligible_performance_evidence":
+        authority_lines = [
+            "- Outcome evidence: exact candidate/Core authority; eligible performance evidence.",
+        ]
+    elif display_status == "excluded_non_performance_diagnostic":
+        reasons = ", ".join(
+            str(reason)
+            for reason in outcome.get("calibration_ineligible_reasons") or ()
+            if str(reason)
+        ) or "unknown"
+        authority_lines = [
+            "- Outcome evidence: excluded diagnostic; not performance evidence.",
+            f"- Calibration exclusion reasons: {reasons}",
+        ]
+    else:
+        return [
+            "- Outcome status: unavailable",
+            "- Outcome evidence: no exact candidate/Core-authorized outcome matched this card.",
+            "- Research-only outcome; not PnL, not a trade, not a paper trade.",
+        ]
     primary_horizon = str(outcome.get("primary_horizon") or "unknown")
     rel_btc = _outcome_horizon_value(outcome.get("relative_return_vs_btc_by_horizon"), primary_horizon)
     if rel_btc in (None, ""):
@@ -30,11 +51,19 @@ def _outcome_tracking_lines(outcome: Mapping[str, Any] | None) -> list[str]:
         mfe = _outcome_horizon_value(outcome.get("max_favorable_excursion_by_window"), primary_horizon)
     if mae in (None, ""):
         mae = _outcome_horizon_value(outcome.get("max_adverse_excursion_by_window"), primary_horizon)
-    status = str(outcome.get("outcome_status") or "pending")
+    status = str(outcome.get("outcome_display_maturation_state") or "unknown")
+    validation = str(outcome.get("outcome_display_validation_status") or "inconclusive")
     missing_reason = str(outcome.get("missing_data_reason") or "").strip()
     lines = [
+        *authority_lines,
         f"- Outcome status: {status}",
-        f"- Outcome label: {outcome.get('outcome_label') or 'unknown'}",
+        f"- Deterministic validation: {validation}",
+        (
+            "- Persisted diagnostic label (not performance): "
+            f"{outcome.get('outcome_label') or 'unknown'}"
+            if display_status == "excluded_non_performance_diagnostic"
+            else "- Persisted outcome labels do not determine validation."
+        ),
         f"- Primary horizon: {primary_horizon}",
         f"- Asset primary return: {_display_pct(outcome.get('primary_horizon_return'))}",
         f"- Asset relative return vs BTC: {_display_pct(rel_btc)}",

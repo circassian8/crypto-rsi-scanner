@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
-import json
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import median
 from typing import Any, Iterable, Mapping
 
-from ..artifacts import json_lines as artifact_json_lines
 from ..artifacts import paths as event_artifact_paths
 from ..artifacts import schema_v1
 from ..radar import integrated_radar as event_integrated_radar
 from ..radar.decision_model_surfaces import decision_model_values
 from . import outcome_eligibility
+from .artifact_io import (
+    read_jsonl as _read_jsonl,
+    write_json as _write_json,
+    write_jsonl as _write_jsonl,
+)
 
 
 HORIZONS = outcome_eligibility.OUTCOME_HORIZONS
@@ -755,15 +758,38 @@ def _performance_observation_row(
     stale_after_days: int,
     join_ineligible_reasons: Iterable[str] = (),
 ) -> dict[str, Any]:
-    lane = _first_text(row, {}, "opportunity_type", default="UNCONFIRMED_RESEARCH").upper()
-    label = str(outcome.get("outcome_label") or "").strip()
-    maturation_state = _maturation_state(row, outcome, generated_at=generated_at, stale_after_days=stale_after_days)
+    authoritative_outcome = dict(outcome)
+    for field in outcome_eligibility.OUTCOME_ATTRIBUTION_FIELDS:
+        authoritative_outcome.pop(field, None)
+        value = row.get(field)
+        if value in (None, "", (), []):
+            value = row.get(f"core_{field}")
+        authoritative_outcome[field] = (
+            value if value not in (None, "", (), []) else "unknown"
+        )
+    lane = _first_text(
+        authoritative_outcome,
+        row,
+        "opportunity_type",
+        default="UNCONFIRMED_RESEARCH",
+    ).upper()
+    label = str(authoritative_outcome.get("outcome_label") or "").strip()
+    maturation_state = _maturation_state(
+        row,
+        authoritative_outcome,
+        generated_at=generated_at,
+        stale_after_days=stale_after_days,
+    )
     calibration_eligible, calibration_reasons = outcome_eligibility.effective_calibration_state(
-        outcome,
+        authoritative_outcome,
         additional_reasons=join_ineligible_reasons,
         evaluated_at=generated_at,
     )
-    validation = _validation_label(outcome) if calibration_eligible else "inconclusive"
+    validation = (
+        outcome_eligibility.deterministic_validation_status(authoritative_outcome)
+        if calibration_eligible
+        else "inconclusive"
+    )
     if maturation_state in {"pending", "stale"} and not label:
         validation = "inconclusive"
     provider = _dimension_primary(row, {}, "provider")
@@ -788,20 +814,20 @@ def _performance_observation_row(
         "source_strength": _dimension_primary(row, {}, "source_strength"),
         **decision,
         "maturation_state": maturation_state,
-        "outcome_data_source": str(outcome.get("outcome_data_source") or "legacy"),
-        "primary_horizon": str(outcome.get("primary_horizon") or ""),
+        "outcome_data_source": str(authoritative_outcome.get("outcome_data_source") or "legacy"),
+        "primary_horizon": str(authoritative_outcome.get("primary_horizon") or ""),
         "calibration_eligible": calibration_eligible,
         "calibration_ineligible_reasons": list(calibration_reasons),
         "outcome_label": label or ("pending" if maturation_state == "pending" else maturation_state),
         "validation_label": validation,
         "delivered": delivered,
         "time_to_confirmation_hours": (
-            _time_to_confirmation_hours(lane, outcome)
+            _time_to_confirmation_hours(lane, authoritative_outcome)
             if calibration_eligible
             else None
         ),
-        "observed_at": _first_text(outcome, row, "observed_at", default=""),
-        "preview_time": str(outcome.get("preview_time") or ""),
+        "observed_at": _first_text(authoritative_outcome, row, "observed_at", default=""),
+        "preview_time": str(authoritative_outcome.get("preview_time") or ""),
         "include_in_main_aggregate": (
             lane != "DIAGNOSTIC"
             and str(decision.get("radar_route") or "").strip().casefold() != "diagnostic"
@@ -1098,7 +1124,7 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
     returns = _fixture_returns(symbol, lane)
     btc_returns = _benchmark_returns("BTC")
     eth_returns = _benchmark_returns("ETH")
-    primary_horizon = _primary_horizon(lane)
+    primary_horizon = outcome_eligibility.primary_horizon_for_lane(lane) or "24h"
     primary_return = returns.get(primary_horizon)
     label = _label_for(symbol, lane, primary_return)
     price = _price(candidate)
@@ -1151,6 +1177,7 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
         "price_at_observation": price,
         "observation_price_source": None,
         "observation_price_id": None,
+        "observation_price_observed_at": None,
         "price_source": "candidate_market_snapshot" if price is not None else "missing",
         "observation_price_provenance_status": "synthetic_fixture",
         "horizons": {horizon: returns.get(horizon) for horizon in HORIZONS},
@@ -1361,14 +1388,7 @@ def _group_by(rows: Iterable[Mapping[str, Any]], key: str) -> dict[str, list[dic
 
 
 def _primary_horizon(lane: str) -> str:
-    return {
-        "EARLY_LONG_RESEARCH": "3d",
-        "CONFIRMED_LONG_RESEARCH": "24h",
-        "FADE_SHORT_REVIEW": "24h",
-        "RISK_ONLY": "24h",
-        "UNCONFIRMED_RESEARCH": "24h",
-        "DIAGNOSTIC": "24h",
-    }.get(lane, "24h")
+    return outcome_eligibility.primary_horizon_for_lane(lane) or "24h"
 
 
 def _label_for(symbol: str, lane: str, primary_return: float | None) -> str:
@@ -1465,33 +1485,3 @@ def _parse_time(value: datetime | str | None) -> datetime | None:
 
 def _iso(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat()
-
-
-def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-    return list(artifact_json_lines.read_jsonl(path).rows)
-
-
-def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        for row in rows:
-            stamped = schema_v1.stamp_artifact_row(row, path=path)
-            handle.write(json.dumps(_json_ready(stamped), sort_keys=True, separators=(",", ":")) + "\n")
-
-
-def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    stamped = schema_v1.stamp_artifact_payload(payload, path=path)
-    path.write_text(json.dumps(_json_ready(stamped), sort_keys=True), encoding="utf-8")
-
-
-def _json_ready(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {str(key): _json_ready(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, set)):
-        return [_json_ready(item) for item in value]
-    if isinstance(value, Path):
-        return event_artifact_paths.artifact_display_path(value)
-    if isinstance(value, datetime):
-        return value.astimezone(timezone.utc).isoformat()
-    return value

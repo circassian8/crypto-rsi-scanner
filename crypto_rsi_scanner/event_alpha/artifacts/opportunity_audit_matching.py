@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+import crypto_rsi_scanner.event_alpha.outcomes.feedback_eligibility as event_feedback_eligibility
 import crypto_rsi_scanner.event_alpha.radar.core_opportunities as event_core_opportunities
 
 from . import research_cards as event_research_cards
@@ -81,42 +83,30 @@ def _matching_feedback_rows(
     feedback_target: str,
     row: Mapping[str, Any],
     feedback_rows: Iterable[Mapping[str, Any] | object],
+    *,
+    core_rows: Iterable[Mapping[str, Any] | object] = (),
+    now: datetime | None = None,
 ) -> tuple[dict[str, Any], ...]:
-    identifiers = {
-        str(feedback_target or ""),
-        str(row.get("alert_id") or ""),
-        str(row.get("alert_key") or ""),
-        str(row.get("card_id") or ""),
-        str(row.get("snapshot_id") or ""),
-        str(row.get("key") or ""),
-        str(row.get("event_id") or ""),
-        str(row.get("hypothesis_id") or ""),
-        str(row.get("incident_id") or ""),
-        str(row.get("symbol") or ""),
-        str(row.get("coin_id") or ""),
-        str(row.get("validated_symbol") or ""),
-        str(row.get("validated_coin_id") or ""),
-    }
-    components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
-    identifiers.update({
-        str(components.get("validated_symbol") or ""),
-        str(components.get("validated_coin_id") or ""),
-    })
-    identifiers = {item for item in identifiers if item}
-    matches: list[dict[str, Any]] = []
-    for item in feedback_rows:
-        feedback = _row(item)
-        candidates = {
-            str(feedback.get("target") or ""),
-            str(feedback.get("key") or ""),
-            str(feedback.get("event_id") or ""),
-            str(feedback.get("incident_id") or ""),
-            str(feedback.get("coin_id") or ""),
-            str(feedback.get("symbol") or ""),
-        }
-        if identifiers.intersection(candidate for candidate in candidates if candidate):
-            matches.append(feedback)
-    return tuple(matches)
+    del feedback_target
+    authorities = [_row(item) for item in core_rows]
+    if now is None or not authorities:
+        return ()
+    exact_identity = event_feedback_eligibility.canonical_feedback_join_identity(row)
+    if exact_identity is None:
+        return ()
+    eligible, _excluded, _reason_counts = (
+        event_feedback_eligibility.partition_joined_calibration_feedback(
+            (_row(item) for item in feedback_rows),
+            authorities,
+            now=now,
+        )
+    )
+    return tuple(
+        dict(feedback)
+        for feedback in eligible
+        if event_feedback_eligibility.canonical_feedback_join_identity(feedback)
+        == exact_identity
+    )
 
 
 def _target_from_card_path(target: str, card_paths: Iterable[str | Path]) -> str | None:

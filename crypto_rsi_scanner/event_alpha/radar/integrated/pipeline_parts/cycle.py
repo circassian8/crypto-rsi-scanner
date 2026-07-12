@@ -601,6 +601,7 @@ def _write_integrated_presentations(
             run_id=start.run_id,
             raw_events=raw_events,
             cumulative_store_rows=cumulative_store_rows,
+            evaluated_at=start.research_observed_at,
         ),
         encoding="utf-8",
     )

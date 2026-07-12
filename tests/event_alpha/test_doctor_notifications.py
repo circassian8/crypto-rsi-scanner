@@ -1144,3 +1144,155 @@ def test_operator_semantic_doctor_catches_counter_and_freshness_scope_mismatches
     assert brief_conflicts["daily_brief_counter_scope_confusion"] > 0
     assert brief_conflicts["daily_brief_freshness_scope_missing"] == 1
     assert brief_conflicts["daily_brief_current_core_freshness_total_mismatch"] == 1
+
+
+def test_doctor_preview_checks_reject_legacy_same_namespace_when_context_preview_missing(
+    tmp_path,
+    monkeypatch,
+):
+    from crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_parts import notification_delivery_checks
+
+    monkeypatch.chdir(tmp_path)
+    namespace = "same_namespace_doctor_preview_authority"
+    legacy_preview = (
+        tmp_path
+        / "event_fade_cache"
+        / namespace
+        / "event_alpha_notification_preview.md"
+    )
+    legacy_preview.parent.mkdir(parents=True)
+    legacy_preview.write_text(
+        "# stale legacy preview\n\n"
+        "Raw events: 999 · Core opportunities: 0\n"
+        "Send guard: No-send rehearsal: send guard is disabled.\n",
+        encoding="utf-8",
+    )
+    context_preview = (
+        tmp_path
+        / "explicit_artifact_base"
+        / namespace
+        / "event_alpha_notification_preview.md"
+    )
+    context_preview.parent.mkdir(parents=True)
+    delivery_row = {
+        "row_type": "event_alpha_notification_delivery",
+        "delivery_id": "delivery-context-preview",
+        "run_id": "run-context-preview",
+        "profile": "notify_llm_deep",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": namespace,
+        "lane": "health_heartbeat",
+        "attempted_at": "2026-07-12T04:30:00+00:00",
+        "notification_preview_path": str(legacy_preview),
+        "notification_preview_relpath": legacy_preview.relative_to(tmp_path).as_posix(),
+    }
+
+    delivery_conflicts = notification_delivery_checks._notification_delivery_conflicts(
+        delivery_rows=[delivery_row],
+        core_rows_by_id={},
+        latest_run_id="run-context-preview",
+        strict_scope="latest_run",
+        notification_preview_path=context_preview,
+    )
+    preview_conflicts = notification_delivery_checks._notification_preview_consistency_conflicts(
+        delivery_rows=[delivery_row],
+        latest_run={
+            "run_id": "run-context-preview",
+            "raw_events": 0,
+            "core_opportunity_rows_written": 0,
+        },
+        core_rows=(),
+        latest_run_id="run-context-preview",
+        notification_preview_path=context_preview,
+    )
+
+    assert delivery_conflicts["notification_preview_missing"] == 1
+    assert delivery_conflicts["notification_preview_path_unresolvable"] == 1
+    assert preview_conflicts["notification_preview_run_summary_mismatch"] == 0
+
+
+def test_artifact_doctor_explicit_context_preview_rejects_legacy_same_namespace(
+    tmp_path,
+    monkeypatch,
+):
+    from datetime import datetime, timezone
+
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+
+    monkeypatch.chdir(tmp_path)
+    namespace = "same_namespace_doctor_context_preview"
+    legacy_preview = (
+        tmp_path
+        / "event_fade_cache"
+        / namespace
+        / "event_alpha_notification_preview.md"
+    )
+    legacy_preview.parent.mkdir(parents=True)
+    legacy_preview.write_text(
+        "# stale legacy preview\n\n"
+        "Raw events: 999 · Core opportunities: 0\n"
+        "Send guard: No-send rehearsal: send guard is disabled.\n",
+        encoding="utf-8",
+    )
+    namespace_dir = tmp_path / "explicit_artifact_base" / namespace
+    namespace_dir.mkdir(parents=True)
+    context_preview = namespace_dir / "event_alpha_notification_preview.md"
+    run_row = {
+        "row_type": "event_alpha_run",
+        "run_id": "run-doctor-context-preview",
+        "profile": "notify_llm_deep",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": namespace,
+        "started_at": "2026-07-12T04:30:00+00:00",
+        "cycle_completed": True,
+        "success": True,
+        "raw_events": 0,
+        "core_opportunity_rows_written": 0,
+    }
+    delivery_row = {
+        "row_type": "event_alpha_notification_delivery",
+        "delivery_id": "delivery-doctor-context-preview",
+        "run_id": run_row["run_id"],
+        "profile": run_row["profile"],
+        "run_mode": run_row["run_mode"],
+        "artifact_namespace": namespace,
+        "lane": "health_heartbeat",
+        "attempted_at": run_row["started_at"],
+        "notification_preview_path": str(legacy_preview),
+        "notification_preview_relpath": legacy_preview.relative_to(tmp_path).as_posix(),
+    }
+
+    result = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[run_row],
+        delivery_rows=[delivery_row],
+        profile=run_row["profile"],
+        artifact_namespace=namespace,
+        artifact_namespace_dir=namespace_dir,
+        notification_preview_path=context_preview,
+        delivery_strict_scope="latest_run",
+        evaluated_at=datetime(2026, 7, 12, 4, 31, tzinfo=timezone.utc),
+    )
+
+    assert result.notification_preview_missing == 1
+    assert result.notification_preview_path_unresolvable == 1
+    assert result.notification_preview_run_summary_mismatch == 0
+
+
+def test_notification_preview_io_helpers_keep_doctor_compat_surface():
+    from crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_parts import (
+        notification_delivery_checks,
+        notification_preview_io,
+    )
+
+    helper_names = (
+        "_delivery_preview_body",
+        "_active_preview_api_alerts_wording_count",
+        "_notification_preview_api_alerts_wording",
+        "_latest_preview_path",
+        "_telegram_preview_bodies",
+    )
+    for name in helper_names:
+        assert getattr(notification_delivery_checks, name) is getattr(
+            notification_preview_io,
+            name,
+        )

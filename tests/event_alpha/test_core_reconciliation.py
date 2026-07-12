@@ -16,7 +16,9 @@ globals().update({
 
 def test_canonical_core_opportunity_view_loads_linked_artifacts():
     import json
+    from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback_eligibility as feedback_eligibility
     import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store
     import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research_cards
 
@@ -35,6 +37,7 @@ def test_canonical_core_opportunity_view_loads_linked_artifacts():
             profile="market_refresh_smoke",
             run_mode="burn_in",
             artifact_namespace="market_refresh_smoke",
+            now=datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc),
         )
         core_rows = event_core_opportunity_store.load_core_opportunities(core_path, latest_run=True).rows
         cards = event_research_cards.write_research_cards(card_dir, watchlist_entries=[], alert_rows=core_rows)
@@ -88,16 +91,31 @@ def test_canonical_core_opportunity_view_loads_linked_artifacts():
             ]) + "\n",
             encoding="utf-8",
         )
+        feedback_row = {
+            "schema_version": "event_alpha_feedback_v1",
+            "row_type": "event_alpha_feedback",
+            "feedback_id": "feedback:velvet:useful",
+            "run_id": velvet["run_id"],
+            "profile": velvet["profile"],
+            "artifact_namespace": velvet["artifact_namespace"],
+            "run_mode": velvet["run_mode"],
+            "core_opportunity_id": velvet["core_opportunity_id"],
+            "target": velvet["core_opportunity_id"],
+            "feedback_target": velvet["core_opportunity_id"],
+            "feedback_target_type": "core_opportunity_id",
+            "label": "useful",
+            "marked_at": "2026-06-15T13:00:00+00:00",
+            "marked_by": "human",
+            "source": "manual_cli",
+            "research_only": True,
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+        }
+        feedback_row.update(
+            feedback_eligibility.build_feedback_eligibility_fields(feedback_row)
+        )
         feedback_path.write_text(
-            json.dumps({
-                "row_type": "event_alpha_feedback",
-                "target": velvet["core_opportunity_id"],
-                "label": "useful",
-                "marked_at": "2026-06-15T13:00:00+00:00",
-                "marked_by": "human",
-                "symbol": "VELVET",
-                "coin_id": "velvet",
-            }) + "\n",
+            json.dumps(feedback_row) + "\n",
             encoding="utf-8",
         )
         incident_path.write_text(
@@ -133,6 +151,7 @@ def test_canonical_core_opportunity_view_loads_linked_artifacts():
             incident_store_path=incident_path,
             feedback_path=feedback_path,
             research_cards_dir=card_dir,
+            now=datetime(2026, 6, 15, 14, 0, tzinfo=timezone.utc),
         )
         legacy = event_core_opportunity_store.load_canonical_core_opportunity_view(
             "market_refresh_smoke",
@@ -156,6 +175,11 @@ def test_canonical_core_opportunity_view_loads_linked_artifacts():
     assert view.incident_row["main_frame_type"] == "proxy_attention"
     assert view.incident_row["incident_relevance_status"] == "active_incident"
     assert view.feedback_status == "has_feedback"
+    assert view.feedback_rows[0]["feedback_label"] == "useful"
+    assert view.feedback_rows_supplied == 1
+    assert view.feedback_rows_eligible == 1
+    assert view.feedback_rows_matched_to_core == 1
+    assert view.feedback_rows_excluded == 0
     assert view.market_refresh_rows
     assert legacy.found
     assert legacy.symbol == "MEME"

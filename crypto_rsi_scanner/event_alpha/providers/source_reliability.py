@@ -6,25 +6,46 @@ import math
 from statistics import median
 from typing import Any, Iterable, Mapping
 
+from ..outcomes import feedback_eligibility
+
 
 def format_source_reliability_report(
     alert_rows: Iterable[Mapping[str, Any]],
     *,
     feedback_rows: Iterable[Mapping[str, Any]] = (),
+    core_rows: Iterable[Mapping[str, Any]] = (),
     missed_rows: Iterable[Mapping[str, Any]] = (),
     run_rows: Iterable[Mapping[str, Any]] = (),
+    now: Any = None,
 ) -> str:
     alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
-    feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    supplied_feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    feedback, excluded_feedback, feedback_reasons = (
+        feedback_eligibility.partition_joined_calibration_feedback(
+            supplied_feedback,
+            core_rows,
+            now=now,
+        )
+    )
+    feedback = list(feedback)
     missed = [dict(row) for row in missed_rows if isinstance(row, Mapping)]
     runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
-    merged = _merge_feedback(alerts, feedback)
+    merged = feedback
     lines = [
         "=" * 76,
         "EVENT SOURCE RELIABILITY REPORT (research-only; recommendations only)",
         "=" * 76,
-        f"alerts={len(alerts)} · feedback={len(feedback)} · missed={len(missed)} · runs={len(runs)}",
+        f"alerts={len(alerts)} · feedback_supplied={len(supplied_feedback)} · "
+        f"feedback_eligible={len(feedback)} · feedback_excluded={len(excluded_feedback)} · "
+        f"missed={len(missed)} · runs={len(runs)}",
     ]
+    if feedback_reasons:
+        lines.append(
+            "feedback exclusions: "
+            + ", ".join(
+                f"{reason}={count}" for reason, count in sorted(feedback_reasons.items())
+            )
+        )
     if not merged and not missed and not runs:
         lines.append("")
         lines.append("No source reliability artifacts found.")
@@ -53,32 +74,6 @@ def format_source_reliability_report(
     lines.extend(f"- {item}" for item in _recommendations(merged, missed, runs))
     lines.append("No alert tiers, thresholds, paper trades, live DB rows, or execution were changed.")
     return "\n".join(line for line in lines if line is not None).rstrip()
-
-
-def _merge_feedback(alerts: list[dict[str, Any]], feedback: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    by_key: dict[str, dict[str, Any]] = {}
-    for row in feedback:
-        for key in _row_keys(row):
-            by_key[key] = row
-    out: list[dict[str, Any]] = []
-    matched: set[str] = set()
-    for alert in alerts:
-        merged = dict(alert)
-        feedback_row = next((by_key[key] for key in _row_keys(alert) if key in by_key), None)
-        if feedback_row:
-            matched.update(_row_keys(feedback_row))
-            merged["feedback_label"] = feedback_row.get("label")
-            merged["feedback_notes"] = feedback_row.get("notes")
-            for field in ("source_provider", "source_domain", "source_pack", "source_class"):
-                if not merged.get(field) and feedback_row.get(field):
-                    merged[field] = feedback_row.get(field)
-        out.append(merged)
-    for row in feedback:
-        keys = _row_keys(row)
-        if keys and any(key in matched for key in keys):
-            continue
-        out.append(dict(row))
-    return out
 
 
 def _provider(row: Mapping[str, Any]) -> str:
@@ -186,32 +181,6 @@ def _group(rows: Iterable[Mapping[str, Any]]) -> dict[str, list[Mapping[str, Any
     for row in rows:
         grouped.setdefault(_provider(row), []).append(row)
     return grouped
-
-
-def _row_keys(row: Mapping[str, Any]) -> tuple[str, ...]:
-    keys: list[str] = []
-    for field in (
-        "key",
-        "target",
-        "feedback_target",
-        "core_opportunity_id",
-        "alert_key",
-        "alert_id",
-        "card_id",
-        "hypothesis_id",
-        "incident_id",
-        "symbol",
-        "coin_id",
-    ):
-        value = str(row.get(field) or "").strip()
-        if not value:
-            continue
-        keys.append(value)
-        if value.startswith("ea:"):
-            keys.append(value[3:])
-        else:
-            keys.append(f"ea:{value}")
-    return tuple(dict.fromkeys(keys))
 
 
 def _float(value: object) -> float | None:

@@ -216,7 +216,6 @@ def apply_integrated_artifact_checks(ctx: object, blockers: Messages, warnings: 
         "integrated_delivery_card_path_not_rendered",
         "integrated_api_preview_alerts_wording",
         "integrated_manifest_daily_brief_unavailable",
-        "integrated_outcome_missing_for_candidate",
         "integrated_outcome_side_effect_flag",
         "integrated_outcome_schema_missing",
         "integrated_outcome_missing_identity",
@@ -240,6 +239,13 @@ def apply_integrated_artifact_checks(ctx: object, blockers: Messages, warnings: 
         count = integrated_conflicts.get(key, 0)
         if count:
             emit(blockers, warnings, f"{key}={count}", blocker=strict)
+    missing_outcomes = integrated_conflicts.get(
+        "integrated_outcome_missing_for_candidate", 0
+    )
+    if missing_outcomes:
+        warnings.append(
+            f"integrated_outcome_missing_for_candidate={missing_outcomes}"
+        )
     for key in (
         "integrated_outcome_eligibility_contract_invalid",
         "integrated_outcome_synthetic_evidence_leak",

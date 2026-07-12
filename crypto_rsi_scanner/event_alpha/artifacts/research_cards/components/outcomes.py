@@ -469,10 +469,15 @@ def _lifecycle_lines(
             f"hints={', '.join(str(item) for item in hints) if hints else 'none'}"
         )
     if feedback_rows:
-        for row in sorted(feedback_rows, key=lambda item: str(item.get("marked_at") or ""), reverse=True)[:5]:
+        for row in sorted(
+            feedback_rows,
+            key=lambda item: str(item.get("feedback_marked_at") or ""),
+            reverse=True,
+        )[:5]:
             lines.append(
-                f"- feedback: {row.get('label') or 'unknown'} at {row.get('marked_at') or 'unknown'} "
-                f"by {row.get('marked_by') or 'unknown'}"
+                f"- feedback: {row.get('feedback_label') or 'unknown'} at "
+                f"{row.get('feedback_marked_at') or 'unknown'} "
+                f"by {row.get('feedback_marked_by') or 'unknown'}"
             )
     else:
         lines.append("- feedback: none")
@@ -484,8 +489,14 @@ def _lifecycle_lines(
         "direction_hit",
         "mfe_mae_ratio",
     )):
+        display_status = str(outcome.get("outcome_display_status") or "")
+        evidence_label = (
+            "eligible exact-authority evidence"
+            if display_status == "eligible_performance_evidence"
+            else "excluded diagnostic; not performance evidence"
+        )
         lines.append(
-            "- outcome: "
+            f"- outcome ({evidence_label}): "
             f"primary={_display_pct(outcome.get('primary_horizon_return'))} "
             f"24h={_display_pct(outcome.get('return_24h'))} "
             f"72h={_display_pct(outcome.get('return_72h'))} "
@@ -497,6 +508,35 @@ def _lifecycle_lines(
         lines.append("- outcome: not filled")
     return lines or ["- No lifecycle timestamps found."]
 
+
+def _feedback_evidence_diagnostic_lines(
+    diagnostics: Mapping[str, Any],
+) -> list[str]:
+    reason_counts = diagnostics.get("feedback_exclusion_reason_counts")
+    reasons = (
+        ", ".join(
+            f"{reason}={count}"
+            for reason, count in sorted(reason_counts.items())
+        )
+        if isinstance(reason_counts, Mapping) and reason_counts
+        else "none"
+    )
+    return [
+        f"- Feedback rows supplied: {diagnostics.get('feedback_rows_supplied', 0)}",
+        f"- Eligible exact-Core feedback rows: {diagnostics.get('feedback_rows_eligible', 0)}",
+        (
+            "- Eligible feedback rows matched to this card: "
+            f"{diagnostics.get('feedback_rows_matched_to_card', 0)}"
+        ),
+        (
+            "- Eligible feedback rows for other Core opportunities: "
+            f"{diagnostics.get('feedback_rows_eligible_other_core', 0)}"
+        ),
+        f"- Excluded feedback rows: {diagnostics.get('feedback_rows_excluded', 0)}",
+        f"- Aggregate exclusion reasons: {reasons}",
+        "- Excluded feedback is aggregate diagnostics only and never supplies a card label.",
+    ]
+
 __all__ = (
     '_impact_hypothesis_lines',
     '_impact_hypothesis_quality_gate_line',
@@ -505,4 +545,5 @@ __all__ = (
     '_quality_gate_lines',
     '_monitor_lines',
     '_lifecycle_lines',
+    '_feedback_evidence_diagnostic_lines',
 )

@@ -154,7 +154,7 @@ def replay_from_raw_events(
                 enabled=llm_cfg.mode == "advisory",
             )
     priors_enabled = bool(priors_cfg and priors_cfg.enabled)
-    with_priors = event_alpha_priors.apply_priors_to_alerts(
+    with_priors = event_alpha_priors.apply_priors_shadow(
         compared,
         cfg=priors_cfg or event_alpha_priors.EventAlphaPriorsConfig(enabled=False),
         alert_cfg=alert_cfg,
@@ -232,6 +232,12 @@ def compare_replay_policies(
     raw = tuple(raw_events)
     asset_rows = tuple(assets)
     market = tuple(dict(row) for row in market_rows if isinstance(row, Mapping))
+    supplied_feedback = tuple(
+        dict(row) for row in feedback_rows if isinstance(row, Mapping)
+    )
+    supplied_outcomes = tuple(
+        dict(row) for row in outcome_rows if isinstance(row, Mapping)
+    )
     base_router = router_cfg or event_alpha_router.EventAlphaRouterConfig(enabled=True)
     priors_enabled_cfg = event_alpha_priors.EventAlphaPriorsConfig(
         enabled=True,
@@ -241,6 +247,11 @@ def compare_replay_policies(
     )
     rows: list[EventAlphaReplayPolicyRow] = []
     warnings: list[str] = ["policy comparison is local-only; no live providers or sends were attempted"]
+    if supplied_feedback or supplied_outcomes:
+        warnings.append(
+            "historical feedback/outcome annotations were omitted because replay "
+            "candidates do not carry an exact canonical Core identity"
+        )
     for policy in [str(item).strip().lower() for item in policies if str(item).strip()]:
         use_llm = policy in {"llm", "llm_advisory"}
         use_priors = policy == "priors"
@@ -287,8 +298,8 @@ def compare_replay_policies(
         warnings.extend(replay.warnings)
     diffs = _policy_diffs(
         rows,
-        feedback_rows=feedback_rows,
-        outcome_rows=outcome_rows,
+        feedback_rows=(),
+        outcome_rows=(),
         baseline_policy=str(rows[0].policy) if rows else "baseline",
     )
     return EventAlphaReplayComparisonResult(
@@ -506,29 +517,47 @@ def _policy_diffs(
 
 
 def _feedback_by_key(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
+    """Index only prevalidated exact-Core projections; replay currently has no bridge."""
+
     out: dict[str, str] = {}
+    ambiguous: set[str] = set()
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        label = str(row.get("label") or "").strip()
-        if not label:
+        label = str(row.get("feedback_label") or "").strip()
+        core_id = str(row.get("core_opportunity_id") or "").strip()
+        if row.get("calibration_eligible") is not True or not label or not core_id:
             continue
-        for field in ("alert_key", "key", "target", "watchlist_key", "snapshot_id"):
-            key = str(row.get(field) or "").strip()
-            if key:
-                out[key] = label
+        if core_id in out:
+            ambiguous.add(core_id)
+            out.pop(core_id, None)
+            continue
+        if core_id not in ambiguous:
+            out[core_id] = label
     return out
 
 
 def _outcome_by_key(rows: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Index only unique exact-Core observed outcomes; never legacy aliases."""
+
     out: dict[str, dict[str, Any]] = {}
+    ambiguous: set[str] = set()
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        for field in ("alert_key", "key", "watchlist_key", "snapshot_id"):
-            key = str(row.get(field) or "").strip()
-            if key:
-                out[key] = dict(row)
+        core_id = str(row.get("core_opportunity_id") or "").strip()
+        if (
+            row.get("calibration_eligible") is not True
+            or row.get("outcome_data_source") != "observed_market_prices"
+            or not core_id
+        ):
+            continue
+        if core_id in out:
+            ambiguous.add(core_id)
+            out.pop(core_id, None)
+            continue
+        if core_id not in ambiguous:
+            out[core_id] = dict(row)
     return out
 
 

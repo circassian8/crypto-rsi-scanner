@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -19,7 +20,6 @@ from . import research_cards as event_research_cards
 from .opportunity_audit_matching import (
     _audit_feedback_target,
     _matching_card_paths,
-    _matching_feedback_rows,
     _target_from_card_path,
 )
 from .opportunity_audit_values import (
@@ -54,11 +54,18 @@ def format_opportunity_audit(
     feedback_rows: Iterable[Mapping[str, Any] | object] = (),
     profile: str | None = None,
     include_diagnostics: bool = False,
+    now: datetime | None = None,
 ) -> str:
     """Explain one candidate's research-only decision path."""
     clean = str(target or "").strip()
     if not clean:
         return "Event opportunity audit failed: target is required."
+    evaluated_at = now or datetime.now(timezone.utc)
+    evaluated_at = (
+        evaluated_at.astimezone(timezone.utc)
+        if evaluated_at.tzinfo is not None
+        else evaluated_at.replace(tzinfo=timezone.utc)
+    )
     resolved_target = _target_from_card_path(clean, card_paths) or clean
     hypothesis_items = list(hypotheses)
     core_items = list(core_opportunity_rows)
@@ -75,6 +82,7 @@ def format_opportunity_audit(
         feedback_rows=feedback_rows,
         card_paths=card_paths,
         profile=profile,
+        now=evaluated_at,
     )
     stored_core_opportunities = (
         (core_view.core_opportunity,)
@@ -118,10 +126,18 @@ def format_opportunity_audit(
     if core_view.research_card_path:
         matching_cards = tuple(dict.fromkeys([Path(core_view.research_card_path), *matching_cards]))
     feedback_target = _audit_feedback_target(row, resolved_target, core_match, matching_cards)
-    feedback_matches = core_view.feedback_rows or _matching_feedback_rows(feedback_target, row, feedback_rows)
-    feedback_status = "has_feedback" if feedback_matches else _value(row, "feedback_status", default="pending_or_unknown")
+    feedback_matches = core_view.feedback_rows
+    feedback_status = (
+        core_view.feedback_status
+        if core_view.found
+        else "pending_or_unknown"
+    )
     feedback_labels = tuple(
-        dict.fromkeys(str(item.get("label") or item.get("feedback") or "") for item in feedback_matches)
+        dict.fromkeys(
+            str(item.get("feedback_label"))
+            for item in feedback_matches
+            if str(item.get("feedback_label") or "")
+        )
     )
     return "\n".join(_opportunity_audit_lines(
         clean=clean,
@@ -190,6 +206,7 @@ def _opportunity_audit_lines(
         "",
         *_router_and_reconciliation_audit_lines(match, core_view, row, include_diagnostics=include_diagnostics),
         *_notification_feedback_audit_lines(row, feedback_status, feedback_labels),
+        *_feedback_evidence_diagnostic_lines(core_view),
         *_upgrade_downgrade_audit_lines(row, components, verdict_copy, upgrade, feedback_target, profile),
         "No secrets, Telegram sends, trades, paper rows, normal RSI rows, or event-fade state were touched.",
     ]
@@ -388,8 +405,33 @@ def _notification_feedback_audit_lines(
         "## Notification and feedback status",
         f"- delivery status: {_value(row, 'delivered_status', 'delivery_state', default='not_delivered_or_unknown')}",
         f"- feedback status: {feedback_status}",
-        f"- feedback label: {_list_value(labels) if labels else _value(row, 'label', 'feedback', default='none')}",
+        f"- feedback label: {_list_value(labels) if labels else 'none'}",
         f"- outcome status: {_value(row, 'outcome_status', default='pending_or_unknown')}",
+        "",
+    ]
+
+
+def _feedback_evidence_diagnostic_lines(
+    core_view: event_core_opportunity_store.CanonicalCoreOpportunityView,
+) -> list[str]:
+    reason_counts = core_view.feedback_exclusion_reason_counts
+    reasons = (
+        "; ".join(
+            f"{reason}={count}"
+            for reason, count in sorted(reason_counts.items())
+        )
+        if reason_counts
+        else "none"
+    )
+    return [
+        "## Feedback evidence diagnostics",
+        f"- feedback rows supplied: {core_view.feedback_rows_supplied}",
+        f"- eligible exact-Core feedback rows: {core_view.feedback_rows_eligible}",
+        f"- eligible feedback rows matched to this Core: {core_view.feedback_rows_matched_to_core}",
+        f"- eligible feedback rows for other Core opportunities: {core_view.feedback_rows_eligible_other_core}",
+        f"- excluded feedback rows: {core_view.feedback_rows_excluded}",
+        f"- aggregate exclusion reasons: {reasons}",
+        "- Excluded feedback is aggregate diagnostics only and never supplies audit status or labels.",
         "",
     ]
 

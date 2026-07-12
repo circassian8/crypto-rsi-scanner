@@ -387,7 +387,7 @@
         "EventAlphaBurnInScorecard"
       ],
       "exception_reason": "",
-      "max_class_line_count": 27,
+      "max_class_line_count": 30,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.burn_in",
       "public_class_count": 3,
@@ -402,7 +402,7 @@
         "EventAlphaFeedbackReadinessResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 33,
+      "max_class_line_count": 36,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.feedback",
       "public_class_count": 2,
@@ -419,7 +419,7 @@
         "EventFeedbackRecord"
       ],
       "exception_reason": "",
-      "max_class_line_count": 50,
+      "max_class_line_count": 57,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.feedback_labels",
       "public_class_count": 4,
@@ -434,7 +434,7 @@
         "EventAlphaPolicySimulationResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 7,
+      "max_class_line_count": 9,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.policy_simulator",
       "public_class_count": 2,
@@ -473,7 +473,7 @@
         "SignalQualityEvalResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 8,
+      "max_class_line_count": 9,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.quality.models",
       "public_class_count": 9,
@@ -1451,7 +1451,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 541,
+  "class_count": 544,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1506,12 +1506,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 6659,
+  "function_count": 6730,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-12T09:11:24.407377+00:00",
+  "generated_at": "2026-07-12T11:22:03.083015+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -1861,7 +1861,7 @@
         "EventAlphaBurnInScorecard"
       ],
       "exception_reason": "",
-      "max_class_line_count": 27,
+      "max_class_line_count": 30,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.burn_in",
       "public_class_count": 3,
@@ -1876,7 +1876,7 @@
         "EventAlphaFeedbackReadinessResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 33,
+      "max_class_line_count": 36,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.feedback",
       "public_class_count": 2,
@@ -1893,7 +1893,7 @@
         "EventFeedbackRecord"
       ],
       "exception_reason": "",
-      "max_class_line_count": 50,
+      "max_class_line_count": 57,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.feedback_labels",
       "public_class_count": 4,
@@ -1908,7 +1908,7 @@
         "EventAlphaPolicySimulationResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 7,
+      "max_class_line_count": 9,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.policy_simulator",
       "public_class_count": 2,
@@ -1947,7 +1947,7 @@
         "SignalQualityEvalResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 8,
+      "max_class_line_count": 9,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.outcomes.quality.models",
       "public_class_count": 9,
@@ -2941,7 +2941,7 @@
   "multi_public_class_modules_count": 83,
   "near_threshold_file_status": [
     {
-      "line_count": 1497,
+      "line_count": 1487,
       "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -3394,7 +3394,7 @@
       "rows": [
         {
           "accepted": true,
-          "line_count": 1497,
+          "line_count": 1487,
           "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
           "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
           "revisit_condition": "When outcome performance views gain new sections.",
@@ -3507,7 +3507,7 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
-        "line_count": 1497,
+        "line_count": 1487,
         "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
         "threshold": 1200
       },
@@ -3570,7 +3570,7 @@
         "rows": [
           {
             "accepted": true,
-            "line_count": 1497,
+            "line_count": 1487,
             "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
             "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
             "revisit_condition": "When outcome performance views gain new sections.",

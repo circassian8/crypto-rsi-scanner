@@ -10,8 +10,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 from . import calendar as calendar_specs, decision_model as decision_model_specs
+from . import feedback_eligibility as feedback_eligibility_specs
 from . import outcome_eligibility as outcome_eligibility_specs
 from . import operator_state as operator_state_specs, provider_lineage_specs
+from .registry_mappings import FILENAME_TO_SCHEMA_ID, ROW_TYPE_TO_SCHEMA_ID
+from .. import json_lines as artifact_json_lines
 EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION = "event_alpha_schema_v1"
 ALLOWED_OPPORTUNITY_TYPES = (
     "EARLY_LONG_RESEARCH",
@@ -408,9 +411,10 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "enough_data_reasons", "auto_apply", "auto_apply_thresholds",
             "fixture_candidate_count", "contract_counted_candidate_count",
             "real_burn_in_candidate_count",
-            "warnings", *outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_FIELDS, *OPERATION_SAFETY,
+            "warnings", *feedback_eligibility_specs.FEEDBACK_EVIDENCE_TELEMETRY_FIELDS,
+            *outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_FIELDS, *OPERATION_SAFETY,
         ),
-        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", **outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_TYPES},
+        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", **feedback_eligibility_specs.FEEDBACK_EVIDENCE_TELEMETRY_TYPES, **outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_TYPES},
         safety=OPERATION_SAFETY + ("auto_apply",),
         timestamps=("generated_at",),
         lineage=("profile", "artifact_namespace"),
@@ -423,9 +427,10 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "window_days", "namespace_policy", "burn_in_contract_scope",
             "candidate_source_scope", "explicit_scope_warning", "enough_data",
             "enough_data_reasons", "low_sample_warning", "min_sample_warning",
-            "source_yield_confidence", *outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_FIELDS, *OPERATION_SAFETY,
+            "source_yield_confidence", *feedback_eligibility_specs.FEEDBACK_EVIDENCE_TELEMETRY_FIELDS,
+            *outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_FIELDS, *OPERATION_SAFETY,
         ),
-        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", "auto_apply_thresholds": "bool", **outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_TYPES},
+        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", "auto_apply_thresholds": "bool", **feedback_eligibility_specs.FEEDBACK_EVIDENCE_TELEMETRY_TYPES, **outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_TYPES},
         safety=OPERATION_SAFETY + ("auto_apply_thresholds",),
         timestamps=("generated_at",),
         lineage=("profile", "artifact_namespace"),
@@ -438,9 +443,10 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "window_days", "namespace_policy", "burn_in_contract_scope",
             "candidate_source_scope", "providers", "source_packs",
             "source_yield_confidence", "recommendations_only",
-            "auto_apply_thresholds", *outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_FIELDS, *OPERATION_SAFETY,
+            "auto_apply_thresholds", *feedback_eligibility_specs.FEEDBACK_EVIDENCE_TELEMETRY_FIELDS,
+            *outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_FIELDS, *OPERATION_SAFETY,
         ),
-        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", "auto_apply": "bool", **outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_TYPES},
+        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", "auto_apply": "bool", **feedback_eligibility_specs.FEEDBACK_EVIDENCE_TELEMETRY_TYPES, **outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_TYPES},
         safety=OPERATION_SAFETY + ("auto_apply", "auto_apply_thresholds"),
         timestamps=("generated_at",),
         lineage=("profile", "artifact_namespace"),
@@ -580,6 +586,44 @@ SCHEMAS: dict[str, ArtifactSchema] = {
         common_safety=COMMON_SAFETY,
         common_lineage=COMMON_LINEAGE,
     ),
+    **feedback_eligibility_specs.schema_specs(
+        _schema,
+        common_safety=COMMON_SAFETY,
+        common_lineage=COMMON_LINEAGE,
+    ),
+    "feedback_calibration_prior_v2": _schema(
+        "feedback_calibration_prior_v2",
+        required=(
+            "schema_version", "row_type", "generated_at",
+            "feedback_firewall_evaluated_at", "feedback_firewall_applied",
+            "feedback_eligibility_contract_version", "alert_rows_supplied",
+            "feedback_rows_supplied", "feedback_rows_eligible",
+            "feedback_rows_excluded",
+            "min_sample", "min_sample_warning", "research_only",
+            "recommendation_only", "eligible_for_auto_apply", "auto_apply",
+        ),
+        optional=(
+            "schema_id", "playbook_priors", "provider_priors",
+            "llm_role_priors", "tier_priors", "source_pack_priors",
+            "source_domain_priors", "market_confirmation_priors",
+            "catalyst_frame_priors", "feedback_exclusion_reason_counts",
+        ),
+        types={
+            "row_type": "str",
+            "feedback_firewall_applied": "bool",
+            "feedback_eligibility_contract_version": "int",
+            "alert_rows_supplied": "int",
+            **feedback_eligibility_specs.FEEDBACK_EVIDENCE_TELEMETRY_TYPES,
+            "min_sample": "int",
+            "min_sample_warning": "bool",
+            "research_only": "bool",
+            "recommendation_only": "bool",
+            "eligible_for_auto_apply": "bool",
+            "auto_apply": "bool",
+        },
+        safety=("research_only", "auto_apply"),
+        timestamps=("generated_at", "feedback_firewall_evaluated_at"),
+    ),
     "calibration_prior_v1": _schema(
         "calibration_prior_v1",
         required=("auto_apply",),
@@ -717,99 +761,6 @@ SCHEMAS: dict[str, ArtifactSchema] = {
     ),
 }
 
-ROW_TYPE_TO_SCHEMA_ID = {
-    "event_core_opportunity": "core_opportunity_v1",
-    "event_integrated_radar_candidate": "integrated_radar_candidate_v1",
-    "event_alpha_notification_delivery": "notification_delivery_v1",
-    "event_integrated_radar_notification_delivery": "integrated_notification_delivery_v1",
-    "event_live_provider_activation_readiness": "provider_readiness_v1",
-    "event_official_exchange_activation": "provider_readiness_v1",
-    "event_coinalyze_preflight": "provider_preflight_v1",
-    "event_coinalyze_rehearsal_report": "provider_preflight_v1",
-    "event_bybit_announcements_preflight": "provider_preflight_v1",
-    "event_bybit_announcements_rehearsal_report": "provider_preflight_v1",
-    "event_unlock_calendar_preflight": "provider_preflight_v1",
-    "event_dex_onchain_readiness": "provider_readiness_v1",
-    "coinalyze_request_ledger": "coinalyze_request_ledger_v1",
-    "derivatives_state_snapshot": "derivatives_state_snapshot_v1",
-    "event_derivatives_crowding_candidate": "derivatives_crowding_candidate_v1",
-    "event_fade_short_review_candidate": "fade_review_candidate_v1",
-    "fade_short_review_candidate": "fade_review_candidate_v1",
-    "event_market_state_snapshot": "market_state_snapshot_v1",
-    "event_targeted_market_refresh_ledger": "targeted_market_refresh_ledger_v1",
-    "event_targeted_market_refresh_report": "targeted_market_refresh_report_v1",
-    "event_market_anomaly": "market_anomaly_v1",
-    "event_market_anomaly_catalyst_search_queue": "market_anomaly_v1",
-    "event_official_exchange_event": "official_exchange_event_v1",
-    "official_exchange_event": "official_exchange_event_v1",
-    "exchange_announcement": "official_exchange_event_v1",
-    "event_scheduled_catalyst": "scheduled_catalyst_event_v1",
-    "scheduled_catalyst": "scheduled_catalyst_event_v1",
-    "event_unified_calendar_event": "unified_calendar_event_v1",
-    "event_unlock_candidate": "unlock_event_v1",
-    "unlock_candidate": "unlock_event_v1",
-    "event_integrated_radar_outcome": "outcome_row_v1",
-    "event_integrated_radar_calibration_priors": "calibration_prior_v1",
-    "event_radar_provider_performance": "calibration_prior_v1",
-    "event_alpha_namespace_status": "namespace_status_v1",
-    "event_alpha_operator_state": "operator_state_v1",
-    "event_alpha_run": "run_ledger_v1",
-    "event_alpha_daily_burn_in_run": "event_alpha_daily_burn_in_run_v1",
-    "event_alpha_candidate_mode_manifest": "event_alpha_candidate_mode_manifest_v1",
-    "event_alpha_daily_review_inbox": "event_alpha_daily_review_inbox_v1",
-    "event_alpha_burn_in_scorecard": "event_alpha_burn_in_scorecard_v1",
-    "event_alpha_burn_in_measurement_dashboard": "event_alpha_burn_in_measurement_dashboard_v1",
-    "event_alpha_source_yield_report": "event_alpha_source_yield_report_v1",
-    "event_alpha_burn_in_archive_manifest": "event_alpha_burn_in_archive_manifest_v1",
-    "event_alpha_burn_in_namespace_policy": "event_alpha_burn_in_namespace_policy_v1",
-}
-
-FILENAME_TO_SCHEMA_ID = {
-    "event_core_opportunities.jsonl": "core_opportunity_v1",
-    "event_integrated_radar_candidates.jsonl": "integrated_radar_candidate_v1",
-    "event_alpha_notification_deliveries.jsonl": "notification_delivery_v1",
-    "event_integrated_radar_notification_deliveries.jsonl": "integrated_notification_delivery_v1",
-    "event_alpha_source_coverage.json": "source_coverage_v1",
-    "event_live_provider_readiness.json": "provider_readiness_v1",
-    "event_live_provider_activation_readiness.json": "provider_readiness_v1",
-    "event_coinalyze_preflight.json": "provider_preflight_v1",
-    "event_coinalyze_rehearsal_report.json": "provider_preflight_v1",
-    "event_bybit_announcements_preflight.json": "provider_preflight_v1",
-    "event_bybit_announcements_rehearsal_report.json": "provider_preflight_v1",
-    "event_unlock_calendar_preflight.json": "provider_preflight_v1",
-    "event_official_exchange_activation.json": "provider_readiness_v1",
-    "event_dex_onchain_readiness.json": "provider_readiness_v1",
-    "event_coinalyze_request_ledger.jsonl": "coinalyze_request_ledger_v1",
-    "event_bybit_announcements_request_ledger.jsonl": "provider_request_ledger_v1",
-    "event_derivatives_state.jsonl": "derivatives_state_snapshot_v1",
-    "event_derivatives_crowding_candidates.jsonl": "derivatives_crowding_candidate_v1",
-    "event_fade_short_review_candidates.jsonl": "fade_review_candidate_v1",
-    "event_market_state_snapshots.jsonl": "market_state_snapshot_v1",
-    "event_targeted_market_refresh_ledger.jsonl": "targeted_market_refresh_ledger_v1",
-    "event_targeted_market_refresh_report.json": "targeted_market_refresh_report_v1",
-    "event_market_anomalies.jsonl": "market_anomaly_v1",
-    "event_market_anomaly_catalyst_search_queue.jsonl": "market_anomaly_v1",
-    "event_exchange_announcements.jsonl": "official_exchange_event_v1",
-    "event_official_exchange_events.jsonl": "official_exchange_event_v1",
-    "event_scheduled_catalysts.jsonl": "scheduled_catalyst_event_v1",
-    "event_unified_calendar_events.jsonl": "unified_calendar_event_v1",
-    "event_unlock_candidates.jsonl": "unlock_event_v1",
-    "event_integrated_radar_outcomes.jsonl": "outcome_row_v1",
-    "event_integrated_radar_calibration_priors.json": "calibration_prior_v1",
-    "event_radar_provider_performance.json": "calibration_prior_v1",
-    "event_alpha_namespace_status.json": "namespace_status_v1",
-    "event_alpha_operator_state.json": "operator_state_v1",
-    "event_alpha_runs.jsonl": "run_ledger_v1",
-    "event_alpha_daily_burn_in_run.json": "event_alpha_daily_burn_in_run_v1",
-    "event_alpha_candidate_mode_manifest.json": "event_alpha_candidate_mode_manifest_v1",
-    "event_alpha_daily_review_inbox.json": "event_alpha_daily_review_inbox_v1",
-    "event_alpha_burn_in_scorecard.json": "event_alpha_burn_in_scorecard_v1",
-    "event_alpha_burn_in_measurement_dashboard.json": "event_alpha_burn_in_measurement_dashboard_v1",
-    "event_alpha_source_yield_report.json": "event_alpha_source_yield_report_v1",
-    "event_alpha_burn_in_archive_manifest.json": "event_alpha_burn_in_archive_manifest_v1",
-    "event_alpha_burn_in_namespace_policy.json": "event_alpha_burn_in_namespace_policy_v1",
-}
-
 
 def get_schema(schema_id: str) -> ArtifactSchema:
     return SCHEMAS[schema_id]
@@ -842,7 +793,9 @@ def validate_row_against_schema(row: Mapping[str, Any], schema: str | ArtifactSc
     if schema_obj.schema_id == "run_ledger_v1": errors.extend(calendar_specs.validate_run_ledger_normalization_contract(row))
     if schema_obj.schema_id == "operator_state_v1": errors.extend(operator_state_specs.validate_contract(row))
     if schema_obj.schema_id == "outcome_row_v1": errors.extend(outcome_eligibility_specs.validate_contract(row))
-    if row.get("decision_model_version") not in (None, "") and schema_obj.schema_id in {"core_opportunity_v1", "integrated_radar_candidate_v1", "outcome_row_v1"}:
+    if schema_obj.schema_id == "feedback_row_v1": errors.extend(feedback_eligibility_specs.validate_contract(row))
+    if schema_obj.schema_id == "feedback_calibration_prior_v2": errors.extend(feedback_eligibility_specs.validate_prior_contract(row))
+    if row.get("decision_model_version") not in (None, "") and schema_obj.schema_id in {"core_opportunity_v1", "integrated_radar_candidate_v1", "outcome_row_v1", "feedback_row_v1"}:
         errors.extend(decision_model_specs.validate_contract(row))
     return errors
 
@@ -999,8 +952,11 @@ def stamp_artifact_payload(
 def validate_artifact_file(path: str | Path, schema_id: str | None = None) -> dict[str, Any]:
     file_path = Path(path)
     fallback = schema_id or infer_schema_id_for_file(file_path)
-    rows = _load_artifact_rows(file_path)
-    errors: list[dict[str, Any]] = []
+    rows, document_errors = _load_artifact_rows_with_errors(file_path)
+    errors: list[dict[str, Any]] = [
+        {"row_index": None, "schema_id": fallback, "error": error}
+        for error in document_errors
+    ]
     rows_validated = 0
     deprecated_field_usage = 0
     for index, row in enumerate(rows):
@@ -1035,30 +991,33 @@ def all_schema_fields() -> frozenset[str]:
 
 
 def _load_artifact_rows(path: Path) -> list[dict[str, Any]]:
+    rows, _errors = _load_artifact_rows_with_errors(path)
+    return rows
+
+
+def _load_artifact_rows_with_errors(
+    path: Path,
+) -> tuple[list[dict[str, Any]], tuple[str, ...]]:
     if not path.exists():
-        return []
+        return [], ()
     if path.suffix == ".jsonl":
-        rows: list[dict[str, Any]] = []
-        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-            if not line.strip():
-                continue
-            try:
-                value = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(value, Mapping):
-                rows.append(dict(value))
-        return rows
+        return list(artifact_json_lines.read_jsonl(path).rows), ()
     try:
-        value = json.loads(path.read_text(encoding="utf-8", errors="replace"))
-    except (OSError, json.JSONDecodeError):
-        return []
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return [], ("json_document_read_error",)
+    try:
+        value = artifact_json_lines.loads_no_duplicate_keys(text)
+    except json.JSONDecodeError:
+        return [], ("invalid_json_document",)
+    except ValueError:
+        return [], ("duplicate_json_object_key",)
     if isinstance(value, Mapping):
         rows = _extract_known_rows(value)
-        return rows if rows else [dict(value)]
+        return (rows if rows else [dict(value)]), ()
     if isinstance(value, list):
-        return [dict(item) for item in value if isinstance(item, Mapping)]
-    return []
+        return [dict(item) for item in value if isinstance(item, Mapping)], ()
+    return [], ("json_document_not_object_or_array",)
 
 
 def _extract_known_rows(value: Mapping[str, Any]) -> list[dict[str, Any]]:

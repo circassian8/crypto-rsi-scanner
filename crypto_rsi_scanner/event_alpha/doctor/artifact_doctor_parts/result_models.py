@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import field
+
 from .runtime import *
 
 @dataclass(frozen=True)
@@ -224,6 +226,26 @@ class _DoctorResultIntegratedOutcomeFields:
     integrated_performance_trade_pnl_wording: int = 0
     integrated_created_normal_rsi_signal: int = 0
     integrated_created_triggered_fade: int = 0
+
+
+@dataclass(frozen=True)
+class _DoctorResultFeedbackEligibilityFields:
+    feedback_rows_supplied: int = 0
+    feedback_rows_eligible: int = 0
+    feedback_rows_excluded: int = 0
+    feedback_exclusion_reason_counts: dict[str, int] = field(default_factory=dict)
+    feedback_eligibility_contract_invalid: int = 0
+    feedback_persisted_eligible_invalid: int = 0
+    feedback_legacy_rows: int = 0
+    feedback_duplicate_rows: int = 0
+    feedback_future_rows: int = 0
+    feedback_unsafe_rows: int = 0
+    feedback_missing_core_rows: int = 0
+    feedback_ambiguous_core_rows: int = 0
+    feedback_superseded_rows: int = 0
+    feedback_duplicate_json_keys: int = 0
+    feedback_invalid_jsonl: int = 0
+    feedback_jsonl_read_errors: int = 0
 
 
 @dataclass(frozen=True)
@@ -476,6 +498,7 @@ class EventAlphaArtifactDoctorResult(
     _DoctorResultNotificationFields,
     _DoctorResultProviderEvidenceFields,
     _DoctorResultProviderReadinessFields,
+    _DoctorResultFeedbackEligibilityFields,
     _DoctorResultIntegratedOutcomeFields,
     _DoctorResultIntegratedRadarFields,
     _DoctorResultStructuredArtifactFields,

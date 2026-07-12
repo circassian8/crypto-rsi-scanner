@@ -9,17 +9,13 @@ from .config_reports import (
     _event_alpha_context_block,
     _event_alpha_retention_config_from_runtime,
     _event_alpha_router_config_from_runtime,
-    _event_core_opportunity_store_config_from_runtime,
-    _event_feedback_config_from_runtime,
     _event_research_now,
-    _event_watchlist_config_from_runtime,
     _event_watchlist_monitor_result_from_runtime,
     _setup_event_discovery_logging,
     _latest_event_alpha_run_id,
     resolve_event_alpha_artifact_context_for_report,
 )
 from .runtime import *
-from .utility_calibration_exports import _event_alpha_local_artifacts
 from ....event_alpha.artifacts import operator_state as event_alpha_operator_state
 
 def _scanner_compat_global(name: str, fallback: Any) -> Any:
@@ -38,22 +34,50 @@ def _scanner_compat_global(name: str, fallback: Any) -> Any:
     return fallback
 
 
+def _event_research_card_outcome_authority(
+    context: Any,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Load exact candidate and outcome evidence from one artifact namespace."""
+
+    candidate_rows = list(
+        event_integrated_radar.load_integrated_candidates(context.namespace_dir)
+    )
+    outcome_rows = [
+        *event_integrated_radar_outcomes.load_integrated_radar_outcomes(
+            context.namespace_dir
+        ),
+        *event_alpha_outcome_artifact_io.read_jsonl(context.outcomes_path),
+    ]
+    return candidate_rows, outcome_rows
+
+
 def event_research_card_report(target: str | None, verbose: bool = False) -> None:
     """Print a Markdown research card for one Event Alpha watchlist/alert key."""
     _setup_event_discovery_logging(verbose)
-    watch_cfg = _event_watchlist_config_from_runtime()
-    watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
-    store_cfg = _event_alpha_alert_store_config_from_runtime()
-    alerts = event_alpha_alert_store.load_alert_snapshots(store_cfg.path, latest_only=True)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(None, None)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    evaluation_now = _event_research_now()
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        context.alert_store_path,
+        latest_only=True,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+    )
     core_store = event_core_opportunity_store.load_core_opportunities(
-        _event_core_opportunity_store_config_from_runtime().path,
+        context.core_opportunity_store_path,
         latest_run=True,
     )
-    feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
+    feedback = event_feedback.load_feedback(context.feedback_path)
     feedback_rows = [record.__dict__ for record in feedback.records]
-    outcome_rows = _event_alpha_local_artifacts(run_limit=1, latest_alerts=False)["outcome_rows"]
+    candidate_rows, outcome_rows = _event_research_card_outcome_authority(context)
     routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
-    monitor_result = _event_watchlist_monitor_result_from_runtime(watchlist)
+    monitor_result = _event_watchlist_monitor_result_from_runtime(
+        watchlist,
+        now=evaluation_now,
+    )
     if target:
         result = event_research_cards.render_research_card(
             target,
@@ -63,6 +87,8 @@ def event_research_card_report(target: str | None, verbose: bool = False) -> Non
             monitor_rows=monitor_result.rows,
             feedback_rows=feedback_rows,
             outcome_rows=outcome_rows,
+            candidate_rows=candidate_rows,
+            generated_at=evaluation_now,
         )
         print(result.markdown)
         return
@@ -74,6 +100,8 @@ def event_research_card_report(target: str | None, verbose: bool = False) -> Non
             monitor_rows=monitor_result.rows,
             feedback_rows=feedback_rows,
             outcome_rows=outcome_rows,
+            candidate_rows=candidate_rows,
+            generated_at=evaluation_now,
         )
     )
 
@@ -105,6 +133,7 @@ def event_research_cards_write(
 
 def _event_research_cards_write_locked(context: Any) -> None:
     _apply_event_alpha_context_to_config(context)
+    evaluation_now = _event_research_now()
     run_rows = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=100).rows
     operator_run = event_alpha_operator_state.latest_matching_run(
         run_rows,
@@ -120,13 +149,17 @@ def _event_research_cards_write_locked(context: Any) -> None:
     alerts = event_alpha_alert_store.load_alert_snapshots(
         context.alert_store_path,
         latest_only=True,
+        core_opportunity_store_path=context.core_opportunity_store_path,
     )
     core_store = event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True)
     feedback = event_feedback.load_feedback(context.feedback_path)
     feedback_rows = [record.__dict__ for record in feedback.records]
-    outcome_rows = _event_alpha_local_artifacts(run_limit=1, latest_alerts=False)["outcome_rows"]
+    candidate_rows, outcome_rows = _event_research_card_outcome_authority(context)
     routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
-    monitor_result = _event_watchlist_monitor_result_from_runtime(watchlist)
+    monitor_result = _event_watchlist_monitor_result_from_runtime(
+        watchlist,
+        now=evaluation_now,
+    )
     result = event_research_cards.write_research_cards(
         context.research_cards_dir,
         watchlist_entries=watchlist.entries,
@@ -135,9 +168,10 @@ def _event_research_cards_write_locked(context: Any) -> None:
         monitor_rows=monitor_result.rows,
         feedback_rows=feedback_rows,
         outcome_rows=outcome_rows,
+        candidate_rows=candidate_rows,
         selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
         limit=config.EVENT_RESEARCH_CARDS_WRITE_LIMIT,
-        now=datetime.now(timezone.utc),
+        now=evaluation_now,
         lineage_context=_event_alpha_card_lineage_context(
             run_id=str((operator_run or {}).get("run_id") or "") or None,
             profile=context.profile,

@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
 import crypto_rsi_scanner.event_alpha.outcomes.outcome_artifacts as event_alpha_outcomes
+import crypto_rsi_scanner.event_alpha.outcomes.feedback_eligibility as event_alpha_feedback_eligibility
+import crypto_rsi_scanner.event_alpha.outcomes.outcome_eligibility as event_alpha_outcome_eligibility
 import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
 import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 import crypto_rsi_scanner.event_alpha.radar.core_opportunities as event_core_opportunities
@@ -99,13 +101,27 @@ def blocked_alert_snapshot_write(
         success=False,
         block_reason=reason,
     )
-def load_alert_snapshots(path: str | Path, *, latest_only: bool = False) -> EventAlphaAlertStoreReadResult:
+def load_alert_snapshots(
+    path: str | Path,
+    *,
+    latest_only: bool = False,
+    core_opportunity_rows: Iterable[Mapping[str, Any]] | None = None,
+    core_opportunity_store_path: str | Path | None = None,
+) -> EventAlphaAlertStoreReadResult:
     p = Path(path).expanduser()
     rows = [
         row for row in _read_jsonl(p)
         if row.get("row_type") == "event_alpha_alert_snapshot"
     ]
-    rows = reconcile_alert_snapshots_with_core_store(rows, _sibling_core_store_rows(p))
+    core_rows = (
+        [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)]
+        if core_opportunity_rows is not None
+        else _core_store_rows_for_alerts(
+            p,
+            core_opportunity_store_path=core_opportunity_store_path,
+        )
+    )
+    rows = reconcile_alert_snapshots_with_core_store(rows, core_rows)
     if latest_only:
         latest: dict[str, tuple[str, int, dict[str, Any]]] = {}
         for idx, row in enumerate(rows):
@@ -133,57 +149,121 @@ def format_alert_snapshot_report(
     result: EventAlphaAlertStoreReadResult,
     *,
     feedback_rows: Iterable[Mapping[str, Any]] = (),
+    core_rows: Iterable[Mapping[str, Any]] = (),
+    candidate_rows: Iterable[Mapping[str, Any]] = (),
+    outcome_rows: Iterable[Mapping[str, Any]] = (),
+    evaluated_at: Any = None,
 ) -> str:
-    rows = list(result.rows)
-    feedback_by_key = _feedback_by_key(feedback_rows)
-    rows = [_with_feedback(row, feedback_by_key) for row in rows]
+    evaluation_clock = evaluated_at if evaluated_at is not None else datetime.now(timezone.utc)
+    source_rows = [dict(row) for row in result.rows if isinstance(row, Mapping)]
+    supplied_feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    cores = [dict(row) for row in core_rows if isinstance(row, Mapping)]
+    candidates = [dict(row) for row in candidate_rows if isinstance(row, Mapping)]
+    supplied_outcomes = [dict(row) for row in outcome_rows if isinstance(row, Mapping)]
+    eligible_feedback, excluded_feedback, feedback_reasons = (
+        event_alpha_feedback_eligibility.partition_joined_alert_feedback(
+            supplied_feedback,
+            cores,
+            source_rows,
+            now=evaluation_clock,
+        )
+    )
+    feedback_by_identity = _feedback_by_identity(eligible_feedback)
+    rows = [_with_feedback(row, feedback_by_identity) for row in source_rows]
+    eligible_outcomes, excluded_outcomes, outcome_reasons = (
+        event_alpha_outcome_eligibility.partition_joined_calibration_outcomes(
+            supplied_outcomes,
+            candidates,
+            cores,
+            evaluated_at=evaluation_clock,
+        )
+    )
+    performance_rows = [_without_feedback_aliases(row) for row in eligible_outcomes]
+    raw_feedback_alias_rows = sum(1 for row in source_rows if _has_feedback_alias(row))
+    raw_outcome_alias_rows = sum(1 for row in source_rows if _has_outcome_alias(row))
     out = [
         "=" * 76,
         "EVENT ALPHA ALERT SNAPSHOT REPORT (research artifact only)",
         "=" * 76,
         f"path: {result.path}",
         f"rows_read: {result.rows_read}",
+        (
+            "feedback authority: "
+            f"supplied={len(supplied_feedback)} eligible={len(eligible_feedback)} "
+            f"excluded={len(excluded_feedback)}"
+        ),
+        f"feedback exclusions: {_format_reason_counts(feedback_reasons)}",
+        (
+            "outcome authority: "
+            f"supplied={len(supplied_outcomes)} eligible={len(performance_rows)} "
+            f"excluded={len(excluded_outcomes)}"
+        ),
+        f"outcome exclusions: {_format_reason_counts(outcome_reasons)}",
+        (
+            "snapshot feedback aliases (non-authoritative diagnostics only): "
+            f"{raw_feedback_alias_rows}"
+        ),
+        (
+            "snapshot outcome aliases (non-authoritative diagnostics only): "
+            f"{raw_outcome_alias_rows}"
+        ),
     ]
     if not rows:
         out.append("")
         out.append("No alert snapshots found.")
-        return "\n".join(out)
-    for label, field in (
-        ("by playbook", "playbook_type"),
-        ("by expected direction", "expected_direction"),
-        ("by tier", "tier"),
-        ("by final route", "final_route_after_quality_gate"),
-        ("by legacy route", "route"),
-        ("by snapshot quality classification", "snapshot_quality_classification"),
-        ("by delivered status", "delivered_status"),
-        ("by feedback status", "feedback_status"),
-        ("by impact path type", "impact_path_type"),
-        ("by impact path strength", "impact_path_strength"),
-        ("by candidate role", "candidate_role"),
-        ("by opportunity level", "opportunity_level"),
-        ("by market confirmation", "market_confirmation_level"),
-        ("by evidence source class", "source_class"),
-        ("by evidence specificity", "evidence_specificity"),
-        ("by LLM role", "llm_asset_role"),
-        ("by source", "source"),
-        ("by BTC regime", "btc_regime"),
-        ("by market anomaly score", "market_anomaly_bucket"),
-        ("by thesis origin", "thesis_origin"),
-        ("by catalyst status", "catalyst_status"),
-        ("by confidence band", "confidence_band"),
-        ("by actionability score cohort", "actionability_score_cohort"),
-        ("by anomaly type", "anomaly_type"),
-        ("by radar route", "radar_route"),
-        ("by feedback label", "feedback_label"),
-    ):
-        out.append(_cohort_line(label, rows, field))
-    mfe_mae = _mfe_mae_by_playbook(rows)
+    else:
+        out.extend(["", "Alert inventory cohorts:"])
+        for label, field in (
+            ("by playbook", "playbook_type"),
+            ("by expected direction", "expected_direction"),
+            ("by tier", "tier"),
+            ("by final route", "final_route_after_quality_gate"),
+            ("by legacy route", "route"),
+            ("by snapshot quality classification", "snapshot_quality_classification"),
+            ("by delivered status", "delivered_status"),
+            ("by feedback status", "feedback_status"),
+            ("by impact path type", "impact_path_type"),
+            ("by impact path strength", "impact_path_strength"),
+            ("by candidate role", "candidate_role"),
+            ("by opportunity level", "opportunity_level"),
+            ("by market confirmation", "market_confirmation_level"),
+            ("by evidence source class", "source_class"),
+            ("by evidence specificity", "evidence_specificity"),
+            ("by LLM role", "llm_asset_role"),
+            ("by source", "source"),
+            ("by BTC regime", "btc_regime"),
+            ("by market anomaly score", "market_anomaly_bucket"),
+            ("by thesis origin", "thesis_origin"),
+            ("by catalyst status", "catalyst_status"),
+            ("by confidence band", "confidence_band"),
+            ("by actionability score cohort", "actionability_score_cohort"),
+            ("by anomaly type", "anomaly_type"),
+            ("by radar route", "radar_route"),
+            ("by feedback label", "feedback_label"),
+        ):
+            out.append(_cohort_line(label, rows, field))
+    if performance_rows:
+        out.extend(["", "Exact observed outcome performance (candidate + Core authorized):"])
+    mfe_mae = _mfe_mae_by_playbook(performance_rows)
     if mfe_mae:
         out.append(mfe_mae)
-    outcome_metrics = event_alpha_outcomes.summarize_outcome_metrics(rows)
+    outcome_metrics = event_alpha_outcomes.summarize_outcome_metrics(performance_rows)
     if outcome_metrics:
         out.append(outcome_metrics)
-    out.append("")
+    for row in sorted(
+        performance_rows,
+        key=lambda item: str(item.get("outcome_evaluated_at") or ""),
+        reverse=True,
+    )[:10]:
+        out.append(
+            "  "
+            f"{row.get('symbol') or 'UNKNOWN'}/{row.get('coin_id') or 'unknown'} "
+            f"lane={row.get('opportunity_type') or 'unknown'} "
+            f"primary={_fmt_pct(row.get('primary_horizon_return'))} "
+            f"status={row.get('validation_status') or row.get('outcome_status') or 'unknown'}"
+        )
+    if rows:
+        out.append("")
     for row in sorted(rows, key=lambda item: str(item.get("observed_at") or ""), reverse=True)[:20]:
         out.append(
             f"{row.get('final_tier_after_quality_gate') or row.get('tier', 'UNKNOWN'):<20} "
@@ -192,21 +272,6 @@ def format_alert_snapshot_report(
             f"playbook={row.get('playbook_type') or 'unknown'}"
         )
         out.append(f"  event: {row.get('event_name') or 'unknown'}")
-        if row.get("return_24h") is not None:
-            out.append(
-                "  outcomes: "
-                f"primary={_fmt_pct(row.get('primary_horizon_return'))} "
-                f"hit={_fmt_bool(row.get('direction_hit'))} "
-                f"1h={_fmt_pct(row.get('return_1h'))} "
-                f"4h={_fmt_pct(row.get('return_4h'))} "
-                f"24h={_fmt_pct(row.get('return_24h'))} "
-                f"72h={_fmt_pct(row.get('return_72h'))} "
-                f"7d={_fmt_pct(row.get('return_7d'))} "
-                f"MFE={_fmt_pct(row.get('max_favorable_excursion'))} "
-                f"MAE={_fmt_pct(row.get('max_adverse_excursion'))} "
-                f"vol={_fmt_bool(row.get('volatility_hit'))} "
-                f"up_fade={_fmt_bool(row.get('up_then_fade_hit'))}"
-            )
         if row.get("route") or row.get("delivered_status") or row.get("research_card_path"):
             out.append(
                 f"  route: final={row.get('final_route_after_quality_gate') or row.get('route') or 'none'} "

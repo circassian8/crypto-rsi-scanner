@@ -428,8 +428,23 @@ CHECKS: tuple[DoctorCheck, ...] = (
             "outcome_identity", "outcome_identity_key", "calibration_eligible",
             "calibration_ineligible_reasons", "primary_horizon", "horizon_metadata",
             "observation_price_provenance_status", "outcome_evaluated_at",
+            "observation_price_observed_at",
         ),
         "Only unique exact-lineage observed-market outcomes with mature ordered provenance may enter calibration evidence.",
+    ),
+    _check(
+        "outcomes.feedback_eligibility_firewall",
+        CATEGORY_OUTCOMES,
+        "blocker",
+        (
+            "schema_id", "schema_version", "feedback_eligibility_contract_version",
+            "run_id", "profile", "run_mode", "artifact_namespace", "core_opportunity_id",
+            "feedback_id", "feedback_target_type", "feedback_target", "target",
+            "label", "marked_at", "marked_by", "source", "research_only",
+            "feedback_identity", "feedback_identity_key", "calibration_eligible",
+            "calibration_ineligible_reasons",
+        ),
+        "Only the latest unambiguous manual feedback joined to one exact canonical Core authority may enter calibration evidence.",
     ),
     _check(
         "outcomes.price_data_labeling",

@@ -369,6 +369,8 @@ def _integrated_radar_artifact_conflicts(
     rows: Iterable[Mapping[str, Any]],
     *,
     core_rows: Iterable[Mapping[str, Any]] = (),
+    outcome_rows: Iterable[Mapping[str, Any]] | None = None,
+    evaluated_at: Any = None,
     research_card_paths: Iterable[Path] = (),
     daily_brief_path: str | Path | None = None,
     manifest_path: str | Path | None = None,
@@ -419,7 +421,14 @@ def _integrated_radar_artifact_conflicts(
     _add_integrated_preview_conflicts(out, row_count, preview_path)
     _add_integrated_operator_path_conflicts(out, research_card_paths, daily_brief_path=daily_brief_path, preview_path=preview_path)
     delivery_rows = _integrated_delivery_rows(out, row_count, delivery_path, preview_path=preview_path)
-    outcome_rows = _integrated_outcome_rows(out, materialized_rows, outcome_path)
+    outcome_rows = _integrated_outcome_rows(
+        out,
+        materialized_rows,
+        materialized_core_rows,
+        outcome_path,
+        outcome_rows=outcome_rows,
+        evaluated_at=evaluated_at,
+    )
     _add_integrated_calibration_performance_conflicts(out, outcome_path)
     out["operator_structured_path_absolute"] += _structured_operator_path_conflicts(
         (*materialized_rows, *materialized_core_rows, *delivery_rows, *outcome_rows)
@@ -716,12 +725,32 @@ def _integrated_delivery_rows(
 def _integrated_outcome_rows(
     out: dict[str, int],
     materialized_rows: Iterable[Mapping[str, Any]],
+    core_rows: Iterable[Mapping[str, Any]],
     outcome_path: str | Path | None,
+    *,
+    outcome_rows: Iterable[Mapping[str, Any]] | None,
+    evaluated_at: Any,
 ) -> list[Mapping[str, Any]]:
-    outcome_rows = _read_jsonl(outcome_path) if outcome_path is not None and Path(outcome_path).exists() else []
-    if outcome_rows:
-        _add_integrated_conflicts(out, _integrated_outcome_conflicts(materialized_rows, outcome_rows))
-    return outcome_rows
+    materialized_outcomes = (
+        [dict(row) for row in outcome_rows if isinstance(row, Mapping)]
+        if outcome_rows is not None
+        else (
+            _read_jsonl(outcome_path)
+            if outcome_path is not None and Path(outcome_path).exists()
+            else []
+        )
+    )
+    if materialized_outcomes or materialized_rows:
+        _add_integrated_conflicts(
+            out,
+            _integrated_outcome_conflicts(
+                materialized_rows,
+                materialized_outcomes,
+                core_rows=core_rows,
+                evaluated_at=evaluated_at,
+            ),
+        )
+    return materialized_outcomes
 
 def _add_integrated_calibration_performance_conflicts(
     out: dict[str, int],

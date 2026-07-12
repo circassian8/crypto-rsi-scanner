@@ -80,7 +80,9 @@ def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
         outcome_report = event_alpha_alert_store.format_alert_snapshot_report(
             event_alpha_alert_store.load_alert_snapshots(out_path)
         )
-        assert "outcomes:" in outcome_report
+        assert "outcomes:" not in outcome_report
+        assert "outcome authority: supplied=0 eligible=0 excluded=0" in outcome_report
+        assert "snapshot outcome aliases (non-authoritative diagnostics only):" in outcome_report
 
         status_out = Path(tmp) / "status_outcomes.jsonl"
         status_result = event_alpha_alert_store.fill_alert_outcomes(
@@ -99,8 +101,8 @@ def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
             "skipped_no_asset",
         ]
         assert status_result.missing_price_rows == 2
-        assert "MFE/MAE by playbook:" in outcome_report
-        assert "Outcome metrics by playbook:" in outcome_report
+        assert "MFE/MAE by playbook:" not in outcome_report
+        assert "Outcome metrics by playbook:" not in outcome_report
 
 
 def test_event_alpha_outcomes_playbook_specific_metrics():

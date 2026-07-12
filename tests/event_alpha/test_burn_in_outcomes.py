@@ -731,6 +731,7 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
     from datetime import datetime, timedelta, timezone
     import crypto_rsi_scanner.event_alpha.outcomes.burn_in as event_alpha_burn_in
     import crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist as event_alpha_burn_in_checklist
+    import crypto_rsi_scanner.event_alpha.outcomes.feedback_eligibility as feedback_eligibility
     import crypto_rsi_scanner.event_alpha.outcomes.outcome_eligibility as outcome_eligibility
 
     now = datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc)
@@ -847,7 +848,7 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
     checklist_text = event_alpha_burn_in_checklist.format_burn_in_checklist(checklist)
     assert "READY_FOR_RESEARCH_SEND: no" in checklist_text
 
-    ready_observed_at = datetime(2026, 6, 19, 10, 1, tzinfo=timezone.utc)
+    ready_observed_at = datetime(2026, 6, 16, 10, 1, tzinfo=timezone.utc)
     ready_metadata = {}
     ready_returns = {}
     for horizon in outcome_eligibility.OUTCOME_HORIZONS:
@@ -893,8 +894,9 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
         "price_at_observation": 100.0,
         "observation_price_source": "fixture_ohlcv",
         "observation_price_id": "fixture:ready:entry",
-        "primary_horizon": "1h",
-        "primary_horizon_return": 0.1,
+        "observation_price_observed_at": ready_observed_at.isoformat(),
+        "primary_horizon": "3d",
+        "primary_horizon_return": ready_returns["3d"],
         "return_by_horizon": ready_returns,
         "horizon_metadata": ready_metadata,
         "research_only": True,
@@ -910,12 +912,53 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
         outcome_eligibility.calibration_ineligibility_reasons(ready_outcome)
     )
     ready_outcome["calibration_eligible"] = not ready_outcome["calibration_ineligible_reasons"]
+    ready_core = {
+        key: ready_outcome[key]
+        for key in (
+            "core_opportunity_id",
+            "run_id",
+            "profile",
+            "artifact_namespace",
+        )
+    } | {
+        "row_type": "event_core_opportunity",
+        "schema_id": "core_opportunity_v1",
+        "schema_version": "event_core_opportunity_store_v1",
+        "generated_at": ready_outcome["observed_at"],
+        "research_only": True,
+        "symbol": "BTC",
+        "opportunity_type": "EARLY_LONG_RESEARCH",
+        "run_mode": "burn_in",
+        "feedback_target": "ready-core",
+        "feedback_target_type": "core_opportunity_id",
+    }
+    ready_feedback = {
+        "schema_version": "event_alpha_feedback_v1",
+        "row_type": "event_alpha_feedback",
+        "feedback_id": "feedback-ready-1",
+        "run_id": "ready-run",
+        "profile": "no_key_live",
+        "artifact_namespace": "no_key_live",
+        "run_mode": "burn_in",
+        "core_opportunity_id": "ready-core",
+        "target": "ready-core",
+        "feedback_target": "ready-core",
+        "feedback_target_type": "core_opportunity_id",
+        "label": "useful",
+        "marked_at": "2026-06-19T11:00:00+00:00",
+        "marked_by": "human",
+        "source": "manual_cli",
+        "research_only": True,
+    }
+    ready_feedback.update(
+        feedback_eligibility.build_feedback_eligibility_fields(ready_feedback)
+    )
     ready_scorecard = event_alpha_burn_in.build_burn_in_scorecard(
         days=7,
         now=now,
         run_rows=[{**meta, "run_id": "ready-run", "started_at": "2026-06-19T10:00:00+00:00", "success": True, "alertable": 1}],
         alert_rows=[{**meta, "run_id": "ready-run", "observed_at": "2026-06-19T10:01:00+00:00", "alert_key": "a", "tier": "WATCHLIST"}],
-        feedback_rows=[{**meta, "marked_at": "2026-06-19T11:00:00+00:00", "key": "a", "label": "useful"}],
+        feedback_rows=[ready_feedback],
         outcome_rows=[ready_outcome],
         candidate_rows=[
             {
@@ -932,27 +975,7 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
                     "run_mode": "burn_in",
                 }
         ],
-        core_rows=[
-            {
-                key: ready_outcome[key]
-                for key in (
-                    "core_opportunity_id",
-                    "run_id",
-                    "profile",
-                    "artifact_namespace",
-                )
-            }
-                | {
-                    "row_type": "event_core_opportunity",
-                    "schema_id": "core_opportunity_v1",
-                    "schema_version": "event_core_opportunity_store_v1",
-                    "generated_at": ready_outcome["observed_at"],
-                    "research_only": True,
-                    "symbol": "BTC",
-                    "opportunity_type": "EARLY_LONG_RESEARCH",
-                    "run_mode": "burn_in",
-                }
-        ],
+        core_rows=[ready_core],
         missed_rows=[{**meta, "observed_at": "2026-06-19T12:00:00+00:00", "failure_stage": "unknown"}],
         provider_health_rows={"gdelt:event_source": {"provider_key": "gdelt:event_source", "consecutive_failures": 0}},
     )

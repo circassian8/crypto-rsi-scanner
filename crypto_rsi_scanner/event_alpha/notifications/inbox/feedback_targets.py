@@ -42,23 +42,17 @@ def _card_path_for_core(
 def _reviewed_ids(rows: Iterable[Mapping[str, Any]]) -> set[str]:
     ids: set[str] = set()
     for row in rows:
-        for field in ("target", "key", "event_id", "coin_id", "symbol", "card_id", "alert_id"):
+        for field in ("core_opportunity_id", "feedback_target"):
             value = str(row.get(field) or "").strip()
             if value:
                 ids.add(value)
-                if value.startswith("ea:"):
-                    ids.add(value[3:])
-                else:
-                    ids.add(f"ea:{value}")
     return ids
 def _alert_ids(alert: Mapping[str, Any], alert_id: str, alert_key: str, card_id: str) -> set[str]:
     ids = {value for value in (alert_id, alert_key, card_id) if value}
-    for field in ("event_id", "coin_id", "symbol", "asset_coin_id", "asset_symbol", "validated_coin_id", "validated_symbol", "snapshot_id"):
+    for field in ("core_opportunity_id", "feedback_target"):
         value = str(alert.get(field) or "").strip()
         if value:
             ids.add(value)
-    ids.update(f"ea:{value}" for value in list(ids) if value and not value.startswith("ea:"))
-    ids.update(value[3:] for value in list(ids) if value.startswith("ea:"))
     return ids
 def _card_paths(cards_dir: Path) -> dict[str, Path]:
     if not cards_dir.exists():

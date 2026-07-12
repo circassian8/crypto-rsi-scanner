@@ -89,9 +89,11 @@ def test_calibration_report_keeps_research_only_terms():
     report = calibration.format_calibration_report([alert], feedback_rows=[feedback])
 
     assert "EVENT ALPHA CALIBRATION REPORT" in report
-    assert "useful=1" in report
-    assert "recommendations:" in report
-    assert "No thresholds, alert tiers, paper trades, live DB rows, or execution were changed." in report
+    assert "feedback_supplied=1" in report
+    assert "feedback_eligible=0" in report
+    assert "feedback_excluded=1" in report
+    assert "legacy_feedback_contract=1" in report
+    assert "No calibration artifacts found." in report
 
 
 def test_feedback_readiness_smoke_is_research_only():

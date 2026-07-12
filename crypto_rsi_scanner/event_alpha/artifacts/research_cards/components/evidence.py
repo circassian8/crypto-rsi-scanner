@@ -562,34 +562,19 @@ def _matching_rows(
     entry: event_watchlist.EventWatchlistEntry | None,
     alert: Mapping[str, Any] | None,
 ) -> list[Mapping[str, Any]]:
-    clean_key = key[3:] if key.startswith("ea:") else key
-    key_l = clean_key.lower()
-    identifiers = {
-        clean_key,
-        str(getattr(entry, "key", "") or ""),
-        str(getattr(entry, "event_id", "") or ""),
-        str(getattr(entry, "symbol", "") or ""),
-        str(getattr(entry, "coin_id", "") or ""),
-        str(alert.get("alert_key") or "") if alert else "",
-        str(alert.get("event_id") or "") if alert else "",
-        str(alert.get("asset_symbol") or "") if alert else "",
-        str(alert.get("asset_coin_id") or "") if alert else "",
-    }
-    identifiers_l = {item.lower() for item in identifiers if item}
-    matches: list[Mapping[str, Any]] = []
-    for row in rows:
-        values = {
-            str(row.get("key") or ""),
-            str(row.get("target") or ""),
-            str(row.get("alert_key") or ""),
-            str(row.get("event_id") or ""),
-            str(row.get("symbol") or row.get("asset_symbol") or ""),
-            str(row.get("coin_id") or row.get("asset_coin_id") or ""),
-        }
-        values_l = {value.lower() for value in values if value}
-        if key_l in values_l or identifiers_l & values_l:
-            matches.append(row)
-    return matches
+    del key, entry
+    if not isinstance(alert, Mapping):
+        return []
+    exact_identity = event_feedback_eligibility.canonical_feedback_join_identity(alert)
+    if exact_identity is None:
+        return []
+    return [
+        row
+        for row in rows
+        if row.get("calibration_eligible") is True
+        and event_feedback_eligibility.canonical_feedback_join_identity(row)
+        == exact_identity
+    ]
 
 def _find_outcome(
     key: str,
@@ -597,10 +582,61 @@ def _find_outcome(
     entry: event_watchlist.EventWatchlistEntry | None,
     alert: Mapping[str, Any] | None,
 ) -> Mapping[str, Any] | None:
-    matches = _matching_rows(key, rows, entry, alert)
-    if not matches:
+    del entry
+    exact_core = _exact_core_context(alert)
+    exact_candidate = (
+        event_outcome_eligibility.canonical_join_identity(alert)
+        if isinstance(alert, Mapping)
+        else None
+    )
+    matches: list[Mapping[str, Any]] = []
+    if exact_candidate is not None:
+        matches = [
+            row
+            for row in rows
+            if event_outcome_eligibility.canonical_join_identity(row) == exact_candidate
+        ]
+    elif exact_core is not None:
+        matches = [row for row in rows if _exact_core_context(row) == exact_core]
+    else:
+        clean_key = str(key or "").strip()
+        if clean_key:
+            matches = [
+                row
+                for row in rows
+                if row.get("candidate_id") == clean_key
+                or row.get("core_opportunity_id") == clean_key
+            ]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        reasons = sorted({
+            str(reason)
+            for row in matches
+            for reason in row.get("calibration_ineligible_reasons") or ()
+            if str(reason)
+        }) or ["ambiguous_outcome_identity"]
+        first = matches[0]
+        return {
+            "candidate_id": first.get("candidate_id"),
+            "core_opportunity_id": first.get("core_opportunity_id"),
+            "outcome_status": "excluded",
+            "calibration_eligible": False,
+            "calibration_ineligible_reasons": reasons,
+        }
+    return None
+
+
+def _exact_core_context(row: Mapping[str, Any] | None) -> tuple[str, str, str, str] | None:
+    if not isinstance(row, Mapping):
         return None
-    return sorted(matches, key=lambda row: str(row.get("observed_at") or row.get("updated_at") or ""), reverse=True)[0]
+    values = tuple(
+        row.get(field)
+        for field in ("core_opportunity_id", "run_id", "profile", "artifact_namespace")
+    )
+    if not all(type(value) is str and value and value == value.strip() for value in values):
+        return None
+    return values  # type: ignore[return-value]
 
 def _value(entry: Any | None, alert: Mapping[str, Any] | None, entry_field: str, alert_field: str) -> Any:
     if entry is not None and entry_field:
@@ -821,6 +857,7 @@ __all__ = (
     '_find_monitor_row',
     '_matching_rows',
     '_find_outcome',
+    '_exact_core_context',
     '_value',
     '_canonical_card_alert',
     '_cluster_lines',

@@ -206,7 +206,15 @@ def row_lane(row: Mapping[str, Any]) -> str:
 
 
 def timestamp_for_row(row: Mapping[str, Any]) -> datetime | None:
-    for field in ("observed_at", "created_at", "started_at", "marked_at", "published_at", "generated_at"):
+    for field in (
+        "observed_at",
+        "created_at",
+        "started_at",
+        "marked_at",
+        "feedback_marked_at",
+        "published_at",
+        "generated_at",
+    ):
         parsed = parse_utc(row.get(field))
         if parsed is not None:
             return parsed

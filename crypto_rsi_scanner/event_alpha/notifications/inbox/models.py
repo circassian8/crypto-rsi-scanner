@@ -117,3 +117,7 @@ class EventAlphaNotificationInboxResult:
     canonical_review_items_with_feedback_targets: int = 0
     diagnostic_review_items_with_feedback_targets: int = 0
     include_diagnostics: bool = False
+    feedback_rows_supplied: int = 0
+    feedback_rows_eligible: int = 0
+    feedback_rows_excluded: int = 0
+    feedback_exclusion_reason_counts: dict[str, int] | None = None

@@ -104,6 +104,7 @@ from ....event_alpha.outcomes import calibration as event_alpha_calibration
 from ....event_alpha.outcomes import feedback as event_alpha_eval_export
 from ....event_alpha.outcomes import feedback as event_alpha_feedback_readiness
 from ....event_alpha.outcomes import integrated_radar_outcomes as event_integrated_radar_outcomes
+from ....event_alpha.outcomes import artifact_io as event_alpha_outcome_artifact_io
 from ....event_alpha.outcomes import policy_simulator as event_alpha_policy_simulator
 from ....event_alpha.outcomes import priors as event_alpha_priors
 from ....event_alpha.outcomes import quality as event_alpha_quality_coverage

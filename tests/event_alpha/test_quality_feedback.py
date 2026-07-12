@@ -205,8 +205,12 @@ def test_event_alpha_feedback_readiness_and_core_feedback_target():
             card_paths=[card_path],
             profile="notify_llm_quality_frame",
         )
-        assert "- feedback status: has_feedback" in audit
-        assert "- feedback label: useful" in audit
+        assert "- feedback status: pending_or_unknown" in audit
+        assert "- feedback label: none" in audit
+        assert "- feedback rows supplied: 1" in audit
+        assert "- eligible exact-Core feedback rows: 0" in audit
+        assert "- excluded feedback rows: 1" in audit
+        assert "missing_core_authority=1" in audit
         assert f"FEEDBACK_TARGET='{core_id}'" in audit
 
         no_alert_ready = event_alpha_feedback_readiness.build_feedback_readiness(
@@ -431,8 +435,11 @@ def test_event_alpha_quality_review_policy_simulation_and_export():
     assert max(low_counts) >= max(high_counts)
     assert "near-threshold" in next(row for row in sim.scenarios if row["scenario"] == "lower_opportunity_threshold")["gained"]
     assert "warning_weak_or_generic_alertable" not in text
-    assert "known_useful_selected" in text
+    assert "known_useful_selected" not in text
     assert "known_junk_selected" not in text
+    assert sim.feedback_rows_supplied == 2
+    assert sim.feedback_rows_eligible == 0
+    assert sim.feedback_rows_excluded == 2
     assert "missed_recall_candidates" in text
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "proposed.json"
@@ -448,14 +455,13 @@ def test_event_alpha_quality_review_policy_simulation_and_export():
         )
         payload = json.loads(out.read_text())
         assert result.cases_written >= 3
-        assert any(case["reason_to_add_case"] == "useful_feedback_positive_case" for case in payload["cases"])
-        assert any(case["reason_to_add_case"] == "junk_feedback_negative_case" for case in payload["cases"])
-        assert any(case["reason_to_add_case"] == "watch_feedback_borderline_case" for case in payload["cases"])
+        assert result.feedback_rows_supplied == 3
+        assert result.feedback_rows_eligible == 0
+        assert result.feedback_rows_excluded == 3
+        assert not any(case["reason_to_add_case"] == "useful_feedback_positive_case" for case in payload["cases"])
+        assert not any(case["reason_to_add_case"] == "junk_feedback_negative_case" for case in payload["cases"])
+        assert not any(case["reason_to_add_case"] == "watch_feedback_borderline_case" for case in payload["cases"])
         assert any(case["reason_to_add_case"] == "missed_opportunity_recall_case" for case in payload["cases"])
-        useful_case = next(case for case in payload["cases"] if case["reason_to_add_case"] == "useful_feedback_positive_case")
-        assert useful_case["expected_route_behavior"] in {"high_priority_if_quality_gates_pass", "research_digest_if_quality_gates_pass"}
-        junk_case = next(case for case in payload["cases"] if case["reason_to_add_case"] == "junk_feedback_negative_case")
-        assert junk_case["expected_opportunity_level"] == "local_only"
         assert "OPENAI_API_KEY" not in out.read_text()
 
 
@@ -673,15 +679,20 @@ def test_feedback_and_calibration_include_signal_quality_fields():
         )
         context_row = {
             "row_type": "event_core_opportunity",
+            "schema_id": "core_opportunity_v1",
+            "schema_version": "event_core_opportunity_store_v1",
             "run_id": "run-velvet",
             "profile": "catalyst_frame_e2e",
             "artifact_namespace": "catalyst_frame_e2e",
+            "run_mode": "burn_in",
             "core_opportunity_id": core_id,
             "feedback_target": core_id,
             "feedback_target_type": "core_opportunity_id",
-            "card_path": str(card_path),
+            "generated_at": "2026-06-20T11:00:00+00:00",
+            "research_only": True,
             "symbol": "VELVET",
             "coin_id": "velvet",
+            "opportunity_type": "UNCONFIRMED_RESEARCH",
             "incident_id": "incident:velvet-spacex",
             "hypothesis_id": "hyp:velvet",
             "impact_path_type": "proxy_exposure",
@@ -706,6 +717,7 @@ def test_feedback_and_calibration_include_signal_quality_fields():
             "useful",
             watchlist_entries=[entry],
             context_rows=[context_row],
+            core_opportunity_rows=[context_row],
             card_paths=[card_path],
             cfg=cfg,
             now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
@@ -729,13 +741,17 @@ def test_feedback_and_calibration_include_signal_quality_fields():
     assert record.final_route_after_quality_gate == "WATCHLIST"
     assert "direct_token_mechanism" in record.accepted_evidence_reason_codes
     assert loaded.records[0].incident_id == "incident:velvet-spacex"
-    report = event_alpha_calibration.format_calibration_report([], feedback_rows=[r.__dict__ for r in loaded.records])
+    report = event_alpha_calibration.format_calibration_report(
+        [],
+        feedback_rows=[r.__dict__ for r in loaded.records],
+        core_rows=[context_row],
+        now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
+    )
     assert "feedback by impact path type: proxy_exposure: useful=1" in report
     assert "feedback by candidate role: proxy_venue: useful=1" in report
     assert "feedback by source class: crypto_native: useful=1" in report
     assert "feedback by source pack: proxy_preipo_rwa_pack: useful=1" in report
-    assert "feedback by accepted evidence reason: cryptopanic_currency_tag_match: useful=1" in report
-    assert "direct_token_mechanism: useful=1" in report
+    assert "feedback by accepted evidence reason" not in report
     assert "feedback by incident id: incident:velvet-spacex: useful=1" in report
     assert "feedback by source domain: cryptopanic.com: useful=1" in report
     assert "feedback by market freshness: fresh: useful=1" in report

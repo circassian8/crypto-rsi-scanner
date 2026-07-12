@@ -1036,3 +1036,414 @@ def test_event_alpha_research_review_skipped_sample_dedupes_by_family():
     assert by_label["SECTOR/diagnostic"]["display_hidden"] is True
     display = notif._research_review_skipped_family_display(summary, limit=2)  # noqa: SLF001
     assert {row["label"] for row in display} == {"CHZ/chiliz", "VELVET/velvet"}
+
+
+def test_daily_brief_writer_uses_context_paths_and_one_research_clock(
+    monkeypatch,
+    tmp_path,
+):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    from crypto_rsi_scanner.cli.services import event_alpha_reports as reports
+
+    namespace = tmp_path / "scoped"
+    context = SimpleNamespace(
+        profile="fixture",
+        run_mode="fixture",
+        artifact_namespace="scoped",
+        namespace_dir=namespace,
+        run_ledger_path=namespace / "event_alpha_runs.jsonl",
+        alert_store_path=namespace / "event_alpha_alerts.jsonl",
+        notification_runs_path=namespace / "event_alpha_notification_runs.jsonl",
+        watchlist_state_path=namespace / "event_watchlist_state.jsonl",
+        feedback_path=namespace / "event_alpha_feedback.jsonl",
+        missed_path=namespace / "event_alpha_missed.jsonl",
+        provider_health_path=namespace / "event_provider_health.json",
+        daily_brief_path=namespace / "event_alpha_daily_brief.md",
+        impact_hypothesis_store_path=namespace / "event_impact_hypotheses.jsonl",
+        core_opportunity_store_path=namespace / "event_core_opportunities.jsonl",
+        incident_store_path=namespace / "event_incidents.jsonl",
+        evidence_acquisition_path=namespace / "event_evidence_acquisition.jsonl",
+        research_cards_dir=namespace / "research_cards",
+    )
+    evaluation_now = datetime(2026, 7, 12, 4, 5, tzinfo=timezone.utc)
+    calls: dict[str, object] = {}
+    clock_calls: list[None] = []
+
+    monkeypatch.setattr(
+        reports,
+        "_event_research_now",
+        lambda: clock_calls.append(None) or evaluation_now,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        reports,
+        "config",
+        SimpleNamespace(
+            EVENT_RESEARCH_CARDS_WRITE_TIERS=(),
+            EVENT_RESEARCH_CARDS_WRITE_LIMIT=25,
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        reports,
+        "event_alpha_profiles",
+        SimpleNamespace(get_profile=lambda _name: SimpleNamespace(name="fixture")),
+        raising=False,
+    )
+    def load_runs(path, limit):
+        calls["runs"] = path
+        calls["run_limit"] = limit
+        return SimpleNamespace(rows=[])
+
+    monkeypatch.setattr(
+        reports,
+        "event_alpha_run_ledger",
+        SimpleNamespace(load_run_records=load_runs),
+        raising=False,
+    )
+    monkeypatch.setattr(reports, "_ensure_daily_operator_state", lambda *_args: None, raising=False)
+
+    def load_alerts(path, latest_only, *, core_opportunity_store_path):
+        calls["alerts"] = path
+        calls["alerts_latest_only"] = latest_only
+        calls["alerts_core"] = core_opportunity_store_path
+        return SimpleNamespace(rows=[])
+
+    monkeypatch.setattr(
+        reports,
+        "event_alpha_alert_store",
+        SimpleNamespace(load_alert_snapshots=load_alerts),
+        raising=False,
+    )
+
+    def normalize_core(path, *, latest_run, now):
+        calls["core_normalize"] = (path, latest_run, now)
+
+    def load_cores(path, *, latest_run):
+        calls["cores"] = (path, latest_run)
+        return SimpleNamespace(rows=[])
+
+    monkeypatch.setattr(
+        reports,
+        "event_core_opportunity_store",
+        SimpleNamespace(
+            normalize_core_opportunity_store=normalize_core,
+            load_core_opportunities=load_cores,
+        ),
+        raising=False,
+    )
+
+    def normalize_runs(path, *, request_ledger_path):
+        calls["notification_normalize"] = (path, request_ledger_path)
+
+    def load_notification_runs(path):
+        calls["notification_runs"] = path
+        return SimpleNamespace(rows=[])
+
+    monkeypatch.setattr(
+        reports,
+        "event_alpha_notification_runs",
+        SimpleNamespace(
+            normalize_notification_runs_after_cryptopanic_success=normalize_runs,
+            load_notification_runs=load_notification_runs,
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        reports,
+        "event_impact_hypothesis_store",
+        SimpleNamespace(
+            load_impact_hypotheses=lambda path, **_kwargs: (
+                calls.__setitem__("hypotheses", path) or SimpleNamespace(rows=[])
+            )
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        reports,
+        "event_feedback",
+        SimpleNamespace(
+            load_feedback=lambda path: (
+                calls.__setitem__("feedback", path) or SimpleNamespace(records=[])
+            )
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        reports,
+        "event_alpha_missed",
+        SimpleNamespace(
+            load_missed_rows=lambda path: calls.__setitem__("missed", path) or []
+        ),
+        raising=False,
+    )
+    watchlist = SimpleNamespace(entries=[])
+    monkeypatch.setattr(
+        reports,
+        "event_watchlist",
+        SimpleNamespace(
+            load_watchlist=lambda path: (
+                calls.__setitem__("watchlist", path) or watchlist
+            )
+        ),
+        raising=False,
+    )
+    router_result = SimpleNamespace(decisions=[], alertable_decisions=[])
+    monkeypatch.setattr(
+        reports,
+        "event_alpha_router",
+        SimpleNamespace(route_watchlist=lambda *_args, **_kwargs: router_result),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        reports,
+        "_event_alpha_router_config_from_runtime",
+        lambda: object(),
+        raising=False,
+    )
+
+    def monitor_result(_watchlist, *, now):
+        calls["monitor_now"] = now
+        return SimpleNamespace(rows=[])
+
+    monkeypatch.setattr(
+        reports,
+        "_event_watchlist_monitor_result_from_runtime",
+        monitor_result,
+        raising=False,
+    )
+
+    card_result = SimpleNamespace(
+        card_paths=(),
+        out_dir=context.research_cards_dir,
+        cards_written=0,
+    )
+
+    def write_cards(path, **kwargs):
+        calls["cards"] = path
+        calls["cards_now"] = kwargs["now"]
+        return card_result
+
+    monkeypatch.setattr(
+        reports,
+        "event_research_cards",
+        SimpleNamespace(write_research_cards=write_cards),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        reports,
+        "_event_alpha_card_lineage_context",
+        lambda **_kwargs: {},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        reports,
+        "event_incident_store",
+        SimpleNamespace(
+            load_incidents=lambda path, **_kwargs: (
+                calls.__setitem__("incidents", path) or SimpleNamespace(rows=[])
+            )
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        reports,
+        "event_evidence_acquisition",
+        SimpleNamespace(
+            load_acquisition_results=lambda path: (
+                calls.__setitem__("acquisition", path) or []
+            )
+        ),
+        raising=False,
+    )
+    for name in (
+        "event_market_anomaly_scanner",
+        "event_official_exchange",
+        "event_scheduled_catalysts",
+        "event_derivatives_crowding",
+    ):
+        loaders = {
+            "event_market_anomaly_scanner": {
+                "load_market_anomaly_rows": lambda path: calls.__setitem__("market", path) or [],
+            },
+            "event_official_exchange": {
+                "load_official_listing_candidates": lambda path: calls.__setitem__("official", path) or [],
+            },
+            "event_scheduled_catalysts": {
+                "load_scheduled_catalysts": lambda path: calls.__setitem__("scheduled", path) or [],
+                "load_unlock_candidates": lambda path: calls.__setitem__("unlocks", path) or [],
+            },
+            "event_derivatives_crowding": {
+                "load_derivatives_state": lambda path: calls.__setitem__("derivatives", path) or [],
+                "load_fade_review_candidates": lambda path: calls.__setitem__("fade", path) or [],
+            },
+        }
+        monkeypatch.setattr(
+            reports,
+            name,
+            SimpleNamespace(**loaders[name]),
+            raising=False,
+        )
+    monkeypatch.setattr(
+        reports,
+        "event_provider_health",
+        SimpleNamespace(
+            load_provider_health=lambda path: (
+                calls.__setitem__("provider_health", path) or {}
+            )
+        ),
+        raising=False,
+    )
+
+    def build_daily_brief(**kwargs):
+        calls["brief_kwargs"] = kwargs
+        return "brief\n"
+
+    def write_daily_brief(path, **kwargs):
+        calls["brief_write"] = path
+        return SimpleNamespace(path=path, markdown=kwargs["markdown"], cards=())
+
+    monkeypatch.setattr(
+        reports,
+        "event_alpha_daily_brief",
+        SimpleNamespace(
+            build_daily_brief=build_daily_brief,
+            write_daily_brief=write_daily_brief,
+            format_daily_brief_result=lambda _result: "brief-written",
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        reports,
+        "_record_daily_brief_operator_state",
+        lambda *_args, **_kwargs: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        reports,
+        "_event_alpha_context_block",
+        lambda _context: "context",
+        raising=False,
+    )
+
+    reports._event_alpha_daily_brief_report_locked(  # noqa: SLF001
+        context,
+        selected_profile="fixture",
+        artifact_namespace="scoped",
+        include_test_artifacts=True,
+        include_api_artifacts=False,
+    )
+
+    assert len(clock_calls) == 1
+    assert calls["alerts"] == context.alert_store_path
+    assert calls["alerts_core"] == context.core_opportunity_store_path
+    assert calls["feedback"] == context.feedback_path
+    assert calls["missed"] == context.missed_path
+    assert calls["watchlist"] == context.watchlist_state_path
+    assert calls["provider_health"] == context.provider_health_path
+    assert calls["cards"] == context.research_cards_dir
+    assert calls["brief_write"] == context.daily_brief_path
+    assert calls["core_normalize"] == (
+        context.core_opportunity_store_path,
+        True,
+        evaluation_now,
+    )
+    assert calls["monitor_now"] == evaluation_now
+    assert calls["cards_now"] == evaluation_now
+    assert calls["brief_kwargs"]["generated_at"] == evaluation_now
+
+
+def test_feedback_mark_persists_and_loads_watchlist_through_resolved_context(
+    monkeypatch,
+    tmp_path,
+):
+    from types import SimpleNamespace
+
+    from crypto_rsi_scanner.cli.services.scanner_parts import utility_commands
+
+    namespace = tmp_path / "scoped"
+    cards_dir = namespace / "research_cards"
+    cards_dir.mkdir(parents=True)
+    (cards_dir / "context-card.md").write_text("context", encoding="utf-8")
+    context = SimpleNamespace(
+        alert_store_path=namespace / "event_alpha_alerts.jsonl",
+        core_opportunity_store_path=namespace / "event_core_opportunities.jsonl",
+        impact_hypothesis_store_path=namespace / "event_impact_hypotheses.jsonl",
+        watchlist_state_path=namespace / "event_watchlist_state.jsonl",
+        feedback_path=namespace / "event_alpha_feedback.jsonl",
+        research_cards_dir=cards_dir,
+    )
+    calls: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        utility_commands,
+        "_setup_event_discovery_logging",
+        lambda _verbose: None,
+    )
+
+    def resolve(profile_name, artifact_namespace):
+        calls["resolved"] = (profile_name, artifact_namespace)
+        return context
+
+    monkeypatch.setattr(
+        utility_commands,
+        "resolve_event_alpha_artifact_context_for_report",
+        resolve,
+    )
+    monkeypatch.setattr(
+        utility_commands,
+        "_event_watchlist_config_from_runtime",
+        lambda: (_ for _ in ()).throw(AssertionError("runtime watchlist path used")),
+    )
+    monkeypatch.setattr(
+        utility_commands,
+        "_event_feedback_config_from_runtime",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("runtime feedback path used")),
+    )
+
+    def load_watchlist(path):
+        calls["watchlist"] = path
+        return SimpleNamespace(entries=[])
+
+    monkeypatch.setattr(
+        utility_commands.event_watchlist,
+        "load_watchlist",
+        load_watchlist,
+    )
+    monkeypatch.setattr(
+        utility_commands.event_alpha_alert_store,
+        "load_alert_snapshots",
+        lambda path, **kwargs: (
+            calls.update(alerts=path, alerts_core=kwargs.get("core_opportunity_store_path"))
+            or SimpleNamespace(rows=[])
+        ),
+    )
+    monkeypatch.setattr(
+        utility_commands.event_core_opportunity_store,
+        "load_core_opportunities",
+        lambda path, **_kwargs: calls.__setitem__("cores", path) or SimpleNamespace(rows=[]),
+    )
+    monkeypatch.setattr(
+        utility_commands.event_impact_hypothesis_store,
+        "load_impact_hypotheses",
+        lambda path, **_kwargs: calls.__setitem__("hypotheses", path) or SimpleNamespace(rows=[]),
+    )
+
+    utility_commands.event_feedback_mark(
+        "missed-context-case",
+        "missed",
+        marked_by="tester",
+    )
+
+    assert calls["resolved"] == (None, None)
+    assert calls["watchlist"] == context.watchlist_state_path
+    assert calls["alerts"] == context.alert_store_path
+    assert calls["alerts_core"] == context.core_opportunity_store_path
+    assert calls["cores"] == context.core_opportunity_store_path
+    assert calls["hypotheses"] == context.impact_hypothesis_store_path
+    assert context.feedback_path.exists()
+    persisted = context.feedback_path.read_text(encoding="utf-8")
+    assert '"target":"missed-context-case"' in persisted
+    assert '"label":"missed"' in persisted

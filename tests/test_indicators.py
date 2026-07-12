@@ -9,8 +9,11 @@ from __future__ import annotations
 import json
 import os
 import sys
+from contextlib import ExitStack, redirect_stderr, redirect_stdout
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -756,11 +759,17 @@ def test_storage_wal_and_busy_timeout():
 _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_alert_outcomes",
     "tests.event_alpha.test_artifact_schema",
+    "tests.event_alpha.test_artifact_doctor_outcome_files",
+    "tests.event_alpha.test_burn_in_candidate_mode",
+    "tests.event_alpha.test_burn_in_contract_hermeticity",
+    "tests.event_alpha.test_burn_in_operations",
+    "tests.event_alpha.test_scorecard_clock",
     "tests.event_alpha.test_burn_in_outcomes",
     "tests.event_alpha.test_canonical_imports",
     "tests.event_alpha.test_catalyst_search",
     "tests.event_alpha.test_catalyst_frames",
     "tests.event_alpha.test_claim_semantics",
+    "tests.event_alpha.test_cli_artifact_authority",
     "tests.event_alpha.test_core_opportunities",
     "tests.event_alpha.test_core_reconciliation",
     "tests.event_alpha.test_decision_model_v2",
@@ -781,6 +790,10 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_fade_validation",
     "tests.event_alpha.test_feedback_calibration",
     "tests.event_alpha.test_feedback_eligibility_firewall",
+    "tests.event_alpha.test_feedback_eligibility_consumers",
+    "tests.event_alpha.test_feedback_eligibility_integration",
+    "tests.event_alpha.test_feedback_alert_authority",
+    "tests.event_alpha.test_feedback_priors_firewall",
     "tests.event_alpha.test_impact_hypotheses",
     "tests.event_alpha.test_integrated_merge_policy",
     "tests.event_alpha.test_incident_relevance",
@@ -805,6 +818,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_operator_state",
     "tests.event_alpha.test_operator_state_hardening",
     "tests.event_alpha.test_operator_workflows",
+    "tests.event_alpha.test_observed_outcome_builder",
     "tests.event_alpha.test_outcome_eligibility_contract",
     "tests.event_alpha.test_outcome_eligibility_consumers",
     "tests.event_alpha.test_outcome_eligibility_firewall",
@@ -889,6 +903,7 @@ def _call_standalone_case(fn, provided):
     kwargs = dict(provided)
     temp_dirs = []
     monkeypatches = []
+    capture_fixtures = []
     original_config = {}
     for config_name in dir(config):
         if not config_name.isupper():
@@ -915,10 +930,19 @@ def _call_standalone_case(fn, provided):
             monkeypatches.append(patcher)
             kwargs[name] = patcher
             continue
+        if name == "capsys":
+            capture = _StandaloneCapsys()
+            capture_fixtures.append(capture)
+            kwargs[name] = capture
+            continue
         raise TypeError(f"unsupported standalone fixture: {name}")
 
     try:
-        fn(**kwargs)
+        with ExitStack() as stack:
+            for capture in capture_fixtures:
+                stack.enter_context(redirect_stdout(capture.stdout))
+                stack.enter_context(redirect_stderr(capture.stderr))
+            fn(**kwargs)
     finally:
         for patcher in reversed(monkeypatches):
             patcher.undo()
@@ -934,6 +958,24 @@ def _call_standalone_case(fn, provided):
 def _call_standalone_test(fn):
     for case in _standalone_param_cases(fn):
         _call_standalone_case(fn, case)
+
+
+class _StandaloneCapsys:
+    """Minimal pytest capsys compatibility for the standalone runner."""
+
+    def __init__(self):
+        self.stdout = StringIO()
+        self.stderr = StringIO()
+
+    def readouterr(self):
+        captured = SimpleNamespace(
+            out=self.stdout.getvalue(),
+            err=self.stderr.getvalue(),
+        )
+        for stream in (self.stdout, self.stderr):
+            stream.seek(0)
+            stream.truncate(0)
+        return captured
 
 
 def _run_all():

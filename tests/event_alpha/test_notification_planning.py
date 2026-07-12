@@ -560,7 +560,10 @@ def test_event_alpha_alert_store_persists_validated_route_snapshots_for_inbox_fe
             feedback_path=root / "feedback.jsonl",
             notification_delivery_rows=[delivery_row],
         )
-        assert len(reviewed.sent_without_feedback) == 0
+        assert len(reviewed.sent_without_feedback) == 1
+        assert reviewed.feedback_rows_supplied == 1
+        assert reviewed.feedback_rows_read == 0
+        assert reviewed.feedback_rows_excluded == 1
 
 
 def test_event_alpha_notification_profiles_and_preflight_guards():

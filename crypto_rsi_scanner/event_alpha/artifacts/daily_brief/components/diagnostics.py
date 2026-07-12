@@ -131,16 +131,11 @@ def _candidate_like_term(item: Mapping[str, Any]) -> bool:
     return bool(symbol or coin_id or name)
 
 def _feedback_by_impact_path(alerts: Iterable[Mapping[str, Any]], feedback: Iterable[Mapping[str, Any]]) -> str:
-    path_by_key: dict[str, str] = {}
-    for row in alerts:
-        key = str(row.get("alert_key") or row.get("alert_id") or "")
-        if key:
-            path_by_key[key] = str(row.get("impact_path_type") or "unknown")
+    del alerts  # Exact projections carry Core-owned attribution; aliases are forbidden.
     counts: dict[str, int] = {}
     for row in feedback:
-        key = str(row.get("key") or row.get("alert_key") or row.get("alert_id") or "")
-        path = str(row.get("impact_path_type") or path_by_key.get(key) or "unknown")
-        label = str(row.get("label") or row.get("feedback") or "feedback")
+        path = str(row.get("impact_path_type") or "unknown")
+        label = str(row.get("feedback_label") or "feedback")
         counts[f"{path}:{label}"] = counts.get(f"{path}:{label}", 0) + 1
     return _format_counts(counts)
 

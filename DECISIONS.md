@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-12 - Keep feedback calibration priors shadow-only
+**Status:** accepted
+**Decision:** Exact Core-authorized feedback may produce reviewable calibration
+prior artifacts and in-memory before/after comparisons, but runtime Event Alpha
+paths must not apply those priors to alert scores or tiers. Canonical artifacts
+carry `recommendation_only=true` and `auto_apply=false`; the retained
+`RSI_EVENT_ALPHA_APPLY_PRIORS` setting is compatibility-only and grants no
+mutation authority. Local replay and the priors-shadow report may calculate
+hypothetical bounded adjustments without writing alert snapshots or changing
+routing.
+**Why:** The July North Star and research-truth decisions supersede the older
+opt-in application path. An environment flag and self-asserted artifact cannot
+replace the separately approved policy decision, burn-in review, holdout
+evidence, and tier-specific safety analysis required for automatic promotion.
+Generic score thresholds could also bypass richer playbook timing, derivatives,
+supply, proxy, and maximum-tier caps.
+**Revisit when:** A separate human-approved decision names the exact prior
+contract, minimum reviewed samples, holdout evidence, freshness window,
+playbook/tier caps, rollback path, and bounded no-send activation procedure.
+
 ## 2026-07-12 - Count only exact observed evidence as outcome and feedback truth
 **Status:** accepted
 **Decision:** Event Alpha calibration may count an outcome only when contract v1
@@ -3736,7 +3756,8 @@ justify promoting a specific replay/prior/provider signal into a separate
 research-digest or paper-tracking workflow.
 
 ## 2026-06-19 - Keep Event Alpha daily-ops automation bounded and local
-**Status:** accepted
+**Status:** superseded
+**Superseded by:** `2026-07-12 - Keep feedback calibration priors shadow-only`.
 **Decision:** Event Alpha may run targeted active-watchlist market refresh,
 provider health circuit breakers, opt-in calibration-prior application, daily
 brief generation, shorthand feedback labels, local artifact replay, and

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Any, Mapping
+
+from .. import check_registry
 from ._utils import Messages, ctx_mapping, ctx_value, emit
 
 
@@ -13,6 +16,14 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
     snapshot_core_conflicts = ctx_mapping(ctx, "snapshot_core_conflicts")
     watchlist_conflicts = ctx_mapping(ctx, "watchlist_conflicts")
     incident_linkage = ctx_mapping(ctx, "incident_linkage")
+    feedback_integrity = ctx_mapping(ctx, "feedback_integrity")
+
+    _apply_feedback_eligibility_checks(
+        feedback_integrity,
+        blockers=blockers,
+        warnings=warnings,
+        strict=strict,
+    )
 
     if quality.get("quality_fields_missing_count", 0):
         message = (
@@ -124,3 +135,58 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
         count = incident_linkage.get(key, 0)
         if count:
             warnings.append(f"{key}={count}")
+
+
+def _apply_feedback_eligibility_checks(
+    summary: Mapping[str, Any],
+    *,
+    blockers: Messages,
+    warnings: Messages,
+    strict: bool,
+) -> None:
+    if not summary:
+        return
+
+    def message(detail: str) -> str:
+        return check_registry.format_check_message(
+            "outcomes.feedback_eligibility_firewall",
+            detail,
+        )
+
+    severe_fields = (
+        "feedback_eligibility_contract_invalid",
+        "feedback_persisted_eligible_invalid",
+        "feedback_duplicate_rows",
+        "feedback_future_rows",
+        "feedback_unsafe_rows",
+        "feedback_missing_core_rows",
+        "feedback_ambiguous_core_rows",
+        "feedback_duplicate_json_keys",
+        "feedback_invalid_jsonl",
+        "feedback_jsonl_read_errors",
+    )
+    for field in severe_fields:
+        count = int(summary.get(field) or 0)
+        if count:
+            emit(blockers, warnings, message(f"{field}={count}"), blocker=strict)
+
+    legacy = int(summary.get("feedback_legacy_rows") or 0)
+    if legacy:
+        warnings.append(message(f"feedback_legacy_rows_readable_but_ineligible={legacy}"))
+    superseded = int(summary.get("feedback_superseded_rows") or 0)
+    if superseded:
+        warnings.append(message(f"feedback_superseded_rows={superseded}"))
+    excluded = int(summary.get("feedback_rows_excluded") or 0)
+    reasons = summary.get("feedback_exclusion_reason_counts")
+    if excluded and isinstance(reasons, Mapping):
+        reason_text = ",".join(
+            f"{key}:{int(value)}"
+            for key, value in sorted(reasons.items())
+            if int(value)
+        )
+        warnings.append(
+            message(
+                f"feedback_rows_excluded={excluded}"
+                + (f" reasons={reason_text}" if reason_text else "")
+            )
+        )

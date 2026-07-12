@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from ..artifacts import context as event_alpha_artifacts
+from . import feedback_eligibility as feedback_eligibility_contract
 from . import outcome_eligibility as outcome_eligibility_contract
 
 
@@ -30,6 +31,9 @@ class EventAlphaBurnInScorecard:
     alert_snapshot_rows: int = 0
     runs_with_alertable_but_no_alert_snapshots: int = 0
     feedback_row_count: int = 0
+    feedback_rows_supplied: int = 0
+    feedback_rows_excluded: int = 0
+    feedback_exclusion_reason_counts: dict[str, int] = field(default_factory=dict)
     outcome_row_count: int = 0
     outcome_rows_supplied: int = 0
     outcome_rows_excluded: int = 0
@@ -95,22 +99,17 @@ def build_burn_in_scorecard(
     test_skipped = 0 if include_test_artifacts else sum(1 for row in raw_all if event_alpha_artifacts.is_non_operational_row(row))
     run_data = _artifact_filter(raw_run_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
     alert_data = _artifact_filter(raw_alert_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
-    feedback_data = _artifact_filter(raw_feedback_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
+    supplied_feedback_data = _artifact_filter(raw_feedback_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
     missed_data = _artifact_filter(raw_missed_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
     budget_data = _artifact_filter(raw_budget_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
     supplied_outcomes = _artifact_filter(raw_outcomes, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
     candidate_data = _artifact_filter(raw_candidates, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
     core_data = _artifact_filter(raw_cores, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
-    candidate_outcomes = supplied_outcomes or _rows_with_outcomes(alert_data)
-    eligible_outcomes, excluded_outcomes, outcome_exclusion_reasons = (
-        outcome_eligibility_contract.partition_joined_calibration_outcomes(
-            candidate_outcomes,
-            candidate_data,
-            core_data,
-            evaluated_at=evaluation_now,
-        )
-    )
-    outcome_data = list(eligible_outcomes)
+    (feedback_data, excluded_feedback, feedback_exclusion_reasons,
+     candidate_outcomes, outcome_data, excluded_outcomes,
+     outcome_exclusion_reasons) = _partition_calibration_evidence(
+        supplied_feedback_data, supplied_outcomes, alert_data,
+        candidate_data, core_data, evaluation_now)
     outcome_excluded = len(excluded_outcomes)
     health_data = {str(key): dict(value) for key, value in (provider_health_rows or {}).items()}
     runs_with_alertable = sum(1 for row in run_data if _int(row.get("alertable")) > 0)
@@ -148,6 +147,15 @@ def build_burn_in_scorecard(
             *coverage,
             f"outcome rows excluded from calibration ({reason_summary or 'unclassified'})",
         )))
+    if excluded_feedback:
+        reason_summary = ", ".join(
+            f"{reason}={count}"
+            for reason, count in sorted(feedback_exclusion_reasons.items())
+        )
+        coverage = tuple(dict.fromkeys((
+            *coverage,
+            f"feedback rows excluded from calibration ({reason_summary or 'unclassified'})",
+        )))
     return EventAlphaBurnInScorecard(
         days=max(1, int(days or 1)),
         run_rows=run_data,
@@ -167,6 +175,9 @@ def build_burn_in_scorecard(
         alert_snapshot_rows=len(alert_data),
         runs_with_alertable_but_no_alert_snapshots=alertable_without_snapshots,
         feedback_row_count=len(feedback_data),
+        feedback_rows_supplied=len(supplied_feedback_data),
+        feedback_rows_excluded=len(excluded_feedback),
+        feedback_exclusion_reason_counts=feedback_exclusion_reasons,
         outcome_row_count=len(outcome_data),
         outcome_rows_supplied=len(candidate_outcomes),
         outcome_rows_excluded=outcome_excluded,
@@ -175,6 +186,41 @@ def build_burn_in_scorecard(
         provider_health_row_count=len(health_data),
         llm_budget_row_count=len(budget_data),
         coverage_warnings=coverage,
+    )
+
+
+def _partition_calibration_evidence(
+    supplied_feedback_data: list[dict[str, Any]],
+    supplied_outcomes: list[dict[str, Any]],
+    alert_data: list[dict[str, Any]],
+    candidate_data: list[dict[str, Any]],
+    core_data: list[dict[str, Any]],
+    evaluation_now: datetime,
+) -> tuple[Any, ...]:
+    eligible_feedback, excluded_feedback, feedback_reasons = (
+        feedback_eligibility_contract.partition_joined_calibration_feedback(
+            supplied_feedback_data,
+            core_data,
+            now=evaluation_now,
+        )
+    )
+    candidate_outcomes = supplied_outcomes or _rows_with_outcomes(alert_data)
+    eligible_outcomes, excluded_outcomes, outcome_reasons = (
+        outcome_eligibility_contract.partition_joined_calibration_outcomes(
+            candidate_outcomes,
+            candidate_data,
+            core_data,
+            evaluated_at=evaluation_now,
+        )
+    )
+    return (
+        list(eligible_feedback),
+        excluded_feedback,
+        feedback_reasons,
+        candidate_outcomes,
+        list(eligible_outcomes),
+        excluded_outcomes,
+        outcome_reasons,
     )
 
 
@@ -217,7 +263,7 @@ def format_burn_in_scorecard(scorecard: EventAlphaBurnInScorecard) -> str:
         ),
         "alerts by tier: " + _count_line(alerts, "tier"),
         "alerts by playbook: " + _count_line(alerts, "playbook_type"),
-        "feedback: " + _count_line(feedback, "label"),
+        "feedback: " + _count_line(feedback, "feedback_label"),
         "missed by stage: " + _count_line(missed, "failure_stage"),
         "provider failures/backoffs: " + _provider_line(health),
         "LLM budget: " + _budget_line(budget),
@@ -225,7 +271,10 @@ def format_burn_in_scorecard(scorecard: EventAlphaBurnInScorecard) -> str:
         f"runs_with_alertable={scorecard.runs_with_alertable} · "
         f"alert_snapshots={scorecard.alert_snapshot_rows} · "
         f"alertable_without_snapshots={scorecard.runs_with_alertable_but_no_alert_snapshots} · "
-        f"feedback={scorecard.feedback_row_count} · outcomes={scorecard.outcome_row_count} · "
+        f"feedback={scorecard.feedback_row_count} · "
+        f"feedback_supplied={scorecard.feedback_rows_supplied} · "
+        f"feedback_excluded={scorecard.feedback_rows_excluded} · "
+        f"outcomes={scorecard.outcome_row_count} · "
         f"outcomes_supplied={scorecard.outcome_rows_supplied} · "
         f"outcomes_excluded={scorecard.outcome_rows_excluded} · "
         f"missed={scorecard.missed_row_count} · provider_health={scorecard.provider_health_row_count} · "
@@ -240,6 +289,14 @@ def format_burn_in_scorecard(scorecard: EventAlphaBurnInScorecard) -> str:
             + ", ".join(
                 f"{reason}={count}"
                 for reason, count in sorted(scorecard.outcome_exclusion_reason_counts.items())
+            )
+        )
+    if scorecard.feedback_exclusion_reason_counts:
+        lines.append(
+            "feedback exclusions: "
+            + ", ".join(
+                f"{reason}={count}"
+                for reason, count in sorted(scorecard.feedback_exclusion_reason_counts.items())
             )
         )
     if scorecard.coverage_warnings:
@@ -390,13 +447,11 @@ def _matured_alerts(alerts: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]
 
 
 def _worst_source_line(alerts: list[dict[str, Any]], feedback: list[dict[str, Any]]) -> str:
-    junk_targets = {str(row.get("key") or row.get("target") or "") for row in feedback if row.get("label") == "junk"}
     counts: dict[str, int] = {}
-    for row in alerts:
-        key = str(row.get("alert_key") or "")
-        if key not in junk_targets:
+    for row in feedback:
+        if row.get("feedback_label") != "junk":
             continue
-        source = str(row.get("source") or row.get("source_provider") or "unknown")
+        source = str(row.get("source_provider") or row.get("source_domain") or "unknown")
         counts[source] = counts.get(source, 0) + 1
     return ", ".join(f"{source}={count}" for source, count in sorted(counts.items())) if counts else "none"
 
@@ -413,8 +468,8 @@ def _recommendations(
         recs.append("run the no_key_live burn-in cycle daily before calibrating thresholds")
     if any(int(row.get("consecutive_failures") or 0) > 0 or row.get("disabled_until") for row in health.values()):
         recs.append("inspect degraded provider health before judging alert recall")
-    junk = sum(1 for row in feedback if row.get("label") == "junk")
-    useful = sum(1 for row in feedback if row.get("label") == "useful")
+    junk = sum(1 for row in feedback if row.get("feedback_label") == "junk")
+    useful = sum(1 for row in feedback if row.get("feedback_label") == "useful")
     if junk > useful and junk >= 2:
         recs.append("tighten source/resolver gates for playbooks producing junk feedback")
     if missed:

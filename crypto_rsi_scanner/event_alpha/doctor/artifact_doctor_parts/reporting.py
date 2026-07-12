@@ -280,6 +280,25 @@ _CORE_OPPORTUNITY_COVERAGE_FIELDS: tuple[_CounterField, ...] = (
     ('duplicate_proxy_core_rows', 'duplicate_proxy_core_rows', None),
 )
 
+_FEEDBACK_ELIGIBILITY_FIELDS: tuple[_CounterField, ...] = (
+    ('supplied', 'feedback_rows_supplied', None),
+    ('eligible', 'feedback_rows_eligible', None),
+    ('excluded', 'feedback_rows_excluded', None),
+    ('contract_invalid', 'feedback_eligibility_contract_invalid', None),
+    ('persisted_eligible_invalid', 'feedback_persisted_eligible_invalid', None),
+    ('legacy', 'feedback_legacy_rows', None),
+    ('duplicates', 'feedback_duplicate_rows', None),
+    ('future', 'feedback_future_rows', None),
+    ('unsafe', 'feedback_unsafe_rows', None),
+    ('missing_core', 'feedback_missing_core_rows', None),
+    ('ambiguous_core', 'feedback_ambiguous_core_rows', None),
+    ('superseded', 'feedback_superseded_rows', None),
+    ('duplicate_json_keys', 'feedback_duplicate_json_keys', None),
+    ('invalid_jsonl', 'feedback_invalid_jsonl', None),
+    ('jsonl_read_errors', 'feedback_jsonl_read_errors', None),
+    ('reasons', 'feedback_exclusion_reason_counts', None),
+)
+
 _NOTIFICATION_DELIVERIES_FIELDS: tuple[_CounterField, ...] = (
     ('rows', 'delivery_rows', None),
     ('partial', 'deliveries_partial_delivered', None),
@@ -484,6 +503,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
     lines = [
         *_header_lines(result),
         _counter_line("core opportunity coverage", _CORE_OPPORTUNITY_COVERAGE_FIELDS, result),
+        _counter_line("feedback eligibility", _FEEDBACK_ELIGIBILITY_FIELDS, result),
         _snapshot_line(result),
         _api_rows_line(result),
         _counter_line("notification deliveries", _NOTIFICATION_DELIVERIES_FIELDS, result),

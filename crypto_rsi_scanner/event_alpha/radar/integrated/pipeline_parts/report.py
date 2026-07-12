@@ -10,6 +10,7 @@ from ...decision_model_surfaces import (
     decision_model_values,
     group_decision_rows,
 )
+from ....outcomes import outcome_eligibility
 
 def format_integrated_radar_report(
     candidates: Iterable[Mapping[str, Any]],
@@ -56,12 +57,22 @@ def format_integrated_daily_brief(
     run_id: str | None = None,
     raw_events: int | None = None,
     cumulative_store_rows: int | None = None,
+    evaluated_at: datetime | str | None = None,
 ) -> str:
     rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
     deliveries = [dict(row) for row in delivery_rows if isinstance(row, Mapping)]
-    outcomes = [dict(row) for row in outcome_rows if isinstance(row, Mapping)]
+    supplied_outcomes = [dict(row) for row in outcome_rows if isinstance(row, Mapping)]
     manifest_rows = _manifest_rows(input_manifest, context=context)
     materialized_core_rows = [dict(row) for row in core_rows if isinstance(row, Mapping)]
+    evaluation_clock = evaluated_at or datetime.now(timezone.utc)
+    eligible_outcomes, excluded_outcomes, outcome_exclusion_reasons = (
+        outcome_eligibility.partition_joined_calibration_outcomes(
+            supplied_outcomes,
+            rows,
+            materialized_core_rows,
+            evaluated_at=evaluation_clock,
+        )
+    )
     visible_core = event_core_opportunities.visible_core_opportunities(materialized_core_rows)
     visible_core_rows = [item.primary_row for item in visible_core]
     support_rows = [
@@ -174,7 +185,10 @@ def format_integrated_daily_brief(
     _append_daily_brief_sections(
         lines,
         rows,
-        outcomes=outcomes,
+        supplied_outcomes=supplied_outcomes,
+        eligible_outcomes=list(eligible_outcomes),
+        excluded_outcomes=list(excluded_outcomes),
+        outcome_exclusion_reasons=outcome_exclusion_reasons,
         performance_snapshot=performance_snapshot,
     )
     return "\n".join(lines).rstrip() + "\n"
@@ -184,7 +198,10 @@ def _append_daily_brief_sections(
     lines: list[str],
     rows: list[dict[str, Any]],
     *,
-    outcomes: list[dict[str, Any]],
+    supplied_outcomes: list[dict[str, Any]],
+    eligible_outcomes: list[dict[str, Any]],
+    excluded_outcomes: list[dict[str, Any]],
+    outcome_exclusion_reasons: Mapping[str, int],
     performance_snapshot: Mapping[str, Any] | None,
 ) -> None:
     sections = (
@@ -220,7 +237,13 @@ def _append_daily_brief_sections(
     lines.extend(["", "## Radar Learning Snapshot"])
     _append_radar_learning_snapshot(lines, performance_snapshot)
     lines.extend(["", "## Outcome Tracker Status"])
-    _append_outcome_tracker_status(lines, outcomes)
+    _append_outcome_tracker_status(
+        lines,
+        supplied_outcomes=supplied_outcomes,
+        eligible_outcomes=eligible_outcomes,
+        excluded_outcomes=excluded_outcomes,
+        exclusion_reasons=outcome_exclusion_reasons,
+    )
     lines.extend(["", "## Diagnostics Appendix"])
     diagnostics = [row for row in rows if row.get("opportunity_type") == event_market_reaction.EventOpportunityType.DIAGNOSTIC.value]
     if not diagnostics:
@@ -262,36 +285,55 @@ def _append_radar_learning_snapshot(lines: list[str], performance_snapshot: Mapp
         lines.append(f"- Fade-review exhaustion rate: {_rate_text(fade.get('rate'))}")
     lines.append("- Recommendations only; no automatic threshold changes were applied.")
 
-def _append_outcome_tracker_status(lines: list[str], outcomes: list[dict[str, Any]]) -> None:
-    if not outcomes:
+def _append_outcome_tracker_status(
+    lines: list[str],
+    *,
+    supplied_outcomes: list[dict[str, Any]],
+    eligible_outcomes: list[dict[str, Any]],
+    excluded_outcomes: list[dict[str, Any]],
+    exclusion_reasons: Mapping[str, int],
+) -> None:
+    if not supplied_outcomes:
         lines.append("- No integrated radar outcomes filled yet.")
         return
-    matured = sum(1 for row in outcomes if str(row.get("outcome_status") or "") == "filled")
-    partial = sum(1 for row in outcomes if str(row.get("outcome_status") or "") != "filled")
-    performance_rows = [row for row in outcomes if _truthy(row.get("include_in_performance"))]
-    diagnostics = [row for row in outcomes if not _truthy(row.get("include_in_performance"))]
-    lines.append(f"- Outcome rows: {len(outcomes)}")
-    lines.append(f"- Filled: {matured}")
-    lines.append(f"- Partial/missing data: {partial}")
-    lines.append(f"- Performance rows: {len(performance_rows)}")
-    lines.append(f"- Diagnostics excluded: {len(diagnostics)}")
-    for lane, count in Counter(str(row.get("opportunity_type") or "unknown") for row in performance_rows).most_common():
+    matured = sum(
+        1
+        for row in eligible_outcomes
+        if outcome_eligibility.primary_horizon_maturation_state(row) == "matured"
+    )
+    lines.append(f"- Outcome rows supplied: {len(supplied_outcomes)}")
+    lines.append(f"- Performance rows: {len(eligible_outcomes)}")
+    lines.append(f"- Matured performance rows: {matured}")
+    lines.append(f"- Diagnostics excluded as non-performance evidence: {len(excluded_outcomes)}")
+    lines.append(f"- Calibration exclusions: {_format_counts(exclusion_reasons)}")
+    for lane, count in Counter(str(row.get("opportunity_type") or "unknown") for row in eligible_outcomes).most_common():
         lines.append(f"- {lane}: {count}")
     lines.extend(["", "## Recently Matured Integrated Radar Outcomes"])
-    for row in sorted(performance_rows, key=lambda item: str(item.get("preview_time") or item.get("observed_at") or ""), reverse=True)[:10]:
+    for row in sorted(eligible_outcomes, key=lambda item: str(item.get("preview_time") or item.get("observed_at") or ""), reverse=True)[:10]:
         lines.append(
             f"- {row.get('symbol')}/{row.get('coin_id')} {row.get('opportunity_type')} "
-            f"label={row.get('outcome_label')} primary={_pct(row.get('primary_horizon_return'))} "
+            f"validation={outcome_eligibility.deterministic_validation_status(row)} "
+            f"primary={_pct(row.get('primary_horizon_return'))} "
             f"vs BTC={_pct(_by_horizon(row.get('relative_return_vs_btc_by_horizon'), row.get('primary_horizon')))} "
-            f"status={row.get('outcome_status')}"
+            f"status={outcome_eligibility.primary_horizon_maturation_state(row) or 'unknown'}"
         )
-    if diagnostics:
-        lines.append(f"- Diagnostics excluded from performance: {len(diagnostics)}")
+    if excluded_outcomes:
+        lines.append("- Excluded rows remain diagnostics only and are not performance evidence.")
+        for row in excluded_outcomes[:5]:
+            lines.append(
+                f"- Non-performance diagnostic: candidate={row.get('candidate_id') or 'unknown'} "
+                f"core={row.get('core_opportunity_id') or 'unknown'} "
+                f"reasons={','.join(row.get('calibration_ineligible_reasons') or ()) or 'unknown'}"
+            )
     lines.extend(["", "## Calibration Snapshot"])
-    for lane, lane_rows in sorted(_group_by(performance_rows, "opportunity_type").items()):
-        validated = sum(1 for row in lane_rows if _outcome_truth(row) == "validated")
-        invalidated = sum(1 for row in lane_rows if _outcome_truth(row) == "invalidated/noise")
-        inconclusive = sum(1 for row in lane_rows if _outcome_truth(row) == "inconclusive")
+    for lane, lane_rows in sorted(_group_by(eligible_outcomes, "opportunity_type").items()):
+        statuses = [
+            outcome_eligibility.deterministic_validation_status(row)
+            for row in lane_rows
+        ]
+        validated = statuses.count("validated")
+        invalidated = statuses.count("invalidated/noise")
+        inconclusive = statuses.count("inconclusive")
         rate = validated / max(1, validated + invalidated)
         lines.append(
             f"- {lane}: rows={len(lane_rows)} validated={validated} "

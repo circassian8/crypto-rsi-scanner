@@ -89,6 +89,12 @@ class CanonicalCoreOpportunityView:
     feedback_target: str | None = None
     feedback_status: str = "pending_or_unknown"
     feedback_rows: tuple[dict[str, Any], ...] = ()
+    feedback_rows_supplied: int = 0
+    feedback_rows_eligible: int = 0
+    feedback_rows_matched_to_core: int = 0
+    feedback_rows_eligible_other_core: int = 0
+    feedback_rows_excluded: int = 0
+    feedback_exclusion_reason_counts: Mapping[str, int] = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
 
     @property

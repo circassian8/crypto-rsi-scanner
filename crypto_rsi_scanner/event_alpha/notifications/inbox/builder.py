@@ -15,6 +15,7 @@ import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import research_cards as event_research_cards
 from ...radar import core_opportunity_store as event_core_opportunity_store
 from ...radar.decision_model_surfaces import decision_model_values
+from ...outcomes import feedback_eligibility
 from .. import delivery
 from .. import pipeline as event_alpha_notifications
 from .models import *  # noqa: F403
@@ -50,6 +51,10 @@ class _InboxSourceRows:
     reviewed_ids: set[str]
     watch_by_alert: dict[str, event_watchlist.EventWatchlistEntry]
     delivery_state_by_run: dict[str, str]
+    feedback_rows_supplied: int
+    feedback_rows_eligible: int
+    feedback_rows_excluded: int
+    feedback_exclusion_reason_counts: dict[str, int]
 
 
 @dataclass(frozen=True)
@@ -84,6 +89,7 @@ def build_notification_inbox(
     core_opportunity_rows: Iterable[Mapping[str, Any]] = (),
     include_api_conflicts: bool = False,
     include_diagnostics: bool = False,
+    now: Any = None,
 ) -> EventAlphaNotificationInboxResult:
     """Join notification, alert, card, and feedback artifacts into review queues."""
     source = _load_inbox_source_rows(
@@ -94,6 +100,7 @@ def build_notification_inbox(
         notification_delivery_rows=notification_delivery_rows,
         watchlist_entries=watchlist_entries,
         core_opportunity_rows=core_opportunity_rows,
+        now=now,
     )
     all_review_items = _build_event_alpha_review_items_from_rows(
         profile=profile,
@@ -133,6 +140,10 @@ def build_notification_inbox(
         feedback_rows_read=len(source.feedback),
         research_cards_read=len(source.card_paths),
         outcome_rows_read=len(outcomes),
+        feedback_rows_supplied=source.feedback_rows_supplied,
+        feedback_rows_eligible=source.feedback_rows_eligible,
+        feedback_rows_excluded=source.feedback_rows_excluded,
+        feedback_exclusion_reason_counts=source.feedback_exclusion_reason_counts,
         sent_without_feedback=queues.sent_without_feedback,
         partial_delivered_without_feedback=queues.partial_delivered_without_feedback,
         would_send_without_feedback=queues.would_send_without_feedback,
@@ -166,12 +177,21 @@ def _load_inbox_source_rows(
     notification_delivery_rows: Iterable[Mapping[str, Any]],
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry],
     core_opportunity_rows: Iterable[Mapping[str, Any]],
+    now: Any,
 ) -> _InboxSourceRows:
     runs = [dict(row) for row in notification_runs if isinstance(row, Mapping)]
     alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
-    feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    supplied_feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
     deliveries = [dict(row) for row in notification_delivery_rows if isinstance(row, Mapping)]
     core_rows = [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)]
+    feedback, excluded_feedback, feedback_reasons = (
+        feedback_eligibility.partition_joined_calibration_feedback(
+            supplied_feedback,
+            core_rows,
+            now=now,
+        )
+    )
+    feedback = list(feedback)
     cards_dir = Path(research_cards_dir).expanduser()
     card_paths = _card_paths(cards_dir)
     return _InboxSourceRows(
@@ -189,6 +209,10 @@ def _load_inbox_source_rows(
             for entry in watchlist_entries
         },
         delivery_state_by_run=_latest_delivery_state_by_run(deliveries),
+        feedback_rows_supplied=len(supplied_feedback),
+        feedback_rows_eligible=len(feedback),
+        feedback_rows_excluded=len(excluded_feedback),
+        feedback_exclusion_reason_counts=feedback_reasons,
     )
 
 

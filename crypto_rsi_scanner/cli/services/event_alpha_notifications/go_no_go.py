@@ -34,7 +34,7 @@ def event_alpha_notify_go_no_go(
     now = _event_research_now()
     storage = Storage(config.DB_PATH)
     try:
-        watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
+        watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
         routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
         plan = event_alpha_notifications.build_notification_plan(
             routed.decisions,
@@ -45,7 +45,11 @@ def event_alpha_notify_go_no_go(
         )
     finally:
         storage.close()
-    artifacts = _event_alpha_local_artifacts(run_limit=250, latest_alerts=False)
+    artifacts = _event_alpha_local_artifacts(
+        context=context,
+        run_limit=250,
+        latest_alerts=False,
+    )
     delivery_path = event_alpha_notification_delivery.deliveries_path_for_context(context)
     delivery_rows = event_alpha_notification_delivery.load_delivery_records(delivery_path)
     core_rows = event_core_opportunity_store.load_core_opportunities(
@@ -74,9 +78,24 @@ def event_alpha_notify_go_no_go(
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
+        artifact_namespace_dir=context.namespace_dir,
         inspected_alert_store_path=context.alert_store_path,
+        feedback_path=context.feedback_path,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+        outcomes_path=context.outcomes_path,
+        integrated_candidate_path=(
+            context.namespace_dir / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME
+        ),
+        integrated_outcomes_path=(
+            context.namespace_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
+        ),
+        notification_preview_path=(
+            event_alpha_notification_delivery.notification_preview_path_for_context(context)
+        ),
+        run_ledger_path=context.run_ledger_path,
         strict=True,
         delivery_strict_scope="latest_run",
+        evaluated_at=now,
     )
     readiness = event_alpha_send_readiness.build_send_readiness(
         profile=profile_name,
@@ -90,6 +109,9 @@ def event_alpha_notify_go_no_go(
         telegram_ready=bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS),
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
+        preview_path=event_alpha_notification_delivery.notification_preview_path_for_context(
+            context
+        ),
     )
     latest_delivery_rows = [
         row for row in event_alpha_notification_delivery.latest_rows_by_delivery(delivery_rows)
@@ -107,7 +129,9 @@ def event_alpha_notify_go_no_go(
         send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
         lock_status=lock_status,
         provider_status=provider_status,
-        provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
+        provider_health_rows=event_provider_health.load_provider_health(
+            context.provider_health_path
+        ),
         delivery_ledger_path=delivery_path,
         notification_run_ledger_path=context.notification_runs_path,
         research_cards_dir=context.research_cards_dir,

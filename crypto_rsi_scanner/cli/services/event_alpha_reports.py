@@ -130,7 +130,8 @@ def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -
         f"missed_path: {config.EVENT_ALPHA_MISSED_PATH}",
         (
             "calibration_priors: "
-            f"enabled={str(bool(config.EVENT_ALPHA_APPLY_PRIORS)).lower()} "
+            "runtime_apply_allowed=false "
+            f"compatibility_flag={str(bool(config.EVENT_ALPHA_APPLY_PRIORS)).lower()} "
             f"path={config.EVENT_ALPHA_PRIORS_PATH} "
             f"bounds={config.EVENT_ALPHA_PRIORS_MIN_MULTIPLIER:g}-{config.EVENT_ALPHA_PRIORS_MAX_MULTIPLIER:g}"
         ),
@@ -210,16 +211,18 @@ def _event_alpha_daily_brief_report_locked(
 ) -> None:
     profile = event_alpha_profiles.get_profile(selected_profile) if selected_profile else None
     artifact_namespace = artifact_namespace or context.artifact_namespace
+    evaluation_now = _event_research_now()
     runs = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=25)
     operator_run = _ensure_daily_operator_state(context, runs.rows)
     alerts = event_alpha_alert_store.load_alert_snapshots(
-        _event_alpha_alert_store_config_from_runtime().path,
+        context.alert_store_path,
         latest_only=True,
+        core_opportunity_store_path=context.core_opportunity_store_path,
     )
     event_core_opportunity_store.normalize_core_opportunity_store(
         context.core_opportunity_store_path,
         latest_run=True,
-        now=datetime.now(timezone.utc),
+        now=evaluation_now,
     )
     event_alpha_notification_runs.normalize_notification_runs_after_cryptopanic_success(
         context.notification_runs_path,
@@ -229,24 +232,27 @@ def _event_alpha_daily_brief_report_locked(
         context.impact_hypothesis_store_path,
         limit=100,
     )
-    feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
-    missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
-    watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
+    feedback = event_feedback.load_feedback(context.feedback_path)
+    missed_rows = event_alpha_missed.load_missed_rows(context.missed_path)
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     router_result = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
-    monitor_result = _event_watchlist_monitor_result_from_runtime(watchlist)
+    monitor_result = _event_watchlist_monitor_result_from_runtime(
+        watchlist,
+        now=evaluation_now,
+    )
     core_store = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
         latest_run=True,
     )
     card_write = event_research_cards.write_research_cards(
-        config.EVENT_RESEARCH_CARDS_DIR,
+        context.research_cards_dir,
         watchlist_entries=watchlist.entries,
         alert_rows=[*alerts.rows, *hypotheses.rows, *core_store.rows],
         route_decisions=router_result.decisions,
         monitor_rows=monitor_result.rows,
         selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
         limit=config.EVENT_RESEARCH_CARDS_WRITE_LIMIT,
-        now=datetime.now(timezone.utc),
+        now=evaluation_now,
         lineage_context=_event_alpha_card_lineage_context(
             run_id=str((operator_run or {}).get("run_id") or "") or None,
             profile=context.profile,
@@ -272,7 +278,9 @@ def _event_alpha_daily_brief_report_locked(
         fade_review_candidate_rows=event_derivatives_crowding.load_fade_review_candidates(context.namespace_dir),
         watchlist_entries=watchlist.entries,
         router_result=router_result,
-        provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
+        provider_health_rows=event_provider_health.load_provider_health(
+            context.provider_health_path
+        ),
         card_paths=card_write.card_paths,
         requested_profile=profile.name if profile else profile_name,
         artifact_namespace=artifact_namespace,
@@ -281,9 +289,10 @@ def _event_alpha_daily_brief_report_locked(
         alert_store_path=context.alert_store_path,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
+        generated_at=evaluation_now,
     )
     result = event_alpha_daily_brief.write_daily_brief(
-        config.EVENT_ALPHA_DAILY_BRIEF_PATH,
+        context.daily_brief_path,
         markdown=markdown,
         card_paths=card_write.card_paths,
     )

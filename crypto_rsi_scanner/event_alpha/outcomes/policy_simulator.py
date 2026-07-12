@@ -8,6 +8,7 @@ from typing import Any, Iterable, Mapping
 import crypto_rsi_scanner.event_alpha.artifacts.alert_store as event_alpha_alert_store
 import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
 import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+from . import feedback_eligibility
 
 _SIMULATOR_EXCLUDED_CLASSIFICATIONS = {
     event_alpha_alert_store.SNAPSHOT_LEGACY_CONFLICT,
@@ -31,6 +32,10 @@ class EventAlphaPolicySimulationResult:
     baseline_alertable: tuple[str, ...]
     scenarios: tuple[dict[str, Any], ...]
     legacy_conflicts_excluded: int = 0
+    feedback_rows_supplied: int = 0
+    feedback_rows_eligible: int = 0
+    feedback_rows_excluded: int = 0
+    feedback_exclusion_reason_counts: dict[str, int] | None = None
 
 
 DEFAULT_SCENARIOS: tuple[EventAlphaPolicyScenario, ...] = tuple(
@@ -94,11 +99,22 @@ def simulate_policy(
     scenarios: Iterable[EventAlphaPolicyScenario] = DEFAULT_SCENARIOS,
     include_api: bool = False,
     feedback_rows: Iterable[Mapping[str, Any]] = (),
+    core_rows: Iterable[Mapping[str, Any]] = (),
     missed_rows: Iterable[Mapping[str, Any]] = (),
+    now: Any = None,
 ) -> EventAlphaPolicySimulationResult:
     raw_items = [_normalize(row) for row in rows if isinstance(row, Mapping)]
-    feedback_by_key = _feedback_by_key(feedback_rows)
-    raw_items = [_with_feedback(row, feedback_by_key) for row in raw_items]
+    supplied_feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    eligible_feedback, excluded_feedback, feedback_reasons = (
+        feedback_eligibility.partition_joined_alert_feedback(
+            supplied_feedback,
+            core_rows,
+            raw_items,
+            now=now,
+        )
+    )
+    feedback_by_identity = _feedback_by_identity(eligible_feedback)
+    raw_items = [_with_feedback(row, feedback_by_identity) for row in raw_items]
     missed = [dict(row) for row in missed_rows if isinstance(row, Mapping)]
     legacy_conflicts = [
         row for row in raw_items
@@ -148,6 +164,10 @@ def simulate_policy(
         baseline_alertable=baseline,
         scenarios=tuple(results),
         legacy_conflicts_excluded=0 if include_api else len(legacy_conflicts),
+        feedback_rows_supplied=len(supplied_feedback),
+        feedback_rows_eligible=len(eligible_feedback),
+        feedback_rows_excluded=len(excluded_feedback),
+        feedback_exclusion_reason_counts=feedback_reasons,
     )
 
 
@@ -159,6 +179,11 @@ def format_policy_simulation(result: EventAlphaPolicySimulationResult) -> str:
         f"profile: {result.profile or 'default'}",
         f"baseline_alertable: {len(result.baseline_alertable)}",
         f"legacy_conflicts_excluded: {result.legacy_conflicts_excluded}",
+        f"feedback_rows_supplied: {result.feedback_rows_supplied}",
+        f"feedback_rows_eligible: {result.feedback_rows_eligible}",
+        f"feedback_rows_excluded: {result.feedback_rows_excluded}",
+        "feedback_exclusion_reasons: "
+        + _format_reason_counts(result.feedback_exclusion_reason_counts),
         "",
     ]
     for row in result.scenarios:
@@ -201,22 +226,34 @@ def _normalize(row: Mapping[str, Any]) -> dict[str, Any]:
     return data
 
 
-def _feedback_by_key(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
-    out: dict[str, str] = {}
+def _format_reason_counts(counts: Mapping[str, int] | None) -> str:
+    if not counts:
+        return "none"
+    return ", ".join(f"{reason}={count}" for reason, count in sorted(counts.items()))
+
+
+def _feedback_by_identity(
+    rows: Iterable[Mapping[str, Any]],
+) -> dict[tuple[str, ...], str]:
+    out: dict[tuple[str, ...], str] = {}
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        label = str(row.get("label") or row.get("feedback_label") or "").strip()
-        if not label:
+        identity = feedback_eligibility.canonical_feedback_join_identity(row)
+        label = str(row.get("feedback_label") or "").strip()
+        if identity is None or not label:
             continue
-        for key in _row_keys(row):
-            out[key] = label
+        out[identity] = label
     return out
 
 
-def _with_feedback(row: Mapping[str, Any], feedback_by_key: Mapping[str, str]) -> dict[str, Any]:
+def _with_feedback(
+    row: Mapping[str, Any],
+    feedback_by_identity: Mapping[tuple[str, ...], str],
+) -> dict[str, Any]:
     out = dict(row)
-    label = next((feedback_by_key[key] for key in _row_keys(out) if key in feedback_by_key), None)
+    identity = feedback_eligibility.canonical_feedback_join_identity(out)
+    label = feedback_by_identity.get(identity) if identity is not None else None
     if label:
         out["feedback_label"] = label
     return out

@@ -62,13 +62,21 @@ def event_alpha_burn_in_readiness_report(
     except ValueError as exc:
         print(str(exc))
         return
+    evaluation_now = _event_research_now()
     provider_report = event_provider_status.build_event_discovery_provider_status(config)
     runs = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=500)
-    alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=False)
-    current_alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        context.alert_store_path,
+        latest_only=False,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+    )
+    current_alerts = event_alpha_alert_store.load_alert_snapshots(
+        context.alert_store_path,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+    )
     core_opportunities = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
-        latest_run=True,
+        latest_run=False,
         include_api=True,
     )
     feedback = event_feedback.load_feedback(context.feedback_path)
@@ -85,6 +93,7 @@ def event_alpha_burn_in_readiness_report(
         notification_runs=notification_runs.rows,
         alert_rows=current_alerts.rows,
         feedback_rows=feedback_rows,
+        core_opportunity_rows=core_opportunities.rows,
         notification_delivery_rows=delivery_rows,
         watchlist_entries=watchlist.entries,
         research_cards_dir=context.research_cards_dir,
@@ -94,6 +103,7 @@ def event_alpha_burn_in_readiness_report(
         alert_store_path=context.alert_store_path,
         feedback_path=context.feedback_path,
         outcomes_path=context.outcomes_path,
+        now=evaluation_now,
     )
     feedback_readiness = event_alpha_feedback_readiness.build_feedback_readiness(
         profile=context.profile,
@@ -104,24 +114,13 @@ def event_alpha_burn_in_readiness_report(
         watchlist_entries=watchlist.entries,
         core_opportunity_rows=core_opportunities.rows,
         inbox_result=inbox,
+        now=evaluation_now,
     )
     outcome_rows = [
-        row for row in alerts.rows if any(
-            row.get(field) not in (None, "")
-            for field in (
-                "primary_horizon_return",
-                "return_1h",
-                "return_4h",
-                "return_24h",
-                "return_72h",
-                "return_7d",
-                "max_favorable_excursion",
-                "max_adverse_excursion",
-                "mfe_mae_ratio",
-                "direction_hit",
-                "volatility_hit",
-            )
-        )
+        *event_alpha_outcome_artifact_io.read_jsonl(context.outcomes_path),
+        *event_integrated_radar_outcomes.load_integrated_radar_outcomes(
+            context.namespace_dir
+        ),
     ]
     doctor = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=runs.rows,
@@ -153,8 +152,19 @@ def event_alpha_burn_in_readiness_report(
         artifact_namespace=context.artifact_namespace,
         include_test_artifacts=False,
         include_api_artifacts=False,
+        artifact_namespace_dir=context.namespace_dir,
         inspected_alert_store_path=context.alert_store_path,
+        feedback_path=context.feedback_path,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+        outcomes_path=context.outcomes_path,
+        integrated_candidate_path=context.namespace_dir / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME,
+        integrated_outcomes_path=context.namespace_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME,
+        notification_preview_path=(
+            event_alpha_notification_delivery.notification_preview_path_for_context(context)
+        ),
+        run_ledger_path=context.run_ledger_path,
         strict=True,
+        evaluated_at=evaluation_now,
     )
     core_store = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
@@ -163,7 +173,8 @@ def event_alpha_burn_in_readiness_report(
     )
     acquisition_rows = event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path)
     contract_scorecard = event_alpha_contract_scorecard.build_authoritative_scorecard(
-        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
+        base_dir=context.base_dir,
+        now=evaluation_now,
     )
     readiness = event_alpha_burn_in_readiness.build_burn_in_readiness(
         profile=context.profile,
@@ -190,27 +201,56 @@ def _burn_in_pack_artifact_doctor(
     artifact_namespace: str | None,
     include_test_artifacts: bool,
     include_api_artifacts: bool,
+    evaluated_at: Any,
 ) -> Any:
-    cards_dir = Path(config.EVENT_RESEARCH_CARDS_DIR)
+    cards_dir = context.research_cards_dir
     return event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=artifacts["runs"].rows,
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
         hypothesis_rows=artifacts["hypotheses"].rows,
-        core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
+        core_opportunity_rows=artifacts["core_opportunities"].rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
-        profile=config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE or None,
+        profile=context.profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
-        inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
+        artifact_namespace_dir=context.namespace_dir,
+        inspected_alert_store_path=context.alert_store_path,
+        feedback_path=context.feedback_path,
+        core_opportunity_store_path=context.core_opportunity_store_path,
+        outcomes_path=context.outcomes_path,
+        integrated_candidate_path=(
+            context.namespace_dir / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME
+        ),
+        integrated_outcomes_path=(
+            context.namespace_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
+        ),
+        notification_preview_path=(
+            event_alpha_notification_delivery.notification_preview_path_for_context(context)
+        ),
+        run_ledger_path=context.run_ledger_path,
         strict=bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT),
+        evaluated_at=evaluated_at,
+    )
+
+
+def _burn_in_pack_contract_sections(base_dir: Any, *, now: Any) -> tuple[Any, str, str]:
+    import crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist as checklist_api
+    from crypto_rsi_scanner.event_alpha.operations import scorecard as scorecard_api
+
+    scorecard = scorecard_api.build_authoritative_scorecard(base_dir=base_dir, now=now)
+    checklist = checklist_api.build_burn_in_checklist(scorecard)
+    return (
+        scorecard,
+        scorecard_api.format_scorecard(scorecard),
+        checklist_api.format_burn_in_checklist(checklist),
     )
 
 
@@ -237,14 +277,12 @@ def event_alpha_export_burn_in_pack(
         print(str(exc))
         return
     artifact_namespace = artifact_namespace or context.artifact_namespace
-    artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
-    import crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist as event_alpha_burn_in_checklist
-    from crypto_rsi_scanner.event_alpha.operations import scorecard as event_alpha_contract_scorecard
-
-    contract_scorecard = event_alpha_contract_scorecard.build_authoritative_scorecard(
-        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
+    artifacts = _event_alpha_local_artifacts(context=context, run_limit=500, latest_alerts=False)
+    evaluation_now = _event_research_now()
+    contract_scorecard, scorecard_text, checklist_text = _burn_in_pack_contract_sections(
+        context.base_dir,
+        now=evaluation_now,
     )
-    checklist_result = event_alpha_burn_in_checklist.build_burn_in_checklist(contract_scorecard)
     readiness = event_alpha_v1_readiness.build_v1_readiness(
         run_rows=artifacts["runs"].rows,
         alert_rows=artifacts["alerts"].rows,
@@ -253,10 +291,13 @@ def event_alpha_export_burn_in_pack(
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
         outcome_rows=artifacts["outcome_rows"],
+        candidate_rows=artifacts["candidate_rows"],
+        core_rows=artifacts["core_opportunities"].rows,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
         days=days,
+        now=evaluation_now,
         burn_in_contract_scorecard=contract_scorecard,
     )
     health = event_alpha_health_guard.evaluate_health_guard(
@@ -273,6 +314,7 @@ def event_alpha_export_burn_in_pack(
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
+        now=evaluation_now,
     )
     doctor = _burn_in_pack_artifact_doctor(
         artifacts=artifacts,
@@ -280,6 +322,7 @@ def event_alpha_export_burn_in_pack(
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
+        evaluated_at=evaluation_now,
     )
     router_result = event_alpha_router.route_watchlist(
         artifacts["watchlist"],
@@ -290,43 +333,50 @@ def event_alpha_export_burn_in_pack(
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
         missed_rows=artifacts["missed_rows"],
-        notification_runs=event_alpha_notification_runs.load_notification_runs(config.EVENT_ALPHA_NOTIFICATION_RUNS_PATH).rows,
-        hypothesis_rows=event_impact_hypothesis_store.load_impact_hypotheses(config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH, limit=100).rows,
-        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(config.EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH),
+        core_opportunity_rows=artifacts["core_opportunities"].rows,
+        notification_runs=event_alpha_notification_runs.load_notification_runs(context.notification_runs_path).rows,
+        hypothesis_rows=event_impact_hypothesis_store.load_impact_hypotheses(context.impact_hypothesis_store_path, limit=100).rows,
+        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         watchlist_entries=artifacts["watchlist"].entries,
         router_result=router_result,
         provider_health_rows=artifacts["provider_rows"],
         artifact_namespace=artifact_namespace,
-        run_mode=config.EVENT_ALPHA_RUN_MODE,
-        run_ledger_path=config.EVENT_ALPHA_RUN_LEDGER_PATH,
-        alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
+        run_mode=context.run_mode,
+        run_ledger_path=context.run_ledger_path,
+        alert_store_path=context.alert_store_path,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
         clock_status=_event_clock_status(),
-        generated_at=_event_research_now(),
+        generated_at=evaluation_now,
     )
     calibration = event_alpha_calibration.format_calibration_report(
         artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
+        core_rows=artifacts["core_opportunities"].rows,
         missed_rows=artifacts["missed_rows"],
+        now=evaluation_now,
     )
     source_reliability = event_source_reliability.format_source_reliability_report(
         artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
+        core_rows=artifacts["core_opportunities"].rows,
         missed_rows=artifacts["missed_rows"],
         run_rows=artifacts["runs"].rows,
+        now=evaluation_now,
     )
     tuning = event_alpha_tuning.format_tuning_worksheet(event_alpha_tuning.build_tuning_worksheet(
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
+        core_rows=artifacts["core_opportunities"].rows,
         missed_rows=artifacts["missed_rows"],
         run_rows=artifacts["runs"].rows,
+        now=evaluation_now,
     ))
     result = event_alpha_burn_in_pack.export_burn_in_pack(
         out_path,
         daily_brief=daily_brief,
-        burn_in_scorecard=event_alpha_contract_scorecard.format_scorecard(contract_scorecard),
-        burn_in_checklist=event_alpha_burn_in_checklist.format_burn_in_checklist(checklist_result),
+        burn_in_scorecard=scorecard_text,
+        burn_in_checklist=checklist_text,
         v1_readiness=event_alpha_v1_readiness.format_v1_readiness_report(readiness),
         health_guard=event_alpha_health_guard.format_health_guard_report(health),
         artifact_doctor=event_alpha_artifact_doctor.format_artifact_doctor_report(doctor),
@@ -342,9 +392,9 @@ def event_alpha_export_burn_in_pack(
         outcome_rows=artifacts["outcome_rows"],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
-        cards_dir=config.EVENT_RESEARCH_CARDS_DIR,
-        proposed_eval_dir=config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR,
-        profile=config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE or None,
+        cards_dir=context.research_cards_dir,
+        proposed_eval_dir=context.proposed_eval_cases_dir,
+        profile=context.profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,

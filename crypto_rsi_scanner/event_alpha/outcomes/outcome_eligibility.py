@@ -30,6 +30,7 @@ OUTCOME_HORIZON_SECONDS = {
     "3d": 3 * 24 * 60 * 60,
     "7d": 7 * 24 * 60 * 60,
 }
+OUTCOME_ENTRY_PRICE_MAX_STALENESS_SECONDS = 24 * 60 * 60
 OUTCOME_MATURITY_STATUSES = frozenset({"pending", "matured", "missing_data"})
 OUTCOME_PROVENANCE_STATUSES = frozenset(
     {"synthetic_fixture", "observed_market_prices", "missing"}
@@ -52,6 +53,14 @@ OUTCOME_DIRECTION_BY_LANE = {
 OUTCOME_ALLOWED_LANES = frozenset(
     {*OUTCOME_DIRECTION_BY_LANE, "UNCONFIRMED_RESEARCH", "DIAGNOSTIC"}
 )
+OUTCOME_PRIMARY_HORIZON_BY_LANE = {
+    "EARLY_LONG_RESEARCH": "3d",
+    "CONFIRMED_LONG_RESEARCH": "24h",
+    "FADE_SHORT_REVIEW": "24h",
+    "RISK_ONLY": "24h",
+    "UNCONFIRMED_RESEARCH": "24h",
+    "DIAGNOSTIC": "24h",
+}
 OUTCOME_VALIDATION_STATUSES = frozenset(
     {"validated", "invalidated/noise", "inconclusive"}
 )
@@ -123,6 +132,7 @@ OUTCOME_INELIGIBLE_REASONS = frozenset(
         "ambiguous_outcome_identity",
         "candidate_authority_contract_invalid",
         "core_authority_contract_invalid",
+        "core_authority_generated_in_future",
         "diagnostic_lane",
         "duplicate_horizon_price_observation_id",
         "duplicate_outcome_identity",
@@ -139,6 +149,7 @@ OUTCOME_INELIGIBLE_REASONS = frozenset(
         "missing_exact_identity",
         "missing_observation_price",
         "missing_observation_price_id",
+        "missing_observation_price_observed_at",
         "missing_observation_price_provenance",
         "missing_observation_price_source",
         "missing_outcome_evaluated_at",
@@ -146,10 +157,14 @@ OUTCOME_INELIGIBLE_REASONS = frozenset(
         "missing_primary_horizon_metadata",
         "outcome_identity_contract_invalid",
         "outcome_evaluated_in_future",
+        "observation_price_after_candidate",
+        "observation_price_after_evaluation",
+        "observation_price_stale",
         "outcome_safety_contract_invalid",
         "outcome_validation_claim_direction_mismatch",
         "primary_horizon_due_in_future",
         "primary_horizon_due_mismatch",
+        "primary_horizon_lane_mismatch",
         "primary_horizon_missing_due_at",
         "primary_horizon_missing_price_observed_at",
         "primary_horizon_missing_provenance",
@@ -190,6 +205,7 @@ OUTCOME_ELIGIBILITY_REQUIRED_FIELDS = tuple(
             "price_at_observation",
             "observation_price_source",
             "observation_price_id",
+            "observation_price_observed_at",
             "primary_horizon_return",
         )
     )
@@ -265,6 +281,7 @@ def valid_candidate_authority(row: Mapping[str, Any]) -> bool:
         and all(row.get(field) == value for field, value in CANDIDATE_AUTHORITY_CONTRACT.items())
         and row.get("research_only") is True
         and _authority_safety_contract_valid(row)
+        and _authority_schema_valid(row, "integrated_radar_candidate_v1")
     )
 
 
@@ -277,6 +294,7 @@ def valid_core_authority(row: Mapping[str, Any]) -> bool:
         and row.get("research_only") is True
         and parse_aware_time(row.get("generated_at")) is not None
         and _authority_safety_contract_valid(row)
+        and _authority_schema_valid(row, "core_opportunity_v1")
     )
 
 
@@ -287,6 +305,12 @@ def build_outcome_identity_fields(candidate: Mapping[str, Any]) -> dict[str, Any
         "outcome_identity": identity,
         "outcome_identity_key": canonical_outcome_identity_key(identity),
     }
+
+
+def primary_horizon_for_lane(lane: Any) -> str | None:
+    """Return the canonical primary horizon for one literal research lane."""
+
+    return OUTCOME_PRIMARY_HORIZON_BY_LANE.get(lane) if type(lane) is str else None
 
 
 def build_synthetic_horizon_metadata(
@@ -359,13 +383,24 @@ def calibration_ineligibility_reasons(row: Mapping[str, Any]) -> tuple[str, ...]
         reasons.add("invalid_observation_price")
     if row.get("observation_price_provenance_status") != "observed_market_prices":
         reasons.add("missing_observation_price_provenance")
+    observed = parse_aware_time(identity.get("observed_at"))
+    evaluated = parse_aware_time(row.get("outcome_evaluated_at"))
     if data_source == "observed_market_prices":
         if not _canonical_identity_text(row.get("observation_price_source")):
             reasons.add("missing_observation_price_source")
         if not _canonical_identity_text(row.get("observation_price_id")):
             reasons.add("missing_observation_price_id")
+        entry_observed_at = parse_aware_time(row.get("observation_price_observed_at"))
+        if entry_observed_at is None:
+            reasons.add("missing_observation_price_observed_at")
+        else:
+            if observed is None or entry_observed_at > observed:
+                reasons.add("observation_price_after_candidate")
+            elif (observed - entry_observed_at).total_seconds() > OUTCOME_ENTRY_PRICE_MAX_STALENESS_SECONDS:
+                reasons.add("observation_price_stale")
+            if evaluated is not None and entry_observed_at > evaluated:
+                reasons.add("observation_price_after_evaluation")
 
-    evaluated = parse_aware_time(row.get("outcome_evaluated_at"))
     if evaluated is None:
         reasons.add("missing_outcome_evaluated_at")
     lane = row.get("opportunity_type")
@@ -378,10 +413,12 @@ def calibration_ineligibility_reasons(row: Mapping[str, Any]) -> tuple[str, ...]
 
     primary = row.get("primary_horizon")
     metadata = row.get("horizon_metadata")
-    observed = parse_aware_time(identity.get("observed_at"))
     if type(primary) is not str or primary not in OUTCOME_HORIZONS:
         reasons.add("missing_primary_horizon")
         primary = None
+    expected_primary = primary_horizon_for_lane(lane)
+    if primary is not None and expected_primary is not None and primary != expected_primary:
+        reasons.add("primary_horizon_lane_mismatch")
     if not _horizon_metadata_contract_valid(metadata, observed_at=observed, evaluated_at=evaluated):
         reasons.add("horizon_metadata_contract_invalid")
     if not _horizon_return_contract_valid(
@@ -608,6 +645,14 @@ def partition_joined_calibration_outcomes(
                     core = matching_cores[0]
                     if not valid_core_authority(core):
                         reasons.add("core_authority_contract_invalid")
+                    core_generated_at = parse_aware_time(core.get("generated_at"))
+                    external_evaluated_at = parse_aware_time(trusted_evaluated_at)
+                    if (
+                        core_generated_at is not None
+                        and external_evaluated_at is not None
+                        and core_generated_at > external_evaluated_at
+                    ):
+                        reasons.add("core_authority_generated_in_future")
         materialized = dict(outcome)
         if candidate is not None and core is not None:
             for key, value in core.items():
@@ -988,6 +1033,17 @@ def _authority_safety_contract_valid(row: Mapping[str, Any]) -> bool:
     return True
 
 
+def _authority_schema_valid(row: Mapping[str, Any], schema_id: str) -> bool:
+    """Validate authority rows against the registered artifact schema lazily."""
+
+    try:
+        from ..artifacts.schema.registry import validate_row_against_schema
+
+        return not validate_row_against_schema(row, schema_id)
+    except (ImportError, KeyError, RuntimeError, TypeError, ValueError):
+        return False
+
+
 def _row_claims_validated(row: Mapping[str, Any]) -> bool:
     label = row.get("outcome_label")
     if type(label) is str and label.strip().casefold() in OUTCOME_VALIDATED_LABELS:
@@ -1086,6 +1142,7 @@ __all__ = (
     "OUTCOME_ELIGIBILITY_CONTRACT_VERSION",
     "OUTCOME_ELIGIBILITY_MARKERS",
     "OUTCOME_ELIGIBILITY_REQUIRED_FIELDS",
+    "OUTCOME_ENTRY_PRICE_MAX_STALENESS_SECONDS",
     "OUTCOME_HORIZONS",
     "OUTCOME_HORIZON_METADATA_FIELDS",
     "OUTCOME_HORIZON_SECONDS",
@@ -1093,6 +1150,7 @@ __all__ = (
     "OUTCOME_INELIGIBLE_REASONS",
     "OUTCOME_DIRECTION_BY_LANE",
     "OUTCOME_MATURITY_STATUSES",
+    "OUTCOME_PRIMARY_HORIZON_BY_LANE",
     "OUTCOME_OPTIONAL_FALSE_SAFETY_FIELDS",
     "OUTCOME_PROVENANCE_STATUSES",
     "OUTCOME_REQUIRED_FALSE_SAFETY_FIELDS",
@@ -1119,6 +1177,7 @@ __all__ = (
     "parse_aware_time",
     "partition_calibration_outcomes",
     "partition_joined_calibration_outcomes",
+    "primary_horizon_for_lane",
     "primary_horizon_maturation_state",
     "validate_contract",
     "valid_candidate_authority",

@@ -492,14 +492,24 @@ def test_feedback_safety_contract_and_notes_are_closed_before_projection():
         assert eligible is False
         assert "feedback_safety_contract_invalid" in reasons
 
-    for notes in ({"api_key": "SECRET"}, ["not", "text"], "x" * 4_097, "unsafe\u202etext"):
+    for notes in (
+        {"api_key": "SECRET"},
+        ["not", "text"],
+        "x" * 4_097,
+        "unsafe\u202etext",
+        "api_key=actual-secret-value",
+        "Authorization: Bearer abcdefghijklmnop",
+        "copied token=xoxb_1234567890abcdefghijkl",
+        "provider key sk-proj-abcdefghijklmnop",
+        "Telegram 123456789:abcdefghijklmnopqrstuvwxyz",
+    ):
         row = _feedback_row(notes=notes)
         eligible, reasons = firewall.effective_feedback_state(row)
         assert eligible is False
         assert "invalid_feedback_notes" in reasons
 
     safe = _feedback_row(
-        notes="human research note",
+        notes="human research note; api_key=<redacted>; token=missing",
         trade_created=False,
         triggered_fade_created=0,
         telegram_sends=0,
@@ -511,7 +521,9 @@ def test_feedback_safety_contract_and_notes_are_closed_before_projection():
     )
     assert excluded == ()
     assert counts == {}
-    assert eligible[0]["feedback_notes"] == "human research note"
+    assert eligible[0]["feedback_notes"] == (
+        "human research note; api_key=<redacted>; token=missing"
+    )
 
 
 def test_malformed_overlapping_core_authority_contaminates_exact_join_only():

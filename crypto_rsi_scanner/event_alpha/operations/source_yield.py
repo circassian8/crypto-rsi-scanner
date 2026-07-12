@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from . import common
 from . import evidence_semantics
+from . import feedback_evidence
 from . import namespace_policy
 from . import outcome_evidence
 from .daily_burn_in import CANDIDATE_MODE_MANIFEST_JSON, RUN_JSON
@@ -49,16 +50,13 @@ def build_source_yield_report(
     )
     included_namespaces = namespace_policy.included_namespace_names(policy)
     (candidates, cores, supplied_outcomes, outcomes, excluded_outcomes,
-     outcome_exclusion_reason_counts) = outcome_evidence.load_exact_namespace_outcomes(
-        base, cutoff, included_namespaces, _rows, evaluation_now)
-    feedback = _rows(base, "event_alpha_feedback.jsonl", cutoff=cutoff, namespaces=included_namespaces)
-    daily_runs = [common.read_json(base / namespace / RUN_JSON) for namespace in included_namespaces]
-    daily_runs = [row for row in daily_runs if row]
-    candidate_mode_manifests = [
-        common.read_json(base / namespace / CANDIDATE_MODE_MANIFEST_JSON)
-        for namespace in included_namespaces
-    ]
-    candidate_mode_manifests = [row for row in candidate_mode_manifests if row]
+     outcome_exclusion_reason_counts, supplied_feedback, feedback,
+     excluded_feedback, feedback_exclusion_reason_counts,
+     learning_evidence_telemetry) = _load_source_yield_learning_evidence(
+        base, cutoff, included_namespaces, evaluation_now)
+    daily_runs = _namespace_json_docs(base, included_namespaces, RUN_JSON)
+    candidate_mode_manifests = _namespace_json_docs(
+        base, included_namespaces, CANDIDATE_MODE_MANIFEST_JSON)
     evidence_summaries = evidence_semantics.namespace_summaries(base, included_namespaces, cutoff=cutoff, policy=policy)
     evidence_aggregate = evidence_semantics.aggregate_namespace_summaries(evidence_summaries)
     explicit_scope = bool(artifact_namespace) or _has_explicit_policy_flags(policy.get("explicit_inclusion_flags") or {})
@@ -152,7 +150,7 @@ def build_source_yield_report(
             "core_opportunity_count": len(cores),
             "feedback_count": len(feedback),
             "outcome_count": len(outcomes),
-            **outcome_evidence.telemetry(supplied_outcomes, outcomes, excluded_outcomes, outcome_exclusion_reason_counts),
+            **learning_evidence_telemetry,
             "recommendations_only": True,
             "auto_apply": False,
             "auto_apply_thresholds": False,
@@ -167,6 +165,48 @@ def build_source_yield_report(
     common.write_json(context.namespace_dir / SOURCE_YIELD_JSON, payload)
     common.write_text(context.namespace_dir / SOURCE_YIELD_MD, format_source_yield_report(payload))
     return payload
+
+
+def _load_source_yield_learning_evidence(
+    base: Path,
+    cutoff: Any,
+    included_namespaces: list[str],
+    evaluation_now: Any,
+) -> tuple[Any, ...]:
+    outcome_rows = outcome_evidence.load_exact_namespace_outcomes(
+        base, cutoff, included_namespaces, _rows, evaluation_now)
+    _candidates, cores, supplied_outcomes, outcomes, excluded_outcomes, reason_counts = outcome_rows
+    feedback_rows = feedback_evidence.load_exact_namespace_feedback(
+        base,
+        cutoff,
+        included_namespaces,
+        _rows,
+        evaluation_now,
+        core_rows=cores,
+    )
+    supplied_feedback, feedback, excluded_feedback, feedback_reason_counts = feedback_rows
+    telemetry = {
+        **feedback_evidence.telemetry(*feedback_rows),
+        **outcome_evidence.telemetry(
+            supplied_outcomes,
+            outcomes,
+            excluded_outcomes,
+            reason_counts,
+        ),
+    }
+    return (*outcome_rows, *feedback_rows, telemetry)
+
+
+def _namespace_json_docs(
+    base: Path,
+    namespaces: list[str],
+    filename: str,
+) -> list[dict[str, Any]]:
+    return [
+        row
+        for namespace in namespaces
+        if (row := common.read_json(base / namespace / filename))
+    ]
 
 
 def format_source_yield_report(payload: Mapping[str, Any]) -> str:
@@ -195,6 +235,13 @@ def format_source_yield_report(payload: Mapping[str, Any]) -> str:
         common.table_line(
             "outcome_exclusion_reason_counts",
             payload.get("outcome_exclusion_reason_counts") or {},
+        ),
+        f"- feedback_rows_supplied: `{payload.get('feedback_rows_supplied')}`",
+        f"- feedback_rows_eligible: `{payload.get('feedback_rows_eligible')}`",
+        f"- feedback_rows_excluded: `{payload.get('feedback_rows_excluded')}`",
+        common.table_line(
+            "feedback_exclusion_reason_counts",
+            payload.get("feedback_exclusion_reason_counts") or {},
         ),
         f"- recommendations_only: `{payload.get('recommendations_only')}`",
         f"- auto_apply: `{payload.get('auto_apply')}`",
@@ -317,9 +364,9 @@ def _summary_for(
         if row.get("accepted_evidence") or common.int_value(row.get("accepted_evidence_count")) > 0
     ]
     label_rows = [row for row in feedback if key_fn(row) == name]
-    useful = [row for row in label_rows if str(row.get("label") or "") in {"useful", "watch", "promising_source_type"}]
-    noisy = [row for row in label_rows if str(row.get("label") or "") in {"junk", "source_noise", "false_positive", "duplicate"}]
-    late = [row for row in label_rows if str(row.get("label") or "") == "late"]
+    useful = [row for row in label_rows if str(row.get("feedback_label") or "") in {"useful", "watch", "promising_source_type"}]
+    noisy = [row for row in label_rows if str(row.get("feedback_label") or "") in {"junk", "source_noise", "false_positive", "duplicate"}]
+    late = [row for row in label_rows if str(row.get("feedback_label") or "") == "late"]
     outcome_rows = [row for row in outcomes if key_fn(row) == name]
     return {
         "name": name,

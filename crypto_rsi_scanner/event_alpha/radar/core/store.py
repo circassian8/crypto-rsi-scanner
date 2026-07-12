@@ -12,6 +12,7 @@ from .... import (
     config,
 )
 import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.outcomes.feedback_eligibility as event_feedback_eligibility
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import paths as event_artifact_paths
 from .. import core_opportunities as event_core_opportunities
@@ -292,6 +293,7 @@ def load_canonical_core_opportunity_view(
     research_cards_dir: str | Path | None = None,
     latest_run: bool = True,
     include_api: bool = True,
+    now: datetime | None = None,
 ) -> CanonicalCoreOpportunityView:
     """Load the canonical operator-facing view for one core opportunity.
 
@@ -300,6 +302,7 @@ def load_canonical_core_opportunity_view(
     cards, audits, and diagnostics.
     """
     clean = str(core_opportunity_id or "").strip()
+    evaluated_at = _as_utc(now or datetime.now(timezone.utc))
     try:
         from ...artifacts import context as event_alpha_artifacts
 
@@ -371,6 +374,7 @@ def load_canonical_core_opportunity_view(
         card_paths=card_paths,
         profile=resolved_profile,
         artifact_namespace=resolved_namespace,
+        now=evaluated_at,
     )
 
 
@@ -440,9 +444,11 @@ def canonical_core_opportunity_view_from_rows(
     card_paths: Iterable[str | Path] = (),
     profile: str | None = None,
     artifact_namespace: str | None = None,
+    now: datetime | None = None,
 ) -> CanonicalCoreOpportunityView:
     """Build a canonical core-opportunity view from already-loaded artifacts."""
     requested = str(core_opportunity_id or "").strip()
+    evaluated_at = _as_utc(now or datetime.now(timezone.utc))
     warnings: list[str] = []
     core_row_list = [_row_dict(row) for row in core_rows]
     support_row_list = [_row_dict(row) for row in supporting_rows]
@@ -450,6 +456,24 @@ def canonical_core_opportunity_view_from_rows(
     alert_row_list = [_row_dict(row) for row in alert_rows]
     incident_row_list = [_row_dict(row) for row in incident_rows]
     feedback_row_list = [_row_dict(row) for row in feedback_rows]
+    if feedback_row_list:
+        eligible_feedback, excluded_feedback, feedback_reason_counts = (
+            event_feedback_eligibility.partition_joined_calibration_feedback(
+                feedback_row_list,
+                core_row_list,
+                now=evaluated_at,
+            )
+        )
+    else:
+        eligible_feedback, excluded_feedback, feedback_reason_counts = (), (), {}
+    feedback_diagnostics = {
+        "feedback_rows_supplied": len(feedback_row_list),
+        "feedback_rows_eligible": len(eligible_feedback),
+        "feedback_rows_matched_to_core": 0,
+        "feedback_rows_eligible_other_core": len(eligible_feedback),
+        "feedback_rows_excluded": len(excluded_feedback),
+        "feedback_exclusion_reason_counts": dict(feedback_reason_counts),
+    }
     normalized_card_paths = tuple(Path(path) for path in card_paths)
     if not requested:
         return CanonicalCoreOpportunityView(
@@ -458,6 +482,7 @@ def canonical_core_opportunity_view_from_rows(
             requested_core_opportunity_id=requested,
             core_opportunity_id=None,
             found=False,
+            **feedback_diagnostics,
             warnings=("missing_core_opportunity_id",),
         )
     resolved_target = _target_from_acquisition_rows(requested, acquisition_row_list) or requested
@@ -480,6 +505,7 @@ def canonical_core_opportunity_view_from_rows(
             requested_core_opportunity_id=requested,
             core_opportunity_id=resolved_target or None,
             found=False,
+            **feedback_diagnostics,
             warnings=tuple(dict.fromkeys([*warnings, "core_opportunity_not_found"])),
         )
 
@@ -508,9 +534,22 @@ def canonical_core_opportunity_view_from_rows(
     ))
     card_path = _research_card_path(canonical_row, canonical_id, normalized_card_paths)
     feedback_target = _first_text([canonical_row], ("feedback_target",)) or canonical_id
-    linked_feedback = tuple(_unique_rows(
-        [row for row in feedback_row_list if _feedback_matches(row, identifiers, feedback_target)]
-    ))
+    canonical_feedback_identity = (
+        event_feedback_eligibility.canonical_feedback_join_identity(canonical_row)
+    )
+    linked_feedback = tuple(
+        dict(row)
+        for row in eligible_feedback
+        if canonical_feedback_identity is not None
+        and event_feedback_eligibility.canonical_feedback_join_identity(row)
+        == canonical_feedback_identity
+    )
+    feedback_diagnostics.update({
+        "feedback_rows_matched_to_core": len(linked_feedback),
+        "feedback_rows_eligible_other_core": (
+            len(eligible_feedback) - len(linked_feedback)
+        ),
+    })
     feedback_status = "has_feedback" if linked_feedback else "pending_or_unknown"
     if requested != canonical_id:
         warnings.append(f"input_target_resolved_to_canonical:{requested}->{canonical_id}")
@@ -533,6 +572,7 @@ def canonical_core_opportunity_view_from_rows(
         feedback_target=feedback_target,
         feedback_status=feedback_status,
         feedback_rows=linked_feedback,
+        **feedback_diagnostics,
         warnings=tuple(dict.fromkeys(warnings)),
     )
 

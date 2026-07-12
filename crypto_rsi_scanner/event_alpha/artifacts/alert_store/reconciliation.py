@@ -681,6 +681,20 @@ def _with_core_resolution(row: dict[str, Any], core_rows: Iterable[Mapping[str, 
     return _with_snapshot_quality_classification(out)
 def _sibling_core_store_rows(alert_path: Path) -> list[dict[str, Any]]:
     core_path = alert_path.expanduser().parent / "event_core_opportunities.jsonl"
+    return _core_store_rows(core_path)
+
+
+def _core_store_rows_for_alerts(
+    alert_path: Path,
+    *,
+    core_opportunity_store_path: str | Path | None,
+) -> list[dict[str, Any]]:
+    if core_opportunity_store_path is None:
+        return _sibling_core_store_rows(alert_path)
+    return _core_store_rows(Path(core_opportunity_store_path).expanduser())
+
+
+def _core_store_rows(core_path: Path) -> list[dict[str, Any]]:
     if not core_path.exists():
         return []
     return [

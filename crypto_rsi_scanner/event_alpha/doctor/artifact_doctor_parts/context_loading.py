@@ -2,8 +2,21 @@
 
 from __future__ import annotations
 
-from ...artifacts import json_lines as artifact_json_lines
+from datetime import datetime, timezone
+
 from .runtime import *
+from .artifact_input_loading import (
+    _attach_outcome_evidence_jsonl_diagnostics,
+    _canonical_doctor_artifact_path,
+    _default_doctor_artifact_dir,
+    _load_optional_rows,
+    _load_raw_doctor_artifacts,
+    _load_raw_fade_review_candidates,
+    _outcome_evidence_jsonl_diagnostics,
+    _read_json,
+    _read_jsonl,
+    _row,
+)
 from .result_fields import build_api_doctor_result
 
 def diagnose_artifacts(
@@ -33,7 +46,14 @@ def diagnose_artifacts(
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
     include_api_artifacts: bool = False,
+    artifact_namespace_dir: str | Path | None = None,
     inspected_alert_store_path: str | Path | None = None,
+    feedback_path: str | Path | None = None,
+    core_opportunity_store_path: str | Path | None = None,
+    outcomes_path: str | Path | None = None,
+    integrated_candidate_path: str | Path | None = None,
+    integrated_outcomes_path: str | Path | None = None,
+    notification_preview_path: str | Path | None = None,
     run_ledger_path: str | Path | None = None,
     strict: bool = False,
     strict_api: bool = False,
@@ -41,6 +61,7 @@ def diagnose_artifacts(
     include_stale_artifacts: bool = False,
     schema_only: bool = False,
     skip_api_checks: bool = False,
+    evaluated_at: datetime | None = None,
 ) -> EventAlphaArtifactDoctorResult:
     """Diagnose cross-artifact lineage, mode, and profile/namespace cleanliness."""
     ctx = _build_doctor_context(locals())
@@ -71,6 +92,8 @@ def _merge_context(ctx: SimpleNamespace, values: Mapping[str, Any]) -> None:
 
 def _load_doctor_context_inputs(options: Mapping[str, Any]) -> SimpleNamespace:
     ctx = SimpleNamespace(**options)
+    if ctx.evaluated_at is None:
+        ctx.evaluated_at = datetime.now(timezone.utc)
     ctx.short_circuit_result = None
     loaded = _load_and_filter_doctor_artifacts(options)
     ctx.loaded = loaded
@@ -78,6 +101,7 @@ def _load_doctor_context_inputs(options: Mapping[str, Any]) -> SimpleNamespace:
     ctx.alerts = loaded.alerts
     ctx.feedback = loaded.feedback
     ctx.outcomes = loaded.outcomes
+    ctx.canonical_core_rows = loaded.canonical_core_rows
     ctx.hypotheses = loaded.hypotheses
     ctx.core_rows = loaded.core_rows
     ctx.watchlist = loaded.watchlist
@@ -101,16 +125,21 @@ def _load_doctor_context_inputs(options: Mapping[str, Any]) -> SimpleNamespace:
     ctx.protocol_fundamentals = loaded.protocol_fundamentals
     ctx.integrated_candidates = loaded.integrated_candidates
     ctx.outcome_evidence_jsonl_diagnostics = loaded.outcome_evidence_jsonl_diagnostics
+    ctx.feedback_jsonl_diagnostics = loaded.feedback_jsonl_diagnostics
     ctx.raw_api = loaded.raw_api
     ctx.integrated_manifest_path = loaded.integrated_manifest_path
     ctx.integrated_source_coverage_json_path = loaded.integrated_source_coverage_json_path
     ctx.integrated_delivery_path = loaded.integrated_delivery_path
     ctx.integrated_outcomes_path = loaded.integrated_outcomes_path
-    ctx.namespace_dir = _artifact_namespace_dir(
-        ctx.inspected_alert_store_path,
-        ctx.source_coverage_report_path,
-        ctx.daily_brief_path,
-        ctx.integrated_outcomes_path,
+    ctx.namespace_dir = (
+        Path(ctx.artifact_namespace_dir).expanduser()
+        if ctx.artifact_namespace_dir is not None
+        else _artifact_namespace_dir(
+            ctx.inspected_alert_store_path,
+            ctx.source_coverage_report_path,
+            ctx.daily_brief_path,
+            ctx.integrated_outcomes_path,
+        )
     )
     ctx.namespace_phase = namespace_doctor.inspect_namespace(
         ctx.namespace_dir,
@@ -462,12 +491,19 @@ def _attach_artifact_conflict_context(ctx: SimpleNamespace) -> None:
     runs = ctx.runs
     feedback = ctx.feedback
     outcomes = ctx.outcomes
+    canonical_core_rows = ctx.canonical_core_rows
     hypotheses = ctx.hypotheses
     watchlist = ctx.watchlist
     derivatives_state = ctx.derivatives_state
     dex_pool_state = ctx.dex_pool_state
     dex_pool_anomalies = ctx.dex_pool_anomalies
     unlock_candidates = ctx.unlock_candidates
+    feedback_integrity = doctor_feedback_checks.summarize_feedback_eligibility(
+        feedback,
+        canonical_core_rows,
+        evaluated_at=ctx.evaluated_at,
+        jsonl_diagnostics=ctx.feedback_jsonl_diagnostics,
+    )
     audit_impact_mismatch = 0
     audit_source_pack_mismatch = 0
     market_freshness_contradictions = sum(1 for row in core_rows if _core_row_has_market_freshness_contradiction(row))
@@ -501,7 +537,9 @@ def _attach_artifact_conflict_context(ctx: SimpleNamespace) -> None:
                 preview_path = legacy_preview
     integrated_conflicts = _integrated_radar_artifact_conflicts(
         integrated_candidates,
-        core_rows=core_rows,
+        core_rows=canonical_core_rows,
+        outcome_rows=outcomes,
+        evaluated_at=ctx.evaluated_at,
         research_card_paths=research_card_paths,
         daily_brief_path=daily_brief_path,
         manifest_path=integrated_manifest_path,
@@ -661,12 +699,14 @@ def _attach_notification_context(ctx: SimpleNamespace) -> None:
         core_rows_by_id=core_rows_by_id,
         latest_run_id=latest_run_id,
         strict_scope=ctx.effective_delivery_scope,
+        notification_preview_path=ctx.notification_preview_path,
     )
     preview_conflicts = _notification_preview_consistency_conflicts(
         delivery_rows=[row for row in delivery_rows if isinstance(row, Mapping)],
         latest_run=latest_run,
         core_rows=core_rows,
         latest_run_id=latest_run_id,
+        notification_preview_path=ctx.notification_preview_path,
     )
     daily_brief_operator_conflicts = _daily_brief_operator_semantic_conflicts(
         ctx.daily_brief_path,
@@ -729,167 +769,8 @@ def _load_and_filter_doctor_artifacts(options: Mapping[str, Any]) -> SimpleNames
     filtered.integrated_delivery_path = raw.integrated_delivery_path
     filtered.integrated_outcomes_path = raw.integrated_outcomes_path
     filtered.outcome_evidence_jsonl_diagnostics = raw.outcome_evidence_jsonl_diagnostics
+    filtered.feedback_jsonl_diagnostics = raw.feedback_jsonl_diagnostics
     return filtered
-
-
-def _default_doctor_artifact_dir(options: Mapping[str, Any]) -> Path | None:
-    if options["inspected_alert_store_path"] is not None:
-        return Path(options["inspected_alert_store_path"]).parent
-    if options["source_coverage_report_path"] is not None:
-        return Path(options["source_coverage_report_path"]).parent
-    return None
-
-
-def _load_raw_doctor_artifacts(options: Mapping[str, Any]) -> SimpleNamespace:
-    default_dir = _default_doctor_artifact_dir(options)
-    raw_fade_review_candidates = _load_raw_fade_review_candidates(options, default_dir)
-    integrated_path = (
-        default_dir / "event_integrated_radar_candidates.jsonl"
-        if default_dir is not None
-        else None
-    )
-    integrated_dir = integrated_path.parent if integrated_path is not None else None
-    integrated_candidate_read = artifact_json_lines.read_jsonl(integrated_path)
-    outcome_evidence_jsonl_diagnostics = _outcome_evidence_jsonl_diagnostics(
-        default_dir,
-        candidate_diagnostics=integrated_candidate_read.diagnostics,
-    )
-    return SimpleNamespace(
-        raw_runs=[dict(row) for row in options["run_rows"] if isinstance(row, Mapping)],
-        raw_alerts=[dict(row) for row in options["alert_rows"] if isinstance(row, Mapping)],
-        raw_feedback=[dict(row) for row in options["feedback_rows"] if isinstance(row, Mapping)],
-        raw_outcomes=[dict(row) for row in options["outcome_rows"] if isinstance(row, Mapping)],
-        raw_hypotheses=[_row(row) for row in options["hypothesis_rows"]],
-        raw_core_rows=[_row(row) for row in options["core_opportunity_rows"]],
-        raw_watchlist=[_row(row) for row in options["watchlist_rows"]],
-        raw_incidents=[_row(row) for row in options["incident_rows"]],
-        raw_acquisition_rows=[
-            dict(row) for row in options["evidence_acquisition_rows"] if isinstance(row, Mapping)
-        ],
-        raw_market_anomalies=_load_optional_rows(
-            options["market_anomaly_rows"],
-            lambda: event_market_anomaly_scanner.load_market_anomaly_rows(default_dir),
-        ),
-        raw_official_exchange_candidates=_load_optional_rows(
-            options["official_exchange_candidate_rows"],
-            lambda: event_official_exchange.load_official_listing_candidates(default_dir),
-        ),
-        raw_scheduled_catalysts=_load_optional_rows(
-            options["scheduled_catalyst_rows"],
-            lambda: event_scheduled_catalysts.load_scheduled_catalysts(default_dir),
-        ),
-        raw_unlock_candidates=_load_optional_rows(
-            options["unlock_candidate_rows"],
-            lambda: event_scheduled_catalysts.load_unlock_candidates(default_dir),
-        ),
-        raw_derivatives_state=_load_optional_rows(
-            options["derivatives_state_rows"],
-            lambda: event_derivatives_crowding.load_derivatives_state(default_dir),
-        ),
-        raw_fade_review_candidates=raw_fade_review_candidates,
-        raw_dex_pool_state=list(event_dex_onchain_readiness.load_dex_pool_state(default_dir)),
-        raw_dex_pool_anomalies=list(event_dex_onchain_readiness.load_dex_pool_anomalies(default_dir)),
-        raw_protocol_fundamentals=list(event_dex_onchain_readiness.load_protocol_fundamentals(default_dir)),
-        raw_integrated_candidates=list(integrated_candidate_read.rows),
-        outcome_evidence_jsonl_diagnostics=outcome_evidence_jsonl_diagnostics,
-        raw_burn_in_scorecard=_read_json(default_dir / "event_alpha_burn_in_scorecard.json" if default_dir is not None else None),
-        raw_source_yield_report=_read_json(default_dir / "event_alpha_source_yield_report.json" if default_dir is not None else None),
-        raw_daily_review_inbox=_read_json(default_dir / "event_alpha_daily_review_inbox.json" if default_dir is not None else None),
-        raw_daily_burn_in_run=_read_json(default_dir / "event_alpha_daily_burn_in_run.json" if default_dir is not None else None),
-        raw_candidate_mode_manifest=_read_json(default_dir / "event_alpha_candidate_mode_manifest.json" if default_dir is not None else None),
-        raw_burn_in_namespace_policy=_read_json(default_dir / "event_alpha_burn_in_namespace_policy.json" if default_dir is not None else None),
-        raw_burn_in_archive_manifest=_read_json(default_dir / "event_alpha_burn_in_archive_manifest.json" if default_dir is not None else None),
-        integrated_manifest_path=(
-            integrated_dir / "event_integrated_radar_input_manifest.json"
-            if integrated_dir is not None
-            else None
-        ),
-        integrated_source_coverage_json_path=(
-            integrated_dir / "event_alpha_source_coverage.json"
-            if integrated_dir is not None
-            else None
-        ),
-        integrated_delivery_path=(
-            integrated_dir / event_integrated_radar.INTEGRATED_DELIVERIES_FILENAME
-            if integrated_dir is not None
-            else None
-        ),
-        integrated_outcomes_path=(
-            integrated_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
-            if integrated_dir is not None
-            else None
-        ),
-    )
-
-
-def _load_optional_rows(rows: Iterable[Mapping[str, Any]] | None, loader: Callable[[], Iterable[Mapping[str, Any]]]) -> list[dict[str, Any]]:
-    if rows is None:
-        return [dict(row) for row in loader() if isinstance(row, Mapping)]
-    return [dict(row) for row in rows if isinstance(row, Mapping)]
-
-
-def _outcome_evidence_jsonl_diagnostics(
-    default_dir: Path | None,
-    *,
-    candidate_diagnostics: Any,
-) -> dict[str, Any]:
-    if default_dir is None:
-        return {}
-    return {
-        "candidates": candidate_diagnostics,
-        "core": artifact_json_lines.read_jsonl(
-            default_dir / "event_core_opportunities.jsonl"
-        ).diagnostics,
-        "integrated_outcomes": artifact_json_lines.read_jsonl(
-            default_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
-        ).diagnostics,
-        "alpha_outcomes": artifact_json_lines.read_jsonl(
-            default_dir / "event_alpha_outcomes.jsonl"
-        ).diagnostics,
-    }
-
-
-def _attach_outcome_evidence_jsonl_diagnostics(ctx: SimpleNamespace) -> None:
-    diagnostics = ctx.outcome_evidence_jsonl_diagnostics
-    duplicate_counts = {
-        name: len(item.duplicate_key_lines)
-        for name, item in diagnostics.items()
-        if item.duplicate_key_lines
-    }
-    malformed_counts = {
-        name: len(item.invalid_json_lines) + len(item.non_object_lines)
-        for name, item in diagnostics.items()
-        if item.invalid_json_lines or item.non_object_lines
-    }
-    read_errors = tuple(sorted(name for name, item in diagnostics.items() if item.read_error))
-    messages: list[str] = []
-    if duplicate_counts:
-        messages.append(
-            "outcome_evidence_duplicate_json_keys="
-            + ",".join(f"{name}:{duplicate_counts[name]}" for name in sorted(duplicate_counts))
-        )
-    if malformed_counts:
-        messages.append(
-            "outcome_evidence_invalid_jsonl="
-            + ",".join(f"{name}:{malformed_counts[name]}" for name in sorted(malformed_counts))
-        )
-    if read_errors:
-        messages.append("outcome_evidence_jsonl_read_errors=" + ",".join(read_errors))
-    target = ctx.blockers if ctx.strict else ctx.warnings
-    target.extend(
-        check_registry.format_check_message("outcomes.eligibility_firewall", message)
-        for message in messages
-    )
-
-
-def _load_raw_fade_review_candidates(options: Mapping[str, Any], default_dir: Path | None) -> list[dict[str, Any]]:
-    rows = options["fade_review_candidate_rows"]
-    if rows is not None:
-        return [dict(row) for row in rows if isinstance(row, Mapping)]
-    candidates = list(event_derivatives_crowding.load_derivatives_candidates(default_dir))
-    if not candidates:
-        candidates = list(event_derivatives_crowding.load_fade_review_candidates(default_dir))
-    return [dict(row) for row in candidates if isinstance(row, Mapping)]
 
 
 def _filter_doctor_artifacts(raw: SimpleNamespace, options: Mapping[str, Any]) -> SimpleNamespace:
@@ -898,6 +779,7 @@ def _filter_doctor_artifacts(raw: SimpleNamespace, options: Mapping[str, Any]) -
         alerts=_filter_doctor_rows(raw.raw_alerts, options),
         feedback=_filter_doctor_rows(raw.raw_feedback, options),
         outcomes=_filter_doctor_rows(raw.raw_outcomes, options),
+        canonical_core_rows=_filter_doctor_rows(raw.raw_canonical_core_rows, options),
         hypotheses=_filter_doctor_rows(raw.raw_hypotheses, options),
         core_rows=_filter_doctor_rows(raw.raw_core_rows, options),
         watchlist=_filter_watchlist_rows_for_doctor(raw.raw_watchlist, **_doctor_filter_options(options)),
@@ -1150,29 +1032,6 @@ def _phase_only_doctor_result(
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
     )
-
-def _row(value: Mapping[str, Any] | object) -> dict[str, Any]:
-    if isinstance(value, Mapping):
-        return dict(value)
-    if is_dataclass(value):
-        return asdict(value)
-    return dict(getattr(value, "__dict__", {}) or {})
-
-def _read_jsonl(path: str | Path | None) -> list[dict[str, Any]]:
-    return list(artifact_json_lines.read_jsonl(path).rows)
-
-
-def _read_json(path: str | Path | None) -> dict[str, Any]:
-    if path is None:
-        return {}
-    source = Path(path)
-    if not source.exists():
-        return {}
-    try:
-        loaded = json.loads(source.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return dict(loaded) if isinstance(loaded, Mapping) else {}
 
 __all__ = (
     'diagnose_artifacts',

@@ -149,6 +149,23 @@ including:
 - `event_integrated_radar_calibration_report.md`
 - `event_integrated_radar_calibration_priors.json`
 
+Evidence-bearing operator commands must resolve one artifact context and use
+that context's run, alert, feedback, missed, provider-health, watchlist, Core,
+card, brief, and outcome paths throughout the command. Do not resolve a profile
+or namespace and then fall back to legacy global artifact paths. Capture the
+research clock once and pass it to cards, briefs, readiness, calibration, and
+artifact doctor so future-dated evidence cannot become valid midway through a
+single report.
+
+Outcome and feedback evidence is fail-closed. Performance rows must join one
+canonical integrated candidate and one canonical Core Opportunity by exact
+run/profile/namespace/candidate/Core identity, carry observed entry and horizon
+price provenance, and be mature under the caller's clock. Alert snapshot return
+aliases are diagnostics only. Feedback must join one exact canonical Core row
+and pass chronology, uniqueness, and safety checks. Every report should show
+supplied, eligible, excluded, and closed reason counts. Calibration priors stay
+shadow-only even when the compatibility environment flag is set.
+
 Rendered Markdown should use artifact-relative labels rather than absolute
 machine paths. Structured JSONL rows may keep relative path fields for tooling,
 but operator Markdown must not expose `/Users`, `/tmp`, `/mnt/data`, secrets,
@@ -2225,10 +2242,16 @@ make event-feedback-watch FEEDBACK_TARGET=ALERT_KEY
 python3 main.py --event-feedback-report
 ```
 
-Allowed labels are `useful`, `junk`, `watch`, `missed`, `traded_elsewhere`, and
-`ignored`. Feedback is a research artifact only; it does not mutate watchlist
-state or alert tiers. Shortcut commands tolerate unmatched keys and record a
-manual warning row so review notes are not lost.
+Allowed labels also cover false positives, late/noisy/duplicate evidence,
+missing confirmation, manipulation risk, and promising source types; use CLI
+help for the complete closed list. Feedback is a research artifact only; it
+does not mutate watchlist state or alert tiers. A label enters calibration only
+when it resolves to one exact `run_id` / profile / namespace / Core Opportunity
+identity, is recorded after that Core row and before the external evaluation
+clock, and passes the research-only safety contract. Unmatched, legacy,
+ambiguous, duplicate, future, or malformed labels remain readable but are
+reported as excluded evidence. Credential-shaped note values are rejected
+before the feedback file is written.
 
 ## Calibration Workflow
 
@@ -2241,20 +2264,37 @@ make event-alpha-calibration-export-priors
 ```
 
 The priors export is reviewable JSON. It is not applied automatically. Treat it
-as a proposal for manual threshold or source-prior changes.
+as a proposal for manual threshold or source-prior changes. Every calibration,
+quality, policy, source-reliability, inbox, card, audit, and daily-brief surface
+uses the same exact feedback partition and prints supplied/eligible/excluded
+counts. Legacy labels and loose symbol/event aliases cannot increase sample
+size.
 
-If you explicitly want to test bounded priors in research ranking:
+Outcome performance follows the parallel exact contract: one canonical
+candidate plus one canonical Core authority, an external evaluation clock, and
+timestamped source-identified entry/exit observations. Synthetic fixtures,
+legacy return aliases, immature horizons, duplicate identities, future
+authority rows, and missing or stale price lineage are diagnostics only. The
+operator reports print exclusion reasons instead of treating those rows as
+measured edge.
+
+To compare bounded priors in memory without changing research ranking:
 
 ```bash
-RSI_EVENT_ALPHA_APPLY_PRIORS=1 make event-alpha-cycle PROFILE=no_key_live
+make event-alpha-priors-shadow-report
 make event-alpha-replay
 ```
 
-Applied priors write `score_before_priors`, `score_after_priors`, prior file,
-version, and multipliers into alert snapshots. They cannot create
+`RSI_EVENT_ALPHA_APPLY_PRIORS` is retained only as a compatibility setting.
+Current accepted policy keeps runtime prior application disabled; a new
+explicit decision is required before priors may mutate scores or tiers.
+
+Shadow priors calculate `score_before_priors`, `score_after_priors`, prior file,
+version, and multipliers in memory for comparison only. Runtime alert snapshots,
+scores, and tiers remain unchanged; shadow evaluation cannot create
 `TRIGGERED_FADE` or bypass hard source-noise/identity gates.
 
-To compare priors without applying or writing snapshots:
+To run the shadow comparison without writing snapshots:
 
 ```bash
 make event-alpha-priors-shadow-report

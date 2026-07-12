@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from . import common
 from . import evidence_semantics
+from . import feedback_evidence
 from . import namespace_policy
 from . import outcome_evidence
 from .daily_burn_in import RUN_JSON
@@ -49,10 +50,10 @@ def build_measurement_dashboard(
     )
     included_namespaces = namespace_policy.included_namespace_names(policy)
     (candidates, cores, supplied_outcomes, outcomes, excluded_outcomes,
-     outcome_exclusion_reason_counts) = outcome_evidence.load_exact_namespace_outcomes(
-        base, cutoff, included_namespaces, _rows, evaluation_now)
-    deliveries = _rows(base, "event_alpha_notification_deliveries.jsonl", cutoff=cutoff, namespaces=included_namespaces)
-    feedback = _rows(base, "event_alpha_feedback.jsonl", cutoff=cutoff, namespaces=included_namespaces)
+     outcome_exclusion_reason_counts, deliveries, supplied_feedback, feedback,
+     excluded_feedback, feedback_exclusion_reason_counts,
+     learning_evidence_telemetry) = _load_dashboard_learning_evidence(
+        base, cutoff, included_namespaces, evaluation_now)
     coverage_docs = [common.read_json(base / namespace / "event_alpha_source_coverage.json") for namespace in included_namespaces]
     provider_health = [common.read_json(base / namespace / "event_provider_health.json") for namespace in included_namespaces]
     daily_runs = _json_docs(base, RUN_JSON, namespaces=included_namespaces)
@@ -131,7 +132,7 @@ def build_measurement_dashboard(
                 "skipped": sum(1 for row in deliveries if "skip" in str(row.get("state") or "").casefold()),
             },
             "labels_by_lane": labels_by_lane,
-            "feedback_label_counts": common.count_by(feedback, "label"),
+            "feedback_label_counts": common.count_by(feedback, "feedback_label"),
             "validation_rate_by_lane": _validation_rates(outcomes),
             "source_noise_rate_by_provider": _source_noise_rate(feedback, "source_provider", "provider"),
             "source_noise_rate_by_source_pack": _source_noise_rate(feedback, "source_pack"),
@@ -144,7 +145,7 @@ def build_measurement_dashboard(
             "label_coverage_pct": label_coverage,
             "outcome_rows_by_status": common.count_by(outcomes, "status", "outcome_status", "validation_status"),
             "outcome_rows_by_horizon": common.count_by(outcomes, "horizon", "horizon_days"),
-            **outcome_evidence.telemetry(supplied_outcomes, outcomes, excluded_outcomes, outcome_exclusion_reason_counts),
+            **learning_evidence_telemetry,
             "source_coverage_docs": len([row for row in coverage_docs if row]),
             "diagnostic_rows_excluded_from_main_aggregate": len(diagnostic_rows),
             "low_sample_warning": low_sample_warning,
@@ -170,6 +171,42 @@ def build_measurement_dashboard(
     return payload
 
 
+def _load_dashboard_learning_evidence(
+    base: Path,
+    cutoff: Any,
+    included_namespaces: list[str],
+    evaluation_now: Any,
+) -> tuple[Any, ...]:
+    outcome_rows = outcome_evidence.load_exact_namespace_outcomes(
+        base, cutoff, included_namespaces, _rows, evaluation_now)
+    candidates, cores, supplied_outcomes, outcomes, excluded_outcomes, reason_counts = outcome_rows
+    deliveries = _rows(
+        base,
+        "event_alpha_notification_deliveries.jsonl",
+        cutoff=cutoff,
+        namespaces=included_namespaces,
+    )
+    feedback_rows = feedback_evidence.load_exact_namespace_feedback(
+        base,
+        cutoff,
+        included_namespaces,
+        _rows,
+        evaluation_now,
+        core_rows=cores,
+    )
+    supplied_feedback, feedback, excluded_feedback, feedback_reason_counts = feedback_rows
+    telemetry = {
+        **feedback_evidence.telemetry(*feedback_rows),
+        **outcome_evidence.telemetry(
+            supplied_outcomes,
+            outcomes,
+            excluded_outcomes,
+            reason_counts,
+        ),
+    }
+    return (*outcome_rows, deliveries, *feedback_rows, telemetry)
+
+
 def format_measurement_dashboard(payload: Mapping[str, Any]) -> str:
     lines = [
         "# Event Alpha Burn-In Measurement Dashboard",
@@ -193,6 +230,13 @@ def format_measurement_dashboard(payload: Mapping[str, Any]) -> str:
         common.table_line(
             "outcome_exclusion_reason_counts",
             payload.get("outcome_exclusion_reason_counts") or {},
+        ),
+        f"- feedback_rows_supplied: `{payload.get('feedback_rows_supplied')}`",
+        f"- feedback_rows_eligible: `{payload.get('feedback_rows_eligible')}`",
+        f"- feedback_rows_excluded: `{payload.get('feedback_rows_excluded')}`",
+        common.table_line(
+            "feedback_exclusion_reason_counts",
+            payload.get("feedback_exclusion_reason_counts") or {},
         ),
         f"- low_sample_warning: `{payload.get('low_sample_warning')}`",
         f"- enough_data: `{payload.get('enough_data')}`",
@@ -352,7 +396,7 @@ def _source_noise_rate(rows: list[dict[str, Any]], *fields: str) -> dict[str, fl
         key = next((str(row.get(field) or "").strip() for field in fields if str(row.get(field) or "").strip()), "unknown")
         groups.setdefault(key, []).append(row)
     return {
-        key: round(100.0 * sum(1 for row in data if str(row.get("label") or "") in {"junk", "source_noise", "false_positive"}) / len(data), 2)
+        key: round(100.0 * sum(1 for row in data if str(row.get("feedback_label") or "") in {"junk", "source_noise", "false_positive"}) / len(data), 2)
         for key, data in sorted(groups.items())
         if data
     }

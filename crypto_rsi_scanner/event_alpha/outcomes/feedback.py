@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from . import feedback_eligibility
+
 
 @dataclass(frozen=True)
 class EventAlphaEvalExportResult:
@@ -18,6 +20,10 @@ class EventAlphaEvalExportResult:
     files_written: tuple[Path, ...]
     proposed_cases: int
     source: str
+    feedback_rows_supplied: int = 0
+    feedback_rows_eligible: int = 0
+    feedback_rows_excluded: int = 0
+    feedback_exclusion_reason_counts: dict[str, int] | None = None
 
 
 def export_cases_from_feedback(
@@ -26,19 +32,56 @@ def export_cases_from_feedback(
     out_dir: str | Path,
     *,
     now: datetime | None = None,
+    core_rows: Iterable[Mapping[str, Any]] = (),
 ) -> EventAlphaEvalExportResult:
     alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
-    feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
-    by_key = {str(row.get("alert_key") or row.get("key") or ""): row for row in alerts}
+    supplied_feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    feedback, excluded_feedback, feedback_reasons = (
+        feedback_eligibility.partition_joined_alert_feedback(
+            supplied_feedback,
+            core_rows,
+            alerts,
+            now=now,
+        )
+    )
+    by_identity = {
+        identity: row
+        for row in alerts
+        if (
+            identity := feedback_eligibility.canonical_feedback_join_identity(row)
+        ) is not None
+    }
     cases: list[dict[str, Any]] = []
     for row in feedback:
-        if row.get("label") not in {"junk", "useful", "watch"}:
+        if row.get("feedback_label") not in {"junk", "useful", "watch"}:
             continue
-        alert = by_key.get(str(row.get("key") or row.get("target") or ""))
+        identity = feedback_eligibility.canonical_feedback_join_identity(row)
+        alert = by_identity.get(identity) if identity is not None else None
         if not alert:
             continue
         cases.append(_feedback_case(alert, row))
-    return _write_cases(out_dir, {"proposed_llm_golden_cases.json": cases}, "feedback", now=now)
+    result = _write_cases(
+        out_dir,
+        {"proposed_llm_golden_cases.json": cases},
+        "feedback",
+        now=now,
+        feedback_telemetry={
+            "feedback_rows_supplied": len(supplied_feedback),
+            "feedback_rows_eligible": len(feedback),
+            "feedback_rows_excluded": len(excluded_feedback),
+            "feedback_exclusion_reason_counts": feedback_reasons,
+        },
+    )
+    return EventAlphaEvalExportResult(
+        result.out_dir,
+        result.files_written,
+        result.proposed_cases,
+        result.source,
+        feedback_rows_supplied=len(supplied_feedback),
+        feedback_rows_eligible=len(feedback),
+        feedback_rows_excluded=len(excluded_feedback),
+        feedback_exclusion_reason_counts=feedback_reasons,
+    )
 
 
 def export_cases_from_missed(
@@ -74,13 +117,15 @@ def format_eval_export_result(result: EventAlphaEvalExportResult) -> str:
         f"source: {result.source}",
         f"out_dir: {result.out_dir}",
         f"files_written: {len(result.files_written)} · proposed_cases={result.proposed_cases}",
+        f"feedback: supplied={result.feedback_rows_supplied} eligible={result.feedback_rows_eligible} excluded={result.feedback_rows_excluded}",
+        "feedback_exclusions: " + _format_reason_counts(result.feedback_exclusion_reason_counts),
         *(f"- {path}" for path in result.files_written),
         "Canonical fixtures were not modified.",
     ])
 
 
 def _feedback_case(alert: Mapping[str, Any], feedback: Mapping[str, Any]) -> dict[str, Any]:
-    label = str(feedback.get("label") or "")
+    label = str(feedback.get("feedback_label") or "")
     expected_role = "source_noise" if label == "junk" else str(alert.get("llm_asset_role") or alert.get("asset_role") or "ambiguous")
     expected_action = "store_only" if label == "junk" else str(alert.get("tier") or "radar_digest").lower()
     return _redact({
@@ -95,7 +140,7 @@ def _feedback_case(alert: Mapping[str, Any], feedback: Mapping[str, Any]) -> dic
         "expected_asset_role": expected_role,
         "expected_relationship_type": alert.get("llm_relationship_type") or alert.get("relationship_type"),
         "expected_recommended_alert_action": expected_action,
-        "feedback_notes": feedback.get("notes"),
+        "feedback_notes": feedback.get("feedback_notes"),
     })
 
 
@@ -136,6 +181,7 @@ def _write_cases(
     source: str,
     *,
     now: datetime | None,
+    feedback_telemetry: Mapping[str, Any] | None = None,
 ) -> EventAlphaEvalExportResult:
     target = Path(out_dir).expanduser()
     target.mkdir(parents=True, exist_ok=True)
@@ -147,6 +193,7 @@ def _write_cases(
             "schema_version": "event_alpha_proposed_eval_cases_v1",
             "generated_at": generated,
             "source": source,
+            **dict(feedback_telemetry or {}),
             "cases": cases,
         }
         path = target / filename
@@ -154,6 +201,12 @@ def _write_cases(
         written.append(path)
         total += len(cases)
     return EventAlphaEvalExportResult(target, tuple(written), total, source)
+
+
+def _format_reason_counts(counts: Mapping[str, int] | None) -> str:
+    if not counts:
+        return "none"
+    return ", ".join(f"{reason}={count}" for reason, count in sorted(counts.items()))
 
 
 def _redact(row: Mapping[str, Any]) -> dict[str, Any]:
@@ -202,6 +255,9 @@ class EventAlphaFeedbackReadinessResult:
     snapshots_missing_core_store: int = 0
     inbox_review_items: int = 0
     feedback_rows: int = 0
+    feedback_rows_supplied: int = 0
+    feedback_rows_excluded: int = 0
+    feedback_exclusion_reason_counts: dict[str, int] | None = None
     calibration_ready_rows: int = 0
     visible_core_opportunities: int = 0
     visible_core_opportunities_with_cards: int = 0
@@ -231,13 +287,22 @@ def build_feedback_readiness(
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry],
     core_opportunity_rows: Iterable[Mapping[str, Any]] = (),
     inbox_result: event_alpha_notification_inbox.EventAlphaNotificationInboxResult | None = None,
+    now: Any = None,
 ) -> EventAlphaFeedbackReadinessResult:
     """Check whether local artifacts are ready for manual useful/junk feedback."""
     cards = [Path(path) for path in card_paths]
     alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
-    feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    supplied_feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
     entries = list(watchlist_entries)
     core_rows = [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)]
+    feedback, excluded_feedback, feedback_reasons = (
+        feedback_eligibility.partition_joined_calibration_feedback(
+            supplied_feedback,
+            core_rows,
+            now=now,
+        )
+    )
+    feedback = list(feedback)
     research_cards = [path for path in cards if path.name != "index.md"]
     card_core_ids = {value for path in research_cards for value in (event_research_cards.card_core_opportunity_id(path),) if value}
     card_feedback_targets = {value for path in research_cards for value in (event_research_cards.card_feedback_target(path),) if value}
@@ -340,6 +405,9 @@ def build_feedback_readiness(
         snapshots_missing_core_store=snapshots_missing_core,
         inbox_review_items=inbox_items,
         feedback_rows=len(feedback),
+        feedback_rows_supplied=len(supplied_feedback),
+        feedback_rows_excluded=len(excluded_feedback),
+        feedback_exclusion_reason_counts=feedback_reasons,
         calibration_ready_rows=calibration_ready,
         visible_core_opportunities=len(visible_core),
         visible_core_opportunities_with_cards=visible_with_cards,
@@ -404,6 +472,17 @@ def format_feedback_readiness(result: EventAlphaFeedbackReadinessResult) -> str:
             f"feedback_targets={result.diagnostic_review_items_with_feedback_targets}"
         ),
         f"feedback_rows: {result.feedback_rows}",
+        f"feedback_rows_supplied: {result.feedback_rows_supplied}",
+        f"feedback_rows_excluded: {result.feedback_rows_excluded}",
+        "feedback_exclusions: " + (
+            ", ".join(
+                f"{reason}={count}"
+                for reason, count in sorted(
+                    (result.feedback_exclusion_reason_counts or {}).items()
+                )
+            )
+            or "none"
+        ),
         f"calibration_ready_rows: {result.calibration_ready_rows}",
         "blockers: " + (", ".join(result.blockers) if result.blockers else "none"),
         "warnings: " + (", ".join(result.warnings) if result.warnings else "none"),

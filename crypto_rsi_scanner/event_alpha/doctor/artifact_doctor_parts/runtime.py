@@ -57,6 +57,7 @@ from ...radar import derivatives_crowding as event_derivatives_crowding
 from ...radar import instrument_resolver as event_instrument_resolver
 from ...radar import scheduled_catalysts as event_scheduled_catalysts
 from ... import shims as event_alpha_shims
+from . import feedback_checks as doctor_feedback_checks
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
     "This namespace contains pre-canonical notification delivery rows. Do not use it "

@@ -788,15 +788,20 @@ def test_feedback_progress_and_scorecard_keep_thresholds_frozen(tmp_path, monkey
         base_dir=tmp_path,
         now=datetime(2026, 7, 5, tzinfo=timezone.utc),
     )
-    assert progress["labels_total"] == 2
-    assert progress["label_coverage_pct"] == 50.0
+    assert progress["labels_total"] == 0
+    assert progress["label_coverage_pct"] == 0.0
+    assert progress["feedback_rows_supplied"] == 2
+    assert progress["feedback_rows_excluded"] == 2
     monkeypatch.setattr(
         scorecard.common,
         "load_contract",
         lambda: radar_north_star.build_burn_in_contract(generated_at=datetime(2026, 7, 5, tzinfo=timezone.utc)),
     )
     score = scorecard.build_scorecard(profile="live_burn_in_no_send", artifact_namespace="burn", base_dir=tmp_path)
-    assert score["labels_collected"] == 2
+    assert score["labels_collected"] == 0
+    assert score["feedback_rows_supplied"] == 2
+    assert score["feedback_rows_excluded"] == 2
+    assert score["feedback_exclusion_reason_counts"]["legacy_feedback_contract"] == 2
     assert score["enough_data"] is False
     assert score["auto_apply_thresholds"] is False
     assert all(value == "frozen_insufficient_data" for value in score["promotion_freeze_status_by_lane"].values())
