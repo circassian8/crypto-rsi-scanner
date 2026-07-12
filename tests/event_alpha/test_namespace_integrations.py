@@ -333,6 +333,7 @@ def test_integrated_radar_loads_external_coinalyze_namespace():
         assert manifest["coinalyze_freshness_status"] == "fresh"
         assert manifest["coinalyze_skip_reason"] is None
         coverage = json.loads(result.source_coverage_json_path.read_text(encoding="utf-8"))
+        assert coverage["generated_at"] == "2026-06-15T16:00:00+00:00"
         assert coverage["coinalyze_derivatives_state_rows_loaded"] == 2
         assert "cryptopanic_configured" in coverage
         assert "cryptopanic_selected_for_run" in coverage

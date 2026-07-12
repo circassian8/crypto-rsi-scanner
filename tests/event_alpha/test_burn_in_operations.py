@@ -808,19 +808,24 @@ def test_feedback_progress_and_scorecard_keep_thresholds_frozen(tmp_path, monkey
 
 
 def test_scorecard_default_policy_excludes_no_key_live_candidates(tmp_path, monkeypatch):
+    fixed_now = datetime(2026, 7, 12, tzinfo=timezone.utc)
     live = tmp_path / "live_burn_in_20260705"
     no_key = tmp_path / "no_key_live"
     live.mkdir()
     no_key.mkdir()
     (live / daily_burn_in.RUN_JSON).write_text('{"generated_at":"2026-07-05T00:00:00+00:00"}\n', encoding="utf-8")
-    _write_jsonl(live / "event_integrated_radar_candidates.jsonl", [{"candidate_id": "live", "opportunity_type": "UNCONFIRMED_RESEARCH"}])
-    _write_jsonl(no_key / "event_integrated_radar_candidates.jsonl", [{"candidate_id": "no-key", "opportunity_type": "UNCONFIRMED_RESEARCH"}])
+    _write_jsonl(live / "event_integrated_radar_candidates.jsonl", [{"candidate_id": "live", "opportunity_type": "UNCONFIRMED_RESEARCH", "generated_at": fixed_now.isoformat()}])
+    _write_jsonl(no_key / "event_integrated_radar_candidates.jsonl", [{"candidate_id": "no-key", "opportunity_type": "UNCONFIRMED_RESEARCH", "generated_at": fixed_now.isoformat()}])
     monkeypatch.setattr(
         scorecard.common,
         "load_contract",
         lambda: radar_north_star.build_burn_in_contract(generated_at=datetime(2026, 7, 5, tzinfo=timezone.utc)),
     )
-    payload = scorecard.build_scorecard(profile="live_burn_in_no_send", base_dir=tmp_path)
+    payload = scorecard.build_scorecard(
+        profile="live_burn_in_no_send",
+        base_dir=tmp_path,
+        now=fixed_now,
+    )
     assert payload["namespace_scope"] == "policy"
     assert payload["included_namespaces"] == ["live_burn_in_20260705"]
     assert payload["evidence_scope"] == "active_burn_in_no_candidate_evidence"
@@ -916,13 +921,14 @@ def test_scorecard_active_burn_in_preflight_only_scope_is_explicit(tmp_path, mon
 
 
 def test_weekly_measurement_and_source_yield_are_recommendations_only(tmp_path):
+    fixed_now = datetime(2026, 7, 12, tzinfo=timezone.utc)
     ns = tmp_path / "burn"
     _write_jsonl(
         ns / "event_integrated_radar_candidates.jsonl",
         [
-            {"candidate_id": "1", "opportunity_type": "UNCONFIRMED_RESEARCH", "provider": "cryptopanic", "source_pack": "cryptopanic_context"},
-            {"candidate_id": "2", "opportunity_type": "DIAGNOSTIC", "provider": "rss", "source_pack": "rss_context"},
-            {"candidate_id": "3", "opportunity_type": "UNCONFIRMED_RESEARCH", "provider": "coinalyze", "source_pack": "derivatives"},
+            {"candidate_id": "1", "opportunity_type": "UNCONFIRMED_RESEARCH", "provider": "cryptopanic", "source_pack": "cryptopanic_context", "generated_at": fixed_now.isoformat()},
+            {"candidate_id": "2", "opportunity_type": "DIAGNOSTIC", "provider": "rss", "source_pack": "rss_context", "generated_at": fixed_now.isoformat()},
+            {"candidate_id": "3", "opportunity_type": "UNCONFIRMED_RESEARCH", "provider": "coinalyze", "source_pack": "derivatives", "generated_at": fixed_now.isoformat()},
         ],
     )
     _write_jsonl(
@@ -935,6 +941,7 @@ def test_weekly_measurement_and_source_yield_are_recommendations_only(tmp_path):
         profile="live_burn_in_no_send",
         artifact_namespace="burn",
         base_dir=tmp_path,
+        now=fixed_now,
     )
     assert dashboard["evidence_scope"] == "explicit_single_namespace_diagnostic"
     assert dashboard["burn_in_contract_scope"] == "explicit_single_namespace_diagnostic"
@@ -950,6 +957,7 @@ def test_weekly_measurement_and_source_yield_are_recommendations_only(tmp_path):
         profile="live_burn_in_no_send",
         artifact_namespace="burn",
         base_dir=tmp_path,
+        now=fixed_now,
     )
     assert yield_report["evidence_scope"] == "explicit_single_namespace_diagnostic"
     assert yield_report["explicit_scope_warning"]

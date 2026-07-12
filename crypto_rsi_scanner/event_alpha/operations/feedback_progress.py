@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import argparse
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Mapping
 
 from . import common
 from . import feedback_evidence
+from . import namespace_policy
 from .review_inbox import INBOX_JSON
 from ..outcomes import feedback_eligibility
 
@@ -25,8 +26,13 @@ def build_feedback_progress(
     days: int = 7,
     now=None,
 ) -> dict[str, Any]:
-    generated = now or common.utc_now()
+    captured_now = common.utc_now() if now is None else now
+    generated = common.parse_aware_utc(captured_now)
+    if generated is None:
+        raise ValueError("feedback progress now must be timezone-aware")
+    window_days = max(1, int(days or 7))
     context = common.context_for(profile=profile, artifact_namespace=artifact_namespace or profile, base_dir=base_dir)
+    namespace_policy.require_mutable_output_namespace(context.namespace_dir)
     supplied_feedback = common.read_jsonl(context.feedback_path)
     core_rows = common.read_jsonl(context.core_opportunity_store_path)
     eligible_feedback, excluded_feedback, feedback_exclusion_reason_counts = (
@@ -38,11 +44,19 @@ def build_feedback_progress(
     )
     feedback = list(eligible_feedback)
     inbox = common.read_json(context.namespace_dir / INBOX_JSON)
-    generated = generated.astimezone(timezone.utc)
     today_cutoff = generated - timedelta(days=1)
-    week_cutoff = generated - timedelta(days=max(1, int(days or 7)))
-    today = [row for row in feedback if (common.timestamp_for_row(row) or generated) >= today_cutoff]
-    week = [row for row in feedback if (common.timestamp_for_row(row) or generated) >= week_cutoff]
+    week_cutoff = generated - timedelta(days=window_days)
+    eligible_source_feedback = _eligible_source_feedback_rows(supplied_feedback, feedback)
+    today = [
+        row
+        for row in eligible_source_feedback
+        if _marked_at_in_window(row, cutoff=today_cutoff, generated=generated)
+    ]
+    week = [
+        row
+        for row in eligible_source_feedback
+        if _marked_at_in_window(row, cutoff=week_cutoff, generated=generated)
+    ]
     inbox_items = inbox.get("items") if isinstance(inbox.get("items"), list) else []
     feedback_targets = {
         str(row.get("feedback_target") or row.get("target") or "")
@@ -70,7 +84,7 @@ def build_feedback_progress(
             "namespace_dir": common.rel_path(context.namespace_dir),
             "labels_today": len(today),
             "labels_this_week": len(week),
-            "window_days": max(1, int(days or 7)),
+            "window_days": window_days,
             "labels_total": len(feedback),
             "labels_by_type": common.count_by(feedback, "feedback_label"),
             "labels_by_opportunity_type": common.count_by(feedback, "opportunity_type", "lane"),
@@ -91,6 +105,33 @@ def build_feedback_progress(
     common.write_json(context.namespace_dir / PROGRESS_JSON, payload)
     common.write_text(context.namespace_dir / PROGRESS_MD, format_feedback_progress(payload))
     return payload
+
+
+def _eligible_source_feedback_rows(
+    supplied_feedback: list[dict[str, Any]],
+    eligible_feedback: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    eligible_keys = {
+        (row.get("feedback_id"), row.get("feedback_identity_key"))
+        for row in eligible_feedback
+        if type(row.get("feedback_id")) is str
+        and type(row.get("feedback_identity_key")) is str
+    }
+    return [
+        row
+        for row in supplied_feedback
+        if (row.get("feedback_id"), row.get("feedback_identity_key")) in eligible_keys
+    ]
+
+
+def _marked_at_in_window(
+    row: Mapping[str, Any],
+    *,
+    cutoff: datetime,
+    generated: datetime,
+) -> bool:
+    marked_at = common.parse_aware_utc(row.get("marked_at"))
+    return bool(marked_at is not None and cutoff <= marked_at <= generated)
 
 
 def format_feedback_progress(payload: Mapping[str, Any]) -> str:

@@ -114,6 +114,9 @@ def build_source_coverage_report(
 ) -> EventAlphaSourceCoverageReport:
     """Build source-pack coverage from readiness, health, and artifact rows."""
     observed = now or datetime.now(timezone.utc)
+    if observed.tzinfo is None or observed.utcoffset() is None:
+        raise ValueError("source coverage now must be timezone-aware")
+    observed = observed.astimezone(timezone.utc)
     raw_health_by_provider = _health_by_provider(provider_health_rows or {}, now=observed)
     health_by_provider = dict(raw_health_by_provider)
     configured = _configured_providers(provider_status_report, health_by_provider)
@@ -161,6 +164,7 @@ def build_source_coverage_report(
     return _source_coverage_report(
         profile=profile,
         artifact_namespace=artifact_namespace,
+        generated_at=observed,
         packs=packs,
         provider_health_rows=provider_health_rows or {},
         acquisition_rows=acquisition,
@@ -415,6 +419,7 @@ def _source_coverage_report(
     *,
     profile: str,
     artifact_namespace: str,
+    generated_at: datetime,
     packs: tuple[EventAlphaSourceCoveragePack, ...],
     provider_health_rows: Mapping[str, Mapping[str, Any]],
     acquisition_rows: list[dict[str, Any]],
@@ -431,6 +436,7 @@ def _source_coverage_report(
     return EventAlphaSourceCoverageReport(
         profile=profile,
         artifact_namespace=artifact_namespace,
+        generated_at=generated_at.isoformat(),
         packs=packs,
         provider_health_rows=len(provider_health_rows or {}),
         acquisition_rows=len(acquisition_rows),

@@ -120,3 +120,48 @@ def test_event_alpha_burn_in_operating_targets_are_no_send_and_artifact_only():
     )
     assert "--event-feedback-source-noise" in source_noise_dry
     assert "--event-alpha-profile notify_llm_deep" in source_noise_dry
+
+
+def test_event_alpha_weekly_measurement_make_target_is_canonical_no_send():
+    measurement_dry = subprocess.check_output(
+        [
+            "make",
+            "-n",
+            "event-alpha-burn-in-weekly-measurement",
+            "PROFILE=notify_llm_deep_rehearsal",
+            "ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal",
+            "INCLUDE_NOTIFICATION_REHEARSALS=1",
+            "INCLUDE_NO_KEY_NAMESPACES=1",
+            "INCLUDE_PROVIDER_REHEARSALS=1",
+            "INCLUDE_FIXTURE_NAMESPACES=1",
+            "INCLUDE_STALE_NAMESPACES=1",
+            "INCLUDE_LIVE_REHEARSALS_WITHOUT_BURN_IN_RUN=1",
+            "PYTHON=python3",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+    )
+
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in measurement_dry
+    assert (
+        "python3 -m crypto_rsi_scanner.event_alpha.operations.measurement"
+        in measurement_dry
+    )
+    assert "--profile notify_llm_deep" in measurement_dry
+    assert (
+        "--artifact-namespace notify_llm_deep_cryptopanic_rehearsal"
+        in measurement_dry
+    )
+    assert "--days 30" in measurement_dry
+    for flag in (
+        "--include-notification-rehearsals",
+        "--include-no-key-namespaces",
+        "--include-provider-rehearsals",
+        "--include-fixture-namespaces",
+        "--include-stale-namespaces",
+        "--include-live-rehearsals-without-burn-in-run",
+    ):
+        assert flag in measurement_dry
+    assert "RSI_EVENT_ALERTS_ENABLED=1" not in measurement_dry
+    assert "--event-alert-send" not in measurement_dry
+    assert "event-alpha-cycle-send" not in measurement_dry

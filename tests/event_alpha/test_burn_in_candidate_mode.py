@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from crypto_rsi_scanner.event_alpha.operations import (
@@ -376,11 +377,12 @@ def test_daily_burn_in_candidate_mode_mocked_live_candidate_counts_with_ledger(t
                     "provider_generation_id": provider_generation_id,
                     "provider_request_succeeded": True,
                     "provider_source_artifact": "event_derivatives_state.jsonl",
-                    "run_id": "integrated-run-1",
-                    "profile": "live_burn_in_no_send",
-                    "artifact_namespace": "live_burn_in_20260705",
-                }
-            ],
+                        "run_id": "integrated-run-1",
+                        "profile": "live_burn_in_no_send",
+                        "artifact_namespace": "live_burn_in_20260705",
+                        "generated_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                ],
         )
         return {
             "name": step.name,

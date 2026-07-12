@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from . import calendar as calendar_specs, decision_model as decision_model_specs
 from . import feedback_eligibility as feedback_eligibility_specs
+from . import feedback_progress as feedback_progress_specs
+from . import measurement as measurement_specs
 from . import outcome_eligibility as outcome_eligibility_specs
 from . import operator_state as operator_state_specs, provider_lineage_specs
 from .registry_mappings import FILENAME_TO_SCHEMA_ID, ROW_TYPE_TO_SCHEMA_ID
@@ -419,6 +421,10 @@ SCHEMAS: dict[str, ArtifactSchema] = {
         timestamps=("generated_at",),
         lineage=("profile", "artifact_namespace"),
     ),
+    **feedback_progress_specs.schema_specs(
+        _schema,
+        common_lineage=COMMON_LINEAGE,
+    ),
     "event_alpha_burn_in_measurement_dashboard_v1": _schema(
         "event_alpha_burn_in_measurement_dashboard_v1",
         required=("row_type", "profile", "artifact_namespace", "evidence_scope", "auto_apply_thresholds", "research_only", "no_send_rehearsal"),
@@ -427,10 +433,15 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "window_days", "namespace_policy", "burn_in_contract_scope",
             "candidate_source_scope", "explicit_scope_warning", "enough_data",
             "enough_data_reasons", "low_sample_warning", "min_sample_warning",
-            "source_yield_confidence", *feedback_eligibility_specs.FEEDBACK_EVIDENCE_TELEMETRY_FIELDS,
+            "included_namespace_count", "real_burn_in_candidate_count",
+            "non_burn_in_candidate_count", "near_miss_count",
+            "quality_capped_count",
+            "source_yield_confidence", "current_window_interpretation",
+            *feedback_eligibility_specs.FEEDBACK_EVIDENCE_TELEMETRY_FIELDS,
             *outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_FIELDS, *OPERATION_SAFETY,
         ),
-        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", "auto_apply_thresholds": "bool", **feedback_eligibility_specs.FEEDBACK_EVIDENCE_TELEMETRY_TYPES, **outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_TYPES},
+        deprecated=("first_real_run_interpretation",),
+        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", "auto_apply_thresholds": "bool", "window_days": "int", "low_sample_warning": "bool", "included_namespace_count": "int", "real_burn_in_candidate_count": "int", "non_burn_in_candidate_count": "int", "near_miss_count": "int", "quality_capped_count": "int", "current_window_interpretation": "dict", **feedback_eligibility_specs.FEEDBACK_EVIDENCE_TELEMETRY_TYPES, **outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_TYPES},
         safety=OPERATION_SAFETY + ("auto_apply_thresholds",),
         timestamps=("generated_at",),
         lineage=("profile", "artifact_namespace"),
@@ -795,6 +806,8 @@ def validate_row_against_schema(row: Mapping[str, Any], schema: str | ArtifactSc
     if schema_obj.schema_id == "outcome_row_v1": errors.extend(outcome_eligibility_specs.validate_contract(row))
     if schema_obj.schema_id == "feedback_row_v1": errors.extend(feedback_eligibility_specs.validate_contract(row))
     if schema_obj.schema_id == "feedback_calibration_prior_v2": errors.extend(feedback_eligibility_specs.validate_prior_contract(row))
+    if schema_obj.schema_id == "event_alpha_feedback_progress_v1": errors.extend(feedback_progress_specs.validate_contract(row))
+    if schema_obj.schema_id == "event_alpha_burn_in_measurement_dashboard_v1": errors.extend(measurement_specs.validate_contract(row))
     if row.get("decision_model_version") not in (None, "") and schema_obj.schema_id in {"core_opportunity_v1", "integrated_radar_candidate_v1", "outcome_row_v1", "feedback_row_v1"}:
         errors.extend(decision_model_specs.validate_contract(row))
     return errors

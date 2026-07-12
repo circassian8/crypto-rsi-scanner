@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -55,25 +56,79 @@ def policy_categories(policy: Mapping[str, Any], namespace: str) -> set[str]:
     return set()
 
 
-def namespace_summaries(base: Path, namespaces: list[str] | tuple[str, ...], *, cutoff, policy: Mapping[str, Any]) -> list[dict[str, Any]]:
+def namespace_summaries(
+    base: Path,
+    namespaces: list[str] | tuple[str, ...],
+    *,
+    cutoff: datetime,
+    policy: Mapping[str, Any],
+    evaluated_at: datetime | None = None,
+) -> list[dict[str, Any]]:
+    evaluation_now = _evaluation_now(evaluated_at)
     return [
-        namespace_summary(base, namespace, cutoff=cutoff, categories=policy_categories(policy, namespace))
+        namespace_summary(
+            base,
+            namespace,
+            cutoff=cutoff,
+            categories=policy_categories(policy, namespace),
+            evaluated_at=evaluation_now,
+        )
         for namespace in namespaces
     ]
 
 
-def namespace_summary(base: Path, namespace: str, *, cutoff, categories: set[str] | None = None) -> dict[str, Any]:
+def namespace_summary(
+    base: Path,
+    namespace: str,
+    *,
+    cutoff: datetime,
+    categories: set[str] | None = None,
+    evaluated_at: datetime | None = None,
+) -> dict[str, Any]:
+    evaluation_now = _evaluation_now(evaluated_at)
     categories = set(categories or set())
     namespace_dir = base / namespace
-    daily_run = common.read_json(namespace_dir / RUN_JSON)
-    candidate_manifest = common.read_json(namespace_dir / CANDIDATE_MODE_MANIFEST_JSON)
+    daily_run = _current_json_doc(
+        namespace_dir / RUN_JSON,
+        cutoff=cutoff,
+        evaluated_at=evaluation_now,
+    )
+    candidate_manifest = _current_json_doc(
+        namespace_dir / CANDIDATE_MODE_MANIFEST_JSON,
+        cutoff=cutoff,
+        evaluated_at=evaluation_now,
+    )
     candidate_mode = bool(daily_run.get("candidate_mode") or candidate_manifest.get("candidate_mode"))
-    burn_in_run_count = _json_doc_count(namespace_dir / RUN_JSON, cutoff=cutoff)
-    integrated_rows = _rows(namespace_dir / INTEGRATED_CANDIDATES, cutoff=cutoff)
-    core_rows = _rows(namespace_dir / CORE_OPPORTUNITIES, cutoff=cutoff)
-    alert_rows = _rows(namespace_dir / NOTIFICATION_ALERTS, cutoff=cutoff)
-    market_rows = _rows(namespace_dir / MARKET_ANOMALIES, cutoff=cutoff)
-    fade_rows = _rows(namespace_dir / FADE_REVIEW_CANDIDATES, cutoff=cutoff)
+    burn_in_run_count = _json_doc_count(
+        namespace_dir / RUN_JSON,
+        cutoff=cutoff,
+        evaluated_at=evaluation_now,
+    )
+    integrated_rows = _rows(
+        namespace_dir / INTEGRATED_CANDIDATES,
+        cutoff=cutoff,
+        evaluated_at=evaluation_now,
+    )
+    core_rows = _rows(
+        namespace_dir / CORE_OPPORTUNITIES,
+        cutoff=cutoff,
+        evaluated_at=evaluation_now,
+    )
+    alert_rows = _rows(
+        namespace_dir / NOTIFICATION_ALERTS,
+        cutoff=cutoff,
+        evaluated_at=evaluation_now,
+    )
+    market_rows = _rows(
+        namespace_dir / MARKET_ANOMALIES,
+        cutoff=cutoff,
+        evaluated_at=evaluation_now,
+    )
+    fade_rows = _rows(
+        namespace_dir / FADE_REVIEW_CANDIDATES,
+        cutoff=cutoff,
+        evaluated_at=evaluation_now,
+    )
     candidate_rows = [*integrated_rows, *core_rows, *alert_rows, *market_rows, *fade_rows]
     fixture_candidate_count = sum(1 for row in integrated_rows if _is_fixture_row(row) or "fixture" in categories)
     diagnostic_count = sum(1 for row in candidate_rows if is_diagnostic_row(row))
@@ -82,9 +137,27 @@ def namespace_summary(base: Path, namespace: str, *, cutoff, categories: set[str
         for row in integrated_rows
         if is_contract_counted_candidate(row, namespace_categories=categories, has_burn_in_run=burn_in_run_count > 0)
     ]
-    readiness_rows = sum(_json_doc_count(namespace_dir / name, cutoff=cutoff) for name in READINESS_ARTIFACTS)
-    preflight_rows = sum(_json_doc_count(namespace_dir / name, cutoff=cutoff) for name in PREFLIGHT_ARTIFACTS)
-    source_coverage_rows = _json_doc_count(namespace_dir / SOURCE_COVERAGE_JSON, cutoff=cutoff)
+    readiness_rows = sum(
+        _json_doc_count(
+            namespace_dir / name,
+            cutoff=cutoff,
+            evaluated_at=evaluation_now,
+        )
+        for name in READINESS_ARTIFACTS
+    )
+    preflight_rows = sum(
+        _json_doc_count(
+            namespace_dir / name,
+            cutoff=cutoff,
+            evaluated_at=evaluation_now,
+        )
+        for name in PREFLIGHT_ARTIFACTS
+    )
+    source_coverage_rows = _json_doc_count(
+        namespace_dir / SOURCE_COVERAGE_JSON,
+        cutoff=cutoff,
+        evaluated_at=evaluation_now,
+    )
     preview_only = int((namespace_dir / "event_alpha_notification_preview.md").exists() and not candidate_rows)
     no_candidate_artifacts = not any((namespace_dir / name).exists() for name in CANDIDATE_ARTIFACTS)
     return {
@@ -290,22 +363,65 @@ def archive_artifact_categories(rel_path: str) -> dict[str, bool]:
     }
 
 
-def _rows(path: Path, *, cutoff) -> list[dict[str, Any]]:
+def _evaluation_now(value: datetime | None) -> datetime:
+    evaluation_now = common.utc_now() if value is None else value
+    if (
+        not isinstance(evaluation_now, datetime)
+        or evaluation_now.tzinfo is None
+        or evaluation_now.utcoffset() is None
+    ):
+        raise ValueError("evidence semantics evaluated_at must be timezone-aware")
+    return evaluation_now.astimezone(timezone.utc)
+
+
+def _rows(
+    path: Path,
+    *,
+    cutoff: datetime,
+    evaluated_at: datetime,
+) -> list[dict[str, Any]]:
     return [
         row
         for row in common.read_jsonl(path)
-        if (common.timestamp_for_row(row) or common.utc_now()) >= cutoff
+        if common.row_in_evidence_window(
+            row,
+            cutoff=cutoff,
+            evaluated_at=evaluated_at,
+        )
     ]
 
 
-def _json_doc_count(path: Path, *, cutoff) -> int:
+def _json_doc_count(
+    path: Path,
+    *,
+    cutoff: datetime,
+    evaluated_at: datetime,
+) -> int:
+    return int(
+        bool(
+            _current_json_doc(
+                path,
+                cutoff=cutoff,
+                evaluated_at=evaluated_at,
+            )
+        )
+    )
+
+
+def _current_json_doc(
+    path: Path,
+    *,
+    cutoff: datetime,
+    evaluated_at: datetime,
+) -> dict[str, Any]:
     row = common.read_json(path)
-    if not row:
-        return 0
-    timestamp = common.parse_utc(row.get("generated_at")) or common.parse_utc(row.get("created_at"))
-    if timestamp is not None and timestamp < cutoff:
-        return 0
-    return 1
+    if not row or not common.row_in_evidence_window(
+        row,
+        cutoff=cutoff,
+        evaluated_at=evaluated_at,
+    ):
+        return {}
+    return row
 
 
 def _is_fixture_row(row: Mapping[str, Any]) -> bool:

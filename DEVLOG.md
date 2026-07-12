@@ -17,6 +17,55 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-12 — Make burn-in evidence windows and cohorts exact · Codex
+**Why:** Burn-in reports could read one wall clock per row, accept unstamped or
+future documents, apply only part of the North Star readiness contract, and
+inflate review cohorts through substring matches or duplicate representations.
+The local rehearsal proved the contradiction: generic matching labeled all 76
+Core rows quality-capped while exact final Core authority found only 6.
+**Changes:**
+- Added one closed, timezone-aware UTC evidence clock across measurement,
+  scorecard, source-yield, namespace policy, evidence semantics, and feedback
+  progress. Missing, naive, stale, future, and invalid-first timestamps now fail
+  closed; cutoff and window-end observations remain inclusively eligible.
+- Made source-coverage artifacts carry their producer's captured clock and made
+  measurement read the real nested provider-health store with exact current
+  success/failure authority. No mtime or secondary timestamp fallback remains.
+- Added canonical Core cohort semantics: exact run/profile/namespace/Core tuple
+  identity, latest-revision selection, delimiter/whitespace-safe ids, fail-closed
+  equal-time conflicts, deterministic near misses on the report clock, and
+  quality caps only from final Core quality state. Linked candidate/prose rows
+  cannot increase these cohorts.
+- Unified measurement, source-yield, and scorecard on all five North Star count
+  thresholds. One cycle with enough labels/outcomes can no longer claim enough
+  data while real candidates or labeled near misses are missing.
+- Added closed measurement-window and feedback-progress schemas with typed
+  clocks, counters, denominators, breakdowns, interpretation, and zero-side-
+  effect checks. Deprecated the old injected first-run interpretation.
+- Protected archived, stale, quarantined, and checksum-sealed daily burn-in
+  namespaces from policy/report writes before any byte changes. Historical
+  diagnostics must use a new output namespace. All 128 archived checksum entries
+  remained byte-identical.
+- Regenerated the active no-send measurement, source-yield, scorecard, and
+  feedback-progress artifacts only. They honestly report 4 cycles, zero exact
+  contract candidates/labels/outcomes, insufficient data, frozen thresholds,
+  schema-valid output, and zero send/trade/paper/RSI/trigger side effects.
+- Updated the Make regression, runbook, roadmap, decision record, standalone
+  runner, and static architecture reports. Two time-dependent tests now use
+  explicit aware clocks instead of crossing their intended freshness boundary.
+**Verify:** The consolidated report/clock/schema/provider/immutable-output gate
+passed 94 tests; additional near-miss, Core, scorecard, and operator regressions
+passed 41 tests. The final local release gate passed the standalone runner,
+full pytest package, alert render smoke, offline backtest fixture, and paper
+scoreboard. Compileall, diff checks, schema validation, and architecture
+cleanliness passed with zero new size/function/old-import violations. GitHub
+Actions was neither polled nor awaited.
+**Notes/risks:** This hardening deliberately did not tune thresholds or create
+learning evidence. The contract remains insufficient until real versioned
+observations and exact human feedback/outcomes exist. External Bybit regional
+blocking, GDELT rate limits, CryptoPanic plan access, and OpenAI quota remain
+provider/environment constraints rather than evidence to bypass safety gates.
+
 ## 2026-07-12 — Add a preview-first exact outcome operator · Codex
 **Why:** The exact observed-price builder had no safe operator boundary, while
 the weekly measurement dashboard still injected a historical 59/14/36 rehearsal

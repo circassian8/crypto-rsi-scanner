@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from typing import Any, Mapping
 
+from . import candidate_semantics
 from . import common
 from . import evidence_semantics
 from . import feedback_evidence
@@ -59,18 +61,16 @@ def build_scorecard(
     base = context.base_dir
     contract = common.load_contract()
     evaluation_now = _evaluation_now(now)
-    cutoff = common.date_window(days, now=evaluation_now)
+    window_days = max(1, int(days or 1))
+    cutoff = common.date_window(window_days, now=evaluation_now)
     policy = namespace_policy.build_namespace_policy(
-        profile=profile,
-        artifact_namespace=context.artifact_namespace,
-        base_dir=base,
-        include_notification_rehearsals=include_notification_rehearsals,
-        include_no_key_namespaces=include_no_key_namespaces,
-        include_provider_rehearsals=include_provider_rehearsals,
-        include_fixture_namespaces=include_fixture_namespaces,
+        profile=profile, artifact_namespace=context.artifact_namespace, base_dir=base,
+        include_notification_rehearsals=include_notification_rehearsals, include_no_key_namespaces=include_no_key_namespaces,
+        include_provider_rehearsals=include_provider_rehearsals, include_fixture_namespaces=include_fixture_namespaces,
         include_stale_namespaces=include_stale_namespaces,
         include_live_rehearsals_without_burn_in_run=include_live_rehearsals_without_burn_in_run,
         include_namespaces=((artifact_namespace,) if artifact_namespace else include_namespaces),
+        now=evaluation_now,
     )
     included_namespaces = namespace_policy.included_namespace_names(policy)
     daily_runs = _daily_runs(
@@ -85,9 +85,9 @@ def build_scorecard(
      feedback_exclusion_reason_counts, feedback_evidence_telemetry,
      outcome_evidence_telemetry) = (
         _load_scorecard_learning_evidence(base, cutoff, included_namespaces, evaluation_now))
-    source_coverage_rows = [common.read_json(base / namespace / "event_alpha_source_coverage.json") for namespace in included_namespaces]
-    evidence_summaries = evidence_semantics.namespace_summaries(base, included_namespaces, cutoff=cutoff, policy=policy)
-    evidence_aggregate = evidence_semantics.aggregate_namespace_summaries(evidence_summaries)
+    source_coverage_rows, evidence_aggregate = _load_scorecard_evidence(
+        base, included_namespaces, cutoff, policy, evaluation_now
+    )
     scope = _scope_counts(
         base=base,
         cutoff=cutoff,
@@ -100,6 +100,7 @@ def build_scorecard(
         daily_runs=daily_runs,
         feedback_rows=feedback_rows,
         outcome_rows=outcome_rows,
+        evaluated_at=evaluation_now,
     )
     contract_namespaces = scope["contract_namespaces"]
     contract_candidate_rows = scope["contract_candidate_rows"]
@@ -112,16 +113,16 @@ def build_scorecard(
             if str(row.get("provider") or row.get("source_provider") or row.get("source_origin") or "").strip()
         }
     )
-    near_misses = [row for row in [*candidate_rows, *core_rows, *alert_rows] if _mentions(row, "near")]
-    quality_capped = [row for row in [*candidate_rows, *core_rows, *alert_rows] if _mentions(row, "quality") or _mentions(row, "cap")]
-    labeled_near_misses = [
-        row for row in feedback_rows
-        if _mentions(row, "near") or str(row.get("lane") or row.get("opportunity_type") or "").upper() == "UNCONFIRMED_RESEARCH"
-    ]
+    review_metrics = _review_identity_metrics(
+        candidate_rows,
+        core_rows,
+        feedback_rows,
+        evaluated_at=evaluation_now,
+    )
     enough_data_reasons, enough_data = _contract_data_status(
         contract=contract,
         scope=scope,
-        labeled_near_misses=labeled_near_misses,
+        labeled_near_misses_count=review_metrics["labeled_near_misses"],
         count_explicit_namespace_for_burn_in=count_explicit_namespace_for_burn_in,
     )
     payload = common.with_safety(
@@ -132,7 +133,7 @@ def build_scorecard(
             "profile": profile,
             "artifact_namespace": context.artifact_namespace,
             "namespace_dir": common.rel_path(context.namespace_dir),
-            "window_days": days,
+            "window_days": window_days,
             "namespace_scope": "single_namespace" if artifact_namespace else "policy",
             "evidence_scope": scope["evidence_scope"],
             "burn_in_contract_scope": scope["burn_in_contract_scope"],
@@ -154,14 +155,14 @@ def build_scorecard(
             "fixture_candidate_count": scope["fixture_candidate_count"],
             "stale_candidate_count": scope["stale_candidate_count"],
             "no_key_candidate_count": scope["no_key_candidate_count"],
-            "core_opportunities_seen": len(core_rows),
-            "near_misses_seen": len(near_misses),
-            "quality_capped_rows": len(quality_capped),
+            "core_opportunities_seen": review_metrics["core_opportunities"],
+            "near_misses_seen": review_metrics["near_misses"],
+            "quality_capped_rows": review_metrics["quality_capped"],
             "strict_count": _count_tier(alert_rows, "STRICT"),
             "strict_alerts": _count_tier(alert_rows, "STRICT"),
-            "research_candidates": len(candidate_rows) + len(core_rows),
-            "near_misses": len(near_misses),
-            "quality_capped": len(quality_capped),
+            "research_candidates": review_metrics["research_candidates"],
+            "near_misses": review_metrics["near_misses"],
+            "quality_capped": review_metrics["quality_capped"],
             "digest_count": _count_tier(alert_rows, "RADAR_DIGEST", "daily_digest"),
             "watchlist_count": _count_tier(alert_rows, "WATCHLIST"),
             "high_priority_count": _count_tier(alert_rows, "HIGH_PRIORITY_WATCH"),
@@ -169,7 +170,7 @@ def build_scorecard(
             "skipped_research_review_count": _count_field(alert_rows, "skipped", True),
             "labels_collected": len(feedback_rows),
             "labels": len(feedback_rows),
-            "labeled_near_misses": len(labeled_near_misses),
+            "labeled_near_misses": review_metrics["labeled_near_misses"],
             **feedback_evidence_telemetry,
             "outcome_rows": len(outcome_rows),
             "outcomes": len(outcome_rows),
@@ -196,10 +197,11 @@ def _load_scorecard_learning_evidence(
     included_namespaces: list[str],
     evaluation_now: Any,
 ) -> tuple[Any, ...]:
+    row_loader = partial(_all_rows, evaluated_at=evaluation_now)
     outcome_rows = outcome_evidence.load_exact_namespace_outcomes(
-        base, cutoff, included_namespaces, _all_rows, evaluation_now)
+        base, cutoff, included_namespaces, row_loader, evaluation_now)
     _candidates, cores, supplied_outcomes, outcomes, excluded_outcomes, reason_counts = outcome_rows
-    alert_rows = _all_rows(
+    alert_rows = row_loader(
         base,
         "event_alpha_alerts.jsonl",
         cutoff=cutoff,
@@ -209,7 +211,7 @@ def _load_scorecard_learning_evidence(
         base,
         cutoff,
         included_namespaces,
-        _all_rows,
+        row_loader,
         evaluation_now,
         core_rows=cores,
     )
@@ -221,6 +223,69 @@ def _load_scorecard_learning_evidence(
         reason_counts,
     )
     return (*outcome_rows, alert_rows, *feedback_rows, feedback_telemetry, outcome_telemetry)
+
+
+def _load_scorecard_evidence(
+    base: Path,
+    included_namespaces: list[str],
+    cutoff: datetime,
+    policy: Mapping[str, Any],
+    evaluation_now: datetime,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    source_coverage_rows = _current_json_docs(
+        base,
+        included_namespaces,
+        "event_alpha_source_coverage.json",
+        cutoff=cutoff,
+        evaluated_at=evaluation_now,
+    )
+    summaries = evidence_semantics.namespace_summaries(
+        base,
+        included_namespaces,
+        cutoff=cutoff,
+        policy=policy,
+        evaluated_at=evaluation_now,
+    )
+    return source_coverage_rows, evidence_semantics.aggregate_namespace_summaries(summaries)
+
+
+def _review_identity_metrics(
+    candidate_rows: list[dict[str, Any]],
+    core_rows: list[dict[str, Any]],
+    feedback_rows: list[dict[str, Any]],
+    *,
+    evaluated_at: datetime,
+) -> dict[str, int]:
+    cores = candidate_semantics.latest_authoritative_core_rows(core_rows)
+    near_misses = candidate_semantics.matching_opportunity_identities(
+        cores,
+        lambda row: candidate_semantics.is_deterministic_core_near_miss(
+            row,
+            evaluated_at=evaluated_at,
+        ),
+    )
+    quality_capped = candidate_semantics.matching_opportunity_identities(
+        cores,
+        candidate_semantics.is_authoritative_core_quality_cap,
+    )
+    labeled_near_misses = {
+        identity
+        for row in feedback_rows
+        if (identity := candidate_semantics.opportunity_identity(row))
+        and identity in near_misses
+    }
+    research_candidates = {
+        identity
+        for row in [*candidate_rows, *cores]
+        if (identity := candidate_semantics.opportunity_identity(row))
+    }
+    return {
+        "core_opportunities": len(cores),
+        "labeled_near_misses": len(labeled_near_misses),
+        "near_misses": len(near_misses),
+        "quality_capped": len(quality_capped),
+        "research_candidates": len(research_candidates),
+    }
 
 
 def format_scorecard(payload: Mapping[str, Any]) -> str:
@@ -311,21 +376,52 @@ def _daily_runs(
     namespaces: list[str] | tuple[str, ...],
     now: datetime,
 ) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    for namespace in namespaces:
-        path = base / namespace / RUN_JSON
-        row = common.read_json(path)
-        if row and (common.parse_utc(row.get("generated_at")) or now) >= cutoff:
-            rows.append(row)
-    return rows
+    return _current_json_docs(
+        base,
+        namespaces,
+        RUN_JSON,
+        cutoff=cutoff,
+        evaluated_at=now,
+    )
 
 
-def _all_rows(base: Path, filename: str, *, cutoff, namespaces: list[str] | tuple[str, ...]) -> list[dict[str, Any]]:
+def _current_json_docs(
+    base: Path,
+    namespaces: list[str] | tuple[str, ...],
+    filename: str,
+    *,
+    cutoff: datetime,
+    evaluated_at: datetime,
+) -> list[dict[str, Any]]:
+    return [
+        row
+        for namespace in namespaces
+        if (row := common.read_json(base / namespace / filename))
+        and common.row_in_evidence_window(
+            row,
+            cutoff=cutoff,
+            evaluated_at=evaluated_at,
+        )
+    ]
+
+
+def _all_rows(
+    base: Path,
+    filename: str,
+    *,
+    cutoff: datetime,
+    namespaces: list[str] | tuple[str, ...],
+    evaluated_at: datetime,
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for namespace in namespaces:
         path = base / namespace / filename
         for row in common.read_jsonl(path):
-            if (common.timestamp_for_row(row) or common.utc_now()) >= cutoff:
+            if common.row_in_evidence_window(
+                row,
+                cutoff=cutoff,
+                evaluated_at=evaluated_at,
+            ):
                 rows.append(row)
     return rows
 
@@ -378,6 +474,7 @@ def _scope_counts(
     feedback_rows: list[dict[str, Any]],
     outcome_rows: list[dict[str, Any]],
     evidence_aggregate: Mapping[str, Any],
+    evaluated_at: datetime,
 ) -> dict[str, Any]:
     explicit_flags = policy.get("explicit_inclusion_flags") if isinstance(policy.get("explicit_inclusion_flags"), Mapping) else {}
     explicit_scope = bool(artifact_namespace) or _has_explicit_policy_flags(explicit_flags)
@@ -391,7 +488,15 @@ def _scope_counts(
     )
     category_names = {category: _category_names(policy, category) for category in ("notification_rehearsal", "provider_rehearsal", "no_key", "fixture", "stale")}
     category_counts = {
-        f"{category}_candidate_count": len(_all_rows(base, "event_integrated_radar_candidates.jsonl", cutoff=cutoff, namespaces=namespaces))
+        f"{category}_candidate_count": len(
+            _all_rows(
+                base,
+                "event_integrated_radar_candidates.jsonl",
+                cutoff=cutoff,
+                namespaces=namespaces,
+                evaluated_at=evaluated_at,
+            )
+        )
         for category, namespaces in category_names.items()
     }
     evidence_scope = _evidence_scope(
@@ -479,17 +584,19 @@ def _contract_data_status(
     *,
     contract: Mapping[str, Any],
     scope: Mapping[str, Any],
-    labeled_near_misses: list[dict[str, Any]],
+    labeled_near_misses_count: int,
     count_explicit_namespace_for_burn_in: bool,
 ) -> tuple[list[str], bool]:
-    contract_labeled_near_misses = labeled_near_misses if scope["contract_countable"] else []
+    contract_labeled_near_misses_count = (
+        labeled_near_misses_count if scope["contract_countable"] else 0
+    )
     reasons = _enough_data_reasons(
         contract=contract,
         included_namespaces=scope["contract_namespaces"],
         daily_runs=scope["contract_daily_runs"],
         candidate_rows=scope["contract_candidate_rows"],
         feedback_rows=scope["contract_feedback_rows"],
-        labeled_near_misses=contract_labeled_near_misses,
+        labeled_near_misses_count=contract_labeled_near_misses_count,
         outcome_rows=scope["contract_outcome_rows"],
     )
     if scope["explicit_scope"] and not count_explicit_namespace_for_burn_in:
@@ -500,15 +607,13 @@ def _contract_data_status(
         and len(scope["contract_daily_runs"]) >= common.contract_threshold(contract, "min_live_no_send_cycles")
         and len(scope["contract_candidate_rows"]) >= common.contract_threshold(contract, "min_real_candidates")
         and len(scope["contract_feedback_rows"]) >= common.contract_threshold(contract, "min_human_labels")
-        and len(contract_labeled_near_misses) >= common.contract_threshold(contract, "min_labeled_near_misses")
+        and contract_labeled_near_misses_count >= common.contract_threshold(
+            contract,
+            "min_labeled_near_misses",
+        )
         and len(scope["contract_outcome_rows"]) >= common.contract_threshold(contract, "min_outcome_rows")
     )
     return reasons, enough
-
-
-def _mentions(row: Mapping[str, Any], needle: str) -> bool:
-    text = " ".join(str(value) for value in row.values() if not isinstance(value, (dict, list, tuple)))
-    return needle.casefold() in text.casefold()
 
 
 def _count_tier(rows: list[dict[str, Any]], *needles: str) -> int:
@@ -540,7 +645,7 @@ def _enough_data_reasons(
     daily_runs: list[dict[str, Any]],
     candidate_rows: list[dict[str, Any]],
     feedback_rows: list[dict[str, Any]],
-    labeled_near_misses: list[dict[str, Any]],
+    labeled_near_misses_count: int,
     outcome_rows: list[dict[str, Any]],
 ) -> list[str]:
     if not included_namespaces:
@@ -548,19 +653,15 @@ def _enough_data_reasons(
             "no_active_burn_in_namespaces",
             "next_command:make event-alpha-daily-live-no-send-burn-in",
         ]
-    checks = (
-        ("min_live_no_send_cycles", len(daily_runs)),
-        ("min_real_candidates", len(candidate_rows)),
-        ("min_human_labels", len(feedback_rows)),
-        ("min_labeled_near_misses", len(labeled_near_misses)),
-        ("min_outcome_rows", len(outcome_rows)),
+    return common.burn_in_contract_count_reasons(
+        contract,
+        included_namespaces=included_namespaces,
+        live_no_send_cycles=len(daily_runs),
+        real_candidates=len(candidate_rows),
+        human_labels=len(feedback_rows),
+        labeled_near_misses=labeled_near_misses_count,
+        outcome_rows=len(outcome_rows),
     )
-    reasons: list[str] = []
-    for key, observed in checks:
-        threshold = common.contract_threshold(contract, key)
-        if threshold and observed < threshold:
-            reasons.append(f"{key}:{observed}/{threshold}")
-    return reasons
 
 
 def _warnings(contract: Mapping[str, Any], runs: list[dict[str, Any]], feedback: list[dict[str, Any]], enough_data: bool, included_namespaces: list[str]) -> list[str]:

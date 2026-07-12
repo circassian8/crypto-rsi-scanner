@@ -1647,7 +1647,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 786,
+  "file_count": 793,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1655,7 +1655,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-12T12:07:19.069945+00:00",
+  "generated_at": "2026-07-12T13:41:55.734086+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1793,6 +1793,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1166,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1162,
       "path": "crypto_rsi_scanner/event_alpha/outcomes/feedback_labels.py",
       "source_kind": "production"
@@ -1801,12 +1807,6 @@
       "limit": 1500,
       "line_count": 1156,
       "path": "crypto_rsi_scanner/event_alpha/operations/review_inbox.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1153,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
       "source_kind": "production"
     },
     {
@@ -1903,20 +1903,20 @@
   "largest_test_files": [
     {
       "limit": 1500,
-      "line_count": 1493,
+      "line_count": 1495,
       "path": "tests/event_alpha/test_operator_state.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1491,
+      "path": "tests/event_alpha/test_burn_in_operations.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
       "line_count": 1484,
       "path": "tests/cli/test_make_targets.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1483,
-      "path": "tests/event_alpha/test_burn_in_operations.py",
       "source_kind": "test"
     },
     {
@@ -2035,7 +2035,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1015,
+      "line_count": 1019,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },
@@ -2053,7 +2053,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 956,
+      "line_count": 957,
       "path": "tests/event_alpha/test_namespace_integrations.py",
       "source_kind": "test"
     },
@@ -2089,7 +2089,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 857,
+      "line_count": 859,
       "path": "tests/event_alpha/test_burn_in_candidate_mode.py",
       "source_kind": "test"
     },

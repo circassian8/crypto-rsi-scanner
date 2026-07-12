@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from typing import Any, Mapping
 
 from . import common
+from . import candidate_semantics
 from . import evidence_semantics
 from . import feedback_evidence
 from . import namespace_policy
@@ -32,10 +35,12 @@ def build_measurement_dashboard(
     include_stale_namespaces: bool = False,
     include_live_rehearsals_without_burn_in_run: bool = False,
     include_namespaces: tuple[str, ...] = (),
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     context = common.context_for(profile=profile, artifact_namespace=artifact_namespace or profile, base_dir=base_dir)
     base = context.base_dir
-    evaluation_now, cutoff = _evaluation_window(days)
+    window_days = max(1, int(days or 1))
+    evaluation_now, cutoff = _evaluation_window(window_days, now=now)
     policy = namespace_policy.build_namespace_policy(
         profile=profile,
         artifact_namespace=context.artifact_namespace,
@@ -47,6 +52,7 @@ def build_measurement_dashboard(
         include_stale_namespaces=include_stale_namespaces,
         include_live_rehearsals_without_burn_in_run=include_live_rehearsals_without_burn_in_run,
         include_namespaces=((artifact_namespace,) if artifact_namespace else include_namespaces),
+        now=evaluation_now,
     )
     included_namespaces = namespace_policy.included_namespace_names(policy)
     (candidates, cores, supplied_outcomes, outcomes, excluded_outcomes,
@@ -54,11 +60,82 @@ def build_measurement_dashboard(
      excluded_feedback, feedback_exclusion_reason_counts,
      learning_evidence_telemetry) = _load_dashboard_learning_evidence(
         base, cutoff, included_namespaces, evaluation_now)
-    coverage_docs = [common.read_json(base / namespace / "event_alpha_source_coverage.json") for namespace in included_namespaces]
-    provider_health = [common.read_json(base / namespace / "event_provider_health.json") for namespace in included_namespaces]
-    daily_runs = _json_docs(base, RUN_JSON, namespaces=included_namespaces)
-    evidence_summaries = evidence_semantics.namespace_summaries(base, included_namespaces, cutoff=cutoff, policy=policy)
+    coverage_docs = _json_docs(
+        base,
+        "event_alpha_source_coverage.json",
+        cutoff=cutoff,
+        namespaces=included_namespaces,
+        evaluated_at=evaluation_now,
+    )
+    provider_health = _provider_health_rows(
+        base,
+        cutoff=cutoff,
+        namespaces=included_namespaces,
+        evaluated_at=evaluation_now,
+    )
+    daily_runs = _json_docs(
+        base,
+        RUN_JSON,
+        cutoff=cutoff,
+        namespaces=included_namespaces,
+        evaluated_at=evaluation_now,
+    )
+    evidence_summaries = evidence_semantics.namespace_summaries(
+        base,
+        included_namespaces,
+        cutoff=cutoff,
+        policy=policy,
+        evaluated_at=evaluation_now,
+    )
     evidence_aggregate = evidence_semantics.aggregate_namespace_summaries(evidence_summaries)
+    payload = _build_measurement_payload(
+        context=context,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        days=window_days,
+        base=base,
+        cutoff=cutoff,
+        evaluation_now=evaluation_now,
+        policy=policy,
+        included_namespaces=included_namespaces,
+        candidates=candidates,
+        cores=cores,
+        deliveries=deliveries,
+        feedback=feedback,
+        outcomes=outcomes,
+        coverage_docs=coverage_docs,
+        provider_health=provider_health,
+        daily_runs=daily_runs,
+        evidence_aggregate=evidence_aggregate,
+        learning_evidence_telemetry=learning_evidence_telemetry,
+    )
+    common.write_json(context.namespace_dir / DASHBOARD_JSON, payload)
+    common.write_text(context.namespace_dir / DASHBOARD_MD, format_measurement_dashboard(payload))
+    return payload
+
+
+def _build_measurement_payload(
+    *,
+    context: Any,
+    profile: str,
+    artifact_namespace: str | None,
+    days: int,
+    base: Path,
+    cutoff: datetime,
+    evaluation_now: datetime,
+    policy: Mapping[str, Any],
+    included_namespaces: list[str],
+    candidates: list[dict[str, Any]],
+    cores: list[dict[str, Any]],
+    deliveries: list[dict[str, Any]],
+    feedback: list[dict[str, Any]],
+    outcomes: list[dict[str, Any]],
+    coverage_docs: list[dict[str, Any]],
+    provider_health: list[dict[str, Any]],
+    daily_runs: list[dict[str, Any]],
+    evidence_aggregate: Mapping[str, Any],
+    learning_evidence_telemetry: Mapping[str, Any],
+) -> dict[str, Any]:
     fixture_cycles = [
         name for name, status in (policy.get("namespace_status") or {}).items()
         if name not in included_namespaces and ("fixture" in str(name).casefold() or "smoke" in str(name).casefold() or status == "active_fixture_smoke")
@@ -69,8 +146,8 @@ def build_measurement_dashboard(
     ]
     diagnostic_rows = [row for row in candidates + cores if common.row_lane(row) == "DIAGNOSTIC"]
     main_candidates = [row for row in candidates if common.row_lane(row) != "DIAGNOSTIC"]
-    near_miss_count, quality_capped_count = _candidate_review_counts(
-        candidates, cores
+    near_miss_count, quality_capped_count, labeled_near_miss_count = (
+        _candidate_review_counts(cores, feedback, evaluated_at=evaluation_now)
     )
     labels_by_lane = common.count_by(feedback, "lane", "opportunity_type")
     label_coverage = _label_coverage(feedback, candidates + cores)
@@ -90,16 +167,19 @@ def build_measurement_dashboard(
         if explicit_scope
         else ""
     )
-    low_sample_warning = len(feedback) < 150 or len(outcomes) < 100 or not included_namespaces or bool(explicit_scope_warning)
-    enough_data_reasons = _enough_data_reasons(
+    enough_data_reasons = common.burn_in_contract_count_reasons(
+        common.load_contract(),
         included_namespaces=included_namespaces if contract_countable else [],
-        feedback=feedback,
-        outcomes=outcomes,
-        daily_runs=daily_runs,
+        live_no_send_cycles=len(daily_runs),
+        real_candidates=real_burn_in_candidate_count,
+        human_labels=len(feedback),
+        labeled_near_misses=labeled_near_miss_count,
+        outcome_rows=len(outcomes),
     )
     if explicit_scope_warning:
         enough_data_reasons = ["explicit_namespace_not_counted_for_burn_in_contract", *enough_data_reasons]
-    payload = common.with_safety(
+    low_sample_warning = bool(enough_data_reasons)
+    return common.with_safety(
         {
             "schema_version": "event_alpha_burn_in_measurement_dashboard_v1",
             "row_type": "event_alpha_burn_in_measurement_dashboard",
@@ -124,11 +204,26 @@ def build_measurement_dashboard(
             "contract_counted_candidate_count": real_burn_in_candidate_count,
             "candidate_evidence_explanation": candidate_evidence_explanation,
             **evidence_semantics.payload_fields(evidence_aggregate),
-            "notification_rehearsal_candidate_count": _category_candidate_count(base, policy, "notification_rehearsal", cutoff=cutoff),
-            "provider_rehearsal_candidate_count": _category_candidate_count(base, policy, "provider_rehearsal", cutoff=cutoff),
-            "fixture_candidate_count": _category_candidate_count(base, policy, "fixture", cutoff=cutoff),
-            "stale_candidate_count": _category_candidate_count(base, policy, "stale", cutoff=cutoff),
-            "no_key_candidate_count": _category_candidate_count(base, policy, "no_key", cutoff=cutoff),
+            "notification_rehearsal_candidate_count": _category_candidate_count(
+                base, policy, "notification_rehearsal",
+                cutoff=cutoff, evaluated_at=evaluation_now,
+            ),
+            "provider_rehearsal_candidate_count": _category_candidate_count(
+                base, policy, "provider_rehearsal",
+                cutoff=cutoff, evaluated_at=evaluation_now,
+            ),
+            "fixture_candidate_count": _category_candidate_count(
+                base, policy, "fixture",
+                cutoff=cutoff, evaluated_at=evaluation_now,
+            ),
+            "stale_candidate_count": _category_candidate_count(
+                base, policy, "stale",
+                cutoff=cutoff, evaluated_at=evaluation_now,
+            ),
+            "no_key_candidate_count": _category_candidate_count(
+                base, policy, "no_key",
+                cutoff=cutoff, evaluated_at=evaluation_now,
+            ),
             "candidates_by_opportunity_type": common.count_by(main_candidates, "opportunity_type", "lane"),
             "rendered_vs_skipped_counts": {
                 "rendered": sum(1 for row in deliveries if str(row.get("state") or "").casefold() in {"sent", "would_send", "rendered"}),
@@ -158,31 +253,37 @@ def build_measurement_dashboard(
             "source_yield_confidence": "low" if low_sample_warning else "measured",
             "auto_apply_thresholds": False,
             "current_window_interpretation": _current_window_interpretation(
-                days, len(included_namespaces), real_burn_in_candidate_count,
-                non_burn_in_candidate_count, len(feedback), len(outcomes),
-                near_miss_count, quality_capped_count, low_sample_warning,
+                days, cutoff, evaluation_now, len(included_namespaces),
+                real_burn_in_candidate_count, non_burn_in_candidate_count,
+                len(feedback), len(outcomes), near_miss_count,
+                quality_capped_count, low_sample_warning,
             ),
         }
     )
-    common.write_json(context.namespace_dir / DASHBOARD_JSON, payload)
-    common.write_text(context.namespace_dir / DASHBOARD_MD, format_measurement_dashboard(payload))
-    return payload
 
 
 def _candidate_review_counts(
-    candidates: list[Mapping[str, Any]],
     cores: list[Mapping[str, Any]],
-) -> tuple[int, int]:
-    rows = candidates + cores
-    near_miss_count = sum(1 for row in rows if _mentions(row, "near"))
-    quality_capped_count = sum(
-        1 for row in rows if _mentions(row, "quality") or _mentions(row, "cap")
+    feedback: list[Mapping[str, Any]],
+    *,
+    evaluated_at: datetime,
+) -> tuple[int, int, int]:
+    counts = candidate_semantics.review_cohort_counts(
+        cores,
+        feedback,
+        evaluated_at=evaluated_at,
     )
-    return near_miss_count, quality_capped_count
+    return (
+        counts["near_misses"],
+        counts["quality_capped"],
+        counts["labeled_near_misses"],
+    )
 
 
 def _current_window_interpretation(
     days: int,
+    window_start: datetime,
+    window_end: datetime,
     included_namespace_count: int,
     real_candidate_count: int,
     non_burn_in_candidate_count: int,
@@ -195,6 +296,8 @@ def _current_window_interpretation(
     return {
         "source": "selected_filtered_namespaces",
         "window_days": days,
+        "window_start": window_start.isoformat(),
+        "window_end": window_end.isoformat(),
         "included_namespace_count": included_namespace_count,
         "real_burn_in_candidate_count": real_candidate_count,
         "non_burn_in_candidate_count": non_burn_in_candidate_count,
@@ -216,10 +319,11 @@ def _load_dashboard_learning_evidence(
     included_namespaces: list[str],
     evaluation_now: Any,
 ) -> tuple[Any, ...]:
+    row_loader = partial(_rows, evaluated_at=evaluation_now)
     outcome_rows = outcome_evidence.load_exact_namespace_outcomes(
-        base, cutoff, included_namespaces, _rows, evaluation_now)
+        base, cutoff, included_namespaces, row_loader, evaluation_now)
     candidates, cores, supplied_outcomes, outcomes, excluded_outcomes, reason_counts = outcome_rows
-    deliveries = _rows(
+    deliveries = row_loader(
         base,
         "event_alpha_notification_deliveries.jsonl",
         cutoff=cutoff,
@@ -229,7 +333,7 @@ def _load_dashboard_learning_evidence(
         base,
         cutoff,
         included_namespaces,
-        _rows,
+        row_loader,
         evaluation_now,
         core_rows=cores,
     )
@@ -304,27 +408,104 @@ def format_measurement_dashboard(payload: Mapping[str, Any]) -> str:
     for key, value in current_window.items():
         lines.append(f"- {key}: `{value}`")
     lines.append("")
-    lines.append("Interpretation remains inconclusive until label and outcome thresholds are met.")
+    lines.append(
+        str(current_window.get("interpretation") or "Current-window interpretation is unavailable.")
+    )
     return "\n".join(lines).rstrip()
 
 
-def _evaluation_window(days: int) -> tuple[Any, Any]:
-    now = common.utc_now()
-    return now, common.date_window(days, now=now)
+def _evaluation_window(
+    days: int,
+    *,
+    now: datetime | None = None,
+) -> tuple[datetime, datetime]:
+    evaluation_now = common.utc_now() if now is None else now
+    if (
+        not isinstance(evaluation_now, datetime)
+        or evaluation_now.tzinfo is None
+        or evaluation_now.utcoffset() is None
+    ):
+        raise ValueError("measurement now must be a timezone-aware datetime")
+    evaluation_now = evaluation_now.astimezone(timezone.utc)
+    return evaluation_now, common.date_window(days, now=evaluation_now)
 
 
-def _rows(base: Path, filename: str, *, cutoff, namespaces: list[str] | tuple[str, ...]) -> list[dict[str, Any]]:
+def _rows(
+    base: Path,
+    filename: str,
+    *,
+    cutoff: datetime,
+    namespaces: list[str] | tuple[str, ...],
+    evaluated_at: datetime,
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for namespace in namespaces:
         path = base / namespace / filename
         for row in common.read_jsonl(path):
-            if (common.timestamp_for_row(row) or common.utc_now()) >= cutoff:
+            if common.row_in_evidence_window(
+                row,
+                cutoff=cutoff,
+                evaluated_at=evaluated_at,
+            ):
                 out.append(row)
     return out
 
 
-def _json_docs(base: Path, filename: str, *, namespaces: list[str] | tuple[str, ...]) -> list[dict[str, Any]]:
-    return [row for namespace in namespaces if (row := common.read_json(base / namespace / filename))]
+def _json_docs(
+    base: Path,
+    filename: str,
+    *,
+    cutoff: datetime,
+    namespaces: list[str] | tuple[str, ...],
+    evaluated_at: datetime,
+) -> list[dict[str, Any]]:
+    return [
+        row
+        for namespace in namespaces
+        if (row := common.read_json(base / namespace / filename))
+        and common.row_in_evidence_window(
+            row,
+            cutoff=cutoff,
+            evaluated_at=evaluated_at,
+        )
+    ]
+
+
+def _provider_health_rows(
+    base: Path,
+    *,
+    cutoff: datetime,
+    namespaces: list[str] | tuple[str, ...],
+    evaluated_at: datetime,
+) -> list[dict[str, Any]]:
+    """Load current provider rows from the real nested health-store shape."""
+
+    rows: list[dict[str, Any]] = []
+    for namespace in namespaces:
+        document = common.read_json(base / namespace / "event_provider_health.json")
+        providers = document.get("providers")
+        if not isinstance(providers, Mapping):
+            continue
+        for provider_key, raw_row in providers.items():
+            if not isinstance(raw_row, Mapping):
+                continue
+            row = dict(raw_row)
+            row.setdefault("provider_key", str(provider_key))
+            timestamp_field = (
+                "last_failure_at"
+                if common.int_value(row.get("consecutive_failures")) > 0
+                else "last_success_at"
+            )
+            timestamp = common.parse_aware_utc(row.get(timestamp_field))
+            if timestamp is None:
+                continue
+            if common.row_in_evidence_window(
+                {"observed_at": timestamp},
+                cutoff=cutoff,
+                evaluated_at=evaluated_at,
+            ):
+                rows.append(row)
+    return rows
 
 
 def _policy_summary(policy: Mapping[str, Any]) -> dict[str, Any]:
@@ -398,7 +579,14 @@ def _mixed_non_burn_in_categories(policy: Mapping[str, Any]) -> bool:
     return False
 
 
-def _category_candidate_count(base: Path, policy: Mapping[str, Any], category: str, *, cutoff) -> int:
+def _category_candidate_count(
+    base: Path,
+    policy: Mapping[str, Any],
+    category: str,
+    *,
+    cutoff: datetime,
+    evaluated_at: datetime,
+) -> int:
     namespaces: list[str] = []
     for section in ("included_namespace_details", "excluded_namespace_details"):
         for row in policy.get(section) or []:
@@ -406,11 +594,15 @@ def _category_candidate_count(base: Path, policy: Mapping[str, Any], category: s
                 name = str(row.get("namespace") or "")
                 if name:
                     namespaces.append(name)
-    return len(_rows(base, "event_integrated_radar_candidates.jsonl", cutoff=cutoff, namespaces=sorted(dict.fromkeys(namespaces))))
-
-
-def _mentions(row: Mapping[str, Any], needle: str) -> bool:
-    return needle.casefold() in " ".join(str(value) for value in row.values()).casefold()
+    return len(
+        _rows(
+            base,
+            "event_integrated_radar_candidates.jsonl",
+            cutoff=cutoff,
+            namespaces=sorted(dict.fromkeys(namespaces)),
+            evaluated_at=evaluated_at,
+        )
+    )
 
 
 def _validation_rates(rows: list[dict[str, Any]]) -> dict[str, float]:
@@ -456,16 +648,24 @@ def _market_confirmation_rate(rows: list[dict[str, Any]]) -> float:
 
 
 def _provider_degraded_rate(rows: list[dict[str, Any]]) -> float:
-    flattened: list[Mapping[str, Any]] = []
-    for row in rows:
-        if isinstance(row, Mapping):
-            for value in row.values():
-                if isinstance(value, Mapping):
-                    flattened.append(value)
-    if not flattened:
+    if not rows:
         return 0.0
-    degraded = sum(1 for row in flattened if str(row.get("status") or row.get("provider_health_status") or "").casefold() in {"degraded", "backoff", "provider_unavailable", "rate_limited"})
-    return round(100.0 * degraded / len(flattened), 2)
+    degraded_statuses = {
+        "degraded",
+        "backoff",
+        "provider_unavailable",
+        "rate_limited",
+    }
+    degraded = sum(
+        1
+        for row in rows
+        if common.int_value(row.get("consecutive_failures")) > 0
+        or str(
+            row.get("status") or row.get("provider_health_status") or ""
+        ).casefold()
+        in degraded_statuses
+    )
+    return round(100.0 * degraded / len(rows), 2)
 
 
 def _label_coverage(feedback: list[dict[str, Any]], candidates: list[dict[str, Any]]) -> float:
@@ -474,25 +674,6 @@ def _label_coverage(feedback: list[dict[str, Any]], candidates: list[dict[str, A
     targets = {common.item_family(row) for row in candidates}
     labels = {common.item_family(row) for row in feedback}
     return round(100.0 * len(targets & labels) / len(targets), 2)
-
-
-def _enough_data_reasons(
-    *,
-    included_namespaces: list[str],
-    feedback: list[dict[str, Any]],
-    outcomes: list[dict[str, Any]],
-    daily_runs: list[dict[str, Any]],
-) -> list[str]:
-    reasons: list[str] = []
-    if not included_namespaces:
-        reasons.append("no_active_burn_in_namespaces")
-    if not daily_runs:
-        reasons.append("no_live_no_send_cycles")
-    if len(feedback) < 150:
-        reasons.append(f"min_human_labels:{len(feedback)}/150")
-    if len(outcomes) < 100:
-        reasons.append(f"min_outcome_rows:{len(outcomes)}/100")
-    return reasons
 
 
 def main(argv: list[str] | None = None) -> int:

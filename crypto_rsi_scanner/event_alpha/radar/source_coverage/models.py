@@ -219,6 +219,7 @@ class _SourceCoverageReportCoreFields:
     profile: str
     artifact_namespace: str
     packs: tuple[EventAlphaSourceCoveragePack, ...]
+    generated_at: str
     provider_health_rows: int = 0
     acquisition_rows: int = 0
     core_rows: int = 0
@@ -310,6 +311,7 @@ def _source_coverage_report_to_dict(report: EventAlphaSourceCoverageReport) -> d
     return {
         "profile": report.profile,
         "artifact_namespace": report.artifact_namespace,
+        "generated_at": report.generated_at,
         "provider_health_rows": report.provider_health_rows,
         "acquisition_rows": report.acquisition_rows,
         "core_rows": report.core_rows,

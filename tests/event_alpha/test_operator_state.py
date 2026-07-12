@@ -1224,7 +1224,9 @@ def test_operator_report_mutation_guard_and_fixed_writer_routes_fail_closed(tmp_
         run_id="active-writer",
         profile=context.profile,
         namespace=context.artifact_namespace,
-        now=_NOW,
+        # This lock must be fresh relative to the mutation guard's real clock.
+        # A fixed date eventually crosses the 24-hour stale-recovery boundary.
+        now=datetime.now(timezone.utc),
     )
     assert held.owned is True
     called: list[bool] = []

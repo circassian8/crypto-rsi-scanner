@@ -16,6 +16,55 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-12 - Use one closed evidence clock for burn-in measurement
+**Status:** accepted
+**Decision:** Event Alpha burn-in measurement, scorecard, source-yield, evidence
+semantics, namespace-policy output, and feedback-progress reports must capture
+one timezone-aware UTC evaluation clock and reuse it throughout the report.
+Window membership is the inclusive relation `cutoff <= timestamp <=
+evaluated_at`. The first present registered timestamp is authoritative;
+missing, malformed, timezone-naive, stale, future, or invalid-first timestamps
+fail closed and cannot borrow a later field or the current wall clock. JSON
+documents such as daily runs, candidate manifests, source coverage, readiness,
+and provider health obey the same rule. Feedback today/week counts use only the
+exact eligible raw label's aware `marked_at`. Source-coverage producers stamp
+that captured clock directly; provider-health measurement reads the real nested
+store and uses the current state's exact success/failure timestamp without mtime
+or secondary-field fallback. Measurement, scorecard, and source-yield share all
+five North Star count thresholds: live no-send cycles, real candidates, human
+labels, labeled near misses, and outcomes. No partial threshold subset may claim
+that evidence is sufficient.
+
+Near-miss and quality-cap measurement cohorts use the latest canonical Core
+Opportunity revision for each exact run/profile/namespace/Core identity. The
+same Core id in another run is a distinct observation; linked candidate or
+alert representations do not add another count. Near misses use the
+deterministic Core classifier, while quality caps require explicit final
+quality state. Arbitrary prose, provider names, URLs, requested states, and
+support-row counts are never cohort predicates. Current dashboards expose a
+closed schema-validated window summary; old interpretation fields are
+deprecated, and feedback progress has its own typed denominator/safety schema.
+Core authority parts must be exact canonical strings and are encoded as a tuple,
+not delimiter-joined text; whitespace/coercion ambiguity fails closed. Distinct
+revisions at the same authoritative timestamp exclude that Core observation
+until a strictly later revision resolves the conflict. Near-miss classification
+uses the same captured report clock.
+
+Archived pre-fix dashboards remain immutable historical evidence rather than
+being rewritten. Burn-in report writers refuse lifecycle-frozen namespaces and
+daily namespaces already sealed by the local archive checksum ledger before
+writing any policy/report file. Historical inputs may be inspected only by
+writing a new explicit diagnostic namespace.
+**Why:** Implicit-now fallbacks, per-row clock reads, future rows, and substring
+matches made mutually contradictory reports possible and inflated local
+quality counts from 6 to 76. One closed clock plus canonical Core authority
+makes denominators reproducible without converting missing or historical data
+into apparent current evidence.
+**Revisit when:** A versioned research database provides immutable temporal
+queries and typed cohort identities with equivalent fail-closed bounds, or a
+reviewed schema version deliberately replaces the timestamp precedence or
+cohort classifier without weakening exact authority.
+
 ## 2026-07-12 - Keep observed-outcome ingestion preview-first and noncanonical
 **Status:** accepted
 **Decision:** Building an Event Alpha observed outcome requires explicit local

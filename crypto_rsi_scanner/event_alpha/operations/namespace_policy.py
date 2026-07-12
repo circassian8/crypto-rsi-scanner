@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -15,6 +16,7 @@ from .daily_burn_in import RUN_JSON
 POLICY_JSON = "event_alpha_burn_in_namespace_policy.json"
 POLICY_MD = "event_alpha_burn_in_namespace_policy.md"
 POLICY_VERSION = "burn_in_namespace_policy_v3"
+ARCHIVE_CHECKSUMS_PATH = Path("research/event_alpha_burn_in_archive_checksums.json")
 
 ACTIVE_BURN_IN_STATUSES = {
     "active_burn_in",
@@ -29,6 +31,11 @@ DEFAULT_EXCLUDED_STATUSES = {
 PROVIDER_REHEARSAL_STATUSES = {
     namespace_status.STATUS_ACTIVE_PROVIDER_PREFLIGHT,
     namespace_status.STATUS_ACTIVE_PROVIDER_REHEARSAL,
+}
+IMMUTABLE_OUTPUT_STATUSES = {
+    namespace_status.STATUS_STALE_DEPRECATED,
+    namespace_status.STATUS_ARCHIVED,
+    namespace_status.STATUS_QUARANTINE,
 }
 KEY_ARTIFACTS = (
     RUN_JSON,
@@ -67,11 +74,15 @@ def build_namespace_policy(
     include_live_rehearsals_without_burn_in_run: bool = False,
     include_namespaces: Iterable[str] = (),
     write: bool = True,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """Resolve namespaces that are valid burn-in evidence inputs."""
 
+    evaluation_now = _evaluation_now(now)
     output_namespace = artifact_namespace or profile
     context = common.context_for(profile=profile, artifact_namespace=output_namespace, base_dir=base_dir)
+    if write:
+        require_mutable_output_namespace(context.namespace_dir)
     selections = select_namespaces(
         context.base_dir,
         include_notification_rehearsals=include_notification_rehearsals,
@@ -91,7 +102,7 @@ def build_namespace_policy(
             "schema_version": "event_alpha_burn_in_namespace_policy_v1",
             "row_type": "event_alpha_burn_in_namespace_policy",
             "namespace_policy_version": POLICY_VERSION,
-            "generated_at": common.utc_now().isoformat(),
+            "generated_at": evaluation_now.isoformat(),
             "profile": profile,
             "artifact_namespace": context.artifact_namespace,
             "namespace_dir": common.rel_path(context.namespace_dir),
@@ -184,6 +195,48 @@ def select_namespaces(
 
 def included_namespace_names(policy: Mapping[str, Any]) -> list[str]:
     return [str(item) for item in policy.get("included_namespaces") or [] if str(item)]
+
+
+def require_mutable_output_namespace(namespace_dir: str | Path) -> None:
+    """Refuse report writes into lifecycle-frozen historical namespaces."""
+
+    path = Path(namespace_dir).expanduser()
+    marker = namespace_status.load_namespace_status(path)
+    status = _status_for(path.name, path, marker)
+    archived_snapshot = _is_checksum_archived_namespace(path)
+    if status in IMMUTABLE_OUTPUT_STATUSES or archived_snapshot:
+        output_status = "archived_checksum_snapshot" if archived_snapshot else status
+        raise ValueError(
+            "burn-in report output namespace is immutable: "
+            f"namespace={path.name} status={output_status}; use a new diagnostic output namespace"
+        )
+
+
+def _is_checksum_archived_namespace(namespace_dir: Path) -> bool:
+    """Recognize local burn-in snapshots already sealed by the archive ledger."""
+
+    root = common.repo_root_from_module()
+    archive_base = root / "event_fade_cache"
+    try:
+        if namespace_dir.resolve().parent != archive_base.resolve():
+            return False
+    except OSError:
+        return False
+    payload = common.read_json(root / ARCHIVE_CHECKSUMS_PATH)
+    files = payload.get("files") if isinstance(payload.get("files"), Mapping) else {}
+    prefix = f"{namespace_dir.name}/"
+    return any(str(rel_path).startswith(prefix) for rel_path in files)
+
+
+def _evaluation_now(value: datetime | None) -> datetime:
+    evaluation_now = common.utc_now() if value is None else value
+    if (
+        not isinstance(evaluation_now, datetime)
+        or evaluation_now.tzinfo is None
+        or evaluation_now.utcoffset() is None
+    ):
+        raise ValueError("namespace policy now must be a timezone-aware datetime")
+    return evaluation_now.astimezone(timezone.utc)
 
 
 def format_namespace_policy(payload: Mapping[str, Any]) -> str:

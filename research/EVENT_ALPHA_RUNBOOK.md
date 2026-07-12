@@ -2070,6 +2070,56 @@ make event-alpha-burn-in-scorecard
 python3 main.py --event-alpha-burn-in-scorecard --days 30
 ```
 
+### Weekly current-window measurement
+
+Regenerate the current 30-day measurement dashboard with the canonical,
+no-send operator target:
+
+```bash
+make event-alpha-burn-in-weekly-measurement
+```
+
+The target invokes
+`crypto_rsi_scanner.event_alpha.operations.measurement`, forces
+`RSI_EVENT_ALERTS_ENABLED=0`, and writes the JSON and Markdown dashboards only
+under the selected output namespace. The default output namespace is
+`live_burn_in_no_send`. One timezone-aware UTC evaluation clock defines the
+closed current window: evidence is eligible only when its own timestamp is
+inside `window_start <= timestamp <= window_end`. Missing, timezone-naive,
+stale, or future evidence remains inspectable at its source but is excluded
+from the current-window aggregate. Review `current_window_interpretation`,
+`enough_data_reasons`, and the feedback/outcome exclusion counters before
+drawing conclusions; dashboard generation never sends, applies thresholds,
+trades, or paper-trades.
+
+An explicit output namespace is a diagnostic slice, not a burn-in-contract
+aggregate. For example:
+
+```bash
+PROFILE=notify_llm_deep \
+ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal \
+make event-alpha-burn-in-weekly-measurement
+```
+
+That report must say
+`burn_in_contract_scope=explicit_single_namespace_diagnostic`, carry the
+explicit-scope warning, and keep `contract_counted_candidate_count=0`. Policy
+include flags such as `INCLUDE_NOTIFICATION_REHEARSALS=1` or
+`INCLUDE_STALE_NAMESPACES=1` are likewise deliberate diagnostics; they must not
+be used as promotion evidence.
+
+Do not regenerate archived, stale, or quarantine namespaces merely to replace
+pre-fix dashboard wording or counts. Their existing pre-fix dashboards are
+historical, immutable evidence. Preserve them as produced, inspect them only
+with explicit historical/diagnostic scope, and regenerate the active current
+namespace instead. A newly generated current dashboard supersedes an older
+dashboard for current decisions without rewriting that historical record.
+Burn-in policy, measurement, scorecard, and source-yield writers refuse an
+archived, stale, or quarantine output namespace before writing any file. To
+inspect historical inputs with explicit include flags, write the report into a
+new diagnostic namespace; never select the historical input namespace itself
+as the report output.
+
 Before promoting any research-send burn-in, run the checklist. It reports
 whether the local artifacts are ready, which blockers remain, and the next
 operator actions:

@@ -56,6 +56,24 @@ SAFETY_FIELDS: dict[str, Any] = {
     "normal_rsi_signal_rows_written": 0,
     "triggered_fade_created": 0,
 }
+EVIDENCE_TIMESTAMP_FIELDS = (
+    "observed_at",
+    "created_at",
+    "started_at",
+    "run_started_at",
+    "attempted_at",
+    "marked_at",
+    "feedback_marked_at",
+    "published_at",
+    "generated_at",
+)
+BURN_IN_CONTRACT_COUNT_FIELDS = (
+    ("min_live_no_send_cycles", "live_no_send_cycles"),
+    ("min_real_candidates", "real_candidates"),
+    ("min_human_labels", "human_labels"),
+    ("min_labeled_near_misses", "labeled_near_misses"),
+    ("min_outcome_rows", "outcome_rows"),
+)
 
 
 def utc_now() -> datetime:
@@ -74,6 +92,26 @@ def parse_utc(value: Any) -> datetime | None:
             parsed = parsed.replace(tzinfo=timezone.utc)
         return parsed.astimezone(timezone.utc)
     except (TypeError, ValueError):
+        return None
+
+
+def parse_aware_utc(value: Any) -> datetime | None:
+    """Parse an explicitly timezone-aware timestamp and normalize it to UTC."""
+
+    if value in (None, ""):
+        return None
+    try:
+        if isinstance(value, datetime):
+            parsed = value
+        else:
+            text = str(value).strip()
+            if text.endswith("Z"):
+                text = text[:-1] + "+00:00"
+            parsed = datetime.fromisoformat(text)
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return None
+        return parsed.astimezone(timezone.utc)
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
@@ -206,18 +244,34 @@ def row_lane(row: Mapping[str, Any]) -> str:
 
 
 def timestamp_for_row(row: Mapping[str, Any]) -> datetime | None:
-    for field in (
-        "observed_at",
-        "created_at",
-        "started_at",
-        "marked_at",
-        "feedback_marked_at",
-        "published_at",
-        "generated_at",
-    ):
+    for field in EVIDENCE_TIMESTAMP_FIELDS:
         parsed = parse_utc(row.get(field))
         if parsed is not None:
             return parsed
+    return None
+
+
+def row_in_evidence_window(
+    row: Mapping[str, Any],
+    *,
+    cutoff: datetime,
+    evaluated_at: datetime,
+) -> bool:
+    """Return whether a row has an aware timestamp inside the closed evidence window."""
+
+    window_start = parse_aware_utc(cutoff)
+    window_end = parse_aware_utc(evaluated_at)
+    if window_start is None or window_end is None or window_start > window_end:
+        raise ValueError("evidence window requires ordered timezone-aware bounds")
+    timestamp = _aware_timestamp_for_row(row)
+    return bool(timestamp is not None and window_start <= timestamp <= window_end)
+
+
+def _aware_timestamp_for_row(row: Mapping[str, Any]) -> datetime | None:
+    for field in EVIDENCE_TIMESTAMP_FIELDS:
+        value = row.get(field)
+        if value not in (None, ""):
+            return parse_aware_utc(value)
     return None
 
 
@@ -424,6 +478,38 @@ def load_contract(root: str | Path | None = None) -> dict[str, Any]:
 
 def contract_threshold(contract: Mapping[str, Any], key: str) -> int:
     return int_value(contract.get(key))
+
+
+def burn_in_contract_count_reasons(
+    contract: Mapping[str, Any],
+    *,
+    included_namespaces: Iterable[str],
+    live_no_send_cycles: int,
+    real_candidates: int,
+    human_labels: int,
+    labeled_near_misses: int,
+    outcome_rows: int,
+) -> list[str]:
+    """Return every unmet North Star burn-in evidence-count threshold."""
+
+    reasons: list[str] = []
+    if not any(str(namespace).strip() for namespace in included_namespaces):
+        reasons.append("no_active_burn_in_namespaces")
+    observed_counts = {
+        "live_no_send_cycles": max(0, int_value(live_no_send_cycles)),
+        "real_candidates": max(0, int_value(real_candidates)),
+        "human_labels": max(0, int_value(human_labels)),
+        "labeled_near_misses": max(0, int_value(labeled_near_misses)),
+        "outcome_rows": max(0, int_value(outcome_rows)),
+    }
+    if observed_counts["live_no_send_cycles"] == 0:
+        reasons.append("no_live_no_send_cycles")
+    for threshold_key, count_key in BURN_IN_CONTRACT_COUNT_FIELDS:
+        threshold = contract_threshold(contract, threshold_key)
+        observed = observed_counts[count_key]
+        if threshold and observed < threshold:
+            reasons.append(f"{threshold_key}:{observed}/{threshold}")
+    return reasons
 
 
 def with_safety(payload: dict[str, Any]) -> dict[str, Any]:

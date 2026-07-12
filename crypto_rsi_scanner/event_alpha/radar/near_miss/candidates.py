@@ -99,8 +99,18 @@ def targeted_market_refresh_queue(
     return tuple(out)
 
 
-def near_miss_metadata_for_row(row: Mapping[str, Any] | object, *, cfg: EventNearMissConfig | None = None) -> EventNearMissCandidate | None:
-    return _candidate_from_row(_row_from_object(row), route=None, cfg=cfg or EventNearMissConfig())
+def near_miss_metadata_for_row(
+    row: Mapping[str, Any] | object,
+    *,
+    cfg: EventNearMissConfig | None = None,
+    now: datetime | None = None,
+) -> EventNearMissCandidate | None:
+    return _candidate_from_row(
+        _row_from_object(row),
+        route=None,
+        cfg=cfg or EventNearMissConfig(),
+        now=now,
+    )
 
 
 _OPTIONAL_HYPOTHESIS_FIELDS = {
@@ -180,6 +190,7 @@ def _candidate_from_row(
     *,
     route: Mapping[str, Any] | None,
     cfg: EventNearMissConfig,
+    now: datetime | None = None,
 ) -> EventNearMissCandidate | None:
     state = _near_miss_candidate_state(row, route=route, cfg=cfg)
     if state is None:
@@ -245,7 +256,12 @@ def _candidate_from_row(
         missing_evidence=missing,
         recommended_refresh_actions=_recommended_refresh_actions(missing, row, pack=pack),
         priority_score=priority,
-        market_context_before=_market_context(row, source=str(row.get("market_context_source") or "existing"), now=datetime.now(timezone.utc), cfg=cfg),
+        market_context_before=_market_context(
+            row,
+            source=str(row.get("market_context_source") or "existing"),
+            now=now or datetime.now(timezone.utc),
+            cfg=cfg,
+        ),
         market_context_source=str(row.get("market_context_source") or state.quality.get("market_context_source") or "") or None,
         market_context_age_seconds=_float(row.get("market_context_age_seconds") or state.quality.get("market_context_age_seconds")),
         market_context_data_quality=str(row.get("market_context_freshness_status") or state.quality.get("market_context_freshness_status") or row.get("market_context_data_quality") or state.quality.get("market_context_data_quality") or "") or None,

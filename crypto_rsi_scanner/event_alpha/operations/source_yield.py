@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from typing import Any, Mapping
 
+from . import candidate_semantics
 from . import common
 from . import evidence_semantics
 from . import feedback_evidence
@@ -31,22 +34,21 @@ def build_source_yield_report(
     include_stale_namespaces: bool = False,
     include_live_rehearsals_without_burn_in_run: bool = False,
     include_namespaces: tuple[str, ...] = (),
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     context = common.context_for(profile=profile, artifact_namespace=artifact_namespace or profile, base_dir=base_dir)
     base = context.base_dir
-    evaluation_now = common.utc_now()
-    cutoff = common.date_window(days, now=evaluation_now)
+    evaluation_now = _evaluation_now(now)
+    window_days = max(1, int(days or 1))
+    cutoff = common.date_window(window_days, now=evaluation_now)
     policy = namespace_policy.build_namespace_policy(
-        profile=profile,
-        artifact_namespace=context.artifact_namespace,
-        base_dir=base,
-        include_notification_rehearsals=include_notification_rehearsals,
-        include_no_key_namespaces=include_no_key_namespaces,
-        include_provider_rehearsals=include_provider_rehearsals,
-        include_fixture_namespaces=include_fixture_namespaces,
+        profile=profile, artifact_namespace=context.artifact_namespace, base_dir=base,
+        include_notification_rehearsals=include_notification_rehearsals, include_no_key_namespaces=include_no_key_namespaces,
+        include_provider_rehearsals=include_provider_rehearsals, include_fixture_namespaces=include_fixture_namespaces,
         include_stale_namespaces=include_stale_namespaces,
         include_live_rehearsals_without_burn_in_run=include_live_rehearsals_without_burn_in_run,
         include_namespaces=((artifact_namespace,) if artifact_namespace else include_namespaces),
+        now=evaluation_now,
     )
     included_namespaces = namespace_policy.included_namespace_names(policy)
     (candidates, cores, supplied_outcomes, outcomes, excluded_outcomes,
@@ -54,11 +56,9 @@ def build_source_yield_report(
      excluded_feedback, feedback_exclusion_reason_counts,
      learning_evidence_telemetry) = _load_source_yield_learning_evidence(
         base, cutoff, included_namespaces, evaluation_now)
-    daily_runs = _namespace_json_docs(base, included_namespaces, RUN_JSON)
-    candidate_mode_manifests = _namespace_json_docs(
-        base, included_namespaces, CANDIDATE_MODE_MANIFEST_JSON)
-    evidence_summaries = evidence_semantics.namespace_summaries(base, included_namespaces, cutoff=cutoff, policy=policy)
-    evidence_aggregate = evidence_semantics.aggregate_namespace_summaries(evidence_summaries)
+    daily_runs, candidate_mode_manifests, evidence_aggregate = _load_report_evidence(
+        base, included_namespaces, cutoff, policy, evaluation_now
+    )
     explicit_scope = bool(artifact_namespace) or _has_explicit_policy_flags(policy.get("explicit_inclusion_flags") or {})
     contract_countable = not explicit_scope
     real_burn_in_candidate_count = len(evidence_aggregate["real_candidate_rows"]) if contract_countable else 0
@@ -70,12 +70,17 @@ def build_source_yield_report(
         candidate_evidence=evidence_aggregate,
         policy=policy,
     )
-    explicit_scope_warning = (
-        "explicit namespace diagnostic; not counted as burn-in contract aggregate"
-        if explicit_scope
-        else ""
+    explicit_scope_warning = "explicit namespace diagnostic; not counted as burn-in contract aggregate" if explicit_scope else ""
+    review_counts = candidate_semantics.review_cohort_counts(cores, feedback, evaluated_at=evaluation_now)
+    enough_data_reasons = common.burn_in_contract_count_reasons(
+        common.load_contract(),
+        included_namespaces=included_namespaces if contract_countable else [],
+        live_no_send_cycles=len(daily_runs),
+        real_candidates=real_burn_in_candidate_count,
+        human_labels=len(feedback),
+        labeled_near_misses=review_counts["labeled_near_misses"],
+        outcome_rows=len(outcomes),
     )
-    enough_data_reasons = _enough_data_reasons(included_namespaces=included_namespaces if contract_countable else [], feedback=feedback, outcomes=outcomes, daily_runs=daily_runs)
     if explicit_scope_warning:
         enough_data_reasons = ["explicit_namespace_not_counted_for_burn_in_contract", *enough_data_reasons]
     real_candidate_rows = list(evidence_aggregate["real_candidate_rows"]) if contract_countable else []
@@ -99,7 +104,7 @@ def build_source_yield_report(
             "profile": profile,
             "artifact_namespace": context.artifact_namespace,
             "namespace_dir": common.rel_path(context.namespace_dir),
-            "window_days": days,
+            "window_days": window_days,
             "namespace_policy": {
                 "namespace_policy_version": policy.get("namespace_policy_version"),
                 "included_namespaces": policy.get("included_namespaces") or [],
@@ -142,11 +147,11 @@ def build_source_yield_report(
             "contract_counted_candidate_count": real_burn_in_candidate_count,
             "candidate_evidence_explanation": candidate_evidence_explanation,
             **evidence_semantics.payload_fields(evidence_aggregate),
-            "notification_rehearsal_candidate_count": _category_candidate_count(base, policy, "notification_rehearsal", cutoff=cutoff),
-            "provider_rehearsal_candidate_count": _category_candidate_count(base, policy, "provider_rehearsal", cutoff=cutoff),
-            "fixture_candidate_count": _category_candidate_count(base, policy, "fixture", cutoff=cutoff),
-            "stale_candidate_count": _category_candidate_count(base, policy, "stale", cutoff=cutoff),
-            "no_key_candidate_count": _category_candidate_count(base, policy, "no_key", cutoff=cutoff),
+            "notification_rehearsal_candidate_count": _category_candidate_count(base, policy, "notification_rehearsal", cutoff=cutoff, evaluated_at=evaluation_now),
+            "provider_rehearsal_candidate_count": _category_candidate_count(base, policy, "provider_rehearsal", cutoff=cutoff, evaluated_at=evaluation_now),
+            "fixture_candidate_count": _category_candidate_count(base, policy, "fixture", cutoff=cutoff, evaluated_at=evaluation_now),
+            "stale_candidate_count": _category_candidate_count(base, policy, "stale", cutoff=cutoff, evaluated_at=evaluation_now),
+            "no_key_candidate_count": _category_candidate_count(base, policy, "no_key", cutoff=cutoff, evaluated_at=evaluation_now),
             "core_opportunity_count": len(cores),
             "feedback_count": len(feedback),
             "outcome_count": len(outcomes),
@@ -173,14 +178,15 @@ def _load_source_yield_learning_evidence(
     included_namespaces: list[str],
     evaluation_now: Any,
 ) -> tuple[Any, ...]:
+    row_loader = partial(_rows, evaluated_at=evaluation_now)
     outcome_rows = outcome_evidence.load_exact_namespace_outcomes(
-        base, cutoff, included_namespaces, _rows, evaluation_now)
+        base, cutoff, included_namespaces, row_loader, evaluation_now)
     _candidates, cores, supplied_outcomes, outcomes, excluded_outcomes, reason_counts = outcome_rows
     feedback_rows = feedback_evidence.load_exact_namespace_feedback(
         base,
         cutoff,
         included_namespaces,
-        _rows,
+        row_loader,
         evaluation_now,
         core_rows=cores,
     )
@@ -197,15 +203,54 @@ def _load_source_yield_learning_evidence(
     return (*outcome_rows, *feedback_rows, telemetry)
 
 
+def _load_report_evidence(
+    base: Path,
+    included_namespaces: list[str],
+    cutoff: datetime,
+    policy: Mapping[str, Any],
+    evaluation_now: datetime,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    daily_runs = _namespace_json_docs(
+        base,
+        included_namespaces,
+        RUN_JSON,
+        cutoff=cutoff,
+        evaluated_at=evaluation_now,
+    )
+    manifests = _namespace_json_docs(
+        base,
+        included_namespaces,
+        CANDIDATE_MODE_MANIFEST_JSON,
+        cutoff=cutoff,
+        evaluated_at=evaluation_now,
+    )
+    summaries = evidence_semantics.namespace_summaries(
+        base,
+        included_namespaces,
+        cutoff=cutoff,
+        policy=policy,
+        evaluated_at=evaluation_now,
+    )
+    return daily_runs, manifests, evidence_semantics.aggregate_namespace_summaries(summaries)
+
+
 def _namespace_json_docs(
     base: Path,
-    namespaces: list[str],
+    namespaces: list[str] | tuple[str, ...],
     filename: str,
+    *,
+    cutoff: datetime,
+    evaluated_at: datetime,
 ) -> list[dict[str, Any]]:
     return [
         row
         for namespace in namespaces
         if (row := common.read_json(base / namespace / filename))
+        and common.row_in_evidence_window(
+            row,
+            cutoff=cutoff,
+            evaluated_at=evaluated_at,
+        )
     ]
 
 
@@ -279,12 +324,31 @@ def format_source_yield_report(payload: Mapping[str, Any]) -> str:
     return "\n".join(lines).rstrip()
 
 
-def _rows(base: Path, filename: str, *, cutoff, namespaces: list[str] | tuple[str, ...]) -> list[dict[str, Any]]:
+def _evaluation_now(value: datetime | None) -> datetime:
+    if value is None:
+        return common.utc_now()
+    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("source-yield now must be a timezone-aware datetime")
+    return value.astimezone(timezone.utc)
+
+
+def _rows(
+    base: Path,
+    filename: str,
+    *,
+    cutoff: datetime,
+    namespaces: list[str] | tuple[str, ...],
+    evaluated_at: datetime,
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for namespace in namespaces:
         path = base / namespace / filename
         for row in common.read_jsonl(path):
-            if (common.timestamp_for_row(row) or common.utc_now()) >= cutoff:
+            if common.row_in_evidence_window(
+                row,
+                cutoff=cutoff,
+                evaluated_at=evaluated_at,
+            ):
                 out.append(row)
     return out
 
@@ -329,7 +393,14 @@ def _mixed_non_burn_in_categories(policy: Mapping[str, Any]) -> bool:
     return False
 
 
-def _category_candidate_count(base: Path, policy: Mapping[str, Any], category: str, *, cutoff) -> int:
+def _category_candidate_count(
+    base: Path,
+    policy: Mapping[str, Any],
+    category: str,
+    *,
+    cutoff: datetime,
+    evaluated_at: datetime,
+) -> int:
     namespaces: list[str] = []
     for section in ("included_namespace_details", "excluded_namespace_details"):
         for row in policy.get(section) or []:
@@ -337,7 +408,15 @@ def _category_candidate_count(base: Path, policy: Mapping[str, Any], category: s
                 name = str(row.get("namespace") or "")
                 if name:
                     namespaces.append(name)
-    return len(_rows(base, "event_integrated_radar_candidates.jsonl", cutoff=cutoff, namespaces=sorted(dict.fromkeys(namespaces))))
+    return len(
+        _rows(
+            base,
+            "event_integrated_radar_candidates.jsonl",
+            cutoff=cutoff,
+            namespaces=sorted(dict.fromkeys(namespaces)),
+            evaluated_at=evaluated_at,
+        )
+    )
 
 
 def _provider(row: Mapping[str, Any]) -> str:
@@ -498,25 +577,6 @@ def _label_coverage(feedback: list[dict[str, Any]], candidates: list[dict[str, A
     targets = {common.item_family(row) for row in candidates}
     labels = {common.item_family(row) for row in feedback}
     return round(100.0 * len(targets & labels) / len(targets), 2)
-
-
-def _enough_data_reasons(
-    *,
-    included_namespaces: list[str],
-    feedback: list[dict[str, Any]],
-    outcomes: list[dict[str, Any]],
-    daily_runs: list[dict[str, Any]],
-) -> list[str]:
-    reasons: list[str] = []
-    if not included_namespaces:
-        reasons.append("no_active_burn_in_namespaces")
-    if not daily_runs:
-        reasons.append("no_live_no_send_cycles")
-    if len(feedback) < 150:
-        reasons.append(f"min_human_labels:{len(feedback)}/150")
-    if len(outcomes) < 100:
-        reasons.append(f"min_outcome_rows:{len(outcomes)}/100")
-    return reasons
 
 
 def _warnings(provider_rows: Mapping[str, Mapping[str, Any]], source_pack_rows: Mapping[str, Mapping[str, Any]]) -> list[str]:
