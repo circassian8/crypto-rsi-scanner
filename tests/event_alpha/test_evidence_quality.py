@@ -50,13 +50,17 @@ def test_integrated_radar_outcome_smoke_writes_research_only_artifacts(tmp_path)
 
     assert len(rows) == 1
     assert loaded == rows
-    assert rows[0]["outcome_label"] == "early_good"
+    assert rows[0]["outcome_label"] == "inconclusive"
+    assert rows[0]["synthetic_diagnostic_label"] == "early_good"
+    assert rows[0]["outcome_data_source"] == "synthetic_fixture"
+    assert rows[0]["calibration_eligible"] is False
+    assert rows[0]["outcome_status"] == "pending"
     assert rows[0]["research_only"] is True
     assert rows[0]["trade_created"] is False
     assert rows[0]["paper_trade_created"] is False
     assert rows[0]["normal_rsi_signal_written"] is False
     assert rows[0]["triggered_fade_created"] is False
-    assert "validation_rate" in integrated_radar_outcomes.format_integrated_radar_calibration_report(rows)
+    assert "Calibration exclusion reasons" in integrated_radar_outcomes.format_integrated_radar_calibration_report(rows)
     assert "early_good" in report
 
 

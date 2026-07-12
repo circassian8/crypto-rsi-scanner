@@ -4,6 +4,58 @@ from __future__ import annotations
 
 from .runtime import *
 
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().casefold() in {"1", "true", "yes", "y"}
+    return bool(value)
+
+
+def _tuple_value(value: Any) -> tuple[str, ...]:
+    if value is None or value == "":
+        return ()
+    if isinstance(value, str):
+        return tuple(item.strip() for item in value.split(",") if item.strip())
+    if isinstance(value, Mapping):
+        return tuple(str(key) for key in value if str(key).strip())
+    if isinstance(value, Iterable):
+        return tuple(str(item) for item in value if str(item).strip())
+    return (str(value),)
+
+
+def _as_int(value: Any) -> int:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _derivatives_metric_has_value(row: Mapping[str, Any], metric: str) -> bool:
+    values = {
+        "open_interest": (
+            "open_interest",
+            "open_interest_delta_1h",
+            "open_interest_delta_4h",
+            "open_interest_delta_24h",
+        ),
+        "funding_rate": ("funding_rate",),
+        "predicted_funding": ("predicted_funding_rate",),
+        "liquidations": (
+            "liquidation_long_usd",
+            "liquidation_short_usd",
+            "liquidation_imbalance",
+        ),
+        "long_short_ratio": ("long_short_ratio",),
+        "basis": ("basis",),
+        "perp_volume": ("perp_volume", "perp_spot_volume_ratio"),
+    }
+    return any(
+        row.get(key) not in (None, "", [], {}, ())
+        for key in values.get(metric, ())
+    )
+
 def _structured_operator_path_file_conflicts(namespace_dir: str | Path) -> int:
     base = Path(namespace_dir)
     if not base.exists() or not base.is_dir():

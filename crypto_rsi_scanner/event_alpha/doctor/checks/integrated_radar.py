@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from .. import check_registry
 from ._utils import Messages, ctx_mapping, ctx_value, emit
 
 
@@ -239,6 +240,22 @@ def apply_integrated_artifact_checks(ctx: object, blockers: Messages, warnings: 
         count = integrated_conflicts.get(key, 0)
         if count:
             emit(blockers, warnings, f"{key}={count}", blocker=strict)
+    for key in (
+        "integrated_outcome_eligibility_contract_invalid",
+        "integrated_outcome_synthetic_evidence_leak",
+        "integrated_outcome_immature_validation_claim",
+        "integrated_outcome_duplicate_exact_identity",
+        "integrated_outcome_ambiguous_exact_identity",
+        "integrated_outcome_eligible_provenance_missing",
+        "integrated_outcome_identity_mismatch",
+    ):
+        count = integrated_conflicts.get(key, 0)
+        if count:
+            detail = check_registry.format_check_message(
+                "outcomes.eligibility_firewall",
+                f"{key}={count}",
+            )
+            emit(blockers, warnings, detail, blocker=strict)
 
 
 def apply_identity_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:

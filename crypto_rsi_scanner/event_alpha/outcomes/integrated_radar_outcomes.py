@@ -9,13 +9,15 @@ from pathlib import Path
 from statistics import median
 from typing import Any, Iterable, Mapping
 
+from ..artifacts import json_lines as artifact_json_lines
 from ..artifacts import paths as event_artifact_paths
 from ..artifacts import schema_v1
 from ..radar import integrated_radar as event_integrated_radar
 from ..radar.decision_model_surfaces import decision_model_values
+from . import outcome_eligibility
 
 
-HORIZONS = ("15m", "1h", "4h", "24h", "3d", "7d")
+HORIZONS = outcome_eligibility.OUTCOME_HORIZONS
 CORE_OPPORTUNITIES_FILENAME = "event_core_opportunities.jsonl"
 ALPHA_NOTIFICATION_DELIVERIES_FILENAME = "event_alpha_notification_deliveries.jsonl"
 PERFORMANCE_DIMENSIONS = (
@@ -41,7 +43,7 @@ PERFORMANCE_LANES = (
     "RISK_ONLY",
     "UNCONFIRMED_RESEARCH",
 )
-MATURED_STATES = ("partially_matured", "matured")
+MATURED_STATES = ("matured",)
 
 
 def fill_integrated_radar_outcomes(
@@ -52,21 +54,47 @@ def fill_integrated_radar_outcomes(
     """Fill deterministic, research-only outcomes for integrated radar candidates."""
     base = Path(namespace_dir)
     candidates = _read_jsonl(base / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME)
+    core_rows = _read_jsonl(base / CORE_OPPORTUNITIES_FILENAME)
     now = _iso(_parse_time(observed_at) or datetime.now(timezone.utc))
     outcomes_path = base / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
     rows = tuple(schema_v1.stamp_artifact_row(_outcome_row(candidate, now=now), path=outcomes_path) for candidate in candidates)
     _write_jsonl(outcomes_path, rows)
-    report = format_integrated_radar_outcome_report(rows)
+    report = format_integrated_radar_outcome_report(
+        rows,
+        candidate_rows=candidates,
+        core_rows=core_rows,
+        evaluated_at=now,
+    )
     (base / event_integrated_radar.INTEGRATED_OUTCOME_REPORT_FILENAME).write_text(report, encoding="utf-8")
-    calibration = format_integrated_radar_calibration_report(rows)
+    calibration = format_integrated_radar_calibration_report(
+        rows,
+        candidate_rows=candidates,
+        core_rows=core_rows,
+        evaluated_at=now,
+    )
     (base / event_integrated_radar.INTEGRATED_CALIBRATION_REPORT_FILENAME).write_text(calibration, encoding="utf-8")
-    priors = build_integrated_radar_calibration_priors(rows)
+    priors = build_integrated_radar_calibration_priors(
+        rows,
+        candidate_rows=candidates,
+        core_rows=core_rows,
+        evaluated_at=now,
+    )
     _write_json(base / event_integrated_radar.INTEGRATED_CALIBRATION_PRIORS_FILENAME, priors)
     return rows
 
 
 def load_integrated_radar_outcomes(namespace_dir: str | Path) -> tuple[dict[str, Any], ...]:
     return tuple(_read_jsonl(Path(namespace_dir) / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME))
+
+
+def load_integrated_radar_outcome_authority(
+    namespace_dir: str | Path,
+) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
+    base = Path(namespace_dir)
+    return (
+        tuple(_read_jsonl(base / event_integrated_radar.INTEGRATED_CANDIDATES_FILENAME)),
+        tuple(_read_jsonl(base / CORE_OPPORTUNITIES_FILENAME)),
+    )
 
 
 def write_radar_performance_dashboard(
@@ -109,6 +137,18 @@ def build_radar_provider_performance(
         and str(row.get("radar_route") or "").casefold() != "diagnostic"
     ]
     diagnostic_count = len(rows) - len(main_rows)
+    eligible_main_rows = [
+        row for row in main_rows
+        if row.get("calibration_eligible") is True
+        and row.get("maturation_state") == "matured"
+    ]
+    exclusion_reasons = Counter(
+        reason
+        for row in main_rows
+        if row.get("calibration_eligible") is not True
+        for reason in row.get("calibration_ineligible_reasons") or ()
+        if type(reason) is str
+    )
     maturation_counts = Counter(str(row.get("maturation_state") or "unknown") for row in main_rows)
     lane_summaries = _dimension_summary(main_rows, "opportunity_type")
     dimension_summaries = {dimension: _dimension_summary(main_rows, dimension) for dimension in PERFORMANCE_DIMENSIONS}
@@ -147,8 +187,10 @@ def build_radar_provider_performance(
             }
             for item in namespace_inputs
         ],
-        "rows_evaluated": len(main_rows),
+        "rows_evaluated": len(eligible_main_rows),
         "diagnostic_rows_excluded": diagnostic_count,
+        "calibration_ineligible_rows_excluded": len(main_rows) - len(eligible_main_rows),
+        "calibration_exclusion_reason_counts": dict(sorted(exclusion_reasons.items())),
         "maturation_counts": dict(sorted(maturation_counts.items())),
         "main_aggregate": _aggregate_summary(main_rows),
         "lane_summaries": lane_summaries,
@@ -276,10 +318,22 @@ def format_radar_learning_snapshot(payload: Mapping[str, Any] | None) -> tuple[s
     return tuple(lines)
 
 
-def format_integrated_radar_outcome_report(rows: Iterable[Mapping[str, Any]]) -> str:
+def format_integrated_radar_outcome_report(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    candidate_rows: Iterable[Mapping[str, Any]] = (),
+    core_rows: Iterable[Mapping[str, Any]] = (),
+    evaluated_at: Any = None,
+) -> str:
     materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
-    performance_rows = [row for row in materialized if _truthy(row.get("include_in_performance"))]
-    diagnostic_rows = [row for row in materialized if not _truthy(row.get("include_in_performance"))]
+    performance_rows, excluded_rows, exclusion_reasons = (
+        outcome_eligibility.partition_joined_calibration_outcomes(
+            materialized,
+            candidate_rows,
+            core_rows,
+            evaluated_at=evaluated_at,
+        )
+    )
     status_counts = Counter(str(row.get("outcome_status") or "unknown") for row in materialized)
     lane_counts = Counter(str(row.get("opportunity_type") or "unknown") for row in performance_rows)
     lines = [
@@ -291,7 +345,8 @@ def format_integrated_radar_outcome_report(rows: Iterable[Mapping[str, Any]]) ->
         "## Summary",
         f"- Outcome rows: {len(materialized)}",
         f"- Performance rows: {len(performance_rows)}",
-        f"- Diagnostics excluded from performance: {len(diagnostic_rows)}",
+        f"- Non-authoritative rows excluded from calibration: {len(excluded_rows)}",
+        f"- Calibration exclusions: {_format_counts(exclusion_reasons)}",
         f"- Status: {_format_counts(status_counts)}",
         f"- Lanes: {_format_counts(lane_counts)}",
         "",
@@ -302,16 +357,24 @@ def format_integrated_radar_outcome_report(rows: Iterable[Mapping[str, Any]]) ->
         by_lane[str(row.get("opportunity_type") or "unknown")].append(row)
     for lane in sorted(by_lane):
         lane_rows = by_lane[lane]
-        returns = [float(row.get("primary_horizon_return") or 0.0) for row in lane_rows if row.get("outcome_status") == "filled"]
-        thesis_returns = [
-            float(row.get("thesis_primary_move") or 0.0)
+        returns = [
+            number
             for row in lane_rows
-            if row.get("outcome_status") == "filled" and row.get("thesis_primary_move") is not None
+            if (number := outcome_eligibility.finite_number(row.get("primary_horizon_return"))) is not None
+        ]
+        thesis_returns = [
+            number
+            for row in lane_rows
+            if (number := outcome_eligibility.finite_number(row.get("thesis_primary_move"))) is not None
         ]
         thesis_favorable = [
-            float(row.get("thesis_favorable_excursion") or 0.0)
+            number
             for row in lane_rows
-            if row.get("outcome_status") == "filled" and row.get("thesis_favorable_excursion") is not None
+            if (
+                number := outcome_eligibility.finite_number(
+                    row.get("thesis_favorable_excursion")
+                )
+            ) is not None
         ]
         lines.append(f"### {lane}")
         lines.append(f"- Rows: {len(lane_rows)}")
@@ -325,28 +388,46 @@ def format_integrated_radar_outcome_report(rows: Iterable[Mapping[str, Any]]) ->
                 f"thesis={_pct(row.get('thesis_primary_move')) if row.get('thesis_primary_move') is not None else 'n/a'} "
                 f"status={row.get('outcome_status')}"
             )
-    if diagnostic_rows:
-        lines.extend(["", "## Diagnostics Appendix"])
-        lines.append("DIAGNOSTIC rows are excluded from performance and calibration priors.")
-        for row in diagnostic_rows[:10]:
+    if excluded_rows:
+        lines.extend(["", "## Calibration-Excluded Rows"])
+        lines.append(
+            "Synthetic, pending, legacy, unmatched, duplicate, and provenance-failed rows "
+            "remain visible here but are not performance evidence."
+        )
+        for row in excluded_rows[:10]:
             lines.append(
                 f"- {row.get('symbol')}/{row.get('coin_id')} lane={row.get('opportunity_type')} "
-                f"label={row.get('outcome_label')} status={row.get('outcome_status')}"
+                f"label={row.get('synthetic_diagnostic_label') or row.get('outcome_label')} "
+                f"status={row.get('outcome_status')} "
+                f"reasons={','.join(row.get('calibration_ineligible_reasons') or ()) or 'unknown'}"
             )
     return "\n".join(lines).rstrip() + "\n"
 
 
-def format_integrated_radar_calibration_report(rows: Iterable[Mapping[str, Any]]) -> str:
+def format_integrated_radar_calibration_report(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    candidate_rows: Iterable[Mapping[str, Any]] = (),
+    core_rows: Iterable[Mapping[str, Any]] = (),
+    evaluated_at: Any = None,
+) -> str:
     all_rows = [dict(row) for row in rows if isinstance(row, Mapping)]
-    materialized = [row for row in all_rows if _truthy(row.get("include_in_performance"))]
-    excluded = len(all_rows) - len(materialized)
+    materialized, excluded_rows, exclusion_reasons = (
+        outcome_eligibility.partition_joined_calibration_outcomes(
+            all_rows,
+            candidate_rows,
+            core_rows,
+            evaluated_at=evaluated_at,
+        )
+    )
     lines = [
         "# Event Alpha Integrated Radar Calibration Report",
         "",
         event_integrated_radar.RESEARCH_DISCLAIMER,
         "Recommendations only. Thresholds and priors are not changed automatically.",
         "Sample sizes are too small for automatic threshold changes.",
-        f"Diagnostics excluded from performance: {excluded}",
+        f"Non-authoritative rows excluded from calibration: {len(excluded_rows)}",
+        f"Calibration exclusion reasons: {_format_counts(exclusion_reasons)}",
         "",
     ]
     for dimension in PERFORMANCE_DIMENSIONS:
@@ -359,18 +440,25 @@ def format_integrated_radar_calibration_report(rows: Iterable[Mapping[str, Any]]
             validated = sum(1 for row in group if _validation_label(row) == "validated")
             invalidated = sum(1 for row in group if _validation_label(row) == "invalidated/noise")
             inconclusive = sum(1 for row in group if _validation_label(row) == "inconclusive")
-            filled = sum(1 for row in group if row.get("outcome_status") == "filled")
-            rate = validated / max(1, validated + invalidated)
+            filled = sum(
+                1 for row in group
+                if outcome_eligibility.primary_horizon_maturation_state(row) == "matured"
+            )
+            rate = _safe_rate(validated, validated + invalidated)
             thesis_moves = [
-                float(row.get("thesis_favorable_excursion") or 0.0)
+                number
                 for row in group
-                if row.get("thesis_favorable_excursion") is not None
+                if (
+                    number := outcome_eligibility.finite_number(
+                        row.get("thesis_favorable_excursion")
+                    )
+                ) is not None
             ]
             median_thesis = _pct(median(thesis_moves)) if thesis_moves else "n/a"
             lines.append(
                 f"- {key}: rows={len(group)} filled={filled} validated={validated} "
                 f"invalidated/noise={invalidated} inconclusive={inconclusive} "
-                f"validation_rate={rate:.2f} median_thesis_favorable_move={median_thesis}"
+                f"validation_rate={_rate_text(rate)} median_thesis_favorable_move={median_thesis}"
             )
         lines.append("")
     lines.extend([
@@ -382,52 +470,88 @@ def format_integrated_radar_calibration_report(rows: Iterable[Mapping[str, Any]]
     return "\n".join(lines).rstrip() + "\n"
 
 
-def build_integrated_radar_calibration_priors(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+def build_integrated_radar_calibration_priors(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    candidate_rows: Iterable[Mapping[str, Any]] = (),
+    core_rows: Iterable[Mapping[str, Any]] = (),
+    evaluated_at: Any = None,
+) -> dict[str, Any]:
     all_rows = [dict(row) for row in rows if isinstance(row, Mapping)]
-    materialized = [row for row in all_rows if _truthy(row.get("include_in_performance"))]
-    diagnostics = [row for row in all_rows if not _truthy(row.get("include_in_performance"))]
+    materialized, diagnostics, exclusion_reasons = (
+        outcome_eligibility.partition_joined_calibration_outcomes(
+            all_rows,
+            candidate_rows,
+            core_rows,
+            evaluated_at=evaluated_at,
+        )
+    )
+    authority_rows = [
+        row
+        for row in (*materialized, *diagnostics)
+        if "core_core_opportunity_id" in row
+    ]
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in materialized:
+    for row in authority_rows:
+        if str(row.get("opportunity_type") or "").upper() == "DIAGNOSTIC":
+            continue
         groups[str(row.get("opportunity_type") or "unknown")].append(row)
+    eligible_groups = _group_by(materialized, "opportunity_type")
     priors = {}
     min_sample = 25
     for lane, lane_rows in groups.items():
-        validated = sum(1 for row in lane_rows if _validation_label(row) == "validated")
-        invalidated = sum(1 for row in lane_rows if _validation_label(row) == "invalidated/noise")
-        inconclusive = sum(1 for row in lane_rows if _validation_label(row) == "inconclusive")
-        sample_size = len(lane_rows)
+        eligible_lane_rows = eligible_groups.get(lane, [])
+        validated = sum(1 for row in eligible_lane_rows if _validation_label(row) == "validated")
+        invalidated = sum(1 for row in eligible_lane_rows if _validation_label(row) == "invalidated/noise")
+        inconclusive = sum(1 for row in eligible_lane_rows if _validation_label(row) == "inconclusive")
+        sample_size = validated + invalidated
         thesis_moves = [
-            float(row.get("thesis_favorable_excursion") or 0.0)
-            for row in lane_rows
-            if row.get("thesis_favorable_excursion") is not None
+            number
+            for row in eligible_lane_rows
+            if (
+                number := outcome_eligibility.finite_number(
+                    row.get("thesis_favorable_excursion")
+                )
+            ) is not None
         ]
+        validation_rate = _safe_rate(validated, validated + invalidated)
         priors[lane] = {
             "sample_size": sample_size,
+            "input_rows": len(lane_rows),
+            "calibration_eligible_rows": len(eligible_lane_rows),
+            "calibration_ineligible_rows": len(lane_rows) - len(eligible_lane_rows),
+            "eligible_inconclusive_count": inconclusive,
             "min_sample_size": min_sample,
             "min_sample_warning": sample_size < min_sample,
             "validated_count": validated,
             "invalidated_count": invalidated,
             "invalidated_noise_count": invalidated,
             "inconclusive_count": inconclusive,
-            "validation_rate": round(validated / max(1, validated + invalidated), 4),
+            "validation_rate": validation_rate,
             "median_thesis_favorable_move": median(thesis_moves) if thesis_moves else None,
             "legacy_aliases": {
                 "useful_deprecated_alias": validated,
                 "junk_deprecated_alias": invalidated,
-                "suggested_prior_deprecated_alias": round(validated / max(1, validated + invalidated), 4),
+                "suggested_prior_deprecated_alias": validation_rate,
             },
-            "suggested_prior": round(validated / max(1, validated + invalidated), 4),
+            "suggested_prior": validation_rate,
             "confidence": "low" if sample_size < min_sample else "medium",
             "recommendation_only": True,
             "eligible_for_auto_apply": False,
             "auto_apply": False,
-            "generated_from_fixture": True,
+            "generated_from_fixture": bool(lane_rows) and all(
+                row.get("outcome_data_source") == "synthetic_fixture"
+                for row in lane_rows
+            ),
             "excluded_from_auto_apply_reason": "fixture_or_small_sample_research_only",
             "last_updated_at": datetime.now(timezone.utc).isoformat(),
             "horizon_basis": "primary_horizon",
         }
     diagnostic_priors: dict[str, Any] = {}
-    for lane, lane_rows in _group_by(diagnostics, "opportunity_type").items():
+    authority_diagnostics = [
+        row for row in diagnostics if "core_core_opportunity_id" in row
+    ]
+    for lane, lane_rows in _group_by(authority_diagnostics, "opportunity_type").items():
         diagnostic_priors[lane] = {
             "sample_size": len(lane_rows),
             "excluded_from_performance": True,
@@ -443,6 +567,10 @@ def build_integrated_radar_calibration_priors(rows: Iterable[Mapping[str, Any]])
         "recommendation_only": True,
         "eligible_for_auto_apply": False,
         "auto_apply": False,
+        "calibration_eligible_rows": len(materialized),
+        "calibration_ineligible_rows": len(diagnostics),
+        "calibration_unattributed_rows": len(diagnostics) - len(authority_diagnostics),
+        "calibration_exclusion_reason_counts": exclusion_reasons,
         "opportunity_type_priors": priors,
         "diagnostic_debug_priors": diagnostic_priors,
     }
@@ -497,76 +625,123 @@ def _performance_observation_rows(
     generated_at: str,
     stale_after_days: int,
 ) -> list[dict[str, Any]]:
-    merged: dict[str, dict[str, Any]] = {}
-    aliases: dict[str, str] = {}
-    for row in candidates:
-        if not isinstance(row, Mapping):
-            continue
-        key = _observation_key(row, aliases)
-        if not key:
-            continue
-        merged.setdefault(key, {}).update(dict(row))
-        _register_observation_aliases(aliases, row, key)
-    for row in core_rows:
-        if not isinstance(row, Mapping):
-            continue
-        key = _observation_key(row, aliases)
-        if not key:
-            continue
-        merged.setdefault(key, {}).update({f"core_{k}": v for k, v in dict(row).items()})
-        _fill_missing(merged[key], dict(row))
-        _register_observation_aliases(aliases, row, key)
-    outcomes_by_key: dict[str, dict[str, Any]] = {}
-    for row in outcome_rows:
-        if not isinstance(row, Mapping):
-            continue
-        key = _row_key(row)
-        if key:
-            outcomes_by_key[key] = dict(row)
-    materialized_outcomes = list(outcomes_by_key.values())
-    outcomes_by_alias: dict[str, tuple[int, dict[str, Any]]] = {}
-    for outcome_index, materialized in enumerate(materialized_outcomes):
-        for alias in _row_aliases(materialized):
-            outcomes_by_alias.setdefault(alias, (outcome_index, materialized))
-    delivery_keys: set[str] = set()
-    for row in delivery_rows:
-        if not isinstance(row, Mapping):
-            continue
-        for key in ("candidate_id", "core_opportunity_id"):
-            value = str(row.get(key) or "").strip()
-            if value:
-                delivery_keys.add(f"{key}:{value}")
-    out: list[dict[str, Any]] = []
-    matched_outcome_indexes: set[int] = set()
-    for key, row in sorted(merged.items()):
-        outcome_match = next(
-            (outcomes_by_alias[alias] for alias in _row_aliases(row) if alias in outcomes_by_alias),
-            None,
-        )
-        if outcome_match is None:
-            outcome: Mapping[str, Any] = {}
+    candidate_rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
+    core_materialized = [dict(row) for row in core_rows if isinstance(row, Mapping)]
+    outcome_materialized = [dict(row) for row in outcome_rows if isinstance(row, Mapping)]
+    delivery_identities = {
+        identity
+        for row in delivery_rows
+        if isinstance(row, Mapping)
+        if (identity := outcome_eligibility.canonical_join_identity(row)) is not None
+    }
+    cores_by_key: dict[tuple[str, ...], list[dict[str, Any]]] = defaultdict(list)
+    for core in core_materialized:
+        key = _core_join_key(core)
+        if key is not None:
+            cores_by_key[key].append(core)
+    base_join_reasons: dict[int, tuple[str, ...]] = {}
+    for target in candidate_rows:
+        authority_reasons: list[str] = []
+        if not outcome_eligibility.valid_candidate_authority(target):
+            authority_reasons.append("candidate_authority_contract_invalid")
+        matching_cores = cores_by_key.get(_core_join_key(target) or (), [])
+        if len(matching_cores) != 1:
+            authority_reasons.append(
+                "ambiguous_outcome_identity"
+                if len(matching_cores) > 1
+                else "unmatched_outcome_identity"
+            )
         else:
-            outcome_index, outcome = outcome_match
-            matched_outcome_indexes.add(outcome_index)
-        out.append(_performance_observation_row(
-            namespace_dir,
+            core = matching_cores[0]
+            if not outcome_eligibility.valid_core_authority(core):
+                authority_reasons.append("core_authority_contract_invalid")
+            else:
+                target.update({f"core_{key}": value for key, value in core.items()})
+                for key, value in core.items():
+                    if key not in target or target.get(key) in (None, "", (), []):
+                        target[key] = value
+        if authority_reasons:
+            base_join_reasons[id(target)] = tuple(authority_reasons)
+    base_rows = candidate_rows
+    bases_by_identity: dict[tuple[str, ...], list[dict[str, Any]]] = defaultdict(list)
+    invalid_bases: list[dict[str, Any]] = []
+    for row in base_rows:
+        identity = outcome_eligibility.canonical_join_identity(
             row,
-            outcome=outcome,
-            delivered=any(alias in delivery_keys for alias in _row_aliases(row)),
-            generated_at=generated_at,
-            stale_after_days=stale_after_days,
-        ))
-    for outcome_index, outcome in enumerate(materialized_outcomes):
-        if outcome_index in matched_outcome_indexes:
+            allow_integrated_candidate_alias=True,
+        )
+        if identity is None:
+            invalid_bases.append(row)
+        else:
+            bases_by_identity[identity].append(row)
+    outcomes_by_identity: dict[tuple[str, ...], list[dict[str, Any]]] = defaultdict(list)
+    invalid_outcomes: list[dict[str, Any]] = []
+    for row in outcome_materialized:
+        identity = outcome_eligibility.canonical_join_identity(row)
+        if identity is None:
+            invalid_outcomes.append(row)
+        else:
+            outcomes_by_identity[identity].append(row)
+    base_aliases = {
+        alias
+        for row in base_rows
+        for alias in _loose_identity_aliases(row)
+    }
+    outcome_aliases = {
+        alias
+        for row in outcome_materialized
+        for alias in _loose_identity_aliases(row)
+    }
+    out: list[dict[str, Any]] = []
+    for identity in sorted(set(bases_by_identity) | set(outcomes_by_identity)):
+        bases = bases_by_identity.get(identity, [])
+        outcomes = outcomes_by_identity.get(identity, [])
+        if len(bases) == 1 and len(outcomes) == 1:
+            _append_performance_observation(
+                out, namespace_dir, bases[0], outcomes[0], identity in delivery_identities,
+                generated_at, stale_after_days, base_join_reasons.get(id(bases[0]), ()),
+            )
             continue
-        out.append(_performance_observation_row(
-            namespace_dir,
-            outcome,
-            outcome=outcome,
-            delivered=any(alias in delivery_keys for alias in _row_aliases(outcome)),
-            generated_at=generated_at,
-            stale_after_days=stale_after_days,
-        ))
+        if len(bases) == 1 and len(outcomes) > 1:
+            for outcome in outcomes:
+                _append_performance_observation(
+                    out, namespace_dir, bases[0], outcome, identity in delivery_identities,
+                    generated_at, stale_after_days,
+                    (*base_join_reasons.get(id(bases[0]), ()), "duplicate_outcome_identity"),
+                )
+            continue
+        if bases:
+            reasons = ("ambiguous_outcome_identity",) if len(bases) > 1 else (
+                "identity_mismatch"
+                if any(alias in outcome_aliases for row in bases for alias in _loose_identity_aliases(row))
+                else "unmatched_outcome_identity",
+            )
+            for row in bases:
+                _append_performance_observation(
+                    out, namespace_dir, row, {}, identity in delivery_identities,
+                    generated_at, stale_after_days, reasons,
+                )
+        if outcomes:
+            reasons = ("duplicate_outcome_identity",) if len(outcomes) > 1 else (
+                "identity_mismatch"
+                if any(alias in base_aliases for alias in _loose_identity_aliases(outcomes[0]))
+                else "unmatched_outcome_identity",
+            )
+            for outcome in outcomes:
+                _append_performance_observation(
+                    out, namespace_dir, outcome, outcome, identity in delivery_identities,
+                    generated_at, stale_after_days, reasons,
+                )
+    for row in invalid_bases:
+        _append_performance_observation(
+            out, namespace_dir, row, {}, False, generated_at, stale_after_days,
+            ("ambiguous_outcome_identity",) if _loose_identity_aliases(row) else ("unmatched_outcome_identity",),
+        )
+    for outcome in invalid_outcomes:
+        _append_performance_observation(
+            out, namespace_dir, outcome, outcome, False, generated_at, stale_after_days,
+            ("ambiguous_outcome_identity",) if _loose_identity_aliases(outcome) else ("unmatched_outcome_identity",),
+        )
     return out
 
 
@@ -578,36 +753,53 @@ def _performance_observation_row(
     delivered: bool,
     generated_at: str,
     stale_after_days: int,
+    join_ineligible_reasons: Iterable[str] = (),
 ) -> dict[str, Any]:
-    lane = _first_text(outcome, row, "opportunity_type", default="UNCONFIRMED_RESEARCH").upper()
+    lane = _first_text(row, {}, "opportunity_type", default="UNCONFIRMED_RESEARCH").upper()
     label = str(outcome.get("outcome_label") or "").strip()
     maturation_state = _maturation_state(row, outcome, generated_at=generated_at, stale_after_days=stale_after_days)
-    validation = _validation_label(outcome) if outcome else "inconclusive"
+    calibration_eligible, calibration_reasons = outcome_eligibility.effective_calibration_state(
+        outcome,
+        additional_reasons=join_ineligible_reasons,
+        evaluated_at=generated_at,
+    )
+    validation = _validation_label(outcome) if calibration_eligible else "inconclusive"
     if maturation_state in {"pending", "stale"} and not label:
         validation = "inconclusive"
-    provider = _dimension_primary(row, outcome, "provider")
-    source_pack = _dimension_primary(row, outcome, "source_pack")
-    source_origin = _dimension_primary(row, outcome, "source_origin")
-    decision = decision_model_values(outcome, row)
+    provider = _dimension_primary(row, {}, "provider")
+    source_pack = _dimension_primary(row, {}, "source_pack")
+    source_origin = _dimension_primary(row, {}, "source_origin")
+    decision = decision_model_values(row)
     return {
         "namespace": namespace_dir.name,
+        "run_id": _first_text(outcome, row, "run_id", default=""),
+        "profile": _first_text(outcome, row, "profile", default=""),
+        "artifact_namespace": _first_text(outcome, row, "artifact_namespace", default=""),
         "candidate_id": _first_text(outcome, row, "candidate_id", default=""),
         "core_opportunity_id": _first_text(outcome, row, "core_opportunity_id", default=""),
-        "symbol": _first_text(outcome, row, "symbol", default="UNKNOWN"),
-        "coin_id": _first_text(outcome, row, "coin_id", default=""),
+        "symbol": _first_text(row, {}, "symbol", default="UNKNOWN"),
+        "coin_id": _first_text(row, {}, "coin_id", default=""),
         "opportunity_type": lane,
         "source_origin": source_origin,
         "source_pack": source_pack,
         "provider": provider,
-        "market_state_class": _dimension_primary(row, outcome, "market_state_class"),
-        "crowding_class": _dimension_primary(row, outcome, "crowding_class"),
-        "source_strength": _dimension_primary(row, outcome, "source_strength"),
+        "market_state_class": _dimension_primary(row, {}, "market_state_class"),
+        "crowding_class": _dimension_primary(row, {}, "crowding_class"),
+        "source_strength": _dimension_primary(row, {}, "source_strength"),
         **decision,
         "maturation_state": maturation_state,
+        "outcome_data_source": str(outcome.get("outcome_data_source") or "legacy"),
+        "primary_horizon": str(outcome.get("primary_horizon") or ""),
+        "calibration_eligible": calibration_eligible,
+        "calibration_ineligible_reasons": list(calibration_reasons),
         "outcome_label": label or ("pending" if maturation_state == "pending" else maturation_state),
         "validation_label": validation,
         "delivered": delivered,
-        "time_to_confirmation_hours": _time_to_confirmation_hours(lane, outcome),
+        "time_to_confirmation_hours": (
+            _time_to_confirmation_hours(lane, outcome)
+            if calibration_eligible
+            else None
+        ),
         "observed_at": _first_text(outcome, row, "observed_at", default=""),
         "preview_time": str(outcome.get("preview_time") or ""),
         "include_in_main_aggregate": (
@@ -617,64 +809,46 @@ def _performance_observation_row(
     }
 
 
-def _row_key(row: Mapping[str, Any]) -> str:
-    candidate_id = str(row.get("candidate_id") or row.get("integrated_candidate_id") or "").strip()
-    if candidate_id:
-        return f"candidate_id:{candidate_id}"
-    core_id = str(row.get("core_opportunity_id") or "").strip()
-    if core_id:
-        return f"core_opportunity_id:{core_id}"
-    symbol = str(row.get("symbol") or "").strip().upper()
-    coin_id = str(row.get("coin_id") or "").strip().casefold()
-    lane = str(row.get("opportunity_type") or "").strip().upper()
-    if symbol or coin_id:
-        return f"identity:{symbol}:{coin_id}:{lane}"
-    return ""
-
-
-def _row_aliases(row: Mapping[str, Any]) -> tuple[str, ...]:
-    aliases: list[str] = []
-    for field in ("candidate_id", "integrated_candidate_id"):
-        value = str(row.get(field) or "").strip()
-        if value:
-            aliases.append(f"candidate_id:{value}")
-    core_id = str(row.get("core_opportunity_id") or "").strip()
-    if core_id:
-        aliases.append(f"core_opportunity_id:{core_id}")
-    if not aliases:
-        identity = _row_key(row)
-        if identity.startswith("identity:"):
-            aliases.append(identity)
-    return tuple(dict.fromkeys(aliases))
-
-
-def _observation_key(row: Mapping[str, Any], aliases: Mapping[str, str]) -> str:
-    candidate_aliases = tuple(
-        alias for alias in _row_aliases(row) if alias.startswith("candidate_id:")
-    )
-    for alias in candidate_aliases:
-        if alias in aliases:
-            return aliases[alias]
-    if not candidate_aliases:
-        for alias in _row_aliases(row):
-            if alias in aliases:
-                return aliases[alias]
-    return _row_key(row)
-
-
-def _register_observation_aliases(
-    aliases: dict[str, str],
+def _append_performance_observation(
+    target: list[dict[str, Any]],
+    namespace_dir: Path,
     row: Mapping[str, Any],
-    key: str,
+    outcome: Mapping[str, Any],
+    delivered: bool,
+    generated_at: str,
+    stale_after_days: int,
+    reasons: Iterable[str],
 ) -> None:
-    for alias in _row_aliases(row):
-        aliases.setdefault(alias, key)
+    target.append(_performance_observation_row(
+        namespace_dir,
+        row,
+        outcome=outcome,
+        delivered=delivered,
+        generated_at=generated_at,
+        stale_after_days=stale_after_days,
+        join_ineligible_reasons=reasons,
+    ))
 
 
-def _fill_missing(target: dict[str, Any], row: Mapping[str, Any]) -> None:
-    for key, value in row.items():
-        if key not in target or target.get(key) in (None, "", (), []):
-            target[key] = value
+def _core_join_key(row: Mapping[str, Any]) -> tuple[str, ...] | None:
+    values = (
+        row.get("core_opportunity_id"),
+        row.get("run_id"),
+        row.get("profile"),
+        row.get("artifact_namespace"),
+    )
+    return tuple(values) if all(type(value) is str and value and value == value.strip() for value in values) else None
+
+
+def _loose_identity_aliases(row: Mapping[str, Any]) -> tuple[tuple[str, str], ...]:
+    aliases: list[tuple[str, str]] = []
+    candidate_id = row.get("candidate_id") or row.get("integrated_candidate_id")
+    core_id = row.get("core_opportunity_id")
+    if type(candidate_id) is str and candidate_id:
+        aliases.append(("candidate_id", candidate_id))
+    if type(core_id) is str and core_id:
+        aliases.append(("core_opportunity_id", core_id))
+    return tuple(aliases)
 
 
 def _first_text(first: Mapping[str, Any], second: Mapping[str, Any], key: str, *, default: str = "unknown") -> str:
@@ -728,6 +902,9 @@ def _maturation_state(
     generated_at: str,
     stale_after_days: int,
 ) -> str:
+    canonical_state = outcome_eligibility.primary_horizon_maturation_state(outcome)
+    if canonical_state is not None:
+        return canonical_state
     if outcome:
         status = str(outcome.get("outcome_status") or "").strip().casefold()
         if status in {"missing_data", "missing_price_data", "no_price_data"}:
@@ -746,11 +923,7 @@ def _maturation_state(
 
 
 def _filled_horizon_count(row: Mapping[str, Any]) -> int:
-    for key in ("return_by_horizon", "horizons"):
-        values = row.get(key)
-        if isinstance(values, Mapping):
-            return sum(1 for horizon in HORIZONS if isinstance(values.get(horizon), (int, float)))
-    return 1 if isinstance(row.get("primary_horizon_return"), (int, float)) else 0
+    return outcome_eligibility.filled_horizon_count(row)
 
 
 def _time_to_confirmation_hours(lane: str, outcome: Mapping[str, Any]) -> float | None:
@@ -767,14 +940,21 @@ def _time_to_confirmation_hours(lane: str, outcome: Mapping[str, Any]) -> float 
 
 def _aggregate_summary(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
-    matured_rows = [row for row in materialized if row.get("maturation_state") in MATURED_STATES]
+    matured_rows = [
+        row for row in materialized
+        if row.get("calibration_eligible") is True
+        and row.get("maturation_state") == "matured"
+    ]
     validated = sum(1 for row in matured_rows if row.get("validation_label") == "validated")
     noise = sum(1 for row in matured_rows if row.get("validation_label") == "invalidated/noise")
     inconclusive = sum(1 for row in matured_rows if row.get("validation_label") == "inconclusive")
     time_values = [_safe_number(row.get("time_to_confirmation_hours")) for row in matured_rows]
     time_values = [value for value in time_values if value is not None]
     return {
-        "rows": len(materialized),
+        "rows": len(matured_rows),
+        "input_rows": len(materialized),
+        "calibration_eligible_rows": len(matured_rows),
+        "calibration_ineligible_rows": len(materialized) - len(matured_rows),
         "matured_rows": len(matured_rows),
         "validated_count": validated,
         "invalidated_noise_count": noise,
@@ -801,12 +981,16 @@ def _performance_views(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     later_confirmed = sum(
         1
         for row in unconfirmed_rows
-        if row.get("validation_label") == "validated" and row.get("maturation_state") in MATURED_STATES
+        if row.get("calibration_eligible") is True
+        and row.get("validation_label") == "validated"
+        and row.get("maturation_state") == "matured"
     )
     noise = sum(
         1
         for row in unconfirmed_rows
-        if row.get("validation_label") == "invalidated/noise" and row.get("maturation_state") in MATURED_STATES
+        if row.get("calibration_eligible") is True
+        and row.get("validation_label") == "invalidated/noise"
+        and row.get("maturation_state") == "matured"
     )
     provider = _dimension_summary(materialized, "provider")
     return {
@@ -857,7 +1041,7 @@ def _prior_suggestion(
     min_sample: int,
 ) -> dict[str, Any]:
     summary = _aggregate_summary(rows)
-    sample = int(summary["rows"])
+    sample = int(summary["validated_count"]) + int(summary["invalidated_noise_count"])
     rate = summary["validation_rate"]
     noise_rate = summary["noise_rate"]
     if sample < min_sample:
@@ -895,10 +1079,7 @@ def _safe_rate(numerator: int, denominator: int) -> float | None:
 
 
 def _safe_number(value: Any) -> float | None:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
+    return outcome_eligibility.finite_number(value)
 
 
 def _rate_text(value: Any) -> str:
@@ -933,15 +1114,29 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
     thesis_favorable = _window_extremes(thesis_returns, want_peak=True)
     thesis_adverse = _window_extremes(thesis_returns, want_peak=False)
     thesis_primary = thesis_returns.get(primary_horizon)
+    numeric_returns = [
+        number
+        for horizon in HORIZONS
+        if (number := outcome_eligibility.finite_number(returns.get(horizon))) is not None
+    ]
     decision = decision_model_values(candidate)
-    return {
+    identity_fields = outcome_eligibility.build_outcome_identity_fields(candidate)
+    horizon_metadata = outcome_eligibility.build_synthetic_horizon_metadata(
+        observed_at=identity_fields["observed_at"],
+        evaluated_at=now,
+    )
+    primary_maturity = horizon_metadata[primary_horizon]["maturity_status"]
+    row = {
         "schema_version": 1,
         "row_type": "event_integrated_radar_outcome",
-        "candidate_id": candidate.get("candidate_id"),
-        "core_opportunity_id": candidate.get("core_opportunity_id"),
-        "run_id": candidate.get("run_id"),
-        "profile": candidate.get("profile"),
-        "artifact_namespace": candidate.get("artifact_namespace"),
+        **identity_fields,
+        "outcome_eligibility_contract_version": (
+            outcome_eligibility.OUTCOME_ELIGIBILITY_CONTRACT_VERSION
+        ),
+        "outcome_data_source": "synthetic_fixture",
+        "outcome_evaluated_at": now,
+        "calibration_eligible": False,
+        "calibration_ineligible_reasons": [],
         "symbol": symbol,
         "coin_id": candidate.get("coin_id"),
         "opportunity_type": lane,
@@ -952,11 +1147,14 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
         "source_strength": candidate.get("source_strength"),
         "crowding_class": candidate.get("crowding_class"),
         **decision,
-        "observed_at": candidate.get("observed_at"),
         "preview_time": now,
         "price_at_observation": price,
-        "price_source": "fixture_or_candidate_snapshot",
+        "observation_price_source": None,
+        "observation_price_id": None,
+        "price_source": "candidate_market_snapshot" if price is not None else "missing",
+        "observation_price_provenance_status": "synthetic_fixture",
         "horizons": {horizon: returns.get(horizon) for horizon in HORIZONS},
+        "horizon_metadata": horizon_metadata,
         "outcome_horizons": list(HORIZONS),
         "return_by_horizon": {horizon: returns.get(horizon) for horizon in HORIZONS},
         "relative_return_vs_btc_by_horizon": relative_vs_btc,
@@ -971,8 +1169,8 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
         "primary_horizon": primary_horizon,
         "primary_horizon_return": primary_return,
         "relative_return_vs_btc_24h": returns.get("relative_vs_btc_24h"),
-        "mfe": max((value for key, value in returns.items() if key in HORIZONS and isinstance(value, (int, float))), default=None),
-        "mae": min((value for key, value in returns.items() if key in HORIZONS and isinstance(value, (int, float))), default=None),
+        "mfe": max(numeric_returns, default=None),
+        "mae": min(numeric_returns, default=None),
         "max_favorable_excursion_by_window": _window_extremes(returns, want_peak=True),
         "max_adverse_excursion_by_window": _window_extremes(returns, want_peak=False),
         "thesis_direction": thesis_direction,
@@ -983,24 +1181,32 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
         "thesis_adverse_excursion_by_window": thesis_adverse,
         "thesis_favorable_excursion": _best_mapping_value(thesis_favorable, want_peak=True),
         "thesis_adverse_excursion": _best_mapping_value(thesis_adverse, want_peak=False),
-        "thesis_outcome_interpretation": _thesis_interpretation(lane, label, thesis_primary),
+        "thesis_outcome_interpretation": (
+            "Synthetic fixture diagnostic only: "
+            + _thesis_interpretation(lane, label, thesis_primary)
+        ),
         "time_to_peak": _time_to_extreme(returns, want_peak=True),
         "time_to_trough": _time_to_extreme(returns, want_peak=False),
         "time_to_peak_hours": _time_to_extreme_hours(returns, want_peak=True),
         "time_to_trough_hours": _time_to_extreme_hours(returns, want_peak=False),
-        "catalyst_confirmed_after_observation": _confirmed_after_observation(label, kind="catalyst"),
-        "market_confirmed_after_observation": _confirmed_after_observation(label, kind="market"),
-        "market_confirmed": lane == "CONFIRMED_LONG_RESEARCH" and label in {"continuation_good", "useful"},
-        "fade_confirmed": lane == "FADE_SHORT_REVIEW" and label in {"fade_review_good", "useful"},
-        "risk_validated": lane == "RISK_ONLY" and label in {"risk_validated", "useful"},
-        "outcome_label": label,
-        "outcome_status": status,
-        "missing_data_reason": missing_reason,
-        "include_in_performance": (
-            lane != "DIAGNOSTIC"
-            and status == "filled"
+        "catalyst_confirmed_after_observation": "unknown",
+        "market_confirmed_after_observation": "unknown",
+        "market_confirmed": False,
+        "fade_confirmed": False,
+        "risk_validated": False,
+        "outcome_label": "inconclusive",
+        "synthetic_diagnostic_label": label,
+        "validation_label": "inconclusive",
+        "outcome_status": primary_maturity,
+        "missing_data_reason": (
+            "primary_horizon_not_observed"
+            if primary_maturity == "missing_data"
+            else missing_reason
         ),
+        "include_in_performance": False,
         "research_only": True,
+        "no_send_rehearsal": True,
+        "sent": False,
         "no_trade_created": True,
         "no_paper_trade_created": True,
         "normal_rsi_signal_written": False,
@@ -1008,6 +1214,10 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
         "paper_trade_created": False,
         "trade_created": False,
     }
+    row["calibration_ineligible_reasons"] = list(
+        outcome_eligibility.calibration_ineligibility_reasons(row)
+    )
+    return row
 
 
 def _fixture_returns(symbol: str, lane: str) -> dict[str, float]:
@@ -1047,19 +1257,20 @@ def _thesis_returns(values: Mapping[str, float | None], lane: str) -> dict[str, 
     multiplier = _thesis_multiplier(lane)
     out: dict[str, float | None] = {}
     for horizon in HORIZONS:
-        value = values.get(horizon)
+        value = outcome_eligibility.finite_number(values.get(horizon))
         if multiplier is None or value is None:
             out[horizon] = None
             continue
-        try:
-            out[horizon] = float(value) * multiplier
-        except (TypeError, ValueError):
-            out[horizon] = None
+        out[horizon] = value * multiplier
     return out
 
 
 def _best_mapping_value(values: Mapping[str, float | None], *, want_peak: bool) -> float | None:
-    numeric = [float(value) for value in values.values() if isinstance(value, (int, float))]
+    numeric = [
+        number
+        for value in values.values()
+        if (number := outcome_eligibility.finite_number(value)) is not None
+    ]
     if not numeric:
         return None
     return max(numeric) if want_peak else min(numeric)
@@ -1102,18 +1313,20 @@ def _benchmark_returns(symbol: str) -> dict[str, float]:
 
 
 def _relative_return(value: float | None, benchmark: float | None) -> float | None:
-    if value is None or benchmark is None:
+    numeric_value = outcome_eligibility.finite_number(value)
+    numeric_benchmark = outcome_eligibility.finite_number(benchmark)
+    if numeric_value is None or numeric_benchmark is None:
         return None
-    return float(value) - float(benchmark)
+    return numeric_value - numeric_benchmark
 
 
 def _window_extremes(returns: Mapping[str, float], *, want_peak: bool) -> dict[str, float | None]:
     values: dict[str, float | None] = {}
     ordered: list[float] = []
     for horizon in HORIZONS:
-        value = returns.get(horizon)
-        if isinstance(value, (int, float)):
-            ordered.append(float(value))
+        value = outcome_eligibility.finite_number(returns.get(horizon))
+        if value is not None:
+            ordered.append(value)
             values[horizon] = max(ordered) if want_peak else min(ordered)
         else:
             values[horizon] = None
@@ -1193,18 +1406,17 @@ def _truth_label(row: Mapping[str, Any]) -> str:
 
 
 def _validation_label(row: Mapping[str, Any]) -> str:
-    label = str(row.get("outcome_label") or "")
-    if label in {"useful", "early_good", "continuation_good", "fade_review_good", "risk_validated"}:
-        return "validated"
-    if label in {"junk", "remained_noise"}:
-        return "invalidated/noise"
-    if label == "diagnostic_only":
-        return "invalidated/noise"
-    return "inconclusive"
+    if row.get("calibration_eligible") is not True:
+        return "inconclusive"
+    return outcome_eligibility.deterministic_validation_status(row)
 
 
 def _time_to_extreme(values: Mapping[str, float], *, want_peak: bool) -> str | None:
-    ordered = [(horizon, values.get(horizon)) for horizon in HORIZONS if isinstance(values.get(horizon), (int, float))]
+    ordered = [
+        (horizon, number)
+        for horizon in HORIZONS
+        if (number := outcome_eligibility.finite_number(values.get(horizon))) is not None
+    ]
     if not ordered:
         return None
     horizon, _value = max(ordered, key=lambda item: item[1]) if want_peak else min(ordered, key=lambda item: item[1])
@@ -1215,18 +1427,15 @@ def _price(candidate: Mapping[str, Any]) -> float | None:
     for key in ("latest_market_snapshot", "market_snapshot", "market_state_snapshot"):
         snapshot = candidate.get(key)
         if isinstance(snapshot, Mapping):
-            try:
-                return float(snapshot.get("price"))
-            except (TypeError, ValueError):
-                continue
-    return 1.0
+            price = outcome_eligibility.finite_number(snapshot.get("price"))
+            if price is not None and price > 0:
+                return price
+    return None
 
 
 def _pct(value: Any) -> str:
-    try:
-        return f"{float(value) * 100:+.2f}%"
-    except (TypeError, ValueError):
-        return "n/a"
+    number = outcome_eligibility.finite_number(value)
+    return "n/a" if number is None else f"{number * 100:+.2f}%"
 
 
 def _format_counts(values: Mapping[str, int] | Counter[Any]) -> str:
@@ -1259,20 +1468,7 @@ def _iso(value: datetime) -> str:
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
-        return []
-    rows: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            if not line.strip():
-                continue
-            try:
-                value = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(value, Mapping):
-                rows.append(dict(value))
-    return rows
+    return list(artifact_json_lines.read_jsonl(path).rows)
 
 
 def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:

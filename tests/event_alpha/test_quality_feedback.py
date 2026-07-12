@@ -984,12 +984,14 @@ def test_integrated_radar_outcomes_and_calibration_are_research_only():
             observed_at="2026-06-16T16:00:00Z",
         )
         by_symbol = {row["symbol"]: row for row in rows}
-        assert by_symbol["TESTLIST"]["outcome_label"] == "early_good"
-        assert by_symbol["TESTPERP"]["outcome_label"] == "continuation_good"
-        assert by_symbol["TESTFADE"]["outcome_label"] == "fade_review_good"
-        assert by_symbol["TESTUNLOCK"]["outcome_label"] == "risk_validated"
-        assert by_symbol["BTC"]["outcome_label"] == "remained_noise"
-        assert by_symbol["TESTRUMOR"]["outcome_label"] == "remained_noise"
+        assert by_symbol["TESTLIST"]["synthetic_diagnostic_label"] == "early_good"
+        assert by_symbol["TESTPERP"]["synthetic_diagnostic_label"] == "continuation_good"
+        assert by_symbol["TESTFADE"]["synthetic_diagnostic_label"] == "fade_review_good"
+        assert by_symbol["TESTUNLOCK"]["synthetic_diagnostic_label"] == "risk_validated"
+        assert by_symbol["BTC"]["synthetic_diagnostic_label"] == "remained_noise"
+        assert by_symbol["TESTRUMOR"]["synthetic_diagnostic_label"] == "remained_noise"
+        assert all(row["outcome_label"] == "inconclusive" for row in rows)
+        assert all(row["calibration_eligible"] is False for row in rows)
         assert by_symbol["TESTFADE"]["primary_horizon_return"] < 0
         assert by_symbol["TESTFADE"]["thesis_direction"] == "downside_or_risk_research"
         assert by_symbol["TESTFADE"]["thesis_primary_move"] > 0
@@ -1005,8 +1007,8 @@ def test_integrated_radar_outcomes_and_calibration_are_research_only():
         report = (context.namespace_dir / "event_integrated_radar_outcome_report.md").read_text(encoding="utf-8")
         assert "Event Alpha Integrated Radar Outcome Report" in report
         assert "No trades or paper trades" in report
-        assert "Median asset primary return" in report
-        assert "Median thesis-favorable move" in report
+        assert "Non-authoritative rows excluded from calibration" in report
+        assert "synthetic_fixture" in report
         priors = json.loads((context.namespace_dir / "event_integrated_radar_calibration_priors.json").read_text(encoding="utf-8"))
         assert priors["auto_apply"] is False
         assert "EARLY_LONG_RESEARCH" in priors["opportunity_type_priors"]
@@ -1017,7 +1019,6 @@ def test_integrated_radar_outcomes_and_calibration_are_research_only():
         assert "junk" not in priors["opportunity_type_priors"]["FADE_SHORT_REVIEW"]
         assert "legacy_aliases" in priors["opportunity_type_priors"]["FADE_SHORT_REVIEW"]
         calibration = (context.namespace_dir / "event_integrated_radar_calibration_report.md").read_text(encoding="utf-8")
-        assert "validated=" in calibration
-        assert "invalidated/noise=" in calibration
-        assert "validation_rate=" in calibration
+        assert "Non-authoritative rows excluded from calibration" in calibration
+        assert "Calibration exclusion reasons" in calibration
         assert " junk" not in calibration.casefold()

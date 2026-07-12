@@ -757,8 +757,10 @@ def event_alpha_integrated_radar_outcome_report(
         print(str(exc))
         return
     rows = event_integrated_radar_outcomes.load_integrated_radar_outcomes(context.namespace_dir)
+    candidates, core_rows = event_integrated_radar_outcomes.load_integrated_radar_outcome_authority(context.namespace_dir)
     print(_event_alpha_context_block(context))
-    print(event_integrated_radar_outcomes.format_integrated_radar_outcome_report(rows))
+    print(event_integrated_radar_outcomes.format_integrated_radar_outcome_report(
+        rows, candidate_rows=candidates, core_rows=core_rows, evaluated_at=_event_research_now()))
 
 def event_alpha_integrated_radar_calibration_report(
     verbose: bool = False,

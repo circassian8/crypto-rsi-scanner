@@ -51,6 +51,8 @@ def build_v1_readiness(
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     llm_budget_rows: Iterable[Mapping[str, Any]] = (),
     outcome_rows: Iterable[Mapping[str, Any]] = (),
+    candidate_rows: Iterable[Mapping[str, Any]] = (),
+    core_rows: Iterable[Mapping[str, Any]] = (),
     card_paths: Iterable[str] = (),
     days: int = 7,
     now: datetime | None = None,
@@ -92,6 +94,18 @@ def build_v1_readiness(
         include_test_artifacts=include_test_artifacts,
         include_api_artifacts=include_api_artifacts,
     )
+    candidate_data = event_alpha_artifacts.filter_artifact_rows(
+        candidate_rows,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_api_artifacts=include_api_artifacts,
+    )
+    core_data = event_alpha_artifacts.filter_artifact_rows(
+        core_rows,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_api_artifacts=include_api_artifacts,
+    )
     budget_data = event_alpha_artifacts.filter_artifact_rows(
         llm_budget_rows,
         artifact_namespace=artifact_namespace,
@@ -115,6 +129,8 @@ def build_v1_readiness(
             provider_health_rows=provider_health_rows or {},
             llm_budget_rows=budget_data,
             outcome_rows=outcome_data,
+            candidate_rows=candidate_data,
+            core_rows=core_data,
             card_paths=tuple(card_paths),
             days=days,
             now=observed,
@@ -238,6 +254,8 @@ def _profile_readiness(
     provider_health_rows: Mapping[str, Mapping[str, Any]],
     llm_budget_rows: Iterable[Mapping[str, Any]],
     outcome_rows: Iterable[Mapping[str, Any]],
+    candidate_rows: Iterable[Mapping[str, Any]],
+    core_rows: Iterable[Mapping[str, Any]],
     card_paths: tuple[str, ...],
     days: int,
     now: datetime,
@@ -257,6 +275,8 @@ def _profile_readiness(
         provider_health_rows=provider_health_rows,
         llm_budget_rows=llm_budget_rows,
         outcome_rows=outcome_rows,
+        candidate_rows=candidate_rows,
+        core_rows=core_rows,
         profile=profile_name,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,

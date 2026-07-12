@@ -780,6 +780,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_fade_review_workflows",
     "tests.event_alpha.test_fade_validation",
     "tests.event_alpha.test_feedback_calibration",
+    "tests.event_alpha.test_feedback_eligibility_firewall",
     "tests.event_alpha.test_impact_hypotheses",
     "tests.event_alpha.test_integrated_merge_policy",
     "tests.event_alpha.test_incident_relevance",
@@ -804,6 +805,10 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_operator_state",
     "tests.event_alpha.test_operator_state_hardening",
     "tests.event_alpha.test_operator_workflows",
+    "tests.event_alpha.test_outcome_eligibility_contract",
+    "tests.event_alpha.test_outcome_eligibility_consumers",
+    "tests.event_alpha.test_outcome_eligibility_firewall",
+    "tests.event_alpha.test_outcome_jsonl_integrity",
     "tests.event_alpha.test_playbooks_graph",
     "tests.event_alpha.test_provider_activation",
     "tests.event_alpha.test_quality_feedback",
@@ -848,13 +853,42 @@ def _iter_standalone_tests():
                 yield module_name, name, value
 
 
-def _call_standalone_test(fn):
+def _standalone_param_cases(fn):
+    cases = [{}]
+    for mark in getattr(fn, "pytestmark", ()):
+        if getattr(mark, "name", "") != "parametrize":
+            continue
+        argnames = mark.args[0]
+        names = (
+            tuple(item.strip() for item in argnames.split(",") if item.strip())
+            if isinstance(argnames, str)
+            else tuple(argnames)
+        )
+        expanded = []
+        for existing in cases:
+            for raw_values in mark.args[1]:
+                values = getattr(raw_values, "values", raw_values)
+                if len(names) == 1:
+                    values = (values,)
+                else:
+                    values = tuple(values)
+                if len(values) != len(names):
+                    raise TypeError(
+                        "standalone parametrize value count does not match argument names"
+                    )
+                expanded.append({**existing, **dict(zip(names, values, strict=True))})
+        cases = expanded
+    return tuple(cases) or ({},)
+
+
+def _call_standalone_case(fn, provided):
     import copy
     import inspect
     from crypto_rsi_scanner import config
 
-    kwargs = {}
+    kwargs = dict(provided)
     temp_dirs = []
+    monkeypatches = []
     original_config = {}
     for config_name in dir(config):
         if not config_name.isupper():
@@ -865,18 +899,29 @@ def _call_standalone_test(fn):
         except Exception:  # noqa: BLE001
             original_config[config_name] = value
     for name, param in inspect.signature(fn).parameters.items():
+        if name in kwargs:
+            continue
         if param.default is not inspect.Parameter.empty:
             continue
         if name == "tmp_path":
             tmp = TemporaryDirectory()
             temp_dirs.append(tmp)
-            kwargs[name] = Path(tmp.name)
+            kwargs[name] = Path(tmp.name).resolve()
+            continue
+        if name == "monkeypatch":
+            import pytest
+
+            patcher = pytest.MonkeyPatch()
+            monkeypatches.append(patcher)
+            kwargs[name] = patcher
             continue
         raise TypeError(f"unsupported standalone fixture: {name}")
 
     try:
         fn(**kwargs)
     finally:
+        for patcher in reversed(monkeypatches):
+            patcher.undo()
         for config_name in tuple(dir(config)):
             if config_name.isupper() and config_name not in original_config:
                 delattr(config, config_name)
@@ -884,6 +929,11 @@ def _call_standalone_test(fn):
             setattr(config, config_name, value)
         for tmp in reversed(temp_dirs):
             tmp.cleanup()
+
+
+def _call_standalone_test(fn):
+    for case in _standalone_param_cases(fn):
+        _call_standalone_case(fn, case)
 
 
 def _run_all():

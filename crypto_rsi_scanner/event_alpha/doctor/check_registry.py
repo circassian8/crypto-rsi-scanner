@@ -419,6 +419,19 @@ CHECKS: tuple[DoctorCheck, ...] = (
         "Outcome rows must retain candidate/core identity and opportunity type.",
     ),
     _check(
+        "outcomes.eligibility_firewall",
+        CATEGORY_OUTCOMES,
+        "blocker",
+        (
+            "run_id", "profile", "artifact_namespace", "candidate_id",
+            "core_opportunity_id", "observed_at", "outcome_data_source",
+            "outcome_identity", "outcome_identity_key", "calibration_eligible",
+            "calibration_ineligible_reasons", "primary_horizon", "horizon_metadata",
+            "observation_price_provenance_status", "outcome_evaluated_at",
+        ),
+        "Only unique exact-lineage observed-market outcomes with mature ordered provenance may enter calibration evidence.",
+    ),
+    _check(
         "outcomes.price_data_labeling",
         CATEGORY_OUTCOMES,
         "blocker",

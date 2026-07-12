@@ -580,17 +580,18 @@ def test_integrated_radar_performance_dashboard_cross_namespace_recommendations(
         assert (out / event_integrated_radar.RADAR_PROVIDER_PERFORMANCE_FILENAME).exists()
         assert payload["thresholds_changed"] is False
         assert payload["auto_apply"] is False
-        assert payload["rows_evaluated"] == 5
-        assert payload["diagnostic_rows_excluded"] == 1
+        assert payload["rows_evaluated"] == 0
+        assert payload["diagnostic_rows_excluded"] == 2
+        assert payload["calibration_ineligible_rows_excluded"] == 9
         assert payload["maturation_counts"]["matured"] == 3
-        assert payload["maturation_counts"]["pending"] == 1
+        assert payload["maturation_counts"]["pending"] == 5
         assert payload["maturation_counts"]["missing_price_data"] == 1
-        assert payload["performance_views"]["early_long_conversion_rate"]["rate"] == 1.0
-        assert payload["performance_views"]["fade_review_exhaustion_rate"]["rate"] == 1.0
-        assert payload["performance_views"]["unconfirmed_later_confirmation_noise_rate"]["noise_rate"] == 1.0
+        assert payload["performance_views"]["early_long_conversion_rate"]["rate"] is None
+        assert payload["performance_views"]["fade_review_exhaustion_rate"]["rate"] is None
+        assert payload["performance_views"]["unconfirmed_later_confirmation_noise_rate"]["noise_rate"] is None
         assert {"bybit", "coinalyze", "cryptopanic"} <= set(payload["provider_performance"])
-        assert payload["provider_performance"]["coinalyze"]["validated_count"] == 1
-        assert payload["provider_performance"]["cryptopanic"]["invalidated_noise_count"] == 1
+        assert payload["provider_performance"]["coinalyze"]["validated_count"] == 0
+        assert payload["provider_performance"]["cryptopanic"]["invalidated_noise_count"] == 0
         assert payload["provider_prior_suggestions"]["bybit"]["auto_apply"] is False
         assert payload["provider_prior_suggestions"]["bybit"]["min_sample_warning"] is True
         assert payload["source_pack_prior_suggestions"]["official_exchange_listing_pack"]["auto_apply"] is False
@@ -718,15 +719,17 @@ def test_integrated_radar_performance_joins_real_core_shape_without_double_count
             generated_at="2026-06-20T00:00:00+00:00",
         )
 
-        assert len(inputs["rows"]) == 11
+        assert len(inputs["rows"]) == 22
         assert len({row["candidate_id"] for row in inputs["rows"]}) == 11
+        assert all(row["calibration_eligible"] is False for row in inputs["rows"])
         assert all(
-            sum(row["core_opportunity_id"] == core["core_opportunity_id"] for row in inputs["rows"]) == 1
+            sum(row["core_opportunity_id"] == core["core_opportunity_id"] for row in inputs["rows"]) == 2
             for core in cores
         )
-        assert payload["rows_evaluated"] == 9
-        assert payload["diagnostic_rows_excluded"] == 2
-        assert payload["main_aggregate"]["rows"] == 9
+        assert payload["rows_evaluated"] == 0
+        assert payload["diagnostic_rows_excluded"] == 4
+        assert payload["calibration_ineligible_rows_excluded"] == 18
+        assert payload["main_aggregate"]["rows"] == 0
 
 
 def test_integrated_radar_performance_deduplicates_outcomes_and_joins_idless_fallback():
@@ -759,9 +762,11 @@ def test_integrated_radar_performance_deduplicates_outcomes_and_joins_idless_fal
         stale_after_days=14,
     )
 
-    assert len(rows) == 2
-    assert next(row for row in rows if row["symbol"] == "IDLESS")["outcome_label"] == "early_good"
-    assert next(row for row in rows if row["symbol"] == "DUP")["outcome_label"] == "later_confirmed"
+    assert len(rows) == 5
+    assert sum(row["symbol"] == "IDLESS" for row in rows) == 2
+    assert sum(row["symbol"] == "DUP" for row in rows) == 3
+    assert all(row["calibration_eligible"] is False for row in rows)
+    assert all(row["validation_label"] == "inconclusive" for row in rows)
 
 
 def test_integrated_performance_doctor_scopes_diagnostic_to_lane_and_route():

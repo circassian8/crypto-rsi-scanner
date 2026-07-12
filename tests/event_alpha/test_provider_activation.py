@@ -1157,7 +1157,8 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
         now=now,
     )
     readiness_text = event_alpha_v1_readiness.format_v1_readiness_report(readiness)
-    assert "READY_FOR_CALIBRATED_RESEARCH_SEND: yes" in readiness_text
+    assert "READY_FOR_CALIBRATED_RESEARCH_SEND: no" in readiness_text
+    assert "calibrated research send still requires burn-in evidence" in readiness_text
     assert "READY_FOR_FULL_LLM_LIVE: yes" in readiness_text
     assert "profile matrix:" in readiness_text
 

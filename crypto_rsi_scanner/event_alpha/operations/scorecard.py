@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from . import common
 from . import evidence_semantics
+from . import outcome_evidence
 from .daily_burn_in import RUN_JSON
 from . import namespace_policy
 
@@ -51,7 +52,8 @@ def build_scorecard(
     context = common.context_for(profile=profile, artifact_namespace=artifact_namespace or profile, base_dir=base_dir)
     base = context.base_dir
     contract = common.load_contract()
-    cutoff = common.date_window(days)
+    evaluation_now = common.utc_now()
+    cutoff = common.date_window(days, now=evaluation_now)
     policy = namespace_policy.build_namespace_policy(
         profile=profile,
         artifact_namespace=context.artifact_namespace,
@@ -66,11 +68,12 @@ def build_scorecard(
     )
     included_namespaces = namespace_policy.included_namespace_names(policy)
     daily_runs = _daily_runs(base, cutoff=cutoff, namespaces=included_namespaces)
-    candidate_rows = _all_rows(base, "event_integrated_radar_candidates.jsonl", cutoff=cutoff, namespaces=included_namespaces)
-    core_rows = _all_rows(base, "event_core_opportunities.jsonl", cutoff=cutoff, namespaces=included_namespaces)
+    (candidate_rows, core_rows, supplied_outcome_rows, outcome_rows,
+     excluded_outcome_rows, outcome_exclusion_reason_counts) = (
+        outcome_evidence.load_exact_namespace_outcomes(
+            base, cutoff, included_namespaces, _all_rows, evaluation_now))
     alert_rows = _all_rows(base, "event_alpha_alerts.jsonl", cutoff=cutoff, namespaces=included_namespaces)
     feedback_rows = _all_rows(base, "event_alpha_feedback.jsonl", cutoff=cutoff, namespaces=included_namespaces)
-    outcome_rows = _all_rows(base, "event_integrated_radar_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces) + _all_rows(base, "event_alpha_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces)
     source_coverage_rows = [common.read_json(base / namespace / "event_alpha_source_coverage.json") for namespace in included_namespaces]
     evidence_summaries = evidence_semantics.namespace_summaries(base, included_namespaces, cutoff=cutoff, policy=policy)
     evidence_aggregate = evidence_semantics.aggregate_namespace_summaries(evidence_summaries)
@@ -114,7 +117,7 @@ def build_scorecard(
         {
             "schema_version": "event_alpha_burn_in_scorecard_v1",
             "row_type": "event_alpha_burn_in_scorecard",
-            "generated_at": common.utc_now().isoformat(),
+            "generated_at": evaluation_now.isoformat(),
             "profile": profile,
             "artifact_namespace": context.artifact_namespace,
             "namespace_dir": common.rel_path(context.namespace_dir),
@@ -158,6 +161,7 @@ def build_scorecard(
             "labeled_near_misses": len(labeled_near_misses),
             "outcome_rows": len(outcome_rows),
             "outcomes": len(outcome_rows),
+            **outcome_evidence.telemetry(supplied_outcome_rows, outcome_rows, excluded_outcome_rows, outcome_exclusion_reason_counts),
             "provider_categories_observed": provider_categories,
             "provider_categories_observed_count": len(provider_categories),
             "enough_data": enough_data,
@@ -204,6 +208,13 @@ def format_scorecard(payload: Mapping[str, Any]) -> str:
         f"- labels_collected: `{payload.get('labels_collected')}`",
         f"- labeled_near_misses: `{payload.get('labeled_near_misses')}`",
         f"- outcome_rows: `{payload.get('outcome_rows')}`",
+        f"- outcome_rows_supplied: `{payload.get('outcome_rows_supplied')}`",
+        f"- outcome_rows_eligible: `{payload.get('outcome_rows_eligible')}`",
+        f"- outcome_rows_excluded: `{payload.get('outcome_rows_excluded')}`",
+        common.table_line(
+            "outcome_exclusion_reason_counts",
+            payload.get("outcome_exclusion_reason_counts") or {},
+        ),
         f"- provider_categories_observed_count: `{payload.get('provider_categories_observed_count')}`",
         f"- enough_data: `{payload.get('enough_data')}`",
         f"- enough_data_reasons: `{', '.join(payload.get('enough_data_reasons') or []) or 'none'}`",

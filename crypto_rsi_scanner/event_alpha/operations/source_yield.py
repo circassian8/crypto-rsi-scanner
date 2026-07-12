@@ -9,6 +9,7 @@ from typing import Any, Mapping
 from . import common
 from . import evidence_semantics
 from . import namespace_policy
+from . import outcome_evidence
 from .daily_burn_in import CANDIDATE_MODE_MANIFEST_JSON, RUN_JSON
 
 
@@ -32,7 +33,8 @@ def build_source_yield_report(
 ) -> dict[str, Any]:
     context = common.context_for(profile=profile, artifact_namespace=artifact_namespace or profile, base_dir=base_dir)
     base = context.base_dir
-    cutoff = common.date_window(days)
+    evaluation_now = common.utc_now()
+    cutoff = common.date_window(days, now=evaluation_now)
     policy = namespace_policy.build_namespace_policy(
         profile=profile,
         artifact_namespace=context.artifact_namespace,
@@ -46,10 +48,10 @@ def build_source_yield_report(
         include_namespaces=((artifact_namespace,) if artifact_namespace else include_namespaces),
     )
     included_namespaces = namespace_policy.included_namespace_names(policy)
-    candidates = _rows(base, "event_integrated_radar_candidates.jsonl", cutoff=cutoff, namespaces=included_namespaces)
-    cores = _rows(base, "event_core_opportunities.jsonl", cutoff=cutoff, namespaces=included_namespaces)
+    (candidates, cores, supplied_outcomes, outcomes, excluded_outcomes,
+     outcome_exclusion_reason_counts) = outcome_evidence.load_exact_namespace_outcomes(
+        base, cutoff, included_namespaces, _rows, evaluation_now)
     feedback = _rows(base, "event_alpha_feedback.jsonl", cutoff=cutoff, namespaces=included_namespaces)
-    outcomes = _rows(base, "event_integrated_radar_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces) + _rows(base, "event_alpha_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces)
     daily_runs = [common.read_json(base / namespace / RUN_JSON) for namespace in included_namespaces]
     daily_runs = [row for row in daily_runs if row]
     candidate_mode_manifests = [
@@ -95,7 +97,7 @@ def build_source_yield_report(
         {
             "schema_version": "event_alpha_source_yield_report_v1",
             "row_type": "event_alpha_source_yield_report",
-            "generated_at": common.utc_now().isoformat(),
+            "generated_at": evaluation_now.isoformat(),
             "profile": profile,
             "artifact_namespace": context.artifact_namespace,
             "namespace_dir": common.rel_path(context.namespace_dir),
@@ -150,6 +152,7 @@ def build_source_yield_report(
             "core_opportunity_count": len(cores),
             "feedback_count": len(feedback),
             "outcome_count": len(outcomes),
+            **outcome_evidence.telemetry(supplied_outcomes, outcomes, excluded_outcomes, outcome_exclusion_reason_counts),
             "recommendations_only": True,
             "auto_apply": False,
             "auto_apply_thresholds": False,
@@ -186,6 +189,13 @@ def format_source_yield_report(payload: Mapping[str, Any]) -> str:
         f"- provider_readiness_rows: `{payload.get('provider_readiness_rows')}`",
         f"- source_coverage_rows: `{payload.get('source_coverage_rows')}`",
         f"- non_burn_in_candidate_count: `{payload.get('non_burn_in_candidate_count')}`",
+        f"- outcome_rows_supplied: `{payload.get('outcome_rows_supplied')}`",
+        f"- outcome_rows_eligible: `{payload.get('outcome_rows_eligible')}`",
+        f"- outcome_rows_excluded: `{payload.get('outcome_rows_excluded')}`",
+        common.table_line(
+            "outcome_exclusion_reason_counts",
+            payload.get("outcome_exclusion_reason_counts") or {},
+        ),
         f"- recommendations_only: `{payload.get('recommendations_only')}`",
         f"- auto_apply: `{payload.get('auto_apply')}`",
         f"- enough_data: `{payload.get('enough_data')}`",
@@ -200,6 +210,7 @@ def format_source_yield_report(payload: Mapping[str, Any]) -> str:
             f"candidates_produced={row.get('candidates_produced')} "
             f"evidence_accepted={row.get('evidence_accepted')} "
             f"useful={row.get('useful_label_count')} noise={row.get('noise_label_count')} "
+            f"outcomes={row.get('outcome_count')} "
             f"activation=`{row.get('activation_status') or 'not_observed'}` "
             f"configured=`{row.get('configured')}` allow=`{row.get('allow_flag_set')}` "
             f"ledger_rows=`{row.get('request_ledger_rows')}` "
@@ -211,6 +222,7 @@ def format_source_yield_report(payload: Mapping[str, Any]) -> str:
         lines.append(
             f"- {pack}: candidates={row.get('candidate_count')} labels={row.get('label_count')} "
             f"useful={row.get('useful_label_count')} noise={row.get('noise_label_count')} "
+            f"outcomes={row.get('outcome_count')} "
             f"recommendation=`{row.get('recommended_action')}`"
         )
     warnings = payload.get("warnings") or []

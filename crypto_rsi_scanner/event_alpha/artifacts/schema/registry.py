@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 from . import calendar as calendar_specs, decision_model as decision_model_specs
+from . import outcome_eligibility as outcome_eligibility_specs
 from . import operator_state as operator_state_specs, provider_lineage_specs
 EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION = "event_alpha_schema_v1"
 ALLOWED_OPPORTUNITY_TYPES = (
@@ -407,9 +408,9 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "enough_data_reasons", "auto_apply", "auto_apply_thresholds",
             "fixture_candidate_count", "contract_counted_candidate_count",
             "real_burn_in_candidate_count",
-            "warnings", *OPERATION_SAFETY,
+            "warnings", *outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_FIELDS, *OPERATION_SAFETY,
         ),
-        types={"row_type": "str", "profile": "str", "artifact_namespace": "str"},
+        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", **outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_TYPES},
         safety=OPERATION_SAFETY + ("auto_apply",),
         timestamps=("generated_at",),
         lineage=("profile", "artifact_namespace"),
@@ -422,9 +423,9 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "window_days", "namespace_policy", "burn_in_contract_scope",
             "candidate_source_scope", "explicit_scope_warning", "enough_data",
             "enough_data_reasons", "low_sample_warning", "min_sample_warning",
-            "source_yield_confidence", *OPERATION_SAFETY,
+            "source_yield_confidence", *outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_FIELDS, *OPERATION_SAFETY,
         ),
-        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", "auto_apply_thresholds": "bool"},
+        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", "auto_apply_thresholds": "bool", **outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_TYPES},
         safety=OPERATION_SAFETY + ("auto_apply_thresholds",),
         timestamps=("generated_at",),
         lineage=("profile", "artifact_namespace"),
@@ -437,9 +438,9 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "window_days", "namespace_policy", "burn_in_contract_scope",
             "candidate_source_scope", "providers", "source_packs",
             "source_yield_confidence", "recommendations_only",
-            "auto_apply_thresholds", *OPERATION_SAFETY,
+            "auto_apply_thresholds", *outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_FIELDS, *OPERATION_SAFETY,
         ),
-        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", "auto_apply": "bool"},
+        types={"row_type": "str", "profile": "str", "artifact_namespace": "str", "auto_apply": "bool", **outcome_eligibility_specs.OUTCOME_EVIDENCE_TELEMETRY_TYPES},
         safety=OPERATION_SAFETY + ("auto_apply", "auto_apply_thresholds"),
         timestamps=("generated_at",),
         lineage=("profile", "artifact_namespace"),
@@ -570,21 +571,14 @@ SCHEMAS: dict[str, ArtifactSchema] = {
         timestamps=("event_time", "unlock_time"),
         lineage=COMMON_LINEAGE,
     ),
-    "outcome_row_v1": _schema(
-        "outcome_row_v1",
-        required=("row_type", "symbol", "opportunity_type"),
-        optional=(
-            "schema_id", "schema_version", "candidate_id", "core_opportunity_id",
-            "outcome_status", "outcome_label", "maturation_state",
-            "return_by_horizon", "max_favorable_excursion",
-            "max_adverse_excursion", "price_data_status", "market_state_class",
-            "crowding_class", *DECISION_MODEL_V2_FIELDS, *COMMON_SAFETY,
-        ),
-        types={**DECISION_MODEL_V2_TYPES},
-        enums={"opportunity_type": ALLOWED_OPPORTUNITY_TYPES, **DECISION_MODEL_V2_ENUMS},
-        safety=COMMON_SAFETY,
-        timestamps=("observed_at", "matured_at"),
-        lineage=COMMON_LINEAGE,
+    **outcome_eligibility_specs.schema_specs(
+        _schema,
+        decision_model_fields=DECISION_MODEL_V2_FIELDS,
+        decision_model_types=DECISION_MODEL_V2_TYPES,
+        decision_model_enums=DECISION_MODEL_V2_ENUMS,
+        allowed_opportunity_types=ALLOWED_OPPORTUNITY_TYPES,
+        common_safety=COMMON_SAFETY,
+        common_lineage=COMMON_LINEAGE,
     ),
     "calibration_prior_v1": _schema(
         "calibration_prior_v1",
@@ -847,6 +841,7 @@ def validate_row_against_schema(row: Mapping[str, Any], schema: str | ArtifactSc
     if schema_obj.schema_id == "unified_calendar_event_v1": errors.extend(calendar_specs.validate_contract(row))
     if schema_obj.schema_id == "run_ledger_v1": errors.extend(calendar_specs.validate_run_ledger_normalization_contract(row))
     if schema_obj.schema_id == "operator_state_v1": errors.extend(operator_state_specs.validate_contract(row))
+    if schema_obj.schema_id == "outcome_row_v1": errors.extend(outcome_eligibility_specs.validate_contract(row))
     if row.get("decision_model_version") not in (None, "") and schema_obj.schema_id in {"core_opportunity_v1", "integrated_radar_candidate_v1", "outcome_row_v1"}:
         errors.extend(decision_model_specs.validate_contract(row))
     return errors

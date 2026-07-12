@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from ..artifacts import context as artifact_context
+from ..artifacts import json_lines as artifact_json_lines
 
 
 SECRET_RE = re.compile(
@@ -99,23 +100,7 @@ def context_for(
 
 
 def read_jsonl(path: str | Path) -> list[dict[str, Any]]:
-    p = Path(path).expanduser()
-    if not p.exists():
-        return []
-    rows: list[dict[str, Any]] = []
-    try:
-        for line in p.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            try:
-                loaded = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(loaded, Mapping):
-                rows.append(dict(loaded))
-    except OSError:
-        return []
-    return rows
+    return list(artifact_json_lines.read_jsonl(path).rows)
 
 
 def read_json(path: str | Path) -> dict[str, Any]:

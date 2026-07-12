@@ -6,12 +6,13 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from ..artifacts import context as event_alpha_artifacts
+from . import outcome_eligibility as outcome_eligibility_contract
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,9 @@ class EventAlphaBurnInScorecard:
     runs_with_alertable_but_no_alert_snapshots: int = 0
     feedback_row_count: int = 0
     outcome_row_count: int = 0
+    outcome_rows_supplied: int = 0
+    outcome_rows_excluded: int = 0
+    outcome_exclusion_reason_counts: dict[str, int] = field(default_factory=dict)
     missed_row_count: int = 0
     provider_health_row_count: int = 0
     llm_budget_row_count: int = 0
@@ -50,6 +54,8 @@ def build_burn_in_scorecard(
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     llm_budget_rows: Iterable[Mapping[str, Any]] = (),
     outcome_rows: Iterable[Mapping[str, Any]] = (),
+    candidate_rows: Iterable[Mapping[str, Any]] = (),
+    core_rows: Iterable[Mapping[str, Any]] = (),
     profile: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
@@ -57,14 +63,34 @@ def build_burn_in_scorecard(
     days: int = 7,
     now: datetime | None = None,
 ) -> EventAlphaBurnInScorecard:
-    cutoff = (now or datetime.now(timezone.utc)).astimezone(timezone.utc) - timedelta(days=max(1, int(days or 1)))
+    evaluation_now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    cutoff = evaluation_now - timedelta(days=max(1, int(days or 1)))
     raw_run_data = _filter_rows(run_rows, cutoff, ("started_at", "observed_at", "marked_at"))
     raw_alert_data = _filter_rows(alert_rows, cutoff, ("observed_at", "started_at"))
     raw_feedback_data = _filter_rows(feedback_rows, cutoff, ("marked_at", "observed_at"))
     raw_missed_data = _filter_rows(missed_rows, cutoff, ("observed_at", "detected_at", "created_at"))
     raw_budget_data = _filter_rows(llm_budget_rows, cutoff, ("date", "updated_at"))
     raw_outcomes = _filter_rows(outcome_rows, cutoff, ("observed_at", "started_at"))
-    raw_all = [*raw_run_data, *raw_alert_data, *raw_feedback_data, *raw_missed_data, *raw_budget_data, *raw_outcomes]
+    raw_candidates = _filter_rows(
+        candidate_rows,
+        cutoff,
+        ("observed_at", "started_at", "created_at"),
+    )
+    raw_cores = _filter_rows(
+        core_rows,
+        cutoff,
+        ("observed_at", "started_at", "created_at"),
+    )
+    raw_all = [
+        *raw_run_data,
+        *raw_alert_data,
+        *raw_feedback_data,
+        *raw_missed_data,
+        *raw_budget_data,
+        *raw_outcomes,
+        *raw_candidates,
+        *raw_cores,
+    ]
     legacy_skipped = 0 if include_api_artifacts else sum(1 for row in raw_all if event_alpha_artifacts.is_api_row(row))
     test_skipped = 0 if include_test_artifacts else sum(1 for row in raw_all if event_alpha_artifacts.is_non_operational_row(row))
     run_data = _artifact_filter(raw_run_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
@@ -73,7 +99,19 @@ def build_burn_in_scorecard(
     missed_data = _artifact_filter(raw_missed_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
     budget_data = _artifact_filter(raw_budget_data, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
     supplied_outcomes = _artifact_filter(raw_outcomes, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
-    outcome_data = supplied_outcomes or _rows_with_outcomes(alert_data)
+    candidate_data = _artifact_filter(raw_candidates, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
+    core_data = _artifact_filter(raw_cores, profile, artifact_namespace, include_test_artifacts, include_api_artifacts)
+    candidate_outcomes = supplied_outcomes or _rows_with_outcomes(alert_data)
+    eligible_outcomes, excluded_outcomes, outcome_exclusion_reasons = (
+        outcome_eligibility_contract.partition_joined_calibration_outcomes(
+            candidate_outcomes,
+            candidate_data,
+            core_data,
+            evaluated_at=evaluation_now,
+        )
+    )
+    outcome_data = list(eligible_outcomes)
+    outcome_excluded = len(excluded_outcomes)
     health_data = {str(key): dict(value) for key, value in (provider_health_rows or {}).items()}
     runs_with_alertable = sum(1 for row in run_data if _int(row.get("alertable")) > 0)
     alert_counts_by_run_id: dict[str, int] = {}
@@ -102,6 +140,14 @@ def build_burn_in_scorecard(
         health_data,
         profile=profile,
     )
+    if outcome_excluded:
+        reason_summary = ", ".join(
+            f"{reason}={count}" for reason, count in sorted(outcome_exclusion_reasons.items())
+        )
+        coverage = tuple(dict.fromkeys((
+            *coverage,
+            f"outcome rows excluded from calibration ({reason_summary or 'unclassified'})",
+        )))
     return EventAlphaBurnInScorecard(
         days=max(1, int(days or 1)),
         run_rows=run_data,
@@ -122,6 +168,9 @@ def build_burn_in_scorecard(
         runs_with_alertable_but_no_alert_snapshots=alertable_without_snapshots,
         feedback_row_count=len(feedback_data),
         outcome_row_count=len(outcome_data),
+        outcome_rows_supplied=len(candidate_outcomes),
+        outcome_rows_excluded=outcome_excluded,
+        outcome_exclusion_reason_counts=outcome_exclusion_reasons,
         missed_row_count=len(missed_data),
         provider_health_row_count=len(health_data),
         llm_budget_row_count=len(budget_data),
@@ -177,12 +226,22 @@ def format_burn_in_scorecard(scorecard: EventAlphaBurnInScorecard) -> str:
         f"alert_snapshots={scorecard.alert_snapshot_rows} · "
         f"alertable_without_snapshots={scorecard.runs_with_alertable_but_no_alert_snapshots} · "
         f"feedback={scorecard.feedback_row_count} · outcomes={scorecard.outcome_row_count} · "
+        f"outcomes_supplied={scorecard.outcome_rows_supplied} · "
+        f"outcomes_excluded={scorecard.outcome_rows_excluded} · "
         f"missed={scorecard.missed_row_count} · provider_health={scorecard.provider_health_row_count} · "
         f"llm_budget={scorecard.llm_budget_row_count} · "
         f"legacy_skipped={scorecard.legacy_rows_skipped} · test_skipped={scorecard.test_rows_skipped}",
         "top playbooks: " + _top_line(alerts, "playbook_type"),
         "worst sources: " + _worst_source_line(alerts, feedback),
     ]
+    if scorecard.outcome_exclusion_reason_counts:
+        lines.append(
+            "outcome exclusions: "
+            + ", ".join(
+                f"{reason}={count}"
+                for reason, count in sorted(scorecard.outcome_exclusion_reason_counts.items())
+            )
+        )
     if scorecard.coverage_warnings:
         lines.extend(["", "coverage warnings:"])
         lines.extend(f"- {warning}" for warning in scorecard.coverage_warnings)

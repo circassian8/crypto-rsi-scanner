@@ -728,9 +728,10 @@ def test_candidate_mode_scorecard_supplied_base_ignores_sibling_poison_cache(tmp
 
 
 def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
     import crypto_rsi_scanner.event_alpha.outcomes.burn_in as event_alpha_burn_in
     import crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist as event_alpha_burn_in_checklist
+    import crypto_rsi_scanner.event_alpha.outcomes.outcome_eligibility as outcome_eligibility
 
     now = datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc)
     meta = {"profile": "no_key_live", "run_mode": "burn_in", "artifact_namespace": "no_key_live"}
@@ -846,13 +847,112 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
     checklist_text = event_alpha_burn_in_checklist.format_burn_in_checklist(checklist)
     assert "READY_FOR_RESEARCH_SEND: no" in checklist_text
 
+    ready_observed_at = datetime(2026, 6, 19, 10, 1, tzinfo=timezone.utc)
+    ready_metadata = {}
+    ready_returns = {}
+    for horizon in outcome_eligibility.OUTCOME_HORIZONS:
+        due_at = ready_observed_at + timedelta(
+            seconds=outcome_eligibility.OUTCOME_HORIZON_SECONDS[horizon]
+        )
+        matured = due_at <= now
+        horizon_return = (
+            (0.1 if horizon == "1h" else 0.05) if matured else None
+        )
+        ready_metadata[horizon] = {
+            "due_at": due_at.isoformat(),
+            "price_observed_at": (due_at + timedelta(seconds=30)).isoformat() if matured else None,
+            "price_at_horizon": (
+                100.0 * (1.0 + horizon_return)
+                if horizon_return is not None
+                else None
+            ),
+            "price_source": "fixture_ohlcv" if matured else None,
+            "price_observation_id": (
+                f"fixture:ready:{horizon}:{due_at.isoformat()}"
+                if matured
+                else None
+            ),
+            "maturity_status": "matured" if matured else "pending",
+            "provenance_status": "observed_market_prices" if matured else "missing",
+        }
+        ready_returns[horizon] = horizon_return
+    ready_outcome = {
+        **meta,
+        "row_type": "event_alpha_outcome",
+        "run_id": "ready-run",
+        "symbol": "BTC",
+        "coin_id": "bitcoin",
+        "opportunity_type": "EARLY_LONG_RESEARCH",
+        "candidate_id": "ready-candidate",
+        "core_opportunity_id": "ready-core",
+        "observed_at": ready_observed_at.isoformat(),
+        "outcome_eligibility_contract_version": outcome_eligibility.OUTCOME_ELIGIBILITY_CONTRACT_VERSION,
+        "outcome_data_source": "observed_market_prices",
+        "outcome_evaluated_at": now.isoformat(),
+        "observation_price_provenance_status": "observed_market_prices",
+        "price_at_observation": 100.0,
+        "observation_price_source": "fixture_ohlcv",
+        "observation_price_id": "fixture:ready:entry",
+        "primary_horizon": "1h",
+        "primary_horizon_return": 0.1,
+        "return_by_horizon": ready_returns,
+        "horizon_metadata": ready_metadata,
+        "research_only": True,
+        "no_send_rehearsal": True,
+        "sent": False,
+        "normal_rsi_signal_written": False,
+        "triggered_fade_created": False,
+        "paper_trade_created": False,
+        "trade_created": False,
+    }
+    ready_outcome.update(outcome_eligibility.build_outcome_identity_fields(ready_outcome))
+    ready_outcome["calibration_ineligible_reasons"] = list(
+        outcome_eligibility.calibration_ineligibility_reasons(ready_outcome)
+    )
+    ready_outcome["calibration_eligible"] = not ready_outcome["calibration_ineligible_reasons"]
     ready_scorecard = event_alpha_burn_in.build_burn_in_scorecard(
         days=7,
         now=now,
         run_rows=[{**meta, "run_id": "ready-run", "started_at": "2026-06-19T10:00:00+00:00", "success": True, "alertable": 1}],
         alert_rows=[{**meta, "run_id": "ready-run", "observed_at": "2026-06-19T10:01:00+00:00", "alert_key": "a", "tier": "WATCHLIST"}],
         feedback_rows=[{**meta, "marked_at": "2026-06-19T11:00:00+00:00", "key": "a", "label": "useful"}],
-        outcome_rows=[{**meta, "observed_at": "2026-06-19T12:00:00+00:00", "alert_key": "a", "primary_horizon_return": 0.1}],
+        outcome_rows=[ready_outcome],
+        candidate_rows=[
+            {
+                key: ready_outcome[key]
+                for key in outcome_eligibility.OUTCOME_IDENTITY_FIELDS
+            }
+                | {
+                    "row_type": "event_integrated_radar_candidate",
+                    "schema_id": "integrated_radar_candidate_v1",
+                    "schema_version": "event_alpha_schema_v1",
+                    "research_only": True,
+                    "symbol": "BTC",
+                    "opportunity_type": "EARLY_LONG_RESEARCH",
+                    "run_mode": "burn_in",
+                }
+        ],
+        core_rows=[
+            {
+                key: ready_outcome[key]
+                for key in (
+                    "core_opportunity_id",
+                    "run_id",
+                    "profile",
+                    "artifact_namespace",
+                )
+            }
+                | {
+                    "row_type": "event_core_opportunity",
+                    "schema_id": "core_opportunity_v1",
+                    "schema_version": "event_core_opportunity_store_v1",
+                    "generated_at": ready_outcome["observed_at"],
+                    "research_only": True,
+                    "symbol": "BTC",
+                    "opportunity_type": "EARLY_LONG_RESEARCH",
+                    "run_mode": "burn_in",
+                }
+        ],
         missed_rows=[{**meta, "observed_at": "2026-06-19T12:00:00+00:00", "failure_stage": "unknown"}],
         provider_health_rows={"gdelt:event_source": {"provider_key": "gdelt:event_source", "consecutive_failures": 0}},
     )

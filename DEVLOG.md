@@ -17,6 +17,52 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-12 — Count only exact observed outcome evidence · Codex
+**Why:** Decision Model v2 reports could treat synthetic fixture returns,
+immature horizons, broad identity matches, or caller-supplied positive labels as
+calibration truth. That could make research performance and burn-in readiness
+look stronger without a canonical candidate, CoreOpportunity, price lineage, or
+directionally correct observed move.
+**Changes:**
+- Added one fail-closed outcome-eligibility contract with exact run/profile/
+  namespace/candidate/Core/observation identity, canonical candidate and Core
+  schema authority, research-only and zero-side-effect guards, finite prices,
+  entry and per-horizon source/observation lineage, maturity and future-time
+  checks, return recomputation, and lane-aware deterministic validation.
+- Rewired outcome reports, calibration priors, performance dashboards,
+  operations scorecards/source yield, burn-in, v1 readiness, CLI writers, and
+  strict doctor checks to count only exact candidate+Core joined eligible rows.
+  Legacy, synthetic, pending, unmatched, duplicated, ambiguous, immature, and
+  unsafe rows remain visible as excluded diagnostics with closed reason counts;
+  the synthetic smoke filler no longer invents price evidence or a favorable
+  outcome label.
+- Added strict duplicate-key-safe JSONL reads for candidate, Core, outcome, and
+  operations paths. Malformed input clears partial reads and exposes only
+  payload-free diagnostics. Hardened doctor split-module imports, exact Core
+  matching, side-effect semantics, and deterministic evaluation clocks.
+- Added adversarial contract, consumer, firewall, JSONL-integrity, burn-in, and
+  doctor coverage. The standalone compatibility runner now supports the
+  parametrization, monkeypatch, and resolved temporary-path fixtures exercised
+  by the real suite.
+- Added the exact-authority feedback eligibility foundation for the next slice:
+  canonical Core attribution, unambiguous latest labels, chronology/current-
+  clock checks, Unicode-safe identity, and no-side-effect guards. It is not yet
+  connected to feedback consumers, so it cannot silently change calibration.
+**Verify:** 901 Event Alpha tests passed. The full local release gate passed:
+`make verify PYTHON=.venv/bin/python` ran 1,006/1,006 standalone tests, 1,113
+pytest tests, alert rendering, a 33-observation fixture backtest, and the paper
+scoreboard. The final integrated-radar outcome no-send smoke produced 11
+candidates, 9 canonical Core rows/cards, and 101 schema-valid doctor rows with
+zero blockers; its only warning was the expected fixture CryptoPanic coverage
+warning, and it created no sends, trades, paper trades, normal RSI rows, or
+Event Alpha triggers. `make architecture-cleanliness-check` passed with zero
+new size violations; `python -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed. GitHub Actions was not polled or awaited.
+**Notes/risks:** The fixture outcome command now writes diagnostic-only missing-
+evidence rows; it does not prove performance. A timestamp-aligned observed
+OHLCV producer is still required. The next checkpoint connects the feedback
+firewall to every learning consumer before any feedback can affect priors.
+
 ## 2026-07-12 — Make calendar normalization losses measurable · Codex
 **Why:** The unified calendar silently discarded non-mapping and invalid rows,
 silently overwrote duplicate identities, and normalized fixture rows before the

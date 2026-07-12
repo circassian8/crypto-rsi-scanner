@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ...artifacts import json_lines as artifact_json_lines
 from .runtime import *
 from .result_fields import build_api_doctor_result
 
@@ -99,6 +100,7 @@ def _load_doctor_context_inputs(options: Mapping[str, Any]) -> SimpleNamespace:
     ctx.dex_pool_anomalies = loaded.dex_pool_anomalies
     ctx.protocol_fundamentals = loaded.protocol_fundamentals
     ctx.integrated_candidates = loaded.integrated_candidates
+    ctx.outcome_evidence_jsonl_diagnostics = loaded.outcome_evidence_jsonl_diagnostics
     ctx.raw_api = loaded.raw_api
     ctx.integrated_manifest_path = loaded.integrated_manifest_path
     ctx.integrated_source_coverage_json_path = loaded.integrated_source_coverage_json_path
@@ -508,6 +510,7 @@ def _attach_artifact_conflict_context(ctx: SimpleNamespace) -> None:
         outcome_path=integrated_outcomes_path,
         preview_path=preview_path,
     )
+    _attach_outcome_evidence_jsonl_diagnostics(ctx)
     namespace_status = event_alpha_namespace_status.load_namespace_status(namespace_dir)
     structured_path_conflicts = _structured_operator_path_conflicts(
         (*runs, *alerts, *feedback, *outcomes, *hypotheses, *core_rows, *watchlist, *incidents, *acquisition_rows,
@@ -725,6 +728,7 @@ def _load_and_filter_doctor_artifacts(options: Mapping[str, Any]) -> SimpleNames
     filtered.integrated_source_coverage_json_path = raw.integrated_source_coverage_json_path
     filtered.integrated_delivery_path = raw.integrated_delivery_path
     filtered.integrated_outcomes_path = raw.integrated_outcomes_path
+    filtered.outcome_evidence_jsonl_diagnostics = raw.outcome_evidence_jsonl_diagnostics
     return filtered
 
 
@@ -745,6 +749,11 @@ def _load_raw_doctor_artifacts(options: Mapping[str, Any]) -> SimpleNamespace:
         else None
     )
     integrated_dir = integrated_path.parent if integrated_path is not None else None
+    integrated_candidate_read = artifact_json_lines.read_jsonl(integrated_path)
+    outcome_evidence_jsonl_diagnostics = _outcome_evidence_jsonl_diagnostics(
+        default_dir,
+        candidate_diagnostics=integrated_candidate_read.diagnostics,
+    )
     return SimpleNamespace(
         raw_runs=[dict(row) for row in options["run_rows"] if isinstance(row, Mapping)],
         raw_alerts=[dict(row) for row in options["alert_rows"] if isinstance(row, Mapping)],
@@ -781,7 +790,8 @@ def _load_raw_doctor_artifacts(options: Mapping[str, Any]) -> SimpleNamespace:
         raw_dex_pool_state=list(event_dex_onchain_readiness.load_dex_pool_state(default_dir)),
         raw_dex_pool_anomalies=list(event_dex_onchain_readiness.load_dex_pool_anomalies(default_dir)),
         raw_protocol_fundamentals=list(event_dex_onchain_readiness.load_protocol_fundamentals(default_dir)),
-        raw_integrated_candidates=_read_jsonl(integrated_path) if integrated_path is not None else [],
+        raw_integrated_candidates=list(integrated_candidate_read.rows),
+        outcome_evidence_jsonl_diagnostics=outcome_evidence_jsonl_diagnostics,
         raw_burn_in_scorecard=_read_json(default_dir / "event_alpha_burn_in_scorecard.json" if default_dir is not None else None),
         raw_source_yield_report=_read_json(default_dir / "event_alpha_source_yield_report.json" if default_dir is not None else None),
         raw_daily_review_inbox=_read_json(default_dir / "event_alpha_daily_review_inbox.json" if default_dir is not None else None),
@@ -816,6 +826,60 @@ def _load_optional_rows(rows: Iterable[Mapping[str, Any]] | None, loader: Callab
     if rows is None:
         return [dict(row) for row in loader() if isinstance(row, Mapping)]
     return [dict(row) for row in rows if isinstance(row, Mapping)]
+
+
+def _outcome_evidence_jsonl_diagnostics(
+    default_dir: Path | None,
+    *,
+    candidate_diagnostics: Any,
+) -> dict[str, Any]:
+    if default_dir is None:
+        return {}
+    return {
+        "candidates": candidate_diagnostics,
+        "core": artifact_json_lines.read_jsonl(
+            default_dir / "event_core_opportunities.jsonl"
+        ).diagnostics,
+        "integrated_outcomes": artifact_json_lines.read_jsonl(
+            default_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
+        ).diagnostics,
+        "alpha_outcomes": artifact_json_lines.read_jsonl(
+            default_dir / "event_alpha_outcomes.jsonl"
+        ).diagnostics,
+    }
+
+
+def _attach_outcome_evidence_jsonl_diagnostics(ctx: SimpleNamespace) -> None:
+    diagnostics = ctx.outcome_evidence_jsonl_diagnostics
+    duplicate_counts = {
+        name: len(item.duplicate_key_lines)
+        for name, item in diagnostics.items()
+        if item.duplicate_key_lines
+    }
+    malformed_counts = {
+        name: len(item.invalid_json_lines) + len(item.non_object_lines)
+        for name, item in diagnostics.items()
+        if item.invalid_json_lines or item.non_object_lines
+    }
+    read_errors = tuple(sorted(name for name, item in diagnostics.items() if item.read_error))
+    messages: list[str] = []
+    if duplicate_counts:
+        messages.append(
+            "outcome_evidence_duplicate_json_keys="
+            + ",".join(f"{name}:{duplicate_counts[name]}" for name in sorted(duplicate_counts))
+        )
+    if malformed_counts:
+        messages.append(
+            "outcome_evidence_invalid_jsonl="
+            + ",".join(f"{name}:{malformed_counts[name]}" for name in sorted(malformed_counts))
+        )
+    if read_errors:
+        messages.append("outcome_evidence_jsonl_read_errors=" + ",".join(read_errors))
+    target = ctx.blockers if ctx.strict else ctx.warnings
+    target.extend(
+        check_registry.format_check_message("outcomes.eligibility_firewall", message)
+        for message in messages
+    )
 
 
 def _load_raw_fade_review_candidates(options: Mapping[str, Any], default_dir: Path | None) -> list[dict[str, Any]]:
@@ -1095,26 +1159,7 @@ def _row(value: Mapping[str, Any] | object) -> dict[str, Any]:
     return dict(getattr(value, "__dict__", {}) or {})
 
 def _read_jsonl(path: str | Path | None) -> list[dict[str, Any]]:
-    if path is None:
-        return []
-    source = Path(path)
-    if not source.exists():
-        return []
-    rows: list[dict[str, Any]] = []
-    try:
-        for line in source.read_text(encoding="utf-8").splitlines():
-            text = line.strip()
-            if not text:
-                continue
-            try:
-                item = json.loads(text)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(item, Mapping):
-                rows.append(dict(item))
-    except OSError:
-        return []
-    return rows
+    return list(artifact_json_lines.read_jsonl(path).rows)
 
 
 def _read_json(path: str | Path | None) -> dict[str, Any]:

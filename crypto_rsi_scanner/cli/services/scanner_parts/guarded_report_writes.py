@@ -113,20 +113,34 @@ def artifact_doctor(
 
 def integrated_radar_calibration(context: Any, *, export_priors: bool) -> None:
     rows = event_integrated_radar_outcomes.load_integrated_radar_outcomes(context.namespace_dir)
+    candidates, core_rows = event_integrated_radar_outcomes.load_integrated_radar_outcome_authority(
+        context.namespace_dir
+    )
+    evaluated_at = _event_research_now()
     if export_priors:
-        priors = event_integrated_radar_outcomes.build_integrated_radar_calibration_priors(rows)
+        priors = event_integrated_radar_outcomes.build_integrated_radar_calibration_priors(
+            rows,
+            candidate_rows=candidates,
+            core_rows=core_rows,
+            evaluated_at=evaluated_at,
+        )
         path = context.namespace_dir / event_integrated_radar.INTEGRATED_CALIBRATION_PRIORS_FILENAME
         path.write_text(json.dumps(priors, sort_keys=True), encoding="utf-8")
         print(_event_alpha_context_block(context))
         print(f"integrated_radar_calibration_priors: {path}")
         return
-    report = event_integrated_radar_outcomes.format_integrated_radar_calibration_report(rows)
+    report = event_integrated_radar_outcomes.format_integrated_radar_calibration_report(
+        rows,
+        candidate_rows=candidates,
+        core_rows=core_rows,
+        evaluated_at=evaluated_at,
+    )
     path = context.namespace_dir / event_integrated_radar.INTEGRATED_CALIBRATION_REPORT_FILENAME
     path.write_text(report, encoding="utf-8")
     event_integrated_radar_outcomes.write_radar_performance_dashboard(
         (context.namespace_dir,),
         output_namespace_dir=context.namespace_dir,
-        generated_at=_event_research_now(),
+        generated_at=evaluated_at,
     )
     print(_event_alpha_context_block(context))
     print(report)

@@ -3,6 +3,25 @@
 from __future__ import annotations
 
 from .runtime import *
+from .context_loading import _read_jsonl
+from .integrated_radar_checks import (
+    _daily_brief_has_integrated_diagnostic_leak,
+    _integrated_candidate_core_card_conflicts,
+    _integrated_coinalyze_manifest_conflicts,
+    _integrated_manifest_mixed_timestamp_pairs,
+    _opportunity_lane_cryptopanic_only_narrative,
+    _opportunity_lane_diagnostic_visible,
+    _opportunity_lane_risk_only_missing_evidence,
+    _safe_float,
+)
+from .outcome_checks import (
+    _integrated_calibration_conflicts,
+    _integrated_delivery_conflicts,
+    _integrated_outcome_conflicts,
+    _integrated_performance_dashboard_conflicts,
+    _structured_operator_path_conflicts,
+)
+from .source_coverage_checks import _card_text_by_core, _truthy, _tuple_value
 
 def _opportunity_lane_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
     out = {
@@ -362,16 +381,37 @@ def _integrated_radar_artifact_conflicts(
     materialized_rows = [dict(row) for row in rows if isinstance(row, Mapping)]
     production_rows = [row for row in materialized_rows if not _fixture_support_row(row)]
     materialized_core_rows = tuple(core_rows)
-    core_by_id = {
-        str(row.get("core_opportunity_id") or ""): dict(row)
-        for row in materialized_core_rows
-        if isinstance(row, Mapping) and row.get("core_opportunity_id")
-    }
+    cores_by_exact_context: dict[tuple[str, str, str, str], list[dict[str, Any]]] = {}
+    cores_by_id: dict[str, list[dict[str, Any]]] = {}
+    for core in materialized_core_rows:
+        if not isinstance(core, Mapping):
+            continue
+        core_id = str(core.get("core_opportunity_id") or "").strip()
+        if not core_id:
+            continue
+        materialized_core = dict(core)
+        cores_by_id.setdefault(core_id, []).append(materialized_core)
+        exact_key = _integrated_core_context_key(core)
+        if exact_key is not None:
+            cores_by_exact_context.setdefault(exact_key, []).append(materialized_core)
     card_text_by_core = _card_text_by_core(research_card_paths)
     row_count = 0
     for row in production_rows:
         row_count += 1
-        _add_integrated_candidate_conflicts(row, core_by_id, card_text_by_core, out)
+        core_id = str(row.get("core_opportunity_id") or "").strip()
+        exact_key = _integrated_core_context_key(row)
+        matches = (
+            cores_by_exact_context.get(exact_key, ())
+            if exact_key is not None
+            else cores_by_id.get(core_id, ())
+        )
+        exact_core_by_id = {core_id: matches[0]} if core_id and len(matches) == 1 else {}
+        _add_integrated_candidate_conflicts(
+            row,
+            exact_core_by_id,
+            card_text_by_core,
+            out,
+        )
 
     _add_integrated_manifest_conflicts(out, row_count, manifest_path, production_rows)
     _add_integrated_source_coverage_conflicts(out, row_count, source_coverage_json_path)
@@ -385,6 +425,21 @@ def _integrated_radar_artifact_conflicts(
         (*materialized_rows, *materialized_core_rows, *delivery_rows, *outcome_rows)
     )
     return out
+
+
+def _integrated_core_context_key(
+    row: Mapping[str, Any],
+) -> tuple[str, str, str, str] | None:
+    values = tuple(
+        row.get(field)
+        for field in ("core_opportunity_id", "run_id", "profile", "artifact_namespace")
+    )
+    if not all(
+        type(value) is str and value and value == value.strip()
+        for value in values
+    ):
+        return None
+    return values  # type: ignore[return-value]
 
 def _empty_integrated_radar_artifact_conflicts() -> dict[str, int]:
     return {
@@ -457,6 +512,13 @@ def _empty_integrated_radar_artifact_conflicts() -> dict[str, int]:
         "integrated_outcome_return_double_scaled": 0,
         "integrated_outcome_missing_data_unlabeled": 0,
         "integrated_outcome_thesis_move_missing": 0,
+        "integrated_outcome_eligibility_contract_invalid": 0,
+        "integrated_outcome_synthetic_evidence_leak": 0,
+        "integrated_outcome_immature_validation_claim": 0,
+        "integrated_outcome_duplicate_exact_identity": 0,
+        "integrated_outcome_ambiguous_exact_identity": 0,
+        "integrated_outcome_eligible_provenance_missing": 0,
+        "integrated_outcome_identity_mismatch": 0,
         "integrated_outcome_card_thesis_interpretation_missing": 0,
         "integrated_outcome_card_trade_wording": 0,
         "integrated_performance_diagnostic_in_main_aggregate": 0,

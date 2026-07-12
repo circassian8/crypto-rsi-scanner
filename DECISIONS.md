@@ -16,6 +16,40 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-12 - Count only exact observed evidence as outcome and feedback truth
+**Status:** accepted
+**Decision:** Event Alpha calibration may count an outcome only when contract v1
+joins one exact run/profile/namespace/candidate/Core/observation identity to one
+canonical integrated-candidate row and one canonical Core Opportunity row. The
+primary horizon must be mature under an external current UTC clock. Every
+mature horizon must carry a due time, bounded-lag observation time, positive
+exit price, canonical source, and unique observation id; its return must
+recompute from the observed entry and exit prices within the contract tolerance.
+Future evaluations, duplicate or malformed JSON keys, partial/legacy rows,
+synthetic fixtures, missing prices, reused observations, ambiguous identities,
+and unsafe send/execution/trade/paper/normal-RSI/trigger fields remain readable
+diagnostics but cannot enter denominators. Validation is derived from the
+canonical lane and signed primary return, never from a persisted positive label.
+Burn-in and readiness surfaces must use the same exact joined partition and
+must not promote legacy alert-return aliases as outcome evidence.
+
+Manual feedback follows the parallel exact contract: one run/profile/namespace/
+Core identity, one canonical Core authority, an unambiguous latest human label
+after Core creation and not in the future, safe scalar attribution owned by the
+Core row, and no side effects or secret-bearing notes. Duplicate, malformed,
+future, pre-Core, legacy, or unmatched feedback is calibration-ineligible.
+Consumers remain fail-closed until they explicitly adopt this partition; the
+presence of a legacy label alone is never evidence authority.
+**Why:** A return or label is not research truth merely because a JSON field
+claims it. Exact authority, independently recomputable prices, deterministic
+directional grading, and closed safety/clock rules prevent synthetic,
+future-dated, duplicated, poisoned, or broadly matched rows from manufacturing
+sample size or priors.
+**Revisit when:** A versioned outcome contract replaces local price lineage with
+equivalent immutable market-data attestations, or measured reviewed samples
+justify a new directional grading contract without weakening exact identity,
+maturity, provenance, and research-only safety.
+
 ## 2026-07-12 - Count calendar normalization without retaining rejected payloads
 **Status:** accepted
 **Decision:** The integrated unified calendar must merge raw scheduled and raw

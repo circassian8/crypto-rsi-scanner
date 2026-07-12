@@ -9,7 +9,9 @@ from typing import Any, Mapping
 from . import common
 from . import evidence_semantics
 from . import namespace_policy
+from . import outcome_evidence
 from .daily_burn_in import RUN_JSON
+from ..outcomes import outcome_eligibility
 
 
 DASHBOARD_JSON = "event_alpha_burn_in_measurement_dashboard.json"
@@ -32,7 +34,7 @@ def build_measurement_dashboard(
 ) -> dict[str, Any]:
     context = common.context_for(profile=profile, artifact_namespace=artifact_namespace or profile, base_dir=base_dir)
     base = context.base_dir
-    cutoff = common.date_window(days)
+    evaluation_now, cutoff = _evaluation_window(days)
     policy = namespace_policy.build_namespace_policy(
         profile=profile,
         artifact_namespace=context.artifact_namespace,
@@ -46,11 +48,11 @@ def build_measurement_dashboard(
         include_namespaces=((artifact_namespace,) if artifact_namespace else include_namespaces),
     )
     included_namespaces = namespace_policy.included_namespace_names(policy)
-    candidates = _rows(base, "event_integrated_radar_candidates.jsonl", cutoff=cutoff, namespaces=included_namespaces)
-    cores = _rows(base, "event_core_opportunities.jsonl", cutoff=cutoff, namespaces=included_namespaces)
+    (candidates, cores, supplied_outcomes, outcomes, excluded_outcomes,
+     outcome_exclusion_reason_counts) = outcome_evidence.load_exact_namespace_outcomes(
+        base, cutoff, included_namespaces, _rows, evaluation_now)
     deliveries = _rows(base, "event_alpha_notification_deliveries.jsonl", cutoff=cutoff, namespaces=included_namespaces)
     feedback = _rows(base, "event_alpha_feedback.jsonl", cutoff=cutoff, namespaces=included_namespaces)
-    outcomes = _rows(base, "event_integrated_radar_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces) + _rows(base, "event_alpha_outcomes.jsonl", cutoff=cutoff, namespaces=included_namespaces)
     coverage_docs = [common.read_json(base / namespace / "event_alpha_source_coverage.json") for namespace in included_namespaces]
     provider_health = [common.read_json(base / namespace / "event_provider_health.json") for namespace in included_namespaces]
     daily_runs = _json_docs(base, RUN_JSON, namespaces=included_namespaces)
@@ -97,7 +99,7 @@ def build_measurement_dashboard(
         {
             "schema_version": "event_alpha_burn_in_measurement_dashboard_v1",
             "row_type": "event_alpha_burn_in_measurement_dashboard",
-            "generated_at": common.utc_now().isoformat(),
+            "generated_at": evaluation_now.isoformat(),
             "profile": profile,
             "artifact_namespace": context.artifact_namespace,
             "namespace_dir": common.rel_path(context.namespace_dir),
@@ -142,6 +144,7 @@ def build_measurement_dashboard(
             "label_coverage_pct": label_coverage,
             "outcome_rows_by_status": common.count_by(outcomes, "status", "outcome_status", "validation_status"),
             "outcome_rows_by_horizon": common.count_by(outcomes, "horizon", "horizon_days"),
+            **outcome_evidence.telemetry(supplied_outcomes, outcomes, excluded_outcomes, outcome_exclusion_reason_counts),
             "source_coverage_docs": len([row for row in coverage_docs if row]),
             "diagnostic_rows_excluded_from_main_aggregate": len(diagnostic_rows),
             "low_sample_warning": low_sample_warning,
@@ -184,6 +187,13 @@ def format_measurement_dashboard(payload: Mapping[str, Any]) -> str:
         f"- contract_counted_candidate_count: `{payload.get('contract_counted_candidate_count')}`",
         f"- candidate_evidence_explanation: `{payload.get('candidate_evidence_explanation')}`",
         f"- non_burn_in_candidate_count: `{payload.get('non_burn_in_candidate_count')}`",
+        f"- outcome_rows_supplied: `{payload.get('outcome_rows_supplied')}`",
+        f"- outcome_rows_eligible: `{payload.get('outcome_rows_eligible')}`",
+        f"- outcome_rows_excluded: `{payload.get('outcome_rows_excluded')}`",
+        common.table_line(
+            "outcome_exclusion_reason_counts",
+            payload.get("outcome_exclusion_reason_counts") or {},
+        ),
         f"- low_sample_warning: `{payload.get('low_sample_warning')}`",
         f"- enough_data: `{payload.get('enough_data')}`",
         f"- enough_data_reasons: `{', '.join(payload.get('enough_data_reasons') or []) or 'none'}`",
@@ -213,6 +223,11 @@ def format_measurement_dashboard(payload: Mapping[str, Any]) -> str:
     lines.append("")
     lines.append("Interpretation remains inconclusive until label and outcome thresholds are met.")
     return "\n".join(lines).rstrip()
+
+
+def _evaluation_window(days: int) -> tuple[Any, Any]:
+    now = common.utc_now()
+    return now, common.date_window(days, now=now)
 
 
 def _rows(base: Path, filename: str, *, cutoff, namespaces: list[str] | tuple[str, ...]) -> list[dict[str, Any]]:
@@ -321,8 +336,13 @@ def _validation_rates(rows: list[dict[str, Any]]) -> dict[str, float]:
         by_lane.setdefault(common.row_lane(row), []).append(row)
     out: dict[str, float] = {}
     for lane, lane_rows in by_lane.items():
-        validated = sum(1 for row in lane_rows if str(row.get("validation_status") or row.get("status") or "").casefold() in {"validated", "continued", "continuation"})
-        out[lane] = round(100.0 * validated / len(lane_rows), 2) if lane_rows else 0.0
+        statuses = [
+            outcome_eligibility.deterministic_validation_status(row)
+            for row in lane_rows
+        ]
+        validated = statuses.count("validated")
+        graded = validated + statuses.count("invalidated/noise")
+        out[lane] = round(100.0 * validated / graded, 2) if graded else 0.0
     return out
 
 

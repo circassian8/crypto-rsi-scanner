@@ -209,6 +209,13 @@ class _DoctorResultIntegratedOutcomeFields:
     integrated_outcome_return_double_scaled: int = 0
     integrated_outcome_missing_data_unlabeled: int = 0
     integrated_outcome_thesis_move_missing: int = 0
+    integrated_outcome_eligibility_contract_invalid: int = 0
+    integrated_outcome_synthetic_evidence_leak: int = 0
+    integrated_outcome_immature_validation_claim: int = 0
+    integrated_outcome_duplicate_exact_identity: int = 0
+    integrated_outcome_ambiguous_exact_identity: int = 0
+    integrated_outcome_eligible_provenance_missing: int = 0
+    integrated_outcome_identity_mismatch: int = 0
     integrated_outcome_card_thesis_interpretation_missing: int = 0
     integrated_outcome_card_trade_wording: int = 0
     integrated_performance_diagnostic_in_main_aggregate: int = 0

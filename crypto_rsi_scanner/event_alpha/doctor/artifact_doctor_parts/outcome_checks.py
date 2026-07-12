@@ -2,8 +2,58 @@
 
 from __future__ import annotations
 
+from collections import Counter, defaultdict
+from datetime import datetime, timezone
+
+from ...outcomes import outcome_eligibility as outcome_eligibility_contract
 from .runtime import *
-from .integrated_radar_checks import _structured_operator_path_conflict_count
+from .integrated_radar_checks import (
+    _safe_float,
+    _structured_operator_path_conflict_count,
+)
+
+
+_OUTCOME_PROVENANCE_FAILURE_REASONS = frozenset({
+    "duplicate_horizon_price_observation_id",
+    "horizon_exit_price_invalid",
+    "horizon_exit_price_missing",
+    "horizon_metadata_contract_invalid",
+    "horizon_price_lineage_contract_invalid",
+    "horizon_price_observation_id_missing",
+    "horizon_price_source_missing",
+    "horizon_return_contract_invalid",
+    "horizon_return_recompute_mismatch",
+    "invalid_observation_price",
+    "missing_observation_price",
+    "missing_observation_price_id",
+    "missing_observation_price_provenance",
+    "missing_observation_price_source",
+    "missing_outcome_evaluated_at",
+    "missing_primary_horizon",
+    "missing_primary_horizon_metadata",
+    "primary_horizon_due_in_future",
+    "primary_horizon_due_mismatch",
+    "primary_horizon_missing_due_at",
+    "primary_horizon_missing_price_observed_at",
+    "primary_horizon_missing_provenance",
+    "primary_horizon_not_mature",
+    "primary_horizon_pending",
+    "primary_horizon_price_after_evaluation",
+    "primary_horizon_price_before_due",
+    "primary_horizon_price_lag_exceeded",
+    "primary_horizon_return_invalid",
+    "primary_horizon_return_mismatch",
+})
+_NON_AUTHORITATIVE_OUTCOME_LABELS = frozenset({
+    "",
+    "inconclusive",
+    "missing_data",
+    "not_applicable",
+    "pending",
+    "synthetic_fixture",
+    "unknown",
+    "unvalidated",
+})
 
 def _integrated_delivery_conflicts(
     rows: Iterable[Mapping[str, Any]],
@@ -85,6 +135,8 @@ def _tuple_value(value: object) -> tuple[object, ...]:
 def _integrated_outcome_conflicts(
     candidates: Iterable[Mapping[str, Any]],
     outcomes: Iterable[Mapping[str, Any]],
+    *,
+    evaluated_at: Any = None,
 ) -> dict[str, int]:
     out = {
         "integrated_outcome_missing_for_candidate": 0,
@@ -96,23 +148,79 @@ def _integrated_outcome_conflicts(
         "integrated_outcome_return_double_scaled": 0,
         "integrated_outcome_missing_data_unlabeled": 0,
         "integrated_outcome_thesis_move_missing": 0,
+        "integrated_outcome_eligibility_contract_invalid": 0,
+        "integrated_outcome_synthetic_evidence_leak": 0,
+        "integrated_outcome_immature_validation_claim": 0,
+        "integrated_outcome_duplicate_exact_identity": 0,
+        "integrated_outcome_ambiguous_exact_identity": 0,
+        "integrated_outcome_eligible_provenance_missing": 0,
+        "integrated_outcome_identity_mismatch": 0,
     }
     outcome_rows = [dict(row) for row in outcomes if isinstance(row, Mapping)]
+    candidate_rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
+    evaluation_clock = evaluated_at or datetime.now(timezone.utc)
+    exact_identity_keys: list[str] = []
+    candidate_identity_counts: Counter[str] = Counter()
+    for candidate in candidate_rows:
+        candidate_identity = outcome_eligibility_contract.canonical_outcome_identity(candidate)
+        if outcome_eligibility_contract.canonical_join_identity(candidate) is not None:
+            candidate_identity_counts[
+                outcome_eligibility_contract.canonical_outcome_identity_key(candidate_identity)
+            ] += 1
+    for row in outcome_rows:
+        if not outcome_eligibility_contract.has_outcome_eligibility_marker(row):
+            continue
+        identity = outcome_eligibility_contract.canonical_outcome_identity(row)
+        if outcome_eligibility_contract.canonical_join_identity(row) is None:
+            continue
+        identity_key = outcome_eligibility_contract.canonical_outcome_identity_key(identity)
+        exact_identity_keys.append(identity_key)
+    identity_counts = Counter(exact_identity_keys)
+    out["integrated_outcome_duplicate_exact_identity"] = sum(
+        count - 1 for count in identity_counts.values() if count > 1
+    )
+    out["integrated_outcome_ambiguous_exact_identity"] = sum(
+        1
+        for row in outcome_rows
+        if outcome_eligibility_contract.has_outcome_eligibility_marker(row)
+        and _outcome_identity_is_ambiguous(row, candidate_identity_counts)
+    )
+    candidates_by_id: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for candidate in candidate_rows:
+        candidate_id = str(candidate.get("candidate_id") or "").strip()
+        if candidate_id:
+            candidates_by_id[candidate_id].append(candidate)
     outcome_by_candidate = {str(row.get("candidate_id") or ""): row for row in outcome_rows if row.get("candidate_id")}
-    for candidate in candidates:
+    for candidate in candidate_rows:
         if str(candidate.get("opportunity_type") or "") == "DIAGNOSTIC":
             continue
         if str(candidate.get("candidate_id") or "") not in outcome_by_candidate:
             out["integrated_outcome_missing_for_candidate"] += 1
     for row in outcome_rows:
+        _update_outcome_eligibility_conflicts(
+            out,
+            row,
+            candidates_by_id,
+            evaluated_at=evaluation_clock,
+        )
         for key in ("normal_rsi_signal_written", "triggered_fade_created", "paper_trade_created", "trade_created"):
             if _truthy(row.get(key)):
                 out["integrated_outcome_side_effect_flag"] += 1
-        if not _truthy(row.get("no_trade_created")) or not _truthy(row.get("no_paper_trade_created")):
+        if (
+            not outcome_eligibility_contract.has_outcome_eligibility_marker(row)
+            and (
+                not _truthy(row.get("no_trade_created"))
+                or not _truthy(row.get("no_paper_trade_created"))
+            )
+        ):
             out["integrated_outcome_schema_missing"] += 1
         if not (row.get("symbol") and row.get("coin_id")):
             out["integrated_outcome_missing_identity"] += 1
-        if row.get("primary_horizon_return") is not None and row.get("price_at_observation") in (None, ""):
+        if (
+            row.get("primary_horizon_return") is not None
+            and row.get("price_at_observation") in (None, "")
+            and row.get("outcome_data_source") != "synthetic_fixture"
+        ):
             out["integrated_outcome_returns_without_price"] += 1
         if str(row.get("opportunity_type") or "") == "DIAGNOSTIC" and _truthy(row.get("include_in_performance")):
             out["integrated_outcome_diagnostic_in_performance"] += 1
@@ -167,6 +275,105 @@ def _integrated_outcome_conflicts(
         if str(row.get("outcome_status") or "") == "missing_data" and not row.get("missing_data_reason"):
             out["integrated_outcome_missing_data_unlabeled"] += 1
     return out
+
+
+def _update_outcome_eligibility_conflicts(
+    out: dict[str, int],
+    row: Mapping[str, Any],
+    candidates_by_id: Mapping[str, list[dict[str, Any]]],
+    *,
+    evaluated_at: Any,
+) -> None:
+    has_firewall = outcome_eligibility_contract.has_outcome_eligibility_marker(row)
+    contract_errors = outcome_eligibility_contract.validate_contract(row) if has_firewall else ()
+    contract_invalid = bool(contract_errors)
+    effective_eligible, effective_reasons = (
+        outcome_eligibility_contract.effective_calibration_state(
+            row,
+            evaluated_at=evaluated_at,
+        )
+    )
+    reasons = set(effective_reasons)
+    if row.get("calibration_eligible") is True and not effective_eligible:
+        contract_invalid = True
+    if contract_invalid:
+        out["integrated_outcome_eligibility_contract_invalid"] += 1
+    if row.get("outcome_data_source") == "synthetic_fixture" and (
+        row.get("calibration_eligible") is True
+        or _truthy(row.get("include_in_performance"))
+        or _authoritative_outcome_claim(row)
+    ):
+        out["integrated_outcome_synthetic_evidence_leak"] += 1
+    immature_reasons = {
+        "horizon_metadata_contract_invalid",
+        "missing_outcome_evaluated_at",
+        "missing_primary_horizon",
+        "missing_primary_horizon_metadata",
+        "primary_horizon_due_in_future",
+        "primary_horizon_due_mismatch",
+        "primary_horizon_missing_due_at",
+        "primary_horizon_missing_price_observed_at",
+        "primary_horizon_not_mature",
+        "primary_horizon_pending",
+        "primary_horizon_price_after_evaluation",
+        "primary_horizon_price_before_due",
+        "primary_horizon_price_lag_exceeded",
+    }
+    if _authoritative_outcome_claim(row) and reasons & immature_reasons:
+        out["integrated_outcome_immature_validation_claim"] += 1
+    if row.get("calibration_eligible") is True and reasons & _OUTCOME_PROVENANCE_FAILURE_REASONS:
+        out["integrated_outcome_eligible_provenance_missing"] += 1
+    if has_firewall and _outcome_identity_mismatches_candidates(row, candidates_by_id):
+        out["integrated_outcome_identity_mismatch"] += 1
+
+
+def _authoritative_outcome_claim(row: Mapping[str, Any]) -> bool:
+    if row.get("calibration_eligible") is True or _truthy(row.get("include_in_performance")):
+        return True
+    for field in ("validation_label", "outcome_label"):
+        label = str(row.get(field) or "").strip().casefold()
+        if label not in _NON_AUTHORITATIVE_OUTCOME_LABELS:
+            return True
+    return False
+
+
+def _outcome_identity_mismatches_candidates(
+    row: Mapping[str, Any],
+    candidates_by_id: Mapping[str, list[dict[str, Any]]],
+) -> bool:
+    identity = outcome_eligibility_contract.canonical_outcome_identity(row)
+    if outcome_eligibility_contract.canonical_join_identity(row) is None:
+        return True
+    candidate_rows = candidates_by_id.get(identity["candidate_id"], ())
+    if not candidate_rows:
+        return True
+    for candidate in candidate_rows:
+        if all(
+            isinstance(candidate.get(field), str)
+            and bool(str(candidate.get(field)).strip())
+            and str(candidate.get(field)) == identity[field]
+            for field in outcome_eligibility_contract.OUTCOME_IDENTITY_FIELDS
+        ):
+            return False
+    return True
+
+
+def _outcome_identity_is_ambiguous(
+    row: Mapping[str, Any],
+    candidate_identity_counts: Mapping[str, int],
+) -> bool:
+    identity = outcome_eligibility_contract.canonical_outcome_identity(row)
+    nested = row.get("outcome_identity")
+    if outcome_eligibility_contract.canonical_join_identity(row) is None or not isinstance(nested, Mapping):
+        return True
+    if set(nested) != set(outcome_eligibility_contract.OUTCOME_IDENTITY_FIELDS):
+        return True
+    if any(nested.get(field) != identity[field] for field in outcome_eligibility_contract.OUTCOME_IDENTITY_FIELDS):
+        return True
+    identity_key = outcome_eligibility_contract.canonical_outcome_identity_key(identity)
+    if row.get("outcome_identity_key") != identity_key:
+        return True
+    return int(candidate_identity_counts.get(identity_key, 0)) > 1
 
 def _integrated_calibration_conflicts(path: str | Path | None) -> dict[str, int]:
     out = {

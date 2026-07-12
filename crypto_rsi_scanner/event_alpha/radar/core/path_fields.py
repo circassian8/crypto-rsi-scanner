@@ -14,6 +14,7 @@ from .... import (
 import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import paths as event_artifact_paths
+from ...artifacts import json_lines as artifact_json_lines
 from .. import core_opportunities as event_core_opportunities
 from .. import market_reaction as event_market_reaction
 from .. import opportunity_verdict as event_opportunity_verdict
@@ -676,24 +677,7 @@ def _market_context_rank(item: Mapping[str, Any]) -> tuple[int, int, int, int, i
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
-        return []
-    rows: list[dict[str, Any]] = []
-    try:
-        with path.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                text = line.strip()
-                if not text:
-                    continue
-                try:
-                    raw = json.loads(text)
-                except json.JSONDecodeError:
-                    continue
-                if isinstance(raw, Mapping):
-                    rows.append(dict(raw))
-    except OSError:
-        return []
-    return rows
+    return list(artifact_json_lines.read_jsonl(path).rows)
 
 
 def _text_or_none(value: Any) -> str | None:
