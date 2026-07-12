@@ -36,6 +36,7 @@ Generated inventory for the scanner CLI dispatch split. Runtime parser construct
 | `event_alpha_integrated_radar` | `--event-alpha-integrated-radar-cycle` | `event_alpha_integrated_radar_cycle` | `crypto_rsi_scanner.cli.commands_event_alpha` |
 | `event_alpha_integrated_radar` | `--event-alpha-integrated-radar-fill-outcomes` | `event_alpha_integrated_radar_fill_outcomes` | `crypto_rsi_scanner.cli.commands_event_alpha` |
 | `event_alpha_integrated_radar` | `--event-alpha-integrated-radar-outcome-report` | `event_alpha_integrated_radar_outcome_report` | `crypto_rsi_scanner.cli.commands_event_alpha` |
+| `event_alpha_integrated_radar` | `--event-alpha-observed-outcome-build` | `event_alpha_observed_outcome_build` | `crypto_rsi_scanner.cli.commands_event_alpha` |
 | `event_alpha_notification` | `--event-alpha-notify-go-no-go` | `event_alpha_notify_go_no_go` | `crypto_rsi_scanner.cli.commands_event_alpha` |
 | `event_alpha_notification` | `--event-alpha-notify-preview` | `event_alpha_notify_preview` | `crypto_rsi_scanner.cli.commands_event_alpha` |
 | `event_alpha_notification` | `--event-alpha-notify-preview-from-artifacts` | `event_alpha_notify_preview_from_artifacts` | `crypto_rsi_scanner.cli.commands_event_alpha` |

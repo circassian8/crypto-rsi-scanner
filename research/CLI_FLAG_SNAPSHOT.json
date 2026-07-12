@@ -1,5 +1,5 @@
 {
-  "flag_count": 235,
+  "flag_count": 248,
   "flags": [
     {
       "action_type": "_StoreTrueAction",
@@ -642,6 +642,55 @@
       "action_type": "_StoreAction",
       "command_group": "option",
       "default": null,
+      "destination": "event_alpha_observed_candidate_id",
+      "flag": "--event-alpha-observed-candidate-id"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_observed_candidates",
+      "flag": "--event-alpha-observed-candidates"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_observed_closes",
+      "flag": "--event-alpha-observed-closes"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_observed_core_id",
+      "flag": "--event-alpha-observed-core-id"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_observed_cores",
+      "flag": "--event-alpha-observed-cores"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_alpha_observed_evaluated_at",
+      "flag": "--event-alpha-observed-evaluated-at"
+    },
+    {
+      "action_type": "_StoreTrueAction",
+      "command_group": "event_alpha_integrated_radar",
+      "default": false,
+      "destination": "event_alpha_observed_outcome_build",
+      "flag": "--event-alpha-observed-outcome-build"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
       "destination": "event_alpha_official_exchange_binance",
       "flag": "--event-alpha-official-exchange-binance"
     },
@@ -1216,6 +1265,20 @@
       "action_type": "_StoreAction",
       "command_group": "option",
       "default": null,
+      "destination": "event_feedback_duplicate",
+      "flag": "--event-feedback-duplicate"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_false_positive",
+      "flag": "--event-feedback-false-positive"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
       "destination": "event_feedback_ignore",
       "flag": "--event-feedback-ignore"
     },
@@ -1237,6 +1300,13 @@
       "action_type": "_StoreAction",
       "command_group": "option",
       "default": null,
+      "destination": "event_feedback_late",
+      "flag": "--event-feedback-late"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
       "destination": "event_feedback_mark",
       "flag": "--event-feedback-mark"
     },
@@ -1246,6 +1316,13 @@
       "default": null,
       "destination": "event_feedback_missed",
       "flag": "--event-feedback-missed"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_needs_confirmation",
+      "flag": "--event-feedback-needs-confirmation"
     },
     {
       "action_type": "_StoreAction",
@@ -1262,11 +1339,25 @@
       "flag": "--event-feedback-path"
     },
     {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_promising_source_type",
+      "flag": "--event-feedback-promising-source-type"
+    },
+    {
       "action_type": "_StoreTrueAction",
       "command_group": "option",
       "default": false,
       "destination": "event_feedback_report",
       "flag": "--event-feedback-report"
+    },
+    {
+      "action_type": "_StoreAction",
+      "command_group": "option",
+      "default": null,
+      "destination": "event_feedback_source_noise",
+      "flag": "--event-feedback-source-noise"
     },
     {
       "action_type": "_StoreAction",

@@ -801,6 +801,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_market_enrichment",
     "tests.event_alpha.test_market_data_providers",
     "tests.event_alpha.test_market_surfaces",
+    "tests.event_alpha.test_measurement_current_window",
     "tests.event_alpha.test_namespace_integrations",
     "tests.event_alpha.test_namespace_ledgers",
     "tests.event_alpha.test_namespace_profiles",
@@ -819,6 +820,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_operator_state_hardening",
     "tests.event_alpha.test_operator_workflows",
     "tests.event_alpha.test_observed_outcome_builder",
+    "tests.event_alpha.test_observed_outcome_operator",
     "tests.event_alpha.test_outcome_eligibility_contract",
     "tests.event_alpha.test_outcome_eligibility_consumers",
     "tests.event_alpha.test_outcome_eligibility_firewall",
@@ -849,6 +851,7 @@ _CLI_TEST_MODULES = (
     "tests.cli.test_dependency_ci",
     "tests.cli.test_event_alpha_operator_command_smoke",
     "tests.cli.test_make_targets",
+    "tests.cli.test_observed_outcome_cli",
     "tests.cli.test_parser",
 )
 

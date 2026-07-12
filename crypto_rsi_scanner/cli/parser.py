@@ -66,6 +66,11 @@ COMMAND_FLAG_TO_SNAPSHOT: dict[str, CommandSnapshot] = {
         "--event-alpha-integrated-radar-calibration-report",
         "event_alpha_integrated_radar",
     ),
+    "--event-alpha-observed-outcome-build": CommandSnapshot(
+        "event_alpha_observed_outcome_build",
+        "--event-alpha-observed-outcome-build",
+        "event_alpha_integrated_radar",
+    ),
     "--event-alpha-artifact-doctor": CommandSnapshot(
         "event_alpha_artifact_doctor",
         "--event-alpha-artifact-doctor",

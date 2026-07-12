@@ -944,7 +944,8 @@ def test_weekly_measurement_and_source_yield_are_recommendations_only(tmp_path):
     assert dashboard["diagnostic_rows_excluded_from_main_aggregate"] == 1
     assert dashboard["low_sample_warning"] is True
     assert dashboard["auto_apply_thresholds"] is False
-    assert dashboard["first_real_run_interpretation"]["real_candidates"] == 59
+    assert "first_real_run_interpretation" not in dashboard
+    assert dashboard["current_window_interpretation"]["non_burn_in_candidate_count"] == 3
     yield_report = source_yield.build_source_yield_report(
         profile="live_burn_in_no_send",
         artifact_namespace="burn",

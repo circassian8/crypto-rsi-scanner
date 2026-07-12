@@ -17,6 +17,56 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-12 — Add a preview-first exact outcome operator · Codex
+**Why:** The exact observed-price builder had no safe operator boundary, while
+the weekly measurement dashboard still injected a historical 59/14/36 rehearsal
+narrative regardless of the selected namespace or current evidence window.
+Directly appending a caller-asserted price row or retaining that stale narrative
+would undermine the new outcome/feedback firewalls.
+**Changes:**
+- Added a strict offline observed-outcome operator with duplicate-key-safe
+  candidate/Core JSONL authority, a closed versioned OHLCV document contract,
+  literal candidate/Core/profile/namespace assertions, one non-future evaluation
+  clock, exact schema/eligibility/safety checks, finite OHLC validation, and
+  payload-free failures. Synthetic fixtures are always inconclusive and
+  calibration-ineligible; observed-mode inputs reject fixture lineage.
+- Added preview-by-default CLI/parser/registry wiring that bypasses scanner
+  globals and artifact-context mutation. Orphan options and mixed commands exit
+  2. Refreshed the complete 248-flag CLI snapshot, including six previously
+  omitted feedback shortcuts.
+- Added optional `--out` plus `--confirm` staging outside configured/canonical
+  roots. It uses a target-scoped lock and atomic create-only publish, writes one
+  mode-0600 JSONL, refuses existing/symlink/aliased/canonical targets, never
+  appends or overwrites, and exposes no canonical write path. Added fixture-
+  backed preview/stage Make targets with a physically resolved temp directory.
+- Replaced the unconditional historical measurement interpretation with a
+  current-window summary derived only from the selected namespace policy and
+  exact eligible feedback/outcomes. Extracted its adversarial isolation test so
+  production functions and test modules remain below architecture limits.
+- Updated the runbook, roadmap, durable decisions, CLI inventory, standalone
+  runner, and architecture reports. No provider, notification, paper, RSI,
+  execution, or trigger path was enabled.
+**Verify:** 15 adversarial core-operator tests and 7 CLI tests passed; the
+builder/operator/CLI gate passed 32 tests. A broader outcome/doctor/CLI/
+architecture regression passed 139 tests, and current-window measurement passed
+46 tests. The real Make staging rehearsal accepted 339 fixture observations,
+created exactly one 4,017-byte mode-0600 row with
+`synthetic_fixture / calibration_eligible=false /
+include_in_performance=false / inconclusive`, and all send/trade/paper/RSI/
+trigger flags false. Repeating it exited 2 with `output_target_exists`; SHA-256
+remained `2e5c18057400bee60bcc380a47fe28f5dc0639a46bb21033880d3de92835358a`.
+Standalone discovery is 1,160 total / 960 Event Alpha / 50 CLI tests.
+`make architecture-cleanliness-check` passed with zero new size violations,
+zero over-limit functions, and zero old imports; compileall and diff checks
+passed. A second full `make verify` was intentionally skipped because the full
+1,136-standalone/1,204-pytest release gate passed immediately before this
+isolated operator slice, which then received the focused integration and static
+gates above. GitHub Actions was not polled or awaited.
+**Notes/risks:** The staged row is deliberately noncanonical and is not merged
+into Event Alpha history. Real observed-close documents still require human-
+reviewed acquisition provenance; no automatic provider ingestion or threshold
+application was added.
+
 ## 2026-07-12 — Make Decision Model v2 learning evidence exact · Codex
 **Why:** Feedback, alert-return aliases, synthetic fixture returns, implicit
 artifact siblings, and process-global paths could still manufacture apparent

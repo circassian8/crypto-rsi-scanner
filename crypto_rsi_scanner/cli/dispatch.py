@@ -14,6 +14,7 @@ from . import (
 )
 from ._scanner_bindings import bind_scanner_globals
 from .parser import CommandSnapshot, classify_command, command_group, dispatch_key_from_args
+from .parser_integrated_radar import observed_outcome_args_supplied
 
 
 def dispatch_command_name(argv: Sequence[str]) -> str:
@@ -21,6 +22,8 @@ def dispatch_command_name(argv: Sequence[str]) -> str:
 
 
 def apply_artifact_context(args) -> None:
+    if observed_outcome_args_supplied(args):
+        return
     bind_scanner_globals(globals())
     if args.event_alpha_artifact_namespace:
         config.EVENT_ALPHA_ARTIFACT_NAMESPACE = args.event_alpha_artifact_namespace
@@ -30,6 +33,10 @@ def apply_artifact_context(args) -> None:
 
 
 def dispatch_args(args) -> None:
+    if observed_outcome_args_supplied(args):
+        if commands_event_alpha.handle(args):
+            return
+        raise SystemExit(2)
     apply_artifact_context(args)
     if commands_export.handle(args):
         return

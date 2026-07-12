@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-12 - Keep observed-outcome ingestion preview-first and noncanonical
+**Status:** accepted
+**Decision:** Building an Event Alpha observed outcome requires explicit local
+candidate, Core Opportunity, and versioned close-set files; literal candidate
+and Core ids; and an explicit aware evaluation clock that is not in the future.
+The default command prints a research-only preview and writes nothing. Optional
+staging requires both an absolute noncanonical `.jsonl` path and `--confirm`,
+creates exactly one mode-0600 file without append/replace, and refuses existing
+targets, symlinks, input aliases, canonical artifact names/paths, and configured
+Event Alpha roots. Profile and namespace flags are identity assertions only.
+The checked-in close fixture is always `synthetic_fixture`, inconclusive, and
+calibration-ineligible; only the strict observed-close contract may claim
+observed market prices. Neither mode writes canonical stores, run ledgers,
+cards, notifications, trades, paper rows, normal RSI rows, or triggers.
+**Why:** A convenient append/upsert path or caller-asserted fixture could poison
+the exact evidence loop before price lineage is reviewed. Preview-first,
+create-only isolation makes provenance and identity inspectable without granting
+the operator authority over live research history.
+**Revisit when:** A human-approved provider ingestion design supplies immutable
+price attestations, bounded acquisition ledgers, replay/rollback semantics, and
+an exact canonical merge policy with holdout evidence; do not weaken the
+synthetic-fixture exclusion or Event Alpha safety boundaries.
+
 ## 2026-07-12 - Keep feedback calibration priors shadow-only
 **Status:** accepted
 **Decision:** Exact Core-authorized feedback may produce reviewable calibration

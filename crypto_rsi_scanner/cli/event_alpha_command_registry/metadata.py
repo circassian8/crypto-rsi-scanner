@@ -91,6 +91,13 @@ _EVENT_ALPHA_DISPATCH_ATTRS = (
     "event_alpha_notify_go_no_go",
     "event_alpha_notify_preview",
     "event_alpha_notify_preview_from_artifacts",
+    "event_alpha_observed_candidate_id",
+    "event_alpha_observed_candidates",
+    "event_alpha_observed_closes",
+    "event_alpha_observed_core_id",
+    "event_alpha_observed_cores",
+    "event_alpha_observed_evaluated_at",
+    "event_alpha_observed_outcome_build",
     "event_alpha_official_exchange_binance",
     "event_alpha_official_exchange_bybit",
     "event_alpha_official_exchange_report",
@@ -229,6 +236,8 @@ def _command_group(attr: str) -> str:
         return "event_alpha_notification"
     if "provider" in attr or "preflight" in attr or "readiness" in attr or "dex_onchain" in attr:
         return "event_alpha_provider_readiness"
+    if attr.startswith("event_alpha_observed_"):
+        return "event_alpha_integrated_radar"
     if "integrated_radar" in attr or "market_anomaly" in attr or "derivatives" in attr:
         return "event_alpha_integrated_radar"
     if "namespace" in attr:

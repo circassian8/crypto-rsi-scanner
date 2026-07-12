@@ -2201,7 +2201,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 1149,
+          "line": 1172,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2239,7 +2239,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 1149,
+          "line": 1172,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2350,7 +2350,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 4788,
+          "line": 4841,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2452,17 +2452,17 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-12T11:21:59.038691+00:00",
+  "generated_at": "2026-07-12T12:07:16.337112+00:00",
   "include_runtime_artifacts": false,
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "crypto_rsi_scanner/cli/services/scanner_parts/operator_report_state.py:1783854972",
-    "crypto_rsi_scanner/cli/services/scanner_parts/reports.py:1783855004",
-    "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py:1783855008",
-    "crypto_rsi_scanner/event_alpha/artifacts/schema/registry_mappings.py:1783854995",
-    "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/artifact_input_loading.py:1783855152"
+    "DECISIONS.md:1783857701",
+    "DEVLOG.md:1783856013",
+    "Makefile:1783857352",
+    "ROADMAP.md:1783857690",
+    "crypto_rsi_scanner/cli/dispatch.py:1783856671"
   ],
-  "newest_source_mtime": 1783855317.4277396,
+  "newest_source_mtime": 1783858034.7887866,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2474,7 +2474,7 @@
   "old_path_text_references": 61,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1783854556.456451,
+  "report_mtime": 1783855319.0391557,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2483,22 +2483,22 @@
     "include_runtime_artifacts": false,
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "crypto_rsi_scanner/cli/services/scanner_parts/operator_report_state.py:1783854972",
-      "crypto_rsi_scanner/cli/services/scanner_parts/reports.py:1783855004",
-      "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py:1783855008",
-      "crypto_rsi_scanner/event_alpha/artifacts/schema/registry_mappings.py:1783854995",
-      "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/artifact_input_loading.py:1783855152"
+      "DECISIONS.md:1783857701",
+      "DEVLOG.md:1783856013",
+      "Makefile:1783857352",
+      "ROADMAP.md:1783857690",
+      "crypto_rsi_scanner/cli/dispatch.py:1783856671"
     ],
-    "newest_source_mtime": 1783855317.4277396,
+    "newest_source_mtime": 1783858034.7887866,
     "regex_compile_count": 124,
-    "report_mtime": 1783854556.456451,
-    "scan_duration_seconds": 1.4851,
+    "report_mtime": 1783855319.0391557,
+    "scan_duration_seconds": 1.431,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 51,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
-    "scanned_source_files": 681,
-    "scanned_test_files": 101,
+    "scanned_source_files": 682,
+    "scanned_test_files": 104,
     "skipped_artifact_files": 1624,
     "skipped_binary_files": 0,
     "skipped_dir_samples": [
@@ -2520,10 +2520,10 @@
     "skipped_large_files": 1,
     "skipped_suffix_files": 1
   },
-  "scan_duration_seconds": 1.4851,
+  "scan_duration_seconds": 1.431,
   "scanned_doc_files": 51,
-  "scanned_source_files": 681,
-  "scanned_test_files": 101,
+  "scanned_source_files": 682,
+  "scanned_test_files": 104,
   "schema_version": "event_alpha_old_import_check_v1",
   "skipped_artifact_files": 1624,
   "skipped_dirs": 66,

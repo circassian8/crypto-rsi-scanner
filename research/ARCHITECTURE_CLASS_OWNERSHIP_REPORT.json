@@ -1451,7 +1451,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 544,
+  "class_count": 550,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1506,12 +1506,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 6730,
+  "function_count": 6764,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-12T11:22:03.083015+00:00",
+  "generated_at": "2026-07-12T12:07:20.302100+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3154,7 +3154,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 435,
+  "public_class_count": 436,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -3222,6 +3222,7 @@
     "crypto_rsi_scanner.event_alpha.outcomes.eval": 1,
     "crypto_rsi_scanner.event_alpha.outcomes.feedback": 2,
     "crypto_rsi_scanner.event_alpha.outcomes.feedback_labels": 4,
+    "crypto_rsi_scanner.event_alpha.outcomes.observed_outcome_operator": 1,
     "crypto_rsi_scanner.event_alpha.outcomes.policy_simulator": 2,
     "crypto_rsi_scanner.event_alpha.outcomes.priors": 4,
     "crypto_rsi_scanner.event_alpha.outcomes.quality.models": 9,

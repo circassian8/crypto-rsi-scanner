@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Callable
 from .._scanner_bindings import bind_scanner_globals
@@ -15,6 +16,11 @@ from ..services import (
     event_alpha_research as _service_research,
 )
 from ...event_alpha.operations import review_inbox as _operations_review_inbox
+from ..parser_integrated_radar import (
+    OBSERVED_OUTCOME_COMMAND_DEST,
+    OBSERVED_OUTCOME_OPTION_DESTS,
+    observed_outcome_has_command_conflict,
+)
 from .models import *  # noqa: F403
 from .metadata import *  # noqa: F403
 
@@ -33,6 +39,67 @@ _FEEDBACK_SHORTCUT_ATTRS = (
     ("event_feedback_ignore", "ignored"),
     ("event_feedback_missed", "missed"),
 )
+
+
+def _dispatch_observed_outcome_command(args) -> bool:
+    command_requested = bool(getattr(args, OBSERVED_OUTCOME_COMMAND_DEST, False))
+    option_supplied = any(
+        getattr(args, destination, None) not in (None, "")
+        for destination in OBSERVED_OUTCOME_OPTION_DESTS
+    )
+    if not command_requested and not option_supplied:
+        return False
+    if not command_requested:
+        if bool(getattr(args, "json", False)):
+            print(
+                json.dumps(
+                    {
+                        "errors": ["observed_outcome_command_required"],
+                        "mode": "blocked",
+                        "ok": False,
+                        "written": False,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        else:
+            print(
+                "Observed-outcome options require "
+                "--event-alpha-observed-outcome-build; no command was run."
+            )
+        raise SystemExit(2)
+    if observed_outcome_has_command_conflict(args):
+        if bool(getattr(args, "json", False)):
+            print(
+                json.dumps(
+                    {
+                        "errors": ["observed_outcome_command_conflict"],
+                        "mode": "blocked",
+                        "ok": False,
+                        "written": False,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+        else:
+            print("Observed-outcome command conflicts with another command; no command was run.")
+        raise SystemExit(2)
+    _service_outcomes.event_alpha_observed_outcome_build(
+        candidate_path=args.event_alpha_observed_candidates,
+        core_path=args.event_alpha_observed_cores,
+        closes_path=args.event_alpha_observed_closes,
+        candidate_id=args.event_alpha_observed_candidate_id,
+        core_id=args.event_alpha_observed_core_id,
+        evaluated_at=args.event_alpha_observed_evaluated_at,
+        profile_assertion=args.event_alpha_profile,
+        artifact_namespace_assertion=args.event_alpha_artifact_namespace or None,
+        out_path=args.out,
+        confirm=args.confirm,
+        json_output=args.json,
+    )
+    return True
 
 
 def _include_legacy_api_artifacts(args) -> bool:
@@ -869,6 +936,8 @@ def _dispatch_event_alpha_command_section_6(args) -> bool:
 
 def dispatch_event_alpha_command(args) -> bool:
     """Dispatch one Event Alpha command using the preserved branch order."""
+    if _dispatch_observed_outcome_command(args):
+        return True
     _bind_api_scanner_globals()
     if _dispatch_event_alpha_command_section_1(args):
         return True

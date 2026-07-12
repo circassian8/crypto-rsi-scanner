@@ -69,6 +69,9 @@ def build_measurement_dashboard(
     ]
     diagnostic_rows = [row for row in candidates + cores if common.row_lane(row) == "DIAGNOSTIC"]
     main_candidates = [row for row in candidates if common.row_lane(row) != "DIAGNOSTIC"]
+    near_miss_count, quality_capped_count = _candidate_review_counts(
+        candidates, cores
+    )
     labels_by_lane = common.count_by(feedback, "lane", "opportunity_type")
     label_coverage = _label_coverage(feedback, candidates + cores)
     explicit_scope = bool(artifact_namespace) or _has_explicit_policy_flags(policy.get("explicit_inclusion_flags") or {})
@@ -138,8 +141,8 @@ def build_measurement_dashboard(
             "source_noise_rate_by_source_pack": _source_noise_rate(feedback, "source_pack"),
             "accepted_evidence_rate": _accepted_evidence_rate(candidates + cores),
             "market_confirmation_rate": _market_confirmation_rate(candidates + cores),
-            "near_miss_count": sum(1 for row in candidates + cores if _mentions(row, "near")),
-            "quality_capped_count": sum(1 for row in candidates + cores if _mentions(row, "quality") or _mentions(row, "cap")),
+            "near_miss_count": near_miss_count,
+            "quality_capped_count": quality_capped_count,
             "provider_degraded_backoff_rate": _provider_degraded_rate(provider_health),
             "label_coverage": label_coverage,
             "label_coverage_pct": label_coverage,
@@ -154,21 +157,57 @@ def build_measurement_dashboard(
             "enough_data_reasons": enough_data_reasons,
             "source_yield_confidence": "low" if low_sample_warning else "measured",
             "auto_apply_thresholds": False,
-            "first_real_run_interpretation": {
-                "source": "notify_llm_deep_cryptopanic_rehearsal",
-                "real_candidates": 59,
-                "high_priority": 0,
-                "digest": 0,
-                "watchlist": 0,
-                "near_miss": 14,
-                "quality_capped": 36,
-                "interpretation": "inconclusive until human labels and outcome rows meet burn-in thresholds",
-            },
+            "current_window_interpretation": _current_window_interpretation(
+                days, len(included_namespaces), real_burn_in_candidate_count,
+                non_burn_in_candidate_count, len(feedback), len(outcomes),
+                near_miss_count, quality_capped_count, low_sample_warning,
+            ),
         }
     )
     common.write_json(context.namespace_dir / DASHBOARD_JSON, payload)
     common.write_text(context.namespace_dir / DASHBOARD_MD, format_measurement_dashboard(payload))
     return payload
+
+
+def _candidate_review_counts(
+    candidates: list[Mapping[str, Any]],
+    cores: list[Mapping[str, Any]],
+) -> tuple[int, int]:
+    rows = candidates + cores
+    near_miss_count = sum(1 for row in rows if _mentions(row, "near"))
+    quality_capped_count = sum(
+        1 for row in rows if _mentions(row, "quality") or _mentions(row, "cap")
+    )
+    return near_miss_count, quality_capped_count
+
+
+def _current_window_interpretation(
+    days: int,
+    included_namespace_count: int,
+    real_candidate_count: int,
+    non_burn_in_candidate_count: int,
+    eligible_feedback_count: int,
+    eligible_outcome_count: int,
+    near_miss_count: int,
+    quality_capped_count: int,
+    low_sample_warning: bool,
+) -> dict[str, Any]:
+    return {
+        "source": "selected_filtered_namespaces",
+        "window_days": days,
+        "included_namespace_count": included_namespace_count,
+        "real_burn_in_candidate_count": real_candidate_count,
+        "non_burn_in_candidate_count": non_burn_in_candidate_count,
+        "feedback_rows_eligible": eligible_feedback_count,
+        "outcome_rows_eligible": eligible_outcome_count,
+        "near_miss_count": near_miss_count,
+        "quality_capped_count": quality_capped_count,
+        "interpretation": (
+            "insufficient exact current-window evidence for threshold changes"
+            if low_sample_warning
+            else "descriptive current-window evidence; thresholds remain review-only"
+        ),
+    }
 
 
 def _load_dashboard_learning_evidence(
@@ -258,11 +297,11 @@ def format_measurement_dashboard(payload: Mapping[str, Any]) -> str:
         f"- provider_degraded_backoff_rate: `{payload.get('provider_degraded_backoff_rate')}`",
         f"- label_coverage_pct: `{payload.get('label_coverage_pct')}`",
         "",
-        "## First Real Run Interpretation",
+        "## Current Window Interpretation",
         "",
     ]
-    first = payload.get("first_real_run_interpretation") or {}
-    for key, value in first.items():
+    current_window = payload.get("current_window_interpretation") or {}
+    for key, value in current_window.items():
         lines.append(f"- {key}: `{value}`")
     lines.append("")
     lines.append("Interpretation remains inconclusive until label and outcome thresholds are met.")

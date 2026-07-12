@@ -7,6 +7,7 @@ remain compatible through the public API bridge.
 
 from __future__ import annotations
 
+import json
 from types import ModuleType
 from typing import Any, MutableMapping
 
@@ -23,6 +24,7 @@ _SERVICE_FUNCTION_NAMES = (
     'event_alpha_calibration_report',
     'event_alpha_fill_outcomes',
     'event_alpha_feedback_readiness_report',
+    'event_alpha_observed_outcome_build',
 )
 
 
@@ -425,6 +427,60 @@ def event_alpha_fill_outcomes(*args: Any, **kwargs: Any) -> Any:
 
 def event_alpha_feedback_readiness_report(*args: Any, **kwargs: Any) -> Any:
     return _scanner_call("event_alpha_feedback_readiness_report", *args, **kwargs)
+
+
+def event_alpha_observed_outcome_build(
+    *,
+    candidate_path: str | None,
+    core_path: str | None,
+    closes_path: str | None,
+    candidate_id: str | None,
+    core_id: str | None,
+    evaluated_at: str | None,
+    profile_assertion: str | None = None,
+    artifact_namespace_assertion: str | None = None,
+    out_path: str | None = None,
+    confirm: bool = False,
+    json_output: bool = False,
+) -> Any:
+    """Preview or explicitly stage one exact offline observed-market outcome."""
+
+    from ...event_alpha.outcomes.observed_outcome_operator import (
+        run_observed_outcome_operator,
+    )
+
+    result = run_observed_outcome_operator(
+        candidate_path,
+        core_path,
+        closes_path,
+        candidate_id,
+        core_id,
+        evaluated_at,
+        profile_assertion=profile_assertion,
+        artifact_namespace_assertion=artifact_namespace_assertion,
+        out_path=out_path,
+        confirm=confirm,
+    )
+    if json_output:
+        print(result.to_json())
+    else:
+        print("Event Alpha exact observed-outcome operator")
+        print("Research-only / unvalidated. Not a trade signal.")
+        print(f"status: {'ok' if result.ok else 'blocked'}")
+        print(f"mode: {result.mode}")
+        print(f"written: {'yes' if result.written else 'no'}")
+        print(
+            "rows: "
+            f"candidates={result.candidate_rows_supplied} "
+            f"cores={result.core_rows_supplied} "
+            f"observations={result.observations_accepted}/{result.observations_supplied}"
+        )
+        print("errors: " + (", ".join(result.errors) if result.errors else "none"))
+        if result.outcome is not None:
+            print(json.dumps(result.outcome, sort_keys=True, separators=(",", ":")))
+    if not result.ok:
+        raise SystemExit(2)
+    return result
 
 
 __all__ = tuple(name for name in _SERVICE_FUNCTION_NAMES if name != 'bind_scanner_globals')

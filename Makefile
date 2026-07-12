@@ -105,6 +105,15 @@ EVENT_RESEARCH_CARDS_DIR ?= $(EVENT_ALPHA_PROFILE_DIR)/research_cards
 EVENT_RESEARCH_CARDS_WRITE_LIMIT ?= 250
 EVENT_ALPHA_ALERT_OUTCOMES ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_alerts_with_outcomes.jsonl
 EVENT_ALPHA_ALERT_PRICES ?= fixtures/event_discovery/outcome_prices.json
+EVENT_ALPHA_OBSERVED_CANDIDATES ?= fixtures/event_discovery/observed_outcome_candidate.jsonl
+EVENT_ALPHA_OBSERVED_CORES ?= fixtures/event_discovery/observed_outcome_core.jsonl
+EVENT_ALPHA_OBSERVED_CLOSES ?= fixtures/event_discovery/observed_outcome_dense_ohlcv.json
+EVENT_ALPHA_OBSERVED_CANDIDATE_ID ?= candidate-testobs
+EVENT_ALPHA_OBSERVED_CORE_ID ?= core-testobs
+EVENT_ALPHA_OBSERVED_EVALUATED_AT ?= 2026-06-08T12:20:00Z
+EVENT_ALPHA_OBSERVED_PROFILE ?= fixture
+EVENT_ALPHA_OBSERVED_NAMESPACE ?= observed-outcome-builder
+EVENT_ALPHA_OBSERVED_OUT ?= $(realpath $(if $(TMPDIR),$(TMPDIR),/tmp))/event_alpha_observed_outcome_staged.jsonl
 PROFILE ?= no_key_live
 EVENT_ALPHA_RUNTIME_PROFILE ?= $(if $(filter notify_llm_deep_rehearsal notify_llm_deep_fixture_rehearsal notify_llm_deep_research_review_smoke,$(PROFILE)),notify_llm_deep,$(if $(filter fixture_notify_smoke notification_format_smoke notify_llm_deep_no_send_smoke,$(PROFILE)),fixture,$(PROFILE)))
 ALERT_KEY ?=
@@ -169,6 +178,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: event-alpha-live-provider-readiness event-alpha-live-provider-readiness-smoke event-alpha-dex-onchain-readiness event-alpha-dex-onchain-readiness-smoke event-alpha-coinalyze-preflight event-alpha-coinalyze-preflight-smoke event-alpha-coinalyze-no-send-rehearsal event-alpha-bybit-announcements-preflight event-alpha-bybit-announcements-preflight-smoke event-alpha-bybit-announcements-no-send-rehearsal event-alpha-tokenomist-preflight event-alpha-messari-unlocks-preflight event-alpha-coinmarketcal-preflight event-alpha-notify-preview-from-artifacts event-alpha-mark-namespace-stale event-alpha-mark-known-stale-namespaces event-alpha-prune-or-archive-stale-namespace event-alpha-shim-report event-alpha-shim-dependency-report event-alpha-old-import-check normalize-export-timestamps export-src-with-artifacts-smoke
 .PHONY: verify-fast test-full test-rsi test-cli test-pytest test-pytest-safe test-pytest-timed test-pytest-durations test-pytest-parallel test-event-alpha architecture-baseline architecture-api-inventory architecture-class-ownership-report architecture-size-baseline-update architecture-size-gates architecture-transitional-file-check architecture-terminology-check architecture-naming-check architecture-final-report architecture-completion-map architecture-cleanliness-check event-alpha-radar-north-star event-alpha-namespace-lifecycle-report event-alpha-list-active-namespaces event-alpha-archive-stale-namespaces radar-dashboard radar-dashboard-smoke radar-calendar-preview
 .PHONY: event-alpha-burn-in-contract event-alpha-daily-live-no-send-burn-in event-alpha-daily-live-no-send-burn-in-plan event-alpha-daily-live-no-send-burn-in-smoke event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke-doctor event-alpha-daily-burn-in-readiness event-alpha-daily-review-inbox event-alpha-feedback-progress event-alpha-burn-in-weekly-measurement event-alpha-source-yield-report conviction-priors-shadow-report paper-risk-research event-alpha-archive-burn-in-evidence event-feedback-false-positive event-feedback-late event-feedback-source-noise event-feedback-needs-confirmation event-feedback-duplicate event-feedback-promising-source-type
+.PHONY: event-alpha-observed-outcome-preview event-alpha-observed-outcome-stage
 .PHONY: dependency-tools lock-dependencies dependency-lock-check dependency-audit dependency-verify
 
 help:
@@ -239,6 +249,8 @@ help:
 	@echo "  make event-alpha-integrated-radar-doctor  Strictly inspect the integrated radar smoke namespace"
 	@echo "  make event-alpha-integrated-radar-outcome-smoke  Fill/report fixture integrated radar outcomes; no sends/trades"
 	@echo "  make event-alpha-integrated-radar-calibration-report  Print recommendation-only integrated radar calibration"
+	@echo "  make event-alpha-observed-outcome-preview  Preview one fixture-backed synthetic diagnostic outcome; no writes/sends"
+	@echo "  CONFIRM=1 make event-alpha-observed-outcome-stage  Stage one synthetic noncanonical diagnostic JSONL without overwrite"
 	@echo "  make event-alpha-market-anomaly-scan PROFILE=no_key_live  Scan cached market rows into anomaly artifacts"
 	@echo "  make event-alpha-official-exchange-smoke  Write fixture official exchange artifacts, no sends"
 	@echo "  make event-alpha-official-exchange-report PROFILE=no_key_live  Normalize configured official exchange fixtures"
@@ -872,6 +884,30 @@ event-alpha-integrated-radar-calibration-report:
 event-alpha-integrated-radar-calibration-export-priors: PROFILE = integrated_radar_smoke
 event-alpha-integrated-radar-calibration-export-priors:
 	$(PYTHON) main.py --event-alpha-integrated-radar-calibration-export-priors --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
+
+event-alpha-observed-outcome-preview:
+	$(PYTHON) main.py --event-alpha-observed-outcome-build \
+		--event-alpha-observed-candidates "$(EVENT_ALPHA_OBSERVED_CANDIDATES)" \
+		--event-alpha-observed-cores "$(EVENT_ALPHA_OBSERVED_CORES)" \
+		--event-alpha-observed-closes "$(EVENT_ALPHA_OBSERVED_CLOSES)" \
+		--event-alpha-observed-candidate-id "$(EVENT_ALPHA_OBSERVED_CANDIDATE_ID)" \
+		--event-alpha-observed-core-id "$(EVENT_ALPHA_OBSERVED_CORE_ID)" \
+		--event-alpha-observed-evaluated-at "$(EVENT_ALPHA_OBSERVED_EVALUATED_AT)" \
+		--event-alpha-profile "$(EVENT_ALPHA_OBSERVED_PROFILE)" \
+		--event-alpha-artifact-namespace "$(EVENT_ALPHA_OBSERVED_NAMESPACE)" --json
+
+event-alpha-observed-outcome-stage:
+	$(PYTHON) main.py --event-alpha-observed-outcome-build \
+		--event-alpha-observed-candidates "$(EVENT_ALPHA_OBSERVED_CANDIDATES)" \
+		--event-alpha-observed-cores "$(EVENT_ALPHA_OBSERVED_CORES)" \
+		--event-alpha-observed-closes "$(EVENT_ALPHA_OBSERVED_CLOSES)" \
+		--event-alpha-observed-candidate-id "$(EVENT_ALPHA_OBSERVED_CANDIDATE_ID)" \
+		--event-alpha-observed-core-id "$(EVENT_ALPHA_OBSERVED_CORE_ID)" \
+		--event-alpha-observed-evaluated-at "$(EVENT_ALPHA_OBSERVED_EVALUATED_AT)" \
+		--event-alpha-profile "$(EVENT_ALPHA_OBSERVED_PROFILE)" \
+		--event-alpha-artifact-namespace "$(EVENT_ALPHA_OBSERVED_NAMESPACE)" \
+		--out "$(EVENT_ALPHA_OBSERVED_OUT)" \
+		$(if $(filter 1 true yes,$(CONFIRM)),--confirm,) --json
 
 event-alpha-market-anomaly-smoke: PROFILE = market_anomaly_smoke
 event-alpha-market-anomaly-smoke:

@@ -137,6 +137,8 @@ Useful commands:
 - `make event-alpha-integrated-radar-outcome-report PYTHON=python3`
 - `make event-alpha-integrated-radar-calibration-report PYTHON=python3`
 - `make event-alpha-integrated-radar-calibration-export-priors PYTHON=python3`
+- `make event-alpha-observed-outcome-preview PYTHON=python3`
+- `CONFIRM=1 make event-alpha-observed-outcome-stage PYTHON=python3`
 
 The cycle writes portable review artifacts under the selected namespace,
 including:
@@ -165,6 +167,26 @@ aliases are diagnostics only. Feedback must join one exact canonical Core row
 and pass chronology, uniqueness, and safety checks. Every report should show
 supplied, eligible, excluded, and closed reason counts. Calibration priors stay
 shadow-only even when the compatibility environment flag is set.
+
+The exact observed-outcome operator is an offline, preview-first bridge into
+that evidence contract. It requires explicit candidate/Core JSONL files, a
+versioned close document, literal candidate/Core ids, and an aware evaluation
+clock. `--event-alpha-profile` and `--event-alpha-artifact-namespace` assert the
+selected row identity; they never select or rewrite paths. The checked-in
+`event_alpha_observed_ohlcv_fixture_v1` input is a synthetic rehearsal: its
+preview remains `calibration_eligible=false`, `include_in_performance=false`,
+and `validation_status=inconclusive` even when the price math is complete. An
+input may claim observed evidence only through
+`event_alpha_observed_ohlcv_v1`; fixture/synthetic lineage tokens are rejected.
+
+Preview mode creates no files or locks. Staging is optional and isolated:
+provide an absolute `.jsonl` with `--out` plus `--confirm` (or set
+`EVENT_ALPHA_OBSERVED_OUT` and `CONFIRM=1` on the Make target). The target must
+not exist, must have a physically resolved real parent, and must be outside all
+configured Event Alpha roots and canonical basenames. Staging atomically creates
+one mode-0600 row and refuses repeat runs; it never appends, overwrites, or
+updates canonical outcomes, runs, cards, operator state, notifications, paper
+rows, normal RSI rows, trades, execution, or `TRIGGERED_FADE`.
 
 Rendered Markdown should use artifact-relative labels rather than absolute
 machine paths. Structured JSONL rows may keep relative path fields for tooling,
