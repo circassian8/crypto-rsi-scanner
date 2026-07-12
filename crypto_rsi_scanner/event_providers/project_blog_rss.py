@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 from urllib.error import HTTPError, URLError
@@ -21,6 +22,12 @@ from ._news_common import fetch_news_events, news_events_from_items
 log = logging.getLogger(__name__)
 
 UrlOpen = Callable[[Request, float], Any]
+_RSS_ACCEPT = (
+    "application/rss+xml, application/atom+xml, application/xml;q=0.9, "
+    "text/xml;q=0.9, */*;q=0.1"
+)
+_RSS_USER_AGENT = "crypto-rsi-scanner/1.0"
+_MAX_TRANSIENT_RETRIES = 1
 
 
 def _urlopen_with_timeout(request: Request, timeout: float) -> Any:
@@ -48,6 +55,7 @@ def initialize_project_blog_rss_provider(
     live_enabled: bool = False,
     feed_urls: Iterable[str] | None = None,
     timeout: float = 10.0,
+    max_retries: int = _MAX_TRANSIENT_RETRIES,
     fail_fast_on_error: bool = False,
     opener: UrlOpen | None = None,
     fetched_at: datetime | None = None,
@@ -57,6 +65,7 @@ def initialize_project_blog_rss_provider(
     self.live_enabled = live_enabled
     self.feed_urls = tuple(url.strip() for url in (feed_urls or ()) if url.strip())
     self.timeout = timeout
+    self.max_retries = max(0, min(_MAX_TRANSIENT_RETRIES, int(max_retries)))
     self.fail_fast_on_error = fail_fast_on_error
     self.opener = opener or _urlopen_with_timeout
     self.fetched_at = fetched_at
@@ -85,15 +94,7 @@ def fetch_project_blog_rss_live_events(self: Any, start: datetime, end: datetime
     feed_health: list[event_source_registry.FeedHealth] = []
     for feed_url in self.feed_urls:
         try:
-            request = Request(
-                feed_url,
-                headers={"Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*"},
-            )
-            with self.opener(request, self.timeout) as response:
-                status = getattr(response, "status", getattr(response, "code", 200))
-                if int(status) >= 400:
-                    raise RuntimeError(f"HTTP {status}")
-                body = response.read()
+            body = _fetch_feed_body(self, feed_url)
             rows = _feed_rows(body, feed_url=feed_url, fetched_at=fetched_at)
         except Exception as exc:  # noqa: BLE001
             failure_kind = _feed_failure_kind(exc)
@@ -135,6 +136,35 @@ def fetch_project_blog_rss_live_events(self: Any, start: datetime, end: datetime
     self.last_warnings = tuple(warnings)
     self.last_feed_health = tuple(feed_health)
     return events
+
+
+def _fetch_feed_body(self: Any, feed_url: str) -> bytes:
+    attempts = 1 + self.max_retries
+    for attempt in range(attempts):
+        request = Request(
+            feed_url,
+            headers={"Accept": _RSS_ACCEPT, "User-Agent": _RSS_USER_AGENT},
+        )
+        try:
+            with self.opener(request, self.timeout) as response:
+                status = int(getattr(response, "status", getattr(response, "code", 200)))
+                if status >= 400:
+                    try:
+                        reason = HTTPStatus(status).phrase
+                    except ValueError:
+                        reason = f"HTTP {status}"
+                    raise HTTPError(feed_url, status, reason, getattr(response, "headers", None), None)
+                return response.read()
+        except Exception as exc:  # noqa: BLE001 - caller records the final fail-soft warning.
+            if attempt + 1 >= attempts or not _retryable_feed_failure(exc):
+                raise
+    raise RuntimeError("unreachable RSS fetch retry state")
+
+
+def _retryable_feed_failure(exc: Exception) -> bool:
+    if isinstance(exc, HTTPError):
+        return exc.code in {408, 429} or 500 <= exc.code < 600
+    return isinstance(exc, (TimeoutError, ConnectionError, URLError, OSError))
 
 
 def _feed_rows(body: bytes, *, feed_url: str, fetched_at: datetime) -> list[Mapping[str, Any]]:

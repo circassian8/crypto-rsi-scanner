@@ -187,7 +187,7 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
         assert profile.config_overrides["EVENT_LLM_MAX_CANDIDATES_PER_RUN"] > 0
         assert profile.config_overrides["EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN"] > 0
         assert profile.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] >= 30.0
-        assert profile.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] >= 12
+        assert profile.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] == 3
         assert "LLM budget defaults" in event_alpha_profiles.format_profile_report(profile)
         assert "artifact policy:" in event_alpha_profiles.format_profile_report(profile)
         assert event_alpha_profiles.get_profile("research_send").config_overrides["EVENT_ALPHA_SNAPSHOT_POLICY"] == "alertable"

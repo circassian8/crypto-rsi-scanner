@@ -436,6 +436,7 @@ def test_event_discovery_bybit_live_provider_parses_documented_response_offline(
     def fake_opener(request, timeout):
         seen["url"] = request.full_url
         seen["timeout"] = timeout
+        seen["request_id"] = request.get_header("Cdn-request-id")
         return FakeResponse({
             "retCode": 0,
             "retMsg": "OK",
@@ -477,6 +478,7 @@ def test_event_discovery_bybit_live_provider_parses_documented_response_offline(
     assert len(events) == 1
     assert seen["url"] == "https://api.bybit.test/v5/announcements/index?locale=en-US&page=1&limit=2&type=new_crypto"
     assert seen["timeout"] == 3.5
+    assert seen["request_id"]
     event = events[0]
     assert event.provider == "bybit_announcements"
     assert event.source_url == "https://announcements.bybit.com/en-US/article/test-live/"

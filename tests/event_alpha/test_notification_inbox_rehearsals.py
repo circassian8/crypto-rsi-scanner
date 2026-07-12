@@ -446,9 +446,11 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             namespace = "bybit_live_mock"
             namespace_dir = root / namespace
             calls: list[str] = []
+            request_ids: list[str | None] = []
 
             def opener(request, _timeout):
                 calls.append(request.full_url)
+                request_ids.append(request.get_header("Cdn-request-id"))
                 return MockBybitResponse(fixture_payload)
 
             _preflight, report, _paths = event_bybit_announcements_preflight.run_no_send_rehearsal(
@@ -496,6 +498,7 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             integrated_symbols = {str(row.get("symbol") or "") for row in integrated_rows}
 
             assert len(calls) == 1
+            assert request_ids[0]
             assert "type=new_crypto" in calls[0]
             assert report.status == "live_rehearsal_success"
             assert report.provider_health_status == "observed_healthy"
@@ -525,6 +528,8 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             assert ledger_rows[0]["success"] is True
             assert ledger_rows[0]["live_call_allowed"] is True
             assert ledger_rows[0]["no_send_rehearsal"] is True
+            assert ledger_rows[0]["request_id"] == request_ids[0]
+            assert ledger_rows[0]["response_body_summary_redacted"] is None
             assert ledger_rows[0]["unsupported_query_params"] == []
             assert ledger_rows[0]["provider_generation_id"] == report.provider_generation_id
             assert ledger_rows[0]["run_id"] == report.run_id

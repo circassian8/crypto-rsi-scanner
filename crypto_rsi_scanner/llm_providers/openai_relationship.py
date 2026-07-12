@@ -7,6 +7,7 @@ from urllib.request import urlopen
 
 from .base import LLMProviderResult
 from .openai_support import (
+    OpenAIRequestGate,
     analyze_openai_catalyst_frames,
     analyze_openai_relationship,
     build_catalyst_frame_request_payload,
@@ -27,6 +28,7 @@ class OpenAILLMRelationshipProvider:
         timeout: float = 30.0,
         base_url: str = "https://api.openai.com/v1/responses",
         opener=urlopen,
+        request_gate: OpenAIRequestGate | None = None,
     ) -> None:
         initialize_openai_provider(
             self,
@@ -36,6 +38,7 @@ class OpenAILLMRelationshipProvider:
             timeout=timeout,
             base_url=base_url,
             opener=opener,
+            request_gate=request_gate,
         )
 
     def analyze_relationship(self, packet: Mapping[str, Any]) -> LLMProviderResult:

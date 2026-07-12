@@ -12,6 +12,7 @@ from typing import Any, MutableMapping
 
 import crypto_rsi_scanner.event_alpha.artifacts.operator_state as _operator_state
 import crypto_rsi_scanner.event_alpha.namespace.status as _namespace_status
+from crypto_rsi_scanner.event_alpha.radar.llm.provider_runtime import build_shared_openai_inputs
 
 
 _SERVICE_FUNCTION_NAMES = (
@@ -329,14 +330,12 @@ def _event_alpha_cycle_llm_inputs(with_llm: bool) -> dict[str, Any]:
     extraction_cfg = _event_llm_extractor_config_from_runtime()
     catalyst_frame_cfg = _event_llm_catalyst_frame_config_from_runtime()
     relationship_cfg = _event_llm_config_from_runtime()
-    return {
-        "extraction_cfg": extraction_cfg,
-        "extraction_provider": _event_llm_extraction_provider(extraction_cfg),
-        "catalyst_frame_cfg": catalyst_frame_cfg,
-        "catalyst_frame_provider": _event_llm_catalyst_frame_provider(catalyst_frame_cfg),
-        "relationship_cfg": relationship_cfg,
-        "relationship_provider": _event_llm_provider(relationship_cfg),
-    }
+    return build_shared_openai_inputs(
+        extraction_cfg, catalyst_frame_cfg, relationship_cfg,
+        extraction_factory=_event_llm_extraction_provider,
+        catalyst_frame_factory=_event_llm_catalyst_frame_provider,
+        relationship_factory=_event_llm_provider,
+    )
 
 
 def _run_event_alpha_cycle_pipeline(

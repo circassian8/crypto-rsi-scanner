@@ -7,6 +7,7 @@ from urllib.request import urlopen
 
 from .base import LLMProviderResult
 from .openai_support import (
+    OpenAIRequestGate,
     build_extraction_request_payload,
     extract_openai_raw_event,
     initialize_openai_provider,
@@ -25,6 +26,7 @@ class OpenAILLMExtractionProvider:
         timeout: float = 30.0,
         base_url: str = "https://api.openai.com/v1/responses",
         opener=urlopen,
+        request_gate: OpenAIRequestGate | None = None,
     ) -> None:
         initialize_openai_provider(
             self,
@@ -34,6 +36,7 @@ class OpenAILLMExtractionProvider:
             timeout=timeout,
             base_url=base_url,
             opener=opener,
+            request_gate=request_gate,
         )
 
     def extract_raw_event(self, packet: Mapping[str, Any]) -> LLMProviderResult:

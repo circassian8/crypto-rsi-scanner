@@ -461,7 +461,18 @@ def record_provider_failure(
     failures = int(row.get("consecutive_failures") or 0) + 1
     error_class = _error_class(error)
     disabled_until = None
-    if failures >= max(1, cfg.max_consecutive_failures) or (cfg.fail_fast_on_dns and _dns_like(error)):
+    immediate_backoff = error_class in {
+        "plan_mismatch",
+        "plan_or_endpoint_unavailable",
+        "rate_limited",
+        "rate_limited_or_forbidden",
+        "quota_exhausted",
+    }
+    if (
+        immediate_backoff
+        or failures >= max(1, cfg.max_consecutive_failures)
+        or (cfg.fail_fast_on_dns and _dns_like(error))
+    ):
         disabled_until = (observed_dt + timedelta(minutes=max(0.0, cfg.backoff_minutes))).isoformat()
     row.update({
         "provider": provider,
@@ -734,6 +745,8 @@ def _error_class(error: object) -> str:
     lowered = text.casefold()
     for known in (
         "auth_failed",
+        "plan_mismatch",
+        "plan_or_endpoint_unavailable",
         "rate_limited_or_forbidden",
         "server_error",
         "json_parse_error",

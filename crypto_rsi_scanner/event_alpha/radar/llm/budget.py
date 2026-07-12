@@ -28,7 +28,10 @@ class EventLLMBudgetSnapshot:
     cache_hits: int = 0
     cache_misses: int = 0
     calls_attempted: int = 0
+    calls_succeeded: int = 0
+    calls_failed: int = 0
     skipped_due_budget: int = 0
+    skipped_due_provider_backoff: int = 0
     warning: str | None = None
 
 
@@ -56,6 +59,9 @@ class EventLLMBudgetRunTracker:
         self.cache_hits = 0
         self.cache_misses = 0
         self.skipped = 0
+        self.skipped_provider_backoff = 0
+        self.calls_succeeded = 0
+        self.calls_failed = 0
 
     def record_cache_hit(self) -> None:
         self.cache_hits += 1
@@ -80,8 +86,17 @@ class EventLLMBudgetRunTracker:
     def record_attempt(self) -> None:
         self.run_calls += 1
 
+    def record_result(self, *, success: bool) -> None:
+        if success:
+            self.calls_succeeded += 1
+        else:
+            self.calls_failed += 1
+
     def record_skipped(self) -> None:
         self.skipped += 1
+
+    def record_provider_backoff(self) -> None:
+        self.skipped_provider_backoff += 1
 
     def exhausted_warning(self) -> str:
         return "LLM skipped: persistent daily/run budget exhausted"
@@ -114,10 +129,19 @@ def _updated_budget_entry(tracker: EventLLMBudgetRunTracker) -> dict[str, Any]:
     entry["cache_hits"] = _int(entry.get("cache_hits")) + tracker.cache_hits
     entry["cache_misses"] = _int(entry.get("cache_misses")) + tracker.cache_misses
     entry["skipped_due_budget"] = _int(entry.get("skipped_due_budget")) + tracker.skipped
+    entry["skipped_due_provider_backoff"] = (
+        _int(entry.get("skipped_due_provider_backoff")) + tracker.skipped_provider_backoff
+    )
     if tracker.call_kind == "extractor":
         entry["extractor_calls_attempted"] = _int(entry.get("extractor_calls_attempted")) + tracker.run_calls
+        entry["extractor_calls_succeeded"] = _int(entry.get("extractor_calls_succeeded")) + tracker.calls_succeeded
+        entry["extractor_calls_failed"] = _int(entry.get("extractor_calls_failed")) + tracker.calls_failed
     else:
         entry["relationship_calls_attempted"] = _int(entry.get("relationship_calls_attempted")) + tracker.run_calls
+        entry["relationship_calls_succeeded"] = (
+            _int(entry.get("relationship_calls_succeeded")) + tracker.calls_succeeded
+        )
+        entry["relationship_calls_failed"] = _int(entry.get("relationship_calls_failed")) + tracker.calls_failed
     entry["estimated_cost_usd"] = round(
         _float(entry.get("estimated_cost_usd"))
         + tracker.run_calls * max(0.0, tracker.cfg.estimated_cost_per_call_usd),
@@ -132,7 +156,10 @@ def _budget_snapshot(tracker: EventLLMBudgetRunTracker, *, warning: str | None) 
         cache_hits=tracker.cache_hits,
         cache_misses=tracker.cache_misses,
         calls_attempted=tracker.run_calls,
+        calls_succeeded=tracker.calls_succeeded,
+        calls_failed=tracker.calls_failed,
         skipped_due_budget=tracker.skipped,
+        skipped_due_provider_backoff=tracker.skipped_provider_backoff,
         warning=warning,
     )
 
@@ -151,10 +178,15 @@ def _load_entry(
         "model": model,
         "prompt_version": prompt_version,
         "extractor_calls_attempted": 0,
+        "extractor_calls_succeeded": 0,
+        "extractor_calls_failed": 0,
         "relationship_calls_attempted": 0,
+        "relationship_calls_succeeded": 0,
+        "relationship_calls_failed": 0,
         "cache_hits": 0,
         "cache_misses": 0,
         "skipped_due_budget": 0,
+        "skipped_due_provider_backoff": 0,
         "estimated_cost_usd": 0.0,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }

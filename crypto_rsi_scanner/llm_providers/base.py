@@ -10,6 +10,21 @@ from typing import Any, Mapping, Protocol
 class LLMProviderResult:
     raw: dict[str, Any] | None = None
     warning: str | None = None
+    error_class: str | None = None
+    http_status: int | None = None
+    retryable: bool | None = None
+    retry_after_seconds: float | None = None
+
+
+def provider_batch_backoff_requested(result: LLMProviderResult) -> bool:
+    """Return whether the remaining calls in this provider batch should stop."""
+    return result.error_class in {
+        "provider_backoff",
+        "rate_limited",
+        "quota_exhausted",
+        "auth_failed",
+        "access_forbidden",
+    }
 
 
 class LLMRelationshipProvider(Protocol):

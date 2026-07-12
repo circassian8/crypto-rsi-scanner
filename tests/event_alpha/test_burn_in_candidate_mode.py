@@ -287,6 +287,32 @@ def test_daily_burn_in_readiness_no_key_and_mock_allow_paths(tmp_path, monkeypat
     assert ready["telegram_sends"] == 0
 
 
+def test_bybit_live_readiness_preserves_specific_forbidden_statuses(tmp_path, monkeypatch):
+    from crypto_rsi_scanner import config
+    from crypto_rsi_scanner.event_alpha.providers import live_provider_readiness
+
+    namespace = "bybit_failure_status"
+    namespace_dir = tmp_path / namespace
+    namespace_dir.mkdir(parents=True)
+    monkeypatch.setattr(config, "EVENT_ALPHA_ARTIFACT_BASE_DIR", tmp_path)
+
+    for status in ("edge_forbidden", "region_restricted"):
+        common.write_json(
+            namespace_dir / "event_bybit_announcements_rehearsal_report.json",
+            {
+                "provider": "bybit_announcements",
+                "status": status,
+                "provider_health_status": status,
+                "configured": True,
+                "live_call_allowed": True,
+            },
+        )
+        history = live_provider_readiness._bybit_announcements_history(namespace)  # noqa: SLF001
+        assert history["latest_rehearsal_status"] == status
+        assert history["latest_provider_health_status"] == status
+        assert history["activation_phase"] == status
+
+
 def test_daily_burn_in_candidate_mode_mocked_live_candidate_counts_with_ledger(tmp_path, monkeypatch):
     monkeypatch.setenv("RSI_EVENT_DISCOVERY_COINALYZE_API_KEY", "fake-test-key")
     monkeypatch.setenv("RSI_EVENT_ALPHA_COINALYZE_ALLOW_LIVE_PREFLIGHT", "1")
@@ -584,7 +610,7 @@ def test_candidate_contract_rejects_stale_or_failed_provider_generation(tmp_path
     # ledger/source rows remain append-only, but cannot count for the retry.
     common.write_json(context.namespace_dir / "event_bybit_announcements_rehearsal_report.json", {
         "provider": "bybit_announcements",
-        "status": "rate_limited",
+        "status": "edge_forbidden",
         "live_call_allowed": True,
         "no_send": True,
         "research_only": True,

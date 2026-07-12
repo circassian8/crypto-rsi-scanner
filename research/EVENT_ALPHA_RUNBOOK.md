@@ -359,8 +359,8 @@ market/protocol metric evidence only: they can support market confirmation or
 source coverage, but they do not prove official confirmation or catalyst
 impact-path validation by themselves.
 
-CryptoPanic runs against the Growth Weekly API by default:
-`https://cryptopanic.com/api/growth_weekly/v2/posts/`. Configure
+CryptoPanic runs against the current Growth API route by default:
+`https://cryptopanic.com/api/growth/v2/posts/`. Configure
 `RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN` in `.env`; the code also accepts the
 legacy aliases `RSI_EVENT_DISCOVERY_CRYPTOPANIC_AUTH_TOKEN`,
 `CRYPTOPANIC_AUTH_TOKEN`, `CRYPTOPANIC_API_KEY`, and `CRYPTOPANIC_TOKEN`.
@@ -392,16 +392,23 @@ If CryptoPanic is configured but unusable, inspect the same ledger rather than
 guessing whether the token is missing. Live fetches record `content_type`,
 `response_bytes`, `body_excerpt_redacted`, `parse_error_message`,
 `provider_health_effect`, `quota_counted`, status code, and a classified
-`error_class` such as `json_parse_error`, `empty_response`,
+`error_class` such as `json_parse_error`, `empty_response`, `plan_mismatch`,
+`plan_or_endpoint_unavailable`,
 `rate_limited_or_forbidden`, `auth_failed`, `server_error`, `network_error`,
 `provider_backoff`, or `quota_exhausted`. Source coverage reports use
 `observed_healthy`, `observed_partial_success`, `observed_no_results`,
-`observed_parse_error`, `observed_rate_limited`,
+`observed_parse_error`, `observed_plan_mismatch`, `observed_rate_limited`,
 `observed_backoff_without_success`, `quota_exhausted`,
 `configured_not_observed`, and `not_configured` so missing configuration,
 successful observation, partial success, and unusable responses are not
 collapsed into one status. Artifact doctor strict mode blocks unredacted token
 excerpts or HTTP-failure rows missing status codes.
+
+A `plan_mismatch` means the token does not belong to the configured supported
+plan route. Do not follow a response hint back to the discontinued Developer
+plan. Replace or upgrade the token, set `RSI_EVENT_DISCOVERY_CRYPTOPANIC_PLAN`
+to the matching active plan, and rerun the bounded preflight before resetting
+provider health.
 
 The CryptoPanic preflight prints only redacted key/config state, endpoint,
 plan, quota usage, source packs, provider health/backoff, and the targeted reset
@@ -700,19 +707,26 @@ candidate. Artifact doctor reports
 `strategic_broad_asset_digest_without_confirmation` if a delivered/promoted
 digest violates this rule.
 
-`notify_no_key` uses public RSS, GDELT, Polymarket, live CoinGecko universe,
-market enrichment, anomaly scanning, catalyst search, watchlist monitoring,
-router lanes, and auto-written research cards. `notify_llm` uses the same source
+`notify_no_key` uses public RSS, one broad GDELT context fetch, Polymarket,
+live CoinGecko universe, market enrichment, anomaly scanning, catalyst search,
+watchlist monitoring, router lanes, and auto-written research cards.
+`notify_llm` uses the same source
 set plus OpenAI extraction/advisory metadata, bounded full-source enrichment for
 LLM context, and bounded parallel OpenAI defaults: 100 calls/run, 500 calls/day,
-$15/day estimated cap, 12 concurrent LLM calls, 30s LLM HTTP timeouts, 10
+$15/day estimated cap, 3 concurrent LLM calls, 30s LLM HTTP timeouts, 10
 enriched source rows/run, a 168-hour cache TTL, and a 600s notification runtime
 budget. Like `notify_no_key`, `notify_llm` sends operator-visible output on
 every clean scheduled run; cooldown/content dedupe is disabled while the run
 lock and in-flight delivery guard remain active. Use `notify_llm_deep` only
 when you explicitly want a deeper review cycle: it keeps the same research-only
 send guards and per-run delivery behavior but raises the LLM/enrichment caps to
-250 calls/run, 1500 calls/day, 16 concurrent LLM calls, and 45s LLM timeouts.
+250 calls/run, 1500 calls/day, 3 concurrent LLM calls, and 45s LLM timeouts.
+All live OpenAI providers in one cycle share a fail-fast gate. A rate-limit,
+quota, authentication, or access response stops unscheduled extraction,
+catalyst-frame, and relationship calls and is reported separately from budget
+skips. GDELT is intentionally absent from automatic catalyst-search providers
+during the upstream DOC API migration; a 429 creates immediate provider
+backoff rather than an in-cycle retry.
 
 ## Market-State Anomaly Artifacts
 

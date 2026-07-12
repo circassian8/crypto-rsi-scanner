@@ -320,7 +320,10 @@ def _append_run_ledger_report_row(rows: list[str], row: Mapping[str, Any]) -> No
         f"provider_fetch={int(row.get('provider_fetch_count') or 0)} "
         f"provider_cache={int(row.get('provider_cache_hits') or 0)}/{int(row.get('provider_cache_misses') or 0)} "
         f"llm_cache={int(row.get('llm_cache_hits') or 0)}/{int(row.get('llm_cache_misses') or 0)} "
-        f"llm_calls={int(row.get('llm_calls_attempted') or 0)} skipped_budget={int(row.get('llm_skipped_due_budget') or 0)}"
+        f"llm_calls={int(row.get('llm_calls_attempted') or 0)} "
+        f"failed={int(row.get('llm_calls_failed') or 0)} "
+        f"skipped_budget={int(row.get('llm_skipped_due_budget') or 0)} "
+        f"skipped_provider_backoff={int(row.get('llm_skipped_due_provider_backoff') or 0)}"
     )
     warnings = [str(item) for item in row.get("warnings") or [] if str(item)]
     if warnings:
@@ -808,7 +811,10 @@ def _run_record_cache_and_path_fields(
         "llm_cache_hits": llm_stats["cache_hits"],
         "llm_cache_misses": llm_stats["cache_misses"],
         "llm_calls_attempted": llm_stats["calls_attempted"],
+        "llm_calls_succeeded": llm_stats["calls_succeeded"],
+        "llm_calls_failed": llm_stats["calls_failed"],
         "llm_skipped_due_budget": llm_stats["skipped_due_budget"],
+        "llm_skipped_due_provider_backoff": llm_stats["skipped_due_provider_backoff"],
         "watchlist_path": str(getattr(watchlist, "state_path", "") or ""),
         "run_ledger_path": getattr(result, "run_ledger_path", None),
         "alert_store_path": getattr(result, "alert_store_path", None),
@@ -889,7 +895,10 @@ def _llm_stats(rows: Iterable[object]) -> dict[str, int]:
         "cache_hits": 0,
         "cache_misses": 0,
         "calls_attempted": 0,
+        "calls_succeeded": 0,
+        "calls_failed": 0,
         "skipped_due_budget": 0,
+        "skipped_due_provider_backoff": 0,
     }
     for row in rows:
         status = str(getattr(row, "cache_status", "") or "")
@@ -898,8 +907,14 @@ def _llm_stats(rows: Iterable[object]) -> dict[str, int]:
         elif status == "miss":
             stats["cache_misses"] += 1
             stats["calls_attempted"] += 1
+            if getattr(row, "analysis", None) is not None or getattr(row, "extraction", None) is not None:
+                stats["calls_succeeded"] += 1
+            else:
+                stats["calls_failed"] += 1
         elif status == "skipped_budget":
             stats["skipped_due_budget"] += 1
+        elif status == "skipped_provider_backoff":
+            stats["skipped_due_provider_backoff"] += 1
         warnings = tuple(getattr(row, "warnings", ()) or ())
         if any("budget exhausted" in str(warning) for warning in warnings):
             stats["skipped_due_budget"] += 1

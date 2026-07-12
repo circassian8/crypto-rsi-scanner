@@ -20,7 +20,11 @@ import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_seman
 import crypto_rsi_scanner.event_alpha.radar.source_enrichment as event_source_enrichment
 from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
 from ..resolver import clean_text
-from ....llm_providers.base import LLMCatalystFrameProvider, LLMProviderResult
+from ....llm_providers.base import (
+    LLMCatalystFrameProvider,
+    LLMProviderResult,
+    provider_batch_backoff_requested,
+)
 
 
 LLM_CATALYST_FRAME_SCHEMA_VERSION = "event_llm_catalyst_frames_v1"
@@ -201,10 +205,22 @@ def analyze_raw_events(
     cfg = cfg or EventLLMCatalystFrameConfig()
     selected = _select_raw_events(raw_events, cfg=cfg)
     rows: list[EventLLMCatalystFrameReportRow] = []
+    provider_backoff_warning: str | None = None
     for raw in selected:
         event = events_by_raw_id.get(raw.raw_id) if events_by_raw_id else None
         packet = build_catalyst_frame_packet(raw, event=event, cfg=cfg)
-        provider_result = _analyze_catalyst_frames_with_deadline(provider, packet, cfg=cfg)
+        provider_result = (
+            LLMProviderResult(
+                warning=provider_backoff_warning,
+                error_class="provider_backoff",
+                retryable=False,
+            )
+            if provider_backoff_warning
+            else _analyze_catalyst_frames_with_deadline(provider, packet, cfg=cfg)
+        )
+        if provider_batch_backoff_requested(provider_result) and provider_backoff_warning is None:
+            reason = provider_result.error_class or "provider_failure"
+            provider_backoff_warning = f"LLM skipped: provider backoff active after {reason}"
         warnings: list[str] = []
         if provider_result.warning:
             warnings.append(provider_result.warning)

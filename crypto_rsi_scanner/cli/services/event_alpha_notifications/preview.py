@@ -10,6 +10,7 @@ import crypto_rsi_scanner.event_alpha.artifacts.locks as _artifact_locks
 import crypto_rsi_scanner.event_alpha.artifacts.operator_state as _operator_state
 import crypto_rsi_scanner.event_alpha.namespace.status as _namespace_status
 import crypto_rsi_scanner.event_alpha.radar.core_opportunities as _core_opportunities
+from crypto_rsi_scanner.event_alpha.radar.llm.provider_runtime import build_shared_openai_inputs
 
 def _event_alpha_notify_cycle_body(
     *,
@@ -260,14 +261,12 @@ def _notification_llm_inputs(
         extraction_cfg = replace(extraction_cfg, deadline_at=llm_deadline_at)
         catalyst_frame_cfg = replace(catalyst_frame_cfg, deadline_at=llm_deadline_at)
         relationship_cfg = replace(relationship_cfg, deadline_at=llm_deadline_at)
-    return True, {
-        "extraction_cfg": extraction_cfg,
-        "extraction_provider": _event_llm_extraction_provider(extraction_cfg),
-        "catalyst_frame_cfg": catalyst_frame_cfg,
-        "catalyst_frame_provider": _event_llm_catalyst_frame_provider(catalyst_frame_cfg),
-        "relationship_cfg": relationship_cfg,
-        "relationship_provider": _event_llm_provider(relationship_cfg),
-    }
+    return True, build_shared_openai_inputs(
+        extraction_cfg, catalyst_frame_cfg, relationship_cfg,
+        extraction_factory=_event_llm_extraction_provider,
+        catalyst_frame_factory=_event_llm_catalyst_frame_provider,
+        relationship_factory=_event_llm_provider,
+    )
 
 
 def _run_notification_pipeline_cycle(

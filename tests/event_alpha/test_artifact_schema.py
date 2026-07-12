@@ -34,6 +34,13 @@ def test_provider_lineage_schema_specs_preserve_registry_order_and_api():
     assert schema_v1.get_schema("provider_preflight_v1").required_fields == (
         "provider", "configured", "live_call_allowed",
     )
+    provider_ledger_fields = schema_v1.get_schema("provider_request_ledger_v1").optional_fields
+    assert {
+        "response_headers_safe",
+        "response_body_summary_redacted",
+        "response_body_truncated",
+        "response_bytes_captured",
+    } <= set(provider_ledger_fields)
     assert schema_v1.get_schema("targeted_market_refresh_report_v1").path_fields == (
         "ledger_path", "snapshot_path",
     )

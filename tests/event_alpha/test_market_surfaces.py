@@ -432,7 +432,10 @@ def test_makefile_exposes_market_anomaly_targets():
 
 
 def test_bybit_announcement_provider_supports_documented_query_params():
-    from crypto_rsi_scanner.event_providers.bybit_announcements import BybitAnnouncementProvider
+    from crypto_rsi_scanner.event_providers.bybit_announcements import (
+        BybitAnnouncementProvider,
+        build_bybit_public_request,
+    )
 
     provider = BybitAnnouncementProvider(
         None,
@@ -451,6 +454,14 @@ def test_bybit_announcement_provider_supports_documented_query_params():
     assert "tag=spot" in url
     assert "page=3" in url
     assert "limit=50" in url
+
+    first = build_bybit_public_request(url)
+    second = build_bybit_public_request(url)
+    first_request_id = first.get_header("Cdn-request-id")
+    second_request_id = second.get_header("Cdn-request-id")
+    assert first_request_id
+    assert second_request_id
+    assert first_request_id != second_request_id
 
 
 def test_official_exchange_fixture_lanes_and_quote_filtering():

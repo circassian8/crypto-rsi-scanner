@@ -806,6 +806,41 @@ def test_event_provider_health_backoff_and_report():
     assert legacy_decision.allowed is False
 
 
+def test_event_provider_health_rate_limit_enters_backoff_after_first_failure():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
+
+    now = datetime(2026, 7, 11, 12, 0, tzinfo=timezone.utc)
+    path = Path(tempfile.mkdtemp()) / "provider_health.json"
+    cfg = event_provider_health.EventProviderHealthConfig(
+        path=path,
+        max_consecutive_failures=3,
+        backoff_minutes=30,
+    )
+    row = event_provider_health.record_provider_failure(
+        "gdelt",
+        "GDELT live news fetch failed: rate_limited_or_forbidden status=429 retry_after=120",
+        cfg=cfg,
+        now=now,
+        provider_service="gdelt",
+        provider_role="event_source",
+        provider_kind="event_source",
+    )
+
+    assert row["consecutive_failures"] == 1
+    assert row["last_error_class"] == "rate_limited_or_forbidden"
+    assert row["disabled_until"] is not None
+    assert event_provider_health.provider_allowed(
+        "gdelt",
+        cfg=cfg,
+        now=now,
+        provider_service="gdelt",
+        provider_role="event_source",
+    ).allowed is False
+
+
 def test_event_provider_health_reset_and_ignore_backoff():
     import tempfile
     from datetime import datetime, timezone

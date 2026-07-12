@@ -22,7 +22,15 @@ from urllib.request import Request
 
 from ... import config
 from ...event_providers._announcement_common import _announcement_items
-from ...event_providers.bybit_announcements import BybitAnnouncementProvider
+from ...event_providers.bybit_announcements import (
+    BybitAnnouncementProvider,
+    bybit_failure_message,
+    bybit_request_id,
+    bybit_response_diagnostics,
+    build_bybit_public_request,
+    classify_bybit_failure,
+    raise_for_bybit_api_error,
+)
 from ..artifacts import paths as event_artifact_paths
 from ..artifacts import schema_v1
 from . import official_exchange as event_official_exchange
@@ -699,9 +707,10 @@ def _fetch_live_announcement_items(
             timeout=float(config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_TIMEOUT or 10.0),
             opener=opener,
         )
-        request = Request(provider._request_url(), headers={"Accept": "application/json", "User-Agent": "crypto-rsi-scanner/1.0"})
+        request = build_bybit_public_request(provider._request_url())
         with opener(request, provider.timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
+            raise_for_bybit_api_error(payload)
         try:
             page_items = _announcement_items(payload)
         except ValueError:
@@ -726,10 +735,12 @@ def _rehearsal_status_from_ledger(
     status_codes = {int(row.get("status_code") or 0) for row in rows if row.get("status_code") not in (None, "")}
     errors = [row for row in rows if not bool(row.get("success"))]
     first_error = errors[0] if errors else {}
-    if 401 in status_codes or 403 in status_codes:
-        return "auth_or_access_error", str(first_error.get("error_class") or "HTTPError"), str(first_error.get("error_message_safe") or "")
-    if 429 in status_codes:
-        return "rate_limited", str(first_error.get("error_class") or "HTTPError"), str(first_error.get("error_message_safe") or "")
+    diagnostic_text = _ledger_error_diagnostic_text(errors)
+    error_class = str(first_error.get("error_class") or "HTTPError")
+    error_message = bybit_failure_message(first_error)
+    classified = classify_bybit_failure(status_codes, diagnostic_text)
+    if classified:
+        return classified, error_class, error_message
     if any(str(row.get("error_class") or "") == "RequestBudgetExceeded" for row in errors):
         return "blocked_request_budget", "RequestBudgetExceeded", str(first_error.get("error_message_safe") or "")
     if errors and item_count <= 0:
@@ -739,6 +750,16 @@ def _rehearsal_status_from_ledger(
     if item_count > 0:
         return "live_rehearsal_success", None, None
     return "live_rehearsal_no_results", None, None
+
+
+def _ledger_error_diagnostic_text(rows: Iterable[Mapping[str, Any]]) -> str:
+    return " ".join(
+        " ".join((
+            str(row.get("error_message_safe") or ""),
+            str(row.get("response_body_summary_redacted") or ""),
+        ))
+        for row in rows
+    ).casefold()
 
 
 def _record_provider_health(
@@ -792,7 +813,13 @@ def _record_provider_health(
         row["provider_coverage_status"] = "observed_partial_success"
         _rewrite_provider_health_row(cfg.path, row)
         return "observed_partial_success"
-    if status in {"auth_or_access_error", "rate_limited", "provider_unavailable"}:
+    if status in {
+        "auth_or_access_error",
+        "edge_forbidden",
+        "rate_limited",
+        "region_restricted",
+        "provider_unavailable",
+    }:
         row = event_provider_health.record_provider_failure(
             PROVIDER_HEALTH_KEY,
             error_class or error_message or status,
@@ -802,7 +829,7 @@ def _record_provider_health(
             provider_service=PROVIDER_HEALTH_KEY,
             provider_role="official_announcements_no_send_rehearsal",
         )
-        mapped = "auth_or_access_error" if status == "auth_or_access_error" else "rate_limited" if status == "rate_limited" else "provider_unavailable"
+        mapped = status
         row["provider_coverage_status"] = mapped
         _rewrite_provider_health_row(cfg.path, row)
         return mapped
@@ -984,6 +1011,7 @@ def _ledger_row(
     parsed = urlparse(request.full_url)
     query_params = {key: value for key, value in parse_qsl(parsed.query, keep_blank_values=True)}
     unsupported = sorted(key for key in query_params if key not in SUPPORTED_PARAMS)
+    response_diagnostics = bybit_response_diagnostics(response=response, payload=payload, error=error)
     return {
         "schema_version": "event_bybit_announcements_request_ledger_v1",
         "provider": PROVIDER_HEALTH_KEY,
@@ -1000,6 +1028,8 @@ def _ledger_row(
         "unsupported_query_params": unsupported,
         "error_class": type(error).__name__ if error else None,
         "error_message_safe": _safe_error_message(error),
+        "request_id": bybit_request_id(request),
+        **response_diagnostics,
         "request_budget_before": budget_before,
         "request_budget_after": budget_after,
         "live_call_allowed": True,

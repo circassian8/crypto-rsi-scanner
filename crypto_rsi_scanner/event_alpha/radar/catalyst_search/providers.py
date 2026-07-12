@@ -214,7 +214,10 @@ def _search_event_provider_queries(
     observed = _as_utc(now or datetime.now(timezone.utc))
     start = observed - timedelta(hours=max(0.0, provider_adapter.lookback_hours))
     end = observed + timedelta(days=max(0.0, provider_adapter.horizon_days))
-    query_rows = tuple(queries)
+    # Spend bounded live-provider fetches on the most specific/highest-value
+    # search first. Stable tie ordering preserves caller order for fixtures and
+    # manually supplied queries that have no score.
+    query_rows = tuple(sorted(tuple(queries), key=lambda query: -int(query.score or 0)))
     result_events: list[SearchResultEvent] = []
     warnings: list[str] = []
     cache: dict[tuple[str, ...], tuple[RawDiscoveredEvent, ...]] = {}
@@ -349,8 +352,8 @@ class CryptoPanicCatalystSearchProvider(EventProviderCatalystSearchProvider):
                 required=bool(kwargs.get("required", False)),
                 live_enabled=bool(kwargs.get("live_enabled", False)),
                 api_token=str(kwargs.get("api_token") or ""),
-                base_url=str(kwargs.get("base_url") or "https://cryptopanic.com/api/growth_weekly/v2"),
-                plan=str(kwargs.get("plan") or "growth_weekly"),
+                base_url=str(kwargs.get("base_url") or "https://cryptopanic.com/api/growth/v2"),
+                plan=str(kwargs.get("plan") or "growth"),
                 public=bool(kwargs.get("public", True)),
                 following=bool(kwargs.get("following", False)),
                 filter_name=str(kwargs.get("filter_name") or ""),

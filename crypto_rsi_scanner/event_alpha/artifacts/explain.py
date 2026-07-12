@@ -95,7 +95,9 @@ def format_last_run_explanation(
     lines.append(
         "LLM budget/cache: "
         f"cache={_int(last.get('llm_cache_hits'))}/{_int(last.get('llm_cache_misses'))} "
-        f"calls={_int(last.get('llm_calls_attempted'))} skipped_budget={_int(last.get('llm_skipped_due_budget'))}"
+        f"calls={_int(last.get('llm_calls_attempted'))} failed={_int(last.get('llm_calls_failed'))} "
+        f"skipped_budget={_int(last.get('llm_skipped_due_budget'))} "
+        f"skipped_provider_backoff={_int(last.get('llm_skipped_due_provider_backoff'))}"
     )
     mismatch = event_alpha_run_ledger.run_profile_mismatch_warning(requested_profile, last)
     if mismatch:

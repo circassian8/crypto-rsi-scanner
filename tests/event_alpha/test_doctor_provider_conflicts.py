@@ -15,6 +15,7 @@ globals().update({
 def test_event_alpha_bybit_announcements_rehearsal_mocked_429_403_and_doctor_conflicts_are_safe():
     import json
     from datetime import datetime, timezone
+    from io import BytesIO
     from urllib.error import HTTPError
 
     import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
@@ -26,16 +27,43 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_429_403_and_doctor_con
         os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES] = "1"
         os.environ[event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT] = "1"
 
-        def raising_opener(code):
+        def raising_opener(code, body=b"", headers=None):
             def opener(request, _timeout):
-                raise HTTPError(request.full_url, code, "blocked", None, None)
+                raise HTTPError(request.full_url, code, "blocked", headers or {}, BytesIO(body))
 
             return opener
 
-        for code, expected_status, expected_health in (
-            (429, "rate_limited", "rate_limited"),
-            (403, "auth_or_access_error", "auth_or_access_error"),
-        ):
+        cases = (
+            (429, b"", {}, "rate_limited"),
+            (401, b"", {}, "auth_or_access_error"),
+            (
+                403,
+                b"access too frequent",
+                {"Retry-After": "600", "Set-Cookie": "private-cookie"},
+                "rate_limited",
+            ),
+            (
+                403,
+                b'{"retCode":10009,"retMsg":"Service Restricted: unavailable for your region"}',
+                {"Content-Type": "application/json", "Server": "edge"},
+                "region_restricted",
+            ),
+            (
+                403,
+                b"The Amazon CloudFront distribution is configured to block access from your country",
+                {"Content-Type": "text/plain", "X-Amz-Cf-Id": "safe-request-id"},
+                "region_restricted",
+            ),
+            (
+                403,
+                b"<html><body>generic edge denial for 203.0.113.10 token=private-value "
+                + (b"x" * 3_000)
+                + b"</body></html>",
+                {"Content-Type": "text/html", "CF-Ray": "safe-ray"},
+                "edge_forbidden",
+            ),
+        )
+        for code, body, headers, expected_status in cases:
             with TemporaryDirectory() as tmp:
                 base = Path(tmp)
                 _preflight, report, _paths = event_bybit_announcements_preflight.run_no_send_rehearsal(
@@ -44,17 +72,67 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_429_403_and_doctor_con
                     profile="fixture",
                     artifact_namespace="bybit_error_mock",
                     allow_live_preflight=True,
-                    opener=raising_opener(code),
+                    opener=raising_opener(code, body, headers),
                     now=datetime(2026, 6, 15, 16, tzinfo=timezone.utc),
                 )
                 ledger_text = (base / event_bybit_announcements_preflight.REQUEST_LEDGER).read_text(encoding="utf-8")
                 ledger_rows = [json.loads(line) for line in ledger_text.splitlines() if line.strip()]
                 assert report.status == expected_status
-                assert report.provider_health_status == expected_health
+                assert report.provider_health_status == expected_status
                 assert ledger_rows[0]["status_code"] == code
                 assert ledger_rows[0]["success"] is False
+                assert ledger_rows[0]["request_id"]
+                assert len(ledger_rows[0]["request_id"]) == 32
+                assert "set-cookie" not in ledger_rows[0]["response_headers_safe"]
+                assert ledger_rows[0]["response_bytes_captured"] <= 2048
+                summary = ledger_rows[0]["response_body_summary_redacted"]
+                assert summary is None or len(summary) <= 320
+                assert ledger_rows[0]["response_body_truncated"] is (len(body) > 2048)
                 assert "Authorization" not in ledger_text
                 assert "api_key" not in ledger_text.casefold()
+                assert "private-cookie" not in ledger_text
+                assert "private-value" not in ledger_text
+                assert "203.0.113.10" not in ledger_text
+
+        class RegionResponse:
+            status = 200
+            headers = {"Content-Type": "application/json", "Set-Cookie": "private-cookie"}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, _exc_type, _exc, _tb):
+                return False
+
+            def read(self):
+                return b'{"retCode":10009,"retMsg":"Service Restricted"}'
+
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _preflight, report, _paths = event_bybit_announcements_preflight.run_no_send_rehearsal(
+                namespace_dir=base,
+                provider_health_path=base / "event_provider_health.json",
+                profile="fixture",
+                artifact_namespace="bybit_region_json_mock",
+                allow_live_preflight=True,
+                opener=lambda _request, _timeout: RegionResponse(),
+                now=datetime(2026, 6, 15, 16, tzinfo=timezone.utc),
+            )
+            ledger_rows = [
+                json.loads(line)
+                for line in (base / event_bybit_announcements_preflight.REQUEST_LEDGER).read_text(
+                    encoding="utf-8"
+                ).splitlines()
+                if line.strip()
+            ]
+            assert report.status == "region_restricted"
+            assert report.provider_health_status == "region_restricted"
+            assert ledger_rows[0]["status_code"] == 200
+            assert ledger_rows[0]["success"] is False
+            assert ledger_rows[0]["error_class"] == "BybitAPIResponseError"
+            assert "10009" in ledger_rows[0]["response_body_summary_redacted"]
+            assert "set-cookie" not in ledger_rows[0]["response_headers_safe"]
+            assert "private-cookie" not in json.dumps(ledger_rows[0])
 
         with TemporaryDirectory() as tmp:
             base = Path(tmp)

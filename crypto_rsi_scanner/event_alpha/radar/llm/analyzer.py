@@ -31,7 +31,11 @@ from crypto_rsi_scanner.event_core.models import (
     RawDiscoveredEvent,
 )
 from ..resolver import clean_text, strip_publisher_suffix
-from ....llm_providers.base import LLMProviderResult, LLMRelationshipProvider
+from ....llm_providers.base import (
+    LLMProviderResult,
+    LLMRelationshipProvider,
+    provider_batch_backoff_requested,
+)
 
 log = logging.getLogger(__name__)
 
@@ -230,9 +234,13 @@ def _run_relationship_provider_jobs(
     max_workers = max(1, int(cfg.max_parallel_calls or 1))
     results: list[tuple[dict[str, Any], LLMProviderResult, str]] = []
     next_idx = 0
+    provider_backoff_warning: str | None = None
 
     def skip_job(job: dict[str, Any], cache_status: str, warning: str) -> None:
-        budget.record_skipped()
+        if cache_status == "skipped_provider_backoff":
+            budget.record_provider_backoff()
+        else:
+            budget.record_skipped()
         results.append((job, LLMProviderResult(warning=warning), cache_status))
 
     def next_submit_job() -> dict[str, Any] | None:
@@ -240,6 +248,9 @@ def _run_relationship_provider_jobs(
         while next_idx < len(jobs):
             job = jobs[next_idx]
             next_idx += 1
+            if provider_backoff_warning:
+                skip_job(job, "skipped_provider_backoff", provider_backoff_warning)
+                continue
             if _budget_exhausted(calls_attempted_ref["value"], cfg) or not budget.can_attempt():
                 skip_job(job, "skipped_budget", budget.exhausted_warning())
                 continue
@@ -256,7 +267,11 @@ def _run_relationship_provider_jobs(
             job = next_submit_job()
             if job is None:
                 break
-            results.append((job, _analyze_relationship(provider, job["packet"]), "miss"))
+            provider_result = _analyze_relationship(provider, job["packet"])
+            budget.record_result(success=provider_result.raw is not None)
+            results.append((job, provider_result, "miss"))
+            if provider_batch_backoff_requested(provider_result):
+                provider_backoff_warning = _provider_backoff_warning(provider_result)
         return results
 
     with ThreadPoolExecutor(max_workers=min(max_workers, len(jobs))) as executor:
@@ -278,10 +293,18 @@ def _run_relationship_provider_jobs(
                 except Exception as exc:  # noqa: BLE001 - providers should fail soft, but keep batch robust
                     log.warning("LLM relationship provider job failed: %s", exc)
                     provider_result = LLMProviderResult(warning=f"LLM relationship provider failed: {type(exc).__name__}")
+                budget.record_result(success=provider_result.raw is not None)
                 results.append((job, provider_result, "miss"))
+                if provider_batch_backoff_requested(provider_result):
+                    provider_backoff_warning = _provider_backoff_warning(provider_result)
                 fill_capacity()
                 break
     return results
+
+
+def _provider_backoff_warning(result: LLMProviderResult) -> str:
+    reason = result.error_class or "provider_failure"
+    return f"LLM skipped: provider backoff active after {reason}"
 
 
 def _analyze_relationship(provider: LLMRelationshipProvider, packet: Mapping[str, Any]) -> LLMProviderResult:

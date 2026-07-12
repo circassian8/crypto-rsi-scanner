@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
+import time
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -23,6 +26,42 @@ from .base import LLMProviderResult
 log = logging.getLogger(__name__)
 
 
+@dataclass
+class OpenAIRequestGate:
+    """Share one fail-fast provider backoff across a single operating cycle."""
+
+    _blocked_until: float = 0.0
+    _error_class: str | None = None
+    _http_status: int | None = None
+    _retry_after_seconds: float | None = None
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def blocked_result(self, failure_prefix: str) -> LLMProviderResult | None:
+        with self._lock:
+            remaining = self._blocked_until - time.monotonic()
+            if remaining <= 0:
+                return None
+            error_class = self._error_class or "provider_backoff"
+            return LLMProviderResult(
+                warning=f"{failure_prefix}: provider backoff active ({error_class})",
+                error_class="provider_backoff",
+                http_status=self._http_status,
+                retryable=False,
+                retry_after_seconds=round(remaining, 3),
+            )
+
+    def trip(self, result: LLMProviderResult) -> None:
+        if result.error_class not in {"rate_limited", "quota_exhausted", "auth_failed", "access_forbidden"}:
+            return
+        default_seconds = 900.0 if result.error_class == "quota_exhausted" else 60.0
+        delay = max(1.0, float(result.retry_after_seconds or default_seconds))
+        with self._lock:
+            self._blocked_until = max(self._blocked_until, time.monotonic() + delay)
+            self._error_class = result.error_class
+            self._http_status = result.http_status
+            self._retry_after_seconds = delay
+
+
 def initialize_openai_provider(
     self: Any,
     *,
@@ -32,6 +71,7 @@ def initialize_openai_provider(
     timeout: float = 30.0,
     base_url: str = "https://api.openai.com/v1/responses",
     opener=urlopen,
+    request_gate: OpenAIRequestGate | None = None,
 ) -> None:
     self.api_key = api_key
     self.model = model or "gpt-4.1-mini"
@@ -39,6 +79,7 @@ def initialize_openai_provider(
     self.timeout = timeout
     self.base_url = base_url
     self.opener = opener
+    self.request_gate = request_gate or OpenAIRequestGate()
 
 
 def analyze_openai_relationship(self: Any, packet: Mapping[str, Any]) -> LLMProviderResult:
@@ -81,6 +122,9 @@ def _call_openai_json(
     empty_warning: str,
     failure_prefix: str,
 ) -> LLMProviderResult:
+    blocked = self.request_gate.blocked_result(failure_prefix)
+    if blocked is not None:
+        return blocked
     try:
         payload = json.dumps(request_payload, sort_keys=True).encode("utf-8")
         request = Request(
@@ -103,10 +147,64 @@ def _call_openai_json(
             return LLMProviderResult(warning=empty_warning)
         return LLMProviderResult(raw=json.loads(text))
     except HTTPError as exc:
-        return LLMProviderResult(warning=f"{failure_prefix}: HTTP {exc.code}")
+        result = _openai_http_error_result(exc, failure_prefix=failure_prefix)
+        self.request_gate.trip(result)
+        return result
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, RuntimeError) as exc:
         log.warning("%s: %s", failure_prefix, exc)
         return LLMProviderResult(warning=f"{failure_prefix}: {type(exc).__name__}")
+
+
+def _openai_http_error_result(exc: HTTPError, *, failure_prefix: str) -> LLMProviderResult:
+    status = int(exc.code)
+    error_code = ""
+    error_type = ""
+    try:
+        body = json.loads(exc.read(4096).decode("utf-8", errors="replace"))
+        error = body.get("error") if isinstance(body, Mapping) else None
+        if isinstance(error, Mapping):
+            error_code = _safe_error_token(error.get("code"))
+            error_type = _safe_error_token(error.get("type"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        pass
+    if status == 429 and (error_code == "insufficient_quota" or error_type == "insufficient_quota"):
+        error_class, retryable = "quota_exhausted", False
+    elif status == 429:
+        error_class, retryable = "rate_limited", True
+    elif status == 401:
+        error_class, retryable = "auth_failed", False
+    elif status == 403:
+        error_class, retryable = "access_forbidden", False
+    elif status >= 500:
+        error_class, retryable = "service_error", True
+    elif status == 400:
+        error_class, retryable = "invalid_request", False
+    else:
+        error_class, retryable = "http_error", False
+    retry_after = _retry_after_seconds(getattr(exc, "headers", None))
+    return LLMProviderResult(
+        warning=f"{failure_prefix}: HTTP {status} ({error_class})",
+        error_class=error_class,
+        http_status=status,
+        retryable=retryable,
+        retry_after_seconds=retry_after,
+    )
+
+
+def _safe_error_token(value: object) -> str:
+    token = str(value or "").strip().lower()
+    return token if token and all(char.isalnum() or char in {"_", "-"} for char in token) else ""
+
+
+def _retry_after_seconds(headers: object) -> float | None:
+    getter = getattr(headers, "get", None)
+    if not callable(getter):
+        return None
+    raw = str(getter("Retry-After") or "").strip()
+    try:
+        return max(0.0, float(raw)) if raw else None
+    except ValueError:
+        return None
 
 
 def build_relationship_request_payload(self: Any, packet: Mapping[str, Any]) -> dict[str, Any]:

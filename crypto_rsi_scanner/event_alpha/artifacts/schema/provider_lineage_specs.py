@@ -76,6 +76,8 @@ def provider_control_schemas(
                 "schema_id", "schema_version", "row_type", "status", "status_code",
                 "http_status", "sanitized_url", "method", "result_count", "content_length",
                 "error_class", "error_message_safe", "redacted_headers", "request_id",
+                "response_headers_safe", "response_body_summary_redacted",
+                "response_body_truncated", "response_bytes_captured",
                 "request_budget_before", "request_budget_after", "live_call_allowed",
                 "token_redacted", "no_send_rehearsal", "supported_query_params",
                 "unsupported_query_params", "query_params", "provider_generation_id",

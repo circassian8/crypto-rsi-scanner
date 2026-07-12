@@ -29,8 +29,11 @@ from .models import (
 log = logging.getLogger(__name__)
 
 UrlOpen = Callable[[Request, float], Any]
-DEFAULT_CRYPTOPANIC_API_BASE_URL = "https://cryptopanic.com/api/growth_weekly/v2"
-GROWTH_WEEKLY_PLAN = "growth_weekly"
+DEFAULT_CRYPTOPANIC_API_BASE_URL = "https://cryptopanic.com/api/growth/v2"
+# Kept as a compatibility export because callers and review artifacts already use
+# this symbol. CryptoPanic's current API slug for the Growth Weekly product is
+# simply ``growth``.
+GROWTH_WEEKLY_PLAN = "growth"
 GROWTH_WEEKLY_ALLOWED_FILTERS = {"rising", "hot", "bullish", "bearish", "important", "saved", "lol"}
 GROWTH_WEEKLY_ALLOWED_KINDS = {"news", "media", "all"}
 GROWTH_WEEKLY_UNSUPPORTED_PARAMS = {
@@ -224,8 +227,8 @@ def initialize_cryptopanic_provider(
     self.required = required
     self.live_enabled = live_enabled
     self.api_token = api_token
-    self.base_url = base_url
-    self.plan = plan or GROWTH_WEEKLY_PLAN
+    self.base_url = _normalize_cryptopanic_base_url(base_url)
+    self.plan = _normalize_cryptopanic_plan(plan)
     self.public = public
     self.following = following
     self.filter_name = filter_name
@@ -354,9 +357,9 @@ def fetch_cryptopanic_live_events(self: Any, start: datetime, end: datetime) -> 
                 body_excerpt = body_excerpt or exc_body_excerpt
                 response_bytes = response_bytes if response_bytes is not None else exc_response_bytes
                 parse_error_message = _parse_error_message(exc)
-                error_class = _error_class_from_exception(exc)
+                error_class = _cryptopanic_error_class(exc, body_excerpt=body_excerpt)
                 provider_health_effect = _provider_health_effect(error_class, status_code)
-                warning = _safe_fetch_warning(exc)
+                warning = _safe_fetch_warning(exc, error_class=error_class)
                 warnings.append(warning)
                 self._request_cache[cache_key] = ()
                 if process_cache_key is not None:
@@ -546,9 +549,9 @@ def record_cryptopanic_request(
         log.warning("CryptoPanic request ledger write failed: %s", type(exc).__name__)
 
 
-def _safe_fetch_warning(exc: BaseException) -> str:
+def _safe_fetch_warning(exc: BaseException, *, error_class: str | None = None) -> str:
     """Return a warning that cannot echo the request URL or auth token."""
-    classified = _error_class_from_exception(exc)
+    classified = error_class or _error_class_from_exception(exc)
     if isinstance(exc, HTTPError):
         return f"CryptoPanic live news fetch failed: {classified} status={exc.code}"
     status = getattr(exc, "status", None) or getattr(exc, "code", None)
@@ -695,7 +698,15 @@ def _parse_error_message(exc: BaseException) -> str | None:
 def _provider_health_effect(error_class: str | None, status_code: int | None) -> str | None:
     if not error_class:
         return None
-    if error_class in {"auth_failed", "rate_limited_or_forbidden", "server_error", "json_parse_error", "empty_response"}:
+    if error_class in {
+        "auth_failed",
+        "plan_mismatch",
+        "plan_or_endpoint_unavailable",
+        "rate_limited_or_forbidden",
+        "server_error",
+        "json_parse_error",
+        "empty_response",
+    }:
         return "degraded_backoff"
     if error_class == "network_error":
         return "degraded_backoff"
@@ -705,10 +716,24 @@ def _provider_health_effect(error_class: str | None, status_code: int | None) ->
 
 
 def _posts_endpoint(base_url: str) -> str:
-    clean = str(base_url or DEFAULT_CRYPTOPANIC_API_BASE_URL).strip().rstrip("/")
+    clean = _normalize_cryptopanic_base_url(base_url).rstrip("/")
     if clean.endswith("/posts"):
         return clean + "/"
     return clean + "/posts/"
+
+
+def _normalize_cryptopanic_base_url(base_url: object) -> str:
+    """Map the retired official Growth Weekly slug to CryptoPanic's current API."""
+    clean = str(base_url or DEFAULT_CRYPTOPANIC_API_BASE_URL).strip().rstrip("/")
+    parts = urlsplit(clean)
+    if parts.netloc.casefold() in {"cryptopanic.com", "www.cryptopanic.com"} and parts.path.rstrip("/") == "/api/growth_weekly/v2":
+        return urlunsplit((parts.scheme or "https", parts.netloc, "/api/growth/v2", parts.query, parts.fragment))
+    return clean
+
+
+def _normalize_cryptopanic_plan(plan: object) -> str:
+    clean = str(plan or GROWTH_WEEKLY_PLAN).strip().lower()
+    return GROWTH_WEEKLY_PLAN if clean == "growth_weekly" else clean
 
 
 def _append_query(url: str, query: Mapping[str, str]) -> str:
@@ -887,3 +912,13 @@ def _error_class_from_exception(exc: BaseException) -> str:
     if isinstance(exc, (OSError, TimeoutError)):
         return "network_error"
     return type(exc).__name__
+
+
+def _cryptopanic_error_class(exc: BaseException, *, body_excerpt: str | None) -> str:
+    status = _status_code_from_exception(exc)
+    body = str(body_excerpt or "").casefold()
+    if status == 400 and ("specify your api plan" in body or "correct request path" in body):
+        return "plan_mismatch"
+    if status == 404:
+        return "plan_or_endpoint_unavailable"
+    return _error_class_from_exception(exc)

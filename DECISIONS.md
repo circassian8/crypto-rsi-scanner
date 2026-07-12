@@ -16,6 +16,33 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-12 - Treat provider access failures as bounded operational state
+**Status:** accepted
+**Decision:** Live research providers must identify themselves honestly, retain
+only bounded/redacted diagnostics, classify access failures precisely, and stop
+spending request budgets when the upstream service says to stop. RSS uses the
+project user agent and at most one retry for transient network/408/429/5xx
+failures, never an ordinary 403 retry. GDELT remains one broad context fetch but
+is excluded from automatic catalyst search while its DOC API migration is
+rate-limited; the first 429 enters backoff. Bybit region/compliance blocks are
+reported as `region_restricted` and are never bypassed through proxy rotation or
+browser impersonation. CryptoPanic uses the current official plan slug and
+reports token/plan mismatch instead of `network_error`. OpenAI 429/auth/access
+failures trip a shared per-cycle gate, stop unscheduled batch work, and record
+attempt/success/failure/provider-backoff counts; live OpenAI profiles use at most
+three concurrent calls. None of these policies enables sends, trades, paper
+trades, normal RSI writes, or LLM-created `TRIGGERED_FADE`.
+**Why:** The full live run amplified upstream failures: RSS publishers rejected
+Python's default user agent, GDELT was called in two roles, Bybit's public 403
+lost the CloudFront country-block evidence, CryptoPanic used a retired route,
+and 150 OpenAI attempts continued after quota 429s. Bounded, explicit provider
+state preserves useful partial results without hiding configuration, billing,
+regional, or upstream-capacity blockers.
+**Revisit when:** GDELT's replacement feed is stable enough for a tested adapter,
+Bybit is available through a permitted owner-approved egress, CryptoPanic/OpenAI
+credentials are restored, or measured successful throughput justifies changing
+the three-call OpenAI concurrency cap.
+
 ## 2026-07-11 - Count provider burn-in evidence only from an exact guarded attempt
 **Status:** accepted
 **Decision:** Event Alpha provider-backed burn-in candidates count only when the

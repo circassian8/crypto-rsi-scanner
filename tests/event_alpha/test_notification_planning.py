@@ -357,7 +357,7 @@ def test_notify_llm_profiles_enable_bounded_source_enrichment_only_for_llm():
     assert llm.config_overrides["EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN"] == 10
     assert llm.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] >= 30.0
     assert llm.config_overrides["EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT"] >= 30.0
-    assert llm.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] >= 12
+    assert llm.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] == 3
     assert llm.config_overrides["EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS"] >= 600.0
     assert llm.config_overrides["EVENT_ALPHA_EXPLORATORY_DIGEST_COOLDOWN_HOURS"] == 0.0
     assert llm.config_overrides["EVENT_ALPHA_NOTIFY_DAILY_DIGEST_COOLDOWN_HOURS"] == 0.0
@@ -368,7 +368,7 @@ def test_notify_llm_profiles_enable_bounded_source_enrichment_only_for_llm():
     assert deep.config_overrides["EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN"] == 20
     assert deep.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"] > llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"]
     assert deep.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] >= 45.0
-    assert deep.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] > llm.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"]
+    assert deep.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] == 3
     assert deep.config_overrides["EVENT_ALPHA_EXPLORATORY_DIGEST_COOLDOWN_HOURS"] == 0.0
     assert deep.config_overrides["EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT"] is False
 
@@ -596,7 +596,7 @@ def test_event_alpha_notification_profiles_and_preflight_guards():
     assert llm.config_overrides["EVENT_LLM_CACHE_TTL_HOURS"] == 168
     assert llm.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] >= 30.0
     assert llm.config_overrides["EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT"] >= 30.0
-    assert llm.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] >= 12
+    assert llm.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] == 3
     assert llm.config_overrides["EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS"] >= 600.0
     assert llm.config_overrides["EVENT_ALPHA_EXPLORATORY_DIGEST_COOLDOWN_HOURS"] == 0.0
     assert llm.config_overrides["EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT"] is False

@@ -202,6 +202,48 @@ def test_event_llm_openai_provider_uses_configured_timeout():
     assert seen == [4.25, 5.5]
 
 
+def test_event_llm_openai_429_is_classified_and_shared_gate_stops_followup_calls():
+    import io
+    import json
+    from urllib.error import HTTPError
+    from crypto_rsi_scanner.llm_providers.openai_provider import (
+        OpenAILLMExtractionProvider,
+        OpenAILLMRelationshipProvider,
+    )
+    from crypto_rsi_scanner.llm_providers.openai_support import OpenAIRequestGate
+
+    calls = 0
+
+    def rate_limited_opener(request, timeout):
+        nonlocal calls
+        calls += 1
+        body = io.BytesIO(json.dumps({
+            "error": {"type": "rate_limit_error", "code": "rate_limit_exceeded", "message": "slow down"}
+        }).encode("utf-8"))
+        raise HTTPError(request.full_url, 429, "Too Many Requests", {"Retry-After": "30"}, body)
+
+    gate = OpenAIRequestGate()
+    extraction = OpenAILLMExtractionProvider(
+        api_key="test-key",
+        opener=rate_limited_opener,
+        request_gate=gate,
+    ).extract_raw_event({})
+    relationship = OpenAILLMRelationshipProvider(
+        api_key="test-key",
+        opener=rate_limited_opener,
+        request_gate=gate,
+    ).analyze_relationship({})
+
+    assert calls == 1
+    assert extraction.http_status == 429
+    assert extraction.error_class == "rate_limited"
+    assert extraction.retryable is True
+    assert extraction.retry_after_seconds == 30.0
+    assert "HTTP 429 (rate_limited)" in str(extraction.warning)
+    assert relationship.error_class == "provider_backoff"
+    assert "provider backoff active" in str(relationship.warning)
+
+
 def test_event_llm_shadow_report_formats_disagreements_and_warnings():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
@@ -439,6 +481,46 @@ def test_event_llm_relationship_calls_run_with_bounded_parallelism():
     assert [row.cache_status for row in rows] == ["miss", "miss", "miss", "miss"]
 
 
+def test_event_llm_relationship_batch_stops_after_provider_rate_limit():
+    import crypto_rsi_scanner.event_alpha.radar.llm.analyzer as event_llm_analyzer
+    from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
+
+    result, alerts, _ = _llm_golden_alerts_and_rows(min_prefilter_score=0)
+
+    class RateLimitedProvider:
+        name = "openai"
+        model = "test-model"
+
+        def __init__(self):
+            self.calls = 0
+
+        def analyze_relationship(self, packet):
+            self.calls += 1
+            return LLMProviderResult(
+                warning="OpenAI LLM relationship provider failed: HTTP 429 (rate_limited)",
+                error_class="rate_limited",
+                http_status=429,
+                retryable=True,
+            )
+
+    provider = RateLimitedProvider()
+    rows = event_llm_analyzer.analyze_event_candidates(
+        result,
+        alerts[:3],
+        provider,
+        cfg=event_llm_analyzer.EventLLMConfig(
+            min_prefilter_score=0,
+            max_candidates_per_run=3,
+            max_parallel_calls=1,
+        ),
+    )
+
+    assert provider.calls == 1
+    assert rows[0].cache_status == "miss"
+    assert all(row.cache_status == "skipped_provider_backoff" for row in rows[1:])
+    assert all(any("provider backoff" in warning for warning in row.warnings) for row in rows[1:])
+
+
 def test_event_llm_budget_ledger_persists_daily_caps_and_cost_limit():
     import json
     import tempfile
@@ -478,6 +560,8 @@ def test_event_llm_budget_ledger_persists_daily_caps_and_cost_limit():
         ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
         entry = ledger["entries"][0]
         assert entry["relationship_calls_attempted"] == 1
+        assert entry["relationship_calls_succeeded"] == 1
+        assert entry["relationship_calls_failed"] == 0
         assert entry["estimated_cost_usd"] == 0.02
 
         second = CountingProvider(_llm_golden_fixture_path())
@@ -515,7 +599,21 @@ def test_event_alpha_profiles_and_make_targets_are_available():
     fixture = event_alpha_profiles.get_profile("fixture")
     assert fixture.config_overrides["EVENT_CATALYST_SEARCH_PROVIDER"] == "fixture"
     no_key = event_alpha_profiles.get_profile("no_key_live")
-    assert no_key.config_overrides["EVENT_CATALYST_SEARCH_PROVIDERS"] == ("gdelt", "rss", "polymarket")
+    assert no_key.config_overrides["EVENT_DISCOVERY_GDELT_LIVE"] is True
+    assert no_key.config_overrides["EVENT_CATALYST_SEARCH_PROVIDERS"] == ("rss", "polymarket")
+    for profile_name in (
+        "no_key_live",
+        "no_key_llm",
+        "api_live",
+        "full_llm_live",
+        "research_send",
+        "notify_no_key",
+        "notify_llm",
+        "notify_llm_deep",
+    ):
+        live_profile = event_alpha_profiles.get_profile(profile_name)
+        assert live_profile.config_overrides["EVENT_DISCOVERY_GDELT_LIVE"] is True
+        assert "gdelt" not in live_profile.config_overrides["EVENT_CATALYST_SEARCH_PROVIDERS"]
     send = event_alpha_profiles.get_profile("research_send")
     assert send.send is True
     report = event_alpha_profiles.format_profile_report(send)

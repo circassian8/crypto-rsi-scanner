@@ -496,6 +496,8 @@ def _cryptopanic_coverage_status(
         return "observed_no_results"
     if last_error == "json_parse_error" or last_error == "empty_response":
         return "observed_parse_error"
+    if last_error in {"plan_mismatch", "plan_or_endpoint_unavailable"}:
+        return "observed_plan_mismatch"
     if last_error in {"rate_limited_or_forbidden", "auth_failed"}:
         return "observed_rate_limited"
     if health_status == "backoff":
@@ -521,6 +523,9 @@ def _cryptopanic_recommendation(status: str) -> str:
         "observed_partial_success": "use accepted evidence; inspect failed CryptoPanic roles in the request ledger",
         "observed_no_results": "no matching token news found; inspect query/candidate terms, not provider credentials",
         "observed_parse_error": "inspect cryptopanic_request_ledger.jsonl body excerpt, content type, and endpoint shape",
+        "observed_plan_mismatch": (
+            "replace the discontinued or mismatched CryptoPanic token/plan, then rerun the bounded preflight"
+        ),
         "observed_rate_limited": "wait for cooldown or reduce CryptoPanic request rate/quota usage",
         "observed_backoff_without_success": "wait for cooldown or reset provider backoff only after configuration changed",
         "quota_exhausted": "wait for quota reset or lower per-run request limits",

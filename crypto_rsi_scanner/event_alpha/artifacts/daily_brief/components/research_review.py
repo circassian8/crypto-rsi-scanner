@@ -349,7 +349,9 @@ def _llm_budget_lines(latest: Mapping[str, Any]) -> list[str]:
     return [
         f"- Cache hits/misses: {int(latest.get('llm_cache_hits') or 0)} / {int(latest.get('llm_cache_misses') or 0)}",
         f"- Calls attempted: {int(latest.get('llm_calls_attempted') or 0)}",
+        f"- Calls failed: {int(latest.get('llm_calls_failed') or 0)}",
         f"- Skipped due budget: {int(latest.get('llm_skipped_due_budget') or 0)}",
+        f"- Skipped due provider backoff: {int(latest.get('llm_skipped_due_provider_backoff') or 0)}",
     ]
 
 def _new_since_last_run_lines(runs: list[dict[str, Any]]) -> list[str]:

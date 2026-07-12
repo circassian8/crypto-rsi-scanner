@@ -17,6 +17,59 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-12 — Stabilize live provider failures and stop retry storms · Codex
+**Why:** The full live-system run exposed repeated RSS 403s, duplicate GDELT
+429s, an opaque Bybit 403, a retired CryptoPanic route, and 150 OpenAI attempts
+that returned no output. Those failures needed real classification and bounded
+backoff rather than more retries or silent provider loss.
+**Changes:**
+- Restored direct RSS publishers with an honest project `User-Agent`, weighted
+  RSS/XML `Accept`, and at most one retry for transient network/408/429/5xx
+  failures; ordinary 403 responses remain single-attempt and feed-local.
+- Moved CryptoPanic defaults to the current `/api/growth/v2` route, retained a
+  safe legacy-route normalization, and added `plan_mismatch` /
+  `plan_or_endpoint_unavailable` health and source-coverage guidance. The local
+  token now reports its real discontinued-plan mismatch instead of
+  `network_error`.
+- Removed GDELT from automatic catalyst/hypothesis searches in live profiles
+  while retaining one broad context fetch; highest-scored manual searches get
+  the bounded request, DOC windows cannot extend into the future, records cap
+  at 250, and 429/status/Retry-After evidence is preserved. Rate/quota/plan
+  failures now enter provider backoff on the first occurrence.
+- Added Bybit `cdn-request-id` lineage, a 2 KiB/320-character redacted error
+  diagnostic envelope, safe response-header allowlisting, HTTP-200 `retCode`
+  rejection, and exact auth/rate/region/edge classifications. The observed
+  CloudFront country block is now `region_restricted`, not an auth failure.
+- Added structured OpenAI HTTP/quota diagnostics, a shared per-cycle gate across
+  extraction/catalyst-frame/relationship roles, provider-backoff row status,
+  call success/failure/backoff telemetry, and three-call live-profile
+  concurrency. A quota/auth/access response stops unscheduled work instead of
+  consuming the remaining run budget. The small provider assembly moved into
+  `event_alpha/radar/llm/provider_runtime.py`, keeping both CLI owners at 1,199
+  lines and the architecture gate clean.
+- Updated active profile policy, optional artifact schemas, daily brief/run
+  ledger/explain surfaces, `.env.example`, the Event Alpha runbook, `ROADMAP.md`,
+  `DECISIONS.md`, size-gate reports, and focused provider/notification/doctor/
+  LLM tests. Research-only/no-send/no-trading/no-paper/no-RSI/no-trigger guards
+  remain unchanged.
+**Verify:** Focused provider/LLM/doctor/profile gates passed (up to 158 tests),
+compileall and `git diff --check` passed, and architecture size gates report
+`pass` with zero new violations. Bounded live checks: four direct RSS feeds
+returned 110 recent rows with zero warnings; Bybit used one request and reported
+`region_restricted`; GDELT used one request and reported upstream HTTP 429;
+CryptoPanic used one request and reported `plan_mismatch` HTTP 400; OpenAI used
+one request and reported HTTP 429 `quota_exhausted`. All rehearsals had zero
+sends, trades, paper trades, normal RSI writes, and `TRIGGERED_FADE` creation.
+Final `make verify PYTHON=.venv/bin/python` passed 848/848 standalone tests,
+929 pytest tests, alert rendering, the 33-observation offline backtest fixture,
+and the paper scoreboard.
+**Notes/risks:** Code-side amplification and misclassification are fixed, but
+external access remains: replace/upgrade the CryptoPanic token, restore OpenAI
+billing/quota, and use Bybit only through an owner-approved permitted egress.
+GDELT remains upstream-rate-limited during its migration and is context-only
+with immediate backoff. No regional bypass, token mutation, Telegram send, or
+GitHub Actions wait/poll was performed.
+
 ## 2026-07-11 — Complete Event Alpha operator semantics and guarded provider evidence · Codex
 **Why:** Pro-model review found that the safe exact-generation run still used
 contradictory provider configuration, counter, source-blocker, market-freshness,

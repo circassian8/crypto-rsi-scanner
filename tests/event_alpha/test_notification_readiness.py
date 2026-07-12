@@ -556,7 +556,8 @@ def test_event_alpha_notification_provider_fail_fast_defaults():
         __import__("datetime").datetime(2026, 6, 19, tzinfo=__import__("datetime").timezone.utc),
         __import__("datetime").datetime(2026, 6, 20, tzinfo=__import__("datetime").timezone.utc),
     ) == []
-    assert len(calls) == 1
+    assert len(calls) == 2
+    assert {url for url, _timeout in calls} == {"https://one.invalid/rss"}
     assert any("skipped remaining feeds" in warning for warning in provider.last_warnings)
 
     original_mode = config.EVENT_ALPHA_RUN_MODE

@@ -604,7 +604,7 @@ def _cryptopanic_request_row_conflicts(row: Mapping[str, Any]) -> dict[str, int]
         "cryptopanic_token_printed_or_unredacted": 0,
     }
     redacted_url = str(row.get("request_url_redacted") or "")
-    plan = str(row.get("plan") or "growth_weekly").strip().lower()
+    plan = str(row.get("plan") or "growth").strip().lower()
     if plan != "enterprise" and _growth_unsupported_params(redacted_url):
         out["cryptopanic_growth_unsupported_param_used"] += 1
     currencies = str(row.get("currencies") or "").strip()

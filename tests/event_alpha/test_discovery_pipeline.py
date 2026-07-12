@@ -308,6 +308,59 @@ def test_event_catalyst_search_gdelt_fetch_cap_prevents_repeated_live_failures()
     assert any("fetch cap reached" in warning for warning in result.warnings)
 
 
+def test_event_catalyst_search_gdelt_fetch_cap_prioritizes_highest_scored_query():
+    import json
+    from datetime import datetime, timezone
+    from urllib.parse import parse_qs, urlparse
+
+    import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps({"articles": []}).encode("utf-8")
+
+    seen_queries = []
+
+    def opener(request, timeout):
+        del timeout
+        seen_queries.append(parse_qs(urlparse(request.full_url).query)["query"][0])
+        return FakeResponse()
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    low = event_catalyst_search.SearchQuery(
+        anomaly_raw_id="market_anomaly:test",
+        query="TEST crypto why up",
+        symbol="TEST",
+        rank=1,
+        score=20,
+    )
+    high = event_catalyst_search.SearchQuery(
+        anomaly_raw_id="market_anomaly:test",
+        query="TEST exploit",
+        symbol="TEST",
+        rank=2,
+        score=80,
+    )
+    provider = event_catalyst_search.GdeltCatalystSearchProvider(
+        live_enabled=True,
+        opener=opener,
+        fetched_at=now,
+        max_fetches_per_search=1,
+    )
+    result = provider.search((low, high), max_results_per_query=1, now=now)
+    assert seen_queries == ["TEST exploit"]
+    assert result.queries == (high, low)
+    assert result.provider_fetch_count == 1
+
+
 def test_event_candidate_discovery_rejects_common_word_false_positives():
     import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
     from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent

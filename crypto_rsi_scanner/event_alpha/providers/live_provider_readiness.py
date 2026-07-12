@@ -965,7 +965,13 @@ def _bybit_announcements_history(artifact_namespace: str) -> dict[str, Any]:
         activation_phase = "observed_no_results"
     elif status == "live_rehearsal_partial":
         activation_phase = "live_rehearsal_partial"
-    elif status in {"auth_or_access_error", "rate_limited", "provider_unavailable"}:
+    elif status in {
+        "auth_or_access_error",
+        "edge_forbidden",
+        "rate_limited",
+        "region_restricted",
+        "provider_unavailable",
+    }:
         activation_phase = status
     elif status and status != "not_generated" and status.startswith("blocked"):
         activation_phase = "blocked"

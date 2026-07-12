@@ -172,7 +172,6 @@ def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
         pass
     else:
         raise AssertionError("required missing CryptoPanic token should fail")
-
     def failing_opener(request, timeout):
         raise TimeoutError(f"offline timeout url={request.full_url}")
 
@@ -251,6 +250,22 @@ def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
         assert daily_cap_provider.fetch_events(start, end) == []
         assert daily_cap_provider.last_skip_reason == "daily_soft_limit_exceeded"
         assert len(ledger.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_cryptopanic_defaults_and_retired_official_slug_use_current_growth_api():
+    from crypto_rsi_scanner.event_providers.cryptopanic import CryptoPanicProvider
+
+    current = CryptoPanicProvider(None)
+    assert current.base_url == "https://cryptopanic.com/api/growth/v2"
+    assert current.plan == "growth"
+
+    legacy = CryptoPanicProvider(
+        None,
+        base_url="https://cryptopanic.com/api/growth_weekly/v2",
+        plan="growth_weekly",
+    )
+    assert legacy.base_url == "https://cryptopanic.com/api/growth/v2"
+    assert legacy.plan == "growth"
 
 
 def test_cryptopanic_live_provider_sanitizes_and_dedupes_currency_requests():
@@ -514,6 +529,23 @@ def test_cryptopanic_live_provider_records_safe_parse_and_http_diagnostics():
     assert http_rows[0]["quota_counted"] is True
     assert fake_token not in http_rows[0]["body_excerpt_redacted"]
 
+    def plan_mismatch_error(request, timeout):
+        del timeout
+        raise HTTPError(
+            request.full_url,
+            400,
+            "Bad Request",
+            FakeHeaders({"Content-Type": "application/json"}),
+            io.BytesIO(b'{"status":"api_error","info":"Please specify your API plan in request path"}'),
+        )
+
+    plan_provider, plan_rows = run_once(plan_mismatch_error)
+    assert plan_provider.last_error_class == "plan_mismatch"
+    assert plan_rows[0]["status_code"] == 400
+    assert plan_rows[0]["error_class"] == "plan_mismatch"
+    assert plan_rows[0]["provider_health_effect"] == "degraded_backoff"
+    assert "plan_mismatch status=400" in plan_provider.last_warnings[0]
+
 
 def test_cryptopanic_catalyst_search_currency_filter_uses_validated_identity_or_empty():
     import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
@@ -628,7 +660,7 @@ def test_event_discovery_gdelt_live_provider_parses_article_list_offline():
     assert params["maxrecords"] == ["7"]
     assert params["sort"] == ["datedesc"]
     assert params["startdatetime"] == ["20260615000000"]
-    assert params["enddatetime"] == ["20260616000000"]
+    assert params["enddatetime"] == ["20260615144500"]
     assert seen["timeout"] == 3.5
     event = events[0]
     assert event.provider == "gdelt"
@@ -636,6 +668,16 @@ def test_event_discovery_gdelt_live_provider_parses_article_list_offline():
     assert event.published_at.isoformat() == "2026-06-15T14:30:00+00:00"
     assert event.fetched_at == fetched_at
     assert event.raw_json["event"]["event_type"] == "ipo_proxy"
+
+    capped_provider = GdeltProvider(
+        None,
+        live_enabled=True,
+        max_records=999,
+        fetched_at=fetched_at,
+    )
+    capped_params = parse_qs(urlparse(capped_provider._request_url(start, end)).query)
+    assert capped_params["maxrecords"] == ["250"]
+    assert capped_params["enddatetime"] == ["20260615144500"]
 
     def empty_opener(request, timeout):
         return FakeResponse({"articles": []})
@@ -646,6 +688,28 @@ def test_event_discovery_gdelt_live_provider_parses_article_list_offline():
         raise TimeoutError("offline timeout")
 
     assert GdeltProvider(None, live_enabled=True, opener=failing_opener).fetch_events(start, end) == []
+
+    calls = {"count": 0}
+
+    def rate_limited_opener(request, timeout):
+        from urllib.error import HTTPError
+
+        del timeout
+        calls["count"] += 1
+        raise HTTPError(request.full_url, 429, "Too Many Requests", {"Retry-After": "120"}, None)
+
+    rate_limited = GdeltProvider(
+        None,
+        live_enabled=True,
+        opener=rate_limited_opener,
+        fetched_at=fetched_at,
+    )
+    assert rate_limited.fetch_events(start, end) == []
+    assert calls["count"] == 1
+    assert rate_limited.last_status_code == 429
+    assert rate_limited.last_error_class == "rate_limited_or_forbidden"
+    assert rate_limited.last_retry_after == "120"
+    assert "rate_limited_or_forbidden status=429 retry_after=120" in rate_limited.last_warnings[0]
 
 
 def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
@@ -696,7 +760,12 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
     seen = []
 
     def fake_opener(request, timeout):
-        seen.append((request.full_url, timeout, request.headers.get("Accept")))
+        seen.append((
+            request.full_url,
+            timeout,
+            request.get_header("Accept"),
+            request.get_header("User-agent"),
+        ))
         if request.full_url.endswith("/rss"):
             return FakeResponse(rss)
         if request.full_url.endswith("/atom"):
@@ -720,9 +789,14 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
     assert all(item.rows_fetched == 1 for item in provider.last_feed_health)
     assert all(item.rows_kept == 1 for item in provider.last_feed_health)
     assert all(item.feed_quality_score > 0 for item in provider.last_feed_health)
-    assert [url for url, _timeout, _accept in seen] == ["https://example.test/rss", "https://example.test/atom"]
-    assert all(timeout == 4.0 for _url, timeout, _accept in seen)
-    assert all("application/rss+xml" in accept for _url, _timeout, accept in seen)
+    assert [url for url, _timeout, _accept, _user_agent in seen] == [
+        "https://example.test/rss",
+        "https://example.test/atom",
+    ]
+    assert all(timeout == 4.0 for _url, timeout, _accept, _user_agent in seen)
+    assert all("application/rss+xml" in accept for _url, _timeout, accept, _user_agent in seen)
+    assert all("*/*;q=0.1" in accept for _url, _timeout, accept, _user_agent in seen)
+    assert all(user_agent == "crypto-rsi-scanner/1.0" for _url, _timeout, _accept, user_agent in seen)
     by_title = {event.title: event for event in events}
     rss_event = by_title["TESTRSS offers synthetic exposure to OpenAI pre IPO event by June 20, 2026"]
     assert rss_event.provider == "project_blog_rss"
@@ -738,7 +812,10 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
     assert atom_event.published_at.isoformat() == "2026-06-16T13:30:00+00:00"
     assert atom_event.raw_json["event"]["event_type"] == "sports_event"
 
+    failing_attempts = []
+
     def failing_opener(request, timeout):
+        failing_attempts.append(request.full_url)
         raise TimeoutError("offline timeout")
 
     assert ProjectBlogRssProvider(
@@ -747,11 +824,31 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
         feed_urls=("https://example.test/rss",),
         opener=failing_opener,
     ).fetch_events(start, end) == []
+    assert failing_attempts == ["https://example.test/rss", "https://example.test/rss"]
 
     class StatusResponse(FakeResponse):
         def __init__(self, body, status):
             super().__init__(body)
             self.status = status
+
+    retry_statuses = []
+
+    def rate_limited_once_opener(request, timeout):
+        retry_statuses.append(request.full_url)
+        if len(retry_statuses) == 1:
+            return StatusResponse("rate limited", 429)
+        return StatusResponse(rss, 200)
+
+    retry_succeeded = ProjectBlogRssProvider(
+        None,
+        live_enabled=True,
+        feed_urls=("https://example.test/retry",),
+        opener=rate_limited_once_opener,
+        fetched_at=fetched_at,
+    )
+    assert len(retry_succeeded.fetch_events(start, end)) == 1
+    assert retry_statuses == ["https://example.test/retry", "https://example.test/retry"]
+    assert retry_succeeded.last_warnings == ()
 
     mixed_seen = []
 
@@ -819,7 +916,7 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
         opener=dns_opener,
     )
     assert dns_failed.fetch_events(start, end) == []
-    assert dns_seen == ["https://example.test/rss"]
+    assert dns_seen == ["https://example.test/rss", "https://example.test/rss"]
     assert any("provider_failure" in warning for warning in dns_failed.last_warnings)
     assert any("skipped remaining feeds" in warning for warning in dns_failed.last_warnings)
     assert len(dns_failed.last_feed_health) == 1
