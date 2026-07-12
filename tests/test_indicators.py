@@ -802,6 +802,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_operator_identity",
     "tests.event_alpha.test_operator_presentation",
     "tests.event_alpha.test_operator_state",
+    "tests.event_alpha.test_operator_state_hardening",
     "tests.event_alpha.test_operator_workflows",
     "tests.event_alpha.test_playbooks_graph",
     "tests.event_alpha.test_provider_activation",

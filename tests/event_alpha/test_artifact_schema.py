@@ -3,9 +3,245 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 
 from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
 from crypto_rsi_scanner.event_alpha.doctor import check_registry, schema_doctor
+
+
+def _operator_state_schema_row(artifacts):
+    return {
+        "row_type": "event_alpha_operator_state",
+        "run_id": "run-fingerprint",
+        "profile": "fixture",
+        "artifact_namespace": "fingerprint",
+        "revision": 1,
+        "manifest_status": "complete",
+        "artifacts": artifacts,
+        "doctor": {"status": "stale", "authoritative": False},
+        "research_only": True,
+        "no_send_rehearsal": True,
+        "sent": False,
+        "send_requested": False,
+        "send_attempted": False,
+        "send_success": False,
+        "send_items_delivered": 0,
+        "trades_created": 0,
+        "paper_trades_created": 0,
+        "normal_rsi_signal_rows_written": 0,
+        "triggered_fade_created": 0,
+    }
+
+
+def _current_artifact_fingerprint(kind, *, item_count=1):
+    return {
+        "status": "current",
+        "fingerprint_contract_version": 1,
+        "fingerprint_kind": kind,
+        "sha256": "a" * 64,
+        "size_bytes": 42,
+        "item_count": item_count,
+    }
+
+
+def test_operator_state_schema_keeps_fingerprintless_and_sha_only_legacy_entries_readable():
+    state = _operator_state_schema_row(
+        {
+            "core_opportunities": {"status": "current", "path": "event_core_opportunities.jsonl"},
+            "unified_calendar": {
+                "status": "current",
+                "path": "event_unified_calendar_events.jsonl",
+                "count": 2,
+                "sha256": "b" * 64,
+            },
+            "daily_brief": {
+                "status": "stale",
+                "fingerprint_contract_version": "legacy-invalid-but-not-current",
+            },
+        }
+    )
+
+    assert schema_v1.validate_row_against_schema(state, "operator_state_v1") == []
+
+
+def test_operator_state_schema_rejects_malformed_sha_only_and_stray_run_row_digest():
+    malformed_sha = _operator_state_schema_row(
+        {"unified_calendar": {"status": "current", "sha256": "not-a-sha256"}}
+    )
+    errors = schema_v1.validate_row_against_schema(malformed_sha, "operator_state_v1")
+    assert "operator_state_current_artifact_invalid_sha256:unified_calendar" in errors
+    assert (
+        "operator_state_current_artifact_missing_fingerprint:unified_calendar:fingerprint_contract_version"
+        in errors
+    )
+
+
+def test_operator_state_schema_rejects_deprecated_and_misplaced_run_row_fields():
+    state = _operator_state_schema_row(
+        {
+            "core_opportunities": {
+                **_current_artifact_fingerprint("jsonl_lines", item_count=1),
+                "run_row_identity": {
+                    "run_id": "schema-run",
+                    "profile": "fixture",
+                    "artifact_namespace": "schema-fixture",
+                },
+                "run_row_match_count": 1,
+            },
+            "run_ledger": {
+                **_current_artifact_fingerprint("canonical_run_row", item_count=1),
+                "run_row_identity": {
+                    "run_id": "schema-run",
+                    "profile": "fixture",
+                    "artifact_namespace": "schema-fixture",
+                },
+                "run_row_match_count": 1,
+                "run_row_sha256": "0" * 64,
+            },
+        }
+    )
+
+    errors = schema_v1.validate_row_against_schema(state, "operator_state_v1")
+
+    assert (
+        "operator_state_current_artifact_invalid_run_row_fields:core_opportunities"
+        in errors
+    )
+    assert "operator_state_current_artifact_deprecated_run_row_sha256:run_ledger" in errors
+
+    stray_run_digest = _operator_state_schema_row(
+        {"run_ledger": {"status": "current", "run_row_sha256": "b" * 64}}
+    )
+    errors = schema_v1.validate_row_against_schema(stray_run_digest, "operator_state_v1")
+    assert "operator_state_current_artifact_missing_fingerprint:run_ledger:sha256" in errors
+    assert "operator_state_run_ledger_invalid_run_row_identity" in errors
+
+
+def test_operator_state_schema_requires_complete_fingerprint_metadata_once_started():
+    state = _operator_state_schema_row(
+        {
+            "daily_brief": {
+                "status": "current",
+                "fingerprint_contract_version": 1,
+            }
+        }
+    )
+
+    errors = schema_v1.validate_row_against_schema(state, "operator_state_v1")
+
+    assert "operator_state_current_artifact_missing_fingerprint:daily_brief:fingerprint_kind" in errors
+    assert "operator_state_current_artifact_missing_fingerprint:daily_brief:sha256" in errors
+    assert "operator_state_current_artifact_missing_fingerprint:daily_brief:size_bytes" in errors
+    assert "operator_state_current_artifact_missing_fingerprint:daily_brief:item_count" in errors
+    assert "operator_state_current_artifact_invalid_fingerprint_kind:daily_brief" in errors
+    assert "operator_state_current_artifact_invalid_sha256:daily_brief" in errors
+    assert "operator_state_current_artifact_invalid_size_bytes:daily_brief" in errors
+    assert "operator_state_current_artifact_invalid_item_count:daily_brief" in errors
+
+
+def test_operator_state_schema_accepts_each_artifact_fingerprint_kind():
+    state = _operator_state_schema_row(
+        {
+            "core_opportunities": _current_artifact_fingerprint("jsonl_lines", item_count=4),
+            "research_cards": _current_artifact_fingerprint("directory_tree_v1", item_count=3),
+            "daily_brief": _current_artifact_fingerprint("file_bytes"),
+            "provider_readiness_json": _current_artifact_fingerprint("file_bytes"),
+            "unified_calendar": _current_artifact_fingerprint("jsonl_lines", item_count=2),
+        }
+    )
+
+    assert schema_v1.validate_row_against_schema(state, "operator_state_v1") == []
+
+
+def test_operator_state_schema_rejects_malformed_common_fingerprint_fields():
+    valid = _current_artifact_fingerprint("file_bytes")
+    malformed = {
+        "fingerprint_contract_version": True,
+        "fingerprint_kind": "jsonl_lines",
+        "sha256": "A" * 64,
+        "size_bytes": True,
+        "item_count": -1,
+    }
+    state = _operator_state_schema_row({"daily_brief": dict(valid, **malformed)})
+
+    errors = schema_v1.validate_row_against_schema(state, "operator_state_v1")
+
+    assert "operator_state_current_artifact_invalid_fingerprint_version:daily_brief" in errors
+    assert "operator_state_current_artifact_invalid_fingerprint_kind:daily_brief" in errors
+    assert "operator_state_current_artifact_invalid_sha256:daily_brief" in errors
+    assert "operator_state_current_artifact_invalid_size_bytes:daily_brief" in errors
+    assert "operator_state_current_artifact_invalid_item_count:daily_brief" in errors
+
+
+def test_operator_state_schema_accepts_exact_canonical_run_row_fingerprint():
+    run_ledger = _current_artifact_fingerprint("canonical_run_row")
+    run_ledger.update(
+        {
+            "run_row_identity": {
+                "run_id": "run-fingerprint",
+                "profile": "fixture",
+                "artifact_namespace": "fingerprint",
+            },
+            "run_row_match_count": 1,
+        }
+    )
+    state = _operator_state_schema_row({"run_ledger": run_ledger})
+
+    assert schema_v1.validate_row_against_schema(state, "operator_state_v1") == []
+
+
+def test_operator_state_schema_rejects_ambiguous_or_incomplete_run_row_fingerprint():
+    valid = _current_artifact_fingerprint("canonical_run_row")
+    valid.update(
+        {
+            "run_row_identity": {
+                "run_id": "run-fingerprint",
+                "profile": "fixture",
+                "artifact_namespace": "fingerprint",
+            },
+            "run_row_match_count": 1,
+        }
+    )
+
+    missing_sha = dict(valid)
+    missing_sha.pop("sha256")
+    missing_sha["run_row_sha256"] = "b" * 64
+    errors = schema_v1.validate_row_against_schema(
+        _operator_state_schema_row({"run_ledger": missing_sha}),
+        "operator_state_v1",
+    )
+    assert "operator_state_current_artifact_missing_fingerprint:run_ledger:sha256" in errors
+    assert "operator_state_current_artifact_invalid_sha256:run_ledger" in errors
+
+    wrong_identity = deepcopy(valid)
+    wrong_identity["run_row_identity"]["run_id"] = "different-run"
+    errors = schema_v1.validate_row_against_schema(
+        _operator_state_schema_row({"run_ledger": wrong_identity}),
+        "operator_state_v1",
+    )
+    assert "operator_state_run_ledger_identity_mismatch:run_id" in errors
+
+    ambiguous = dict(valid, run_row_match_count=0, item_count=2)
+    errors = schema_v1.validate_row_against_schema(
+        _operator_state_schema_row({"run_ledger": ambiguous}),
+        "operator_state_v1",
+    )
+    assert "operator_state_run_ledger_match_count_not_one" in errors
+    assert "operator_state_run_ledger_item_count_not_one" in errors
+
+    bool_match_count = dict(valid, run_row_match_count=True)
+    errors = schema_v1.validate_row_against_schema(
+        _operator_state_schema_row({"run_ledger": bool_match_count}),
+        "operator_state_v1",
+    )
+    assert "operator_state_run_ledger_match_count_not_one" in errors
+
+    wrong_kind = dict(valid, fingerprint_kind="jsonl_lines")
+    errors = schema_v1.validate_row_against_schema(
+        _operator_state_schema_row({"run_ledger": wrong_kind}),
+        "operator_state_v1",
+    )
+    assert "operator_state_current_artifact_invalid_fingerprint_kind:run_ledger" in errors
 
 
 def test_schema_registry_contains_required_ids():

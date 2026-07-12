@@ -6,7 +6,11 @@ Research-oriented crypto RSI scanner and human-decided Event Alpha Crypto Radar.
 
 `make radar-dashboard` serves the current Event Alpha operator generation at
 `http://127.0.0.1:8765/`. It reads the exact run/revision manifest and local
-artifacts only; it does not call providers, send notifications, trade, paper
+artifacts only. Current research appears only when exact file/tree/run-row
+fingerprints, the immutable run age, and a fresh strict doctor for the same
+revision all agree; otherwise current pages are suppressed while Health and
+clearly labeled cumulative history remain available. It does not call
+providers, send notifications, trade, paper
 trade, write normal RSI rows, or create `TRIGGERED_FADE`. Run
 `make radar-dashboard-smoke` for the deterministic fixture/no-write render gate.
 `make radar-calendar-preview` prints the unified macro/crypto calendar fixture

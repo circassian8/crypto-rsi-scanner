@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import stat
@@ -13,6 +14,7 @@ from typing import Callable
 from crypto_rsi_scanner.cli.services import event_alpha_reports as daily_report_service
 from crypto_rsi_scanner.cli.services.event_alpha_notifications import preview as preview_service
 from crypto_rsi_scanner.cli.services.scanner_parts import reports as scanner_report_service
+from crypto_rsi_scanner.event_alpha.artifacts import fingerprints as artifact_fingerprints
 from crypto_rsi_scanner.event_alpha.artifacts import operator_state, schema_v1
 from crypto_rsi_scanner.event_alpha.doctor.checks import operations
 from crypto_rsi_scanner.event_alpha.namespace import lifecycle as namespace_lifecycle
@@ -30,6 +32,29 @@ def _run_row(namespace: str = "notify_no_key", run_id: str = "run-current") -> d
         "artifact_namespace": namespace,
         "run_mode": "event_alpha_cycle",
     }
+
+
+def _begin_run(
+    namespace_dir: Path,
+    run_row: dict[str, object],
+    *,
+    updated_at: datetime,
+    run_ledger_path: Path | None = None,
+) -> dict[str, object]:
+    """Persist the exact run row before building its authoritative state."""
+
+    ledger = run_ledger_path or namespace_dir / "event_alpha_runs.jsonl"
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    with ledger.open("a", encoding="utf-8") as handle:
+        handle.write(
+            json.dumps(run_row, default=str, sort_keys=True, separators=(",", ":")) + "\n"
+        )
+    return operator_state.begin_run(
+        namespace_dir,
+        run_row,
+        run_ledger_path=ledger,
+        updated_at=updated_at,
+    )
 
 
 def _assert_value_error(call: Callable[[], object], fragment: str) -> None:
@@ -52,9 +77,7 @@ def test_operator_text_run_id_matching_is_prefix_safe():
 def test_operator_state_begin_run_is_atomic_valid_and_private(tmp_path):
     namespace_dir = tmp_path / "notify_no_key"
     custom_ledger = namespace_dir / "custom_runs.jsonl"
-    custom_ledger.parent.mkdir(parents=True)
-    custom_ledger.write_text('{"run_id":"run-current"}\n', encoding="utf-8")
-    state = operator_state.begin_run(
+    state = _begin_run(
         namespace_dir,
         _run_row(),
         run_ledger_path=custom_ledger,
@@ -73,9 +96,293 @@ def test_operator_state_begin_run_is_atomic_valid_and_private(tmp_path):
     assert state["artifacts"]["run_ledger"]["path"] == "custom_runs.jsonl"
 
 
+def test_artifact_fingerprint_contract_binds_exact_bytes_lines_and_tree(tmp_path):
+    jsonl = tmp_path / "rows.jsonl"
+    payload = b'{"row":1}\n\n {"row":2}\r\n'
+    jsonl.write_bytes(payload)
+    file_fingerprint = artifact_fingerprints.fingerprint_path(jsonl)
+    assert file_fingerprint == {
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "size_bytes": len(payload),
+        "item_count": 2,
+        "fingerprint_kind": "jsonl_lines",
+        "fingerprint_contract_version": 1,
+    }
+    assert artifact_fingerprints.verify_bytes_fingerprint(payload, file_fingerprint) == (
+        True,
+        None,
+    )
+    invalid_version = dict(file_fingerprint, fingerprint_contract_version=True)
+    assert artifact_fingerprints.fingerprint_metadata_error(invalid_version) == (
+        "fingerprint_contract_version_unsupported"
+    )
+
+    tree = tmp_path / "cards"
+    (tree / "nested").mkdir(parents=True)
+    (tree / "a.md").write_bytes(b"a")
+    (tree / "nested" / "b.md").write_bytes(b"bb")
+    before = artifact_fingerprints.fingerprint_path(tree)
+    assert before["fingerprint_kind"] == "directory_tree_v1"
+    assert before["size_bytes"] == 3
+    assert before["item_count"] == 2
+
+    from unittest.mock import patch
+    original_reader = artifact_fingerprints._read_regular_file_once  # noqa: SLF001
+    mutated = False
+    def mutate_during_read(path):
+        nonlocal mutated
+        data = original_reader(path)
+        if not mutated:
+            (tree / "concurrent.md").write_text("new", encoding="utf-8")
+            mutated = True
+        return data
+
+    with patch.object(artifact_fingerprints, "_read_regular_file_once", side_effect=mutate_during_read):
+        try:
+            artifact_fingerprints.fingerprint_path(tree)
+        except artifact_fingerprints.FingerprintError as exc:
+            assert str(exc) == "directory_changed_during_fingerprint"
+        else:
+            raise AssertionError("directory mutation during fingerprint must fail closed")
+    (tree / "concurrent.md").unlink()
+
+    (tree / "nested" / "b.md").write_bytes(b"changed")
+    verified, reason = artifact_fingerprints.verify_path_fingerprint(tree, before)
+    assert verified is False
+    assert reason == "fingerprint_content_mismatch:sha256"
+
+    symlink = tree / "unsafe-link"
+    symlink.symlink_to(tree / "a.md")
+    try:
+        artifact_fingerprints.fingerprint_path(tree)
+    except artifact_fingerprints.FingerprintError as exc:
+        assert str(exc) == "directory_symlink_not_allowed"
+    else:
+        raise AssertionError("directory fingerprints must reject symlinks")
+
+
+def test_operator_state_fingerprints_current_files_directories_and_mutations(tmp_path):
+    namespace_dir = tmp_path / "notify_no_key"
+    core_path = namespace_dir / "event_core_opportunities.jsonl"
+    cards_dir = namespace_dir / "research_cards"
+    cards_dir.mkdir(parents=True)
+    core_path.write_text('{"row_type":"event_core_opportunity"}\n\n', encoding="utf-8")
+    (cards_dir / "one.md").write_text("one\n", encoding="utf-8")
+    run_row = {
+        **_run_row(),
+        "core_opportunity_store_path": core_path,
+        "core_opportunity_write_success": True,
+        "research_cards_dir": cards_dir,
+        "research_card_paths": [cards_dir / "one.md"],
+        "research_cards_written": 1,
+    }
+
+    state = _begin_run(namespace_dir, run_row, updated_at=_NOW)
+    core_entry = state["artifacts"]["core_opportunities"]
+    cards_entry = state["artifacts"]["research_cards"]
+    ledger_entry = state["artifacts"]["run_ledger"]
+    assert core_entry["fingerprint_kind"] == "jsonl_lines"
+    assert core_entry["item_count"] == 1
+    assert cards_entry["fingerprint_kind"] == "directory_tree_v1"
+    assert cards_entry["item_count"] == 1
+    assert ledger_entry["fingerprint_kind"] == "canonical_run_row"
+    assert ledger_entry["item_count"] == 1
+    assert ledger_entry["run_row_identity"] == {
+        "run_id": "run-current",
+        "profile": "notify_no_key",
+        "artifact_namespace": "notify_no_key",
+    }
+    assert ledger_entry["run_row_match_count"] == 1
+    assert operator_state.state_has_complete_artifact_fingerprints(
+        state,
+        base=namespace_dir,
+    ) is True
+
+    core_path.write_text('{"row_type":"event_core_opportunity","changed":true}\n', encoding="utf-8")
+    changed_core = operator_state.load_operator_state(namespace_dir)
+    assert changed_core.valid is False
+    assert changed_core.error == (
+        "artifact_fingerprint_invalid:core_opportunities:"
+        "fingerprint_content_mismatch:sha256"
+    )
+
+    core_path.write_text('{"row_type":"event_core_opportunity"}\n\n', encoding="utf-8")
+    (cards_dir / "two.md").write_text("two\n", encoding="utf-8")
+    changed_tree = operator_state.load_operator_state(namespace_dir)
+    assert changed_tree.valid is False
+    assert changed_tree.error == (
+        "artifact_fingerprint_invalid:research_cards:"
+        "fingerprint_content_mismatch:sha256"
+    )
+
+
+def test_operator_state_run_ledger_fingerprint_is_append_stable_and_edit_sensitive(tmp_path):
+    namespace_dir = tmp_path / "notify_no_key"
+    exact = _run_row()
+    state = _begin_run(namespace_dir, exact, updated_at=_NOW)
+    ledger_path = namespace_dir / "event_alpha_runs.jsonl"
+    baseline = dict(state["artifacts"]["run_ledger"])
+
+    unrelated = _run_row(run_id="run-later")
+    with ledger_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(unrelated, sort_keys=True, separators=(",", ":")) + "\n")
+    appended = operator_state.load_operator_state(namespace_dir)
+    assert appended.valid is True
+    assert appended.state is not None
+    assert appended.state["artifacts"]["run_ledger"] == baseline
+
+    rows = [json.loads(line) for line in ledger_path.read_text(encoding="utf-8").splitlines()]
+    rows[0]["run_mode"] = "edited_after_fingerprint"
+    ledger_path.write_text(
+        "\n".join(json.dumps(row, sort_keys=True, separators=(",", ":")) for row in rows)
+        + "\n",
+        encoding="utf-8",
+    )
+    edited = operator_state.load_operator_state(namespace_dir)
+    assert edited.valid is False
+    assert edited.error == (
+        "artifact_fingerprint_invalid:run_ledger:fingerprint_content_mismatch:sha256"
+    )
+
+
+def test_operator_state_run_ledger_duplicate_exact_identity_fails_closed(tmp_path):
+    namespace_dir = tmp_path / "notify_no_key"
+    exact = _run_row()
+    _begin_run(namespace_dir, exact, updated_at=_NOW)
+    ledger_path = namespace_dir / "event_alpha_runs.jsonl"
+    with ledger_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(exact, sort_keys=True, separators=(",", ":")) + "\n")
+
+    duplicated = operator_state.load_operator_state(namespace_dir)
+    assert duplicated.valid is False
+    assert duplicated.error == (
+        "artifact_fingerprint_invalid:run_ledger:run_row_match_count_mismatch:2"
+    )
+
+
+def test_legacy_fingerprintless_state_remains_readable_but_cannot_gain_authority(tmp_path):
+    namespace_dir = tmp_path / "notify_no_key"
+    state = _begin_run(namespace_dir, _run_row(), updated_at=_NOW)
+    legacy_sha_only = json.loads(json.dumps(state))
+    ledger = legacy_sha_only["artifacts"]["run_ledger"]
+    for field in (
+        *(field for field in artifact_fingerprints.FINGERPRINT_FIELDS if field != "sha256"),
+        "run_row_identity",
+        "run_row_match_count",
+    ):
+        ledger.pop(field, None)
+    operator_state.write_json_atomic(
+        operator_state.operator_state_path(namespace_dir),
+        legacy_sha_only,
+    )
+    assert operator_state.load_operator_state(namespace_dir).valid is True
+
+    legacy = json.loads(json.dumps(legacy_sha_only))
+    legacy["artifacts"]["run_ledger"].pop("sha256", None)
+    operator_state.write_json_atomic(operator_state.operator_state_path(namespace_dir), legacy)
+
+    loaded = operator_state.load_operator_state(namespace_dir)
+    assert loaded.valid is True
+    assert loaded.state is not None
+    assert operator_state.state_has_complete_artifact_fingerprints(
+        loaded.state,
+        base=namespace_dir,
+    ) is False
+    stray_legacy = json.loads(json.dumps(legacy_sha_only))
+    stray_legacy["artifacts"]["run_ledger"]["run_row_sha256"] = "0" * 64
+    assert operator_state.operator_artifact_fingerprint_error(
+        stray_legacy,
+        base=namespace_dir,
+        require_complete=False,
+    ) == "artifact_fingerprint_partial:run_ledger"
+    _assert_value_error(
+        lambda: operator_state.record_doctor_status(
+            namespace_dir,
+            run_id="run-current",
+            profile="notify_no_key",
+            artifact_namespace="notify_no_key",
+            expected_revision=1,
+            strict=True,
+            schema_only=False,
+            skip_api_checks=False,
+            status="OK",
+            checked_at=_NOW,
+        ),
+        "fingerprint authority unavailable",
+    )
+
+
+def test_missing_declared_artifact_is_non_current_and_malformed_legacy_digest_fails(tmp_path):
+    namespace_dir = tmp_path / "notify_no_key"
+    missing_core = namespace_dir / "event_core_opportunities.jsonl"
+    run_row = {
+        **_run_row(),
+        "core_opportunity_store_path": missing_core,
+        "core_opportunity_write_success": True,
+    }
+
+    state = _begin_run(namespace_dir, run_row, updated_at=_NOW)
+    core_entry = state["artifacts"]["core_opportunities"]
+    assert core_entry["status"] == operator_state.STATUS_MISSING
+    assert core_entry["reason"] == "artifact_path_missing_for_fingerprint"
+    assert not any(field in core_entry for field in artifact_fingerprints.FINGERPRINT_FIELDS)
+    assert state["manifest_status"] == "incoherent"
+    assert operator_state.load_operator_state(namespace_dir).valid is True
+
+    corrupted = json.loads(json.dumps(state))
+    ledger = corrupted["artifacts"]["run_ledger"]
+    for field in (
+        "size_bytes",
+        "item_count",
+        "fingerprint_kind",
+        "fingerprint_contract_version",
+        "run_row_identity",
+        "run_row_match_count",
+    ):
+        ledger.pop(field, None)
+    ledger["sha256"] = "not-a-valid-legacy-digest"
+    operator_state.write_json_atomic(operator_state.operator_state_path(namespace_dir), corrupted)
+    invalid = operator_state.load_operator_state(namespace_dir)
+    assert invalid.valid is False
+    assert invalid.error in {
+        "artifact_legacy_sha256_invalid:run_ledger",
+        "schema_error:operator_state_current_artifact_missing_fingerprint:run_ledger:size_bytes",
+    }
+
+
+def test_operator_state_rejects_leaf_and_component_symlink_artifacts(tmp_path):
+    for case_name in ("leaf", "component"):
+        namespace_dir = tmp_path / case_name
+        _begin_run(namespace_dir, _run_row(namespace=case_name), updated_at=_NOW)
+        real_dir = namespace_dir / "real"
+        real_dir.mkdir()
+        real = real_dir / "coverage.json"
+        real.write_text("{}\n", encoding="utf-8")
+        if case_name == "leaf":
+            artifact_path = namespace_dir / "coverage-link.json"
+            artifact_path.symlink_to(real)
+        else:
+            alias = namespace_dir / "alias"
+            alias.symlink_to(real_dir, target_is_directory=True)
+            artifact_path = alias / real.name
+        state = operator_state.record_artifact(
+            namespace_dir,
+            run_id="run-current",
+            profile="notify_no_key",
+            artifact_namespace=case_name,
+            name="source_coverage_json",
+            path=artifact_path,
+            updated_at=_NOW,
+        )
+        entry = state["artifacts"]["source_coverage_json"]
+        assert entry["status"] == operator_state.STATUS_MISSING
+        assert entry["reason"] == "artifact_path_missing_for_fingerprint"
+        assert "fingerprint_contract_version" not in entry
+
+
 def test_operator_state_revision_invalidates_completed_doctor(tmp_path):
     namespace_dir = tmp_path / "notify_no_key"
-    operator_state.begin_run(namespace_dir, _run_row(), updated_at=_NOW)
+    _begin_run(namespace_dir, _run_row(), updated_at=_NOW)
     state = operator_state.record_doctor_status(
         namespace_dir,
         run_id="run-current",
@@ -733,7 +1040,7 @@ def test_namespace_lifecycle_never_reports_policy_safe_with_stale_doctor(tmp_pat
 
 def test_operator_state_invalidation_advances_revision_and_stales_doctor(tmp_path):
     namespace_dir = tmp_path / "notify_no_key"
-    operator_state.begin_run(namespace_dir, _run_row(), updated_at=_NOW)
+    _begin_run(namespace_dir, _run_row(), updated_at=_NOW)
     verified = operator_state.record_doctor_status(
         namespace_dir,
         run_id="run-current",

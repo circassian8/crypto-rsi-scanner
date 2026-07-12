@@ -16,6 +16,34 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-12 - Require exact evidence for current dashboard authority
+**Status:** accepted
+**Decision:** A current Event Alpha operator artifact from a new generation must
+carry fingerprint contract v1: exact bytes for files, a framed sorted exact-byte
+tree for directories, or one canonical persisted row for the cumulative run
+ledger. Run-ledger authority binds exactly one non-whitespace string identity
+of run id, profile, and artifact namespace; unrelated later appends are allowed,
+but edits, duplicate identities/JSON keys, partial/deprecated metadata, symlinks,
+non-regular files, concurrent mutation, and path fallbacks are not. The dashboard
+parses the same verified byte buffer and grants current-generation authority
+only when the known-artifact manifest is structurally complete, the immutable
+run time and exact strict-doctor stamp are fresh, the doctor inspected the same
+revision, its exact typed status is `OK` or `WARN`, and it has zero blockers.
+Failed current artifacts are never parsed or displayed. Legacy fingerprintless
+or valid SHA-only states may remain readable only through a stale,
+non-authoritative in-memory view; they are never rewritten or upgraded by
+inference. When current authority fails, only system Health and explicitly
+cumulative/non-authoritative feedback, outcomes, and provider health remain
+visible; current ideas, diagnostics, calendar rows, candidate details, and
+counts stay suppressed. The dashboard smoke must fail when authority is absent.
+**Why:** Run ids, paths, counts, and revision labels prove lineage but not
+content. Exact verified evidence plus independent immutable-run and doctor
+freshness prevents a locally coherent-looking mix of stale, replaced, aliased,
+or uninspected artifacts from becoming trader-facing research authority.
+**Revisit when:** Artifact schema v2 stores immutable per-run directories behind
+an atomic content-addressed pointer and provides equivalent exact-row,
+freshness, no-follow, and fail-closed display guarantees.
+
 ## 2026-07-12 - Treat one valid v2 authority and strict doctor as fail-closed contracts
 **Status:** accepted
 **Decision:** A projected Decision Model v2 row must come from one individually

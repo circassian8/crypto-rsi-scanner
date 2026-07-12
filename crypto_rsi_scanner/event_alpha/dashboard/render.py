@@ -28,6 +28,16 @@ def render_dashboard_page(
     *,
     include_diagnostics: bool = False,
 ) -> DashboardResponse:
+    current_generation_page = path in {"/", "/anomalies", "/catalysts", "/fade-risk", "/calendar"}
+    if current_generation_page and not snapshot.generation_authoritative:
+        title = {
+            "/": "Today",
+            "/anomalies": "Market Anomalies",
+            "/catalysts": "Catalyst Ideas",
+            "/fade-risk": "Fade / Risk",
+            "/calendar": "Calendar",
+        }[path]
+        return _ok(snapshot, title, _authority_unavailable(snapshot))
     if path == "/":
         body = _today(snapshot, include_diagnostics=include_diagnostics)
         return _ok(snapshot, "Today", body)
@@ -191,6 +201,13 @@ def _health(snapshot: DashboardSnapshot) -> str:
             ("Manifest", snapshot.manifest_status),
             ("Doctor", snapshot.doctor_status),
             ("Doctor verified revision", doctor_revision),
+            ("Generation authority", snapshot.generation_authority_status),
+            ("Authority checked at", snapshot.generation_authority_checked_at),
+            ("Operator-state SHA-256", snapshot.operator_state_sha256),
+            (
+                "Authority reasons",
+                "; ".join(snapshot.generation_authority_reasons) or "none",
+            ),
             ("Research only", snapshot.operator_state.get("research_only")),
             ("Send attempted", snapshot.operator_state.get("send_attempted")),
             ("Trades / paper / RSI / triggered fade", "0 / 0 / 0 / 0"),
@@ -210,11 +227,28 @@ def _health(snapshot: DashboardSnapshot) -> str:
                     _h(entry.get("reason") or ""),
                 )
             )
-    providers = _provider_rows(snapshot.provider_readiness, snapshot.provider_health)
+    current_providers = _provider_rows(snapshot.provider_readiness)
+    cumulative_providers = _provider_rows(snapshot.provider_health)
+    cumulative_health_metadata = _definition_list(
+        (
+            ("Authority", "cumulative / non-authoritative"),
+            ("Read at", snapshot.provider_health_read_at or "not read"),
+            ("SHA-256", snapshot.provider_health_sha256 or "unavailable"),
+            ("Read error", snapshot.provider_health_error or "none"),
+        )
+    )
     return (
         _section("Current operator generation", summary)
         + _section("Artifact manifest", _table(("Artifact", "Status", "Path", "Reason"), artifact_rows))
-        + _section("Provider status", _table(("Provider", "Status", "Detail"), providers))
+        + _section(
+            "Exact-generation provider readiness",
+            _table(("Provider", "Status", "Detail"), current_providers),
+        )
+        + _section(
+            "Cumulative provider health (non-authoritative)",
+            cumulative_health_metadata
+            + _table(("Provider", "Status", "Detail"), cumulative_providers),
+        )
     )
 
 
@@ -240,9 +274,24 @@ def _feedback_outcomes(snapshot: DashboardSnapshot) -> str:
                 _h(row.get("actionability_score") if row.get("actionability_score") is not None else "n/a"),
             )
         )
+    history_rows = []
+    for artifact_name, metadata in sorted(snapshot.cumulative_history_metadata.items()):
+        history_rows.append(
+            (
+                _h(artifact_name),
+                _h(metadata.get("authority") or "cumulative_non_authoritative"),
+                _h(metadata.get("read_at") or "not read"),
+                _h(metadata.get("sha256") or "unavailable"),
+                _h(metadata.get("error") or "none"),
+            )
+        )
     return (
         '<p class="scope"><strong>Cumulative research history.</strong> These rows are intentionally not '
         "presented as current-generation candidate counts.</p>"
+        + _section(
+            "Cumulative artifact reads (non-authoritative)",
+            _table(("Artifact", "Authority", "Read at", "SHA-256", "Read error"), history_rows),
+        )
         + _section(
             f"Feedback labels ({len(feedback_rows)})",
             _table(("Target", "Label", "Thesis origin", "Catalyst status"), feedback_rows),
@@ -260,6 +309,12 @@ def _candidate_detail(
     *,
     include_diagnostics: bool,
 ) -> DashboardResponse:
+    if not snapshot.generation_authoritative:
+        return DashboardResponse(
+            409,
+            "Conflict",
+            _layout(snapshot, "Candidate unavailable", _authority_unavailable(snapshot)),
+        )
     row = next(
         (
             item
@@ -400,29 +455,58 @@ def _ok(snapshot: DashboardSnapshot, title: str, body: str) -> DashboardResponse
 
 def _layout(snapshot: DashboardSnapshot, title: str, body: str) -> str:
     nav = "".join(f'<a href="{path}">{_h(label)}</a>' for path, label in _NAV)
+    current_count = (
+        str(snapshot.current_generation_count)
+        if snapshot.generation_authoritative
+        else "suppressed (untrusted)"
+    )
+    cumulative_count = (
+        str(snapshot.cumulative_store_count)
+        if snapshot.generation_authoritative
+        else "see Feedback / Outcomes"
+    )
     scope = (
         f"Current generation: {_h(snapshot.run_id)} · revision {snapshot.revision} · "
-        f"current candidates {snapshot.current_generation_count} · cumulative core history {snapshot.cumulative_store_count}"
+        f"current candidates {current_count} · cumulative core history {cumulative_count}"
     )
+    authority_banner = ""
+    if not snapshot.generation_authoritative:
+        reasons = "".join(f"<li>{_h(reason)}</li>" for reason in snapshot.generation_authority_reasons)
+        authority_banner = (
+            '<div class="authority-untrusted"><strong>UNTRUSTED CURRENT GENERATION.</strong> '
+            "Current actionable, anomaly, catalyst, fade/risk, calendar, diagnostic, and candidate-detail "
+            f"content is suppressed.<ul>{reasons}</ul></div>"
+        )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{_h(title)} · Crypto Radar</title><style>
-:root{{--bg:#0b1020;--panel:#151d31;--ink:#eef3ff;--muted:#a9b6d3;--line:#2d3956;--accent:#7dd3fc;--warn:#fbbf24}}
+:root{{--bg:#0b1020;--panel:#151d31;--ink:#eef3ff;--muted:#a9b6d3;--line:#2d3956;--accent:#7dd3fc;--warn:#fbbf24;--danger:#f87171}}
 *{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}}
 header,main{{max-width:1280px;margin:auto;padding:18px}}nav{{display:flex;gap:14px;flex-wrap:wrap}}a{{color:var(--accent)}}
-.banner,.scope,section{{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:14px 0}}
+.banner,.scope,.authority-untrusted,section{{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:14px 0}}
 .banner{{border-color:#725b16;color:#fde68a}}.muted{{color:var(--muted)}}table{{width:100%;border-collapse:collapse;overflow:auto}}
+.authority-untrusted{{border:3px solid var(--danger);color:#fecaca;background:#3f1219}}.authority-untrusted strong{{font-size:1.08em}}
 th,td{{border-bottom:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}}th{{color:var(--muted)}}
 dl{{display:grid;grid-template-columns:minmax(150px,260px) 1fr;gap:6px 14px}}dt{{color:var(--muted)}}dd{{margin:0;overflow-wrap:anywhere}}
 code{{color:#bae6fd}}@media(max-width:760px){{table{{display:block;overflow-x:auto}}dl{{grid-template-columns:1fr}}}}
 </style></head><body><header><h1>Crypto Radar</h1><nav>{nav}</nav></header><main>
 <div class="banner"><strong>Research idea, not a trade instruction.</strong> No execution, Event Alpha paper trading, normal RSI writes, or Event Alpha <code>TRIGGERED_FADE</code> creation.</div>
+{authority_banner}
 <div class="scope">{scope}<br>Doctor: {_h(snapshot.doctor_status)} at revision {_h(snapshot.doctor_verified_revision if snapshot.doctor_verified_revision is not None else 'not verified')}</div>
 <h2>{_h(title)}</h2>{body}</main></body></html>"""
 
 
 def _standalone_error(title: str, detail: str) -> str:
     return f"<!doctype html><html><head><meta charset=\"utf-8\"><title>{_h(title)}</title></head><body><h1>{_h(title)}</h1><p>{_h(detail)}</p></body></html>"
+
+
+def _authority_unavailable(snapshot: DashboardSnapshot) -> str:
+    reasons = _text_list("Authority failures", snapshot.generation_authority_reasons)
+    return (
+        "<p><strong>Current-generation research content is unavailable because generation authority "
+        "did not pass.</strong> Provider/system health and explicitly cumulative feedback/outcomes remain visible.</p>"
+        + reasons
+    )
 
 
 def _section(title: str, body: str) -> str:

@@ -8,7 +8,6 @@ generation.  It is research metadata only and cannot route or send anything.
 from __future__ import annotations
 
 import fcntl
-import hashlib
 import json
 import os
 import re
@@ -20,7 +19,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping
 
+from . import fingerprints as artifact_fingerprints
+from . import operator_state_fingerprints as operator_fingerprint_helpers
 from . import run_counters, schema_v1
+
+
+_resolve_namespace_artifact_path = operator_fingerprint_helpers.resolve_namespace_artifact_path
+_portable_path = operator_fingerprint_helpers.portable_path
 
 
 OPERATOR_STATE_FILENAME = "event_alpha_operator_state.json"
@@ -161,15 +166,23 @@ def _write_text_atomic(path: Path, text_value: str) -> None:
 
 def load_operator_state(namespace_dir: str | Path) -> EventAlphaOperatorStateReadResult:
     path = operator_state_path(namespace_dir)
-    if not path.exists():
-        return EventAlphaOperatorStateReadResult(path=path, exists=False, valid=False, error="missing")
     try:
-        parsed = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        raw = artifact_fingerprints.read_regular_file_bytes(path)
+    except artifact_fingerprints.FingerprintError as exc:
+        exists = os.path.lexists(path)
+        return EventAlphaOperatorStateReadResult(
+            path=path,
+            exists=exists,
+            valid=False,
+            error=str(exc) if exists else "missing",
+        )
+    try:
+        parsed = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         return EventAlphaOperatorStateReadResult(path=path, exists=True, valid=False, error=type(exc).__name__)
     if not isinstance(parsed, Mapping):
         return EventAlphaOperatorStateReadResult(path=path, exists=True, valid=False, error="not_object")
-    state = dict(parsed)
+    state = _downgrade_legacy_doctor_authority(dict(parsed), base=path.parent)
     error = _state_validation_error(state, base=path.parent)
     return EventAlphaOperatorStateReadResult(
         path=path,
@@ -307,26 +320,6 @@ def enrich_run_row_from_core_store(
     return enriched
 
 
-def _resolve_namespace_artifact_path(base: Path, raw_path: str) -> Path | None:
-    raw_candidate = Path(raw_path).expanduser()
-    path_candidates = (
-        (raw_candidate,)
-        if raw_candidate.is_absolute()
-        else (Path.cwd() / raw_candidate, base / raw_candidate, base / raw_candidate.name)
-    )
-    resolved: Path | None = None
-    for candidate_path in path_candidates:
-        try:
-            candidate_resolved = candidate_path.resolve()
-            candidate_resolved.relative_to(base.resolve())
-        except (OSError, ValueError):
-            continue
-        if candidate_resolved.exists():
-            resolved = candidate_resolved
-            break
-    return resolved
-
-
 def _build_run_state(
     base: Path,
     run_row: Mapping[str, Any],
@@ -334,11 +327,9 @@ def _build_run_state(
     run_ledger_path: str | Path | None,
     updated_at: datetime | None,
 ) -> dict[str, Any]:
-    run_id = str(run_row.get("run_id") or "").strip()
-    profile = str(run_row.get("profile") or "default").strip() or "default"
-    namespace = str(run_row.get("artifact_namespace") or base.name).strip() or base.name
-    if not run_id:
-        raise ValueError("operator state requires run_id")
+    run_id = _require_identity_string(run_row, "run_id")
+    profile = _require_identity_string(run_row, "profile", default="default")
+    namespace = _require_identity_string(run_row, "artifact_namespace", default=base.name)
     now = _as_utc(updated_at or datetime.now(timezone.utc)).isoformat()
     counters = run_counters.canonical_run_counters(run_row)
     decision_summary = _decision_model_summary_from_run(run_row)
@@ -662,7 +653,7 @@ def record_artifact(
 ) -> dict[str, Any]:
     """Update one artifact for the exact current generation."""
 
-    if name not in KNOWN_ARTIFACTS:
+    if name not in {*KNOWN_ARTIFACTS, *OPTIONAL_ARTIFACTS}:
         raise ValueError(f"unknown operator artifact: {name}")
     if status not in ARTIFACT_STATUSES:
         raise ValueError(f"invalid operator artifact status: {status}")
@@ -703,7 +694,7 @@ def write_text_artifact(
 ) -> dict[str, Any]:
     """Write text and record it while holding exact-generation ownership."""
 
-    if name not in KNOWN_ARTIFACTS:
+    if name not in {*KNOWN_ARTIFACTS, *OPTIONAL_ARTIFACTS}:
         raise ValueError(f"unknown operator artifact: {name}")
     base = Path(namespace_dir).expanduser()
     target = Path(path).expanduser()
@@ -739,15 +730,27 @@ def _updated_artifact_state(
     count: int | None,
     now: str,
 ) -> dict[str, Any]:
-    entry: dict[str, Any] = {
-        "status": status,
-        "run_id": str(run_id),
-        "path": _portable_path(path, base=base) if path is not None else None,
-        "generated_at": now,
-        "reason": None if status == STATUS_CURRENT else reason,
-    }
-    if count is not None:
-        entry["count"] = max(0, int(count))
+    if status == STATUS_CURRENT and path is not None:
+        entry = _fingerprinted_artifact_entry(
+            name,
+            base=base,
+            run_id=run_id,
+            profile=str(state.get("profile") or "default"),
+            artifact_namespace=str(state.get("artifact_namespace") or base.name),
+            path=path,
+            now=now,
+            count=count,
+        )
+    else:
+        entry = {
+            "status": status,
+            "run_id": str(run_id),
+            "path": _portable_path(path, base=base) if path is not None else None,
+            "generated_at": now,
+            "reason": reason,
+        }
+        if count is not None:
+            entry["count"] = max(0, int(count))
     artifacts = dict(state.get("artifacts") or {})
     artifacts[name] = entry
     state["artifacts"] = artifacts
@@ -786,6 +789,9 @@ def record_doctor_status(
 ) -> dict[str, Any]:
     """Stamp doctor status against the exact manifest revision it inspected."""
 
+    verified_revision = _require_nonnegative_int(expected_revision, field="expected_revision")
+    verified_blocker_count = _require_nonnegative_int(blocker_count, field="blocker_count")
+    verified_warning_count = _require_nonnegative_int(warning_count, field="warning_count")
     if status not in DOCTOR_COMPLETED_STATUSES:
         raise ValueError(f"invalid completed doctor status: {status}")
     if not strict or schema_only or skip_api_checks:
@@ -794,11 +800,20 @@ def record_doctor_status(
     with _state_lock(base):
         state = _require_matching_state(base, run_id, profile, artifact_namespace)
         current_revision = int(state.get("revision") or 0)
-        if current_revision != int(expected_revision):
+        if current_revision != verified_revision:
             raise ValueError(
                 "operator state revision mismatch: "
-                f"expected={int(expected_revision)} actual={current_revision}"
+                f"expected={verified_revision} actual={current_revision}"
             )
+        if str(state.get("manifest_status") or "") != "complete":
+            raise ValueError("operator state manifest is not complete")
+        fingerprint_error = operator_artifact_fingerprint_error(
+            state,
+            base=base,
+            require_complete=True,
+        )
+        if fingerprint_error:
+            raise ValueError(f"operator artifact fingerprint authority unavailable: {fingerprint_error}")
         checked = _as_utc(checked_at or datetime.now(timezone.utc)).isoformat()
         state["doctor"] = {
             "status": status,
@@ -809,8 +824,8 @@ def record_doctor_status(
             "skip_api_checks": False,
             "verified_at": checked,
             "verified_revision": current_revision,
-            "blocker_count": max(0, int(blocker_count)),
-            "warning_count": max(0, int(warning_count)),
+            "blocker_count": verified_blocker_count,
+            "warning_count": verified_warning_count,
         }
         state.pop("invalidation_reason", None)
         state["updated_at"] = checked
@@ -850,19 +865,20 @@ def _initial_artifact_entry(
             None,
         )
     if path:
-        entry = {
-            "status": STATUS_CURRENT,
-            "run_id": run_id,
-            "path": _portable_path(path, base=base),
-            "generated_at": now,
-            "reason": None,
-        }
-        if name == "unified_calendar":
-            entry["count"] = _nonnegative_int(run_row.get("unified_calendar_rows"))
-            resolved = _resolve_namespace_artifact_path(base, str(path))
-            if resolved is not None:
-                entry["sha256"] = hashlib.sha256(resolved.read_bytes()).hexdigest()
-        return entry
+        return _fingerprinted_artifact_entry(
+            name,
+            base=base,
+            run_id=run_id,
+            profile=str(run_row.get("profile") or "default"),
+            artifact_namespace=str(run_row.get("artifact_namespace") or base.name),
+            path=path,
+            now=now,
+            count=(
+                _nonnegative_int(run_row.get("unified_calendar_rows"))
+                if name == "unified_calendar"
+                else None
+            ),
+        )
     return {
         "status": STATUS_SKIPPED,
         "run_id": run_id,
@@ -870,6 +886,32 @@ def _initial_artifact_entry(
         "generated_at": now,
         "reason": "not_written_by_cycle",
     }
+
+
+def _fingerprinted_artifact_entry(
+    name: str,
+    *,
+    base: Path,
+    run_id: str,
+    profile: str,
+    artifact_namespace: str,
+    path: str | Path,
+    now: str,
+    count: int | None,
+) -> dict[str, Any]:
+    return operator_fingerprint_helpers.fingerprinted_artifact_entry(
+        name,
+        base=base,
+        run_id=run_id,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        path=path,
+        now=now,
+        count=count,
+        current_status=STATUS_CURRENT,
+        missing_status=STATUS_MISSING,
+        failed_status=STATUS_FAILED,
+    )
 
 
 def _require_matching_state(base: Path, run_id: str, profile: str, namespace: str) -> dict[str, Any]:
@@ -886,6 +928,42 @@ def _require_matching_state(base: Path, run_id: str, profile: str, namespace: st
     if actual != expected:
         raise ValueError(f"operator state identity mismatch: expected={expected!r} actual={actual!r}")
     return state
+
+
+def operator_artifact_fingerprint_error(
+    state: Mapping[str, Any],
+    *,
+    base: str | Path,
+    require_complete: bool,
+) -> str | None:
+    """Validate current artifact fingerprints without upgrading legacy entries.
+
+    Missing v1 metadata remains readable when ``require_complete`` is false so
+    historical operator states can still power status/Health surfaces.  Any
+    present v1 contract is validated strictly, and authority callers require a
+    complete verified contract for every current artifact.
+    """
+
+    return operator_fingerprint_helpers.operator_artifact_fingerprint_error(
+        state,
+        base=base,
+        require_complete=require_complete,
+        current_status=STATUS_CURRENT,
+    )
+
+
+def state_has_complete_artifact_fingerprints(
+    state: Mapping[str, Any],
+    *,
+    base: str | Path,
+) -> bool:
+    """Return whether every current artifact has a verified v1 contract."""
+
+    return operator_artifact_fingerprint_error(
+        state,
+        base=base,
+        require_complete=True,
+    ) is None
 
 
 def _state_validation_error(state: Mapping[str, Any], *, base: Path) -> str | None:
@@ -909,6 +987,10 @@ def _state_validation_error(state: Mapping[str, Any], *, base: Path) -> str | No
     for key in ("run_id", "profile", "artifact_namespace", "revision", "manifest_status", "artifacts", "doctor"):
         if state.get(key) in (None, "", {}):
             return f"missing_{key}"
+    for key in ("run_id", "profile", "artifact_namespace"):
+        value = state.get(key)
+        if not isinstance(value, str) or value != value.strip():
+            return f"invalid_identity:{key}"
     artifacts = state.get("artifacts")
     if not isinstance(artifacts, Mapping):
         return "artifacts_not_object"
@@ -937,27 +1019,59 @@ def _state_validation_error(state: Mapping[str, Any], *, base: Path) -> str | No
                 (base / raw).resolve().relative_to(base.resolve())
             except (OSError, ValueError):
                 return f"artifact_path_outside_namespace:{name}"
+    doctor = state.get("doctor") if isinstance(state.get("doctor"), Mapping) else {}
+    doctor_status_value = doctor.get("status")
+    if not isinstance(doctor_status_value, str) or doctor_status_value not in DOCTOR_STATUSES:
+        return "invalid_doctor_status"
+    doctor_authoritative = doctor.get("authoritative") is True
+    if doctor_authoritative:
+        revision = state.get("revision")
+        verified_revision = doctor.get("verified_revision")
+        if not _is_nonnegative_int(revision):
+            return "doctor_authority_invalid_revision"
+        if not _is_nonnegative_int(verified_revision):
+            return "doctor_authority_invalid_verified_revision"
+        if verified_revision != revision:
+            return "doctor_authority_revision_mismatch"
+        for field in ("blocker_count", "warning_count"):
+            if not _is_nonnegative_int(doctor.get(field)):
+                return f"doctor_authority_invalid_{field}"
+    fingerprint_error = operator_artifact_fingerprint_error(
+        state,
+        base=base,
+        require_complete=doctor_authoritative,
+    )
+    if fingerprint_error:
+        return fingerprint_error
     if str(state.get("manifest_status") or "") != _manifest_status(artifacts):
         return "manifest_status_mismatch"
-    doctor = state.get("doctor") if isinstance(state.get("doctor"), Mapping) else {}
-    doctor_status = str(doctor.get("status") or "")
-    if doctor_status not in DOCTOR_STATUSES:
-        return "invalid_doctor_status"
-    if doctor.get("authoritative") is True and not (
+    doctor_status = doctor_status_value
+    if doctor_authoritative and not (
         doctor_status in DOCTOR_COMPLETED_STATUSES
         and doctor.get("strict") is True
         and doctor.get("schema_only") is False
         and doctor.get("skip_api_checks") is False
     ):
         return "doctor_authority_mode_mismatch"
-    if doctor.get("authoritative") is True:
+    if doctor_authoritative:
         if str(doctor.get("run_id") or "") != str(state.get("run_id") or ""):
             return "doctor_authority_run_mismatch"
-        if _nonnegative_int(doctor.get("verified_revision")) != _nonnegative_int(state.get("revision")):
-            return "doctor_authority_revision_mismatch"
         if not str(doctor.get("verified_at") or "").strip():
             return "doctor_authority_missing_verified_at"
     return None
+
+
+def _downgrade_legacy_doctor_authority(
+    state: dict[str, Any],
+    *,
+    base: Path,
+) -> dict[str, Any]:
+    return operator_fingerprint_helpers.downgrade_legacy_doctor_authority(
+        state,
+        base=base,
+        completed_statuses=DOCTOR_COMPLETED_STATUSES,
+        current_status=STATUS_CURRENT,
+    )
 
 
 def _manifest_status(artifacts: Mapping[str, Mapping[str, Any]]) -> str:
@@ -967,16 +1081,6 @@ def _manifest_status(artifacts: Mapping[str, Mapping[str, Any]]) -> str:
     if STATUS_PENDING in statuses:
         return "partial"
     return "complete"
-
-
-def _portable_path(path: str | Path, *, base: Path) -> str:
-    raw = Path(path).expanduser()
-    if not raw.is_absolute():
-        raw = (Path.cwd() / raw).resolve()
-    try:
-        return raw.resolve().relative_to(base.resolve()).as_posix()
-    except (OSError, ValueError) as exc:
-        raise ValueError(f"operator artifact path outside namespace: {raw}") from exc
 
 
 @contextmanager
@@ -1013,6 +1117,28 @@ def _nonnegative_int(value: Any) -> int:
         return 0
 
 
+def _require_nonnegative_int(value: Any, *, field: str) -> int:
+    if not _is_nonnegative_int(value):
+        raise ValueError(f"{field} must be a non-negative integer")
+    return value
+
+
+def _is_nonnegative_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _require_identity_string(
+    row: Mapping[str, Any],
+    field: str,
+    *,
+    default: str | None = None,
+) -> str:
+    raw = default if field not in row and default is not None else row.get(field)
+    if not isinstance(raw, str) or not raw or raw != raw.strip():
+        raise ValueError(f"operator state requires string {field}")
+    return raw
+
+
 def _first_timestamp(row: Mapping[str, Any], fields: Iterable[str]) -> datetime | None:
     for field in fields:
         text = str(row.get(field) or "").strip()
@@ -1038,11 +1164,13 @@ __all__ = (
     "invalidate_operator_state",
     "latest_matching_run",
     "load_operator_state",
+    "operator_artifact_fingerprint_error",
     "operator_state_path",
     "record_artifact",
     "record_doctor_status",
     "run_is_newer_than_state",
     "state_matches_run",
+    "state_has_complete_artifact_fingerprints",
     "text_has_exact_run_id",
     "write_text_artifact",
     "write_json_atomic",

@@ -139,7 +139,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   smoke/doctor targets for artifact behavior.
 - **Alert render smoke (no sends/network):** `make smoke-alerts`
 - **Local Crypto Radar dashboard:** `make radar-dashboard` serves exact-current
-  operator artifacts read-only on `127.0.0.1:8765`; `make
+  operator artifacts read-only on `127.0.0.1:8765`. Current content requires
+  complete v1 file/tree/canonical-run fingerprints plus a fresh immutable run
+  and fresh full strict doctor for the exact revision; untrusted current data is
+  suppressed, and the smoke fails rather than rendering a false green. `make
   radar-dashboard-smoke` renders all fixture pages without starting a server,
   calling providers, sending, or writing artifacts.
 - **Unified calendar no-send preview:** `make radar-calendar-preview` renders

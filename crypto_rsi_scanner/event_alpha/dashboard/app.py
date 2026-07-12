@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Iterable
 from urllib.parse import parse_qs, unquote
@@ -18,9 +19,20 @@ StartResponse = Callable[[str, list[tuple[str, str]]], object]
 class RadarDashboardApp:
     """Small read-only WSGI app backed by exact operator generations."""
 
-    def __init__(self, artifact_base_dir: str | Path, artifact_namespace: str) -> None:
+    def __init__(
+        self,
+        artifact_base_dir: str | Path,
+        artifact_namespace: str,
+        *,
+        now: datetime | str | None = None,
+        max_generation_age_hours: float | None = None,
+        max_doctor_age_hours: float | None = None,
+    ) -> None:
         self.artifact_base_dir = Path(artifact_base_dir).expanduser()
         self.artifact_namespace = str(artifact_namespace)
+        self.now = now
+        self.max_generation_age_hours = max_generation_age_hours
+        self.max_doctor_age_hours = max_doctor_age_hours
 
     def __call__(self, environ: dict[str, object], start_response: StartResponse) -> Iterable[bytes]:
         method = str(environ.get("REQUEST_METHOD") or "GET").upper()
@@ -37,7 +49,13 @@ class RadarDashboardApp:
             )
             return [b"" if method == "HEAD" else body]
         try:
-            snapshot = load_dashboard_snapshot(self.artifact_base_dir, self.artifact_namespace)
+            snapshot = load_dashboard_snapshot(
+                self.artifact_base_dir,
+                self.artifact_namespace,
+                now=self.now,
+                max_generation_age_hours=self.max_generation_age_hours,
+                max_doctor_age_hours=self.max_doctor_age_hours,
+            )
             path = unquote(str(environ.get("PATH_INFO") or "/"))
             query = parse_qs(str(environ.get("QUERY_STRING") or ""), keep_blank_values=True)
             include_diagnostics = str((query.get("include_diagnostics") or [""])[0]).casefold() in {

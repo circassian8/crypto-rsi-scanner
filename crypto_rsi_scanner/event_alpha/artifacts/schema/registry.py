@@ -9,9 +9,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping
-from . import calendar as calendar_specs
-from . import decision_model as decision_model_specs
-from . import provider_lineage_specs
+from . import calendar as calendar_specs, decision_model as decision_model_specs
+from . import operator_state as operator_state_specs, provider_lineage_specs
 EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION = "event_alpha_schema_v1"
 ALLOWED_OPPORTUNITY_TYPES = (
     "EARLY_LONG_RESEARCH",
@@ -847,6 +846,7 @@ def validate_row_against_schema(row: Mapping[str, Any], schema: str | ArtifactSc
     errors.extend(validate_secret_redaction_fields(row, schema_obj))
     if schema_obj.schema_id == "unified_calendar_event_v1":
         errors.extend(calendar_specs.validate_contract(row))
+    if schema_obj.schema_id == "operator_state_v1": errors.extend(operator_state_specs.validate_contract(row))
     if row.get("decision_model_version") not in (None, "") and schema_obj.schema_id in {"core_opportunity_v1", "integrated_radar_candidate_v1", "outcome_row_v1"}:
         errors.extend(decision_model_specs.validate_contract(row))
     return errors

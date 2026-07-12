@@ -227,7 +227,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 46,
+      "max_class_line_count": 62,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 3,
@@ -1450,7 +1450,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 531,
+  "class_count": 534,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1505,12 +1505,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 6497,
+  "function_count": 6562,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-12T06:11:33.484036+00:00",
+  "generated_at": "2026-07-12T07:04:58.406202+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -1700,7 +1700,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 46,
+      "max_class_line_count": 62,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 3,
@@ -3152,7 +3152,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 431,
+  "public_class_count": 432,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -3168,6 +3168,7 @@
     "crypto_rsi_scanner.event_alpha.artifacts.cache": 3,
     "crypto_rsi_scanner.event_alpha.artifacts.context": 1,
     "crypto_rsi_scanner.event_alpha.artifacts.daily_brief.components.models": 1,
+    "crypto_rsi_scanner.event_alpha.artifacts.fingerprints": 1,
     "crypto_rsi_scanner.event_alpha.artifacts.locks": 3,
     "crypto_rsi_scanner.event_alpha.artifacts.operator_state": 1,
     "crypto_rsi_scanner.event_alpha.artifacts.replay": 4,

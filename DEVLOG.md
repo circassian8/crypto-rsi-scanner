@@ -17,6 +17,62 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-12 — Bind dashboard authority to exact artifact evidence · Codex
+**Why:** The first Decision Model v2 dashboard release still trusted paths,
+counts, revision labels, and doctor timestamps without proving that every
+displayed artifact was the exact content inspected by the same strict doctor.
+That left stale-run, file-swap, symlink, duplicate-ledger, malformed-metadata,
+and false-green smoke paths that could overstate current research authority.
+**Changes:**
+- Added the shared fingerprint v1 contract for exact file bytes, JSONL line
+  counts, framed directory trees, and one canonical persisted run-ledger row.
+  Fingerprints reject symlinks, non-regular files, duplicate JSON keys,
+  duplicate exact identities, ambiguous basename fallbacks, non-string or
+  whitespace-normalized identities, partial/deprecated metadata, concurrent
+  tree mutation, non-finite values, and unencodable Unicode with stable
+  payload-free diagnostics.
+- Made operator-state writers fingerprint every real current artifact and mark
+  missing or unverifiable paths explicitly non-current. A full strict doctor
+  verifies every current fingerprint at the exact revision before recording
+  its result. Legacy fingerprintless or valid SHA-only states remain readable
+  through an in-memory stale/non-authoritative view and are never silently
+  upgraded or rewritten.
+- Rebuilt dashboard loading around one-read verified byte buffers, exact
+  canonical run-row verification, a full before/after operator-state digest,
+  a complete known-artifact manifest, immutable run age, fresh exact-revision
+  doctor age, literal typed doctor fields, `OK`/`WARN`, and zero blockers.
+  Failed fingerprints are never parsed. Untrusted generations keep Health and
+  explicitly cumulative feedback/outcome history available with provenance,
+  while current ideas, diagnostics, calendar rows, candidate details, and
+  counts are suppressed. Provider readiness is exact-run authority; cumulative
+  provider health is separately labeled non-authoritative and fail-soft.
+- Made dashboard and cumulative reads descriptor-safe/no-follow, made the
+  fixture smoke clock deterministic, and made smoke fail nonzero whenever the
+  generation is untrusted. Added nested schema checks, 15 direct exploit
+  probes, extensive authority regressions, and explicit CLI report-helper
+  imports so strict-doctor failure paths remain executable.
+- Extracted exact path/fingerprint/legacy-downgrade ownership into the focused
+  `operator_state_fingerprints.py` module. `operator_state.py` is 1,177 lines,
+  and the two incidental report/schema threshold crossings are back below
+  1,200, leaving no new architecture size target gaps.
+**Verify:** 153 focused operator-state, schema, dashboard, namespace-ledger, and
+burn-in tests passed after the final hardening; the full local Event Alpha suite
+passed 846 tests before the final isolated warning-count/Unicode guards, which
+were then covered by the focused rerun. `make radar-dashboard-smoke
+PYTHON=.venv/bin/python` rendered 8 authoritative exact-generation pages. The
+integrated radar outcome smoke produced 11 candidates, 9 canonical core rows
+and cards, 101 schema-valid doctor rows, zero blockers, one expected fixture
+provider warning, and zero sends/trades/paper/RSI/triggered-fade writes.
+`python -m compileall -q crypto_rsi_scanner tests` and `git diff --check`
+passed; `make architecture-cleanliness-check PYTHON=.venv/bin/python` passed
+with zero new size violations and zero unresolved 1,200-line target gaps.
+GitHub Actions was not polled or awaited.
+**Notes/risks:** The authority layer is now exact, but the overnight outcome
+audit proved that synthetic fixtures, immature horizons, and broad identity
+joins are not calibration truth. Next work is safe calendar-normalization
+telemetry followed by a fail-closed real/provenance-complete outcome eligibility
+firewall and exact feedback joins.
+
 ## 2026-07-12 — Fail closed on Decision Model v2 evidence integrity · Codex
 **Why:** An adversarial post-release audit found a cluster of ways the research
 surface could overstate certainty: final reevaluation could forget provider
