@@ -4,17 +4,25 @@ from __future__ import annotations
 
 import copy
 import hashlib
+from http.client import HTTPConnection
 import json
+import socket
 import shutil
 from dataclasses import replace
 from pathlib import Path
+from threading import Event, Thread
+from wsgiref.simple_server import WSGIRequestHandler
 
 import pytest
 
 from crypto_rsi_scanner.event_alpha.artifacts import fingerprints, operator_state
 from crypto_rsi_scanner.event_alpha.dashboard import loader as dashboard_loader
 from crypto_rsi_scanner.event_alpha.dashboard.__main__ import _smoke
-from crypto_rsi_scanner.event_alpha.dashboard.app import RadarDashboardApp, serve_dashboard
+from crypto_rsi_scanner.event_alpha.dashboard.app import (
+    RadarDashboardApp,
+    _make_dashboard_server,
+    serve_dashboard,
+)
 from crypto_rsi_scanner.event_alpha.dashboard.loader import _dashboard_decision_row, load_dashboard_snapshot
 from crypto_rsi_scanner.event_alpha.dashboard.models import DashboardLoadError
 from crypto_rsi_scanner.event_alpha.dashboard.render import (
@@ -897,3 +905,46 @@ def test_dashboard_never_turns_unsafe_source_url_into_a_link():
 def test_dashboard_refuses_non_loopback_bind():
     with pytest.raises(ValueError, match="loopback"):
         serve_dashboard(_FIXTURE_BASE, _FIXTURE_NAMESPACE, host="0.0.0.0")
+
+
+def test_dashboard_server_serves_while_another_client_stalls():
+    class ObservedRequestHandler(WSGIRequestHandler):
+        entered = Event()
+
+        def handle(self) -> None:
+            self.entered.set()
+            super().handle()
+
+    fixture_hashes_before = _fixture_hashes()
+    app = RadarDashboardApp(_FIXTURE_BASE, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    server = _make_dashboard_server(
+        "127.0.0.1",
+        0,
+        app,
+        handler_class=ObservedRequestHandler,
+    )
+    server_thread = Thread(target=server.serve_forever, daemon=True)
+    stalled_client = None
+    healthy_client = None
+    try:
+        server_thread.start()
+        stalled_client = socket.create_connection(server.server_address, timeout=2.0)
+        stalled_client.sendall(b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n")
+        assert ObservedRequestHandler.entered.wait(timeout=2.0)
+
+        healthy_client = HTTPConnection(*server.server_address, timeout=2.0)
+        healthy_client.request("GET", "/")
+        response = healthy_client.getresponse()
+
+        assert response.status == 200
+        assert response.getheader("Cache-Control") == "no-store"
+        assert b"Crypto Radar" in response.read()
+    finally:
+        if healthy_client is not None:
+            healthy_client.close()
+        if stalled_client is not None:
+            stalled_client.close()
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=2.0)
+    assert _fixture_hashes() == fixture_hashes_before

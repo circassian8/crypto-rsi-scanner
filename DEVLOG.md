@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-13 — Keep the local dashboard responsive to stalled clients · Codex
+**Why:** The in-app browser opened an incomplete loopback HTTP connection, and
+the default single-threaded `wsgiref` server blocked in request-line reading so
+the dashboard stopped answering every later request even though its process was
+still listening.
+**Changes:**
+- Added a loopback threaded WSGI server and one production server factory in
+  `event_alpha/dashboard/app.py`. Daemon request threads prevent an incomplete
+  client from monopolizing the dashboard while preserving GET/HEAD-only,
+  read-only, exact-generation behavior.
+- Added a deterministic real-socket regression that waits until a partial
+  request is parked, proves a concurrent GET returns the dashboard, and verifies
+  the checked-in dashboard fixture tree remains byte-identical.
+- Regenerated the offline integrated-radar fixture after its six-hour authority
+  window elapsed, reran its strict doctor with zero blockers, republished its
+  exact pointer, and started the dashboard as transient launchd job
+  `com.nasrenkaraf.crypto-radar-dashboard`. The page remains explicitly labeled
+  fixture, no-send, and burn-in-excluded; no live provider was authorized.
+**Verify:** The focused stalled-client/non-loopback tests passed (2 tests), the
+complete dashboard module passed (65 tests), compileall passed, and
+`make radar-dashboard-smoke PYTHON=.venv/bin/python` rendered eight pages with
+zero writes. `make event-alpha-integrated-radar-smoke PYTHON=.venv/bin/python`
+rebuilt 15 candidates, 12 Core rows/cards, and 15 outcomes; strict doctor had
+zero blockers and readiness republished the exact fixture pointer. Against the
+actual launchd server, one incomplete socket remained open while a second GET
+returned HTTP 200, 11,049 bytes, and `Cache-Control: no-store`.
+**Notes/risks:** The live market generation remains blocked on owner-set
+`RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1`; this fix did not enable providers, sends,
+trades, paper trades, normal RSI writes, or `TRIGGERED_FADE`. Stop the transient
+dashboard with `launchctl remove com.nasrenkaraf.crypto-radar-dashboard`.
+
 ## 2026-07-13 — Deliver Crypto Decision Radar Live Pilot v1 · Codex
 **Why:** Decision Model v2 was fixture-proven, but a real no-send pilot still
 needed closed market provenance, honest proxy/temporal quality limits, a rolling

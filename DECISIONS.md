@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-13 - The local dashboard must tolerate stalled loopback clients
+**Status:** accepted
+**Decision:** The Crypto Radar dashboard remains loopback-only, GET/HEAD-only,
+read-only, and bound to one exact authoritative generation, but its WSGI serving
+layer must handle client connections concurrently. One local client that opens
+a socket without completing an HTTP request may occupy only its daemon request
+thread and must not prevent another complete request from receiving the current
+dashboard. A real-socket regression must park the incomplete request before
+proving the second request succeeds and must verify dashboard fixture bytes are
+unchanged.
+**Why:** The stdlib reference server's single-threaded default blocked inside
+`rfile.readline()` when the in-app browser left an incomplete connection open,
+making the healthy dashboard appear offline to every later request. Concurrency
+fixes availability without weakening freshness, pointer, schema, path, provider,
+write, send, or trading guards.
+**Revisit when:** The local dashboard moves to another loopback HTTP server with
+equivalent or stronger stalled-client isolation and the same read-only and exact-
+authority contracts.
+
 ## 2026-07-13 - Count market-pilot truth only from canonical provenance and bounded temporal evidence
 **Status:** accepted
 **Decision:** New Decision Radar market-led generations use the closed

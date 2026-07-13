@@ -149,7 +149,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   and never guess the newest directory. Pointer-mode serving is bound to the
   exact run/revision/operator-state hash and fails closed if it drifts. `make
   radar-dashboard-smoke` renders all fixture pages without starting a server,
-  calling providers, sending, or writing artifacts.
+  calling providers, sending, or writing artifacts. The loopback WSGI serving
+  layer handles clients concurrently so one incomplete local connection cannot
+  block every later GET/HEAD request.
 - **Decision Radar market pilot:** `make radar-market-no-send-readiness` is
   read-only/no-network and reports explicit CoinGecko authorization, bounded
   universe, rolling-baseline warmup, spread limits, artifacts, and the next

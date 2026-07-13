@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from socketserver import ThreadingMixIn
 from typing import Callable, Iterable
 from urllib.parse import parse_qs, unquote
-from wsgiref.simple_server import make_server
+from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
 from .loader import load_dashboard_snapshot
 from .models import DashboardGenerationBinding, DashboardLoadError, DashboardSnapshot
@@ -14,6 +15,14 @@ from .render import render_dashboard_page
 
 
 StartResponse = Callable[[str, list[tuple[str, str]]], object]
+
+
+class _ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
+    """Loopback WSGI server that cannot be monopolized by one stalled client."""
+
+    daemon_threads = True
+    block_on_close = False
+    allow_reuse_address = True
 
 
 class RadarDashboardApp:
@@ -143,10 +152,26 @@ def serve_dashboard(
         artifact_namespace,
         generation_binding=generation_binding,
     )
-    with make_server(host, int(port), app) as server:
+    with _make_dashboard_server(host, int(port), app) as server:
         print(f"Crypto Radar dashboard: http://{host}:{int(port)}/")
         print(f"Artifact namespace: {artifact_namespace} (read-only)")
         server.serve_forever()
+
+
+def _make_dashboard_server(
+    host: str,
+    port: int,
+    app: RadarDashboardApp,
+    *,
+    handler_class: type[WSGIRequestHandler] = WSGIRequestHandler,
+) -> WSGIServer:
+    return make_server(
+        host,
+        int(port),
+        app,
+        server_class=_ThreadingWSGIServer,
+        handler_class=handler_class,
+    )
 
 
 def _escape_text(value: str) -> str:
