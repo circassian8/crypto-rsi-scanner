@@ -159,7 +159,15 @@ class _DoctorResultIntegratedRadarFields:
     integrated_candidate_core_scheduled_event_loss: int = 0
     integrated_candidate_core_unlock_event_loss: int = 0
     integrated_candidate_core_derivatives_loss: int = 0
+    integrated_candidate_core_decision_context_mismatch: int = 0
+    integrated_candidate_core_decision_score_mismatch: int = 0
+    integrated_dashboard_decision_authority_invalid: int = 0
+    integrated_candidate_expired_actionable: int = 0
+    integrated_core_expired_actionable: int = 0
+    integrated_preview_expired_actionable: int = 0
+    integrated_dashboard_expired_actionable: int = 0
     integrated_candidate_card_opportunity_type_mismatch: int = 0
+    integrated_candidate_card_decision_mismatch: int = 0
     integrated_candidate_card_why_now_mismatch: int = 0
     integrated_major_pair_card_early_long: int = 0
     integrated_card_generic_lane_override: int = 0
@@ -218,6 +226,7 @@ class _DoctorResultIntegratedOutcomeFields:
     integrated_outcome_ambiguous_exact_identity: int = 0
     integrated_outcome_eligible_provenance_missing: int = 0
     integrated_outcome_identity_mismatch: int = 0
+    integrated_outcome_decision_projection_mismatch: int = 0
     integrated_outcome_card_thesis_interpretation_missing: int = 0
     integrated_outcome_card_trade_wording: int = 0
     integrated_performance_diagnostic_in_main_aggregate: int = 0

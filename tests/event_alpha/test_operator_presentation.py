@@ -45,21 +45,21 @@ def test_integrated_radar_fixture_lane_counts_and_core_types_stay_stable():
 
     assert Counter(row["opportunity_type"] for row in rows) == Counter(
         {
-            "CONFIRMED_LONG_RESEARCH": 2,
+            "CONFIRMED_LONG_RESEARCH": 3,
             "DIAGNOSTIC": 3,
             "EARLY_LONG_RESEARCH": 1,
             "FADE_SHORT_REVIEW": 1,
             "RISK_ONLY": 2,
-            "UNCONFIRMED_RESEARCH": 4,
+            "UNCONFIRMED_RESEARCH": 5,
         }
     )
     assert Counter(row["opportunity_type"] for row in core_rows) == Counter(
         {
-            "CONFIRMED_LONG_RESEARCH": 2,
+            "CONFIRMED_LONG_RESEARCH": 3,
             "EARLY_LONG_RESEARCH": 1,
             "FADE_SHORT_REVIEW": 1,
             "RISK_ONLY": 2,
-            "UNCONFIRMED_RESEARCH": 4,
+            "UNCONFIRMED_RESEARCH": 5,
         }
     )
     by_symbol = {row["symbol"]: row for row in rows}
@@ -154,19 +154,25 @@ def test_market_led_fixture_reaches_existing_operator_surfaces_without_legacy_pr
         flow_card = next(
             path.read_text(encoding="utf-8")
             for path in result.research_card_paths
-            if "# TESTFLOW Event Research Card" in path.read_text(encoding="utf-8")
+            if "# TESTFLOW Crypto Decision Radar Card" in path.read_text(encoding="utf-8")
         )
         for expected in (
+            "## Crypto Decision Radar",
+            "Actionable Market-Led Idea",
             "Opportunity type: UNCONFIRMED_RESEARCH",
             "Radar route: actionable_watch",
             "Radar actionable: true",
-                "Primary / contributing origins: market_led / market_led",
-                "Directional bias: long",
+            "Primary / contributing origins: market_led / market_led",
+            "Directional bias: long",
             "Catalyst status: unknown",
+            "Why now: Fresh market-led evidence shows",
+            "Dashboard: /candidate/",
+            "## Catalyst Radar Classification",
             "Higher manipulation risk:",
             "Research idea, not a trade instruction.",
         ):
             assert expected in flow_card
+        assert "not alertable" not in flow_card.casefold()
 
         preview = result.notification_preview_path.read_text(encoding="utf-8")
         assert "## Lane: Actionable Ideas" in preview

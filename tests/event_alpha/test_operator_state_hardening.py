@@ -7,7 +7,11 @@ from datetime import datetime, timezone
 
 import pytest
 
-from crypto_rsi_scanner.event_alpha.artifacts import fingerprints, operator_state
+from crypto_rsi_scanner.event_alpha.artifacts import (
+    fingerprints,
+    operator_state,
+    operator_state_fingerprints,
+)
 
 
 _NOW = datetime(2026, 7, 12, 12, 0, tzinfo=timezone.utc)
@@ -139,6 +143,23 @@ def test_begin_run_rejects_explicit_non_string_or_empty_identity(tmp_path):
     )
     assert defaulted["profile"] == "default"
     assert defaulted["artifact_namespace"] == "defaulted"
+
+
+def test_portable_path_resolves_bare_relative_artifact_against_namespace(tmp_path):
+    namespace_dir = tmp_path / "alternate_base" / "radar_market_no_send"
+    namespace_dir.mkdir(parents=True)
+    artifact = namespace_dir / "event_core_opportunities.jsonl"
+    artifact.write_text("", encoding="utf-8")
+
+    assert operator_state_fingerprints.portable_path(
+        "event_core_opportunities.jsonl",
+        base=namespace_dir,
+    ) == "event_core_opportunities.jsonl"
+
+    outside = tmp_path / "event_core_opportunities.jsonl"
+    outside.write_text("outside", encoding="utf-8")
+    with pytest.raises(ValueError, match="outside namespace"):
+        operator_state_fingerprints.portable_path(outside, base=namespace_dir)
 
 
 def test_record_doctor_status_rejects_coerced_or_negative_integer_inputs(tmp_path):

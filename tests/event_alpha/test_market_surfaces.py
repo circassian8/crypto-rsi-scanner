@@ -1070,7 +1070,7 @@ def test_integrated_radar_fixture_lanes_and_merge():
                 continue
             text = path.read_text(encoding="utf-8")
             for symbol in ("BTC", "TESTFADE", "TESTPERP", "AAVE", "TKND"):
-                if f"# {symbol} Event Research Card" in text:
+                if f"# {symbol} Crypto Decision Radar Card" in text:
                     card_text_by_symbol[symbol] = text
         card_text = "\n".join(card_text_by_symbol.values())
         assert "Opportunity type: UNCONFIRMED_RESEARCH" in card_text
@@ -1112,15 +1112,15 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert "SECTOR/ai_theme DIAGNOSTIC" in daily
         assert "TKNC/token-c DIAGNOSTIC" in daily
         assert f"run_id: {result.run_id}" in daily
-        assert "candidate_events=13" in daily
-        assert "research_candidates=13" in daily
-        assert "current_generation_core_rows=10" in daily
-        assert "current_generation_visible_core_rows=10" in daily
-        assert "cumulative_store_rows=10" in daily
-        assert "- current_core_market_freshness: total=10; statuses=" in daily
-        assert "- current_generation_visible_core_freshness: total=10; statuses=" in daily
+        assert "candidate_events=15" in daily
+        assert "research_candidates=15" in daily
+        assert "current_generation_core_rows=12" in daily
+        assert "current_generation_visible_core_rows=12" in daily
+        assert "cumulative_store_rows=12" in daily
+        assert "- current_core_market_freshness: total=12; statuses=" in daily
+        assert "- current_generation_visible_core_freshness: total=12; statuses=" in daily
         assert "- support_row_market_freshness: total=0; statuses=none" in daily
-        assert "- quality_row_market_freshness: total=13; statuses=" in daily
+        assert "- quality_row_market_freshness: total=15; statuses=" in daily
         assert "- Core opportunities:" not in daily
 
         manifest = json.loads(result.input_manifest_path.read_text(encoding="utf-8"))
@@ -1175,8 +1175,8 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert "Alerts:" not in preview
         assert f"run_id: {result.run_id}" in preview
         assert "Send guard: disabled (no-send rehearsal)" in preview
-        assert "Raw events: 22 · Candidate events: 13 · Research candidates: 13" in preview
-        assert "Source alert snapshots: 0 · Current-generation core rows: 10" in preview
+        assert "Raw events: 25 · Candidate events: 15 · Research candidates: 15" in preview
+        assert "Source alert snapshots: 0 · Current-generation core rows: 12" in preview
         assert "Alertable decisions: 0 · Strict alerts: 0 · Preview-rendered items:" in preview
         assert "Raw source candidates:" not in preview
         assert "/Users/" not in preview

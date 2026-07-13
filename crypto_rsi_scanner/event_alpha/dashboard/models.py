@@ -75,6 +75,18 @@ class DashboardSnapshot:
             or row.get("_dashboard_route") == "diagnostic"
         )
 
+    @property
+    def expired_current_candidates(self) -> tuple[dict[str, Any], ...]:
+        """Canonical ideas suppressed from current actionability at read time."""
+
+        if not self.generation_authoritative:
+            return ()
+        return tuple(
+            row
+            for row in self.current_candidates
+            if row.get("_decision_expired_at_read_time") is True
+        )
+
 
 @dataclass(frozen=True)
 class DashboardGenerationBinding:

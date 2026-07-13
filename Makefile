@@ -88,6 +88,13 @@ RADAR_DASHBOARD_PORT ?= 8765
 RADAR_DASHBOARD_FIXTURE_BASE ?= fixtures/event_alpha/radar_dashboard
 RADAR_DASHBOARD_FIXTURE_NAMESPACE ?= current
 RADAR_DASHBOARD_NAMESPACE_ARG = $(if $(strip $(RADAR_DASHBOARD_EXPLICIT_NAMESPACE)),--namespace $(RADAR_DASHBOARD_EXPLICIT_NAMESPACE),)
+RADAR_MARKET_NO_SEND_NAMESPACE ?= radar_market_no_send
+RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE ?= radar_market_no_send_smoke
+RADAR_MARKET_NO_SEND_TOP_N ?= 30
+RADAR_MARKET_NO_SEND_FETCH_LIMIT ?=
+RADAR_MARKET_NO_SEND_FETCH_ARG = $(if $(strip $(RADAR_MARKET_NO_SEND_FETCH_LIMIT)),--fetch-limit $(RADAR_MARKET_NO_SEND_FETCH_LIMIT),)
+RADAR_MARKET_NO_SEND_PYTHON = $(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON))
+RADAR_MARKET_NO_SEND_MAIN = $(abspath main.py)
 PYTEST_RUNTIME_SECONDS ?=
 STANDALONE_RUNTIME_SECONDS ?=
 COINALYZE_LIVE_PREFLIGHT_ARG = $(if $(filter 1 true yes,$(ALLOW_LIVE_PREFLIGHT)),--event-alpha-coinalyze-allow-live-preflight,)
@@ -178,7 +185,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 
 .PHONY: help check-python bootstrap export-src export-src-with-artifacts verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-catalyst-frame-validation-cycle event-alpha-catalyst-frame-e2e-cycle event-alpha-notify-llm-quality-frame-smoke event-alpha-integrated-radar-smoke event-alpha-integrated-radar-doctor event-alpha-integrated-radar-cycle event-alpha-integrated-radar-fill-outcomes event-alpha-integrated-radar-outcome-smoke event-alpha-integrated-radar-outcome-report event-alpha-integrated-radar-calibration-report event-alpha-integrated-radar-calibration-export-priors event-alpha-market-anomaly-scan event-alpha-market-anomaly-smoke event-alpha-official-exchange-report event-alpha-official-exchange-smoke event-alpha-scheduled-catalyst-report event-alpha-scheduled-catalyst-smoke event-alpha-unlock-risk-smoke event-alpha-derivatives-report event-alpha-derivatives-smoke event-alpha-fade-review-smoke event-alpha-market-refresh-smoke event-alpha-evidence-acquisition-smoke event-alpha-quality-frame-live-smoke event-alpha-frame-quality-loop event-alpha-signal-quality-eval event-alpha-quality-review event-alpha-quality-coverage-report event-alpha-quality-validation-cycle event-alpha-notify-llm-quality-validation-cycle event-alpha-notify-llm-quality-fresh-cycle event-alpha-quality-live-smoke event-alpha-live-burn-in-no-send event-alpha-burn-in-readiness event-alpha-policy-simulate event-alpha-export-signal-quality-cases event-alpha-quality-loop event-alpha-quality-loop-llm event-opportunity-audit event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-cycle-profile event-alpha-cycle-profile-send event-alpha-notify-cycle event-alpha-notify-no-key event-alpha-notify-llm event-alpha-notify-preview event-alpha-notify-go-no-go event-alpha-send-go-no-go event-alpha-telegram-no-send-final-check-fast event-alpha-telegram-no-send-final-check event-alpha-telegram-one-cycle-send-preflight event-alpha-telegram-send-one-cycle event-alpha-telegram-post-send-audit event-alpha-notification-pause event-alpha-telegram-send-readiness-final event-alpha-telegram-final-send-checklist event-alpha-environment-doctor event-alpha-pause-notifications event-alpha-resume-notifications event-alpha-scheduler-status event-alpha-generate-launchd event-alpha-notification-slo-report event-alpha-export-notification-pack event-alpha-notification-checklist event-alpha-send-readiness event-alpha-notification-runs-report event-alpha-notification-inbox event-alpha-notification-deliveries-report event-alpha-notification-retry-failed event-alpha-notify-no-key-scheduled event-alpha-notify-llm-scheduled event-alpha-notify-llm-deep-scheduled event-alpha-notify-llm-quality-scheduled event-alpha-provider-health-report event-alpha-cryptopanic-preflight event-alpha-source-coverage-report event-alpha-provider-health-reset event-alpha-day1-start event-alpha-day1-start-llm event-alpha-notify-fixture-smoke event-alpha-research-review-digest-smoke event-alpha-notify-llm-deep-research-review-no-send-smoke event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal event-alpha-notification-format-smoke event-alpha-notify-llm-deep-no-send-smoke event-alpha-notify-llm-deep-fixture-rehearsal-artifacts event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate event-alpha-notify-llm-deep-real-no-send-rehearsal-with-fixture-candidate event-alpha-notify-llm-deep-real-no-send-rehearsal-fast event-alpha-notify-start-no-key event-alpha-notify-start-llm event-alpha-send-test event-alpha-telegram-recipient-check event-alpha-runs-report event-alpha-status event-alpha-preflight event-alpha-daily-report event-alpha-daily-llm-report event-alpha-daily-send event-alpha-health event-alpha-health-guard event-alpha-doctor-check-registry event-alpha-artifact-doctor event-alpha-v1-readiness event-alpha-tuning-worksheet event-alpha-export-burn-in-pack event-alpha-launchd-template event-alpha-open-items event-alpha-daily-brief event-alpha-prune-artifacts event-alpha-replay event-alpha-priors-shadow-report event-alpha-burn-in-no-key event-alpha-burn-in-llm event-alpha-weekly-review event-alpha-burn-in-scorecard event-alpha-burn-in-checklist event-alpha-feedback-readiness event-feedback-useful event-feedback-junk event-feedback-watch event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-watchlist-monitor event-alpha-router-report event-alpha-missed-report event-alpha-near-miss-report event-alpha-calibration-report event-source-reliability-report event-alpha-calibration-export-priors event-alpha-export-eval-cases event-alpha-explain-last-run event-research-cards event-research-cards-write event-feedback-report event-incidents-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 .PHONY: event-alpha-live-provider-readiness event-alpha-live-provider-readiness-smoke event-alpha-dex-onchain-readiness event-alpha-dex-onchain-readiness-smoke event-alpha-coinalyze-preflight event-alpha-coinalyze-preflight-smoke event-alpha-coinalyze-no-send-rehearsal event-alpha-bybit-announcements-preflight event-alpha-bybit-announcements-preflight-smoke event-alpha-bybit-announcements-no-send-rehearsal event-alpha-tokenomist-preflight event-alpha-messari-unlocks-preflight event-alpha-coinmarketcal-preflight event-alpha-notify-preview-from-artifacts event-alpha-mark-namespace-stale event-alpha-mark-known-stale-namespaces event-alpha-prune-or-archive-stale-namespace event-alpha-shim-report event-alpha-shim-dependency-report event-alpha-old-import-check normalize-export-timestamps export-src-with-artifacts-smoke
-.PHONY: verify-fast test-full test-rsi test-cli test-pytest test-pytest-safe test-pytest-timed test-pytest-durations test-pytest-parallel test-event-alpha architecture-baseline architecture-api-inventory architecture-class-ownership-report architecture-size-baseline-update architecture-size-gates architecture-transitional-file-check architecture-terminology-check architecture-naming-check architecture-final-report architecture-completion-map architecture-cleanliness-check event-alpha-radar-north-star event-alpha-namespace-lifecycle-report event-alpha-list-active-namespaces event-alpha-archive-stale-namespaces radar-dashboard radar-dashboard-readiness radar-dashboard-smoke radar-calendar-preview
+.PHONY: verify-fast test-full test-rsi test-cli test-pytest test-pytest-safe test-pytest-timed test-pytest-durations test-pytest-parallel test-event-alpha architecture-baseline architecture-api-inventory architecture-class-ownership-report architecture-size-baseline-update architecture-size-gates architecture-transitional-file-check architecture-terminology-check architecture-naming-check architecture-final-report architecture-completion-map architecture-cleanliness-check event-alpha-radar-north-star event-alpha-namespace-lifecycle-report event-alpha-list-active-namespaces event-alpha-archive-stale-namespaces radar-dashboard radar-dashboard-readiness radar-dashboard-smoke radar-calendar-preview radar-market-no-send-readiness radar-market-no-send radar-market-no-send-smoke
 .PHONY: event-alpha-burn-in-contract event-alpha-daily-live-no-send-burn-in event-alpha-daily-live-no-send-burn-in-plan event-alpha-daily-live-no-send-burn-in-smoke event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke-doctor event-alpha-daily-burn-in-readiness event-alpha-daily-review-inbox event-alpha-feedback-progress event-alpha-burn-in-weekly-measurement event-alpha-source-yield-report conviction-priors-shadow-report paper-risk-research event-alpha-archive-burn-in-evidence event-feedback-false-positive event-feedback-late event-feedback-source-noise event-feedback-needs-confirmation event-feedback-duplicate event-feedback-promising-source-type
 .PHONY: event-alpha-observed-outcome-preview event-alpha-observed-outcome-stage
 .PHONY: dependency-tools lock-dependencies dependency-lock-check dependency-audit dependency-verify
@@ -247,6 +254,9 @@ help:
 	@echo "  make radar-dashboard              Serve the local read-only Crypto Radar UI"
 	@echo "  make radar-dashboard-readiness ARTIFACT_NAMESPACE=...  Validate and select one authoritative dashboard generation"
 	@echo "  make radar-dashboard-smoke        Render every dashboard page from fixtures, no server/writes"
+	@echo "  make radar-market-no-send-readiness  Check explicit live CoinGecko authorization without a provider call"
+	@echo "  make radar-market-no-send          Build, strict-doctor, and publish one fresh live/no-send market generation"
+	@echo "  make radar-market-no-send-smoke    Prove the market generation offline; never updates the dashboard pointer"
 	@echo "  make radar-calendar-preview       Print the fixture-backed unified calendar, no writes/sends"
 	@echo "  make event-alpha-integrated-radar-smoke  Run fixture integrated radar cycle, cards, preview, doctor; no sends"
 	@echo "  make event-alpha-integrated-radar-doctor  Strictly inspect the integrated radar smoke namespace"
@@ -962,6 +972,72 @@ radar-dashboard-smoke:
 		--artifact-base $(RADAR_DASHBOARD_FIXTURE_BASE) \
 		--namespace $(RADAR_DASHBOARD_FIXTURE_NAMESPACE) \
 		--smoke
+
+radar-market-no-send-readiness:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED=0 \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send readiness \
+		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) \
+		--top-n $(RADAR_MARKET_NO_SEND_TOP_N) $(RADAR_MARKET_NO_SEND_FETCH_ARG)
+
+radar-market-no-send:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED=0 \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send run \
+		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) \
+		--top-n $(RADAR_MARKET_NO_SEND_TOP_N) $(RADAR_MARKET_NO_SEND_FETCH_ARG)
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED=0 \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	sh -c 'cd "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_NAMESPACE)" && exec "$(RADAR_MARKET_NO_SEND_PYTHON)" "$(RADAR_MARKET_NO_SEND_MAIN)" --event-alpha-artifact-doctor \
+		--event-alpha-profile no_key_live \
+		--event-alpha-artifact-namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) \
+		--event-alpha-artifact-doctor-strict'
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send publish \
+		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE)
+
+radar-market-no-send-smoke:
+	rm -rf $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)
+	env $(EVENT_FIXTURE_NOW_ENV) \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED=0 \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send smoke \
+		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		--namespace $(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE) \
+		--top-n 5 --observed-at $(EVENT_FIXTURE_NOW)
+	test -s $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_market_no_send_generation.json
+	test -s $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_market_no_send_market_rows.json
+	test -s $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_integrated_radar_candidates.jsonl
+	grep -q '"data_mode": "mock"' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_market_no_send_generation.json
+	grep -q '"no_send": true' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_market_no_send_generation.json
+	grep -q '"contract_counted_status": "counted"' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_market_no_send_generation.json
+	grep -q '"primary_thesis_origin":"market_led"' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_integrated_radar_candidates.jsonl
+	grep -q '"symbol":"MKTLOW"' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_integrated_radar_candidates.jsonl
+	grep -q '"radar_route":"diagnostic"' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_integrated_radar_candidates.jsonl
+	env $(EVENT_FIXTURE_NOW_ENV) \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	sh -c 'cd "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)" && exec "$(RADAR_MARKET_NO_SEND_PYTHON)" "$(RADAR_MARKET_NO_SEND_MAIN)" --event-alpha-artifact-doctor \
+		--event-alpha-profile fixture \
+		--event-alpha-artifact-namespace $(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE) \
+		--event-alpha-include-test-artifacts \
+		--event-alpha-artifact-doctor-strict'
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.dashboard \
+		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		--namespace $(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE) \
+		--smoke
+	! $(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send publish \
+		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		--namespace $(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE) \
+		--observed-at $(EVENT_FIXTURE_NOW)
 
 radar-calendar-preview:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.radar.calendar

@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-12T17:36:11.371127+00:00`
+- generated_at: `2026-07-13T03:57:41.291428+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -26,8 +26,8 @@ Static source inventory only. This report does not call providers, send Telegram
 - remaining_class_ownership_debt_count: `0`
 - modules_with_multiple_public_classes_count: `0`
 - modules_with_multiple_public_classes_status: `pass`
-- multi_public_class_modules_count: `83`
-- accepted_model_bundles_count: `82`
+- multi_public_class_modules_count: `84`
+- accepted_model_bundles_count: `83`
 - unresolved_multi_class_modules_count: `0`
 - new_violation_count: `0`
 - moved_existing_violation_count: `0`
@@ -105,18 +105,18 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1198 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1189 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1187 |
-| `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py` | 1182 |
+| `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py` | 1187 |
+| `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py` | 1182 |
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
 | `crypto_rsi_scanner/event_alpha/artifacts/operator_state.py` | 1180 |
 | `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 1180 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py` | 1176 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py` | 1176 |
-| `crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py` | 1169 |
+| `crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py` | 1171 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1169 |
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1168 |
-| `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py` | 1160 |
 | `crypto_rsi_scanner/event_alpha/operations/review_inbox.py` | 1156 |
-| `crypto_rsi_scanner/event_alpha/outcomes/feedback_labels.py` | 1138 |
+| `crypto_rsi_scanner/event_alpha/outcomes/feedback_labels.py` | 1139 |
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1136 |
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 1135 |
 | `crypto_rsi_scanner/event_alpha/outcomes/feedback_eligibility.py` | 1120 |
@@ -127,11 +127,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/cli/services/scanner_parts/reports.py` | 1078 |
 | `crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py` | 1078 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1070 |
+| `crypto_rsi_scanner/project_health/radar_north_star.py` | 1065 |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1056 |
 | `crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py` | 1055 |
-| `crypto_rsi_scanner/event_alpha/outcomes/burn_in.py` | 1045 |
-| `crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py` | 1044 |
-| `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py` | 1042 |
+| `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py` | 1047 |
+| `crypto_rsi_scanner/event_alpha/dashboard/render.py` | 1046 |
 
 ## Accepted Production Files Over 1200 Lines
 
@@ -171,7 +171,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_news_providers.py` | 1210 |
 | `tests/event_alpha/test_watchlist_router.py` | 1207 |
 | `tests/event_alpha/test_catalyst_frames.py` | 1127 |
-| `tests/event_alpha/test_decision_model_v2.py` | 1118 |
+| `tests/event_alpha/test_decision_model_v2.py` | 1120 |
 | `tests/event_alpha/test_catalyst_search.py` | 1107 |
 | `tests/event_alpha/test_radar_pipeline.py` | 1088 |
 | `tests/event_alpha/test_fade_validation.py` | 1081 |
@@ -179,7 +179,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_notification_inbox_rehearsals.py` | 1068 |
 | `tests/event_alpha/test_llm_radar.py` | 1040 |
 | `tests/event_alpha/test_quality_feedback.py` | 1040 |
-| `tests/test_indicators.py` | 1022 |
+| `tests/test_indicators.py` | 1025 |
 | `tests/event_alpha/test_discovery_pipeline.py` | 993 |
 | `tests/event_alpha/test_doctor_provider_conflicts.py` | 979 |
 | `tests/event_alpha/test_namespace_integrations.py` | 962 |
@@ -195,7 +195,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_core_reconciliation.py` | 810 |
 | `tests/event_alpha/test_source_coverage_reports.py` | 807 |
 | `tests/event_alpha/test_doctor_reconciliation.py` | 805 |
-| `tests/event_alpha/test_notification_readiness.py` | 797 |
+| `tests/event_alpha/test_operator_presentation.py` | 801 |
 
 ## Files Over 1500 Lines
 

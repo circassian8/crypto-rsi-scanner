@@ -43,15 +43,30 @@ def resolve_namespace_artifact_path(base: Path, raw_path: str) -> Path | None:
 
 
 def portable_path(path: str | Path, *, base: Path) -> str:
-    """Return an exact namespace-relative artifact path or fail closed."""
+    """Return a lexical namespace-relative path; fingerprinting validates it."""
 
     raw = Path(path).expanduser()
-    if not raw.is_absolute():
-        raw = (Path.cwd() / raw).resolve()
-    try:
-        return raw.resolve().relative_to(base.resolve()).as_posix()
-    except (OSError, ValueError) as exc:
-        raise ValueError(f"operator artifact path outside namespace: {raw}") from exc
+    base_lexical = Path(os.path.abspath(os.fspath(base.expanduser())))
+    candidates = (
+        (raw,)
+        if raw.is_absolute()
+        else (Path.cwd() / raw, base_lexical / raw)
+    )
+    valid: list[Path] = []
+    for candidate in candidates:
+        try:
+            lexical = Path(os.path.abspath(os.fspath(candidate.expanduser())))
+            lexical.relative_to(base_lexical)
+        except ValueError:
+            continue
+        valid.append(lexical)
+    if not valid:
+        raise ValueError(f"operator artifact path outside namespace: {raw}")
+    # A repo-relative path already lexically below the namespace wins.  A bare
+    # filename from another cwd falls back to the namespace-relative candidate.
+    # Symlink and target identity checks remain the fingerprint resolver's job,
+    # so unsafe links become explicit missing entries instead of exceptions.
+    return valid[0].relative_to(base_lexical).as_posix()
 
 
 def fingerprinted_artifact_entry(

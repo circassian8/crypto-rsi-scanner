@@ -17,6 +17,65 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-12 — Stabilize the closed Decision Radar v2 authority · Codex
+**Why:** Decision v2 could classify market-led and calendar ideas correctly at
+the raw candidate, but partial downstream re-evaluation lost calendar/RSI
+context, drifted Core/card/outcome values, contradicted actionable ideas with
+legacy Catalyst wording, and did not prove every trader-facing route. The first
+real/no-send generation also needed an explicit, fail-closed publication and
+path-security contract before it could be operated safely.
+**Changes:**
+- Added the idempotent, schema-backed `crypto_radar_decision_projection_v1` as
+  the closed candidate authority. CoreOpportunity, cards, Decision preview,
+  inbox, outcomes, and dashboard now copy that projection; calendar evidence,
+  RSI references, observation/provider lineage, evaluation time, and explicit
+  research-only safety fields survive intact.
+- Added strict cross-artifact doctor checks for candidate/Core route, score,
+  context, card, preview, outcome, and dashboard drift. Current expired ideas
+  are blockers in candidate/Core/preview/dashboard reconciliation; dashboard
+  read-time overlays suppress expired actionability without rewriting the
+  historical canonical projection.
+- Fixed calendar-risk preview preservation and fixture coverage for all eight
+  routes. TESTFLOW stays liquid, unknown-catalyst, market-led, spread-verified,
+  and actionable; TESTFLOWLOW stays suspicious/illiquid and diagnostic.
+  TESTPERP/TESTFADE are explicitly fresh, and a dedicated rapid-anomaly fixture
+  now proves the urgent market-led route.
+- Normalized return values exactly once with per-field unit metadata,
+  plausibility validation, and hard failure for a `10.0` fraction. Cards and
+  previews are Decision Radar-first, show canonical why-now/confirmation/
+  invalidation and dashboard paths, keep strict Catalyst Radar classification
+  secondary, and distinguish unblocked diagnostic controls from hard-blocked
+  diagnostics.
+- Added guarded `radar-market-no-send-readiness`, `radar-market-no-send`, and
+  `radar-market-no-send-smoke` targets. Live CoinGecko acquisition requires the
+  existing explicit authorization, records exact request/cache/no-send
+  provenance, and can publish only a real, fresh, fingerprinted, strict-doctor
+  clean generation. Descriptor-anchored reads/writes now reject namespace
+  symlink/replacement races and leave outside-root files untouched.
+- Updated the Crypto Decision Radar and Event Alpha/Catalyst Radar North Stars,
+  durable decision, roadmap, generated architecture reports, standalone test
+  registration, dashboard badges/filters/detail hierarchy, and architecture
+  helper boundaries without changing legacy Catalyst lanes or historical rows.
+**Verify:** The export parent-symlink regression and both new market artifact
+read/write swap regressions passed first (3 tests). The final focused Decision,
+calendar, dashboard, doctor, operator, unit, and no-send suite passed 209 tests;
+compileall and `git diff --check` passed. Market-anomaly, integrated-radar,
+market-no-send, dashboard, and calendar smokes passed; the strict integrated
+doctor reported zero blockers and zero projection/expiry mismatches. The fresh
+fixture generation has 15 candidates, 12 Core rows/cards, 15 pending outcomes,
+and all eight Decision routes. Architecture cleanliness passed with zero new
+violations. `make verify-fast PYTHON=python3` passed 1,340 tests plus its
+smokes. Final `make verify PYTHON=python3` passed 1,269/1,269 standalone tests,
+1,340 pytest tests, alert rendering, the 33-observation offline backtest, and
+paper scoreboard. GitHub Actions was not polled or awaited.
+**Notes/risks:** Real-market readiness correctly returned blocked because
+`RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1` was not authorized; it attempted no
+provider call. No existing cache had fresh complete market/spread/provenance
+evidence, so the authoritative dashboard pointer remains the verified fixture
+generation until the owner explicitly authorizes a live-safe run. No Telegram
+send, trade, Event Alpha paper trade, normal RSI write, execution, or Event
+Alpha-created `TRIGGERED_FADE` occurred.
+
 ## 2026-07-12 — Productize Crypto Radar Decision Model v2 end to end · Codex
 **Why:** The pure v2 evaluator could recognize a liquid market-led idea, but the
 real integrated fixture did not carry one through cards, preview, dashboard,

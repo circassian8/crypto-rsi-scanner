@@ -78,6 +78,7 @@ class EventAlphaNotificationInboxItem:
     why_still_worth_reviewing: tuple[str, ...] = ()
     radar_what_confirms: tuple[str, ...] = ()
     radar_what_invalidates: tuple[str, ...] = ()
+    decision_projection: dict[str, Any] | None = None
 @dataclass(frozen=True)
 class EventAlphaReviewQueueItem:
     category: str

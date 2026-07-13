@@ -11,6 +11,8 @@ from crypto_rsi_scanner.event_alpha.radar import decision_model
 def _market_led_candidate(**overrides):
     row = {
         "row_type": "event_integrated_radar_candidate",
+        "candidate_id": "decision-model-v2-move",
+        "observed_at": "2026-06-15T16:00:00Z",
         "symbol": "MOVE",
         "coin_id": "move-token",
         "canonical_asset_id": "move-token",

@@ -18,13 +18,15 @@
       "role": "Reports lane/provider/source-pack usefulness, noise, and maturation rates as recommendations-only priors."
     },
     "crypto_radar_decision_model_v2": {
-      "north_star_requirement": "New lowercase radar routes are explicit research-only metadata; they do not replace legacy alert routes or authorize delivery, paper trading, execution, RSI writes, or TRIGGERED_FADE.",
+      "north_star_requirement": "Decision Radar routes are explicit research-only metadata. They are additive to Event Alpha catalyst lanes and never authorize delivery, paper trading, execution, RSI writes, or TRIGGERED_FADE.",
       "primary_artifacts": [
         "event_integrated_radar_candidates.jsonl",
         "event_core_opportunities.jsonl",
+        "event_decision_v2_notification_preview.md",
+        "event_integrated_radar_outcomes.jsonl",
         "event_alpha_operator_state.json"
       ],
-      "role": "Separates thesis origin, directional bias, catalyst status, evidence confidence, timing, tradability, actionability, and risk from legacy opportunity lanes."
+      "role": "Stores one closed trader-facing Decision v2 projection on each integrated candidate and copies it to CoreOpportunity, cards, Decision preview, outcomes, review inbox, and dashboard without partial downstream re-evaluation; operator state stores exact aggregates and artifact fingerprints derived from that authority."
     },
     "derivatives_crowding_layer": {
       "north_star_requirement": "Crowding warnings and fade-review evidence must be derived from deterministic derivatives state rows.",
@@ -79,7 +81,7 @@
         "event_integrated_radar_outcomes.jsonl",
         "event_radar_provider_performance.json"
       ],
-      "role": "Matures rows with future market behavior labels for lane/source/provider usefulness analysis."
+      "role": "Creates one pending row for every current canonical Decision idea, then matures rows with future market behavior labels for route/origin/lane/source/provider usefulness analysis."
     },
     "policy_routing_gates": {
       "north_star_requirement": "No route may bypass research-only/no-send guards, and Event Alpha never writes normal RSI rows or TRIGGERED_FADE.",
@@ -89,13 +91,14 @@
       "role": "Applies quality, freshness, dedupe, source-strength, no-send, and safety blockers before any preview or delivery row."
     },
     "research_cards_notifications": {
-      "north_star_requirement": "Copy must preserve research-only and not-a-trade-signal framing.",
+      "north_star_requirement": "Copy must preserve research-only and human-decision-required framing; notifications route attention and never execution.",
       "primary_artifacts": [
         "research_cards/",
         "event_alpha_daily_brief.md",
+        "event_decision_v2_notification_preview.md",
         "event_alpha_notification_preview.md"
       ],
-      "role": "Produces operator-facing cards, daily brief sections, and guarded/no-send notification previews."
+      "role": "Produces Decision-first operator cards, daily brief sections, and guarded/no-send attention previews while retaining Catalyst Radar classification as a secondary compatibility section."
     },
     "resolver": {
       "north_star_requirement": "Quote assets, simple BTC/ETH pair noise, and SECTOR/theme entities are capped or diagnostic by default.",
@@ -159,6 +162,32 @@
     }
   },
   "decision_model_v2": {
+    "canonical_consistency": {
+      "calendar_risk_without_attached_evidence": "blocker",
+      "candidate_core_route_or_score_drift": "blocker",
+      "card_projection_drift": "blocker",
+      "dashboard_projection_drift": "blocker",
+      "outcome_cohort_drift": "blocker",
+      "preview_lane_drift": "blocker"
+    },
+    "canonical_context": [
+      "calendar event ids, categories, times or windows, time certainty, importance, and resolvable references",
+      "explicit read-only RSI context and artifact references",
+      "observation ids, source/provider lineage, evaluation timestamp, and safety attestations"
+    ],
+    "canonical_projection": {
+      "authority": "decision_model_values(raw_row) stored on the integrated candidate and copied downstream",
+      "idempotent": true,
+      "rendering_re_evaluates": false,
+      "schema_version": "crypto_radar_decision_projection_v1"
+    },
+    "decision_scores": [
+      "actionability_score",
+      "evidence_confidence_score",
+      "risk_score",
+      "urgency_score",
+      "chase_risk_score"
+    ],
     "dimensions": {
       "catalyst_status": [
         "confirmed",
@@ -179,12 +208,40 @@
         "risk",
         "neutral"
       ],
-      "thesis_origin": [
+      "market_phase": [
+        "emerging",
+        "breakout",
+        "acceleration",
+        "active",
+        "extended",
+        "exhaustion",
+        "reversal"
+      ],
+      "legacy_thesis_origin": [
         "market_led",
         "catalyst_led",
         "technical_led",
+        "derivatives_led",
+        "onchain_led",
+        "fundamental_led",
         "macro_led",
         "mixed"
+      ],
+      "primary_and_contributing_thesis_origins": [
+        "market_led",
+        "catalyst_led",
+        "technical_led",
+        "derivatives_led",
+        "onchain_led",
+        "fundamental_led",
+        "macro_led"
+      ],
+      "spread_status": [
+        "verified_good",
+        "verified_acceptable",
+        "verified_wide",
+        "unavailable",
+        "stale"
       ],
       "timing_state": [
         "early",
@@ -214,21 +271,27 @@
       "secret/path/safety failure"
     ],
     "legacy_alert_routes_preserved": true,
+    "legacy_mixed_thesis_origin_is_compatibility_only": true,
     "legacy_opportunity_type_preserved": true,
     "market_led_actionability": {
       "catalyst_required": false,
-      "requires_adequate_liquidity_and_spread": true,
+      "invent_spread": false,
       "requires_canonical_identity": true,
       "requires_fresh_market_snapshot": true,
       "requires_meaningful_volume_anomaly": true,
-      "requires_relative_move_or_stealth_accumulation": true
+      "requires_adequate_liquidity": true,
+      "requires_relative_move_or_stealth_accumulation": true,
+      "requires_verified_good_or_acceptable_spread_for_actionable_or_rapid": true,
+      "unavailable_spread_may_reach_dashboard_watch_only": true
     },
     "old_artifacts_auto_promoted": false,
     "operator_routes": [
+      "dashboard_watch",
       "actionable_watch",
       "high_confidence_watch",
       "rapid_market_anomaly",
       "fade_exhaustion_review",
+      "risk_watch",
       "calendar_risk",
       "diagnostic"
     ],
@@ -238,9 +301,22 @@
       "missing official source or article",
       "missing derivatives",
       "missing optional confirmation"
-    ]
+    ],
+    "timing_contract": {
+      "calendar_alone_creates_directional_bias": false,
+      "preferred_horizon_and_expires_at_are_canonical": true,
+      "scheduled_evidence_may_raise_risk_and_shorten_expiry": true,
+      "stale_or_expired_idea_actionable": false
+    },
+    "unit_contract": {
+      "fraction_0_10_normalized_percent": 10.0,
+      "fraction_10_0": "blocker",
+      "incompatible_mixed_units": "blocker",
+      "per_field_unit_metadata": true,
+      "percent_points_10_0_normalized_percent": 10.0
+    }
   },
-  "generated_at": "2026-07-12T05:04:45.541497+00:00",
+  "generated_at": "2026-07-12T18:45:07+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",
@@ -259,6 +335,44 @@
     "scope": "burn-in only"
   },
   "live_provider_calls_allowed_by_default": false,
+  "market_no_send_generation": {
+    "authorization": "existing explicit RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1 only",
+    "dashboard_pointer_policy": {
+      "fixture_or_mock_generation_eligible": false,
+      "pointer_changes_on_blocked_failed_stale_or_untrusted_generation": false,
+      "required_checks": [
+        "real live-safe data mode",
+        "complete operator state",
+        "valid exact fingerprints",
+        "matching canonical counts",
+        "current run revision and operator-state binding",
+        "fresh full strict doctor with zero blockers"
+      ]
+    },
+    "default_namespace": "radar_market_no_send",
+    "defaults": {
+      "no_normal_rsi_writes": true,
+      "no_paper_trades": true,
+      "no_sends": true,
+      "no_trades": true,
+      "no_triggered_fade": true,
+      "research_only": true
+    },
+    "provider": "coingecko",
+    "provenance_fields": [
+      "data_mode",
+      "provider",
+      "request_or_cache_artifact",
+      "observed_at",
+      "contract_counted",
+      "no_send"
+    ],
+    "targets": [
+      "radar-market-no-send-readiness",
+      "radar-market-no-send",
+      "radar-market-no-send-smoke"
+    ]
+  },
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "opportunity_lanes": {
@@ -561,10 +675,36 @@
     "burn_in_contract_missing": "warning",
     "north_star_document_missing": "warning"
   },
-  "purpose": "Align future Event Alpha work around a measurable crypto market radar and 30-day no-send burn-in contract.",
+  "product_layers": {
+    "catalyst_radar": {
+      "name": "Event Alpha",
+      "owns": [
+        "catalyst discovery",
+        "source-strength classification",
+        "strict catalyst routes",
+        "historical Event Alpha artifacts"
+      ]
+    },
+    "decision_radar": {
+      "name": "Crypto Decision Radar",
+      "owns": [
+        "canonical trader-facing Decision v2 projection",
+        "operator routes",
+        "Decision-first cards and preview",
+        "local read-only dashboard"
+      ],
+      "primary_surface": "dashboard",
+      "notifications_role": "route human attention, never execution"
+    },
+    "relationship": "additive",
+    "unknown_catalyst_policy": "soft explanatory-confidence penalty and risk input, not a universal visibility blocker"
+  },
+  "purpose": "Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.",
   "research_only": true,
   "row_type": "event_alpha_radar_north_star",
   "safety_invariants": {
+    "dashboard_primary_notifications_attention_only": true,
+    "decision_support_requires_human": true,
     "no_api_keys_in_tests": true,
     "no_event_alpha_paper_trading": true,
     "no_event_alpha_rsi_signal_rows": true,
@@ -572,7 +712,9 @@
     "no_execution_order_logic": true,
     "no_live_provider_calls_by_default": true,
     "no_live_trading": true,
+    "no_provider_calls_without_existing_explicit_authorization": true,
     "no_secrets_printed_or_committed": true,
+    "preserve_historical_artifacts_without_silent_reinterpretation": true,
     "research_only": true,
     "telegram_sends_guarded": true,
     "triggered_fade_source_boundary": "event_fade.py + proxy_fade only"

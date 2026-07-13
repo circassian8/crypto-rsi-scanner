@@ -8,9 +8,11 @@ from datetime import datetime, timezone
 from ...outcomes import outcome_eligibility as outcome_eligibility_contract
 from .runtime import *
 from .integrated_radar_checks import (
+    _decision_projection_differences,
     _safe_float,
     _structured_operator_path_conflict_count,
 )
+from ...radar.decision_model_surfaces import decision_model_values
 
 
 _OUTCOME_PROVENANCE_FAILURE_REASONS = frozenset({
@@ -76,6 +78,7 @@ _INTEGRATED_OUTCOME_CONFLICT_KEYS = (
     "integrated_outcome_ambiguous_exact_identity",
     "integrated_outcome_eligible_provenance_missing",
     "integrated_outcome_identity_mismatch",
+    "integrated_outcome_decision_projection_mismatch",
 )
 
 
@@ -236,38 +239,11 @@ def _integrated_outcome_conflicts(
             candidates, outcomes, core_rows, evaluated_at
         )
     )
-    exact_identity_keys: list[str] = []
-    candidate_identity_counts: Counter[str] = Counter()
-    for candidate in candidate_rows:
-        candidate_identity = outcome_eligibility_contract.canonical_outcome_identity(candidate)
-        if outcome_eligibility_contract.canonical_join_identity(candidate) is not None:
-            candidate_identity_counts[
-                outcome_eligibility_contract.canonical_outcome_identity_key(candidate_identity)
-            ] += 1
-    for row in outcome_rows:
-        if not outcome_eligibility_contract.has_outcome_eligibility_marker(row):
-            continue
-        identity = outcome_eligibility_contract.canonical_outcome_identity(row)
-        if outcome_eligibility_contract.canonical_join_identity(row) is None:
-            continue
-        identity_key = outcome_eligibility_contract.canonical_outcome_identity_key(identity)
-        exact_identity_keys.append(identity_key)
-    identity_counts = Counter(exact_identity_keys)
-    out["integrated_outcome_duplicate_exact_identity"] = sum(
-        count - 1 for count in identity_counts.values() if count > 1
+    candidates_by_id, outcome_by_candidate = _integrated_outcome_identity_indexes(
+        candidate_rows,
+        outcome_rows,
+        out,
     )
-    out["integrated_outcome_ambiguous_exact_identity"] = sum(
-        1
-        for row in outcome_rows
-        if outcome_eligibility_contract.has_outcome_eligibility_marker(row)
-        and _outcome_identity_is_ambiguous(row, candidate_identity_counts)
-    )
-    candidates_by_id: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for candidate in candidate_rows:
-        candidate_id = str(candidate.get("candidate_id") or "").strip()
-        if candidate_id:
-            candidates_by_id[candidate_id].append(candidate)
-    outcome_by_candidate = {str(row.get("candidate_id") or ""): row for row in outcome_rows if row.get("candidate_id")}
     for candidate in candidate_rows:
         legacy_diagnostic = (
             str(candidate.get("opportunity_type") or "") == "DIAGNOSTIC"
@@ -363,7 +339,75 @@ def _integrated_outcome_conflicts(
             out["integrated_outcome_return_double_scaled"] += 1
         if str(row.get("outcome_status") or "") == "missing_data" and not row.get("missing_data_reason"):
             out["integrated_outcome_missing_data_unlabeled"] += 1
+        matching_candidates = candidates_by_id.get(str(row.get("candidate_id") or ""), ())
+        if len(matching_candidates) == 1 and decision_model_values(matching_candidates[0]):
+            expected = decision_model_values(matching_candidates[0])
+            cohort_mismatch = (
+                row.get("actionability_score_cohort")
+                != expected.get("actionability_score_cohort")
+                or row.get("evidence_confidence_score_cohort")
+                != _decision_score_cohort(expected.get("evidence_confidence_score"))
+                or row.get("risk_score_cohort")
+                != _decision_score_cohort(expected.get("risk_score"))
+            )
+            if _decision_projection_differences(matching_candidates[0], row) or cohort_mismatch:
+                out["integrated_outcome_decision_projection_mismatch"] += 1
     return out
+
+
+def _integrated_outcome_identity_indexes(
+    candidate_rows: list[dict[str, Any]],
+    outcome_rows: list[dict[str, Any]],
+    out: dict[str, int],
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, dict[str, Any]]]:
+    exact_identity_keys: list[str] = []
+    candidate_identity_counts: Counter[str] = Counter()
+    for candidate in candidate_rows:
+        candidate_identity = outcome_eligibility_contract.canonical_outcome_identity(candidate)
+        if outcome_eligibility_contract.canonical_join_identity(candidate) is not None:
+            candidate_identity_counts[
+                outcome_eligibility_contract.canonical_outcome_identity_key(candidate_identity)
+            ] += 1
+    for row in outcome_rows:
+        if not outcome_eligibility_contract.has_outcome_eligibility_marker(row):
+            continue
+        identity = outcome_eligibility_contract.canonical_outcome_identity(row)
+        if outcome_eligibility_contract.canonical_join_identity(row) is None:
+            continue
+        identity_key = outcome_eligibility_contract.canonical_outcome_identity_key(identity)
+        exact_identity_keys.append(identity_key)
+    identity_counts = Counter(exact_identity_keys)
+    out["integrated_outcome_duplicate_exact_identity"] = sum(
+        count - 1 for count in identity_counts.values() if count > 1
+    )
+    out["integrated_outcome_ambiguous_exact_identity"] = sum(
+        1
+        for row in outcome_rows
+        if outcome_eligibility_contract.has_outcome_eligibility_marker(row)
+        and _outcome_identity_is_ambiguous(row, candidate_identity_counts)
+    )
+    candidates_by_id: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for candidate in candidate_rows:
+        candidate_id = str(candidate.get("candidate_id") or "").strip()
+        if candidate_id:
+            candidates_by_id[candidate_id].append(candidate)
+    outcome_by_candidate = {str(row.get("candidate_id") or ""): row for row in outcome_rows if row.get("candidate_id")}
+    return candidates_by_id, outcome_by_candidate
+
+
+def _decision_score_cohort(value: Any) -> str:
+    number = _safe_float(value)
+    if number is None:
+        return "unknown"
+    if number < 25:
+        return "0_24"
+    if number < 45:
+        return "25_44"
+    if number < 65:
+        return "45_64"
+    if number < 80:
+        return "65_79"
+    return "80_100"
 
 
 def _update_outcome_eligibility_conflicts(

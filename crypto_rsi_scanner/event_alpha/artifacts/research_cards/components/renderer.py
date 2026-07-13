@@ -233,29 +233,53 @@ def _research_card_summary_lines(context: Mapping[str, Any]) -> list[str]:
     summary_identity_lines = [f"- Asset: {symbol}/{coin_id}"]
     if canonical_asset_id:
         summary_identity_lines.append(f"- Canonical asset: {canonical_asset_id}")
-    lines = [
-        f"# {symbol} Event Research Card",
-        "",
-        "Research artifact only. Not a trade signal, paper trade, live RSI signal, or execution.",
-        "Research idea, not a trade instruction.",
-        "",
-        "## Summary",
-        *summary_identity_lines,
-        f"- Event: {event_name}",
-        f"- State / alert tier: {state} / {tier}",
-        f"- Playbook: {playbook}",
-    ]
-    lane_lines = _opportunity_lane_lines(entry, alert)
-    if lane_lines:
-        lines.extend(["", "## Opportunity Lane"])
-        lines.extend(lane_lines)
     decision_values = decision_model_values(alert, _card_components(entry, alert))
-    decision_source = dict(core) if isinstance(core, Mapping) else {}
+    decision_source = dict(alert) if isinstance(alert, Mapping) else {}
+    if isinstance(core, Mapping):
+        decision_source.update(core)
     decision_source.update(decision_values)
     decision_lines = decision_model_markdown_lines(decision_source)
     if decision_lines:
-        lines.extend(["", "## Crypto Radar Decision"])
+        lines = [
+            f"# {symbol} Crypto Decision Radar Card",
+            "",
+            "Research-only decision support. Human decision required.",
+            "Not a trade signal, paper trade, live RSI signal, or execution.",
+            "",
+            "## Crypto Decision Radar",
+            f"- Operator classification: {_decision_operator_classification(decision_values)}",
+            *summary_identity_lines,
+        ]
         lines.extend(decision_lines)
+        lines.extend(
+            [
+                "",
+                "## Catalyst Radar Classification",
+                "- Secondary strict-catalyst classification; it does not override the Decision Radar route above.",
+                f"- Event: {event_name}",
+                f"- Catalyst Radar state / alert tier: {state} / {tier}",
+                f"- Catalyst playbook: {playbook}",
+            ]
+        )
+        lane_lines = _opportunity_lane_lines(entry, alert)
+        lines.extend(lane_lines)
+    else:
+        lines = [
+            f"# {symbol} Event Research Card",
+            "",
+            "Research artifact only. Not a trade signal, paper trade, live RSI signal, or execution.",
+            "Research idea, not a trade instruction.",
+            "",
+            "## Summary",
+            *summary_identity_lines,
+            f"- Event: {event_name}",
+            f"- State / alert tier: {state} / {tier}",
+            f"- Playbook: {playbook}",
+        ]
+        lane_lines = _opportunity_lane_lines(entry, alert)
+        if lane_lines:
+            lines.extend(["", "## Opportunity Lane"])
+            lines.extend(lane_lines)
     analyst_lines = _analyst_summary_lines(entry, alert)
     if analyst_lines:
         lines.extend(["", "## Analyst Summary"])
@@ -285,6 +309,27 @@ def _research_card_summary_lines(context: Mapping[str, Any]) -> list[str]:
         card_path=context["card_path"],
     ))
     return lines
+
+
+def _decision_operator_classification(values: Mapping[str, Any]) -> str:
+    route = str(values.get("radar_route") or "diagnostic")
+    origin = str(
+        values.get("primary_thesis_origin") or values.get("thesis_origin") or ""
+    )
+    if route == "actionable_watch" and origin == "market_led":
+        return "Actionable Market-Led Idea"
+    if route == "diagnostic":
+        blockers = values.get("decision_hard_blockers") or values.get("hard_blockers")
+        return "Blocked Diagnostic" if _list_value(blockers) else "Diagnostic Research Control"
+    return {
+        "high_confidence_watch": "High-Confidence Research Idea",
+        "actionable_watch": "Actionable Research Idea",
+        "rapid_market_anomaly": "Rapid Market Anomaly",
+        "dashboard_watch": "Dashboard Watch",
+        "fade_exhaustion_review": "Fade / Exhaustion Review",
+        "risk_watch": "Risk Watch",
+        "calendar_risk": "Calendar / Scheduled Risk",
+    }.get(route, "Diagnostic Research Control")
 
 
 def _research_card_state(

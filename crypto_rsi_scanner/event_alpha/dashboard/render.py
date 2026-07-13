@@ -142,6 +142,19 @@ def _today(
             ),
         ),
     ]
+    if snapshot.expired_current_candidates:
+        sections.append(
+            _section(
+                "Expired ideas (not currently actionable)",
+                '<p class="scope">Canonical research history is preserved, but these ideas are '
+                "suppressed from current actionability because their recorded expiry is at or before "
+                "the dashboard read time.</p>"
+                + _candidate_table(
+                    snapshot.expired_current_candidates,
+                    query=query,
+                ),
+            )
+        )
     if include_diagnostics:
         sections.append(
             _section(
@@ -422,6 +435,7 @@ def _candidate_detail(
     )
     if row is None or (
         not include_diagnostics
+        and row.get("_decision_expired_at_read_time") is not True
         and (
             row.get("_decision_model_status") != "v2"
             or row.get("_dashboard_route") == "diagnostic"
@@ -437,6 +451,17 @@ def _candidate_detail(
             ("ID", candidate_identifier(row)),
             ("Asset", f"{row.get('symbol') or 'unknown'} / {row.get('coin_id') or 'unknown'}"),
             ("Research route", row.get("_dashboard_route") or "diagnostic"),
+            ("Canonical route", row.get("radar_route") or "diagnostic"),
+            (
+                "Current actionability",
+                "suppressed: expired at dashboard read time"
+                if row.get("_decision_expired_at_read_time") is True
+                else str(bool(row.get("radar_actionable"))).lower(),
+            ),
+            (
+                "Read-time safety reason",
+                row.get("_decision_read_time_reason") or "none",
+            ),
             ("Legacy opportunity type", row.get("opportunity_type") or "unknown"),
             ("Primary thesis origin", row.get("primary_thesis_origin") or row.get("thesis_origin") or "unclassified"),
             ("Thesis origins", _origin_display(row)),
@@ -548,6 +573,10 @@ def _candidate_table(
         seen.add(identifier)
         link = f'<a href="/candidate/{quote(identifier, safe="")}">{_h(row.get("symbol") or identifier)}</a>'
         warning = "Catalyst unknown" if row.get("catalyst_status") == "unknown" else ""
+        if row.get("_decision_expired_at_read_time") is True:
+            warning = (
+                (warning + "; ") if warning else ""
+            ) + "Expired; current actionability suppressed"
         if _higher_manipulation_risk(row):
             warning = (warning + "; " if warning else "") + "Higher manipulation/tradability risk"
         body_rows.append(
@@ -809,6 +838,7 @@ def _layout(snapshot: DashboardSnapshot, title: str, body: str) -> str:
         f"Current generation: {_h(snapshot.run_id)} · revision {snapshot.revision} · "
         f"current candidates {current_count} · cumulative core history {cumulative_count}"
     )
+    badges = _generation_badges(snapshot)
     authority_banner = ""
     if not snapshot.generation_authoritative:
         reasons = "".join(f"<li>{_h(reason)}</li>" for reason in snapshot.generation_authority_reasons)
@@ -824,6 +854,7 @@ def _layout(snapshot: DashboardSnapshot, title: str, body: str) -> str:
 *{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}}
 header,main{{max-width:1280px;margin:auto;padding:18px}}nav{{display:flex;gap:14px;flex-wrap:wrap}}a{{color:var(--accent)}}
 .banner,.scope,.authority-untrusted,section{{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:14px 0}}
+.badge{{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 8px;margin:0 5px 4px 0;font-size:.86em}}.badge-current{{border-color:#22c55e;color:#bbf7d0}}.badge-live{{border-color:#38bdf8;color:#bae6fd}}.badge-fixture{{border-color:#a78bfa;color:#ddd6fe}}.badge-stale{{border-color:var(--danger);color:#fecaca}}
 .banner{{border-color:#725b16;color:#fde68a}}.muted{{color:var(--muted)}}table{{width:100%;border-collapse:collapse;overflow:auto}}
 .authority-untrusted{{border:3px solid var(--danger);color:#fecaca;background:#3f1219}}.authority-untrusted strong{{font-size:1.08em}}
 .candidate-filters{{display:flex;gap:10px;flex-wrap:wrap;align-items:end;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:14px 0}}
@@ -835,8 +866,64 @@ code{{color:#bae6fd}}@media(max-width:760px){{table{{display:block;overflow-x:au
 </style></head><body><header><h1>Crypto Radar</h1><nav>{nav}</nav></header><main>
 <div class="banner"><strong>Research idea, not a trade instruction.</strong> No execution, Event Alpha paper trading, normal RSI writes, or Event Alpha <code>TRIGGERED_FADE</code> creation.</div>
 {authority_banner}
-<div class="scope">{scope}<br>Doctor: {_h(snapshot.doctor_status)} at revision {_h(snapshot.doctor_verified_revision if snapshot.doctor_verified_revision is not None else 'not verified')}</div>
+<div class="scope">{badges}<br>{scope}<br>Doctor: {_h(snapshot.doctor_status)} at revision {_h(snapshot.doctor_verified_revision if snapshot.doctor_verified_revision is not None else 'not verified')}</div>
 <h2>{_h(title)}</h2>{body}</main></body></html>"""
+
+
+def _generation_badges(snapshot: DashboardSnapshot) -> str:
+    state = snapshot.operator_state
+    provenance = state.get("market_no_send_provenance")
+    if not isinstance(provenance, Mapping):
+        provenance = state.get("market_data_provenance")
+    if not isinstance(provenance, Mapping):
+        provenance = {}
+    data_mode = str(
+        provenance.get("data_mode")
+        or state.get("data_mode")
+        or next(
+            (
+                row.get("data_mode")
+                or (
+                    row.get("decision_projection", {}).get("source_provider_lineage", {}).get("data_mode")
+                    if isinstance(row.get("decision_projection"), Mapping)
+                    and isinstance(row.get("decision_projection", {}).get("source_provider_lineage"), Mapping)
+                    else None
+                )
+                for row in snapshot.current_candidates
+                if isinstance(row, Mapping)
+                and (
+                    row.get("data_mode")
+                    or isinstance(row.get("decision_projection"), Mapping)
+                )
+            ),
+            None,
+        )
+        or state.get("run_mode")
+        or "unknown"
+    ).strip().casefold()
+    stale = any(
+        "stale" in str(reason).casefold() or "age" in str(reason).casefold()
+        for reason in snapshot.generation_authority_reasons
+    )
+    status_label = "STALE" if stale else (
+        "CURRENT" if snapshot.generation_authoritative else "UNTRUSTED"
+    )
+    status_class = "stale" if stale or not snapshot.generation_authoritative else "current"
+    is_live = data_mode.startswith(("live", "real")) or data_mode == "market_no_send"
+    mode_label = "LIVE / REAL DATA" if is_live else (
+        "FIXTURE" if "fixture" in data_mode or "mock" in data_mode else data_mode.upper()
+    )
+    mode_class = "live" if is_live else "fixture"
+    no_send = state.get("send_attempted") is False
+    values = (
+        (status_label, status_class),
+        (mode_label or "UNKNOWN MODE", mode_class),
+        ("NO-SEND" if no_send else "SEND STATE UNKNOWN", "current" if no_send else "stale"),
+    )
+    return "".join(
+        f'<span class="badge badge-{_h(css)}">{_h(label)}</span>'
+        for label, css in values
+    )
 
 
 def _standalone_error(title: str, detail: str) -> str:

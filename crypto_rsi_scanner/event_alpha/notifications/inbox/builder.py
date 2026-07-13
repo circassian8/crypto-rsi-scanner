@@ -769,6 +769,7 @@ def _inbox_decision_fields(*rows: Mapping[str, Any]) -> dict[str, Any]:
     if not values:
         return {}
     return {
+        "decision_projection": dict(values),
         "decision_model_version": str(values.get("decision_model_version") or ""),
         "decision_model_enabled": bool(values.get("decision_model_enabled", True)),
         "thesis_origin": str(values.get("thesis_origin") or ""),

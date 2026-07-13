@@ -148,6 +148,7 @@ def schema_specs(
                 "event_time",
                 "watchlist_last_seen_at",
                 "scheduled_at",
+                "decision_evaluated_at",
             ),
             lineage=common_lineage,
         )

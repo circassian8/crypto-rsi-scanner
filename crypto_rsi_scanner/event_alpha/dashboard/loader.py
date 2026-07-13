@@ -21,15 +21,14 @@ from ... import config
 from ..artifacts import fingerprints as event_alpha_fingerprints
 from ..artifacts import operator_state as event_alpha_operator_state
 from ..artifacts import schema_v1
-from ..artifacts.schema import decision_model as decision_model_schema
 from ..radar.calendar import CalendarValidationError, UnifiedCalendarEvent
 from ..radar.decision_model import DECISION_MODEL_VERSION
+from ..radar.decision_model_surfaces import decision_model_values
 from .models import DashboardLoadError, DashboardSnapshot
 
 
 _NAMESPACE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 SUPPORTED_DECISION_MODEL_VERSION = DECISION_MODEL_VERSION
-_ROUTE_FIELDS = ("radar_route", "decision_route", "actionability_route", "research_route")
 _ROUTES = {
     "dashboard_watch",
     "actionable_watch",
@@ -181,6 +180,7 @@ def _load_once(
         run_id=run_id,
         profile=profile,
         namespace=namespace,
+        read_at=now,
         authority_reasons=authority_reasons,
     )
     expected_core_count = _expected_current_core_count(state)
@@ -636,6 +636,7 @@ def _current_core_rows(
     run_id: str,
     profile: str,
     namespace: str,
+    read_at: datetime,
     authority_reasons: list[str],
 ) -> tuple[dict[str, Any], ...]:
     if blob is None:
@@ -654,7 +655,7 @@ def _current_core_rows(
         if schema_v1.validate_row_against_schema(row, "core_opportunity_v1"):
             authority_reasons.append("core_opportunities:schema_validation_failed")
             continue
-        current.append(_dashboard_decision_row(row))
+        current.append(_dashboard_decision_row(row, read_at=read_at))
     return tuple(current)
 
 
@@ -780,21 +781,49 @@ def _matches_generation(
     )
 
 
-def _dashboard_decision_row(row: Mapping[str, Any]) -> dict[str, Any]:
+def _dashboard_decision_row(
+    row: Mapping[str, Any],
+    *,
+    read_at: datetime | str | None = None,
+) -> dict[str, Any]:
+    """Build a read-only dashboard view over the stored canonical projection.
+
+    Expiry is a read-time safety overlay only.  The canonical route and
+    ``radar_actionable`` value remain untouched so historical artifacts are not
+    silently reinterpreted, while the dashboard's effective route fails closed.
+    """
+
     out = dict(row)
-    route = next(
-        (str(row.get(field) or "").strip().casefold() for field in _ROUTE_FIELDS if row.get(field)),
-        "",
-    )
-    complete = (
-        str(row.get("decision_model_version") or "").strip() == SUPPORTED_DECISION_MODEL_VERSION
-        and row.get("decision_model_enabled") is True
-        and not decision_model_schema.validate_contract(row)
+    projection = decision_model_values(row)
+    if projection:
+        out.update(projection)
+    route = str(projection.get("radar_route") or "").strip().casefold()
+    complete = bool(projection) and (
+        str(projection.get("decision_model_version") or "").strip()
+        == SUPPORTED_DECISION_MODEL_VERSION
     )
     if route not in _ROUTES:
         complete = False
     out["_decision_model_status"] = "v2" if complete else "legacy_unclassified"
     out["_dashboard_route"] = route if complete else "diagnostic"
+    checked_at = _strict_timestamp(read_at)
+    expiry = _strict_timestamp(projection.get("expires_at")) if projection else None
+    expired = bool(
+        complete
+        and projection.get("radar_actionable") is True
+        and checked_at is not None
+        and expiry is not None
+        and expiry <= checked_at
+    )
+    out["_decision_expired_at_read_time"] = expired
+    out["_decision_read_time_checked_at"] = (
+        checked_at.isoformat() if checked_at is not None else None
+    )
+    out["_decision_read_time_reason"] = (
+        "canonical_expiry_at_or_before_dashboard_read_time" if expired else None
+    )
+    if expired:
+        out["_dashboard_route"] = "diagnostic"
     return out
 
 

@@ -16,6 +16,12 @@ RETURN_UNIT_FRACTION = "fraction"
 RETURN_UNIT_PERCENT_POINTS = "percent_points"
 RETURN_UNIT_UNKNOWN = "unknown"
 
+RETURN_UNIT_METADATA_KEYS = (
+    "return_units",
+    "return_unit_by_field",
+    "field_return_units",
+)
+
 RETURN_KEYS = (
     "return_5m",
     "return_15m",
@@ -76,6 +82,28 @@ def infer_return_unit(
     return _clean_unit(default)
 
 
+def return_unit_for_field(
+    row: Mapping[str, Any] | None,
+    field: str,
+    *,
+    default: str = RETURN_UNIT_FRACTION,
+) -> str:
+    """Return the declared unit for one return field.
+
+    A field-level declaration wins over the snapshot-wide declaration.  The
+    helper deliberately does not infer from the numeric value once explicit
+    metadata exists, so a value such as ``10.0`` declared as a fraction stays
+    invalid instead of being silently reinterpreted as ten percentage points.
+    """
+
+    if not isinstance(row, Mapping):
+        return _clean_unit(default)
+    overrides = _return_unit_overrides(row)
+    if overrides is not None and field in overrides:
+        return _clean_unit(overrides.get(field))
+    return infer_return_unit(row, default=default, keys=(field,))
+
+
 def normalize_return_fraction(value: object, unit_hint: str | None = None) -> float | None:
     """Return a fractional value where ``0.012`` means ``+1.2%``."""
     parsed = _float(value)
@@ -116,15 +144,40 @@ def validate_market_snapshot_units(
     unit = infer_return_unit(snapshot, default=RETURN_UNIT_PERCENT_POINTS)
     if not snapshot.get("return_unit"):
         warnings.append("return_unit_missing")
+    overrides = _return_unit_overrides(snapshot)
+    if overrides is None and any(key in snapshot for key in RETURN_UNIT_METADATA_KEYS):
+        warnings.append("invalid_return_unit_metadata")
+        overrides = {}
+    for key in overrides or {}:
+        if str(key) not in RETURN_KEYS:
+            warnings.append(f"unknown_return_unit_field:{key}")
+    for key in RETURN_KEYS:
+        if key not in snapshot or snapshot.get(key) in (None, ""):
+            continue
+        parsed = _float(snapshot.get(key))
+        field_unit = return_unit_for_field(snapshot, key, default=unit)
+        if parsed is None:
+            warnings.append(f"invalid_return_value:{key}")
+            continue
+        if field_unit == RETURN_UNIT_UNKNOWN:
+            warnings.append(f"return_unit_missing:{key}")
+            continue
+        if field_unit == RETURN_UNIT_FRACTION and abs(parsed) > 3.0:
+            warnings.append(f"implausible_fraction_return:{key}")
+            continue
+        normalized = normalize_return_percent_points(parsed, field_unit)
+        if normalized is not None and abs(normalized) > 300.0:
+            warnings.append(f"implausible_normalized_return:{key}")
     if isinstance(reference_snapshot, Mapping):
         compared_keys = ("return_1h", "return_4h", "return_24h")
-        ref_unit = infer_return_unit(
-            reference_snapshot,
-            default=RETURN_UNIT_FRACTION,
-            keys=compared_keys,
-        )
         for key in compared_keys:
-            actual = normalize_return_percent_points(snapshot.get(key), unit)
+            actual_unit = return_unit_for_field(snapshot, key, default=unit)
+            ref_unit = return_unit_for_field(
+                reference_snapshot,
+                key,
+                default=RETURN_UNIT_FRACTION,
+            )
+            actual = normalize_return_percent_points(snapshot.get(key), actual_unit)
             expected = normalize_return_percent_points(reference_snapshot.get(key), ref_unit)
             if actual is None or expected is None:
                 continue
@@ -137,6 +190,15 @@ def validate_market_snapshot_units(
         if actual is not None and abs(actual) > threshold:
             warnings.append(f"{key}_extreme_without_unit_context")
     return tuple(dict.fromkeys(warnings))
+
+
+def _return_unit_overrides(row: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    for key in RETURN_UNIT_METADATA_KEYS:
+        if key not in row:
+            continue
+        value = row.get(key)
+        return value if isinstance(value, Mapping) else None
+    return {}
 
 
 def _clean_unit(value: object) -> str:

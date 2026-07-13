@@ -547,6 +547,11 @@ def _attach_artifact_conflict_context(ctx: SimpleNamespace) -> None:
         delivery_path=integrated_delivery_path,
         outcome_path=integrated_outcomes_path,
         preview_path=preview_path,
+        decision_preview_path=(
+            operator_dir / event_integrated_radar.DECISION_V2_PREVIEW_FILENAME
+            if operator_dir is not None
+            else None
+        ),
     )
     _attach_outcome_evidence_jsonl_diagnostics(ctx)
     namespace_status = event_alpha_namespace_status.load_namespace_status(namespace_dir)

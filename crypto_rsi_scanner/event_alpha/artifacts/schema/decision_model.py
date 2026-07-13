@@ -9,6 +9,7 @@ from typing import Any
 
 
 DECISION_MODEL_VERSION = "crypto_radar_decision_model_v2"
+DECISION_PROJECTION_SCHEMA_VERSION = "crypto_radar_decision_projection_v1"
 ALLOWED_THESIS_ORIGINS = (
     "market_led", "catalyst_led", "technical_led", "derivatives_led", "onchain_led",
     "fundamental_led", "macro_led", "mixed",
@@ -44,6 +45,11 @@ FIELDS = (
     "actionability_score_cohort", "anomaly_type",
     "decision_source_side_effect_safety_failed", "decision_source_secret_safety_failed",
     "decision_source_path_safety_failed",
+    "decision_projection_schema_version", "hard_blockers", "soft_penalties", "warnings",
+    "why_now", "supporting_facts", "missing_information", "main_risks",
+    "what_confirms", "what_invalidates", "calendar_evidence", "calendar_evidence_ids",
+    "rsi_context", "rsi_context_references", "observation_ids", "source_provider_lineage",
+    "decision_evaluated_at", "decision_safety_invariants", "decision_projection",
 )
 TYPES = {
     "decision_model_version": "str", "decision_model_enabled": "bool",
@@ -65,6 +71,15 @@ TYPES = {
     "decision_source_side_effect_safety_failed": "bool",
     "decision_source_secret_safety_failed": "bool",
     "decision_source_path_safety_failed": "bool",
+    "decision_projection_schema_version": "str",
+    "hard_blockers": "list", "soft_penalties": "list", "warnings": "list",
+    "why_now": "str", "supporting_facts": "list", "missing_information": "list",
+    "main_risks": "list", "what_confirms": "list", "what_invalidates": "list",
+    "calendar_evidence": "list", "calendar_evidence_ids": "list", "rsi_context": "dict",
+    "rsi_context_references": "list", "observation_ids": "list",
+    "source_provider_lineage": "dict", "decision_evaluated_at": "str",
+    "decision_safety_invariants": "dict",
+    "decision_projection": "dict",
 }
 ENUMS = {
     "thesis_origin": ALLOWED_THESIS_ORIGINS,
@@ -216,7 +231,129 @@ def _validate_contract(row: Mapping[str, Any]) -> list[str]:
             errors.append("decision_model_unknown_catalyst_warning_missing")
     if extended_contract:
         errors.extend(_validate_market_return_units(row))
+    if "decision_projection_schema_version" in row:
+        errors.extend(_validate_closed_projection(row))
+    nested_projection = row.get("decision_projection")
+    if nested_projection is not None:
+        if not isinstance(nested_projection, Mapping):
+            errors.append("decision_projection_invalid_type")
+        else:
+            errors.extend(
+                f"decision_projection_nested:{error}"
+                for error in _validate_contract(nested_projection)
+            )
     return errors
+
+
+def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
+    errors: list[str] = []
+    if row.get("decision_projection_schema_version") != DECISION_PROJECTION_SCHEMA_VERSION:
+        errors.append("decision_projection_schema_version_unsupported")
+    required = (
+        "hard_blockers", "soft_penalties", "warnings", "why_now", "supporting_facts",
+        "missing_information", "main_risks", "what_confirms", "what_invalidates",
+        "calendar_evidence", "calendar_evidence_ids", "rsi_context", "rsi_context_references",
+        "observation_ids", "source_provider_lineage", "decision_evaluated_at",
+        "decision_safety_invariants",
+    )
+    errors.extend(
+        f"decision_projection_missing_field:{field}"
+        for field in required
+        if field not in row or row.get(field) is None
+    )
+    for field in (
+        "hard_blockers", "soft_penalties", "warnings", "supporting_facts",
+        "missing_information", "main_risks", "what_confirms", "what_invalidates",
+        "calendar_evidence", "calendar_evidence_ids", "rsi_context_references", "observation_ids",
+    ):
+        if field in row and not _is_sequence(row.get(field)):
+            errors.append(f"decision_projection_invalid_type:{field}")
+    for field in ("rsi_context", "source_provider_lineage", "decision_safety_invariants"):
+        if field in row and not isinstance(row.get(field), Mapping):
+            errors.append(f"decision_projection_invalid_type:{field}")
+    if not isinstance(row.get("why_now"), str) or not str(row.get("why_now") or "").strip():
+        errors.append("decision_projection_why_now_missing")
+    if _aware_timestamp(row.get("decision_evaluated_at")) is None:
+        errors.append("decision_projection_evaluation_timestamp_invalid")
+    if _is_sequence(row.get("observation_ids")) and not _items(row.get("observation_ids")):
+        errors.append("decision_projection_observation_ids_empty")
+
+    aliases = {
+        "hard_blockers": "decision_hard_blockers",
+        "soft_penalties": "decision_soft_penalties",
+        "warnings": "decision_warnings",
+        "missing_information": "decision_missing_data",
+        "what_confirms": "radar_what_confirms",
+        "what_invalidates": "radar_what_invalidates",
+    }
+    for alias, canonical in aliases.items():
+        if _items(row.get(alias)) != _items(row.get(canonical)):
+            errors.append(f"decision_projection_alias_mismatch:{alias}")
+
+    evidence = row.get("calendar_evidence")
+    evidence_ids: list[str] = []
+    if _is_sequence(evidence):
+        for item in evidence:
+            if not isinstance(item, Mapping):
+                errors.append("decision_projection_calendar_evidence_invalid")
+                continue
+            event_id = str(item.get("calendar_event_id") or "").strip()
+            reference = str(item.get("evidence_reference") or "").strip()
+            if not event_id and not reference:
+                errors.append("decision_projection_calendar_evidence_unresolvable")
+            if event_id:
+                evidence_ids.append(event_id)
+            if not str(item.get("category") or item.get("event_kind") or "").strip():
+                errors.append("decision_projection_calendar_category_missing")
+            if str(item.get("time_certainty") or "") not in {"exact", "window", "estimated", "unknown"}:
+                errors.append("decision_projection_calendar_time_certainty_invalid")
+            if str(item.get("importance") or "") not in {"low", "medium", "high", "critical", "unknown"}:
+                errors.append("decision_projection_calendar_importance_invalid")
+            timestamps = (item.get("scheduled_at"), item.get("window_start"), item.get("window_end"))
+            if not any(value not in (None, "") for value in timestamps):
+                errors.append("decision_projection_calendar_time_missing")
+            elif any(value not in (None, "") and _aware_timestamp(value) is None for value in timestamps):
+                errors.append("decision_projection_calendar_time_invalid")
+    if _items(row.get("calendar_evidence_ids")) != tuple(evidence_ids):
+        errors.append("decision_projection_calendar_ids_mismatch")
+    if str(row.get("radar_route") or "") == "calendar_risk" and not (
+        _is_sequence(evidence) and any(isinstance(item, Mapping) for item in evidence)
+    ):
+        errors.append("decision_projection_calendar_risk_without_evidence")
+
+    rsi_context = row.get("rsi_context")
+    rsi_references = row.get("rsi_context_references")
+    if isinstance(rsi_context, Mapping) and rsi_context and not (
+        _is_sequence(rsi_references) and any(isinstance(item, Mapping) for item in rsi_references)
+    ):
+        errors.append("decision_projection_rsi_context_unreferenced")
+
+    lineage = row.get("source_provider_lineage")
+    if isinstance(lineage, Mapping):
+        for field in ("providers", "origins", "source_packs"):
+            if not _is_sequence(lineage.get(field)):
+                errors.append(f"decision_projection_lineage_invalid:{field}")
+
+    safety = row.get("decision_safety_invariants")
+    required_safety = (
+        "research_only", "no_live_trading", "no_event_alpha_paper_trading",
+        "no_normal_rsi_writes", "no_triggered_fade_creation", "no_notification_send",
+    )
+    if isinstance(safety, Mapping):
+        for field in required_safety:
+            if safety.get(field) is not True:
+                errors.append(f"decision_projection_safety_invariant_failed:{field}")
+        source_safety = {
+            "source_side_effect_safety_passed": "decision_source_side_effect_safety_failed",
+            "source_secret_safety_passed": "decision_source_secret_safety_failed",
+            "source_path_safety_passed": "decision_source_path_safety_failed",
+        }
+        for field, attestation in source_safety.items():
+            if not isinstance(safety.get(field), bool):
+                errors.append(f"decision_projection_safety_invariant_invalid:{field}")
+            elif safety.get(field) is not (row.get(attestation) is not True):
+                errors.append(f"decision_projection_safety_attestation_mismatch:{field}")
+    return list(dict.fromkeys(errors))
 
 
 def _validate_scores_and_expiry(
@@ -283,6 +420,9 @@ def _aware_timestamp(value: object) -> datetime | None:
 
 
 def _has_calendar_evidence(row: Mapping[str, Any]) -> bool:
+    canonical = row.get("calendar_evidence")
+    if _is_sequence(canonical) and any(isinstance(item, Mapping) and bool(item) for item in canonical):
+        return True
     for field in (
         "unified_calendar_event", "calendar_event", "scheduled_catalyst_event", "unlock_event",
     ):
@@ -367,6 +507,7 @@ __all__ = (
     "ALLOWED_CATALYST_STATUSES", "ALLOWED_CONFIDENCE_BANDS", "ALLOWED_DIRECTIONAL_BIASES",
     "ALLOWED_MARKET_PHASES", "ALLOWED_PREFERRED_HORIZONS", "ALLOWED_RADAR_ROUTES",
     "ALLOWED_SPREAD_STATUSES", "ALLOWED_THESIS_ORIGINS", "ALLOWED_TIMING_STATES",
-    "ALLOWED_TRADABILITY_STATUSES", "DECISION_MODEL_VERSION", "ENUMS", "FIELDS",
+    "ALLOWED_TRADABILITY_STATUSES", "DECISION_MODEL_VERSION",
+    "DECISION_PROJECTION_SCHEMA_VERSION", "ENUMS", "FIELDS",
     "TYPES", "validate_contract",
 )

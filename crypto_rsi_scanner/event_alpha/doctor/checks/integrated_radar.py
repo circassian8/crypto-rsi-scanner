@@ -183,7 +183,15 @@ def apply_integrated_artifact_checks(ctx: object, blockers: Messages, warnings: 
         "integrated_candidate_core_scheduled_event_loss",
         "integrated_candidate_core_unlock_event_loss",
         "integrated_candidate_core_derivatives_loss",
+        "integrated_candidate_core_decision_context_mismatch",
+        "integrated_candidate_core_decision_score_mismatch",
+        "integrated_dashboard_decision_authority_invalid",
+        "integrated_candidate_expired_actionable",
+        "integrated_core_expired_actionable",
+        "integrated_preview_expired_actionable",
+        "integrated_dashboard_expired_actionable",
         "integrated_candidate_card_opportunity_type_mismatch",
+        "integrated_candidate_card_decision_mismatch",
         "integrated_candidate_card_why_now_mismatch",
         "integrated_major_pair_card_early_long",
         "integrated_card_generic_lane_override",
@@ -254,6 +262,7 @@ def apply_integrated_artifact_checks(ctx: object, blockers: Messages, warnings: 
         "integrated_outcome_ambiguous_exact_identity",
         "integrated_outcome_eligible_provenance_missing",
         "integrated_outcome_identity_mismatch",
+        "integrated_outcome_decision_projection_mismatch",
     ):
         count = integrated_conflicts.get(key, 0)
         if count:

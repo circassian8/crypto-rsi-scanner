@@ -228,7 +228,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 62,
+      "max_class_line_count": 74,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 4,
@@ -275,7 +275,7 @@
         "EventAlphaReviewQueueItem"
       ],
       "exception_reason": "",
-      "max_class_line_count": 56,
+      "max_class_line_count": 57,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.notifications.inbox.models",
       "public_class_count": 3,
@@ -376,6 +376,22 @@
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor",
       "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "MarketNoSendError",
+        "MarketNoSendGenerationResult",
+        "MarketNoSendReadiness"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 35,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_models",
+      "public_class_count": 3,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
@@ -1089,7 +1105,7 @@
         "MarketStateSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 30,
+      "max_class_line_count": 35,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.market_reaction",
       "public_class_count": 5,
@@ -1444,7 +1460,7 @@
       "resolution": "accepted_model_bundle"
     }
   ],
-  "accepted_model_bundles_count": 82,
+  "accepted_model_bundles_count": 83,
   "accepted_production_files_over_1200_line_rows": [
     {
       "accepted": true,
@@ -1642,7 +1658,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 803,
+  "file_count": 810,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1650,7 +1666,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-12T17:36:11.371127+00:00",
+  "generated_at": "2026-07-13T03:57:41.291428+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1734,8 +1750,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1182,
+      "line_count": 1187,
       "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1182,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py",
       "source_kind": "production"
     },
     {
@@ -1770,7 +1792,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1169,
+      "line_count": 1171,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
       "source_kind": "production"
     },
@@ -1788,19 +1810,13 @@
     },
     {
       "limit": 1500,
-      "line_count": 1160,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1156,
       "path": "crypto_rsi_scanner/event_alpha/operations/review_inbox.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1138,
+      "line_count": 1139,
       "path": "crypto_rsi_scanner/event_alpha/outcomes/feedback_labels.py",
       "source_kind": "production"
     },
@@ -1866,6 +1882,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1065,
+      "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1056,
       "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
       "source_kind": "production"
@@ -1878,20 +1900,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1045,
-      "path": "crypto_rsi_scanner/event_alpha/outcomes/burn_in.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1044,
-      "path": "crypto_rsi_scanner/event_alpha/radar/impact_path_validator.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1042,
+      "line_count": 1047,
       "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1046,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/render.py",
       "source_kind": "production"
     }
   ],
@@ -1988,7 +2004,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1118,
+      "line_count": 1120,
       "path": "tests/event_alpha/test_decision_model_v2.py",
       "source_kind": "test"
     },
@@ -2036,7 +2052,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1022,
+      "line_count": 1025,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },
@@ -2132,8 +2148,8 @@
     },
     {
       "limit": 1500,
-      "line_count": 797,
-      "path": "tests/event_alpha/test_notification_readiness.py",
+      "line_count": 801,
+      "path": "tests/event_alpha/test_operator_presentation.py",
       "source_kind": "test"
     }
   ],
@@ -2326,7 +2342,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 62,
+      "max_class_line_count": 74,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 4,
@@ -2373,7 +2389,7 @@
         "EventAlphaReviewQueueItem"
       ],
       "exception_reason": "",
-      "max_class_line_count": 56,
+      "max_class_line_count": 57,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.notifications.inbox.models",
       "public_class_count": 3,
@@ -2474,6 +2490,22 @@
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor",
       "public_class_count": 2,
+      "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "resolution": "accepted_model_bundle"
+    },
+    {
+      "accepted": true,
+      "accepted_model_bundle": true,
+      "class_names": [
+        "MarketNoSendError",
+        "MarketNoSendGenerationResult",
+        "MarketNoSendReadiness"
+      ],
+      "exception_reason": "",
+      "max_class_line_count": 35,
+      "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_models",
+      "public_class_count": 3,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
@@ -3187,7 +3219,7 @@
         "MarketStateSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 30,
+      "max_class_line_count": 35,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.market_reaction",
       "public_class_count": 5,
@@ -3566,7 +3598,7 @@
       "resolution": "accepted_model_bundle"
     }
   ],
-  "multi_public_class_modules_count": 83,
+  "multi_public_class_modules_count": 84,
   "near_threshold_file_status": [
     {
       "line_count": 1447,

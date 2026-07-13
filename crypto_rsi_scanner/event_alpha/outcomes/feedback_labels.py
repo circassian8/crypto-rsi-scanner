@@ -69,6 +69,7 @@ class _EventFeedbackDecisionFields:
     market_phase: str | None = None
     preferred_horizon: str | None = None
     expires_at: str | None = None
+    decision_evaluated_at: str | None = None
     chase_risk_score: float | None = None
     scheduled_at: str | None = None
     nearby_calendar_events: tuple[dict[str, Any], ...] = ()

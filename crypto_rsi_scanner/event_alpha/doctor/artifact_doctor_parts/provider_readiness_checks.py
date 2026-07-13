@@ -6,6 +6,7 @@ from .runtime import *
 from .context_loading import _read_jsonl
 from .integrated_radar_checks import (
     _daily_brief_has_integrated_diagnostic_leak,
+    _decision_is_expired_actionable,
     _integrated_candidate_core_card_conflicts,
     _integrated_coinalyze_manifest_conflicts,
     _integrated_manifest_mixed_timestamp_pairs,
@@ -22,6 +23,11 @@ from .outcome_checks import (
     _structured_operator_path_conflicts,
 )
 from .source_coverage_checks import _card_text_by_core, _truthy, _tuple_value
+from ...radar.decision_model_surfaces import (
+    PREVIEW_LANE_TITLES,
+    decision_model_values,
+    decision_preview_lane,
+)
 
 def _opportunity_lane_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
     out = {
@@ -378,6 +384,7 @@ def _integrated_radar_artifact_conflicts(
     delivery_path: str | Path | None = None,
     outcome_path: str | Path | None = None,
     preview_path: str | Path | None = None,
+    decision_preview_path: str | Path | None = None,
 ) -> dict[str, int]:
     out = _empty_integrated_radar_artifact_conflicts()
     materialized_rows = [dict(row) for row in rows if isinstance(row, Mapping)]
@@ -413,12 +420,24 @@ def _integrated_radar_artifact_conflicts(
             exact_core_by_id,
             card_text_by_core,
             out,
+            evaluated_at=evaluated_at,
         )
 
     _add_integrated_manifest_conflicts(out, row_count, manifest_path, production_rows)
     _add_integrated_source_coverage_conflicts(out, row_count, source_coverage_json_path)
     _add_integrated_daily_brief_conflicts(out, row_count, daily_brief_path, manifest_path, production_rows)
-    _add_integrated_preview_conflicts(out, row_count, preview_path)
+    _add_integrated_preview_conflicts(
+        out,
+        row_count,
+        preview_path,
+    )
+    _add_decision_v2_preview_conflicts(
+        out,
+        row_count,
+        decision_preview_path,
+        candidate_rows=production_rows,
+        evaluated_at=evaluated_at,
+    )
     _add_integrated_operator_path_conflicts(out, research_card_paths, daily_brief_path=daily_brief_path, preview_path=preview_path)
     delivery_rows = _integrated_delivery_rows(out, row_count, delivery_path, preview_path=preview_path)
     outcome_rows = _integrated_outcome_rows(
@@ -473,7 +492,15 @@ def _empty_integrated_radar_artifact_conflicts() -> dict[str, int]:
         "integrated_candidate_core_scheduled_event_loss": 0,
         "integrated_candidate_core_unlock_event_loss": 0,
         "integrated_candidate_core_derivatives_loss": 0,
+        "integrated_candidate_core_decision_context_mismatch": 0,
+        "integrated_candidate_core_decision_score_mismatch": 0,
+        "integrated_dashboard_decision_authority_invalid": 0,
+        "integrated_candidate_expired_actionable": 0,
+        "integrated_core_expired_actionable": 0,
+        "integrated_preview_expired_actionable": 0,
+        "integrated_dashboard_expired_actionable": 0,
         "integrated_candidate_card_opportunity_type_mismatch": 0,
+        "integrated_candidate_card_decision_mismatch": 0,
         "integrated_candidate_card_why_now_mismatch": 0,
         "integrated_major_pair_card_early_long": 0,
         "integrated_card_generic_lane_override": 0,
@@ -528,6 +555,7 @@ def _empty_integrated_radar_artifact_conflicts() -> dict[str, int]:
         "integrated_outcome_ambiguous_exact_identity": 0,
         "integrated_outcome_eligible_provenance_missing": 0,
         "integrated_outcome_identity_mismatch": 0,
+        "integrated_outcome_decision_projection_mismatch": 0,
         "integrated_outcome_card_thesis_interpretation_missing": 0,
         "integrated_outcome_card_trade_wording": 0,
         "integrated_performance_diagnostic_in_main_aggregate": 0,
@@ -543,6 +571,8 @@ def _add_integrated_candidate_conflicts(
     core_by_id: Mapping[str, Mapping[str, Any]],
     card_text_by_core: Mapping[str, str],
     out: dict[str, int],
+    *,
+    evaluated_at: Any = None,
 ) -> None:
     if _fixture_support_row(row):
         return
@@ -588,7 +618,13 @@ def _add_integrated_candidate_conflicts(
     if lane == "EARLY_LONG_RESEARCH" and _truthy(row.get("major_pair_simple_announcement")):
         out["integrated_major_pair_early_long"] += 1
     _add_integrated_dex_and_side_effect_conflicts(row, lane, out)
-    _integrated_candidate_core_card_conflicts(row, core_by_id, card_text_by_core, out)
+    _integrated_candidate_core_card_conflicts(
+        row,
+        core_by_id,
+        card_text_by_core,
+        out,
+        evaluated_at=evaluated_at,
+    )
 
 def _integrated_source_sets(row: Mapping[str, Any]) -> tuple[set[str], set[str]]:
     source_origins = {str(item).strip().casefold() for item in row.get("source_origins") or () if str(item).strip()}
@@ -692,6 +728,118 @@ def _add_integrated_preview_conflicts(
             out["integrated_api_preview_alerts_wording"] += 1
         if event_artifact_paths.has_operator_absolute_path(preview_text):
             out["integrated_operator_markdown_absolute_path"] += 1
+
+
+def _add_decision_v2_preview_conflicts(
+    out: dict[str, int],
+    row_count: int,
+    preview_path: str | Path | None,
+    *,
+    candidate_rows: Iterable[Mapping[str, Any]],
+    evaluated_at: Any = None,
+) -> None:
+    if not row_count:
+        return
+    if preview_path is None:
+        out["integrated_preview_lane_mismatch"] += 1
+        return
+    try:
+        preview_text = Path(preview_path).read_text(encoding="utf-8")
+    except OSError:
+        out["integrated_preview_lane_mismatch"] += 1
+        return
+    out["integrated_preview_lane_mismatch"] += _decision_preview_mismatch_count(
+        preview_text,
+        candidate_rows,
+    )
+    out["integrated_preview_expired_actionable"] += (
+        _expired_actionable_preview_count(
+            preview_text,
+            candidate_rows,
+            evaluated_at=evaluated_at,
+        )
+    )
+
+
+def _expired_actionable_preview_count(
+    preview_text: str,
+    candidate_rows: Iterable[Mapping[str, Any]],
+    *,
+    evaluated_at: Any,
+) -> int:
+    """Count current preview identities whose canonical actionable idea expired."""
+
+    count = 0
+    for row in candidate_rows:
+        decision = decision_model_values(row)
+        if not _decision_is_expired_actionable(
+            decision,
+            evaluated_at=evaluated_at,
+        ):
+            continue
+        identity = (
+            f"{str(row.get('symbol') or '').strip()}/"
+            f"{str(row.get('coin_id') or '').strip()}"
+        )
+        if identity != "/" and preview_text.count(identity) > 0:
+            count += 1
+    return count
+
+
+def _decision_preview_mismatch_count(
+    preview_text: str,
+    candidate_rows: Iterable[Mapping[str, Any]],
+) -> int:
+    """Reconcile every canonical non-diagnostic idea with its v2 preview lane."""
+
+    expected: dict[str, list[str]] = {
+        lane: []
+        for lane in PREVIEW_LANE_TITLES
+        if lane != "decision_diagnostic"
+    }
+    for row in candidate_rows:
+        decision = decision_model_values(row)
+        if not decision:
+            return 1
+        lane = decision_preview_lane(decision)
+        if lane == "decision_diagnostic":
+            continue
+        identity = f"{str(row.get('symbol') or '').strip()}/{str(row.get('coin_id') or '').strip()}"
+        if identity == "/":
+            return 1
+        expected.setdefault(lane, []).append(identity)
+
+    mismatches = 0
+    sections: dict[str, str] = {}
+    for lane, title in PREVIEW_LANE_TITLES.items():
+        if lane == "decision_diagnostic":
+            continue
+        marker = f"## Lane: {title}"
+        start = preview_text.find(marker)
+        if start < 0:
+            mismatches += 1
+            sections[lane] = ""
+            continue
+        body = preview_text[start + len(marker):]
+        next_section = body.find("\n## Lane: ")
+        sections[lane] = body if next_section < 0 else body[:next_section]
+
+    for lane, identities in expected.items():
+        body = sections.get(lane, "")
+        rendered_match = re.search(r"^- rendered_items:\s*(\d+)\s*$", body, re.MULTILINE)
+        rendered_count = int(rendered_match.group(1)) if rendered_match else -1
+        if rendered_count != len(identities):
+            mismatches += 1
+        for identity in identities:
+            if body.count(identity) != 1:
+                mismatches += 1
+            if any(
+                identity in other_body
+                for other_lane, other_body in sections.items()
+                if other_lane != lane
+            ):
+                mismatches += 1
+    return mismatches
 
 def _add_integrated_operator_path_conflicts(
     out: dict[str, int],

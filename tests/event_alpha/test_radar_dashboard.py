@@ -124,6 +124,24 @@ def test_dashboard_loads_only_current_operator_run_and_revision():
     }
 
 
+def test_dashboard_badges_distinguish_current_fixture_and_live_no_send():
+    fixture = _snapshot()
+    fixture_page = render_dashboard_page(fixture, "/")
+    assert "CURRENT" in fixture_page.body
+    assert "FIXTURE" in fixture_page.body
+    assert "NO-SEND" in fixture_page.body
+
+    live = replace(
+        fixture,
+        current_candidates=tuple(
+            {**row, "data_mode": "live"}
+            for row in fixture.current_candidates
+        ),
+    )
+    live_page = render_dashboard_page(live, "/")
+    assert "LIVE / REAL DATA" in live_page.body
+
+
 def test_dashboard_requires_explicit_supported_v2_version_and_hides_legacy_default():
     snapshot = _snapshot()
     by_symbol = {row["symbol"]: row for row in snapshot.current_candidates}
@@ -207,6 +225,36 @@ def test_dashboard_candidate_table_shows_trader_timing_and_execution_dimensions(
 
     for label in ("Urgency", "Horizon", "Expires", "Spread", "Chase risk"):
         assert label in page.body
+
+
+def test_dashboard_suppresses_expired_actionability_at_read_time_without_mutating_canonical_values():
+    snapshot = _snapshot()
+    rows = tuple(
+        _dashboard_decision_row(row, read_at="2026-07-12T12:00:00+00:00")
+        for row in snapshot.current_candidates
+    )
+    expired_snapshot = replace(snapshot, current_candidates=rows)
+    alpha = next(row for row in rows if row.get("symbol") == "ALPHA")
+
+    assert alpha["radar_route"] == "actionable_watch"
+    assert alpha["radar_actionable"] is True
+    assert alpha["_dashboard_route"] == "diagnostic"
+    assert alpha["_decision_expired_at_read_time"] is True
+    assert alpha["_decision_read_time_reason"] == (
+        "canonical_expiry_at_or_before_dashboard_read_time"
+    )
+
+    page = render_dashboard_page(expired_snapshot, "/")
+    assert "Expired ideas (not currently actionable)" in page.body
+    assert "Expired; current actionability suppressed" in page.body
+    assert "/candidate/core%3Aalpha" not in page.body.split(
+        "Expired ideas (not currently actionable)", 1
+    )[0]
+
+    detail = render_dashboard_page(expired_snapshot, "/candidate/core:alpha")
+    assert detail.status_code == 200
+    assert "suppressed: expired at dashboard read time" in detail.body
+    assert "canonical_expiry_at_or_before_dashboard_read_time" in detail.body
 
 
 def test_dashboard_calendar_renders_uncertain_window_and_current_scope_labels():

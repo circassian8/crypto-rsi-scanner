@@ -2,7 +2,49 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from .runtime import *
+from ...radar.decision_model_surfaces import (
+    PREVIEW_LANE_TITLES,
+    decision_model_values,
+    decision_preview_lane,
+)
+
+
+_DECISION_EXACT_CONSISTENCY_FIELDS = (
+    "primary_thesis_origin",
+    "thesis_origins",
+    "directional_bias",
+    "catalyst_status",
+    "confidence_band",
+    "timing_state",
+    "market_phase",
+    "tradability_status",
+    "spread_status",
+    "radar_route",
+    "radar_actionable",
+    "preferred_horizon",
+    "expires_at",
+    "decision_hard_blockers",
+    "decision_warnings",
+    "calendar_evidence",
+    "calendar_evidence_ids",
+    "rsi_context",
+    "rsi_context_references",
+    "observation_ids",
+    "source_provider_lineage",
+    "decision_evaluated_at",
+    "decision_safety_invariants",
+)
+_DECISION_SCORE_CONSISTENCY_FIELDS = (
+    "actionability_score",
+    "evidence_confidence_score",
+    "risk_score",
+    "urgency_score",
+    "chase_risk_score",
+)
+_DECISION_SCORE_TOLERANCE = 0.011
 
 
 def _truthy(value: Any) -> bool:
@@ -128,6 +170,8 @@ def _integrated_candidate_core_card_conflicts(
     core_by_id: Mapping[str, Mapping[str, Any]],
     card_text_by_core: Mapping[str, str],
     out: dict[str, int],
+    *,
+    evaluated_at: datetime | str | None = None,
 ) -> None:
     if str(candidate.get("opportunity_type") or "").strip().upper() == "DIAGNOSTIC":
         return
@@ -170,12 +214,82 @@ def _integrated_candidate_core_card_conflicts(
         out["integrated_candidate_core_unlock_event_loss"] += 1
     if isinstance(candidate.get("derivatives_state_snapshot"), Mapping) and not isinstance(core.get("derivatives_state_snapshot"), Mapping):
         out["integrated_candidate_core_derivatives_loss"] += 1
+    candidate_decision = decision_model_values(candidate)
+    if _decision_is_expired_actionable(candidate_decision, evaluated_at=evaluated_at):
+        out["integrated_candidate_expired_actionable"] += 1
+    if candidate_decision:
+        decision_differences = _decision_projection_differences(candidate, core)
+        if "canonical_projection_missing" in decision_differences or (
+            decision_differences & set(_DECISION_EXACT_CONSISTENCY_FIELDS)
+        ):
+            out["integrated_candidate_core_decision_context_mismatch"] += 1
+        if decision_differences & set(_DECISION_SCORE_CONSISTENCY_FIELDS):
+            out["integrated_candidate_core_decision_score_mismatch"] += 1
+        if str(core.get("decision_projection_source") or "") != "integrated_candidate" or (
+            core.get("decision_projection_drift_detected") is not False
+        ):
+            out["integrated_dashboard_decision_authority_invalid"] += 1
+    core_decision = decision_model_values(core)
+    if _decision_is_expired_actionable(core_decision, evaluated_at=evaluated_at):
+        out["integrated_core_expired_actionable"] += 1
+        # The current dashboard read model is sourced from this exact Core row.
+        out["integrated_dashboard_expired_actionable"] += 1
     if str(candidate_lane).upper() == "FADE_SHORT_REVIEW":
         if not str(core.get("crowding_class") or "").strip() or not str(core.get("fade_readiness") or "").strip():
             out["integrated_candidate_core_crowding_metadata_loss"] += 1
         if not _tuple_value(core.get("crowding_exhaustion_evidence")):
             out["integrated_candidate_core_crowding_metadata_loss"] += 1
-    card_text = card_text_by_core.get(core_id, "")
+    _update_integrated_candidate_card_conflicts(
+        candidate,
+        core,
+        card_text_by_core.get(core_id, ""),
+        candidate_lane=candidate_lane,
+        candidate_url=candidate_url,
+        has_candidate_decision=bool(candidate_decision),
+        out=out,
+    )
+
+
+def _decision_is_expired_actionable(
+    row_or_projection: Mapping[str, Any],
+    *,
+    evaluated_at: datetime | str | None,
+) -> bool:
+    """Check expiry without mutating or re-evaluating the canonical decision."""
+
+    if not row_or_projection or row_or_projection.get("radar_actionable") is not True:
+        return False
+    expiry = _aware_decision_timestamp(row_or_projection.get("expires_at"))
+    checked_at = _aware_decision_timestamp(evaluated_at)
+    return bool(expiry is not None and checked_at is not None and expiry <= checked_at)
+
+
+def _aware_decision_timestamp(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        try:
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _update_integrated_candidate_card_conflicts(
+    candidate: Mapping[str, Any],
+    core: Mapping[str, Any],
+    card_text: str,
+    *,
+    candidate_lane: str,
+    candidate_url: str,
+    has_candidate_decision: bool,
+    out: dict[str, int],
+) -> None:
     if not card_text:
         return
     derivatives_state = candidate.get("derivatives_state_snapshot")
@@ -201,7 +315,14 @@ def _integrated_candidate_core_card_conflicts(
     )
     if has_coinalyze_crowding and "coinalyze source:" not in card_text.casefold():
         out["integrated_coinalyze_crowding_card_missing"] += 1
-    card_lane = _markdown_bullet_value(card_text, "Opportunity type", section="Opportunity Lane")
+    card_lane = (
+        _markdown_bullet_value(
+            card_text,
+            "Opportunity type",
+            section="Catalyst Radar Classification",
+        )
+        or _markdown_bullet_value(card_text, "Opportunity type", section="Opportunity Lane")
+    )
     core_lane_lit = str(core.get("opportunity_type") or "").strip()
     if candidate_lane and card_lane and card_lane != candidate_lane:
         out["integrated_candidate_card_opportunity_type_mismatch"] += 1
@@ -213,7 +334,14 @@ def _integrated_candidate_core_card_conflicts(
         and card_lane in {"EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH"}
     ):
         out["integrated_major_pair_card_early_long"] += 1
-    card_why = _markdown_bullet_value(card_text, "Why now", section="Opportunity Lane")
+    card_why = (
+        _markdown_bullet_value(
+            card_text,
+            "Why now",
+            section="Catalyst Radar Classification",
+        )
+        or _markdown_bullet_value(card_text, "Why now", section="Opportunity Lane")
+    )
     candidate_why = str(candidate.get("why_now") or "").strip()
     if candidate_why and card_why and candidate_why != card_why:
         out["integrated_candidate_card_why_now_mismatch"] += 1
@@ -261,6 +389,65 @@ def _integrated_candidate_core_card_conflicts(
             out["integrated_candidate_card_official_event_missing"] += 1
     if candidate_url and candidate_url not in card_text:
         out["integrated_candidate_card_source_url_missing"] += 1
+    if has_candidate_decision and _card_decision_projection_mismatch(candidate, card_text):
+        out["integrated_candidate_card_decision_mismatch"] += 1
+
+
+def _decision_projection_differences(
+    expected_row: Mapping[str, Any],
+    observed_row: Mapping[str, Any],
+) -> set[str]:
+    """Return canonical Decision-v2 fields that drifted across an artifact boundary."""
+
+    expected = decision_model_values(expected_row)
+    observed = decision_model_values(observed_row)
+    if not expected or not observed:
+        return {"canonical_projection_missing"}
+    differences: set[str] = set()
+    for field in _DECISION_EXACT_CONSISTENCY_FIELDS:
+        if _decision_normalized_value(expected.get(field)) != _decision_normalized_value(
+            observed.get(field)
+        ):
+            differences.add(field)
+    for field in _DECISION_SCORE_CONSISTENCY_FIELDS:
+        expected_score = _safe_float(expected.get(field))
+        observed_score = _safe_float(observed.get(field))
+        if expected_score is None or observed_score is None or abs(
+            expected_score - observed_score
+        ) > _DECISION_SCORE_TOLERANCE:
+            differences.add(field)
+    return differences
+
+
+def _decision_normalized_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return tuple(
+            (str(key), _decision_normalized_value(child))
+            for key, child in sorted(value.items(), key=lambda item: str(item[0]))
+        )
+    if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+        return tuple(_decision_normalized_value(item) for item in value)
+    return value
+
+
+def _card_decision_projection_mismatch(
+    candidate: Mapping[str, Any],
+    card_text: str,
+) -> bool:
+    decision = decision_model_values(candidate)
+    if not decision:
+        return True
+    expected_fragments = (
+        f"- Radar route: {decision.get('radar_route')}",
+        f"- Radar actionable: {str(bool(decision.get('radar_actionable'))).lower()}",
+        (
+            "- Actionability / evidence confidence / risk: "
+            f"{float(decision.get('actionability_score')):.1f}/100 / "
+            f"{float(decision.get('evidence_confidence_score')):.1f}/100 / "
+            f"{float(decision.get('risk_score')):.1f}/100"
+        ),
+    )
+    return any(fragment not in card_text for fragment in expected_fragments)
 
 def _integrated_opportunity_rank(value: object) -> int:
     text = str(value or "").strip().upper()
@@ -575,6 +762,7 @@ __all__ = (
     '_operator_structured_path_debug_field',
     '_operator_structured_path_field',
     '_integrated_candidate_core_card_conflicts',
+    '_decision_is_expired_actionable',
     '_integrated_opportunity_rank',
     '_markdown_bullet_value',
     '_markdown_section',

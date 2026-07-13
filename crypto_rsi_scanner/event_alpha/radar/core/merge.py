@@ -8,15 +8,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from .... import (
-    config,
-)
 import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import paths as event_artifact_paths
 from .. import core_opportunities as event_core_opportunities
-from .. import decision_model as event_radar_decision_model
-from ..decision_model_surfaces import DECISION_MODEL_FIELD_NAMES
+from ..decision_model_surfaces import DECISION_MODEL_FIELD_NAMES, decision_model_values
 from .. import market_reaction as event_market_reaction
 from .. import opportunity_verdict as event_opportunity_verdict
 from .models import *  # noqa: F403 - split modules share historical model names
@@ -103,6 +99,10 @@ _INTEGRATED_SEQUENCE_TRUTH_FIELDS = (
     ("asset_registry_coinalyze_symbols", "asset_registry_coinalyze_symbols"),
     ("asset_registry_bybit_symbols", "asset_registry_bybit_symbols"),
     ("asset_registry_binance_symbols", "asset_registry_binance_symbols"),
+    ("nearby_calendar_events", "nearby_calendar_events"),
+    ("calendar_events", "calendar_events"),
+    ("unified_calendar_context", "unified_calendar_context"),
+    ("rsi_adjustment_reason_codes", "rsi_adjustment_reason_codes"),
 )
 
 _INTEGRATED_MAPPING_TRUTH_FIELDS = (
@@ -110,10 +110,15 @@ _INTEGRATED_MAPPING_TRUTH_FIELDS = (
     "latest_market_snapshot",
     "market_snapshot",
     "official_exchange_event",
+    "unified_calendar_event",
+    "calendar_event",
     "scheduled_catalyst_event",
     "unlock_event",
     "derivatives_state_snapshot",
     "derivatives_snapshot",
+    "rsi_context",
+    "rsi_context_adjustment",
+    "rsi_context_safety",
 )
 
 
@@ -266,13 +271,28 @@ def _apply_integrated_candidate_truth(
     if core_duplicate_suppressed:
         row["final_route_after_quality_gate"] = event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE.value
         row["duplicate_suppressed"] = True
-    row.update(
-        event_radar_decision_model.reevaluate_radar_decision_fields(
-            row,
-            source_rows=materialized_rows,
-            cfg=event_radar_decision_model.RadarDecisionConfig.from_runtime(config),
-        )
-    )
+    # The integrated candidate owns the Decision v2 evaluation for this idea
+    # generation.  Core serialization is a projection/copy boundary, not a
+    # second scoring boundary: re-evaluating here can lose calendar or RSI
+    # evidence that is not part of the generic Core merge context and silently
+    # change routes or scores.  A malformed explicit authority therefore fails
+    # closed instead of borrowing partial context from supporting rows.
+    canonical_decision = decision_model_values(integrated)
+    if canonical_decision:
+        row["decision_projection"] = dict(canonical_decision)
+        for field in DECISION_MODEL_FIELD_NAMES:
+            if field in canonical_decision:
+                row[field] = canonical_decision[field]
+        row["decision_projection_source"] = "integrated_candidate"
+        row["decision_projection_drift_detected"] = False
+    elif any(
+        integrated.get(field) not in (None, "")
+        for field in ("decision_model_version", "decision_model_enabled")
+    ):
+        for field in DECISION_MODEL_FIELD_NAMES:
+            row.pop(field, None)
+        row["decision_projection_source"] = "invalid_integrated_candidate"
+        row["decision_projection_drift_detected"] = True
     return row
 
 

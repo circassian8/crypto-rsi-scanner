@@ -16,44 +16,74 @@ decision, rationale, and revisit condition.
 
 ---
 
-## 2026-07-12 - Make Decision Model v2 the complete no-send operator projection
+## 2026-07-12 - Use one closed Decision v2 projection as trader-facing authority
 **Status:** accepted
-**Decision:** New Crypto Radar operator surfaces use Decision Model v2 as the
-primary research projection while retaining legacy `opportunity_type` and
-`thesis_origin` only for compatibility. New rows carry one
-`primary_thesis_origin`, an ordered `thesis_origins` list, independent
-actionability/evidence/risk/urgency scores, market phase, horizon, expiry,
-chase risk, tradability, and explicit spread status. The configurable initial
-route floors are dashboard watch 45, actionable 65, rapid anomaly 68 with
-urgency 72, and high confidence 80 with evidence confidence 75. Missing spread
-may support dashboard watch through strong provisional execution-quality
-evidence but cannot support actionable/rapid routing; insufficient liquidity
-and verified extreme spread remain blockers. `risk_watch` owns unscheduled
-risk, while `calendar_risk` requires actual attached calendar evidence.
+**Decision:** `crypto_radar_decision_projection_v1`, returned by
+`decision_model_values`, is the single Decision Model v2 authority for one idea
+generation. It is stored on the integrated candidate, is idempotent, contains
+everything required to validate and render itself, and is copied—not rebuilt—
+to CoreOpportunity, cards, the Decision preview, review inbox, pending outcome,
+and dashboard. Operator state carries exact aggregates and artifact fingerprints
+derived from those canonical projections rather than duplicating every idea.
+Candidate/Core route or deterministic-score drift and card/preview/outcome/
+dashboard projection drift are doctor blockers. Rendering may not perform a
+materially new evaluation from partial context.
 
-The product preview is `event_decision_v2_notification_preview.md` with seven
-v2 lanes; legacy lanes stay in the separate integrated compatibility preview.
-Dashboard authority may be published only through the fixed current-namespace
-pointer after the complete product artifact set is current and fingerprinted,
-current counts match, and a fresh full strict doctor reports zero blockers.
-Pointer-mode serving stays bound to the exact namespace/run/revision/operator-
-state hash and fails closed on later drift; it never guesses a latest directory.
+Crypto Decision Radar is the trader-facing product layer; Event Alpha remains
+the additive Catalyst Radar with unchanged strict catalyst lanes and historical
+artifacts. Decision Radar primary and contributing origins are `market_led`,
+`catalyst_led`, `technical_led`, `derivatives_led`, `onchain_led`,
+`fundamental_led`, and `macro_led`. Legacy `thesis_origin=mixed` remains
+readable compatibility metadata only. The eight operator routes are
+`dashboard_watch`, `actionable_watch`, `high_confidence_watch`,
+`rapid_market_anomaly`, `fade_exhaustion_review`, `risk_watch`,
+`calendar_risk`, and `diagnostic`. Unknown catalyst lowers explanatory
+confidence and may raise risk but is not a universal visibility blocker.
 
-Calendar evidence may adjust risk/expiry but cannot create direction. Optional
-RSI context may adjust an existing idea only from one unique exact symbol plus
-coin-id match loaded read-only from the explicitly configured local artifact;
-it cannot create an RSI-only idea or touch RSI storage, alerts, backtests, paper,
-sends, execution, or triggers. Every explicit v2 idea receives a pending outcome
-placeholder, including diagnostic controls, but diagnostic rows remain outside
-Core/calibration authority. Automatic outcomes remain separate from preference
-feedback. Initial burn-in targets outcomes for every idea and 3–5 targeted human
-labels per day until roughly 30–50 reviewed labels exist; threshold or route
-changes always require human approval and are never auto-applied.
-**Why:** One vertically consistent operator contract makes a liquid unknown-
-catalyst move visible without weakening tradability or safety, keeps scheduled
-and unscheduled risk distinct, and produces measurable evidence instead of
-another parallel architecture. Exact pointer authority and read-only context
-adapters prevent stale or cross-asset data from becoming trader-facing truth.
+The configurable initial route floors remain dashboard watch 45, actionable
+65, rapid anomaly 68 with urgency 72, and high confidence 80 with evidence
+confidence 75. Actionable/rapid routes require verified good or acceptable
+spread. Unavailable spread may support dashboard watch only; spread is never
+invented. Timing, phase, urgency, horizon, expiry, and chase risk are canonical
+values. Stale/expired ideas cannot remain actionable, and urgency never bypasses
+identity, freshness, liquidity, spread, turnover, manipulation, unit, dedupe,
+schema, path, secret, or safety gates. Per-field return units normalize exactly
+once; implausible fractions and incompatible mixed units fail closed.
+
+The dashboard is the primary read-only surface and notifications route human
+attention, never execution. The Decision-first preview is
+`event_decision_v2_notification_preview.md`; the legacy Event Alpha preview
+stays separate compatibility/diagnostic output. Cards lead with Crypto Decision
+Radar and retain Catalyst Radar Classification as a secondary section. Calendar
+evidence and read-only RSI context remain inside the canonical projection.
+Calendar evidence may adjust risk/expiry but cannot create direction;
+`calendar_risk` without actual attached evidence is invalid. RSI cannot create
+an idea or touch RSI storage, alerts, backtests, paper, sends, or execution.
+
+The first real/no-send market-led generation uses
+`radar-market-no-send-readiness`, `radar-market-no-send`, and
+`radar-market-no-send-smoke`. Readiness performs no write or network call; live
+CoinGecko data requires the existing explicit
+`RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1` authorization. Fixture/mock generations
+are never real dashboard authority. The fixed pointer updates only for a real,
+fresh, complete generation with exact fingerprints, matching canonical counts,
+current run/revision/operator-state binding, and a fresh full strict doctor with
+zero blockers. A real clean zero-idea generation may become honest current
+authority when those same gates pass. Blocked, failed, stale, fixture, or mock
+runs must remain explicit and cannot make stale fixture data look live.
+
+Every current canonical Decision idea, including diagnostic controls, receives
+a pending outcome placeholder whose origin/route/actionability/evidence/risk/
+catalyst/timing/phase cohorts match the projection exactly. Outcomes and
+optional preference feedback remain measurement only; threshold, route, and
+prior changes require explicit human approval. All paths remain research-only,
+no-send by default, and incapable of trading, Event Alpha paper trading, normal
+RSI writes, execution, or Event Alpha-created `TRIGGERED_FADE`.
+**Why:** A closed, copy-only authority prevents context loss and downstream
+semantic drift, makes a liquid unknown-catalyst move visible without weakening
+execution-quality or safety gates, and separates trader-facing judgment from
+strict catalyst eligibility. Guarded pointer publication prevents stale,
+fixture, or partially inspected data from becoming current operator truth.
 **Revisit when:** Exact observed outcomes and reviewed preference cohorts are
 large enough to justify a human-approved threshold experiment, or a versioned
 Decision Model v3 deliberately replaces these fields while preserving legacy

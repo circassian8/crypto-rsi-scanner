@@ -17,6 +17,7 @@ def _market_led_candidate(**overrides):
         "symbol": "V2",
         "coin_id": "v2-coin",
         "canonical_asset_id": "v2-coin",
+        "observed_at": "2026-06-15T16:00:00Z",
         "instrument_resolver_status": "resolved",
         "instrument_resolver_confidence": 0.95,
         "instrument_identity_trusted": True,
@@ -106,7 +107,9 @@ def test_v2_fields_propagate_to_core_and_alert_reconciliation_without_legacy_pro
     assert core["opportunity_type"] == "UNCONFIRMED_RESEARCH"
     assert core["radar_route"] == "actionable_watch"
     assert core["radar_actionable"] is True
-    assert core["actionability_penalty_components"]["catalyst_unknown"] > 0
+    assert core["actionability_penalty_components"] == candidate[
+        "actionability_penalty_components"
+    ]
     assert core.get("normal_rsi_signal_written") is not True
     assert core.get("triggered_fade_created") is not True
 
@@ -230,6 +233,192 @@ def test_v2_projection_preserves_source_safety_attestations_and_diagnostic_aggre
     assert rows[0]["include_in_main_aggregate"] is False
 
 
+def test_closed_decision_projection_is_idempotent_and_preserves_calendar_rsi_and_lineage():
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        DECISION_PROJECTION_SCHEMA_VERSION,
+        decision_model_values,
+        decision_preview_lane,
+    )
+
+    raw = _market_led_candidate(
+        candidate_id="calendar-rsi-v2",
+        core_opportunity_id="calendar-rsi-core-v2",
+        directional_bias="risk",
+        confidence_band="exploratory",
+        radar_route="calendar_risk",
+        radar_route_reason="attached_calendar_or_scheduled_risk_research",
+        radar_actionable=False,
+        timing_state="scheduled",
+        preferred_horizon="scheduled_window",
+        why_now="Known high-impact window overlaps the research horizon.",
+        source_origin="unified_calendar",
+        source_origins=["unified_calendar", "market_anomaly"],
+        source_provider="fixture-calendar",
+        source_packs=["unified_calendar_pack", "market_anomaly_pack"],
+        run_mode="fixture",
+        run_id="calendar-rsi-run",
+        profile="fixture",
+        artifact_namespace="calendar-rsi",
+        unified_calendar_context=[{
+            "calendar_event_id": "calendar-fomc-v2",
+            "event_kind": "central_bank",
+            "scheduled_at": "2026-06-15T20:00:00Z",
+            "time_certainty": "exact",
+            "importance": "high",
+            "source": "Fixture Calendar",
+            "source_url": "https://example.invalid/calendar/fomc",
+        }],
+        rsi_context_version="rsi_technical_context_v1",
+        rsi_context={
+            "context_version": "rsi_technical_context_v1",
+            "valid": True,
+            "symbol": "V2",
+            "coin_id": "v2-coin",
+            "setup_type": "breakdown_risk",
+            "rsi_value": 78.0,
+            "rsi_timeframe": "1d",
+            "observed_at": "2026-06-15T15:00:00Z",
+            "freshness_status": "fresh",
+        },
+    )
+
+    projected = decision_model_values(raw)
+    projected_again = decision_model_values(projected)
+
+    assert projected_again == projected
+    assert validate_contract(projected) == []
+    assert projected["decision_projection_schema_version"] == DECISION_PROJECTION_SCHEMA_VERSION
+    assert decision_preview_lane(raw) == decision_preview_lane(projected) == "calendar_risk"
+    assert projected["calendar_evidence_ids"] == ["calendar-fomc-v2"]
+    assert projected["calendar_evidence"][0] == {
+        "calendar_event_id": "calendar-fomc-v2",
+        "evidence_reference": None,
+        "category": "central_bank",
+        "event_kind": "central_bank",
+        "scheduled_at": "2026-06-15T20:00:00Z",
+        "window_start": None,
+        "window_end": None,
+        "time_certainty": "exact",
+        "importance": "high",
+        "source": "Fixture Calendar",
+        "source_url": "https://example.invalid/calendar/fomc",
+    }
+    assert projected["rsi_context"]["setup_type"] == "breakdown_risk"
+    assert projected["rsi_context_references"][0]["observed_at"] == "2026-06-15T15:00:00Z"
+    assert projected["observation_ids"] == ["calendar-rsi-v2", "calendar-rsi-core-v2"]
+    assert projected["source_provider_lineage"] == {
+        "data_mode": "fixture",
+        "providers": ["fixture-calendar"],
+        "origins": ["unified_calendar", "market_anomaly"],
+        "source_packs": ["unified_calendar_pack", "market_anomaly_pack"],
+        "provider_generation_id": "",
+        "run_id": "calendar-rsi-run",
+        "profile": "fixture",
+        "artifact_namespace": "calendar-rsi",
+    }
+    assert projected["decision_evaluated_at"] == "2026-06-15T16:00:00Z"
+    assert all(projected["decision_safety_invariants"].values())
+    assert projected["hard_blockers"] == projected["decision_hard_blockers"]
+    assert projected["missing_information"] == projected["decision_missing_data"]
+    assert projected["what_confirms"] == projected["radar_what_confirms"]
+
+
+def test_calendar_preview_keeps_every_canonical_item_and_rejects_false_calendar_routes():
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
+        decision_preview_lane,
+        group_decision_rows,
+    )
+
+    def calendar_candidate(candidate_id: str, event_id: str):
+        return _market_led_candidate(
+            candidate_id=candidate_id,
+            core_opportunity_id=f"{candidate_id}-core",
+            directional_bias="risk",
+            confidence_band="exploratory",
+            radar_route="calendar_risk",
+            radar_route_reason="attached_calendar_or_scheduled_risk_research",
+            radar_actionable=False,
+            timing_state="scheduled",
+            preferred_horizon="scheduled_window",
+            unified_calendar_event={
+                "event_id": event_id,
+                "event_kind": "crypto_unlock",
+                "scheduled_at": "2026-06-15T20:00:00Z",
+                "time_certainty": "exact",
+                "importance": "high",
+            },
+        )
+
+    testlist = calendar_candidate("testlist-calendar", "calendar-testlist")
+    testunlock = calendar_candidate("testunlock-calendar", "calendar-testunlock")
+    testrumor = {
+        **calendar_candidate("testrumor-calendar", "unused-calendar-id"),
+        "unified_calendar_event": None,
+        "scheduled_catalyst_event": {
+            "event_type": "project",
+            "event_start_time": "2026-06-15T20:00:00Z",
+            "provider": "fixture-calendar",
+            "source_url": "https://example.invalid/calendar/rumor",
+        },
+    }
+    diagnostic = _market_led_candidate(
+        candidate_id="non-calendar-diagnostic",
+        core_opportunity_id="non-calendar-diagnostic-core",
+        confidence_band="diagnostic",
+        tradability_status="blocked",
+        radar_route="diagnostic",
+        radar_route_reason="hard_gate_blocked_research_promotion",
+        radar_actionable=False,
+        decision_hard_blockers=["canonical_asset_identity_untrusted"],
+    )
+    groups = group_decision_rows(
+        (testlist, testunlock, testrumor, diagnostic),
+        include_diagnostics=True,
+    )
+
+    assert {row["candidate_id"] for row in groups["calendar_risk"]} == {
+        "testlist-calendar", "testunlock-calendar", "testrumor-calendar",
+    }
+    assert groups["decision_diagnostic"] == [diagnostic]
+    for raw in (testlist, testunlock, testrumor):
+        projected = decision_model_values(raw)
+        assert decision_preview_lane(raw) == decision_preview_lane(projected) == "calendar_risk"
+    rumor_projection = decision_model_values(testrumor)
+    assert rumor_projection["calendar_evidence_ids"] == []
+    assert rumor_projection["calendar_evidence"][0]["evidence_reference"] == (
+        "candidate_schedule:testrumor-calendar"
+    )
+
+    false_calendar = {
+        **testlist,
+        "unified_calendar_event": None,
+        "radar_route": "calendar_risk",
+    }
+    assert "decision_model_calendar_risk_without_calendar_evidence" in validate_contract(false_calendar)
+    assert decision_model_values(false_calendar) == {}
+    assert decision_preview_lane(false_calendar) == "decision_diagnostic"
+
+
+def test_closed_projection_fails_closed_on_tampered_context_or_safety():
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import decision_model_values
+
+    projected = decision_model_values(_market_led_candidate())
+    alias_drift = {**projected, "hard_blockers": ["hidden_downstream_override"]}
+    unsafe = {
+        **projected,
+        "decision_safety_invariants": {
+            **projected["decision_safety_invariants"],
+            "no_live_trading": False,
+        },
+    }
+
+    assert decision_model_values(alias_drift) == {}
+    assert decision_model_values(unsafe) == {}
+
+
 def test_v2_projection_fails_closed_on_malformed_actionable_route():
     from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
     from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
@@ -263,7 +452,10 @@ def test_cards_daily_brief_and_preview_render_v2_transparently_and_no_send():
         format_integrated_notification_preview_from_deliveries,
     )
 
-    candidate = _market_led_candidate()
+    candidate = _market_led_candidate(
+        why_now="strict catalyst route is STORE_ONLY because source is missing",
+        opportunity_type_why_now="strict catalyst route is STORE_ONLY because source is missing",
+    )
     diagnostic = _market_led_candidate(
         candidate_id="diagnostic-v2",
         alert_key="diagnostic-v2",
@@ -279,20 +471,49 @@ def test_cards_daily_brief_and_preview_render_v2_transparently_and_no_send():
     card = render_research_card("candidate-v2", alert_rows=(candidate,))
     assert card.found is True
     for text in (
-        "## Crypto Radar Decision",
+        "## Crypto Decision Radar",
+        "## Catalyst Radar Classification",
         "Radar actionable: true",
         "Actionability components: liquidity=20; relative_move=18",
         "Actionability penalties: unknown_catalyst=5",
         "Evidence-confidence components: market_evidence=42",
         "Risk components: manipulation_risk=10",
         "Missing data: derivatives",
+        "Why now: fresh liquid breakout with relative strength",
         "Why this is still worth human review: fresh liquid breakout with relative strength",
         "Catalyst unknown:",
         "Higher manipulation risk:",
         "Research idea, not a trade instruction.",
+        "Dashboard: /candidate/core-v2",
     ):
         assert text in card.markdown
     assert "['fresh liquid breakout" not in card.markdown
+    assert "not alertable" not in card.markdown.casefold()
+    assert (
+        "- Why now: strict catalyst route is STORE_ONLY because source is missing"
+        in card.markdown.split("## Catalyst Radar Classification", 1)[1]
+    )
+
+    unblocked_diagnostic_card = render_research_card(
+        "diagnostic-v2", alert_rows=(diagnostic,)
+    )
+    assert "- Operator classification: Diagnostic Research Control" in (
+        unblocked_diagnostic_card.markdown
+    )
+    blocked_diagnostic = {
+        **diagnostic,
+        "candidate_id": "blocked-diagnostic-v2",
+        "alert_key": "blocked-diagnostic-v2",
+        "symbol": "BLOCKED",
+        "asset_symbol": "BLOCKED",
+        "decision_hard_blockers": ["liquidity_below_minimum"],
+    }
+    blocked_diagnostic_card = render_research_card(
+        "blocked-diagnostic-v2", alert_rows=(blocked_diagnostic,)
+    )
+    assert "- Operator classification: Blocked Diagnostic" in (
+        blocked_diagnostic_card.markdown
+    )
 
     deliveries = build_integrated_notification_delivery_rows((candidate, diagnostic))
     by_lane = {row["lane"]: row for row in deliveries}
@@ -323,6 +544,11 @@ def test_cards_daily_brief_and_preview_render_v2_transparently_and_no_send():
     assert "## Calendar / Scheduled Risk" in brief
     assert "Crypto Radar v2: route=actionable_watch" in brief
     assert "## Lane: Actionable Ideas" in preview
+    assert "Decision why now: fresh liquid breakout with relative strength" in preview
+    assert (
+        "Catalyst Radar why now: strict catalyst route is STORE_ONLY because source is missing"
+        in preview
+    )
     assert "Catalyst unknown:" in preview
     assert "Higher manipulation risk:" in preview
     assert "Research idea, not a trade instruction." in preview
@@ -343,6 +569,9 @@ def test_v2_outcomes_inbox_and_feedback_keep_decision_context(tmp_path: Path):
     from crypto_rsi_scanner.event_alpha.outcomes.integrated_radar_outcomes import (
         _outcome_row,
         write_integrated_radar_outcome_placeholders,
+    )
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
     )
 
     candidate = _market_led_candidate(
@@ -390,6 +619,7 @@ def test_v2_outcomes_inbox_and_feedback_keep_decision_context(tmp_path: Path):
 
     item = _inbox_item(candidate, None, {}, set(), {})
     assert item.radar_route == "actionable_watch"
+    assert item.decision_projection == decision_model_values(candidate)
     assert item.primary_thesis_origin == "market_led"
     assert item.thesis_origins == ("market_led",)
     assert item.spread_status == "verified_good"

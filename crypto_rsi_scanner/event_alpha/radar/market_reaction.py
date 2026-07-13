@@ -60,11 +60,16 @@ class MarketStateSnapshot:
     return_unit: str = event_market_units.RETURN_UNIT_PERCENT_POINTS
     source_return_unit: str = event_market_units.RETURN_UNIT_UNKNOWN
     threshold_unit: str = event_market_units.RETURN_UNIT_PERCENT_POINTS
+    return_units: Mapping[str, str] = field(default_factory=dict)
+    source_return_units: Mapping[str, str] = field(default_factory=dict)
     unit_warnings: tuple[str, ...] = ()
     observed_fields: int = 0
 
     def to_dict(self) -> dict[str, Any]:
-        return {key: value for key, value in asdict(self).items() if value is not None}
+        data = {key: value for key, value in asdict(self).items() if value is not None}
+        data["return_units"] = dict(self.return_units)
+        data["source_return_units"] = dict(self.source_return_units)
+        return data
 
 
 @dataclass(frozen=True)
@@ -332,15 +337,51 @@ def _build_snapshot(data: MarketReactionInput) -> MarketStateSnapshot:
             "relative_strength_vs_sector",
         ),
     )
+
+    source_return_units: dict[str, str] = {}
+
+    def market_pct(field: str, *aliases: str) -> float | None:
+        source_field = next(
+            (
+                key
+                for key in (field, *aliases)
+                if key in market and market.get(key) not in (None, "")
+            ),
+            field,
+        )
+        unit = event_market_units.return_unit_for_field(
+            market,
+            source_field,
+            default=market_unit,
+        )
+        value = _pct(_first(market, field, *aliases), unit_hint=unit)
+        if value is not None:
+            source_return_units[field] = unit
+        return value
+
     values = {
-        "return_5m": _pct(_first(market, "return_5m", "price_change_5m"), unit_hint=market_unit),
-        "return_15m": _pct(_first(market, "return_15m", "price_change_15m"), unit_hint=market_unit),
-        "return_1h": _pct(_first(market, "return_1h", "price_change_1h"), unit_hint=market_unit),
-        "return_4h": _pct(_first(market, "return_4h", "price_change_4h"), unit_hint=market_unit),
-        "return_24h": _pct(_first(market, "return_24h", "price_change_24h", "price_change_percentage_24h"), unit_hint=market_unit),
-        "relative_return_vs_btc": _pct(_first(market, "relative_return_vs_btc", "rel_return_btc", "relative_strength_vs_btc"), unit_hint=market_unit),
-        "relative_return_vs_eth": _pct(_first(market, "relative_return_vs_eth", "rel_return_eth", "relative_strength_vs_eth"), unit_hint=market_unit),
-        "relative_return_vs_sector": _pct(_first(market, "relative_return_vs_sector", "rel_return_sector", "relative_strength_vs_sector"), unit_hint=market_unit),
+        "return_5m": market_pct("return_5m", "price_change_5m"),
+        "return_15m": market_pct("return_15m", "price_change_15m"),
+        "return_1h": market_pct("return_1h", "price_change_1h"),
+        "return_4h": market_pct("return_4h", "price_change_4h"),
+        "return_24h": market_pct("return_24h", "price_change_24h", "price_change_percentage_24h"),
+        "relative_return_vs_btc": market_pct(
+            "relative_return_vs_btc",
+            "relative_return_vs_btc_4h",
+            "rel_return_btc",
+            "relative_strength_vs_btc",
+        ),
+        "relative_return_vs_eth": market_pct(
+            "relative_return_vs_eth",
+            "relative_return_vs_eth_4h",
+            "rel_return_eth",
+            "relative_strength_vs_eth",
+        ),
+        "relative_return_vs_sector": market_pct(
+            "relative_return_vs_sector",
+            "rel_return_sector",
+            "relative_strength_vs_sector",
+        ),
         "volume_turnover_zscore": _float(_first(market, "volume_turnover_zscore", "volume_zscore_24h", "volume_zscore", "volume_z")),
         "volume_to_market_cap": _float(_first(market, "volume_to_market_cap", "volume_mcap", "volume_mcap_ratio")),
         "liquidity_usd": _float(_first(market, "liquidity_usd", "order_book_depth_2pct", "depth_2pct_usd")),
@@ -363,6 +404,27 @@ def _build_snapshot(data: MarketReactionInput) -> MarketStateSnapshot:
         values["event_age_hours"] = _float(_first(market, "event_age_hours", "age_hours"))
     if values["event_age_hours"] is None:
         values["event_age_hours"] = _float(_first(supply, "event_age_hours"))
+    return_units = {
+        key: event_market_units.RETURN_UNIT_PERCENT_POINTS
+        for key, value in values.items()
+        if key in event_market_units.RETURN_KEYS and value is not None
+    }
+    unit_warnings = list(event_market_units.validate_market_snapshot_units(
+        {
+            "return_unit": event_market_units.RETURN_UNIT_PERCENT_POINTS,
+            "return_units": return_units,
+            **{
+                key: value
+                for key, value in values.items()
+                if key in event_market_units.RETURN_KEYS
+            },
+        },
+        market,
+    ))
+    if market.get("return_unit") not in (None, "") or any(
+        key in market for key in event_market_units.RETURN_UNIT_METADATA_KEYS
+    ):
+        unit_warnings.extend(event_market_units.validate_market_snapshot_units(market))
     return MarketStateSnapshot(
         **values,
         freshness_status=data.market_context_freshness_status or _first_text(market, {}, "market_context_freshness_status", "freshness_status"),
@@ -370,10 +432,9 @@ def _build_snapshot(data: MarketReactionInput) -> MarketStateSnapshot:
         return_unit=event_market_units.RETURN_UNIT_PERCENT_POINTS,
         source_return_unit=market_unit,
         threshold_unit=event_market_units.RETURN_UNIT_PERCENT_POINTS,
-        unit_warnings=event_market_units.validate_market_snapshot_units(
-            {"return_unit": event_market_units.RETURN_UNIT_PERCENT_POINTS, **{key: values.get(key) for key in ("return_1h", "return_4h", "return_24h")}},
-            market,
-        ),
+        return_units=return_units,
+        source_return_units=source_return_units,
+        unit_warnings=tuple(dict.fromkeys(unit_warnings)),
         observed_fields=observed,
     )
 

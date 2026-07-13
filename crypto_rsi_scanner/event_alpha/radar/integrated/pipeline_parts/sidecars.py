@@ -469,8 +469,24 @@ def _fixture_market_rows() -> tuple[dict[str, Any], ...]:
             "spread_bps": 320,
             "freshness_status": "fresh",
         },
-        {"symbol": "TESTPERP", "coin_id": "test-perp", "price": 2.4, "return_unit": "fraction", "return_1h": 0.035, "return_4h": 0.11, "return_24h": 0.18, "relative_return_vs_btc_4h": 0.10, "volume_zscore_24h": 3.4, "volume_to_market_cap": 0.32, "liquidity_usd": 18_000_000, "spread_bps": 18},
-        {"symbol": "TESTFADE", "coin_id": "test-fade", "price": 5.2, "return_unit": "fraction", "return_1h": 0.06, "return_4h": 0.21, "return_24h": 0.42, "volume_zscore_24h": 4.8, "volume_to_market_cap": 0.45, "liquidity_usd": 3_500_000, "spread_bps": 42, "event_age_hours": 3},
+        {
+            "symbol": "TESTRAPID",
+            "coin_id": "test-rapid",
+            "price": 3.1,
+            "return_unit": "fraction",
+            "return_1h": 0.08,
+            "return_4h": 0.18,
+            "return_24h": 0.32,
+            "relative_return_vs_btc_4h": 0.20,
+            "relative_return_vs_eth_4h": 0.198,
+            "volume_zscore_24h": 1.8,
+            "volume_to_market_cap": 0.50,
+            "liquidity_usd": 32_000_000,
+            "spread_bps": 14,
+            "freshness_status": "fresh",
+        },
+        {"symbol": "TESTPERP", "coin_id": "test-perp", "price": 2.4, "return_unit": "fraction", "return_1h": 0.035, "return_4h": 0.11, "return_24h": 0.18, "relative_return_vs_btc_4h": 0.10, "volume_zscore_24h": 3.4, "volume_to_market_cap": 0.32, "liquidity_usd": 18_000_000, "spread_bps": 18, "freshness_status": "fresh"},
+        {"symbol": "TESTFADE", "coin_id": "test-fade", "price": 5.2, "return_unit": "fraction", "return_1h": 0.06, "return_4h": 0.21, "return_24h": 0.42, "volume_zscore_24h": 4.8, "volume_to_market_cap": 0.45, "liquidity_usd": 3_500_000, "spread_bps": 42, "event_age_hours": 3, "freshness_status": "fresh"},
         {"symbol": "TESTRUMOR", "coin_id": "test-rumor", "price": 0.5, "return_unit": "fraction", "return_1h": 0.002, "return_4h": 0.004, "return_24h": 0.01, "volume_zscore_24h": 0.4, "liquidity_usd": 1_200_000, "spread_bps": 55},
     )
 
@@ -496,7 +512,28 @@ def _fixture_binance_announcements() -> tuple[dict[str, Any], ...]:
             "source_url": "https://www.binance.com/en/support/announcement/testfade",
             "published_at": "2026-06-14T12:00:00Z",
             "effective_time": "2026-06-15T13:00:00Z",
-            "market_snapshot": {"return_unit": "fraction", "return_4h": 0.21, "return_24h": 0.42, "volume_zscore_24h": 4.8, "event_age_hours": 3, "liquidity_usd": 3_500_000, "spread_bps": 42},
+            "market_snapshot": {"return_unit": "fraction", "return_4h": 0.21, "return_24h": 0.42, "volume_zscore_24h": 4.8, "event_age_hours": 3, "liquidity_usd": 3_500_000, "spread_bps": 42, "freshness_status": "fresh"},
+        },
+        {
+            "id": "binance-testhigh",
+            "title": "Binance Will List TestHigh (TESTHIGH)",
+            "body": "Binance will open spot trading for TESTHIGH/USDT.",
+            "symbols": ["TESTHIGH"],
+            "coin_ids": ["test-high"],
+            "source_url": "https://www.binance.com/en/support/announcement/testhigh",
+            "published_at": "2026-06-15T13:15:00Z",
+            "effective_time": "2026-06-15T16:30:00Z",
+            "market_snapshot": {
+                "return_unit": "fraction",
+                "return_4h": 0.12,
+                "return_24h": 0.20,
+                "relative_return_vs_btc": 0.09,
+                "volume_zscore_24h": 3.8,
+                "volume_to_market_cap": 0.30,
+                "liquidity_usd": 25_000_000,
+                "spread_bps": 12,
+                "freshness_status": "fresh",
+            },
         },
         {
             "id": "binance-btc-pair",
@@ -521,7 +558,7 @@ def _fixture_bybit_announcements() -> tuple[dict[str, Any], ...]:
             "source_url": "https://announcements.bybit.com/article/testperp",
             "published_at": "2026-06-15T14:00:00Z",
             "effective_time": "2026-06-15T16:30:00Z",
-            "market_snapshot": {"return_unit": "fraction", "return_4h": 0.11, "return_24h": 0.18, "volume_zscore_24h": 3.4, "relative_return_vs_btc": 0.10, "liquidity_usd": 18_000_000, "spread_bps": 18},
+            "market_snapshot": {"return_unit": "fraction", "return_4h": 0.11, "return_24h": 0.18, "volume_zscore_24h": 3.4, "relative_return_vs_btc": 0.10, "liquidity_usd": 18_000_000, "spread_bps": 18, "freshness_status": "fresh"},
         },
     )
 
@@ -571,10 +608,12 @@ def _fixture_derivatives_payload() -> dict[str, Any]:
         "derivatives": [
             {"symbol": "TESTFADEUSDT", "coin_id": "test-fade", "open_interest_delta_24h": 0.52, "funding_rate": 0.12, "funding_zscore": 3.2, "liquidation_long_usd": 2_800_000, "liquidation_short_usd": 500_000, "perp_volume": 90_000_000, "spot_volume": 30_000_000, "freshness_status": "fresh"},
             {"symbol": "TESTPERPUSDT", "coin_id": "test-perp", "open_interest_delta_24h": 0.06, "funding_rate": 0.01, "funding_zscore": 0.2, "liquidation_long_usd": 120_000, "liquidation_short_usd": 90_000, "perp_volume": 12_000_000, "spot_volume": 10_000_000, "freshness_status": "fresh"},
+            {"symbol": "TESTRAPIDUSDT", "coin_id": "test-rapid", "open_interest_delta_24h": 4.0, "funding_rate": 0.0, "funding_zscore": 0.1, "liquidation_long_usd": 100_000, "liquidation_short_usd": 100_000, "perp_volume": 20_000_000, "spot_volume": 18_000_000, "freshness_status": "fresh"},
         ],
         "candidates": [
-            {"symbol": "TESTFADE", "coin_id": "test-fade", "event_name": "TESTFADE listing blowoff", "source_class": "official_exchange", "source_pack": "listing_liquidity_pack", "impact_path_type": "listing_liquidity_event", "evidence_quality_score": 92, "accepted_evidence_count": 1, "market_snapshot": {"return_unit": "fraction", "return_4h": 0.21, "return_24h": 0.42, "volume_zscore_24h": 4.8, "volume_to_market_cap": 0.45, "liquidity_usd": 3_500_000, "spread_bps": 42, "event_age_hours": 3}},
-            {"symbol": "TESTPERP", "coin_id": "test-perp", "event_name": "TESTPERP perp breakout", "source_class": "official_exchange", "source_pack": "perp_listing_squeeze_pack", "impact_path_type": "listing_liquidity_event", "evidence_quality_score": 92, "accepted_evidence_count": 1, "market_snapshot": {"return_unit": "fraction", "return_4h": 0.11, "return_24h": 0.18, "volume_zscore_24h": 3.4, "relative_return_vs_btc": 0.10, "liquidity_usd": 18_000_000, "spread_bps": 18, "event_age_hours": -1}},
+            {"symbol": "TESTFADE", "coin_id": "test-fade", "event_name": "TESTFADE listing blowoff", "source_class": "official_exchange", "source_pack": "listing_liquidity_pack", "impact_path_type": "listing_liquidity_event", "evidence_quality_score": 92, "accepted_evidence_count": 1, "market_snapshot": {"return_unit": "fraction", "return_4h": 0.21, "return_24h": 0.42, "volume_zscore_24h": 4.8, "volume_to_market_cap": 0.45, "liquidity_usd": 3_500_000, "spread_bps": 42, "event_age_hours": 3, "freshness_status": "fresh"}},
+            {"symbol": "TESTPERP", "coin_id": "test-perp", "event_name": "TESTPERP perp breakout", "source_class": "official_exchange", "source_pack": "perp_listing_squeeze_pack", "impact_path_type": "listing_liquidity_event", "evidence_quality_score": 92, "accepted_evidence_count": 1, "market_snapshot": {"return_unit": "fraction", "return_4h": 0.11, "return_24h": 0.18, "volume_zscore_24h": 3.4, "relative_return_vs_btc": 0.10, "liquidity_usd": 18_000_000, "spread_bps": 18, "event_age_hours": -1, "freshness_status": "fresh"}},
+            {"symbol": "TESTRAPID", "coin_id": "test-rapid", "event_name": "TESTRAPID rapid market anomaly", "source_class": "market_anomaly", "source_pack": "market_anomaly_pack", "impact_path_type": "market_anomaly", "evidence_quality_score": 55, "accepted_evidence_count": 0, "market_snapshot": {"return_unit": "fraction", "return_1h": 0.08, "return_4h": 0.18, "return_24h": 0.32, "relative_return_vs_btc_4h": 0.20, "volume_zscore_24h": 1.8, "volume_to_market_cap": 0.50, "liquidity_usd": 32_000_000, "spread_bps": 14, "freshness_status": "fresh"}},
         ],
     }
 

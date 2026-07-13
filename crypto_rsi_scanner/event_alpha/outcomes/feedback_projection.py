@@ -35,6 +35,7 @@ def decision_fields(values: Mapping[str, Any]) -> dict[str, Any]:
         "market_phase": _optional_str(values.get("market_phase")),
         "preferred_horizon": _optional_str(values.get("preferred_horizon")),
         "expires_at": _optional_str(values.get("expires_at")),
+        "decision_evaluated_at": _optional_str(values.get("decision_evaluated_at")),
         "chase_risk_score": _optional_float(values.get("chase_risk_score")),
         "actionability_score_cohort": _optional_str(
             values.get("actionability_score_cohort")
@@ -95,6 +96,11 @@ def calendar_evidence_fields(*authorities: Mapping[str, Any]) -> dict[str, Any]:
             continue
         scheduled_at = _aware_calendar_timestamp(authority.get("scheduled_at"))
         event_rows: list[Mapping[str, Any]] = []
+        canonical = authority.get("calendar_evidence")
+        if isinstance(canonical, Iterable) and not isinstance(
+            canonical, (str, bytes, Mapping)
+        ):
+            event_rows.extend(item for item in canonical if isinstance(item, Mapping))
         for field in (
             "nearby_calendar_events",
             "calendar_events",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .runtime import *
+from ....radar.decision_model_surfaces import decision_model_values
 
 def _source_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str, Any] | None) -> list[str]:
     components = _card_components(entry, alert)
@@ -140,7 +141,10 @@ def _scheduled_catalyst_lines(
     if invalidates:
         lines.append("- What invalidates: " + "; ".join(invalidates[:4]))
     if why_not:
-        lines.append("- Why not alertable: " + "; ".join(why_not[:5]))
+        lines.append(
+            "- Why not eligible for strict catalyst alert: "
+            + "; ".join(why_not[:5])
+        )
     source_url = components.get("source_url") or event.get("source_url") or event.get("url")
     if source_url:
         lines.append(f"- Source: {source_url}")
@@ -431,9 +435,15 @@ def _analyst_summary_lines(
         return []
     plan = components.get("evidence_acquisition_plan") if isinstance(components.get("evidence_acquisition_plan"), Mapping) else None
     summary = event_llm_evidence_planner.generate_analyst_summary(components, plan=plan)
+    catalyst_eligibility = str(summary.why_not_alertable)
+    if decision_model_values(alert, components):
+        catalyst_eligibility = catalyst_eligibility.replace(
+            "Not alertable on final route",
+            "Ineligible on strict catalyst route",
+        ).replace("Not alertable", "Ineligible for strict catalyst alert")
     lines = [
         f"- Why surfaced: {summary.why_surfaced}",
-        f"- Alertability: {summary.why_not_alertable}",
+        f"- Strict catalyst alert eligibility: {catalyst_eligibility}",
         f"- What would upgrade: {summary.what_would_upgrade}",
         f"- What would invalidate: {summary.what_would_invalidate}",
         "- Check next: " + "; ".join(summary.what_to_check_next[:4]),

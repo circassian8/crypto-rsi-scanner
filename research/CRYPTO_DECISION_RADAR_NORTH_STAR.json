@@ -1,0 +1,306 @@
+{
+  "canonical_projection": {
+    "authority_function": "decision_model_values",
+    "copied_to": [
+      "event_core_opportunities.jsonl",
+      "research_cards/",
+      "event_decision_v2_notification_preview.md",
+      "event_alpha_notification_inbox.md",
+      "event_integrated_radar_outcomes.jsonl",
+      "dashboard read model"
+    ],
+    "drift_policy": {
+      "candidate_core_route_mismatch": "blocker",
+      "candidate_core_score_mismatch_beyond_deterministic_rounding": "blocker",
+      "card_projection_mismatch": "blocker",
+      "dashboard_projection_mismatch": "blocker",
+      "outcome_projection_mismatch": "blocker",
+      "preview_lane_mismatch": "blocker"
+    },
+    "idempotent": true,
+    "projection_schema_version": "crypto_radar_decision_projection_v1",
+    "rendering_re_evaluates": false,
+    "required_context": [
+      "calendar_evidence",
+      "calendar_evidence_ids",
+      "rsi_context",
+      "rsi_context_references",
+      "observation_ids",
+      "source_provider_lineage",
+      "decision_evaluated_at"
+    ],
+    "required_decision_fields": [
+      "decision_model_version",
+      "decision_projection_schema_version",
+      "research_only",
+      "primary_thesis_origin",
+      "thesis_origins",
+      "directional_bias",
+      "catalyst_status",
+      "confidence_band",
+      "timing_state",
+      "market_phase",
+      "tradability_status",
+      "spread_status",
+      "radar_route",
+      "radar_actionable",
+      "actionability_score",
+      "evidence_confidence_score",
+      "risk_score",
+      "urgency_score",
+      "chase_risk_score",
+      "preferred_horizon",
+      "expires_at",
+      "hard_blockers",
+      "soft_penalties",
+      "warnings",
+      "why_now",
+      "supporting_facts",
+      "missing_information",
+      "main_risks",
+      "what_confirms",
+      "what_invalidates",
+      "decision_safety_invariants"
+    ],
+    "stored_on": "event_integrated_radar_candidates.jsonl",
+    "validation_uses_projection_only": true
+  },
+  "context_policy": {
+    "calendar": {
+      "calendar_alone_creates_directional_bias": false,
+      "calendar_risk_requires_attached_evidence": true,
+      "preserved_fields": [
+        "calendar_event_id",
+        "category",
+        "event_at_or_impact_window",
+        "time_certainty",
+        "importance",
+        "timezone",
+        "forecast",
+        "previous",
+        "actual",
+        "surprise"
+      ]
+    },
+    "rsi": {
+      "creates_ideas": false,
+      "no_edge_setup_remains_capped": true,
+      "preserve_context_and_references": true,
+      "read_only": true,
+      "side_effects_allowed": []
+    }
+  },
+  "decision_model_version": "crypto_radar_decision_model_v2",
+  "generated_at": "2026-07-12T18:45:07+00:00",
+  "market_no_send_generation": {
+    "authorization": {
+      "live_provider_calls_allowed_by_default": false,
+      "required_environment_flag": "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1"
+    },
+    "dashboard_pointer_policy": {
+      "fixture_or_mock_generation_eligible": false,
+      "pointer_changes_on_failed_or_blocked_run": false,
+      "required_checks": [
+        "real live-safe data mode",
+        "fresh complete operator state",
+        "valid exact fingerprints",
+        "matching canonical counts",
+        "current run/revision/operator-state binding",
+        "fresh full strict doctor with zero blockers"
+      ],
+      "zero_idea_generation_may_be_clean": true
+    },
+    "default_namespace": "radar_market_no_send",
+    "defaults": {
+      "no_normal_rsi_writes": true,
+      "no_paper_trades": true,
+      "no_sends": true,
+      "no_trades": true,
+      "no_triggered_fade": true,
+      "research_only": true
+    },
+    "pipeline": [
+      "bounded top-liquid universe",
+      "fresh market snapshots",
+      "market anomalies and observations",
+      "canonical Decision v2 projections",
+      "cards and Decision preview",
+      "pending outcomes",
+      "operator state and dashboard read model",
+      "strict doctor",
+      "guarded authoritative-pointer publication"
+    ],
+    "provider": "coingecko",
+    "provenance_fields": [
+      "data_mode",
+      "provider",
+      "request_or_cache_artifact",
+      "observed_at",
+      "contract_counted",
+      "no_send"
+    ],
+    "targets": [
+      "radar-market-no-send-readiness",
+      "radar-market-no-send",
+      "radar-market-no-send-smoke"
+    ]
+  },
+  "origins": {
+    "contributing": [
+      "market_led",
+      "catalyst_led",
+      "technical_led",
+      "derivatives_led",
+      "onchain_led",
+      "fundamental_led",
+      "macro_led"
+    ],
+    "legacy_mixed_is_compatibility_only": true,
+    "primary": [
+      "market_led",
+      "catalyst_led",
+      "technical_led",
+      "derivatives_led",
+      "onchain_led",
+      "fundamental_led",
+      "macro_led"
+    ],
+    "primary_is_first_contributing_origin": true
+  },
+  "outcome_policy": {
+    "automatic_threshold_changes": false,
+    "canonical_cohort_fields": [
+      "primary_thesis_origin",
+      "thesis_origins",
+      "radar_route",
+      "actionability_score_cohort",
+      "evidence_confidence_score_cohort",
+      "risk_score_cohort",
+      "catalyst_status",
+      "timing_state",
+      "market_phase"
+    ],
+    "human_feedback_is_optional_preference_data": true,
+    "pending_row_for_every_current_idea": true
+  },
+  "product_layers": {
+    "catalyst_radar": {
+      "name": "Event Alpha",
+      "owns": [
+        "catalyst discovery",
+        "source-strength classification",
+        "strict catalyst routes",
+        "historical Event Alpha artifacts"
+      ]
+    },
+    "decision_radar": {
+      "name": "Crypto Decision Radar",
+      "owns": [
+        "canonical trader-facing Decision v2 projection",
+        "operator routes",
+        "dashboard",
+        "Decision preview",
+        "Decision-first card hierarchy"
+      ]
+    },
+    "relationship": "additive",
+    "unknown_catalyst_policy": "soft explanatory-confidence penalty and risk input, not a universal visibility blocker"
+  },
+  "purpose": "Make Decision Model v2 one internally consistent source of trader-facing research truth without authorizing execution.",
+  "research_only": true,
+  "route_definitions": {
+    "actionable_watch": "Actionable research that passes identity, freshness, liquidity, spread, turnover, manipulation, dedupe, and safety gates.",
+    "calendar_risk": "Scheduled risk backed by actual canonical calendar evidence; calendar context alone does not create direction.",
+    "dashboard_watch": "Visible non-actionable research, including otherwise-sufficient ideas with unavailable spread.",
+    "diagnostic": "Hard-blocked, malformed, suspicious, stale, duplicate, control, or otherwise non-promotable evidence retained for audit.",
+    "fade_exhaustion_review": "Fresh exhaustion or crowding evidence for human review, never Event Alpha-created TRIGGERED_FADE.",
+    "high_confidence_watch": "Actionable research with the strongest current evidence and execution-quality checks.",
+    "rapid_market_anomaly": "Fresh, liquid, urgent market dislocation that passes actionable execution-quality gates; catalyst may remain unknown.",
+    "risk_watch": "Unscheduled downside or integrity risk without attached scheduled-calendar evidence."
+  },
+  "routes": [
+    "dashboard_watch",
+    "actionable_watch",
+    "high_confidence_watch",
+    "rapid_market_anomaly",
+    "fade_exhaustion_review",
+    "risk_watch",
+    "calendar_risk",
+    "diagnostic"
+  ],
+  "row_type": "crypto_decision_radar_north_star",
+  "safety_invariants": {
+    "human_decision_required": true,
+    "no_credentials_in_artifacts_or_output": true,
+    "no_event_alpha_paper_trading": true,
+    "no_event_alpha_triggered_fade": true,
+    "no_execution_order_logic": true,
+    "no_live_provider_calls_without_existing_explicit_authorization": true,
+    "no_live_trading": true,
+    "no_normal_rsi_signal_writes": true,
+    "no_real_telegram_sends_by_default": true,
+    "preserve_historical_artifacts_without_silent_reinterpretation": true,
+    "research_only": true,
+    "triggered_fade_source_boundary": "event_fade.py + proxy_fade only"
+  },
+  "schema_version": "crypto_decision_radar_north_star_v1",
+  "score_and_timing_policy": {
+    "scores": [
+      "actionability_score",
+      "evidence_confidence_score",
+      "risk_score",
+      "urgency_score",
+      "chase_risk_score"
+    ],
+    "timing_fields": [
+      "timing_state",
+      "market_phase",
+      "preferred_horizon",
+      "expires_at"
+    ],
+    "urgent_or_high_score_bypasses_hard_blockers": false,
+    "expired_idea_actionable": false
+  },
+  "spread_policy": {
+    "actionable_or_rapid_allowed": [
+      "verified_good",
+      "verified_acceptable"
+    ],
+    "dashboard_watch_may_use_unavailable": true,
+    "invent_spread": false,
+    "states": [
+      "verified_good",
+      "verified_acceptable",
+      "verified_wide",
+      "unavailable",
+      "stale"
+    ]
+  },
+  "surfaces": {
+    "card_hierarchy": [
+      "Crypto Decision Radar",
+      "Catalyst Radar Classification"
+    ],
+    "dashboard_get_head_side_effects": [],
+    "dashboard_is_primary": true,
+    "decision_preview_sections": [
+      "High-Confidence Ideas",
+      "Actionable Ideas",
+      "Rapid Market Anomalies",
+      "Dashboard Watch",
+      "Fade / Exhaustion Review",
+      "Risk Watch",
+      "Calendar / Scheduled Risk"
+    ],
+    "legacy_event_alpha_preview_role": "diagnostic and compatibility output",
+    "notifications_route_attention_only": true,
+    "stale_or_untrusted_data_shown_actionable": false
+  },
+  "unit_policy": {
+    "fraction_example": "0.10 becomes 10 percent",
+    "mixed_incompatible_shared_unit": "blocker",
+    "per_field_units_required": true,
+    "percent_points_example": "10.0 becomes 10 percent",
+    "ten_as_fraction": "blocker"
+  }
+}

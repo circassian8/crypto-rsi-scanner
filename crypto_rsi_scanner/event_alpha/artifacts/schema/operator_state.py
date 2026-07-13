@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from ..fingerprints import (
@@ -34,15 +36,35 @@ _LEGACY_SHA_ONLY_OTHER_FIELDS = tuple(
     )
     if field != "sha256"
 )
+_MARKET_NO_SEND_PROVENANCE_FIELDS = frozenset(
+    {
+        "contract_version",
+        "data_mode",
+        "provider",
+        "observed_at",
+        "request_cache_artifact",
+        "contract_counted_status",
+        "provider_call_attempted",
+        "provider_request_succeeded",
+        "no_send_status",
+        "no_send",
+        "research_only",
+        "trades_created",
+        "paper_trades_created",
+        "normal_rsi_signal_rows_written",
+        "triggered_fade_created",
+        "telegram_sends",
+    }
+)
 
 
 def validate_contract(row: Mapping[str, Any]) -> list[str]:
     """Validate fingerprints on every artifact claiming current authority."""
 
+    errors = _validate_market_no_send_provenance(row.get("market_no_send_provenance"))
     artifacts = row.get("artifacts")
     if not isinstance(artifacts, Mapping):
-        return []
-    errors: list[str] = []
+        return errors
     for raw_name, raw_entry in artifacts.items():
         name = str(raw_name)
         if not isinstance(raw_entry, Mapping):
@@ -54,6 +76,57 @@ def validate_contract(row: Mapping[str, Any]) -> list[str]:
         if not _has_fingerprint_contract(raw_entry):
             continue
         errors.extend(_validate_current_entry(name, raw_entry, state=row))
+    return errors
+
+
+def _validate_market_no_send_provenance(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, Mapping):
+        return ["operator_state_market_no_send_provenance_not_object"]
+    errors: list[str] = []
+    fields = set(value)
+    if fields != _MARKET_NO_SEND_PROVENANCE_FIELDS:
+        errors.append("operator_state_market_no_send_provenance_fields_invalid")
+    if value.get("contract_version") != 1:
+        errors.append("operator_state_market_no_send_provenance_version_invalid")
+    data_mode = value.get("data_mode")
+    provider = value.get("provider")
+    if data_mode not in {"live", "mock"}:
+        errors.append("operator_state_market_no_send_data_mode_invalid")
+    if provider != ("coingecko" if data_mode == "live" else "mock_coingecko"):
+        errors.append("operator_state_market_no_send_provider_invalid")
+    observed_at = value.get("observed_at")
+    try:
+        observed = datetime.fromisoformat(str(observed_at).replace("Z", "+00:00"))
+    except ValueError:
+        observed = None
+    if observed is None or observed.tzinfo is None:
+        errors.append("operator_state_market_no_send_observed_at_invalid")
+    request_artifact = value.get("request_cache_artifact")
+    request_path = Path(str(request_artifact or ""))
+    if (
+        request_artifact != "event_market_no_send_market_rows.json"
+        or request_path.is_absolute()
+        or len(request_path.parts) != 1
+    ):
+        errors.append("operator_state_market_no_send_request_artifact_invalid")
+    expected = {
+        "contract_counted_status": "counted",
+        "no_send_status": "enforced",
+        "provider_call_attempted": True,
+        "provider_request_succeeded": True,
+        "no_send": True,
+        "research_only": True,
+        "trades_created": 0,
+        "paper_trades_created": 0,
+        "normal_rsi_signal_rows_written": 0,
+        "triggered_fade_created": 0,
+        "telegram_sends": 0,
+    }
+    for field, expected_value in expected.items():
+        if value.get(field) != expected_value:
+            errors.append(f"invalid_safety_market_no_send_provenance:{field}")
     return errors
 
 

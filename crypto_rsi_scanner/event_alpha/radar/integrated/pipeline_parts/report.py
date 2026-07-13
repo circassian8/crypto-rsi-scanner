@@ -383,6 +383,7 @@ def build_integrated_notification_delivery_rows(
                 context=context,
                 lane=lane,
                 core_by_id=core_by_id,
+                decision_product=True,
             )
             out.append(_integrated_delivery_row(
                 lane=lane,
@@ -598,10 +599,11 @@ def _integrated_lane_message(
     lane: str,
     core_by_id: Mapping[str, Mapping[str, Any]] | None = None,
     extra_lines: Iterable[str] = (),
+    decision_product: bool = False,
 ) -> str:
     materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
     lines = [
-        f"🧭 Event Alpha {lane_title}",
+        f"🧭 {'Crypto Decision Radar' if decision_product else 'Event Alpha'} {lane_title}",
         "Research-only / unvalidated. Not a trade signal.",
         "Research idea, not a trade instruction.",
         f"Profile: {context.profile if context else 'unknown'}",
@@ -613,16 +615,36 @@ def _integrated_lane_message(
         lines.append("- No candidate items in this lane.")
     for index, row in enumerate(materialized, start=1):
         card_path = _row_card_path(row, core_by_id=core_by_id)
+        decision_values = decision_model_values(row) if decision_product else {}
         decision_lines = decision_model_markdown_lines(row)
+        catalyst_why_now = (
+            row.get("opportunity_type_why_now") or row.get("why_now") or "unknown"
+        )
         lines.extend([
             f"{index}. {row.get('symbol')}/{row.get('coin_id')}",
-            f"   Opportunity: {row.get('opportunity_type') or 'unknown'}",
-            f"   Why now: {row.get('why_now') or 'unknown'}",
+            (
+                f"   Catalyst Radar classification: {row.get('opportunity_type') or 'unknown'}"
+                if decision_product
+                else f"   Opportunity: {row.get('opportunity_type') or 'unknown'}"
+            ),
+            (
+                f"   Decision why now: {decision_values.get('why_now') or 'unknown'}"
+                if decision_product
+                else f"   Why now: {row.get('why_now') or 'unknown'}"
+            ),
+            *(
+                [f"   Catalyst Radar why now: {catalyst_why_now}"]
+                if decision_product
+                else []
+            ),
             f"   Evidence: {row.get('source_pack') or 'unknown'}; source={row.get('source_class') or 'unknown'}",
             f"   Market state: {row.get('market_state_class') or 'unknown'}",
             f"   What confirms: {_list_label(row.get('what_confirms') or ())}",
             f"   What invalidates: {_list_label(row.get('what_invalidates') or ())}",
-            f"   Why not alertable: {_list_label(row.get('why_not_alertable') or ())}",
+            (
+                "   Why not eligible for strict catalyst alert: "
+                f"{_list_label(row.get('why_not_alertable') or ())}"
+            ),
             f"   Card: {card_path or 'not generated'}",
         ])
         if decision_lines:

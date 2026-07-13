@@ -84,6 +84,7 @@ def _outcome_placeholder_row(candidate: Mapping[str, Any], *, now: str) -> dict[
         "source_strength": candidate.get("source_strength"),
         "crowding_class": candidate.get("crowding_class"),
         **_calendar_evidence_values(candidate),
+        "decision_projection": dict(decision),
         **decision,
         "evidence_confidence_score_cohort": _score_cohort(
             decision.get("evidence_confidence_score")
@@ -209,6 +210,7 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
         "source_strength": candidate.get("source_strength"),
         "crowding_class": candidate.get("crowding_class"),
         **_calendar_evidence_values(candidate),
+        "decision_projection": dict(decision),
         **decision,
         "evidence_confidence_score_cohort": _score_cohort(
             decision.get("evidence_confidence_score")

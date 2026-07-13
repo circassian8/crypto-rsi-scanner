@@ -709,6 +709,7 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "directional_bias_counts", "catalyst_status_counts", "timing_state_counts",
             "tradability_status_counts",
             "actionable_research_ideas", "high_confidence_research_ideas",
+            "market_no_send_provenance",
         ),
         types={
             "revision": "int", "artifacts": "dict", "doctor": "dict",
@@ -723,6 +724,7 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "confidence_band_counts": "dict", "thesis_origin_counts": "dict", "directional_bias_counts": "dict",
             "catalyst_status_counts": "dict", "timing_state_counts": "dict", "tradability_status_counts": "dict",
             "actionable_research_ideas": "int", "high_confidence_research_ideas": "int",
+            "market_no_send_provenance": "dict",
             "trades_created": "int", "paper_trades_created": "int", "normal_rsi_signal_rows_written": "int", "triggered_fade_created": "int",
         },
         enums={"manifest_status": ("complete", "partial", "incoherent")},

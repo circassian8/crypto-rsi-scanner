@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ... import decision_model as event_radar_decision_model
+from ...decision_model_surfaces import decision_model_values
 from .runtime import *
 from .sidecars import _load_rsi_signal_context_rows
 
@@ -316,16 +317,20 @@ def _write_integrated_candidate_artifacts(
         now=start.research_observed_at,
     )
     decision_cfg = event_radar_decision_model.RadarDecisionConfig.from_runtime(config)
-    candidates = tuple(
-        {
+    projected_candidates: list[dict[str, Any]] = []
+    for candidate in candidates:
+        evaluated = {
             **candidate,
             **event_radar_decision_model.reevaluate_radar_decision_fields(
                 candidate,
                 cfg=decision_cfg,
             ),
         }
-        for candidate in candidates
-    )
+        projection = decision_model_values(evaluated)
+        if projection:
+            evaluated["decision_projection"] = projection
+        projected_candidates.append(evaluated)
+    candidates = tuple(projected_candidates)
     candidates_path = start.namespace_dir / INTEGRATED_CANDIDATES_FILENAME
     _write_jsonl(candidates_path, candidates)
     # Establish truthful pending outcome coverage immediately.  Import here to

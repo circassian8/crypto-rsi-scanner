@@ -60,6 +60,7 @@ ACCEPTED_MODEL_BUNDLE_MODULES = {
     "crypto_rsi_scanner.event_alpha.notifications.router",
     "crypto_rsi_scanner.event_alpha.notifications.runs",
     "crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor",
+    "crypto_rsi_scanner.event_alpha.operations.market_no_send_models",
     "crypto_rsi_scanner.event_alpha.outcomes.burn_in",
     "crypto_rsi_scanner.event_alpha.outcomes.feedback",
     "crypto_rsi_scanner.event_alpha.outcomes.feedback_labels",

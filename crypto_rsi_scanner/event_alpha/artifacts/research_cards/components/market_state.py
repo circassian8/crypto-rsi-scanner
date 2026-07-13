@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .runtime import *
+from ....radar.decision_model_surfaces import decision_model_values
 
 def _market_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str, Any] | None) -> list[str]:
     snapshot = dict(entry.latest_market_snapshot if entry else {})
@@ -134,7 +135,12 @@ def _opportunity_lane_lines(entry: event_watchlist.EventWatchlistEntry | None, a
         f"- What invalidates: {'; '.join(invalidates[:4]) if invalidates else 'not available'}",
     ]
     if why_not:
-        lines.append(f"- Why not alertable: {'; '.join(why_not[:4])}")
+        label = (
+            "Why not eligible for strict catalyst alert"
+            if decision_model_values(alert, components)
+            else "Why not alertable"
+        )
+        lines.append(f"- {label}: {'; '.join(why_not[:4])}")
     if snapshot:
         compact = []
         snapshot_unit = event_market_units.infer_return_unit(snapshot, default=event_market_units.RETURN_UNIT_PERCENT_POINTS)
