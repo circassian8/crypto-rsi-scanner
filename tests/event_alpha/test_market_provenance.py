@@ -13,6 +13,7 @@ _SOURCE_SHA = "2" * 64
 def _provenance(**overrides):
     row = {
         "schema_version": "crypto_radar_market_provenance_v2",
+        "measurement_program": "decision_radar_live_observation_campaign_v2",
         "data_acquisition_mode": "live_provider",
         "candidate_source_mode": "live_no_send",
         "provider": "coingecko",
@@ -53,6 +54,17 @@ def _decision_candidate(market_provenance):
         "source_origins": ["market_anomaly"],
         "source_pack": "market_anomaly_pack",
         "source_packs": ["market_anomaly_pack"],
+        "market_context_source": "coingecko",
+        "market_context_observed_at": _OBSERVED,
+        "market_context_freshness_status": "fresh",
+        "market_data_freshness": "fresh",
+        "market_snapshot_id": "market-history-observation-1",
+        "market_snapshot": {
+            "market_data_source": "coingecko",
+            "observed_at": _OBSERVED,
+            "freshness_status": "fresh",
+            "market_snapshot_id": "market-history-observation-1",
+        },
         "market_provenance": market_provenance,
         "decision_model_version": "crypto_radar_decision_model_v2",
         "decision_model_enabled": True,
@@ -124,10 +136,12 @@ def test_mock_provenance_is_explicitly_never_burn_in_counted():
     assert normalized["candidate_source_mode"] == "mocked_fixture"
     assert normalized["burn_in_eligible"] is False
     assert normalized["burn_in_counted"] is False
-    assert normalized["burn_in_reason"] == "not_counted_non_live_mode:mocked_fixture"
+    assert normalized["burn_in_reason"] == "not_counted_separate_decision_radar_campaign"
+    assert normalized["decision_radar_campaign_counted"] is False
+    assert normalized["decision_radar_campaign_reason"] == "not_counted_non_live_mode:mocked_fixture"
 
 
-def test_exact_authorized_live_no_send_provenance_is_counted():
+def test_exact_authorized_live_no_send_campaign_provenance_is_counted_separately():
     from crypto_rsi_scanner.event_alpha.operations.market_provenance import (
         normalize_market_provenance,
     )
@@ -135,10 +149,51 @@ def test_exact_authorized_live_no_send_provenance_is_counted():
     normalized = normalize_market_provenance(_provenance())
 
     assert normalized["provenance_contract_valid"] is True
-    assert normalized["burn_in_eligible"] is True
-    assert normalized["burn_in_counted"] is True
-    assert normalized["burn_in_reason"] == "counted_live_no_send_exact_lineage"
+    assert normalized["decision_radar_campaign_eligible"] is True
+    assert normalized["decision_radar_campaign_counted"] is True
+    assert normalized["burn_in_eligible"] is False
+    assert normalized["burn_in_counted"] is False
+    assert normalized["burn_in_reason"] == "not_counted_separate_decision_radar_campaign"
     assert normalized["validation_errors"] == []
+
+
+def test_decision_campaign_counting_is_separate_from_event_alpha_burn_in():
+    from crypto_rsi_scanner.event_alpha.operations.market_provenance import (
+        DECISION_RADAR_MEASUREMENT_PROGRAM,
+        market_provenance_flat_fields,
+        normalize_market_provenance,
+    )
+
+    normalized = normalize_market_provenance(
+        _provenance(measurement_program=DECISION_RADAR_MEASUREMENT_PROGRAM)
+    )
+    flattened = market_provenance_flat_fields(normalized)
+
+    assert normalized["provenance_contract_valid"] is True
+    assert normalized["decision_radar_campaign_eligible"] is True
+    assert normalized["decision_radar_campaign_counted"] is True
+    assert normalized["decision_radar_campaign_reason"] == "counted_live_no_send_exact_lineage"
+    assert normalized["burn_in_eligible"] is False
+    assert normalized["burn_in_counted"] is False
+    assert normalized["burn_in_reason"] == "not_counted_separate_decision_radar_campaign"
+    assert flattened["contract_counted_candidate"] is True
+
+
+def test_decision_campaign_projection_requires_complete_market_context_lineage():
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
+    )
+
+    projected = decision_model_values(_decision_candidate(_provenance()))
+    assert projected["market_context_reference"]["market_snapshot_id"]
+
+    partial = {
+        **projected,
+        "market_context_reference": {"source": "coingecko"},
+    }
+    missing = {**projected, "market_context_reference": {}}
+    assert decision_model_values(partial) == {}
+    assert decision_model_values(missing) == {}
 
 
 def test_runner_v2_aliases_normalize_with_row_feature_context():
@@ -263,9 +318,9 @@ def test_provenance_survives_merge_projection_core_preview_and_pending_outcome()
     merged = integrated_radar._merge_family(
         "market-provenance-family",
         [candidate],
-        profile="live_burn_in_no_send",
+        profile="no_key_live",
         artifact_namespace="market-provenance",
-        run_mode="burn_in",
+        run_mode="operational",
         run_id="market-provenance-run",
         observed_at=_OBSERVED,
     )
@@ -277,7 +332,14 @@ def test_provenance_survives_merge_projection_core_preview_and_pending_outcome()
     assert projected["source_provider_lineage"]["market_provenance"] == normalized
     assert projected["source_provider_lineage"]["data_mode"] == "live_provider"
     assert projected["candidate_source_mode"] == "live_no_send"
-    assert projected["burn_in_counted"] is True
+    assert projected["burn_in_counted"] is False
+    assert projected["decision_radar_campaign_counted"] is True
+    assert projected["market_context_reference"] == {
+        "source": "coingecko",
+        "observed_at": _OBSERVED,
+        "freshness_status": "fresh",
+        "market_snapshot_id": "market-history-observation-1",
+    }
     assert decision_model_values(projected) == projected
 
     reaction = MarketReactionResult(
@@ -290,18 +352,32 @@ def test_provenance_survives_merge_projection_core_preview_and_pending_outcome()
         {}, primary=candidate, all_rows=(candidate,), reaction=reaction
     )
     assert core["market_provenance"] == normalized
-    assert core["burn_in_counted"] is True
+    assert core["burn_in_counted"] is False
+    assert core["decision_radar_campaign_counted"] is True
     assert core["contract_counted_candidate"] is True
+    assert core["market_context_reference"] == projected["market_context_reference"]
+    assert core["decision_projection"]["market_context_reference"] == projected[
+        "market_context_reference"
+    ]
 
     preview = "\n".join(decision_model_markdown_lines(candidate))
     assert "live_provider / live_no_send / coingecko" in preview
-    assert "Burn-in eligible / counted: true / true" in preview
+    assert "Decision Radar campaign eligible / counted: true / true" in preview
+    assert (
+        "Market context reference: source=coingecko; "
+        f"observed_at={_OBSERVED}; freshness=fresh; "
+        "snapshot_id=market-history-observation-1"
+    ) in preview
 
     outcome = _outcome_placeholder_row(candidate, now=_OBSERVED)
     assert outcome["market_provenance"] == normalized
     assert outcome["decision_projection"]["market_provenance"] == normalized
-    assert outcome["burn_in_eligible"] is True
-    assert outcome["burn_in_counted"] is True
+    assert outcome["decision_projection"]["market_context_reference"] == projected[
+        "market_context_reference"
+    ]
+    assert outcome["burn_in_eligible"] is False
+    assert outcome["burn_in_counted"] is False
+    assert outcome["decision_radar_campaign_counted"] is True
     assert outcome["contract_counted_candidate"] is True
 
 
@@ -332,6 +408,11 @@ def test_research_card_keeps_hash_lineage_without_rendering_full_digests():
     )
     assert "- Request ledger: event_market_request_ledger.jsonl" in card.markdown
     assert "- Provider source artifact: event_market_source_rows.jsonl" in card.markdown
+    assert (
+        "- Market context reference: source=coingecko; "
+        f"observed_at={_OBSERVED}; freshness=fresh; "
+        "snapshot_id=market-history-observation-1"
+    ) in card.markdown
     assert _LEDGER_SHA not in card.markdown
     assert _SOURCE_SHA not in card.markdown
     assert re.search(r"\b[A-Fa-f0-9]{32,}\b", card.markdown) is None

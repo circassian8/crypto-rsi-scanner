@@ -8,7 +8,8 @@ import hashlib
 import os
 import re
 import stat
-from datetime import datetime, timezone
+from contextlib import nullcontext
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
@@ -41,10 +42,13 @@ from .market_no_send_io import (
 from . import (
     market_no_send_audit,
     market_no_send_attempt,
+    market_no_send_campaign_guard,
+    market_no_send_campaign_provider,
     market_no_send_features,
     market_no_send_history_cache,
     market_no_send_provider,
     market_no_send_publication,
+    market_observation_outcomes,
     market_provenance,
 )
 
@@ -75,6 +79,8 @@ def build_market_no_send_readiness(
     fetch_limit: int | None = None,
     environ: Mapping[str, str] | None = None,
     fixture_dir: str | Path | None | object = ...,  # explicit None means live client mode
+    now: datetime | str | None = None,
+    _campaign_reservation_id: str | None = None,
 ) -> MarketNoSendReadiness:
     """Return a no-write/no-network readiness result for the live run."""
 
@@ -97,10 +103,33 @@ def build_market_no_send_readiness(
     )
     if namespace_blocker:
         reasons.append(namespace_blocker)
+    evaluated_at = _as_utc(_parse_time(now) or datetime.now(timezone.utc))
+    history_config, history_config_error = _market_history_config()
+    if history_config_error: reasons.append(history_config_error)
     baseline = market_no_send_history_cache.cache_readiness(
         selected_base,
         history_filename=HISTORY_FILENAME,
+        now=evaluated_at,
+        config=history_config,
     )
+    if baseline.get("cache_status") == "invalid": reasons.append(str(baseline["cache_error"]))
+    if baseline.get("cadence_status") == "waiting":
+        reasons.append(
+            "observation cadence window has not elapsed; next eligible at "
+            f"{baseline.get('next_eligible_observation_at')}"
+        )
+    provider_state = market_no_send_campaign_provider.assess_shared_provider_state(
+        selected_base,
+        checked_at=evaluated_at,
+    )
+    if not provider_state["allowed"]:
+        reasons.append(str(provider_state["reason"] or "shared provider backoff is active"))
+    reservation_state = market_no_send_campaign_guard.assess_campaign_reservation(
+        selected_base, checked_at=evaluated_at,
+        owner_reservation_id=_campaign_reservation_id,
+    )
+    if not reservation_state["allowed"]:
+        reasons.append(str(reservation_state["reason"]))
     return MarketNoSendReadiness(
         status="ready" if not reasons else "blocked",
         provider="coingecko",
@@ -118,27 +147,41 @@ def build_market_no_send_readiness(
         candidate_source_mode="live_no_send" if not reasons else "preflight_only",
         **baseline,
         spread_data_status="unavailable_from_coingecko_market_endpoint",
-        burn_in_eligible=not reasons,
+        measurement_program=market_provenance.DECISION_RADAR_MEASUREMENT_PROGRAM,
+        decision_radar_campaign_eligible=not reasons,
+        burn_in_eligible=False,
         pointer_eligible=False,
         pointer_eligibility_status=(
             "pending_complete_strict_doctor" if not reasons else "blocked_preflight"
         ),
         artifact_paths=(
-            market_no_send_attempt.LATEST_ATTEMPT_FILENAME,
+            market_no_send_attempt.LATEST_ATTEMPT_FILENAME, market_no_send_attempt.ATTEMPT_LEDGER_FILENAME,
             REQUEST_CACHE_FILENAME,
             REQUEST_LEDGER_FILENAME,
             f"{market_no_send_history_cache.LIVE_HISTORY_CACHE_NAMESPACE}/{HISTORY_FILENAME}",
+            f"{market_no_send_history_cache.LIVE_HISTORY_CACHE_NAMESPACE}/"
+            f"{market_no_send_provider.PROVIDER_HEALTH_FILENAME}",
+            f"{market_no_send_history_cache.LIVE_HISTORY_CACHE_NAMESPACE}/"
+            f"{market_no_send_campaign_provider.LATEST_SHARED_FAILURE_FILENAME}",
             HISTORY_FILENAME,
             market_no_send_provider.PROVIDER_HEALTH_FILENAME,
             RUN_MANIFEST_FILENAME,
             PILOT_AUDIT_JSON_FILENAME,
             PILOT_AUDIT_MD_FILENAME,
         ),
-        next_safe_command=market_no_send_publication.readiness_next_command(
-            authorization_env=LIVE_AUTH_ENV,
-            authorized=authorized,
-            fixture_mode=fixture_mode,
-            namespace_blocker=namespace_blocker,
+        next_safe_command=(
+            "make radar-market-no-send-readiness"
+            if (
+                baseline.get("cadence_status") == "waiting"
+                or not provider_state["allowed"]
+                or not reservation_state["allowed"]
+            )
+            else market_no_send_publication.readiness_next_command(
+                authorization_env=LIVE_AUTH_ENV,
+                authorized=authorized,
+                fixture_mode=fixture_mode,
+                namespace_blocker=namespace_blocker,
+            )
         ),
     )
 
@@ -148,7 +191,7 @@ def run_market_no_send_generation(
     artifact_base_dir: str | Path,
     artifact_namespace: str = DEFAULT_NAMESPACE,
     profile: str = DEFAULT_PROFILE,
-    run_mode: str = "burn_in",
+    run_mode: str = "operational",
     top_n: int = DEFAULT_TOP_N,
     fetch_limit: int | None = None,
     provider: MarketRowsProvider | None = None,
@@ -166,70 +209,167 @@ def run_market_no_send_generation(
     mode = str(data_mode or "").strip().casefold()
     if mode not in {"live", "mock"}:
         raise MarketNoSendError("data_mode must be live or mock")
+    policy_environ, policy_fixture_dir = (None, ...) if mode == "live" else (environ, fixture_dir)
     readiness = build_market_no_send_readiness(
         artifact_base_dir=artifact_base_dir,
         artifact_namespace=namespace,
         top_n=bounded_top_n,
         fetch_limit=bounded_fetch,
-        environ=environ,
-        fixture_dir=fixture_dir,
+        environ=policy_environ,
+        fixture_dir=policy_fixture_dir,
     )
     if mode != "live" and not allow_non_live:
         raise MarketNoSendError("non-live market generation is reserved for the no-network smoke")
     if mode == "live" and not readiness.ready:
-        return MarketNoSendGenerationResult(
-            status="blocked",
-            profile=profile,
-            artifact_namespace=namespace,
-            namespace_dir=None,
-            data_mode=mode,
-            provider="coingecko",
-            observed_at=_as_utc(_parse_time(observed_at) or datetime.now(timezone.utc)).isoformat(),
-            live_provider_authorized=readiness.live_provider_authorized,
-            provider_call_attempted=False,
-            provider_request_succeeded=False,
+        return market_no_send_campaign_guard.blocked_generation_result(
+            readiness=readiness, profile=profile, artifact_namespace=namespace,
+            data_mode=mode, observed_at=datetime.now(timezone.utc),
             failure_class="readiness_blocked",
-            data_acquisition_mode="preflight_only",
-            candidate_source_mode="preflight_only",
+        )
+    canonical_base = Path(config.EVENT_ALPHA_ARTIFACT_BASE_DIR).expanduser().resolve()
+    if mode == "live" and Path(artifact_base_dir).expanduser().resolve() != canonical_base:
+        return market_no_send_campaign_guard.blocked_generation_result(
+            readiness=readiness, profile=profile, artifact_namespace=namespace,
+            data_mode=mode, observed_at=datetime.now(timezone.utc),
+            failure_class="noncanonical_artifact_base",
         )
     market_no_send_provider.require_approved_live_adapter(
         data_mode=mode,
         injected=provider is not None,
     )
 
-    observed = _as_utc(_parse_time(observed_at) or datetime.now(timezone.utc))
+    observed = _as_utc(datetime.now(timezone.utc) if mode == "live" else (
+        _parse_time(observed_at) or datetime.now(timezone.utc)))
     base = _validated_artifact_base(artifact_base_dir)
-    market_no_send_publication.assert_namespace_not_current_authority(
-        base,
-        namespace,
+    reservation_context = (
+        market_no_send_campaign_guard.acquire_campaign_reservation(
+            base, artifact_namespace=namespace,
+        ) if mode == "live" else nullcontext(None)
     )
-    context = artifact_context.context_from_profile(
-        profile,
-        run_mode=run_mode,
-        base_dir=base,
-        artifact_namespace=namespace,
-    )
-    _require_exact_context(context, base=base, namespace=namespace)
-    _ensure_safe_namespace_dir(context.namespace_dir)
-    provider_name = "coingecko" if mode == "live" else "mock_coingecko"
-    fetch = provider or _fetch_live_coingecko_rows
-    provider_run_id = run_ledger.run_id_for(observed, context.profile)
-
     try:
-        fetched = (
-            market_no_send_provider.fetch_approved_live_rows(
+        with reservation_context as reservation:
+            attempted_at = datetime.now(timezone.utc)
+            if mode == "live":
+                observed = attempted_at
+                readiness = build_market_no_send_readiness(
+                    artifact_base_dir=base, artifact_namespace=namespace,
+                    top_n=bounded_top_n, fetch_limit=bounded_fetch,
+                    environ=None, fixture_dir=..., now=attempted_at,
+                    _campaign_reservation_id=reservation.reservation_id,
+                )
+                if not readiness.ready:
+                    return market_no_send_campaign_guard.blocked_generation_result(
+                        readiness=readiness, profile=profile, artifact_namespace=namespace,
+                        data_mode=mode, observed_at=observed,
+                        failure_class="locked_readiness_blocked",
+                    )
+            market_no_send_publication.assert_namespace_not_current_authority(base, namespace)
+            context = artifact_context.context_from_profile(
+                profile, run_mode=run_mode, base_dir=base, artifact_namespace=namespace,
+            )
+            _require_exact_context(context, base=base, namespace=namespace)
+            _ensure_safe_namespace_dir(context.namespace_dir)
+            provider_name = "coingecko" if mode == "live" else "mock_coingecko"
+            fetch = provider or _fetch_live_coingecko_rows
+            provider_run_id = run_ledger.run_id_for(observed, context.profile)
+            if reservation is not None:
+                market_no_send_campaign_guard.mark_provider_call_reserved(
+                    reservation, attempted_at=attempted_at,
+                    minimum_spacing=timedelta(
+                        seconds=readiness.minimum_observation_spacing_seconds
+                    ),
+                )
+            raw_rows, request_telemetry, provider_failure = _fetch_generation_rows(
+                context=context, fetch=fetch, fetch_limit=bounded_fetch,
+                provider_name=provider_name, provider_run_id=provider_run_id,
+                observed=observed, attempted_at=attempted_at, mode=mode,
+                readiness=readiness, top_n=bounded_top_n,
+                campaign_reservation=reservation,
+            )
+            if provider_failure is not None:
+                return provider_failure
+            return _build_market_generation_from_rows(
+                context=context, observed=observed, raw_rows=raw_rows,
+                provider_name=provider_name, data_mode=mode, readiness=readiness,
+                top_n=bounded_top_n, fetch_limit=bounded_fetch,
+                request_telemetry=request_telemetry, campaign_reservation=reservation,
+            )
+    except market_no_send_campaign_guard.CampaignReservationBusy:
+        return market_no_send_campaign_guard.blocked_generation_result(
+            readiness=readiness, profile=profile, artifact_namespace=namespace,
+            data_mode=mode, observed_at=observed,
+            failure_class="campaign_reservation_busy",
+        )
+
+
+def _fetch_generation_rows(
+    *,
+    context: Any,
+    fetch: MarketRowsProvider,
+    fetch_limit: int,
+    provider_name: str,
+    provider_run_id: str,
+    observed: datetime,
+    attempted_at: datetime,
+    mode: str,
+    readiness: MarketNoSendReadiness,
+    top_n: int,
+    campaign_reservation: market_no_send_campaign_guard.CampaignReservation | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any], MarketNoSendGenerationResult | None]:
+    request_telemetry: dict[str, Any] = {}
+    try:
+        if mode == "live":
+            result = market_no_send_provider.fetch_approved_live_rows(
                 context.namespace_dir,
                 fetch=fetch,
-                fetch_limit=bounded_fetch,
+                fetch_limit=fetch_limit,
                 provider=provider_name,
                 run_id=provider_run_id,
                 observed_at=observed,
+                attempted_at=attempted_at,
             )
-            if mode == "live"
-            else fetch(bounded_fetch)
-        )
+            fetched = result.rows
+            request_telemetry = dict(result.telemetry)
+            if campaign_reservation is None:
+                raise MarketNoSendError("shared campaign provider state is missing")
+            market_no_send_campaign_provider.record_shared_provider_success(
+                campaign_reservation, provider=provider_name, run_id=provider_run_id,
+                attempted_at=attempted_at, request_telemetry=request_telemetry,
+            )
+        else:
+            fetched = fetch(fetch_limit)
         raw_rows = [dict(row) for row in fetched if isinstance(row, Mapping)]
+        if mode != "live":
+            request_telemetry = {
+                "endpoint_path": "/coins/markets",
+                "request_started_at": observed.isoformat(),
+                "request_ended_at": observed.isoformat(),
+                "duration_ms": 0,
+                "http_status": None,
+                "result_count": len(raw_rows),
+                "retry_count": 0,
+                "error_class": None,
+                "cache_behavior": "mocked_fixture",
+            }
+        return raw_rows, request_telemetry, None
     except Exception as exc:  # noqa: BLE001 - external provider must fail soft
+        telemetry = dict(getattr(exc, "request_telemetry", {}) or {})
+        error_class = getattr(exc, "error_class", None) or type(exc).__name__
+        if mode == "live" and campaign_reservation is not None:
+            market_no_send_campaign_provider.record_shared_provider_failure(
+                campaign_reservation, artifact_namespace=context.artifact_namespace,
+                provider=provider_name, run_id=provider_run_id,
+                attempted_at=attempted_at, error=exc, request_telemetry=telemetry,
+            )
+        ledger_path = _write_failed_market_request_ledger(
+            context=context,
+            observed=observed,
+            provider_name=provider_name,
+            readiness=readiness,
+            run_id=provider_run_id,
+            telemetry=telemetry,
+            error_class=error_class,
+        )
         failure = _base_manifest(
             context=context,
             observed=observed,
@@ -237,20 +377,21 @@ def run_market_no_send_generation(
             provider=provider_name,
             authorized=readiness.live_provider_authorized,
             fixture_mode=readiness.fixture_mode,
-            top_n=bounded_top_n,
-            fetch_limit=bounded_fetch,
+            top_n=top_n,
+            fetch_limit=fetch_limit,
             status="provider_unavailable",
         )
         failure.update({
             "run_id": provider_run_id,
             "provider_call_attempted": True,
             "provider_request_succeeded": False,
-            "failure_class": type(exc).__name__,
+            "failure_class": error_class,
+            "request_ledger_artifact": REQUEST_LEDGER_FILENAME,
             "contract_counted_status": "not_counted",
         })
         manifest_path = context.namespace_dir / RUN_MANIFEST_FILENAME
         _write_json_atomic(manifest_path, failure)
-        return MarketNoSendGenerationResult(
+        return [], telemetry, MarketNoSendGenerationResult(
             status="provider_unavailable",
             profile=context.profile,
             artifact_namespace=context.artifact_namespace,
@@ -262,21 +403,11 @@ def run_market_no_send_generation(
             provider_call_attempted=True,
             provider_request_succeeded=False,
             manifest_path=manifest_path,
-            failure_class=type(exc).__name__,
+            request_ledger_path=ledger_path,
+            failure_class=error_class,
             data_acquisition_mode="live_provider" if mode == "live" else "mocked_fixture",
             candidate_source_mode="live_no_send" if mode == "live" else "mocked_fixture",
         )
-
-    return _build_market_generation_from_rows(
-        context=context,
-        observed=observed,
-        raw_rows=raw_rows,
-        provider_name=provider_name,
-        data_mode=mode,
-        readiness=readiness,
-        top_n=bounded_top_n,
-        fetch_limit=bounded_fetch,
-    )
 
 
 def _build_market_generation_from_rows(
@@ -289,10 +420,12 @@ def _build_market_generation_from_rows(
     readiness: MarketNoSendReadiness,
     top_n: int,
     fetch_limit: int,
+    request_telemetry: Mapping[str, Any],
+    campaign_reservation: market_no_send_campaign_guard.CampaignReservation | None,
 ) -> MarketNoSendGenerationResult:
     source_mode = "live_no_send" if data_mode == "live" else "mocked_fixture"
     acquisition_mode = "live_provider" if data_mode == "live" else "mocked_fixture"
-    burn_in_counted = bool(
+    decision_radar_campaign_counted = bool(
         source_mode == "live_no_send"
         and readiness.live_provider_authorized
         and not readiness.fixture_mode
@@ -305,8 +438,9 @@ def _build_market_generation_from_rows(
             provider_name=provider_name,
             data_mode=data_mode,
             source_mode=source_mode,
-            burn_in_counted=burn_in_counted,
+            decision_radar_campaign_counted=decision_radar_campaign_counted,
             top_n=top_n,
+            campaign_reservation=campaign_reservation,
         )
     )
     run_id = run_ledger.run_id_for(observed, context.profile)
@@ -320,11 +454,12 @@ def _build_market_generation_from_rows(
             data_mode=data_mode,
             acquisition_mode=acquisition_mode,
             source_mode=source_mode,
-            burn_in_counted=burn_in_counted,
+            decision_radar_campaign_counted=decision_radar_campaign_counted,
             readiness=readiness,
             run_id=run_id,
             universe_audit=universe_audit,
             history_sha256=history_sha256,
+            request_telemetry=request_telemetry,
         )
     )
     provenance = _closed_market_provenance(
@@ -367,7 +502,7 @@ def _build_market_generation_from_rows(
         "market_provenance": provenance,
         "market_history_artifact": HISTORY_FILENAME,
         "market_history_sha256": history_sha256,
-        "contract_counted_status": "pending" if burn_in_counted else "not_counted",
+        "contract_counted_status": "pending" if decision_radar_campaign_counted else "not_counted",
     })
     _write_json_atomic(manifest_path, manifest)
     try:
@@ -419,7 +554,6 @@ def _build_market_generation_from_rows(
         _write_json_atomic(manifest_path, manifest)
         raise
 
-
 def _prepare_normalized_market_rows(
     *,
     context: Any,
@@ -428,8 +562,9 @@ def _prepare_normalized_market_rows(
     provider_name: str,
     data_mode: str,
     source_mode: str,
-    burn_in_counted: bool,
+    decision_radar_campaign_counted: bool,
     top_n: int,
+    campaign_reservation: market_no_send_campaign_guard.CampaignReservation | None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any], str]:
     rows, universe_audit = normalize_market_rows(
         raw_rows,
@@ -440,7 +575,7 @@ def _prepare_normalized_market_rows(
         request_cache_artifact=REQUEST_CACHE_FILENAME,
         request_ledger_artifact=REQUEST_LEDGER_FILENAME,
         candidate_source_mode=source_mode,
-        burn_in_counted=burn_in_counted,
+        decision_radar_campaign_counted=decision_radar_campaign_counted,
     )
     history_rows, history_summary, history_sha256 = (
         market_no_send_history_cache.enrich_and_persist_history(
@@ -450,6 +585,8 @@ def _prepare_normalized_market_rows(
         history_filename=HISTORY_FILENAME,
         observed_at=observed,
         live_no_send=data_mode == "live",
+        config=_market_history_config()[0],
+        campaign_reservation=campaign_reservation,
         )
     )
     rows = [
@@ -475,11 +612,12 @@ def _write_market_request_artifacts(
     data_mode: str,
     acquisition_mode: str,
     source_mode: str,
-    burn_in_counted: bool,
+    decision_radar_campaign_counted: bool,
     readiness: MarketNoSendReadiness,
     run_id: str,
     universe_audit: Mapping[str, Any],
     history_sha256: str,
+    request_telemetry: Mapping[str, Any],
 ) -> tuple[Path, str, Path, str]:
     common = _market_request_common(
         context=context,
@@ -490,7 +628,7 @@ def _write_market_request_artifacts(
         data_mode=data_mode,
         acquisition_mode=acquisition_mode,
         source_mode=source_mode,
-        burn_in_counted=burn_in_counted,
+        decision_radar_campaign_counted=decision_radar_campaign_counted,
         run_id=run_id,
     )
     request_path = context.namespace_dir / REQUEST_CACHE_FILENAME
@@ -514,9 +652,98 @@ def _write_market_request_artifacts(
         "cache_status": "write_through",
         "market_history_artifact": HISTORY_FILENAME,
         "market_history_sha256": history_sha256,
+        **_safe_request_telemetry(
+            request_telemetry,
+            fallback_result_count=raw_row_count,
+            succeeded=True,
+        ),
     })
     ledger_sha256 = hashlib.sha256(_read_regular_bytes(request_ledger_path)).hexdigest()
     return request_path, source_sha256, request_ledger_path, ledger_sha256
+
+
+def _write_failed_market_request_ledger(
+    *,
+    context: Any,
+    observed: datetime,
+    provider_name: str,
+    readiness: MarketNoSendReadiness,
+    run_id: str,
+    telemetry: Mapping[str, Any],
+    error_class: str,
+) -> Path:
+    path = context.namespace_dir / REQUEST_LEDGER_FILENAME
+    _write_json_atomic(path, {
+        "contract_version": CONTRACT_VERSION,
+        "row_type": "event_market_no_send_request_ledger",
+        "profile": context.profile,
+        "artifact_namespace": context.artifact_namespace,
+        "run_mode": context.run_mode,
+        "run_id": run_id,
+        "data_mode": "live",
+        "data_acquisition_mode": "live_provider",
+        "candidate_source_mode": "live_no_send",
+        "provider": provider_name,
+        "observed_at": observed.isoformat(),
+        "provider_call_attempted": True,
+        "provider_request_succeeded": False,
+        "raw_market_row_count": 0,
+        "selected_market_row_count": 0,
+        "live_provider_authorized": readiness.live_provider_authorized,
+        "fixture_mode": readiness.fixture_mode,
+        "provenance_contract_valid": False,
+        "measurement_program": market_provenance.DECISION_RADAR_MEASUREMENT_PROGRAM,
+        "decision_radar_campaign_eligible": False,
+        "decision_radar_campaign_counted": False,
+        "decision_radar_campaign_reason": "not_counted_provider_request_failed",
+        "burn_in_eligible": False,
+        "burn_in_counted": False,
+        "burn_in_reason": "not_counted_separate_decision_radar_campaign",
+        "contract_counted_status": "not_counted",
+        "no_send_status": "enforced",
+        "no_send": True,
+        "research_only": True,
+        **_safe_request_telemetry(
+            telemetry,
+            fallback_result_count=0,
+            succeeded=False,
+            fallback_error_class=error_class,
+        ),
+        **_SAFETY_COUNTERS,
+    })
+    return path
+
+
+def _safe_request_telemetry(
+    telemetry: Mapping[str, Any],
+    *,
+    fallback_result_count: int,
+    succeeded: bool,
+    fallback_error_class: str | None = None,
+) -> dict[str, Any]:
+    allowed = {
+        "endpoint_path",
+        "request_started_at",
+        "request_ended_at",
+        "duration_ms",
+        "http_status",
+        "result_count",
+        "retry_count",
+        "error_class",
+        "cache_behavior",
+    }
+    values = {key: telemetry.get(key) for key in allowed if key in telemetry}
+    endpoint = str(values.get("endpoint_path") or "/coins/markets")
+    values["endpoint_path"] = endpoint if endpoint == "/coins/markets" else "/unknown"
+    values.setdefault("request_started_at", None)
+    values.setdefault("request_ended_at", None)
+    values["duration_ms"] = max(0, int(values.get("duration_ms") or 0))
+    values.setdefault("http_status", 200 if succeeded else None)
+    values["result_count"] = max(0, int(values.get("result_count") or fallback_result_count))
+    values["retry_count"] = max(0, int(values.get("retry_count") or 0))
+    values["error_class"] = None if succeeded else str(values.get("error_class") or fallback_error_class or "provider_error")[:80]
+    values.setdefault("cache_behavior", "network")
+    return values
 
 
 def _market_request_common(
@@ -529,7 +756,7 @@ def _market_request_common(
     data_mode: str,
     acquisition_mode: str,
     source_mode: str,
-    burn_in_counted: bool,
+    decision_radar_campaign_counted: bool,
     run_id: str,
 ) -> dict[str, Any]:
     return {
@@ -548,13 +775,17 @@ def _market_request_common(
         "raw_market_row_count": raw_row_count,
         "selected_market_row_count": selected_row_count,
         "provenance_contract_valid": True,
-        "burn_in_eligible": burn_in_counted,
-        "burn_in_counted": burn_in_counted,
-        "burn_in_reason": (
+        "measurement_program": market_provenance.DECISION_RADAR_MEASUREMENT_PROGRAM,
+        "decision_radar_campaign_eligible": decision_radar_campaign_counted,
+        "decision_radar_campaign_counted": decision_radar_campaign_counted,
+        "decision_radar_campaign_reason": (
             "counted_live_no_send_exact_lineage"
-            if burn_in_counted else "not_counted_non_live_mode:mocked_fixture"
+            if decision_radar_campaign_counted else "not_counted_non_live_mode:mocked_fixture"
         ),
-        "contract_counted_status": "counted" if burn_in_counted else "not_counted",
+        "burn_in_eligible": False,
+        "burn_in_counted": False,
+        "burn_in_reason": "not_counted_separate_decision_radar_campaign",
+        "contract_counted_status": "counted" if decision_radar_campaign_counted else "not_counted",
         "no_send_status": "enforced",
         "no_send": True,
         "research_only": True,
@@ -603,28 +834,51 @@ def _finish_market_generation(
     quality_counts = market_no_send_features.market_quality_counts(
         integrated_result.integrated_candidates_path
     )
-    outcomes_path = context.namespace_dir / integrated_radar.INTEGRATED_OUTCOMES_FILENAME
+    core_path, outcomes_path = Path(integrated_result.core_opportunity_store_path), context.namespace_dir / integrated_radar.INTEGRATED_OUTCOMES_FILENAME
     manifest.update({
         "status": "complete",
-        "market_snapshot_count": anomaly_result.snapshot_count,
-        "market_anomaly_count": anomaly_result.anomaly_count,
-        "candidate_count": integrated_result.candidates,
-        "core_row_count": integrated_result.current_generation_core_rows,
+        "market_snapshot_count": anomaly_result.snapshot_count, "market_anomaly_count": anomaly_result.anomaly_count,
+        "candidate_count": integrated_result.candidates, "core_row_count": integrated_result.current_generation_core_rows,
+        "candidate_artifact": Path(integrated_result.integrated_candidates_path).name,
+        "candidate_artifact_sha256": hashlib.sha256(_read_regular_bytes(Path(integrated_result.integrated_candidates_path)) or b"").hexdigest(),
+        **market_no_send_publication.supporting_jsonl_artifact_bindings(core_path, outcomes_path),
         "card_count": len(integrated_result.research_card_paths),
         "decision_route_counts": dict(route_counts),
         "universe_audit": dict(universe_audit),
         **quality_counts,
         "provenance_contract_valid": provenance.get("provenance_contract_valid") is True,
+        "measurement_program": provenance.get("measurement_program"),
+        "decision_radar_campaign_eligible": provenance.get("decision_radar_campaign_eligible") is True,
+        "decision_radar_campaign_counted": provenance.get("decision_radar_campaign_counted") is True,
+        "decision_radar_campaign_reason": provenance.get("decision_radar_campaign_reason"),
         "burn_in_eligible": provenance.get("burn_in_eligible") is True,
         "burn_in_counted": provenance.get("burn_in_counted") is True,
         "burn_in_reason": provenance.get("burn_in_reason"),
         "contract_counted_status": (
-            "counted" if provenance.get("burn_in_counted") is True else "not_counted"
+            "counted" if provenance.get("decision_radar_campaign_counted") is True else "not_counted"
         ),
         "no_send_status": "enforced",
         "completed_at": datetime.now(timezone.utc).isoformat(),
     })
     _write_json_atomic(manifest_path, manifest)
+    if data_mode == "live":
+        try:
+            outcome_refresh = market_observation_outcomes.refresh_campaign_outcomes(
+                context.namespace_dir.parent,
+                evaluated_at=observed,
+            )
+            manifest.update({
+                "campaign_outcome_ledger": (
+                    f"{market_no_send_history_cache.LIVE_HISTORY_CACHE_NAMESPACE}/"
+                    f"{market_observation_outcomes.CAMPAIGN_OUTCOMES_FILENAME}"
+                ),
+                "campaign_outcome_count": outcome_refresh["outcome_count"],
+                "campaign_outcome_maturation_counts": outcome_refresh["maturation_counts"],
+                "campaign_outcome_refresh_error_counts": outcome_refresh["build_error_counts"],
+            })
+        except (OSError, ValueError, MarketNoSendError) as exc:
+            manifest["campaign_outcome_refresh_failure_class"] = type(exc).__name__
+        _write_json_atomic(manifest_path, manifest)
     _record_market_authority_artifacts(
         context,
         run_id=run_id,
@@ -660,6 +914,10 @@ def _finish_market_generation(
         data_acquisition_mode=str(provenance.get("data_acquisition_mode") or "preflight_only"),
         candidate_source_mode=str(provenance.get("candidate_source_mode") or "preflight_only"),
         provenance_contract_valid=provenance.get("provenance_contract_valid") is True,
+        measurement_program=str(provenance.get("measurement_program") or ""),
+        decision_radar_campaign_eligible=provenance.get("decision_radar_campaign_eligible") is True,
+        decision_radar_campaign_counted=provenance.get("decision_radar_campaign_counted") is True,
+        decision_radar_campaign_reason=str(provenance.get("decision_radar_campaign_reason") or "not_counted"),
         burn_in_eligible=provenance.get("burn_in_eligible") is True,
         burn_in_counted=provenance.get("burn_in_counted") is True,
         baseline_status=str(quality_counts.get("baseline_status") or "not_evaluated"),
@@ -680,7 +938,7 @@ def normalize_market_rows(
     request_cache_artifact: str,
     request_ledger_artifact: str = REQUEST_LEDGER_FILENAME,
     candidate_source_mode: str | None = None,
-    burn_in_counted: bool = False,
+    decision_radar_campaign_counted: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Select a bounded liquid universe and add transparent market proxies."""
 
@@ -694,7 +952,8 @@ def normalize_market_rows(
         request_cache_artifact=request_cache_artifact,
         request_ledger_artifact=request_ledger_artifact,
         candidate_source_mode=candidate_source_mode,
-        burn_in_counted=burn_in_counted,
+        decision_radar_campaign_counted=decision_radar_campaign_counted,
+        burn_in_counted=False,
         safety_counters=_SAFETY_COUNTERS,
     )
 
@@ -712,7 +971,7 @@ def publish_market_no_send_generation(
     namespace = _validated_namespace(artifact_namespace)
     namespace_dir = _safe_existing_namespace_dir(base, namespace)
     manifest = _read_json_object(namespace_dir / RUN_MANIFEST_FILENAME)
-    checked_at = _as_utc(_parse_time(now) or datetime.now(timezone.utc))
+    checked_at = _as_utc(datetime.now(timezone.utc) if manifest.get("data_mode") == "live" else (_parse_time(now) or datetime.now(timezone.utc)))
     _validate_publishable_manifest(
         manifest,
         namespace_dir=namespace_dir,
@@ -753,6 +1012,7 @@ def write_market_no_send_pilot_audit(
         artifact_namespace=namespace,
         environ=os.environ,
         fixture_dir=config.FIXTURE_DIR,
+        now=checked_at,
     )
     return market_no_send_audit.write_pilot_audit(
         base=base,
@@ -767,21 +1027,36 @@ def write_market_no_send_pilot_audit(
     )
 
 
-def _fetch_live_coingecko_rows(fetch_limit: int) -> Sequence[Mapping[str, Any]]:
+def _fetch_live_coingecko_rows(fetch_limit: int) -> market_no_send_provider.MarketProviderResponse:
+    client_holder: dict[str, Any] = {}
+
+    def client_factory() -> Any:
+        client = __import__(
+            "crypto_rsi_scanner.client", fromlist=["CoinGeckoClient"]
+        ).CoinGeckoClient(timeout_seconds=8.0, max_retries=1)
+        client_holder["client"] = client
+        return client
+
     rows, warnings = market_enrichment.load_market_enrichment_rows_safe(
         None,
         live=True,
         fetch_limit=fetch_limit,
         limit=fetch_limit,
-        client_factory=lambda: __import__(
-            "crypto_rsi_scanner.client", fromlist=["CoinGeckoClient"]
-        ).CoinGeckoClient(timeout_seconds=8.0, max_retries=1),
+        client_factory=client_factory,
         fail_soft=True,
         now=datetime.now(timezone.utc),
     )
+    client = client_holder.get("client")
+    telemetry = dict(getattr(client, "last_request_telemetry", {}) or {})
     if warnings:
-        raise MarketNoSendError("CoinGecko market request was unavailable")
-    return rows
+        raise market_no_send_provider.MarketProviderRequestError(
+            str(telemetry.get("error_class") or "CoinGeckoUnavailable"),
+            telemetry,
+        )
+    return market_no_send_provider.MarketProviderResponse(
+        tuple(rows),
+        telemetry,
+    )
 
 
 def _run_integrated_without_extra_providers(context: Any, *, observed_at: datetime) -> Any:
@@ -925,12 +1200,16 @@ def _attach_market_no_send_lineage(
         "request_ledger_path": request_ledger_artifact,
         "request_ledger_sha256": provenance.get("request_ledger_sha256"),
         "provenance_contract_valid": provenance.get("provenance_contract_valid") is True,
+        "measurement_program": provenance.get("measurement_program"),
+        "decision_radar_campaign_eligible": provenance.get("decision_radar_campaign_eligible") is True,
+        "decision_radar_campaign_counted": provenance.get("decision_radar_campaign_counted") is True,
+        "decision_radar_campaign_reason": provenance.get("decision_radar_campaign_reason"),
         "burn_in_eligible": provenance.get("burn_in_eligible") is True,
         "burn_in_counted": provenance.get("burn_in_counted") is True,
-        "contract_counted_candidate": provenance.get("burn_in_counted") is True,
+        "contract_counted_candidate": provenance.get("decision_radar_campaign_counted") is True,
         "burn_in_reason": provenance.get("burn_in_reason"),
         "contract_counted_status": (
-            "counted" if provenance.get("burn_in_counted") is True else "not_counted"
+            "counted" if provenance.get("decision_radar_campaign_counted") is True else "not_counted"
         ),
         "market_provenance": dict(provenance),
         "no_send_status": "enforced",
@@ -945,6 +1224,7 @@ def _attach_market_no_send_lineage(
             "liquidity_basis", "volume_zscore_basis", "spread_status",
             "market_feature_basis", "market_data_quality",
             "direct_market_feature_count", "proxy_market_feature_count",
+            "market_snapshot_id", "market_history_observation_id",
         ):
             if source.get(key) is not None:
                 row[key] = source[key]
@@ -960,6 +1240,7 @@ def _attach_market_no_send_lineage(
                 "liquidity_basis", "volume_zscore_basis", "spread_status",
                 "market_feature_basis", "market_data_quality",
                 "direct_market_feature_count", "proxy_market_feature_count",
+                "market_snapshot_id", "market_history_observation_id",
             ):
                 if source.get(key) is not None:
                     attached[key] = source[key]
@@ -990,6 +1271,7 @@ def _closed_market_provenance(
         "data_acquisition_mode": "live_provider" if live else "mocked_fixture",
         "candidate_source_mode": "live_no_send" if live else "mocked_fixture",
         "provider": provider,
+        "measurement_program": market_provenance.DECISION_RADAR_MEASUREMENT_PROGRAM,
         "provider_generation_id": run_id,
         "live_provider_authorized": readiness.live_provider_authorized,
         "fixture_mode": readiness.fixture_mode,
@@ -1109,6 +1391,24 @@ def _bounded_top_n(value: int) -> int:
 def _bounded_fetch_limit(value: int | None, top_n: int) -> int:
     selected = int(value or config.EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT or universe.candidate_count(top_n))
     return min(250, max(top_n, selected))
+
+
+def _market_history_config() -> tuple[Any, str | None]:
+    from ..radar import market_history
+
+    try:
+        minutes = int(config.DECISION_RADAR_MIN_OBSERVATION_SPACING_MINUTES)
+        return (
+            market_history.MarketHistoryConfig(
+                minimum_observation_spacing=timedelta(minutes=minutes),
+            ),
+            None,
+        )
+    except (TypeError, ValueError):
+        return (
+            market_history.MarketHistoryConfig(),
+            "RSI_DECISION_RADAR_MIN_OBSERVATION_SPACING_MINUTES must be a positive integer",
+        )
 
 
 def _validated_namespace(value: str) -> str:

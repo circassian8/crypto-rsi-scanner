@@ -15,6 +15,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from .radar_north_star_campaign import (
+    MARKET_NO_SEND_GENERATION,
+    REVIEW_EXPORT_POLICY,
+)
 
 REPORT_SCHEMA_VERSION = "event_alpha_radar_north_star_v1"
 REPORT_JSON = "EVENT_ALPHA_RADAR_NORTH_STAR.json"
@@ -70,14 +74,16 @@ ARCHITECTURE_COMPONENTS: dict[str, dict[str, Any]] = {
         "north_star_requirement": "Freshness, unit, observation-id, warmup, and direct/proxy basis metadata must travel with state; stale state, proxy-only evidence, and unwarmed proxy anomaly inputs cannot be presented as urgent or actionable truth.",
     },
     "market_provenance_v2": {
-        "role": "Normalizes one closed market acquisition value and derives contract validity, burn-in eligibility, and counting without accepting caller-asserted trust flags.",
+        "role": "Normalizes one closed market acquisition value, derives Decision Radar campaign eligibility/counting, and retains legacy burn-in fields as explicit compatibility metadata without accepting caller-asserted trust flags.",
         "primary_artifacts": [
             "event_market_no_send_request_ledger.json",
             "event_market_no_send_market_rows.json",
             "event_market_no_send_generation.json",
             "event_market_no_send_pilot_audit.json",
+            "event_market_no_send_attempts.jsonl",
+            "event_decision_radar_campaign_reservation.json",
         ],
-        "north_star_requirement": "Only canonical crypto_radar_market_provenance_v2 live/no-send rows with explicit authorization, attempted and successful provider lineage, distinct fingerprinted request and source artifacts, generation identity, feature basis, and data quality may count as real burn-in evidence.",
+        "north_star_requirement": "Only canonical crypto_radar_market_provenance_v2 live/no-send rows with explicit authorization, attempted and successful provider lineage, distinct fingerprinted request and source artifacts, generation identity, feature basis, and data quality may count in decision_radar_live_observation_campaign_v2; those rows never count in Event Alpha catalyst burn-in.",
     },
     "derivatives_crowding_layer": {
         "role": "Adds OI, funding, liquidations, long/short, basis, and perp/spot crowding evidence when provider artifacts exist.",
@@ -265,112 +271,6 @@ PRODUCT_LAYERS: dict[str, Any] = {
     "unknown_catalyst_policy": "soft explanatory-confidence penalty and risk input, not a universal visibility blocker",
 }
 
-MARKET_NO_SEND_GENERATION: dict[str, Any] = {
-    "targets": [
-        "radar-market-no-send-readiness", "radar-market-no-send",
-        "radar-market-no-send-smoke",
-    ],
-    "default_namespace": "radar_market_no_send",
-    "provider": "coingecko",
-    "authorization": {
-        "existing_explicit_environment_flag": "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1",
-        "inferred_from_cache": False,
-        "absent_behavior": "safe blocked result, no provider call, credential-free JSON and Markdown pilot audit, pointer unchanged",
-    },
-    "provenance_contract": {
-        "schema_version": "crypto_radar_market_provenance_v2",
-        "contract_version": 2,
-        "data_acquisition_modes": [
-            "live_provider",
-            "mocked_fixture",
-            "artifact_replay",
-            "preflight_only",
-            "cache_replay",
-        ],
-        "candidate_source_modes": [
-            "live_no_send",
-            "mocked_fixture",
-            "artifact_replay",
-            "preflight_only",
-        ],
-        "burn_in_counting_is_derived": True,
-        "mock_or_fixture_may_validate_mechanics": True,
-        "mock_or_fixture_real_burn_in_counted": False,
-        "historical_flat_rows_silently_reclassified": False,
-    },
-    "provenance_fields": [
-        "data_acquisition_mode",
-        "candidate_source_mode",
-        "provider",
-        "provider_call_attempted",
-        "provider_call_succeeded",
-        "live_provider_authorized",
-        "request_ledger_path",
-        "request_ledger_sha256",
-        "provider_source_artifact",
-        "provider_source_artifact_sha256",
-        "provider_generation_id",
-        "cache_status",
-        "provenance_contract_valid",
-        "burn_in_eligible",
-        "burn_in_counted",
-        "burn_in_reason",
-        "feature_basis",
-        "data_quality",
-        "validation_errors",
-    ],
-    "temporal_baseline": {
-        "generation_snapshot_artifact": "event_market_history.jsonl", "shared_live_cache": "radar_market_history_cache/event_market_history.jsonl",
-        "fixture_and_mock_cache_scope": "generation-local only; never seeds live history", "authoritative_namespace_mutation": "forbidden; use a new generation namespace backed by the bounded shared cache",
-        "schema_id": "event_alpha.market_history_observation",
-        "schema_version": 1,
-        "default_limits": {
-            "max_history_age_days": 45,
-            "max_observations_per_asset": 256,
-            "min_baseline_observations": 8,
-            "max_current_age_hours": 6,
-            "future_tolerance_minutes": 5,
-        },
-        "baseline_excludes_current_observation": True,
-        "direct_provider_fields_preserved": True,
-        "only_explicit_proxy_fields_may_be_replaced": True,
-        "derived_evidence": [
-            "1h/4h/24h returns in percent points",
-            "turnover and volume z-scores",
-            "return volatility",
-            "BTC and ETH relative returns",
-            "observation ids and baseline bounds",
-        ],
-    },
-    "outcome_policy": {
-        "pending_placeholder_per_canonical_decision_candidate": True, "candidate_outcome_count_mismatch": "publication blocker",
-        "cohort_drift": "blocker",
-    },
-    "pilot_audit_artifacts": [
-        "event_market_no_send_latest_attempt.json", "event_market_no_send_pilot_audit.json",
-        "event_market_no_send_pilot_audit.md",
-    ],
-    "exact_attempt_policy": {
-        "doctor_and_publish_require_latest_cli_receipt_manifest_match": True, "blocked_attempt_may_reuse_older_complete_manifest": False,
-        "provider_health_artifact": "event_provider_health.json", "provider_errors_persisted_as_safe_classes_only": True,
-    },
-    "defaults": {
-        "research_only": True, "no_sends": True, "no_trades": True,
-        "no_paper_trades": True, "no_normal_rsi_writes": True,
-        "no_triggered_fade": True,
-    },
-    "dashboard_pointer_policy": {
-        "fixture_or_mock_generation_eligible": False,
-        "pointer_changes_on_blocked_failed_stale_or_untrusted_generation": False,
-        "current_authoritative_namespace_is_immutable": True,
-        "required_checks": [
-            "real live-safe data mode", "complete operator state",
-            "valid exact fingerprints", "matching canonical counts",
-            "current run revision and operator-state binding",
-            "fresh full strict doctor with zero blockers",
-        ],
-    },
-}
 OPPORTUNITY_LANES: dict[str, dict[str, Any]] = {
     "EARLY_LONG_RESEARCH": {
         "required_evidence": [
@@ -595,7 +495,7 @@ BURN_IN_CONTRACT = {
     "min_outcome_rows": 100,
     "auto_apply_thresholds": False,
     "no_auto_threshold_changes": True,
-    "candidate_count_authority": "canonical market provenance v2 with candidate_source_mode=live_no_send, exact valid lineage, and burn_in_counted=true",
+    "candidate_count_authority": "canonical Event Alpha catalyst rows with burn_in_counted=true; decision_radar_live_observation_campaign_v2 rows are excluded",
     "mock_fixture_replay_cache_or_preflight_counted": False,
     "promotion_freeze_criteria": {
         "EARLY_LONG_RESEARCH": [
@@ -660,6 +560,7 @@ def build_north_star(*, generated_at: datetime | None = None) -> dict[str, Any]:
         "product_layers": deepcopy(PRODUCT_LAYERS),
         "decision_model_v2": deepcopy(DECISION_MODEL_V2),
         "market_no_send_generation": deepcopy(MARKET_NO_SEND_GENERATION),
+        "review_export_policy": deepcopy(REVIEW_EXPORT_POLICY),
         "opportunity_lanes": deepcopy(OPPORTUNITY_LANES),
         "human_labeling": deepcopy(HUMAN_LABELING_ROLE),
         "burn_in_contract": deepcopy(BURN_IN_CONTRACT),
@@ -1076,6 +977,14 @@ def format_north_star(payload: Mapping[str, Any]) -> str:
             lines.append(f"- {key}: {', '.join(str(item) for item in value)}")
         else:
             lines.append(f"- {key}: `{value}`")
+    export_policy = (
+        payload.get("review_export_policy")
+        if isinstance(payload.get("review_export_policy"), Mapping)
+        else {}
+    )
+    lines.extend(["", "## Source + Artifacts Review Export", ""])
+    for key, value in export_policy.items():
+        lines.append(f"- {key}: `{value}`")
     lines.extend(["", "## Opportunity Lanes", ""])
     lanes = payload.get("opportunity_lanes") if isinstance(payload.get("opportunity_lanes"), Mapping) else {}
     for lane_name in LANE_NAMES:

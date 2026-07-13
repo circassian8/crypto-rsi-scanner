@@ -839,11 +839,12 @@ def test_event_alpha_radar_north_star_generation_writes_contract():
     assert payload["burn_in_contract"]["auto_apply_thresholds"] is False
     assert payload["burn_in_contract"]["no_auto_threshold_changes"] is True
     assert payload["burn_in_contract"]["mock_fixture_replay_cache_or_preflight_counted"] is False
-    assert "burn_in_counted=true" in payload["burn_in_contract"]["candidate_count_authority"]
+    assert "decision_radar_live_observation_campaign_v2 rows are excluded" in payload["burn_in_contract"]["candidate_count_authority"]
     market_generation = payload["market_no_send_generation"]
     assert market_generation["provenance_contract"]["schema_version"] == "crypto_radar_market_provenance_v2"
     assert market_generation["provenance_contract"]["contract_version"] == 2
-    assert market_generation["provenance_contract"]["mock_or_fixture_real_burn_in_counted"] is False
+    assert market_generation["provenance_contract"]["mock_or_fixture_decision_campaign_counted"] is False
+    assert market_generation["provenance_contract"]["event_alpha_catalyst_burn_in_counted"] is False
     assert "live_provider" in market_generation["provenance_contract"]["data_acquisition_modes"]
     assert "live_no_send" in market_generation["provenance_contract"]["candidate_source_modes"]
     assert market_generation["authorization"]["inferred_from_cache"] is False
@@ -1357,7 +1358,7 @@ def test_export_source_with_artifacts_fallback_and_archive_validation():
     import subprocess
     import time
     import zipfile
-    from datetime import datetime
+    from datetime import datetime, timedelta, timezone
 
     root = REPO_ROOT
     spec = importlib.util.spec_from_file_location(

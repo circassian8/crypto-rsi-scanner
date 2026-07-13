@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import aiohttp
 
@@ -92,6 +94,9 @@ def initialize_coingecko_client(
             else config.MAX_RETRIES
         )
     )
+    # Sanitized, single-request telemetry. It intentionally never contains the
+    # URL query, headers, API key, response body, or recipient identifiers.
+    self.last_request_telemetry: dict[str, Any] | None = None
 
 
 async def enter_coingecko_client(self: CoinGeckoClient) -> CoinGeckoClient:
@@ -112,16 +117,31 @@ def load_coingecko_fixture_json(self: CoinGeckoClient, *parts: str) -> object:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-async def get_coingecko_json(self: CoinGeckoClient, path: str, params: dict) -> dict:
+async def get_coingecko_json(self: CoinGeckoClient, path: str, params: dict) -> Any:
     url = f"{self.base_url}{path}"
     max_retries = max(1, int(self.max_retries or 1))
+    started_at = datetime.now(timezone.utc)
+    started_monotonic = asyncio.get_running_loop().time()
+    last_status: int | None = None
     for attempt in range(max_retries):
         await self._limiter.acquire()
         try:
             timeout = aiohttp.ClientTimeout(total=max(0.1, float(self.timeout_seconds or 30.0)))
             async with self._session.get(url, params=params, timeout=timeout) as resp:
+                last_status = int(resp.status)
                 if resp.status == 200:
-                    return await resp.json()
+                    payload = await resp.json()
+                    _record_request_telemetry(
+                        self,
+                        path=path,
+                        started_at=started_at,
+                        started_monotonic=started_monotonic,
+                        http_status=last_status,
+                        retry_count=attempt,
+                        error_class=None,
+                        result_count=len(payload) if isinstance(payload, (list, dict)) else None,
+                    )
+                    return payload
                 if resp.status == 429:
                     retry_after = resp.headers.get("Retry-After")
                     wait = float(retry_after) if retry_after and retry_after.isdigit() else 8.0 * (attempt + 1)
@@ -132,13 +152,69 @@ async def get_coingecko_json(self: CoinGeckoClient, path: str, params: dict) -> 
                     await asyncio.sleep(2.0 * (attempt + 1))
                     continue
                 text = await resp.text()
+                _record_request_telemetry(
+                    self,
+                    path=path,
+                    started_at=started_at,
+                    started_monotonic=started_monotonic,
+                    http_status=last_status,
+                    retry_count=attempt,
+                    error_class="http_error",
+                )
                 raise RuntimeError(f"CoinGecko {resp.status}: {text[:200]}")
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             if attempt == max_retries - 1:
+                _record_request_telemetry(
+                    self,
+                    path=path,
+                    started_at=started_at,
+                    started_monotonic=started_monotonic,
+                    http_status=last_status,
+                    retry_count=attempt,
+                    error_class=type(e).__name__,
+                )
                 raise
             log.warning("Request error on %s (attempt %d): %s", path, attempt + 1, e)
             await asyncio.sleep(2.0 * (attempt + 1))
+    _record_request_telemetry(
+        self,
+        path=path,
+        started_at=started_at,
+        started_monotonic=started_monotonic,
+        http_status=last_status,
+        retry_count=max_retries - 1,
+        error_class="request_retries_exhausted",
+    )
     raise RuntimeError(f"CoinGecko request failed after {max_retries} retries: {path}")
+
+
+def _record_request_telemetry(
+    self: CoinGeckoClient,
+    *,
+    path: str,
+    started_at: datetime,
+    started_monotonic: float,
+    http_status: int | None,
+    retry_count: int,
+    error_class: str | None,
+    result_count: int | None = None,
+) -> None:
+    ended_at = datetime.now(timezone.utc)
+    duration_ms = max(
+        0,
+        int(round((asyncio.get_running_loop().time() - started_monotonic) * 1000)),
+    )
+    self.last_request_telemetry = {
+        "endpoint_path": path if path.startswith("/") else "/unknown",
+        "request_started_at": started_at.isoformat(),
+        "request_ended_at": ended_at.isoformat(),
+        "duration_ms": duration_ms,
+        "http_status": http_status,
+        "result_count": result_count,
+        "retry_count": max(0, int(retry_count)),
+        "error_class": error_class,
+        "cache_behavior": "network",
+    }
 
 
 async def get_top_markets(self: CoinGeckoClient, n: int) -> list[dict]:

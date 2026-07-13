@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections import Counter
 from datetime import datetime
@@ -46,6 +45,9 @@ def write_pilot_audit(
         namespace,
         manifest_filename=manifest_filename,
     )
+    output_dir = namespace_dir or base
+    json_path = output_dir / json_filename
+    previous_audit = _load_previous_audit(json_path, namespace=namespace)
     pointer = _read_pointer(base)
     audit = _build_audit(
         namespace=namespace,
@@ -60,12 +62,124 @@ def write_pilot_audit(
         pointer=pointer,
         safety_counters=safety_counters,
     )
-    output_dir = namespace_dir or base
-    json_path = output_dir / json_filename
+    _preserve_publication_history(audit, previous_audit=previous_audit)
     markdown_path = output_dir / markdown_filename
     write_json_atomic(json_path, audit)
     write_bytes_atomic(markdown_path, format_pilot_audit(audit).encode("utf-8"))
     return json_path, markdown_path, audit
+
+
+def _load_previous_audit(path: Path, *, namespace: str) -> dict[str, Any]:
+    """Load only history belonging to the same immutable namespace."""
+
+    try:
+        previous = read_json_object(path)
+    except MarketNoSendError:
+        return {}
+    if previous.get("artifact_namespace") != namespace:
+        return {}
+    return previous
+
+
+def _preserve_publication_history(
+    audit: dict[str, Any],
+    *,
+    previous_audit: Mapping[str, Any],
+) -> None:
+    """Keep authority history monotonic while current pointer state may change."""
+
+    publication = audit.get("publication")
+    if not isinstance(publication, dict):
+        return
+    previous_publication = previous_audit.get("publication")
+    previous_publication = (
+        previous_publication if isinstance(previous_publication, Mapping) else {}
+    )
+    same_run = bool(
+        audit.get("exact_run_id")
+        and previous_audit.get("exact_run_id") == audit.get("exact_run_id")
+    )
+    if same_run and audit.get("exact_operator_revision") is None:
+        audit["exact_operator_revision"] = previous_audit.get("exact_operator_revision")
+    currently_published = publication.get("status") == "published"
+    previously_published = bool(
+        same_run
+        and (
+            previous_publication.get("ever_authoritative") is True
+            or previous_publication.get("status") == "published"
+        )
+    )
+    ever_authoritative = currently_published or previously_published
+    publication["ever_authoritative"] = ever_authoritative
+    binding = (
+        _authority_binding(audit, publication)
+        if currently_published
+        else previous_publication.get("authority_binding")
+    )
+    if not isinstance(binding, Mapping) and previously_published:
+        binding = _authority_binding(previous_audit, previous_publication)
+    publication["authority_binding"] = dict(binding) if isinstance(binding, Mapping) else None
+    first_authoritative_at: str | None = None
+    if previously_published:
+        previous_first = previous_publication.get("first_authoritative_at")
+        if isinstance(previous_first, str) and previous_first.strip():
+            first_authoritative_at = previous_first.strip()
+        else:
+            previous_generated_at = previous_audit.get("generated_at")
+            if isinstance(previous_generated_at, str) and previous_generated_at.strip():
+                first_authoritative_at = previous_generated_at.strip()
+    if first_authoritative_at is None and currently_published:
+        generated_at = audit.get("generated_at")
+        if isinstance(generated_at, str) and generated_at.strip():
+            first_authoritative_at = generated_at.strip()
+    publication["first_authoritative_at"] = first_authoritative_at
+
+
+def has_bound_publication_authority(
+    audit: Mapping[str, Any],
+    operator: Mapping[str, Any],
+    *,
+    namespace: str,
+    run_id: str,
+) -> bool:
+    """Accept historical authority only with an exact immutable operator binding."""
+
+    publication = audit.get("publication")
+    if not isinstance(publication, Mapping):
+        return False
+    binding = (
+        _authority_binding(audit, publication)
+        if publication.get("status") == "published"
+        else publication.get("authority_binding")
+        if publication.get("ever_authoritative") is True
+        else None
+    )
+    expected = {
+        "artifact_namespace": namespace,
+        "run_id": run_id,
+        "revision": operator.get("revision"),
+        "operator_state_sha256": _operator_digest(operator),
+    }
+    return bool(
+        isinstance(binding, Mapping)
+        and audit.get("artifact_namespace") == namespace
+        and audit.get("exact_run_id") == run_id
+        and audit.get("exact_operator_revision") == operator.get("revision")
+        and all(binding.get(key) == value for key, value in expected.items())
+        and expected["operator_state_sha256"]
+    )
+
+
+def _authority_binding(
+    audit: Mapping[str, Any],
+    publication: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "artifact_namespace": publication.get("pointer_namespace"),
+        "run_id": publication.get("pointer_run_id"),
+        "revision": publication.get("pointer_revision"),
+        "operator_state_sha256": publication.get("pointer_operator_state_sha256"),
+    }
 
 
 def _load_generation(
@@ -130,7 +244,7 @@ def _build_audit(
         status == "complete"
         and manifest.get("candidate_source_mode") == "live_no_send"
         and manifest.get("provenance_contract_valid") is True
-        and manifest.get("burn_in_counted") is True
+        and manifest.get("decision_radar_campaign_counted") is True
         and doctor.get("authoritative") is True
         and doctor.get("blocker_count") == 0
     )
@@ -203,6 +317,10 @@ def _build_audit(
         "data_acquisition_mode": acquisition_mode,
         "candidate_source_mode": str(manifest.get("candidate_source_mode") or result_payload.get("candidate_source_mode") or "preflight_only"),
         "provenance_contract_valid": manifest.get("provenance_contract_valid") is True,
+        "measurement_program": manifest.get("measurement_program"),
+        "decision_radar_campaign_eligible": manifest.get("decision_radar_campaign_eligible") is True,
+        "decision_radar_campaign_counted": manifest.get("decision_radar_campaign_counted") is True,
+        "decision_radar_campaign_reason": manifest.get("decision_radar_campaign_reason") or "generation_not_available",
         "burn_in_eligible": manifest.get("burn_in_eligible") is True,
         "burn_in_counted": manifest.get("burn_in_counted") is True,
         "burn_in_reason": manifest.get("burn_in_reason") or "generation_not_available",
@@ -277,16 +395,9 @@ def _operator_digest(operator: Mapping[str, Any]) -> str | None:
     if not operator:
         return None
     try:
-        data = json.dumps(
-            operator,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
+        return operator_state.operator_authority_digest(operator)
     except (TypeError, ValueError):
         return None
-    return hashlib.sha256(data).hexdigest()
 
 
 def _baseline_status(quality: Mapping[str, Any]) -> str:
@@ -413,7 +524,9 @@ def format_pilot_audit(audit: Mapping[str, Any]) -> str:
         f"- data_acquisition_mode: {audit.get('data_acquisition_mode')}",
         f"- candidate_source_mode: {audit.get('candidate_source_mode')}",
         f"- provenance_contract_valid: {str(audit.get('provenance_contract_valid')).lower()}",
-        f"- burn_in_counted: {str(audit.get('burn_in_counted')).lower()}",
+        f"- measurement_program: {audit.get('measurement_program')}",
+        f"- decision_radar_campaign_counted: {str(audit.get('decision_radar_campaign_counted')).lower()}",
+        f"- event_alpha_burn_in_counted: {str(audit.get('burn_in_counted')).lower()}",
         f"- universe_fetched/kept/excluded: {universe.get('fetched_count', 0)}/{universe.get('kept_count', 0)}/{universe.get('excluded_count', 0)}",
         f"- baseline_status: {baseline.get('baseline_status')}",
         "- baseline_cold/warming/warm: "
@@ -427,6 +540,8 @@ def format_pilot_audit(audit: Mapping[str, Any]) -> str:
         f"- outcome_placeholder_count: {audit.get('outcome_placeholder_count')}",
         f"- publication_status: {publication.get('status')}",
         f"- publication_reason: {publication.get('reason')}",
+        f"- ever_authoritative: {str(publication.get('ever_authoritative') is True).lower()}",
+        f"- first_authoritative_at: {publication.get('first_authoritative_at')}",
         f"- pointer_namespace: {publication.get('pointer_namespace')}",
         f"- strict_doctor_status/blockers: {doctor.get('status', 'not_run')}/{doctor.get('blocker_count', 'unknown')}",
         f"- dashboard_trusted_current: {str(dashboard.get('trusted_current') is True).lower()}",

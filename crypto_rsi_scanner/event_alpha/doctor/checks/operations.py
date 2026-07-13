@@ -397,7 +397,15 @@ def _check_candidate_mode(ctx: object, daily_run: Mapping[str, Any], candidate_m
                 "daily_burn_in_candidate_mode_manifest_missing",
             )
         )
-    candidate_rows = [row for row in ctx_value(ctx, "integrated_candidates", []) or [] if isinstance(row, Mapping)]
+    candidate_rows = [
+        row for row in ctx_value(ctx, "integrated_candidates", []) or []
+        if isinstance(row, Mapping)
+        and (
+            row.get("measurement_program")
+            or event_market_provenance.market_provenance_values(row).get("measurement_program")
+        )
+        != event_market_provenance.DECISION_RADAR_MEASUREMENT_PROGRAM
+    ]
     missing_provenance = 0
     missing_ledger = 0
     fixture_counted = 0

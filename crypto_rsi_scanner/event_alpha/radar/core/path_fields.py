@@ -478,7 +478,14 @@ def _best_market_context(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
             if not isinstance(source, Mapping):
                 continue
             candidates.append(_market_context_from_flat(source))
-            for key in ("market_context_after", "market_context", "market_data_context"):
+            for key in (
+                "market_context_after",
+                "market_context",
+                "market_data_context",
+                "latest_market_snapshot",
+                "market_snapshot",
+                "market_state_snapshot",
+            ):
                 nested = source.get(key)
                 if isinstance(nested, Mapping):
                     candidates.append(_market_context_from_nested(nested))
@@ -609,12 +616,20 @@ def _latest_run_id(rows: Iterable[Mapping[str, Any]]) -> str | None:
 
 def _market_context_from_flat(source: Mapping[str, Any]) -> dict[str, Any]:
     return {
-        "market_context_freshness_status": _text_or_none(source.get("market_context_freshness_status")),
-        "market_context_source": _text_or_none(source.get("market_context_source")),
+        "market_context_freshness_status": _text_or_none(
+            source.get("market_context_freshness_status")
+            or source.get("market_data_freshness")
+            or source.get("integrated_market_freshness_status")
+        ),
+        "market_context_source": _text_or_none(
+            source.get("market_context_source")
+            or source.get("integrated_market_context_source")
+        ),
         "market_context_observed_at": _text_or_none(source.get("market_context_observed_at")),
         "market_context_age_hours": _float_or_none(source.get("market_context_age_hours")),
         "market_context_freshness_cap_applied": _truthy(source.get("market_context_freshness_cap_applied")),
         "market_context_data_quality": _text_or_none(source.get("market_context_data_quality")),
+        "market_snapshot_id": _text_or_none(source.get("market_snapshot_id")),
     }
 
 
@@ -631,13 +646,40 @@ def _market_context_from_nested(source: Mapping[str, Any]) -> dict[str, Any]:
     age_hours = _float_or_none(source.get("age_hours"))
     if age_hours is None and age_seconds is not None:
         age_hours = age_seconds / 3600.0
-    source_name = _text_or_none(source.get("source")) or _text_or_none(snapshot.get("source"))
-    freshness = _text_or_none(source.get("freshness_status")) or _text_or_none(source.get("market_context_freshness_status"))
+    source_name = next((
+        value
+        for value in (
+            _text_or_none(source.get("market_data_source")),
+            _text_or_none(source.get("source_provider")),
+            _text_or_none(source.get("latest_source")),
+            _text_or_none(source.get("source")),
+            _text_or_none(snapshot.get("market_data_source")),
+            _text_or_none(snapshot.get("source_provider")),
+            _text_or_none(snapshot.get("source")),
+        )
+        if value
+    ), None)
+    freshness = (
+        _text_or_none(source.get("freshness_status"))
+        or _text_or_none(source.get("market_context_freshness_status"))
+        or _text_or_none(source.get("market_data_freshness"))
+    )
     if not freshness and data_quality in {"fresh", "fixture_allowed_stale", "stale", "missing", "unknown"}:
         freshness = data_quality
     if not freshness and observed_at:
         freshness = "fresh"
     cap_value = source.get("freshness_cap_applied", source.get("market_context_freshness_cap_applied"))
+    quality = (
+        source.get("market_data_quality")
+        if isinstance(source.get("market_data_quality"), Mapping)
+        else {}
+    )
+    snapshot_id = (
+        _text_or_none(source.get("market_snapshot_id"))
+        or _text_or_none(source.get("market_history_observation_id"))
+        or _text_or_none(quality.get("market_snapshot_id"))
+        or _text_or_none(quality.get("baseline_observation_id"))
+    )
     return {
         "market_context_freshness_status": freshness,
         "market_context_source": source_name,
@@ -645,6 +687,7 @@ def _market_context_from_nested(source: Mapping[str, Any]) -> dict[str, Any]:
         "market_context_age_hours": age_hours,
         "market_context_freshness_cap_applied": _truthy(cap_value),
         "market_context_data_quality": data_quality,
+        "market_snapshot_id": snapshot_id,
     }
 
 
@@ -652,18 +695,20 @@ def _market_context_has_value(item: Mapping[str, Any]) -> bool:
     return any(value not in (None, "", [], {}, ()) for value in item.values())
 
 
-def _market_context_rank(item: Mapping[str, Any]) -> tuple[int, int, int, int, int, int]:
+def _market_context_rank(item: Mapping[str, Any]) -> tuple[int, int, int, int, int, int, int]:
     status = str(item.get("market_context_freshness_status") or "").casefold()
     source = str(item.get("market_context_source") or "").casefold()
     data_quality = str(item.get("market_context_data_quality") or "").casefold()
     observed_at = str(item.get("market_context_observed_at") or "").strip()
     age = item.get("market_context_age_hours")
     cap = bool(item.get("market_context_freshness_cap_applied"))
+    snapshot_id = str(item.get("market_snapshot_id") or "").strip()
     return (
         3 if status == "fresh" else 2 if status == "fixture_allowed_stale" else 1 if status == "stale" else 0,
         1 if source not in {"", "missing", "unknown"} else 0,
         1 if data_quality not in {"", "missing", "unknown"} else 0,
         1 if observed_at else 0,
+        1 if snapshot_id else 0,
         1 if age not in (None, "", "unknown") else 0,
         0 if cap else 1,
     )

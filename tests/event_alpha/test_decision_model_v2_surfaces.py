@@ -260,6 +260,12 @@ def test_closed_decision_projection_is_idempotent_and_preserves_calendar_rsi_and
         run_id="calendar-rsi-run",
         profile="fixture",
         artifact_namespace="calendar-rsi",
+        market_snapshot={
+            "market_data_source": "fixture_coingecko",
+            "observed_at": "2026-06-15T15:59:00Z",
+            "freshness_status": "fresh",
+            "market_snapshot_id": "calendar-rsi-market-1",
+        },
         unified_calendar_context=[{
             "calendar_event_id": "calendar-fomc-v2",
             "event_kind": "central_bank",
@@ -306,6 +312,12 @@ def test_closed_decision_projection_is_idempotent_and_preserves_calendar_rsi_and
     }
     assert projected["rsi_context"]["setup_type"] == "breakdown_risk"
     assert projected["rsi_context_references"][0]["observed_at"] == "2026-06-15T15:00:00Z"
+    assert projected["market_context_reference"] == {
+        "source": "fixture_coingecko",
+        "observed_at": "2026-06-15T15:59:00Z",
+        "freshness_status": "fresh",
+        "market_snapshot_id": "calendar-rsi-market-1",
+    }
     assert projected["observation_ids"] == ["calendar-rsi-v2", "calendar-rsi-core-v2"]
     assert projected["source_provider_lineage"] == {
         "data_mode": "fixture",

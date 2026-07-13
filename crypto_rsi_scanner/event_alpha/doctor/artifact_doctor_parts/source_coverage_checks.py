@@ -442,7 +442,11 @@ def _cryptopanic_source_state_conflicts(
         "cryptopanic_profile_disabled_credential_recommendation": 0,
         "source_coverage_blocker_summary_inconsistent": 0,
     }
-    if "CryptoPanic:" in source_text:
+    selected_for_run = (
+        source_payload.get("cryptopanic_selected_for_run") is True
+        or (exact_run or {}).get("cryptopanic_selected_for_run") is True
+    )
+    if "CryptoPanic:" in source_text and selected_for_run:
         if "- configured: true" in source_text and "- observed this run: false" in source_text:
             out["cryptopanic_configured_but_not_observed"] = 1
     run_configured = bool((exact_run or {}).get("cryptopanic_configured"))

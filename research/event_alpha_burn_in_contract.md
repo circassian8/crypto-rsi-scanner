@@ -2,7 +2,7 @@
 
 Research-only 30-day burn-in operating contract. This document does not authorize live trading, Event Alpha paper trading, execution/order logic, normal RSI signal writes, Event Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by default, or secret handling changes.
 
-- generated_at: `2026-07-13T06:45:34.694233+00:00`
+- generated_at: `2026-07-13T18:57:37.809108+00:00`
 - schema_version: `event_alpha_burn_in_contract_v1`
 - duration_days: `30`
 - min_live_no_send_cycles: `20`
@@ -12,7 +12,7 @@ Research-only 30-day burn-in operating contract. This document does not authoriz
 - min_outcome_rows: `100`
 - auto_apply_thresholds: `False`
 - no_auto_threshold_changes: `True`
-- candidate_count_authority: `canonical market provenance v2 with candidate_source_mode=live_no_send, exact valid lineage, and burn_in_counted=true`
+- candidate_count_authority: `canonical Event Alpha catalyst rows with burn_in_counted=true; decision_radar_live_observation_campaign_v2 rows are excluded`
 - mock_fixture_replay_cache_or_preflight_counted: `False`
 
 ## Opportunity Lanes

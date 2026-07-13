@@ -80,12 +80,25 @@ _MARKET_NO_SEND_PROVENANCE_V2_FIELDS = frozenset(
         "provider_generation_id",
         "cache_status",
         "provenance_contract_valid",
+        "measurement_program",
+        "decision_radar_campaign_eligible",
+        "decision_radar_campaign_counted",
+        "decision_radar_campaign_reason",
         "burn_in_eligible",
         "burn_in_counted",
         "burn_in_reason",
         "feature_basis",
         "data_quality",
         "validation_errors",
+    }
+)
+_MARKET_NO_SEND_PROVENANCE_V2_LEGACY_FIELDS = frozenset(
+    _MARKET_NO_SEND_PROVENANCE_V2_FIELDS
+    - {
+        "measurement_program",
+        "decision_radar_campaign_eligible",
+        "decision_radar_campaign_counted",
+        "decision_radar_campaign_reason",
     }
 )
 
@@ -123,12 +136,21 @@ def _validate_market_no_send_provenance(value: Any) -> list[str]:
     if version != 2:
         errors.append("operator_state_market_no_send_provenance_version_invalid")
         return errors
-    if set(value) != _MARKET_NO_SEND_PROVENANCE_V2_FIELDS:
+    fields = set(value)
+    if fields not in {
+        _MARKET_NO_SEND_PROVENANCE_V2_FIELDS,
+        _MARKET_NO_SEND_PROVENANCE_V2_LEGACY_FIELDS,
+    }:
         errors.append("operator_state_market_no_send_provenance_fields_invalid")
     if value.get("schema_version") != "crypto_radar_market_provenance_v2":
         errors.append("operator_state_market_no_send_schema_version_invalid")
     normalized = market_provenance.normalize_market_provenance(value)
-    if dict(value) != normalized:
+    comparable = (
+        normalized
+        if fields == _MARKET_NO_SEND_PROVENANCE_V2_FIELDS
+        else {key: normalized.get(key) for key in _MARKET_NO_SEND_PROVENANCE_V2_LEGACY_FIELDS}
+    )
+    if dict(value) != comparable:
         errors.append("operator_state_market_no_send_provenance_not_canonical")
     acquisition_mode = value.get("data_acquisition_mode")
     source_mode = value.get("candidate_source_mode")
@@ -182,9 +204,19 @@ def _validate_market_no_send_provenance(value: Any) -> list[str]:
     contract_valid = not validation_errors
     if value.get("provenance_contract_valid") is not contract_valid:
         errors.append("invalid_market_no_send_provenance:provenance_contract_valid")
+    decision_campaign = fields == _MARKET_NO_SEND_PROVENANCE_V2_FIELDS
     for field in ("burn_in_eligible", "burn_in_counted"):
-        if value.get(field) is not eligible:
+        expected = False if decision_campaign else eligible
+        if value.get(field) is not expected:
             errors.append(f"invalid_market_no_send_provenance:{field}")
+    if decision_campaign:
+        if value.get("measurement_program") != market_provenance.DECISION_RADAR_MEASUREMENT_PROGRAM:
+            errors.append("operator_state_market_no_send_measurement_program_invalid")
+        for field in ("decision_radar_campaign_eligible", "decision_radar_campaign_counted"):
+            if value.get(field) is not eligible:
+                errors.append(f"invalid_market_no_send_provenance:{field}")
+        if not str(value.get("decision_radar_campaign_reason") or "").strip():
+            errors.append("operator_state_market_no_send_campaign_reason_invalid")
     if not str(value.get("provider_generation_id") or "").strip():
         errors.append("operator_state_market_no_send_generation_id_invalid")
     if value.get("cache_status") not in {

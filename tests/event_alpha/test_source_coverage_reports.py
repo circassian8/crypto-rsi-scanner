@@ -289,6 +289,10 @@ def test_source_coverage_doctor_blocks_exact_run_semantic_contradictions():
             "cryptopanic_recommendation": "enable CryptoPanic in an explicit no-send evidence/candidate profile if desired",
             "candidates_blocked_by_source_coverage": 1,
         }), encoding="utf-8")
+        report_path.write_text(
+            "CryptoPanic:\n- configured: true\n- observed this run: false\n",
+            encoding="utf-8",
+        )
         good = artifact_doctor.diagnose_artifacts(
             run_rows=[run],
             core_opportunity_rows=[core],
@@ -301,7 +305,27 @@ def test_source_coverage_doctor_blocks_exact_run_semantic_contradictions():
         assert good.cryptopanic_run_coverage_config_mismatch == 0
         assert good.cryptopanic_profile_disabled_coverage_mismatch == 0
         assert good.cryptopanic_profile_disabled_credential_recommendation == 0
+        assert good.cryptopanic_configured_but_not_observed == 0
         assert good.source_coverage_blocker_summary_inconsistent == 0
+
+        selected_payload = json.loads(
+            (base / "event_alpha_source_coverage.json").read_text(encoding="utf-8")
+        )
+        selected_payload["cryptopanic_selected_for_run"] = True
+        (base / "event_alpha_source_coverage.json").write_text(
+            json.dumps(selected_payload),
+            encoding="utf-8",
+        )
+        selected = artifact_doctor.diagnose_artifacts(
+            run_rows=[{**run, "cryptopanic_selected_for_run": True}],
+            core_opportunity_rows=[core],
+            source_coverage_report_path=report_path,
+            profile=run["profile"],
+            artifact_namespace=run["artifact_namespace"],
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert selected.cryptopanic_configured_but_not_observed == 1
 
 
 def test_source_coverage_links_live_provider_readiness_artifacts():

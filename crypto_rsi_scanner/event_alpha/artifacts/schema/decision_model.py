@@ -52,6 +52,7 @@ FIELDS = (
     "what_confirms", "what_invalidates", "calendar_evidence", "calendar_evidence_ids",
     "rsi_context", "rsi_context_references", "observation_ids", "source_provider_lineage",
     "market_provenance",
+    "market_context_reference",
     "market_provenance_schema_version", "market_provenance_contract_version",
     "data_acquisition_mode", "candidate_source_mode",
     "provider", "provider_call_attempted", "provider_call_succeeded",
@@ -89,6 +90,7 @@ TYPES = {
     "calendar_evidence": "list", "calendar_evidence_ids": "list", "rsi_context": "dict",
     "rsi_context_references": "list", "observation_ids": "list",
     "source_provider_lineage": "dict", "market_provenance": "dict",
+    "market_context_reference": "dict",
     "market_provenance_schema_version": "str", "market_provenance_contract_version": "int",
     "data_acquisition_mode": "str",
     "candidate_source_mode": "str", "provider": "str",
@@ -313,43 +315,7 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
         if _items(row.get(alias)) != _items(row.get(canonical)):
             errors.append(f"decision_projection_alias_mismatch:{alias}")
 
-    evidence = row.get("calendar_evidence")
-    evidence_ids: list[str] = []
-    if _is_sequence(evidence):
-        for item in evidence:
-            if not isinstance(item, Mapping):
-                errors.append("decision_projection_calendar_evidence_invalid")
-                continue
-            event_id = str(item.get("calendar_event_id") or "").strip()
-            reference = str(item.get("evidence_reference") or "").strip()
-            if not event_id and not reference:
-                errors.append("decision_projection_calendar_evidence_unresolvable")
-            if event_id:
-                evidence_ids.append(event_id)
-            if not str(item.get("category") or item.get("event_kind") or "").strip():
-                errors.append("decision_projection_calendar_category_missing")
-            if str(item.get("time_certainty") or "") not in {"exact", "window", "estimated", "unknown"}:
-                errors.append("decision_projection_calendar_time_certainty_invalid")
-            if str(item.get("importance") or "") not in {"low", "medium", "high", "critical", "unknown"}:
-                errors.append("decision_projection_calendar_importance_invalid")
-            timestamps = (item.get("scheduled_at"), item.get("window_start"), item.get("window_end"))
-            if not any(value not in (None, "") for value in timestamps):
-                errors.append("decision_projection_calendar_time_missing")
-            elif any(value not in (None, "") and _aware_timestamp(value) is None for value in timestamps):
-                errors.append("decision_projection_calendar_time_invalid")
-    if _items(row.get("calendar_evidence_ids")) != tuple(evidence_ids):
-        errors.append("decision_projection_calendar_ids_mismatch")
-    if str(row.get("radar_route") or "") == "calendar_risk" and not (
-        _is_sequence(evidence) and any(isinstance(item, Mapping) for item in evidence)
-    ):
-        errors.append("decision_projection_calendar_risk_without_evidence")
-
-    rsi_context = row.get("rsi_context")
-    rsi_references = row.get("rsi_context_references")
-    if isinstance(rsi_context, Mapping) and rsi_context and not (
-        _is_sequence(rsi_references) and any(isinstance(item, Mapping) for item in rsi_references)
-    ):
-        errors.append("decision_projection_rsi_context_unreferenced")
+    errors.extend(_validate_projection_calendar_and_rsi(row))
 
     lineage = row.get("source_provider_lineage")
     if isinstance(lineage, Mapping):
@@ -374,6 +340,50 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
                 if row.get(field) != expected:
                     errors.append(f"decision_projection_market_provenance_alias_mismatch:{field}")
 
+    market_reference = row.get("market_context_reference")
+    if market_reference is not None:
+        if not isinstance(market_reference, Mapping):
+            errors.append("decision_projection_market_context_reference_invalid_type")
+        elif market_reference:
+            allowed_reference_fields = {
+                "source", "observed_at", "freshness_status", "market_snapshot_id",
+            }
+            if set(market_reference) != allowed_reference_fields:
+                errors.append("decision_projection_market_context_reference_fields_invalid")
+            for field in allowed_reference_fields:
+                value = market_reference.get(field)
+                if value is not None and (
+                    not isinstance(value, str) or not value or value != value.strip()
+                ):
+                    errors.append(
+                        f"decision_projection_market_context_reference_value_invalid:{field}"
+                    )
+            observed_at = market_reference.get("observed_at")
+            if observed_at is not None and _aware_timestamp(observed_at) is None:
+                errors.append("decision_projection_market_context_reference_timestamp_invalid")
+    campaign_provenance = (
+        provenance
+        if isinstance(provenance, Mapping)
+        and provenance.get("measurement_program")
+        == event_market_provenance.DECISION_RADAR_MEASUREMENT_PROGRAM
+        else None
+    )
+    if campaign_provenance is not None:
+        required_reference_fields = {
+            "source", "observed_at", "freshness_status", "market_snapshot_id",
+        }
+        if not isinstance(market_reference, Mapping) or set(market_reference) != required_reference_fields:
+            errors.append("decision_projection_campaign_market_context_reference_missing")
+        else:
+            for field in required_reference_fields:
+                value = market_reference.get(field)
+                if not isinstance(value, str) or not value or value != value.strip():
+                    errors.append(
+                        f"decision_projection_campaign_market_context_reference_missing:{field}"
+                    )
+            if _aware_timestamp(market_reference.get("observed_at")) is None:
+                errors.append("decision_projection_campaign_market_context_reference_timestamp_invalid")
+
     safety = row.get("decision_safety_invariants")
     required_safety = (
         "research_only", "no_live_trading", "no_event_alpha_paper_trading",
@@ -394,6 +404,58 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
             elif safety.get(field) is not (row.get(attestation) is not True):
                 errors.append(f"decision_projection_safety_attestation_mismatch:{field}")
     return list(dict.fromkeys(errors))
+
+
+def _validate_projection_calendar_and_rsi(row: Mapping[str, Any]) -> list[str]:
+    errors: list[str] = []
+    evidence = row.get("calendar_evidence")
+    evidence_ids: list[str] = []
+    if _is_sequence(evidence):
+        for item in evidence:
+            if not isinstance(item, Mapping):
+                errors.append("decision_projection_calendar_evidence_invalid")
+                continue
+            event_id = str(item.get("calendar_event_id") or "").strip()
+            reference = str(item.get("evidence_reference") or "").strip()
+            if not event_id and not reference:
+                errors.append("decision_projection_calendar_evidence_unresolvable")
+            if event_id:
+                evidence_ids.append(event_id)
+            if not str(item.get("category") or item.get("event_kind") or "").strip():
+                errors.append("decision_projection_calendar_category_missing")
+            if str(item.get("time_certainty") or "") not in {
+                "exact", "window", "estimated", "unknown",
+            }:
+                errors.append("decision_projection_calendar_time_certainty_invalid")
+            if str(item.get("importance") or "") not in {
+                "low", "medium", "high", "critical", "unknown",
+            }:
+                errors.append("decision_projection_calendar_importance_invalid")
+            timestamps = (
+                item.get("scheduled_at"), item.get("window_start"), item.get("window_end"),
+            )
+            if not any(value not in (None, "") for value in timestamps):
+                errors.append("decision_projection_calendar_time_missing")
+            elif any(
+                value not in (None, "") and _aware_timestamp(value) is None
+                for value in timestamps
+            ):
+                errors.append("decision_projection_calendar_time_invalid")
+    if _items(row.get("calendar_evidence_ids")) != tuple(evidence_ids):
+        errors.append("decision_projection_calendar_ids_mismatch")
+    if str(row.get("radar_route") or "") == "calendar_risk" and not (
+        _is_sequence(evidence) and any(isinstance(item, Mapping) for item in evidence)
+    ):
+        errors.append("decision_projection_calendar_risk_without_evidence")
+
+    rsi_context = row.get("rsi_context")
+    rsi_references = row.get("rsi_context_references")
+    if isinstance(rsi_context, Mapping) and rsi_context and not (
+        _is_sequence(rsi_references)
+        and any(isinstance(item, Mapping) for item in rsi_references)
+    ):
+        errors.append("decision_projection_rsi_context_unreferenced")
+    return errors
 
 
 def _validate_scores_and_expiry(

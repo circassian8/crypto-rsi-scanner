@@ -44,6 +44,10 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "reason": "Dense operator audit renderer with many cross-section helper dependencies.",
         "revisit_condition": "When audit sections are split with golden Markdown fixture comparison.",
     },
+    "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py": {
+        "reason": "Canonical operator-state hashing and exact revision ownership remain centralized and fail closed.",
+        "revisit_condition": "When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures.",
+    },
     "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py": {
         "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
         "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
@@ -60,6 +64,10 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
         "revisit_condition": "When adding a new derivatives metric family or crowding class.",
     },
+    "crypto_rsi_scanner/event_alpha/radar/market_history.py": {
+        "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
+        "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
+    },
     "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py": {
         "reason": "Verdict scoring and live-confirmation policy share many ordered caps and guardrails.",
         "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
@@ -71,6 +79,10 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
     "crypto_rsi_scanner/event_alpha/shims.py": {
         "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
         "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
+    },
+    "crypto_rsi_scanner/event_alpha/operations/market_no_send.py": {
+        "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
+        "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
     },
     "crypto_rsi_scanner/architecture_report.py": {
         "reason": "Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together.",

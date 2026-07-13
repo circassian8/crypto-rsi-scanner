@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 import crypto_rsi_scanner.event_alpha.radar.market_history as event_market_history
+import crypto_rsi_scanner.event_alpha.radar.market_history_readiness as market_history_readiness
 
 
 NOW = datetime(2026, 7, 13, 12, 0, tzinfo=timezone.utc)
@@ -210,12 +211,18 @@ def test_warmup_is_explicit_and_does_not_replace_proxy_before_ready():
     enriched = result.enriched_rows[0]
 
     assert enriched["market_history_status"] == "warming"
-    assert enriched["market_history"]["warmup"]["volume_zscore_24h"] == {
+    volume_warmup = enriched["market_history"]["warmup"]["volume_zscore_24h"]
+    assert {
+        key: volume_warmup[key]
+        for key in ("status", "sample_count", "required_sample_count", "basis")
+    } == {
         "status": "warming",
         "sample_count": 2,
         "required_sample_count": 4,
         "basis": "temporal_baseline",
     }
+    assert volume_warmup["coverage_seconds"] == 3600
+    assert volume_warmup["required_coverage_seconds"] == 10800
     assert enriched["market_history"]["warmup"]["return_zscore_1h"]["status"] == "warming"
     assert enriched["temporal_return_1h"] == pytest.approx((104 / 102 - 1) * 100)
     assert "temporal_volume_zscore_24h" not in enriched
@@ -403,3 +410,113 @@ def test_market_history_requires_aware_clock_and_valid_bounded_config():
         event_market_history.MarketHistoryConfig(max_observations_per_asset=1)
     with pytest.raises(ValueError, match="min_baseline_observations"):
         event_market_history.MarketHistoryConfig(min_baseline_observations=1)
+    with pytest.raises(ValueError, match="minimum_observation_spacing"):
+        event_market_history.MarketHistoryConfig(
+            minimum_observation_spacing=timedelta(0),
+        )
+
+
+def test_too_close_observation_is_preserved_but_never_advances_baseline():
+    first_at = NOW - timedelta(minutes=10)
+    first = _row("move-token", first_at, price=100, volume=1_000)
+    rapid = _row("move-token", NOW, price=101, volume=1_100)
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [rapid],
+        [first],
+        now=NOW,
+        config=_config(),
+    )
+
+    enriched = result.enriched_rows[0]
+    assert enriched["market_history"]["baseline_counted"] is False
+    assert enriched["market_history"]["baseline_counting_status"] == "too_close"
+    assert enriched["market_history"]["prior_observation_count"] == 1
+    assert result.summary["baseline_counting"]["current"] == {"too_close": 1}
+    assert len(result.retained_history) == 2
+    assert [row["baseline_counting_status"] for row in result.retained_history] == [
+        "counted",
+        "too_close",
+    ]
+
+    eligible_at = NOW + timedelta(hours=1)
+    rebuilt = event_market_history.enrich_market_rows_with_history(
+        [_row("move-token", eligible_at, price=102, volume=1_200)],
+        result.retained_history,
+        now=eligible_at,
+        config=_config(),
+    )
+    assert rebuilt.enriched_rows[0]["market_history"]["baseline_counted"] is True
+    assert [row["baseline_counting_status"] for row in rebuilt.retained_history] == [
+        "counted",
+        "too_close",
+        "counted",
+    ]
+
+
+def test_readiness_rejects_rapid_count_warmth_and_reports_every_feature_group():
+    start = NOW - timedelta(minutes=70)
+    rapid = [
+        _row(
+            "move-token",
+            start + timedelta(minutes=10 * index),
+            price=100 + index,
+            volume=1_000 + index * 10,
+        )
+        for index in range(8)
+    ]
+
+    readiness = market_history_readiness.assess_market_history_readiness(
+        rapid,
+        now=NOW,
+    )
+
+    assert readiness["baseline_status"] == "warming"
+    assert readiness["baseline_observation_count"] == 8
+    assert readiness["baseline_counted_observation_count"] == 2
+    assert readiness["baseline_too_close_observation_count"] == 6
+    assert readiness["cadence_status"] == "waiting"
+    assert readiness["next_eligible_observation_at"] == (NOW + timedelta(hours=1)).isoformat()
+    assert set(readiness["baseline_feature_readiness"]) == set(
+        event_market_history.FEATURE_READINESS_GROUPS
+    )
+    assert readiness["baseline_asset_readiness"]["move-token"]["status"] == "warming"
+
+
+def test_long_horizon_history_is_globally_warm_only_when_all_groups_are_warm():
+    history: list[dict] = []
+    for index in range(27):
+        observed_at = NOW - timedelta(hours=26 - index)
+        history.extend((
+            _row("move-token", observed_at, price=100 + index * 2, volume=1_000 + index * 13),
+            _row("bitcoin", observed_at, price=200 + index, volume=5_000 + index * 17, symbol="BTC"),
+            _row("ethereum", observed_at, price=1_000 + index * 3, volume=4_000 + index * 19, symbol="ETH"),
+        ))
+    cfg = event_market_history.MarketHistoryConfig(
+        max_history_age=timedelta(days=2),
+        max_observations_per_asset=64,
+        min_baseline_observations=2,
+    )
+
+    readiness = market_history_readiness.assess_market_history_readiness(
+        history,
+        now=NOW,
+        config=cfg,
+    )
+
+    assert readiness["baseline_status"] == "warm"
+    assert readiness["baseline_warm_asset_count"] == 3
+    for group in event_market_history.FEATURE_READINESS_GROUPS:
+        assert readiness["baseline_feature_readiness"][group]["warm_asset_count"] == 3
+
+    without_eth = [row for row in history if row["canonical_asset_id"] != "ethereum"]
+    missing_benchmark = market_history_readiness.assess_market_history_readiness(
+        without_eth,
+        now=NOW,
+        config=cfg,
+    )
+    assert missing_benchmark["baseline_status"] == "warming"
+    assert (
+        missing_benchmark["baseline_feature_readiness"]["btc_eth_relative"]["warm_asset_count"]
+        == 0
+    )

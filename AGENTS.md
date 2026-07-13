@@ -120,7 +120,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   overwrites `crypto_rsi_scanner_source_with_artifacts.zip` with current
   committed source plus local research artifacts such as `event_fade_cache/`,
   while excluding secrets, DBs, logs, virtualenvs, git data, caches, and other
-  zip files.
+  zip files. The supported exporter is read-only with respect to source and
+  research inputs and writes one reproducible, UTC-safe ZIP timestamp for every
+  entry (the ZIP epoch by default, or a wall-clock-safe `SOURCE_DATE_EPOCH`). It
+  must retain the descriptor-anchored symlink/TOCTOU and secret-scanning gates;
+  never normalize review archives by mutating input mtimes.
 - **Deterministic event research clock:** event fixture/review commands may set
   `RSI_EVENT_RESEARCH_NOW` or pass `--event-now`. Fixture-oriented Make targets
   use `EVENT_FIXTURE_NOW` (default `2026-06-15T16:00:00Z`) so checked-in June
@@ -152,18 +156,28 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   calling providers, sending, or writing artifacts. The loopback WSGI serving
   layer handles clients concurrently so one incomplete local connection cannot
   block every later GET/HEAD request.
-- **Decision Radar market pilot:** `make radar-market-no-send-readiness` is
-  read-only/no-network and reports explicit CoinGecko authorization, bounded
-  universe, rolling-baseline warmup, spread limits, artifacts, and the next
-  command. `make radar-market-no-send` attempts one bounded live call only when
-  `RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1` is already present and fixture mode is
-  off; an exact latest-attempt receipt prevents a blocked run from reusing an
-  older complete manifest. Only canonical live/no-send provenance plus a fresh
-  strict doctor may publish. Published namespaces are immutable, so later live
-  cycles use a new namespace and seed their exact history snapshot from the
-  bounded `radar_market_history_cache`; fixture/mock history remains isolated.
-  `make radar-market-no-send-smoke` proves mechanics offline and can never count
-  as real burn-in or replace dashboard authority.
+- **Decision Radar Observation Campaign v2:**
+  `make radar-market-no-send-readiness` is read-only/no-network and reports the
+  already-existing CoinGecko authorization, bounded universe, enforced cadence,
+  feature/time-aware warmup, spread limits, artifacts, and next safe command.
+  The default minimum observation spacing is 60 minutes; too-close observations
+  remain explicit evidence but never enter temporal baselines or advance
+  warmup. `make radar-market-no-send` rechecks authorization, cadence, and shared
+  provider backoff before the adapter and may reserve/attempt at most one bounded
+  live request in one eligible invocation. It never creates authorization. A
+  stable base-root cadence receipt and bounded attempt ledger survive campaign
+  state-directory replacement, and the exact latest-attempt receipt prevents a
+  blocked run from reusing an older complete manifest. Only canonical live/
+  no-send provenance plus a fresh strict doctor may publish. Published
+  namespaces are immutable, so later live cycles use a new namespace and seed
+  their exact history snapshot from `radar_market_history_cache`; fixture/mock
+  history remains isolated. `make radar-market-no-send-smoke` proves mechanics
+  offline but never counts in the Decision campaign or replaces dashboard
+  authority. `make radar-market-campaign-report` rebuilds the canonical
+  Markdown/JSON campaign report from local artifacts without a provider call;
+  the live target also refreshes it after every success or failure. Decision
+  campaign generations, candidates, routes, feature maturity, and outcomes are
+  never aggregated into Event Alpha Catalyst Radar's separate 30-day burn-in.
 - **Unified calendar no-send preview:** `make radar-calendar-preview` renders
   checked macro/crypto fixture rows without providers, artifact writes, or sends.
   Integrated cycles normalize raw scheduled/fixture rows exactly once and bind

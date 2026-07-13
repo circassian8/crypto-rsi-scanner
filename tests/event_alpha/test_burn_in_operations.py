@@ -1315,6 +1315,12 @@ def test_burn_in_doctor_candidate_mode_manifest_and_provenance_checks():
                 "source_pack": "derivatives",
                 "source_origin": "coinalyze",
             },
+            {
+                "candidate_id": "separate-decision-campaign",
+                "contract_counted_candidate": True,
+                "measurement_program": "decision_radar_live_observation_campaign_v2",
+                "candidate_source_mode": "live_no_send",
+            },
         ],
     )
     doctor_operations_checks.apply_checks(ctx, blockers, warnings)

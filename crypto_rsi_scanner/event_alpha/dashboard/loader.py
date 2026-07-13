@@ -974,16 +974,9 @@ def _strict_timestamp(value: object) -> datetime | None:
 
 def _operator_state_digest(state: Mapping[str, Any]) -> str:
     try:
-        data = json.dumps(
-            state,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
+        return event_alpha_operator_state.operator_authority_digest(state)
     except (TypeError, ValueError) as exc:
         raise DashboardLoadError("operator state cannot be canonically digested") from exc
-    return hashlib.sha256(data).hexdigest()
 
 
 def _coerce_now(value: datetime | str | None) -> datetime:

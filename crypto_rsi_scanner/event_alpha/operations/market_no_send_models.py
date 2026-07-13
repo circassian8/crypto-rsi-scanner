@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 
 SAFETY_COUNTERS = {
@@ -18,6 +18,38 @@ SAFETY_COUNTERS = {
 
 class MarketNoSendError(RuntimeError):
     """A concise, credential-free market generation failure."""
+
+
+class MarketProviderBackoff(MarketNoSendError):
+    """Raised before a call when the exact local provider is in backoff."""
+
+
+@dataclass(frozen=True)
+class MarketProviderResponse:
+    rows: tuple[Mapping[str, Any], ...]
+    telemetry: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class MarketProviderFetchResult:
+    rows: tuple[Mapping[str, Any], ...]
+    telemetry: dict[str, Any]
+
+
+class MarketProviderRequestError(MarketNoSendError):
+    """A provider failure carrying allowlisted, credential-free telemetry."""
+
+    def __init__(self, error_class: str, telemetry: Mapping[str, Any]):
+        super().__init__("market provider request was unavailable")
+        allowed = {
+            "endpoint_path", "request_started_at", "request_ended_at",
+            "duration_ms", "http_status", "result_count", "retry_count",
+            "error_class", "cache_behavior",
+        }
+        self.error_class = str(error_class or "provider_error")[:80]
+        self.request_telemetry = {
+            key: telemetry.get(key) for key in allowed if key in telemetry
+        }
 
 
 @dataclass(frozen=True)
@@ -38,12 +70,25 @@ class MarketNoSendReadiness:
     candidate_source_mode: str = "preflight_only"
     baseline_status: str = "not_evaluated"
     baseline_observation_count: int = 0
+    baseline_counted_observation_count: int = 0
+    baseline_too_close_observation_count: int = 0
     baseline_asset_count: int = 0
     baseline_warm_asset_count: int = 0
     baseline_min_observations: int = 8
     baseline_newest_observed_at: str | None = None
+    baseline_newest_counted_observed_at: str | None = None
+    minimum_observation_spacing_seconds: int = 3600
+    next_eligible_observation_at: str | None = None
+    cadence_status: str = "eligible"
+    baseline_feature_readiness: dict[str, Any] = field(default_factory=dict)
+    baseline_asset_readiness: dict[str, Any] = field(default_factory=dict)
+    baseline_rejection_counts: dict[str, int] = field(default_factory=dict)
+    cache_status: str = "missing"
+    cache_error: str | None = None
     spread_data_status: str = "not_evaluated"
     market_feature_policy: str = "temporal_when_warm; provider_price_volume_market_cap; explicit_proxies_otherwise"
+    measurement_program: str = "decision_radar_live_observation_campaign_v2"
+    decision_radar_campaign_eligible: bool = False
     burn_in_eligible: bool = False
     pointer_eligible: bool = False
     pointer_eligibility_status: str = "pending_complete_strict_doctor"
@@ -88,6 +133,10 @@ class MarketNoSendGenerationResult:
     data_acquisition_mode: str = "preflight_only"
     candidate_source_mode: str = "preflight_only"
     provenance_contract_valid: bool = False
+    measurement_program: str = "decision_radar_live_observation_campaign_v2"
+    decision_radar_campaign_eligible: bool = False
+    decision_radar_campaign_counted: bool = False
+    decision_radar_campaign_reason: str = "not_counted"
     burn_in_eligible: bool = False
     burn_in_counted: bool = False
     baseline_status: str = "not_evaluated"
@@ -125,5 +174,9 @@ __all__ = (
     "MarketNoSendError",
     "MarketNoSendGenerationResult",
     "MarketNoSendReadiness",
+    "MarketProviderBackoff",
+    "MarketProviderFetchResult",
+    "MarketProviderRequestError",
+    "MarketProviderResponse",
     "SAFETY_COUNTERS",
 )

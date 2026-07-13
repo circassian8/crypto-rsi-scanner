@@ -1,131 +1,3542 @@
 {
-  "artifact_namespace_authoritative": "radar_market_no_send_20260713t152704z",
-  "authorized_cycles_completed": 2,
-  "campaign_complete": false,
-  "campaign_status": "in_progress_baseline_warming",
-  "contract_version": 1,
-  "dashboard": {
-    "exact_run_id": "2026-07-13T15:27:13.330145+00:00|no_key_live",
-    "http_status_verified": 200,
-    "ready": true,
-    "revision": 9,
-    "trusted_current": true,
-    "url": "http://127.0.0.1:8765/"
+  "authoritative_generations": [
+    {
+      "artifact_authority": {
+        "core_bound": true,
+        "core_row_count": 0,
+        "integrated_outcome_row_count": 0,
+        "integrated_outcomes_bound": true
+      },
+      "artifact_names": {
+        "manifest": "event_market_no_send_generation.json",
+        "outcomes": "event_integrated_radar_outcomes.jsonl",
+        "pilot_audit": "event_market_no_send_pilot_audit.json",
+        "request_ledger": "event_market_no_send_request_ledger.json"
+      },
+      "artifact_namespace": "radar_market_no_send_20260713t190728z",
+      "campaign_counted": true,
+      "campaign_counting_reason": "counted_live_no_send_exact_lineage",
+      "campaign_counting_source": "decision_radar_campaign_contract",
+      "campaign_outcome_refresh": {
+        "error_counts": {},
+        "failure_class": null
+      },
+      "candidate_count": 0,
+      "candidate_count_matches_manifest": true,
+      "data_quality": {
+        "baseline_status_counts": {
+          "cold": 1,
+          "warming": 29
+        },
+        "baseline_warm_assets": 0,
+        "baseline_warming_assets": 30,
+        "direct_feature_count": 120,
+        "proxy_feature_count": 90,
+        "selected_market_row_count": 30,
+        "spread_available_count": 0,
+        "spread_coverage_ratio": 0.0
+      },
+      "doctor": {
+        "authoritative": true,
+        "blocker_count": 0,
+        "revision": 9,
+        "status": "OK",
+        "warning_count": 0
+      },
+      "manifest_candidate_count": 0,
+      "observed_at": "2026-07-13T19:07:29.084694+00:00",
+      "outcomes": {
+        "automatic_threshold_changes": false,
+        "human_feedback_optional": true,
+        "matured": 0,
+        "missing_data": 0,
+        "other": 0,
+        "pending": 0,
+        "refresh_build_error_count": 0,
+        "refresh_build_error_counts": {},
+        "source": "canonical_candidate_pending_base",
+        "status_counts": {},
+        "total": 0
+      },
+      "provider": "coingecko",
+      "provider_call_attempted": true,
+      "provider_request_succeeded": true,
+      "publication": {
+        "audit_authority_binding_valid": true,
+        "audit_status": "published",
+        "authority_source": "pilot_audit_exact_binding",
+        "currently_authoritative": true,
+        "ever_authoritative": true,
+        "first_authoritative_at": "2026-07-13T19:07:36.252663+00:00"
+      },
+      "request_ledger": {
+        "artifact": "event_market_no_send_request_ledger.json",
+        "cache_behavior": "network",
+        "duration_ms": 1605.0,
+        "endpoint_path": "/coins/markets",
+        "error_class": null,
+        "http_status": 200,
+        "live_provider_authorized": true,
+        "no_send": true,
+        "request_ended_at": "2026-07-13T19:07:30.697279+00:00",
+        "request_started_at": "2026-07-13T19:07:29.092485+00:00",
+        "result_count": 80,
+        "retry_count": 0
+      },
+      "route_counts": {},
+      "run_id": "2026-07-13T19:07:29.084694+00:00|no_key_live",
+      "safety": {
+        "no_send": true,
+        "normal_rsi_signal_rows_written": 0,
+        "paper_trades_created": 0,
+        "research_only": true,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "triggered_fade_created": 0
+      },
+      "status": "complete"
+    }
+  ],
+  "baseline_maturity": {
+    "baseline_asset_count": 31,
+    "baseline_asset_readiness": {
+      "aave": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "aster-2": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "avalanche-2": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "binancecoin": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "bitcoin": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "bitcoin-cash": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "bittensor": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "cardano": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "chainlink": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "dexe": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "dogecoin": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "ethereum": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "hedera-hashgraph": {
+        "baseline_counted_observation_count": 1,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 0,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 0,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 0,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 0,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 0,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 1,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 0,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 0,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 1,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "raw_observation_count": 1,
+        "status": "warming",
+        "too_close_observation_count": 0
+      },
+      "htx-dao": {
+        "baseline_counted_observation_count": 1,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 0,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 0,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 0,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 0,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 0,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 1,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 0,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 0,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 1,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 2,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "hyperliquid": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "litecoin": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "monero": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "near": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "pepe": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "polkadot": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "polygon-ecosystem-token": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "ripple": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "shiba-inu": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "solana": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "stellar": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "sui": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "tron": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "uniswap": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "whitebit": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "worldcoin-wld": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      },
+      "zcash": {
+        "baseline_counted_observation_count": 2,
+        "feature_readiness": {
+          "btc_eth_relative": {
+            "coverage_seconds": 13822,
+            "features": [
+              "relative_return_vs_btc_1h_zscore",
+              "relative_return_vs_btc_4h_zscore",
+              "relative_return_vs_btc_24h_zscore",
+              "relative_return_vs_eth_1h_zscore",
+              "relative_return_vs_eth_4h_zscore",
+              "relative_return_vs_eth_24h_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_1h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_1h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 28800,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_24h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "returns_4h": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_zscore_4h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 39600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "turnover": {
+            "coverage_seconds": 13822,
+            "features": [
+              "turnover_zscore"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          },
+          "volatility": {
+            "coverage_seconds": 13822,
+            "features": [
+              "return_volatility_1h",
+              "volatility_zscore_1h",
+              "return_volatility_4h",
+              "volatility_zscore_4h",
+              "return_volatility_24h",
+              "volatility_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 111600,
+            "required_sample_count": 8,
+            "sample_count": 0,
+            "status": "cold"
+          },
+          "volume": {
+            "coverage_seconds": 13822,
+            "features": [
+              "volume_zscore_24h"
+            ],
+            "required": true,
+            "required_coverage_seconds": 25200,
+            "required_sample_count": 8,
+            "sample_count": 2,
+            "status": "warming"
+          }
+        },
+        "newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+        "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
+        "raw_observation_count": 3,
+        "status": "warming",
+        "too_close_observation_count": 1
+      }
+    },
+    "baseline_counted_observation_count": 60,
+    "baseline_duplicate_conflict_count": 0,
+    "baseline_duplicate_observation_count": 0,
+    "baseline_feature_readiness": {
+      "btc_eth_relative": {
+        "asset_count": 31,
+        "status_counts": {
+          "cold": 31
+        },
+        "warm_asset_count": 0,
+        "warming_asset_count": 31
+      },
+      "returns_1h": {
+        "asset_count": 31,
+        "status_counts": {
+          "cold": 31
+        },
+        "warm_asset_count": 0,
+        "warming_asset_count": 31
+      },
+      "returns_24h": {
+        "asset_count": 31,
+        "status_counts": {
+          "cold": 31
+        },
+        "warm_asset_count": 0,
+        "warming_asset_count": 31
+      },
+      "returns_4h": {
+        "asset_count": 31,
+        "status_counts": {
+          "cold": 31
+        },
+        "warm_asset_count": 0,
+        "warming_asset_count": 31
+      },
+      "turnover": {
+        "asset_count": 31,
+        "status_counts": {
+          "warming": 31
+        },
+        "warm_asset_count": 0,
+        "warming_asset_count": 31
+      },
+      "volatility": {
+        "asset_count": 31,
+        "status_counts": {
+          "cold": 31
+        },
+        "warm_asset_count": 0,
+        "warming_asset_count": 31
+      },
+      "volume": {
+        "asset_count": 31,
+        "status_counts": {
+          "warming": 31
+        },
+        "warm_asset_count": 0,
+        "warming_asset_count": 31
+      }
+    },
+    "baseline_min_observations": 8,
+    "baseline_newest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
+    "baseline_newest_observed_at": "2026-07-13T19:07:29.084694+00:00",
+    "baseline_observation_count": 90,
+    "baseline_rejection_counts": {},
+    "baseline_status": "warming",
+    "baseline_too_close_observation_count": 30,
+    "baseline_warm_asset_count": 0,
+    "cache_error": null,
+    "cache_status": "valid",
+    "cadence_status": "waiting",
+    "minimum_observation_spacing_seconds": 3600,
+    "next_eligible_observation_at": "2026-07-13T20:07:29.084694+00:00"
   },
-  "decision_evidence": {
-    "anomalies_total": 1,
+  "blocked_or_preflight_attempts": [
+    {
+      "artifact_namespace": "radar_market_no_send",
+      "attempt_id": null,
+      "attempt_status": "blocked",
+      "candidate_source_mode": "preflight_only",
+      "failure_class": null,
+      "no_send": true,
+      "observed_at": "2026-07-13T12:40:37.875495+00:00",
+      "provider": "coingecko",
+      "provider_call_attempted": false,
+      "provider_request_succeeded": false,
+      "research_only": true,
+      "run_id": null
+    }
+  ],
+  "campaign_metrics": {
+    "baseline_status": "warming",
+    "baseline_warm_asset_count": 0,
+    "blocked_attempts": 1,
+    "direct_feature_count": 360,
+    "matured_outcomes": 0,
     "pending_outcomes": 1,
+    "provider_failed_attempts": 0,
+    "proxy_feature_count": 270,
+    "real_candidates": 1,
+    "real_cycles": 3,
     "route_counts": {
       "risk_watch": 1
     },
-    "visible_ideas": [
-      {
-        "actionability_score": 42.32,
-        "actionable": false,
-        "catalyst_status": "unknown",
-        "evidence_confidence_score": 52.45,
-        "market_phase": "reversal",
-        "risk_score": 48.0,
-        "route": "risk_watch",
-        "soft_penalties": [
-          "catalyst_unknown_soft_penalty",
-          "spread_unavailable_dashboard_only",
-          "market_led_confirmation_gate_incomplete",
-          "temporal_market_baseline_not_warm"
-        ],
-        "spread_status": "unavailable",
-        "symbol": "DEXE"
-      }
-    ]
+    "selected_market_row_count": 90,
+    "spread_available_count": 0,
+    "spread_coverage_ratio": 0.0
   },
-  "doctor": {
-    "authoritative_generation_blockers": 0,
-    "authoritative_generation_status": "WARN",
-    "authoritative_generation_warnings": [
-      "cryptopanic_configured_but_not_observed=1"
+  "campaign_status": "in_progress_baseline_warming",
+  "campaign_v2_conclusion": {
+    "baseline_coverage": {
+      "asset_count": 31,
+      "counted_observations": 60,
+      "retained_observations": 90,
+      "warm_asset_count": 0
+    },
+    "baseline_status": "warming",
+    "current_authority": {
+      "artifact_namespace": "radar_market_no_send_20260713t190728z",
+      "exact_operator_binding": true,
+      "revision": 9,
+      "run_id": "2026-07-13T19:07:29.084694+00:00|no_key_live"
+    },
+    "data_quality_limitation_categories": [
+      "execution_quality_spread",
+      "proxy_market_features",
+      "temporal_baseline_maturity"
     ],
-    "campaign_failures": 1,
-    "failure_summary": "The first clean zero-idea run found zero artifact blockers but could not bind doctor authority because the successful zero-row CoreOpportunity surface was missing its canonical empty file. The pointer remained on the fixture until the defect was fixed and tested."
+    "highest_value_missing_input_category": "execution_quality_spread",
+    "no_trade_recommendation": true,
+    "pointer_history_count": 1,
+    "research_only": true,
+    "spread_provider_selection": "deferred_pending_operator_execution_venue",
+    "status": "in_progress_baseline_warming",
+    "summary": "Decision Radar campaign v2 has 3 counted real/no-send cycles and 1 canonical idea; 1 outcome is pending and 0 are matured. There are 0 provider failures and 1 blocked/preflight attempts. Baseline status is warming with 0/31 warm assets. Pointer history contains 1 bound generation and current authority is radar_market_no_send_20260713t190728z. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread."
   },
-  "feature_evidence": {
-    "direct_feature_count_latest_generation": 120,
-    "direct_features": {
-      "returns": "provider_derived_sparkline",
-      "volume_turnover": "provider_observed"
-    },
-    "proxy_feature_count_latest_generation": 90,
-    "proxy_features": {
-      "liquidity": "coingecko_total_volume_24h_proxy",
-      "volume_zscore": "cross_sectional_log_turnover_proxy",
-      "volume_zscore_24h": "cross_sectional_log_turnover_proxy"
-    },
-    "spread": "unavailable",
-    "spread_assets": 0,
-    "spread_coverage_ratio": 0.0,
-    "universe_assets": 30
-  },
-  "generated_at": "2026-07-13T15:31:26+00:00",
-  "highest_value_missing_input": {
-    "input": "public order-book or trusted spread data",
-    "reason": "Spread coverage was 0 of 30 assets and the only visible market-led idea was capped to risk_watch/dashboard-only. This is the first missing input that directly blocks execution-quality validation; derivatives or DEX enrichment should not be prioritized ahead of this observed limitation."
-  },
-  "market_history": {
-    "assets_cold": 0,
-    "assets_warm": 0,
-    "assets_warming": 30,
-    "minimum_prior_observations_for_warm": 8,
-    "observations_per_asset": 2,
-    "retained_assets": 30,
-    "retained_observations": 60,
-    "status": "warming"
-  },
-  "network": {
-    "non_network_blocked_attempts": 1,
-    "provider": "coingecko",
-    "provider_calls_attempted": 2,
-    "provider_calls_failed": 0,
-    "provider_calls_succeeded": 2
-  },
-  "next_cycle": {
-    "command": "make radar-market-no-send PYTHON=.venv/bin/python",
-    "namespace_policy": "Make generates a new lowercase UTC namespace; an explicit namespace must also be unused.",
-    "not_before": "2026-07-13T16:27:13+00:00",
-    "reason": "Preserve a meaningful observation cadence; do not manufacture warm-up with rapid duplicate calls."
-  },
-  "pilot_audit_contract_version": 1,
-  "provider_authorization_present": true,
-  "real_cycles": [
+  "contract_version": 2,
+  "data_quality_limitations": [
     {
-      "anomalies": 0,
-      "candidates": 0,
-      "doctor_authoritative": false,
-      "namespace": "radar_market_no_send",
-      "observed_at": "2026-07-13T15:17:06.228233+00:00",
-      "provider_request_succeeded": true,
-      "published": false,
-      "run_id": "2026-07-13T15:17:06.228233+00:00|no_key_live"
+      "category": "execution_quality_spread",
+      "detail": "Trusted spread coverage is 0/90. Provider selection is deferred until the operator identifies the intended execution venue.",
+      "provider_selection": "deferred_pending_execution_venue"
     },
     {
-      "anomalies": 1,
-      "candidates": 1,
-      "doctor_authoritative": true,
-      "namespace": "radar_market_no_send_20260713t152704z",
-      "observed_at": "2026-07-13T15:27:13.330145+00:00",
-      "provider_request_succeeded": true,
-      "published": true,
-      "run_id": "2026-07-13T15:27:13.330145+00:00|no_key_live"
+      "category": "proxy_market_features",
+      "detail": "The campaign retains 270 proxy feature observations; proxy evidence remains explicitly quality-capped."
+    },
+    {
+      "category": "temporal_baseline_maturity",
+      "detail": "The required feature/time-aware temporal baseline is not globally warm."
     }
   ],
-  "research_only": true,
+  "excluded_invalid_generations": [],
+  "generated_at": "2026-07-13T19:11:31.360351+00:00",
+  "generation_validation": {
+    "excluded_generation_count": 0,
+    "exclusion_reason_counts": {},
+    "valid_generation_count": 3
+  },
+  "measurement_program": "decision_radar_live_observation_campaign_v2",
+  "measurement_scope": {
+    "decision_radar_live_observation_campaign": "included",
+    "event_alpha_catalyst_burn_in": "separate_not_aggregated",
+    "historical_market_provenance_v2_adapter": "read_only",
+    "historical_rows_rewritten": false
+  },
+  "next_observation": {
+    "authorization_rechecked_by_command": true,
+    "blocking_reasons": [
+      "Decision Radar provider call is reserved until 2026-07-13T20:07:29.084694+00:00"
+    ],
+    "cadence_status": "waiting",
+    "eligible_now": false,
+    "eligible_run_command": "make radar-market-no-send PYTHON=.venv/bin/python",
+    "history_next_eligible_observation_at": "2026-07-13T20:07:29.084694+00:00",
+    "next_eligible_observation_at": "2026-07-13T20:07:29.084694+00:00",
+    "next_safe_operator_command": "make radar-market-no-send-readiness PYTHON=.venv/bin/python",
+    "provider_backoff_disabled_until": null,
+    "provider_call_reservation_next_at": "2026-07-13T20:07:29.084694+00:00",
+    "rapid_cycles_do_not_advance_warmup": true
+  },
+  "non_authoritative_complete_generations": [
+    {
+      "artifact_authority": {
+        "core_bound": false,
+        "core_row_count": 0,
+        "integrated_outcome_row_count": 0,
+        "integrated_outcomes_bound": true
+      },
+      "artifact_names": {
+        "manifest": "event_market_no_send_generation.json",
+        "outcomes": "event_integrated_radar_outcomes.jsonl",
+        "pilot_audit": "event_market_no_send_pilot_audit.json",
+        "request_ledger": "event_market_no_send_request_ledger.json"
+      },
+      "artifact_namespace": "radar_market_no_send",
+      "campaign_counted": true,
+      "campaign_counting_reason": "counted_valid_live_no_send_v2_lineage",
+      "campaign_counting_source": "historical_market_provenance_v2_read_only_adapter",
+      "campaign_outcome_refresh": {
+        "error_counts": {},
+        "failure_class": null
+      },
+      "candidate_count": 0,
+      "candidate_count_matches_manifest": true,
+      "data_quality": {
+        "baseline_status_counts": {
+          "cold": 30
+        },
+        "baseline_warm_assets": 0,
+        "baseline_warming_assets": 30,
+        "direct_feature_count": 120,
+        "proxy_feature_count": 90,
+        "selected_market_row_count": 30,
+        "spread_available_count": 0,
+        "spread_coverage_ratio": 0.0
+      },
+      "doctor": {
+        "authoritative": false,
+        "blocker_count": 0,
+        "revision": 9,
+        "status": "stale",
+        "warning_count": 0
+      },
+      "manifest_candidate_count": 0,
+      "observed_at": "2026-07-13T15:17:06.228233+00:00",
+      "outcomes": {
+        "automatic_threshold_changes": false,
+        "human_feedback_optional": true,
+        "matured": 0,
+        "missing_data": 0,
+        "other": 0,
+        "pending": 0,
+        "refresh_build_error_count": 0,
+        "refresh_build_error_counts": {},
+        "source": "canonical_candidate_pending_base",
+        "status_counts": {},
+        "total": 0
+      },
+      "provider": "coingecko",
+      "provider_call_attempted": true,
+      "provider_request_succeeded": true,
+      "publication": {
+        "audit_authority_binding_valid": false,
+        "audit_status": "not_published",
+        "authority_source": null,
+        "currently_authoritative": false,
+        "ever_authoritative": false,
+        "first_authoritative_at": null
+      },
+      "request_ledger": {
+        "artifact": "event_market_no_send_request_ledger.json",
+        "cache_behavior": "write_through",
+        "duration_ms": null,
+        "endpoint_path": null,
+        "error_class": null,
+        "http_status": null,
+        "live_provider_authorized": true,
+        "no_send": true,
+        "request_ended_at": null,
+        "request_started_at": null,
+        "result_count": 80,
+        "retry_count": null
+      },
+      "route_counts": {},
+      "run_id": "2026-07-13T15:17:06.228233+00:00|no_key_live",
+      "safety": {
+        "no_send": true,
+        "normal_rsi_signal_rows_written": 0,
+        "paper_trades_created": 0,
+        "research_only": true,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "triggered_fade_created": 0
+      },
+      "status": "complete"
+    },
+    {
+      "artifact_authority": {
+        "core_bound": true,
+        "core_row_count": 1,
+        "integrated_outcome_row_count": 1,
+        "integrated_outcomes_bound": true
+      },
+      "artifact_names": {
+        "manifest": "event_market_no_send_generation.json",
+        "outcomes": "event_integrated_radar_outcomes.jsonl",
+        "pilot_audit": "event_market_no_send_pilot_audit.json",
+        "request_ledger": "event_market_no_send_request_ledger.json"
+      },
+      "artifact_namespace": "radar_market_no_send_20260713t152704z",
+      "campaign_counted": true,
+      "campaign_counting_reason": "counted_valid_live_no_send_v2_lineage",
+      "campaign_counting_source": "historical_market_provenance_v2_read_only_adapter",
+      "campaign_outcome_refresh": {
+        "error_counts": {},
+        "failure_class": null
+      },
+      "candidate_count": 1,
+      "candidate_count_matches_manifest": true,
+      "data_quality": {
+        "baseline_status_counts": {
+          "warming": 30
+        },
+        "baseline_warm_assets": 0,
+        "baseline_warming_assets": 30,
+        "direct_feature_count": 120,
+        "proxy_feature_count": 90,
+        "selected_market_row_count": 30,
+        "spread_available_count": 0,
+        "spread_coverage_ratio": 0.0
+      },
+      "doctor": {
+        "authoritative": true,
+        "blocker_count": 2,
+        "revision": 9,
+        "status": "BLOCKED",
+        "warning_count": 0
+      },
+      "manifest_candidate_count": 1,
+      "observed_at": "2026-07-13T15:27:13.330145+00:00",
+      "outcomes": {
+        "automatic_threshold_changes": false,
+        "human_feedback_optional": true,
+        "matured": 0,
+        "missing_data": 0,
+        "other": 0,
+        "pending": 1,
+        "refresh_build_error_count": 0,
+        "refresh_build_error_counts": {},
+        "source": "canonical_candidate_pending_base",
+        "status_counts": {
+          "pending": 1
+        },
+        "total": 1
+      },
+      "provider": "coingecko",
+      "provider_call_attempted": true,
+      "provider_request_succeeded": true,
+      "publication": {
+        "audit_authority_binding_valid": false,
+        "audit_status": "published",
+        "authority_source": null,
+        "currently_authoritative": false,
+        "ever_authoritative": false,
+        "first_authoritative_at": null
+      },
+      "request_ledger": {
+        "artifact": "event_market_no_send_request_ledger.json",
+        "cache_behavior": "write_through",
+        "duration_ms": null,
+        "endpoint_path": null,
+        "error_class": null,
+        "http_status": null,
+        "live_provider_authorized": true,
+        "no_send": true,
+        "request_ended_at": null,
+        "request_started_at": null,
+        "result_count": 80,
+        "retry_count": null
+      },
+      "route_counts": {
+        "risk_watch": 1
+      },
+      "run_id": "2026-07-13T15:27:13.330145+00:00|no_key_live",
+      "safety": {
+        "no_send": true,
+        "normal_rsi_signal_rows_written": 0,
+        "paper_trades_created": 0,
+        "research_only": true,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "triggered_fade_created": 0
+      },
+      "status": "complete"
+    }
+  ],
+  "outcomes": {
+    "automatic_threshold_changes": false,
+    "human_feedback_optional": true,
+    "matured": 0,
+    "missing_data": 0,
+    "other": 0,
+    "pending": 1,
+    "refresh_build_error_count": 0,
+    "refresh_build_error_counts": {},
+    "source": "campaign_outcome_ledger",
+    "status_counts": {
+      "pending": 1
+    },
+    "total": 1
+  },
+  "pointer": {
+    "artifact_namespace": "radar_market_no_send_20260713t190728z",
+    "authority_checked_at": "2026-07-13T19:11:31.360351+00:00",
+    "exact_operator_binding": true,
+    "generation_authority_status": "authoritative",
+    "readiness_error": null,
+    "readiness_validation": "passed",
+    "revision": 9,
+    "run_id": "2026-07-13T19:07:29.084694+00:00|no_key_live",
+    "status": "authoritative"
+  },
+  "pointer_history": [
+    {
+      "artifact_namespace": "radar_market_no_send_20260713t190728z",
+      "currently_authoritative": true,
+      "first_authoritative_at": "2026-07-13T19:07:36.252663+00:00",
+      "observed_at": "2026-07-13T19:07:29.084694+00:00",
+      "run_id": "2026-07-13T19:07:29.084694+00:00|no_key_live",
+      "source": "pilot_audit_exact_binding"
+    }
+  ],
+  "provider_failed_attempts": [],
+  "row_type": "decision_radar_live_observation_campaign_report",
   "safety": {
-    "no_send": true,
+    "automatic_route_changes": false,
+    "automatic_threshold_changes": false,
+    "no_trade_recommendation": true,
     "normal_rsi_signal_rows_written": 0,
     "paper_trades_created": 0,
+    "provider_authorization_modified": false,
+    "provider_calls_made_by_report": 0,
+    "research_only": true,
     "telegram_sends": 0,
     "trades_created": 0,
     "triggered_fade_created": 0
   },
-  "schema_id": "radar_live_observation_campaign_report_v1",
-  "schema_version": "radar_live_observation_campaign_report_v1",
-  "source_audit": "event_fade_cache/radar_market_no_send_20260713t152704z/event_market_no_send_pilot_audit.json"
+  "schema_id": "decision_radar_live_observation_campaign_report_v2",
+  "schema_version": "decision_radar_live_observation_campaign_report_v2"
 }

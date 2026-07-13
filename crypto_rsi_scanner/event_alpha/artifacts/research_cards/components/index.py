@@ -38,6 +38,10 @@ def _lineage_lines(
     candidate_source_mode = _lineage_value("candidate_source_mode", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     contract_counted = _lineage_value("contract_counted_candidate", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     provenance_valid = _lineage_value("provenance_contract_valid", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    measurement_program = _lineage_value("measurement_program", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    campaign_eligible = _lineage_value("decision_radar_campaign_eligible", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    campaign_counted = _lineage_value("decision_radar_campaign_counted", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    campaign_reason = _lineage_value("decision_radar_campaign_reason", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     burn_in_eligible = _lineage_value("burn_in_eligible", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     burn_in_reason = _lineage_value("burn_in_reason", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     provider_call_attempted = _lineage_value("provider_call_attempted", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
@@ -57,6 +61,18 @@ def _lineage_lines(
     )
     card_path_label = event_artifact_paths.artifact_display_path(card_path)
     profile_for_command = profile or "default"
+    measurement_lines = (
+        [
+            f"- Measurement program: {measurement_program}",
+            f"- Decision Radar campaign eligible: {str(campaign_eligible or 'false').lower()} ({campaign_reason or 'not_counted'})",
+            f"- Decision Radar campaign-counted candidate: {str(campaign_counted or 'false').lower()}",
+        ]
+        if measurement_program == "decision_radar_live_observation_campaign_v2"
+        else [
+            f"- Burn-in eligible: {str(burn_in_eligible or 'false').lower()} ({burn_in_reason or 'not_counted'})",
+            f"- Contract-counted burn-in candidate: {str(contract_counted or 'false').lower()}",
+        ]
+    )
     return [
         f"- Generated at: {generated_iso}",
         f"- Lineage status: {legacy_label or 'current'}",
@@ -91,8 +107,7 @@ def _lineage_lines(
             f"{str(bool(request_ledger_sha256)).lower()} / "
             f"{str(bool(source_artifact_sha256)).lower()}"
         ),
-        f"- Burn-in eligible: {str(burn_in_eligible or 'false').lower()} ({burn_in_reason or 'not_counted'})",
-        f"- Contract-counted burn-in candidate: {str(contract_counted or 'false').lower()}",
+        *measurement_lines,
         f"- Market refresh artifact: {market_refresh_artifact or 'none'}",
         f"- Source raw/event IDs: raw={_list_label(raw_ids)} events={_list_label(event_ids)}",
         f"- Card path: {card_path_label}",

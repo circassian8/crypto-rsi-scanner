@@ -14,6 +14,7 @@
       "candidate_core_score_mismatch_beyond_deterministic_rounding": "blocker",
       "card_projection_mismatch": "blocker",
       "dashboard_projection_mismatch": "blocker",
+      "market_context_reference_mismatch": "blocker",
       "outcome_projection_mismatch": "blocker",
       "preview_lane_mismatch": "blocker"
     },
@@ -23,6 +24,7 @@
     "required_context": [
       "calendar_evidence",
       "calendar_evidence_ids",
+      "market_context_reference",
       "rsi_context",
       "rsi_context_references",
       "observation_ids",
@@ -91,14 +93,18 @@
     }
   },
   "decision_model_version": "crypto_radar_decision_model_v2",
-  "generated_at": "2026-07-13T06:00:07+00:00",
+  "generated_at": "2026-07-13T17:17:38+00:00",
   "market_provenance_contract": {
-    "burn_in_authority": {
+    "decision_radar_campaign_authority": {
       "caller_asserted_counting_trusted": false,
       "counted_candidate_source_mode": "live_no_send",
+      "event_alpha_catalyst_burn_in_aggregated": false,
+      "legacy_burn_in_counted_for_new_campaign_rows": false,
+      "measurement_program": "decision_radar_live_observation_campaign_v2",
       "mock_or_fixture_contract_may_be_valid": true,
       "mock_or_fixture_counted": false,
       "recomputed_from_closed_contract": true,
+      "run_mode": "operational",
       "required_live_lineage": [
         "explicit live provider authorization",
         "provider call attempted and succeeded",
@@ -124,6 +130,17 @@
       "cache_replay"
     ],
     "historical_flat_rows_silently_reclassified": false,
+    "legacy_burn_in_compatibility": {
+      "fields": [
+        "burn_in_eligible",
+        "burn_in_counted",
+        "burn_in_reason"
+      ],
+      "historical_rows_rewritten": false,
+      "new_campaign_row_reason": "not_counted_separate_decision_radar_campaign",
+      "report_adapter": "read_only",
+      "treated_as_event_alpha_catalyst_burn_in": false
+    },
     "required_fields": [
       "schema_version",
       "contract_version",
@@ -140,6 +157,10 @@
       "provider_generation_id",
       "cache_status",
       "provenance_contract_valid",
+      "measurement_program",
+      "decision_radar_campaign_eligible",
+      "decision_radar_campaign_counted",
+      "decision_radar_campaign_reason",
       "burn_in_eligible",
       "burn_in_counted",
       "burn_in_reason",
@@ -152,7 +173,10 @@
   "market_no_send_generation": {
     "authorization": {
       "authorization_absent_behavior": "safe blocked result, no provider call, credential-free pilot audit, pointer unchanged",
+      "authorization_or_cadence_rechecked_by_generation": true,
+      "eligible_invocation_live_request_max": 1,
       "live_provider_calls_allowed_by_default": false,
+      "program_modifies_authorization": false,
       "required_environment_flag": "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1"
     },
     "dashboard_pointer_policy": {
@@ -160,6 +184,14 @@
       "current_authoritative_namespace_is_immutable": true,
       "latest_attempt_receipt_must_match_manifest": true,
       "pointer_changes_on_failed_or_blocked_run": false,
+      "stable_authority_digest": {
+        "excluded_clock_only_fields": [
+          "updated_at",
+          "doctor.verified_at"
+        ],
+        "substantive_doctor_or_artifact_drift": "blocker",
+        "unchanged_doctor_rerun_changes_pointer_identity": false
+      },
       "required_checks": [
         "real live-safe data mode",
         "fresh complete operator state",
@@ -187,12 +219,33 @@
       "market anomalies and observations",
       "canonical Decision v2 projections",
       "cards and Decision preview",
-      "pending outcomes",
+      "pending outcomes and shared campaign-outcome refresh",
       "operator state and dashboard read model",
       "strict doctor",
       "guarded authoritative-pointer publication"
     ],
     "provider": "coingecko",
+    "request_telemetry_contract": {
+      "allowed_fields": [
+        "endpoint_path",
+        "request_started_at",
+        "request_ended_at",
+        "duration_ms",
+        "http_status",
+        "result_count",
+        "retry_count",
+        "error_class",
+        "cache_behavior"
+      ],
+      "forbidden_content": [
+        "query parameters",
+        "headers",
+        "tokens",
+        "raw response bodies",
+        "exception text"
+      ],
+      "provider_health_must_reconcile": true
+    },
     "pilot_audit_artifacts": [
       "event_market_no_send_latest_attempt.json",
       "event_market_no_send_pilot_audit.json",
@@ -232,6 +285,10 @@
       "cache_status",
       "feature_basis",
       "data_quality",
+      "measurement_program",
+      "decision_radar_campaign_eligible",
+      "decision_radar_campaign_counted",
+      "decision_radar_campaign_reason",
       "burn_in_eligible",
       "burn_in_counted",
       "burn_in_reason"
@@ -239,8 +296,49 @@
     "targets": [
       "radar-market-no-send-readiness",
       "radar-market-no-send",
-      "radar-market-no-send-smoke"
+      "radar-market-no-send-smoke",
+      "radar-market-campaign-report"
     ]
+  },
+  "market_observation_campaign": {
+    "artifact_inputs_only": true,
+    "event_alpha_catalyst_burn_in": "separate_not_aggregated",
+    "historical_market_provenance_adapter": "read_only",
+    "measurement_program": "decision_radar_live_observation_campaign_v2",
+    "provider_calls_made_by_report": 0,
+    "report_artifacts": [
+      "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json",
+      "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.md"
+    ],
+    "report_schema_version": "decision_radar_live_observation_campaign_report_v2",
+    "report_target": "radar-market-campaign-report",
+    "reports": [
+      "authoritative and non-authoritative generations",
+      "provider-failed and blocked attempts",
+      "route counts",
+      "feature and time maturity",
+      "next eligible observation time and command",
+      "pending and mature outcomes",
+      "data-quality limitations"
+    ]
+  },
+  "market_context_lineage": {
+    "canonical_fields": [
+      "source",
+      "observed_at",
+      "freshness_status",
+      "market_snapshot_id"
+    ],
+    "copied_to": [
+      "candidate",
+      "CoreOpportunity",
+      "card",
+      "Decision preview",
+      "outcome",
+      "dashboard"
+    ],
+    "downstream_re_evaluation": false,
+    "lineage_drift": "doctor blocker"
   },
   "origins": {
     "contributing": [
@@ -277,7 +375,11 @@
       "timing_state",
       "market_phase"
     ],
+    "campaign_outcome_ledger": "radar_market_history_cache/event_decision_radar_campaign_outcomes.jsonl",
+    "campaign_outcome_refresh_provider_calls": 0,
     "human_feedback_is_optional_preference_data": true,
+    "immutable_origin_namespaces_rewritten": false,
+    "maturation_policy": "pending until horizon is due and sufficient observed price lineage exists; then mature deterministically",
     "pending_row_for_every_current_idea": true
   },
   "product_layers": {
@@ -287,7 +389,8 @@
         "catalyst discovery",
         "source-strength classification",
         "strict catalyst routes",
-        "historical Event Alpha artifacts"
+        "historical Event Alpha artifacts",
+        "Event Alpha catalyst burn-in"
       ]
     },
     "decision_radar": {
@@ -297,9 +400,11 @@
         "operator routes",
         "dashboard",
         "Decision preview",
-        "Decision-first card hierarchy"
+        "Decision-first card hierarchy",
+        "live observation campaign v2"
       ]
     },
+    "measurement_programs_are_aggregated": false,
     "relationship": "additive",
     "unknown_catalyst_policy": "soft explanatory-confidence penalty and risk input, not a universal visibility blocker"
   },
@@ -395,10 +500,15 @@
     "stale_or_untrusted_data_shown_actionable": false
   },
   "temporal_market_baseline_policy": {
-    "generation_snapshot_artifact": "event_market_history.jsonl",
-    "shared_live_cache": "radar_market_history_cache/event_market_history.jsonl",
-    "fixture_and_mock_cache_scope": "generation-local only; never seeds live history",
     "baseline_excludes_current_observation": true,
+    "cadence_policy": {
+      "default_minimum_observation_spacing_minutes": 60,
+      "next_eligible_observation_at_is_reported": true,
+      "rapid_cycles_advance_warmup": false,
+      "too_close_observations_are_retained": true,
+      "too_close_observations_count_in_baseline": false,
+      "too_close_status": "too_close"
+    },
     "default_limits": {
       "future_tolerance_minutes": 5,
       "max_current_age_hours": 6,
@@ -414,6 +524,17 @@
       "observation ids and baseline bounds"
     ],
     "direct_provider_fields_preserved": true,
+    "feature_readiness_groups": [
+      "volume",
+      "turnover",
+      "volatility",
+      "returns_1h",
+      "returns_4h",
+      "returns_24h",
+      "btc_eth_relative"
+    ],
+    "fixture_and_mock_cache_scope": "generation-local only; never seeds live history",
+    "generation_snapshot_artifact": "event_market_history.jsonl",
     "market_quality_caps": {
       "cold_or_warming_evidence_confidence_max": 62,
       "cold_or_warming_risk_min": 48,
@@ -425,8 +546,11 @@
       "proxy_only_urgency_max": 45
     },
     "only_explicit_proxy_fields_may_be_replaced": true,
+    "required_feature_groups_must_all_be_warm": true,
+    "required_time_coverage_is_horizon_and_cadence_aware": true,
     "schema_id": "event_alpha.market_history_observation",
     "schema_version": 1,
+    "shared_live_cache": "radar_market_history_cache/event_market_history.jsonl",
     "statuses": [
       "cold",
       "warming",

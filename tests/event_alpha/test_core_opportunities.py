@@ -939,6 +939,53 @@ def test_event_core_opportunity_store_uses_refreshed_nested_market_context():
     assert stored["market_context_freshness_cap_applied"] is False
 
 
+def test_event_core_opportunity_store_preserves_integrated_market_snapshot_identity():
+    import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store
+
+    rows = _canonical_core_fixture_rows()
+    velvet = dict(rows[0])
+    velvet.update({
+        "market_context_freshness_status": "missing",
+        "market_context_source": "missing",
+        "market_context_age_hours": "unknown",
+        "market_context_data_quality": "missing",
+        "market_context_freshness_cap_applied": True,
+        "market_snapshot": {
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "market_data_source": "coingecko",
+            "observed_at": "2026-06-15T15:30:00+00:00",
+            "freshness_status": "fresh",
+            "market_snapshot_id": "market-history-velvet-1",
+        },
+    })
+    rows[0] = velvet
+
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        result = event_core_opportunity_store.write_core_opportunities(
+            rows,
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-core-market-snapshot",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        assert result.success
+        loaded = event_core_opportunity_store.load_core_opportunities(path, latest_run=True)
+    stored = next(row for row in loaded.rows if row["symbol"] == "VELVET")
+    assert stored["market_context_source"] == "coingecko"
+    assert stored["market_context_observed_at"] == "2026-06-15T15:30:00+00:00"
+    assert stored["market_context_freshness_status"] == "fresh"
+    assert stored["market_snapshot_id"] == "market-history-velvet-1"
+    assert stored["market_context_reference"] == {
+        "source": "coingecko",
+        "observed_at": "2026-06-15T15:30:00+00:00",
+        "freshness_status": "fresh",
+        "market_snapshot_id": "market-history-velvet-1",
+    }
+
+
 def test_event_core_opportunity_store_prevents_stale_support_near_miss():
     import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store
     import crypto_rsi_scanner.event_alpha.radar.near_miss as event_near_miss

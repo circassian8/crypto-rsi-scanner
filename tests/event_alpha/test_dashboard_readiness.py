@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime
 import hashlib
 import json
 from pathlib import Path
@@ -13,6 +14,7 @@ import subprocess
 import pytest
 
 import crypto_rsi_scanner.event_alpha.dashboard.__main__ as dashboard_cli
+from crypto_rsi_scanner.event_alpha.artifacts import operator_state
 from crypto_rsi_scanner.event_alpha.dashboard.__main__ import main as dashboard_main
 from crypto_rsi_scanner.event_alpha.dashboard.app import (
     DashboardGenerationBinding,
@@ -70,6 +72,19 @@ def _request(app: RadarDashboardApp, path: str = "/") -> tuple[str, str]:
     return str(captured["status"]), body
 
 
+def test_dashboard_readiness_rejects_smoke_only_clock(tmp_path, capsys):
+    status = dashboard_main([
+        "--artifact-base",
+        str(tmp_path),
+        "--readiness",
+        "--smoke-now",
+        _TEST_NOW,
+    ])
+
+    assert status == 1
+    assert "--smoke-now is allowed only with --smoke" in capsys.readouterr().err
+
+
 def test_dashboard_readiness_publishes_exact_pointer_and_default_cli_uses_it(tmp_path, capsys):
     base = _copy_fixture(tmp_path)
     namespace_dir = base / _FIXTURE_NAMESPACE
@@ -99,6 +114,80 @@ def test_dashboard_readiness_publishes_exact_pointer_and_default_cli_uses_it(tmp
     assert "Traceback" not in output.err
     assert pointer_path.read_bytes() == pointer_before
     assert _file_hashes(namespace_dir) == namespace_hashes
+
+
+def test_published_pointer_survives_unchanged_strict_doctor_reverification(tmp_path):
+    base = _copy_fixture(tmp_path)
+    namespace_dir = base / _FIXTURE_NAMESPACE
+    published = publish_current_namespace_pointer(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    pointer_before = (base / CURRENT_NAMESPACE_POINTER).read_bytes()
+    state = published.snapshot.operator_state
+
+    operator_state.record_doctor_status(
+        namespace_dir,
+        run_id=published.snapshot.run_id,
+        profile=published.snapshot.profile,
+        artifact_namespace=published.snapshot.artifact_namespace,
+        expected_revision=published.snapshot.revision,
+        strict=True,
+        schema_only=False,
+        skip_api_checks=False,
+        status=str(state["doctor"]["status"]),
+        blocker_count=int(state["doctor"]["blocker_count"]),
+        warning_count=int(state["doctor"]["warning_count"]),
+        checked_at=datetime.fromisoformat("2026-07-12T06:04:00+00:00"),
+    )
+
+    resolved = resolve_authoritative_dashboard(
+        base,
+        now="2026-07-12T06:04:00+00:00",
+    )
+    assert resolved.snapshot.operator_state_sha256 == published.snapshot.operator_state_sha256
+    assert (base / CURRENT_NAMESPACE_POINTER).read_bytes() == pointer_before
+
+
+def test_published_pointer_invalidates_when_doctor_result_changes(tmp_path):
+    base = _copy_fixture(tmp_path)
+    namespace_dir = base / _FIXTURE_NAMESPACE
+    published = publish_current_namespace_pointer(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    state = published.snapshot.operator_state
+
+    operator_state.record_doctor_status(
+        namespace_dir,
+        run_id=published.snapshot.run_id,
+        profile=published.snapshot.profile,
+        artifact_namespace=published.snapshot.artifact_namespace,
+        expected_revision=published.snapshot.revision,
+        strict=True,
+        schema_only=False,
+        skip_api_checks=False,
+        status="WARN",
+        blocker_count=0,
+        warning_count=int(state["doctor"]["warning_count"]) + 1,
+        checked_at=datetime.fromisoformat("2026-07-12T06:04:00+00:00"),
+    )
+
+    with pytest.raises(
+        DashboardReadinessError,
+        match="pointer does not match the exact operator generation",
+    ):
+        resolve_authoritative_dashboard(base, now="2026-07-12T06:04:00+00:00")
+
+
+def test_published_pointer_invalidates_when_fingerprinted_artifact_changes(tmp_path):
+    base = _copy_fixture(tmp_path)
+    publish_current_namespace_pointer(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    pointer_path = base / CURRENT_NAMESPACE_POINTER
+    pointer_before = pointer_path.read_bytes()
+    brief_path = base / _FIXTURE_NAMESPACE / "event_alpha_daily_brief.md"
+    brief_path.write_text(
+        brief_path.read_text(encoding="utf-8") + "\nchanged after publication\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(DashboardReadinessError, match="not authoritative"):
+        resolve_authoritative_dashboard(base, now=_TEST_NOW)
+    assert pointer_path.read_bytes() == pointer_before
 
 
 def test_pointer_bound_dashboard_refuses_operator_state_drift_after_startup(tmp_path):

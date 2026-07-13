@@ -1,6 +1,6 @@
 {
   "auto_apply_thresholds": false,
-  "candidate_count_authority": "canonical market provenance v2 with candidate_source_mode=live_no_send, exact valid lineage, and burn_in_counted=true",
+  "candidate_count_authority": "canonical Event Alpha catalyst rows with burn_in_counted=true; decision_radar_live_observation_campaign_v2 rows are excluded",
   "duration_days": 30,
   "freeze_criteria": [
     "any lane has unresolved strict blockers",
@@ -8,7 +8,7 @@
     "minimum cycles/candidates/labels/outcomes are not met",
     "provider evidence is missing from cards or source coverage"
   ],
-  "generated_at": "2026-07-13T06:45:34.694233+00:00",
+  "generated_at": "2026-07-13T18:57:37.809108+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",

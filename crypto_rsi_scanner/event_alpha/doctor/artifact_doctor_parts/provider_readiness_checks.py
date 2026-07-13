@@ -792,7 +792,7 @@ def _decision_preview_mismatch_count(
 ) -> int:
     """Reconcile every canonical non-diagnostic idea with its v2 preview lane."""
 
-    expected: dict[str, list[str]] = {
+    expected: dict[str, list[tuple[str, str | None]]] = {
         lane: []
         for lane in PREVIEW_LANE_TITLES
         if lane != "decision_diagnostic"
@@ -807,7 +807,17 @@ def _decision_preview_mismatch_count(
         identity = f"{str(row.get('symbol') or '').strip()}/{str(row.get('coin_id') or '').strip()}"
         if identity == "/":
             return 1
-        expected.setdefault(lane, []).append(identity)
+        market_reference = decision.get("market_context_reference")
+        rendered_reference: str | None = None
+        if isinstance(market_reference, Mapping) and market_reference:
+            rendered_reference = (
+                "- Market context reference: "
+                f"source={market_reference.get('source') or 'unknown'}; "
+                f"observed_at={market_reference.get('observed_at') or 'unknown'}; "
+                f"freshness={market_reference.get('freshness_status') or 'unknown'}; "
+                f"snapshot_id={market_reference.get('market_snapshot_id') or 'unknown'}"
+            )
+        expected.setdefault(lane, []).append((identity, rendered_reference))
 
     mismatches = 0
     sections: dict[str, str] = {}
@@ -824,13 +834,13 @@ def _decision_preview_mismatch_count(
         next_section = body.find("\n## Lane: ")
         sections[lane] = body if next_section < 0 else body[:next_section]
 
-    for lane, identities in expected.items():
+    for lane, items in expected.items():
         body = sections.get(lane, "")
         rendered_match = re.search(r"^- rendered_items:\s*(\d+)\s*$", body, re.MULTILINE)
         rendered_count = int(rendered_match.group(1)) if rendered_match else -1
-        if rendered_count != len(identities):
+        if rendered_count != len(items):
             mismatches += 1
-        for identity in identities:
+        for identity, reference in items:
             if body.count(identity) != 1:
                 mismatches += 1
             if any(
@@ -839,7 +849,24 @@ def _decision_preview_mismatch_count(
                 if other_lane != lane
             ):
                 mismatches += 1
+            item_body = _decision_preview_item_body(body, identity)
+            if reference is not None and item_body.count(reference) != 1:
+                mismatches += 1
     return mismatches
+
+
+def _decision_preview_item_body(lane_body: str, identity: str) -> str:
+    """Return one numbered preview item so lineage cannot be swapped by lane."""
+
+    marker = re.search(
+        rf"(?m)^\d+\.\s+{re.escape(identity)}\s*$",
+        lane_body,
+    )
+    if marker is None:
+        return ""
+    following = lane_body[marker.end():]
+    next_item = re.search(r"(?m)^\d+\.\s+\S", following)
+    return following if next_item is None else following[:next_item.start()]
 
 def _add_integrated_operator_path_conflicts(
     out: dict[str, int],

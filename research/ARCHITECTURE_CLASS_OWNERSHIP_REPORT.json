@@ -385,13 +385,17 @@
       "class_names": [
         "MarketNoSendError",
         "MarketNoSendGenerationResult",
-        "MarketNoSendReadiness"
+        "MarketNoSendReadiness",
+        "MarketProviderBackoff",
+        "MarketProviderFetchResult",
+        "MarketProviderRequestError",
+        "MarketProviderResponse"
       ],
       "exception_reason": "",
-      "max_class_line_count": 55,
+      "max_class_line_count": 59,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_models",
-      "public_class_count": 3,
+      "public_class_count": 7,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
@@ -1471,7 +1475,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 571,
+  "class_count": 577,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1526,12 +1530,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 7156,
+  "function_count": 7314,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-13T15:40:28.147137+00:00",
+  "generated_at": "2026-07-13T19:11:48.042754+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -1879,13 +1883,17 @@
       "class_names": [
         "MarketNoSendError",
         "MarketNoSendGenerationResult",
-        "MarketNoSendReadiness"
+        "MarketNoSendReadiness",
+        "MarketProviderBackoff",
+        "MarketProviderFetchResult",
+        "MarketProviderRequestError",
+        "MarketProviderResponse"
       ],
       "exception_reason": "",
-      "max_class_line_count": 55,
+      "max_class_line_count": 59,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_models",
-      "public_class_count": 3,
+      "public_class_count": 7,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
@@ -2981,7 +2989,21 @@
   "multi_public_class_modules_count": 84,
   "near_threshold_file_status": [
     {
-      "line_count": 1447,
+      "line_count": 1500,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
+      "line_count": 1457,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
+      "line_count": 1450,
       "path": "crypto_rsi_scanner/config.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -3187,7 +3209,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 448,
+  "public_class_count": 453,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -3249,8 +3271,9 @@
     "crypto_rsi_scanner.event_alpha.notifications.slo": 1,
     "crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor": 2,
     "crypto_rsi_scanner.event_alpha.operations.daily_burn_in_plan": 1,
-    "crypto_rsi_scanner.event_alpha.operations.market_no_send_models": 3,
-    "crypto_rsi_scanner.event_alpha.operations.market_no_send_provider": 1,
+    "crypto_rsi_scanner.event_alpha.operations.market_no_send_campaign_guard": 1,
+    "crypto_rsi_scanner.event_alpha.operations.market_no_send_models": 7,
+    "crypto_rsi_scanner.event_alpha.operations.market_no_send_publication": 1,
     "crypto_rsi_scanner.event_alpha.operations.namespace_policy": 1,
     "crypto_rsi_scanner.event_alpha.operations.review_inbox": 1,
     "crypto_rsi_scanner.event_alpha.outcomes.burn_in": 3,
@@ -3429,12 +3452,28 @@
       "rows": []
     },
     "production_files_over_1200_lines": {
-      "count": 9,
+      "count": 12,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
         {
           "accepted": true,
-          "line_count": 1447,
+          "line_count": 1500,
+          "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+          "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
+          "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
+          "threshold": 1200
+        },
+        {
+          "accepted": true,
+          "line_count": 1457,
+          "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+          "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
+          "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
+          "threshold": 1200
+        },
+        {
+          "accepted": true,
+          "line_count": 1450,
           "path": "crypto_rsi_scanner/config.py",
           "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
           "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
@@ -3503,6 +3542,14 @@
           "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
           "revisit_condition": "When adding a new derivatives metric family or crowding class.",
           "threshold": 1200
+        },
+        {
+          "accepted": true,
+          "line_count": 1227,
+          "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
+          "reason": "Canonical operator-state hashing and exact revision ownership remain centralized and fail closed.",
+          "revisit_condition": "When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures.",
+          "threshold": 1200
         }
       ]
     }
@@ -3537,7 +3584,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 9,
+      "production_files_over_1200_lines": 12,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -3547,7 +3594,17 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
-        "line_count": 1447,
+        "line_count": 1500,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1457,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1450,
         "path": "crypto_rsi_scanner/config.py",
         "threshold": 1200
       },
@@ -3590,6 +3647,11 @@
         "line_count": 1247,
         "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
         "threshold": 1200
+      },
+      {
+        "line_count": 1227,
+        "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
+        "threshold": 1200
       }
     ],
     "production_files_over_1500_line_rows": [],
@@ -3605,12 +3667,28 @@
         "rows": []
       },
       "production_files_over_1200_lines": {
-        "count": 9,
+        "count": 12,
         "reason": "accepted/documented production files over the v3 1,200-line target",
         "rows": [
           {
             "accepted": true,
-            "line_count": 1447,
+            "line_count": 1500,
+            "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+            "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
+            "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
+            "threshold": 1200
+          },
+          {
+            "accepted": true,
+            "line_count": 1457,
+            "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+            "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
+            "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
+            "threshold": 1200
+          },
+          {
+            "accepted": true,
+            "line_count": 1450,
             "path": "crypto_rsi_scanner/config.py",
             "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
             "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
@@ -3679,6 +3757,14 @@
             "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
             "revisit_condition": "When adding a new derivatives metric family or crowding class.",
             "threshold": 1200
+          },
+          {
+            "accepted": true,
+            "line_count": 1227,
+            "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
+            "reason": "Canonical operator-state hashing and exact revision ownership remain centralized and fail closed.",
+            "revisit_condition": "When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures.",
+            "threshold": 1200
           }
         ]
       }
@@ -3697,7 +3783,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 9,
+    "production_files_over_1200_lines": 12,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,

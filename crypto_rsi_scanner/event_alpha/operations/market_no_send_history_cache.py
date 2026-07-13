@@ -2,19 +2,20 @@
 
 The mutable cache is deliberately separate from immutable dashboard authority.
 Every generation receives its own exact, fingerprinted history snapshot, while
-only approved live observations may update the shared rolling cache.  Fixture
-and mock generations remain namespace-local and cannot warm live burn-in data.
+only approved live observations may update the shared rolling cache. Fixture
+and mock generations remain namespace-local and cannot warm Decision campaign data.
 """
 
 from __future__ import annotations
 
 import hashlib
-from collections import Counter
+import stat
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from ..radar import market_history
+from ..radar import market_history, market_history_readiness
+from . import market_no_send_campaign_guard
 from .market_no_send_io import (
     ensure_safe_namespace_dir,
     read_jsonl,
@@ -24,46 +25,53 @@ from .market_no_send_io import (
 from .market_no_send_models import MarketNoSendError
 
 
-LIVE_HISTORY_CACHE_NAMESPACE = "radar_market_history_cache"
+LIVE_HISTORY_CACHE_NAMESPACE = market_no_send_campaign_guard.CAMPAIGN_STATE_NAMESPACE
 
 
-def cache_readiness(artifact_base_dir: Path, *, history_filename: str) -> dict[str, Any]:
+def cache_readiness(
+    artifact_base_dir: Path,
+    *,
+    history_filename: str,
+    now: datetime | str | None = None,
+    config: market_history.MarketHistoryConfig | None = None,
+) -> dict[str, Any]:
     """Summarize the live cache without creating paths or mutating artifacts."""
 
+    cache_dir = artifact_base_dir.absolute() / LIVE_HISTORY_CACHE_NAMESPACE
+    cache_status = "valid"
     try:
-        cache_dir = artifact_base_dir.absolute() / LIVE_HISTORY_CACHE_NAMESPACE
-        rows = read_jsonl(cache_dir / history_filename)
-    except (MarketNoSendError, OSError):
-        rows = []
-    counts = Counter(
-        str(row.get("canonical_asset_id") or "")
-        for row in rows
-        if str(row.get("canonical_asset_id") or "")
-    )
-    observed_times = [
-        parsed
-        for row in rows
-        if (parsed := _aware_time(row.get("observed_at"))) is not None
-    ]
-    newest = max(observed_times, default=None)
-    config = market_history.MarketHistoryConfig()
-    minimum = config.min_baseline_observations
-    warm_assets = sum(count >= minimum for count in counts.values())
-    if not rows:
-        status = "cold"
-    elif newest is None or datetime.now(timezone.utc) - newest > config.max_history_age:
-        status = "stale"
-    elif warm_assets == len(counts):
-        status = "warm"
+        info = cache_dir.lstat()
+    except FileNotFoundError:
+        rows, cache_status = [], "missing"
+    except OSError:
+        rows, cache_status = [], "invalid"
     else:
-        status = "warming"
+        if not stat.S_ISDIR(info.st_mode):
+            rows, cache_status = [], "invalid"
+        else:
+            try:
+                rows = read_jsonl(cache_dir / history_filename)
+            except (MarketNoSendError, OSError, ValueError):
+                rows, cache_status = [], "invalid"
+    evaluated_at = now or datetime.now(timezone.utc)
+    assessment = market_history_readiness.assess_market_history_readiness(
+        rows,
+        now=evaluated_at,
+        config=config,
+    )
     return {
-        "baseline_status": status,
-        "baseline_observation_count": len(rows),
-        "baseline_asset_count": len(counts),
-        "baseline_warm_asset_count": warm_assets,
-        "baseline_min_observations": minimum,
-        "baseline_newest_observed_at": newest.isoformat() if newest else None,
+        key: value
+        for key, value in assessment.items()
+        if key.startswith("baseline_")
+        or key in {
+            "minimum_observation_spacing_seconds",
+            "next_eligible_observation_at",
+            "cadence_status",
+        }
+    } | {
+        "baseline_rejection_counts": assessment.get("rejection_counts", {}),
+        "cache_status": cache_status,
+        "cache_error": "shared market history is invalid" if cache_status == "invalid" else None,
     }
 
 
@@ -75,8 +83,21 @@ def enrich_and_persist_history(
     history_filename: str,
     observed_at: datetime,
     live_no_send: bool,
+    config: market_history.MarketHistoryConfig | None = None,
+    campaign_reservation: market_no_send_campaign_guard.CampaignReservation | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
     """Enrich rows and persist a generation snapshot plus optional live cache."""
+
+    if live_no_send and campaign_reservation is None:
+        raise MarketNoSendError("live market history requires an active campaign reservation")
+    if campaign_reservation is not None:
+        campaign_reservation.assert_active(artifact_base_dir)
+    if live_no_send:
+        if campaign_reservation.provider_call_reserved_at is None:
+            raise MarketNoSendError("live market history requires a provider-call reservation")
+        if campaign_reservation.artifact_namespace != generation_namespace_dir.name:
+            raise MarketNoSendError("live market history campaign namespace mismatch")
+        _validate_live_campaign_rows(rows)
 
     generation_path = generation_namespace_dir / history_filename
     local_history = read_jsonl(generation_path)
@@ -94,10 +115,12 @@ def enrich_and_persist_history(
         rows,
         (*shared_history, *local_history),
         now=observed_at,
+        config=config,
     )
     retained = result.retained_history
     if shared_path is not None:
         write_jsonl(shared_path, retained)
+        campaign_reservation.assert_active(artifact_base_dir)
     write_jsonl(generation_path, retained)
     raw = read_regular_bytes(generation_path)
     if raw is None:  # pragma: no cover - write_jsonl either writes or raises
@@ -116,14 +139,22 @@ def enrich_and_persist_history(
     )
 
 
-def _aware_time(value: Any) -> datetime | None:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return parsed.astimezone(timezone.utc) if parsed.tzinfo is not None else None
+def _validate_live_campaign_rows(rows: Sequence[Mapping[str, Any]]) -> None:
+    expected = {
+        "data_mode": "live", "data_acquisition_mode": "live_provider",
+        "candidate_source_mode": "live_no_send", "provider": "coingecko",
+        "provider_request_succeeded": True,
+        "measurement_program": "decision_radar_live_observation_campaign_v2",
+        "decision_radar_campaign_eligible": True,
+        "decision_radar_campaign_counted": True,
+        "burn_in_eligible": False, "burn_in_counted": False,
+        "contract_counted_status": "counted", "no_send": True, "research_only": True,
+    }
+    if not rows or any(
+        any(row.get(field) != value for field, value in expected.items())
+        for row in rows
+    ):
+        raise MarketNoSendError("live market history rows lack canonical campaign provenance")
 
 
 __all__ = ("LIVE_HISTORY_CACHE_NAMESPACE", "cache_readiness", "enrich_and_persist_history")

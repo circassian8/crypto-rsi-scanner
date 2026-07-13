@@ -2,8 +2,9 @@
 
 This module deliberately performs no file or provider I/O.  It validates the
 lineage assertions supplied by an upstream market-data operation, recomputes
-burn-in eligibility from those assertions, and exposes one JSON-shaped value
-that downstream artifacts can copy without reinterpreting acquisition mode.
+the applicable measurement-program eligibility from those assertions, and
+exposes one JSON-shaped value that downstream artifacts can copy without
+reinterpreting acquisition mode.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from typing import Any
 
 MARKET_PROVENANCE_CONTRACT_VERSION = 2
 MARKET_PROVENANCE_SCHEMA_VERSION = "crypto_radar_market_provenance_v2"
+DECISION_RADAR_MEASUREMENT_PROGRAM = "decision_radar_live_observation_campaign_v2"
 
 CANDIDATE_SOURCE_MODES = (
     "live_no_send",
@@ -185,6 +187,7 @@ def _normalized_provenance_fields(raw: Mapping[str, Any]) -> dict[str, Any]:
         "cache_status": _CACHE_ALIASES.get(cache_declared.casefold(), ""),
         "feature_basis": _mapping(raw.get("feature_basis")),
         "data_quality": _data_quality(raw.get("data_quality")),
+        "measurement_program": _text(raw.get("measurement_program")),
     }
 
 
@@ -198,6 +201,11 @@ def _provenance_validation_errors(
     _validate_lineage(errors, normalized)
     _validate_candidate_inputs(errors, normalized)
     _validate_live_claim(errors, raw, normalized)
+    if normalized.get("measurement_program") not in {
+        "",
+        DECISION_RADAR_MEASUREMENT_PROGRAM,
+    }:
+        errors.append("measurement_program_unsupported")
     return list(dict.fromkeys(errors))
 
 
@@ -341,14 +349,27 @@ def _closed_provenance_value(
 ) -> dict[str, Any]:
     contract_valid = not errors
     source_mode = normalized["source_mode"]
-    burn_in_eligible = bool(contract_valid and source_mode == "live_no_send")
-    if burn_in_eligible:
+    decision_campaign = (
+        normalized.get("measurement_program") == DECISION_RADAR_MEASUREMENT_PROGRAM
+    )
+    live_lineage_eligible = bool(contract_valid and source_mode == "live_no_send")
+    campaign_eligible = bool(decision_campaign and live_lineage_eligible)
+    burn_in_eligible = bool(not decision_campaign and live_lineage_eligible)
+    if decision_campaign:
+        burn_in_reason = "not_counted_separate_decision_radar_campaign"
+    elif burn_in_eligible:
         burn_in_reason = "counted_live_no_send_exact_lineage"
     elif errors:
         burn_in_reason = "not_counted_invalid_provenance:" + ",".join(errors)
     else:
         burn_in_reason = f"not_counted_non_live_mode:{source_mode}"
-    return {
+    if campaign_eligible:
+        campaign_reason = "counted_live_no_send_exact_lineage"
+    elif errors:
+        campaign_reason = "not_counted_invalid_provenance:" + ",".join(errors)
+    else:
+        campaign_reason = f"not_counted_non_live_mode:{source_mode}"
+    out = {
         "schema_version": normalized["schema_version"] or None,
         "contract_version": MARKET_PROVENANCE_CONTRACT_VERSION,
         "data_acquisition_mode": (
@@ -379,6 +400,14 @@ def _closed_provenance_value(
         "data_quality": normalized["data_quality"],
         "validation_errors": errors,
     }
+    if decision_campaign:
+        out.update({
+            "measurement_program": DECISION_RADAR_MEASUREMENT_PROGRAM,
+            "decision_radar_campaign_eligible": campaign_eligible,
+            "decision_radar_campaign_counted": campaign_eligible,
+            "decision_radar_campaign_reason": campaign_reason,
+        })
+    return out
 
 
 def market_provenance_values(source: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -454,6 +483,12 @@ def merge_market_provenance(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]
     errors.append("market_provenance_conflict")
     invalid["validation_errors"] = list(dict.fromkeys(str(item) for item in errors))
     invalid["provenance_contract_valid"] = False
+    if invalid.get("measurement_program") == DECISION_RADAR_MEASUREMENT_PROGRAM:
+        invalid["decision_radar_campaign_eligible"] = False
+        invalid["decision_radar_campaign_counted"] = False
+        invalid["decision_radar_campaign_reason"] = (
+            "not_counted_invalid_provenance:market_provenance_conflict"
+        )
     invalid["burn_in_eligible"] = False
     invalid["burn_in_counted"] = False
     invalid["burn_in_reason"] = "not_counted_invalid_provenance:market_provenance_conflict"
@@ -483,12 +518,22 @@ def market_provenance_flat_fields(source: Mapping[str, Any] | None) -> dict[str,
         "provider_generation_id": provenance["provider_generation_id"],
         "cache_status": provenance["cache_status"],
         "provenance_contract_valid": provenance["provenance_contract_valid"],
+        **({
+            "measurement_program": provenance.get("measurement_program"),
+            "decision_radar_campaign_eligible": provenance.get("decision_radar_campaign_eligible"),
+            "decision_radar_campaign_counted": provenance.get("decision_radar_campaign_counted"),
+            "decision_radar_campaign_reason": provenance.get("decision_radar_campaign_reason"),
+        } if provenance.get("measurement_program") else {}),
         "burn_in_eligible": provenance["burn_in_eligible"],
         "burn_in_counted": provenance["burn_in_counted"],
         "burn_in_reason": provenance["burn_in_reason"],
         "feature_basis": deepcopy(provenance["feature_basis"]),
         "data_quality": deepcopy(provenance["data_quality"]),
-        "contract_counted_candidate": provenance["burn_in_counted"],
+        "contract_counted_candidate": (
+            provenance.get("decision_radar_campaign_counted") is True
+            if provenance.get("measurement_program") == DECISION_RADAR_MEASUREMENT_PROGRAM
+            else provenance["burn_in_counted"]
+        ),
     }
 
 

@@ -16,6 +16,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from ... import universe
 from ..radar import market_enrichment
 from .market_no_send_io import read_jsonl
+from .market_provenance import DECISION_RADAR_MEASUREMENT_PROGRAM
 
 
 def normalize_market_rows(
@@ -28,6 +29,7 @@ def normalize_market_rows(
     request_cache_artifact: str,
     request_ledger_artifact: str,
     candidate_source_mode: str | None,
+    decision_radar_campaign_counted: bool,
     burn_in_counted: bool,
     safety_counters: Mapping[str, int],
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -53,6 +55,7 @@ def normalize_market_rows(
             source_mode=source_mode,
             request_cache_artifact=request_cache_artifact,
             request_ledger_artifact=request_ledger_artifact,
+            decision_radar_campaign_counted=decision_radar_campaign_counted,
             burn_in_counted=burn_in_counted,
             proxy_zscore=proxy_zscores.get(index),
             safety_counters=safety_counters,
@@ -68,6 +71,7 @@ def normalize_market_rows(
         data_mode=data_mode,
         source_mode=source_mode,
         observed_at=observed_at,
+        decision_radar_campaign_counted=decision_radar_campaign_counted,
         burn_in_counted=burn_in_counted,
     )
 
@@ -81,6 +85,7 @@ def _normalize_market_row(
     source_mode: str,
     request_cache_artifact: str,
     request_ledger_artifact: str,
+    decision_radar_campaign_counted: bool,
     burn_in_counted: bool,
     proxy_zscore: float | None,
     safety_counters: Mapping[str, int],
@@ -151,11 +156,29 @@ def _normalize_market_row(
         "provider_source_artifact": request_cache_artifact,
         "request_ledger_path": request_ledger_artifact,
         "provenance_contract_valid": True,
+        "measurement_program": DECISION_RADAR_MEASUREMENT_PROGRAM,
+        "decision_radar_campaign_eligible": bool(decision_radar_campaign_counted),
+        "decision_radar_campaign_counted": bool(decision_radar_campaign_counted),
+        "decision_radar_campaign_reason": (
+            "counted_live_no_send_exact_lineage"
+            if decision_radar_campaign_counted
+            else f"not_counted_non_live_mode:{source_mode}"
+        ),
         "burn_in_eligible": bool(burn_in_counted),
         "burn_in_counted": bool(burn_in_counted),
-        "contract_counted_candidate": bool(burn_in_counted),
-        "burn_in_reason": _burn_in_reason(burn_in_counted),
-        "contract_counted_status": "counted" if burn_in_counted else "not_counted",
+        "contract_counted_candidate": bool(
+            decision_radar_campaign_counted or burn_in_counted
+        ),
+        "burn_in_reason": (
+            _burn_in_reason(burn_in_counted)
+            if burn_in_counted
+            else "not_counted_separate_decision_radar_campaign"
+        ),
+        "contract_counted_status": (
+            "counted"
+            if decision_radar_campaign_counted or burn_in_counted
+            else "not_counted"
+        ),
         "no_send_status": "enforced",
         "no_send": True,
         "research_only": True,
@@ -217,6 +240,7 @@ def _normalization_audit(
     data_mode: str,
     source_mode: str,
     observed_at: datetime,
+    decision_radar_campaign_counted: bool,
     burn_in_counted: bool,
 ) -> dict[str, Any]:
     output = dict(audit)
@@ -232,6 +256,8 @@ def _normalization_audit(
         "proxy_feature_count": sum(int(row.get("proxy_market_feature_count") or 0) for row in rows),
         "spread_available_count": sum(1 for row in rows if row.get("spread_bps") is not None),
         "candidate_source_mode": source_mode,
+        "measurement_program": DECISION_RADAR_MEASUREMENT_PROGRAM,
+        "decision_radar_campaign_counted": bool(decision_radar_campaign_counted),
         "burn_in_counted": bool(burn_in_counted),
     })
     return output
@@ -329,12 +355,14 @@ def attach_history_quality(row: Mapping[str, Any]) -> dict[str, Any]:
     )
     quality = enriched.get("market_data_quality")
     quality = dict(quality) if isinstance(quality, Mapping) else {}
+    market_snapshot_id = history.get("observation_id")
     quality.update({
         "baseline_status": status,
         "baseline_observation_count": int(history.get("prior_observation_count") or 0),
         "baseline_warm_feature_count": int(history.get("warm_feature_count") or 0),
         "baseline_feature_count": int(history.get("feature_count") or 0),
         "baseline_observation_id": history.get("observation_id"),
+        "market_snapshot_id": market_snapshot_id,
         "direct_feature_count": direct_count,
         "proxy_feature_count": proxy_count,
         "feature_basis": basis,
@@ -350,6 +378,8 @@ def attach_history_quality(row: Mapping[str, Any]) -> dict[str, Any]:
         "market_data_quality": quality,
         "data_quality": quality,
         "temporal_baseline_status": status,
+        "market_snapshot_id": market_snapshot_id,
+        "market_history_observation_id": market_snapshot_id,
         "direct_market_feature_count": direct_count,
         "proxy_market_feature_count": proxy_count,
     })

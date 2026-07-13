@@ -487,9 +487,10 @@ def _candidate_detail(
             ("Candidate source mode", provenance.get("candidate_source_mode") or "not recorded"),
             ("Market provider", provenance.get("provider") or "not recorded"),
             ("Cache status", provenance.get("cache_status") or "not recorded"),
-            ("Burn-in eligible", str(provenance.get("burn_in_eligible") is True).lower()),
-            ("Burn-in counted", str(provenance.get("burn_in_counted") is True).lower()),
-            ("Burn-in reason", provenance.get("burn_in_reason") or "not recorded"),
+            ("Measurement program", provenance.get("measurement_program") or "not recorded"),
+            ("Campaign eligible", str(provenance.get("decision_radar_campaign_eligible") is True).lower()),
+            ("Campaign counted", str(provenance.get("decision_radar_campaign_counted") is True).lower()),
+            ("Campaign reason", provenance.get("decision_radar_campaign_reason") or "not recorded"),
             ("Provider source artifact", provenance.get("provider_source_artifact") or "not recorded"),
             ("Request ledger", provenance.get("request_ledger_path") or "not recorded"),
             ("Temporal baseline", data_quality.get("baseline_status") or "not evaluated"),
@@ -716,7 +717,9 @@ def _candidate_market_provenance(row: Mapping[str, Any]) -> Mapping[str, Any]:
     merged: dict[str, Any] = {}
     fields = (
         "data_mode", "data_acquisition_mode", "candidate_source_mode", "provider",
-        "cache_status", "burn_in_eligible", "burn_in_counted", "burn_in_reason",
+        "cache_status", "measurement_program", "decision_radar_campaign_eligible",
+        "decision_radar_campaign_counted", "decision_radar_campaign_reason",
+        "burn_in_eligible", "burn_in_counted", "burn_in_reason",
         "provider_source_artifact", "provider_source_sha256", "request_ledger_path",
         "request_ledger_sha256", "provenance_contract_valid",
     )
@@ -1020,9 +1023,9 @@ def _generation_badges(snapshot: DashboardSnapshot) -> str:
         "live_no_send", "live_provider", "live",
     }
     no_send = state.get("send_attempted") is False
-    burn_in_counted = bool(
+    campaign_counted = bool(
         provenance.get("provenance_contract_valid") is True
-        and provenance.get("burn_in_counted") is True
+        and provenance.get("decision_radar_campaign_counted") is True
         and is_live
     )
     values = (
@@ -1030,8 +1033,8 @@ def _generation_badges(snapshot: DashboardSnapshot) -> str:
         (mode_label or "UNKNOWN MODE", mode_class),
         ("NO-SEND" if no_send else "SEND STATE UNKNOWN", "current" if no_send else "stale"),
         (
-            "BURN-IN COUNTED" if burn_in_counted else "BURN-IN EXCLUDED",
-            "current" if burn_in_counted and is_live else "fixture",
+            "CAMPAIGN COUNTED" if campaign_counted else "CAMPAIGN EXCLUDED",
+            "current" if campaign_counted and is_live else "fixture",
         ),
     )
     return "".join(
@@ -1051,12 +1054,15 @@ def _canonical_generation_market_provenance(
     normalized = market_provenance.normalize_market_provenance(raw)
     if (
         normalized.get("provenance_contract_valid") is True
-        and dict(raw) == normalized
+        and all(normalized.get(key) == value for key, value in raw.items())
     ):
         return normalized
     return {
         "candidate_source_mode": "untrusted_provenance",
         "provenance_contract_valid": False,
+        "measurement_program": "decision_radar_live_observation_campaign_v2",
+        "decision_radar_campaign_eligible": False,
+        "decision_radar_campaign_counted": False,
         "burn_in_eligible": False,
         "burn_in_counted": False,
     }

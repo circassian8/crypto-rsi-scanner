@@ -5,12 +5,14 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 from typing import Sequence
 
 from ... import config
 from ..dashboard.readiness import DashboardReadinessError
 from . import market_no_send
 from . import market_no_send_attempt
+from . import market_observation_campaign
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -29,13 +31,41 @@ def _parser() -> argparse.ArgumentParser:
         )
         sub.add_argument("--top-n", type=int, default=market_no_send.DEFAULT_TOP_N)
         sub.add_argument("--fetch-limit", type=int, default=None)
-        sub.add_argument("--observed-at", default=None)
+        if command in {"smoke", "audit"}:
+            sub.add_argument("--observed-at", default=None)
+    campaign = subparsers.add_parser(
+        "campaign-report",
+        help="build the artifact-derived Decision Radar campaign report without providers",
+    )
+    campaign.add_argument(
+        "--artifact-base",
+        default=str(config.EVENT_ALPHA_ARTIFACT_BASE_DIR),
+    )
+    campaign.add_argument("--output-dir", default="research")
+    campaign.add_argument("--evaluated-at", default=None)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.command == "campaign-report":
+            json_path, markdown_path, report = (
+                market_observation_campaign.write_campaign_report(
+                    args.artifact_base,
+                    args.output_dir,
+                    evaluated_at=args.evaluated_at,
+                )
+            )
+            metrics = report["campaign_metrics"]
+            print(
+                "radar_market_campaign_report: "
+                f"status={report['campaign_status']} "
+                f"real_cycles={metrics['real_cycles']} "
+                f"real_candidates={metrics['real_candidates']} "
+                f"json={json_path} markdown={markdown_path} provider_calls=0"
+            )
+            return 0
         if args.command == "readiness":
             result = market_no_send.build_market_no_send_readiness(
                 artifact_base_dir=args.artifact_base,
@@ -49,7 +79,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             published = market_no_send.publish_market_no_send_generation(
                 args.artifact_base,
                 args.namespace,
-                now=args.observed_at,
             )
             snapshot = published.snapshot
             print(
@@ -99,7 +128,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 artifact_namespace=args.namespace,
                 top_n=args.top_n,
                 fetch_limit=args.fetch_limit,
-                observed_at=args.observed_at,
             )
             base = market_no_send._validated_artifact_base(args.artifact_base)
             market_no_send_attempt.record_attempt(base, args.namespace, result)
@@ -107,7 +135,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.artifact_base,
             args.namespace,
             result=result,
-            now=args.observed_at,
+            now=getattr(args, "observed_at", None),
         )
         payload = result.to_dict()
         payload["audit_json_path"] = str(json_path)
@@ -116,8 +144,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         if result.complete or result.status == "blocked":
             return 0
         return 1
-    except (market_no_send.MarketNoSendError, DashboardReadinessError) as exc:
-        print(f"radar_market_no_send_blocked: {exc}", file=sys.stderr)
+    except Exception as exc:  # fail closed and retain one sanitized run-attempt row
+        if args.command == "run":
+            try:
+                requested = Path(args.artifact_base).expanduser().resolve()
+                canonical = Path(config.EVENT_ALPHA_ARTIFACT_BASE_DIR).expanduser().resolve()
+                if requested == canonical:
+                    base = market_no_send._validated_artifact_base(requested)
+                    market_no_send_attempt.record_boundary_failure(
+                        base, args.namespace, failure=exc,
+                        manifest_filename=market_no_send.RUN_MANIFEST_FILENAME,
+                    )
+            except Exception:
+                pass
+        detail = (
+            str(exc)
+            if isinstance(exc, (market_no_send.MarketNoSendError, DashboardReadinessError))
+            else type(exc).__name__
+        )
+        print(f"radar_market_no_send_blocked: {detail}", file=sys.stderr)
         return 1
 
 

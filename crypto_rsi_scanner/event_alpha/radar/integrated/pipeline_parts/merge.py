@@ -447,12 +447,42 @@ def _merge_family_market_fields(
     market_snapshot: dict[str, Any],
     integrated_market: Mapping[str, Any],
 ) -> dict[str, Any]:
+    quality = (
+        market_snapshot.get("market_data_quality")
+        if isinstance(market_snapshot.get("market_data_quality"), Mapping)
+        else {}
+    )
+    source = (
+        market_snapshot.get("market_data_source")
+        or market_snapshot.get("source_provider")
+        or market_snapshot.get("latest_source")
+        or market_snapshot.get("source")
+        or integrated_market["source"]
+    )
+    freshness = (
+        market_snapshot.get("market_context_freshness_status")
+        or market_snapshot.get("freshness_status")
+        or integrated_market["freshness"]
+    )
+    snapshot_id = (
+        market_snapshot.get("market_snapshot_id")
+        or market_snapshot.get("market_history_observation_id")
+        or quality.get("market_snapshot_id")
+        or quality.get("baseline_observation_id")
+    )
     return {
         "integrated_market_confirmation_level": integrated_market["level"],
         "integrated_market_confirmation_score": integrated_market["score"],
         "integrated_market_reaction_confirmation": integrated_market["reaction"],
         "integrated_market_context_source": integrated_market["source"],
         "integrated_market_freshness_status": integrated_market["freshness"],
+        "market_context_source": source,
+        "market_context_observed_at": (
+            market_snapshot.get("observed_at") or market_snapshot.get("timestamp")
+        ),
+        "market_context_freshness_status": freshness,
+        "market_data_freshness": freshness,
+        "market_snapshot_id": snapshot_id,
         "market_state_snapshot": raw_reaction.market_state_snapshot.to_dict(),
         "latest_market_snapshot": market_snapshot,
         "market_snapshot": market_snapshot,

@@ -8,6 +8,7 @@ generation.  It is research metadata only and cannot route or send anything.
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -101,6 +102,33 @@ class EventAlphaOperatorStateReadResult:
 
 def operator_state_path(namespace_dir: str | Path) -> Path:
     return Path(namespace_dir).expanduser() / OPERATOR_STATE_FILENAME
+
+
+def operator_authority_digest(state: Mapping[str, Any]) -> str:
+    """Return the stable fingerprint for one exact operator authority.
+
+    A full strict doctor may be rerun against an unchanged revision.  Its
+    verification clock is freshness evidence, not generation identity, so the
+    two clock-only fields written by :func:`record_doctor_status` are excluded.
+    Every substantive doctor value and the complete artifact manifest remain
+    bound into the digest.
+    """
+
+    stable = dict(state)
+    stable.pop("updated_at", None)
+    doctor = stable.get("doctor")
+    if isinstance(doctor, Mapping):
+        stable_doctor = dict(doctor)
+        stable_doctor.pop("verified_at", None)
+        stable["doctor"] = stable_doctor
+    data = json.dumps(
+        stable,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(data).hexdigest()
 
 
 def text_has_exact_run_id(text: str, run_id: object) -> bool:
@@ -1186,6 +1214,7 @@ __all__ = (
     "latest_matching_run",
     "load_operator_state",
     "operator_artifact_fingerprint_error",
+    "operator_authority_digest",
     "operator_state_path",
     "record_artifact",
     "record_doctor_status",

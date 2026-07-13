@@ -16,6 +16,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Mapping, Sequence
 
+from crypto_rsi_scanner.event_alpha.radar.market_history_summary import (
+    build_market_history_summary,
+)
+
 
 MARKET_HISTORY_OBSERVATION_SCHEMA = "event_alpha.market_history_observation"
 MARKET_HISTORY_ENRICHMENT_SCHEMA = "event_alpha.market_history_enrichment"
@@ -23,12 +27,27 @@ MARKET_HISTORY_SUMMARY_SCHEMA = "event_alpha.market_history_summary"
 MARKET_HISTORY_SCHEMA_VERSION = 1
 TEMPORAL_BASELINE_BASIS = "temporal_baseline"
 RETURN_UNIT_PERCENT_POINTS = "percent_points"
+BASELINE_COUNTED = "counted"
+BASELINE_TOO_CLOSE = "too_close"
+BASELINE_DUPLICATE = "duplicate"
+FEATURE_READINESS_GROUPS = (
+    "volume",
+    "turnover",
+    "volatility",
+    "returns_1h",
+    "returns_4h",
+    "returns_24h",
+    "btc_eth_relative",
+)
+_WARM_FEATURE_STATUSES = {"ready", "constant_baseline", "warm"}
 
 _LINEAGE_FIELDS = (
     "provider", "source", "market_data_source", "data_mode", "provider_source_artifact",
     "data_acquisition_mode", "candidate_source_mode", "provider_generation_id",
     "provider_source_artifact_sha256", "request_ledger_path", "request_ledger_sha256",
     "provenance_contract_valid", "burn_in_eligible", "burn_in_counted",
+    "measurement_program", "decision_radar_campaign_eligible",
+    "decision_radar_campaign_counted", "decision_radar_campaign_reason",
     "contract_counted_status", "no_send_status", "research_only",
 )
 _PROXY_BASIS_MARKERS = ("proxy", "cross_sectional", "24h_volume")
@@ -43,7 +62,9 @@ class MarketHistoryConfig:
     future_tolerance: timedelta = timedelta(minutes=5)
     max_observations_per_asset: int = 256
     min_baseline_observations: int = 8
+    minimum_observation_spacing: timedelta = timedelta(hours=1)
     return_horizons_hours: tuple[int, ...] = (1, 4, 24)
+    required_feature_groups: tuple[str, ...] = FEATURE_READINESS_GROUPS
     anchor_tolerance_ratio: float = 0.25
     min_anchor_tolerance: timedelta = timedelta(minutes=5)
     benchmark_alignment_tolerance: timedelta = timedelta(minutes=5)
@@ -58,6 +79,8 @@ class MarketHistoryConfig:
             (self.future_tolerance >= timedelta(0), "future_tolerance cannot be negative"),
             (self.max_observations_per_asset >= 2, "max_observations_per_asset must be at least 2"),
             (self.min_baseline_observations >= 2, "min_baseline_observations must be at least 2"),
+            (self.minimum_observation_spacing > timedelta(0),
+             "minimum_observation_spacing must be positive"),
             (self.return_horizons_hours and all(value > 0 for value in self.return_horizons_hours),
              "return_horizons_hours must contain positive values"),
             (len(set(self.return_horizons_hours)) == len(self.return_horizons_hours),
@@ -67,6 +90,11 @@ class MarketHistoryConfig:
             (self.benchmark_alignment_tolerance >= timedelta(0),
              "benchmark_alignment_tolerance cannot be negative"),
             (self.rejection_example_limit >= 0, "rejection_example_limit cannot be negative"),
+            (bool(self.required_feature_groups), "required_feature_groups cannot be empty"),
+            (len(set(self.required_feature_groups)) == len(self.required_feature_groups),
+             "required_feature_groups must be unique"),
+            (set(self.required_feature_groups).issubset(FEATURE_READINESS_GROUPS),
+             "required_feature_groups contains an unknown group"),
         )
         for valid, message in checks:
             if not valid:
@@ -159,7 +187,12 @@ def enrich_market_rows_with_history(
         telemetry=telemetry,
     )
     canonical_history = _deduplicate_history(prepared_history, telemetry)
+    canonical_history, historical_cadence_counts = _classify_history_cadence(
+        canonical_history,
+        minimum_spacing=cfg.minimum_observation_spacing,
+    )
     history_by_asset = _group_observations(canonical_history)
+    counted_history_by_asset = _counted_observations(history_by_asset)
     prepared_current, current_rejections = _prepare_current_rows(
         current,
         now=evaluated_at,
@@ -172,6 +205,11 @@ def enrich_market_rows_with_history(
         telemetry=telemetry,
     )
     current_rejections.update(current_statuses)
+    current_cadence_counts = _classify_current_cadence(
+        accepted_current,
+        history_by_asset=history_by_asset,
+        minimum_spacing=cfg.minimum_observation_spacing,
+    )
     combined_by_asset: dict[str, list[dict[str, Any]]] = {
         asset: [copy.deepcopy(item) for item in observations]
         for asset, observations in history_by_asset.items()
@@ -180,6 +218,16 @@ def enrich_market_rows_with_history(
         observations = combined_by_asset.setdefault(prepared.asset_id, [])
         if not any(_observation_time(item) == prepared.observed_at for item in observations):
             observations.append(copy.deepcopy(prepared.observation))
+    evaluation_by_asset: dict[str, list[dict[str, Any]]] = {
+        asset: [copy.deepcopy(item) for item in observations]
+        for asset, observations in counted_history_by_asset.items()
+    }
+    for prepared in accepted_current.values():
+        observations = evaluation_by_asset.setdefault(prepared.asset_id, [])
+        if not any(_observation_time(item) == prepared.observed_at for item in observations):
+            observations.append(copy.deepcopy(prepared.observation))
+    for observations in evaluation_by_asset.values():
+        observations.sort(key=_observation_sort_key)
     pruned_by_limit = 0
     for asset_id, observations in combined_by_asset.items():
         observations.sort(key=_observation_sort_key)
@@ -189,6 +237,7 @@ def enrich_market_rows_with_history(
     enriched: list[dict[str, Any]] = []
     warmup_status_counts: Counter[str] = Counter()
     warmup_feature_counts: dict[str, Counter[str]] = defaultdict(Counter)
+    warmup_group_counts: dict[str, Counter[str]] = defaultdict(Counter)
     feature_basis_counts: Counter[str] = Counter()
     for index, source_row in enumerate(current):
         prepared = accepted_current.get(index)
@@ -200,7 +249,7 @@ def enrich_market_rows_with_history(
         row = _enrich_current_row(
             source_row,
             current=prepared,
-            history_by_asset=combined_by_asset,
+            history_by_asset=evaluation_by_asset,
             cfg=cfg,
         )
         enriched.append(row)
@@ -211,6 +260,11 @@ def enrich_market_rows_with_history(
             for feature, details in warmup.items():
                 if isinstance(details, Mapping):
                     warmup_feature_counts[str(feature)][str(details.get("status") or "unknown")] += 1
+        groups = row.get("market_history", {}).get("feature_readiness")
+        if isinstance(groups, Mapping):
+            for group, details in groups.items():
+                if isinstance(details, Mapping):
+                    warmup_group_counts[str(group)][str(details.get("status") or "unknown")] += 1
         evidence = row.get("market_feature_evidence")
         if isinstance(evidence, Mapping):
             for details in evidence.values():
@@ -221,46 +275,31 @@ def enrich_market_rows_with_history(
         for asset_id in sorted(combined_by_asset)
         for observation in sorted(combined_by_asset[asset_id], key=_observation_sort_key)
     )
-    summary = {
-        "schema_id": MARKET_HISTORY_SUMMARY_SCHEMA,
-        "schema_version": MARKET_HISTORY_SCHEMA_VERSION,
-        "evaluated_at": _iso(evaluated_at),
-        "config": _config_values(cfg),
-        "input_counts": {
-            "current_rows": len(current),
-            "existing_history_rows": len(historical),
-        },
-        "accepted_counts": {
-            "current_observations": len(accepted_current),
-            "historical_observations": len(canonical_history),
-        },
-        "rejection_counts": dict(sorted(telemetry.counts.items())),
-        "rejection_examples": sorted(
-            telemetry.examples,
-            key=lambda item: (
-                str(item.get("role") or ""),
-                int(item.get("input_index") or 0),
-                str(item.get("reason") or ""),
-            ),
+    summary = build_market_history_summary(
+        schema_id=MARKET_HISTORY_SUMMARY_SCHEMA,
+        schema_version=MARKET_HISTORY_SCHEMA_VERSION,
+        evaluated_at=_iso(evaluated_at),
+        config=_config_values(cfg),
+        current_row_count=len(current),
+        historical_row_count=len(historical),
+        accepted_current_count=len(accepted_current),
+        accepted_historical_count=len(canonical_history),
+        current_cadence_counts=current_cadence_counts,
+        historical_cadence_counts=historical_cadence_counts,
+        minimum_observation_spacing_seconds=int(
+            cfg.minimum_observation_spacing.total_seconds()
         ),
-        "retention": {
-            "retained_observations": len(retained),
-            "retained_assets": len(combined_by_asset),
-            "pruned_by_age": int(telemetry.role_counts.get(("history", "stale"), 0)),
-            "pruned_by_limit": pruned_by_limit,
-            "oldest_observed_at": min((item["observed_at"] for item in retained), default=None),
-            "newest_observed_at": max((item["observed_at"] for item in retained), default=None),
-        },
-        "warmup": {
-            "row_status_counts": dict(sorted(warmup_status_counts.items())),
-            "feature_status_counts": {
-                feature: dict(sorted(counts.items()))
-                for feature, counts in sorted(warmup_feature_counts.items())
-            },
-        },
-        "feature_basis_counts": dict(sorted(feature_basis_counts.items())),
-        "research_only": True,
-    }
+        rejection_counts=telemetry.counts,
+        rejection_examples=telemetry.examples,
+        retained=retained,
+        retained_asset_count=len(combined_by_asset),
+        pruned_by_age=int(telemetry.role_counts.get(("history", "stale"), 0)),
+        pruned_by_limit=pruned_by_limit,
+        warmup_status_counts=warmup_status_counts,
+        warmup_feature_counts=warmup_feature_counts,
+        warmup_group_counts=warmup_group_counts,
+        feature_basis_counts=feature_basis_counts,
+    )
     return _MarketHistoryResult(tuple(enriched), retained, summary)
 
 
@@ -360,6 +399,89 @@ def _deduplicate_history(
                 observed_at=duplicate.observed_at,
             )
     return retained
+
+
+def _classify_history_cadence(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    minimum_spacing: timedelta,
+) -> tuple[list[dict[str, Any]], Counter[str]]:
+    """Mark retained raw evidence without letting rapid rows warm baselines."""
+
+    grouped = _group_observations(rows)
+    classified: list[dict[str, Any]] = []
+    counts: Counter[str] = Counter()
+    for asset_id in sorted(grouped):
+        last_counted_at: datetime | None = None
+        for source in grouped[asset_id]:
+            row = copy.deepcopy(source)
+            observed_at = _observation_time(row)
+            status = (
+                BASELINE_COUNTED
+                if last_counted_at is None or observed_at - last_counted_at >= minimum_spacing
+                else BASELINE_TOO_CLOSE
+            )
+            row["baseline_counted"] = status == BASELINE_COUNTED
+            row["baseline_counting_status"] = status
+            if status == BASELINE_COUNTED:
+                last_counted_at = observed_at
+            counts[status] += 1
+            classified.append(row)
+    return classified, counts
+
+
+def _counted_observations(
+    grouped: Mapping[str, Sequence[Mapping[str, Any]]],
+) -> dict[str, list[dict[str, Any]]]:
+    return {
+        asset_id: [
+            copy.deepcopy(dict(row))
+            for row in rows
+            if row.get("baseline_counted") is True
+        ]
+        for asset_id, rows in grouped.items()
+    }
+
+
+def _classify_current_cadence(
+    accepted: Mapping[int, _PreparedObservation],
+    *,
+    history_by_asset: Mapping[str, Sequence[Mapping[str, Any]]],
+    minimum_spacing: timedelta,
+) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    status_by_key: dict[tuple[str, datetime], str] = {}
+    for prepared in sorted(
+        accepted.values(),
+        key=lambda item: (item.asset_id, item.observed_at, item.index),
+    ):
+        status = status_by_key.get(prepared.key)
+        if status is None:
+            history = list(history_by_asset.get(prepared.asset_id, ()))
+            existing_same_time = any(
+                _observation_time(item) == prepared.observed_at for item in history
+            )
+            counted_times = [
+                _observation_time(item)
+                for item in history
+                if item.get("baseline_counted") is True
+                and _observation_time(item) < prepared.observed_at
+            ]
+            latest_counted = max(counted_times, default=None)
+            if existing_same_time:
+                status = BASELINE_DUPLICATE
+            elif (
+                latest_counted is not None
+                and prepared.observed_at - latest_counted < minimum_spacing
+            ):
+                status = BASELINE_TOO_CLOSE
+            else:
+                status = BASELINE_COUNTED
+            status_by_key[prepared.key] = status
+            counts[status] += 1
+        prepared.observation["baseline_counted"] = status == BASELINE_COUNTED
+        prepared.observation["baseline_counting_status"] = status
+    return counts
 
 
 def _select_current_observations(
@@ -474,12 +596,18 @@ def _enrich_current_row(
          ("turnover_zscore_basis", "turnover_basis"), "turnover_zscore_basis"),
     )
     for source_field, feature, temporal_field, basis_fields, basis_field in scalar_specs:
-        baseline = [_number(item.get(source_field)) for item in prior]
+        baseline_rows = [item for item in prior if _number(item.get(source_field)) is not None]
+        baseline = [_number(item.get(source_field)) for item in baseline_rows]
         baseline = [value for value in baseline if value is not None]
         value, stats = _zscore(
             _number(current.observation.get(source_field)),
             baseline,
             minimum=cfg.min_baseline_observations,
+        )
+        stats = _with_feature_coverage(
+            stats,
+            baseline_rows,
+            required=_required_coverage(cfg, horizon_hours=0),
         )
         _record_baseline_feature(
             row, evidence, warmup, baseline_values,
@@ -501,6 +629,11 @@ def _enrich_current_row(
             current_return,
             historical_returns,
             minimum=cfg.min_baseline_observations,
+        )
+        return_stats = _with_feature_coverage(
+            return_stats,
+            prior,
+            required=_required_coverage(cfg, horizon_hours=hours),
         )
         return_field = f"return_{hours}h"
         temporal_return_field = f"temporal_return_{hours}h"
@@ -543,6 +676,11 @@ def _enrich_current_row(
             "mean": _rounded(statistics.fmean(historical_returns)) if historical_returns else None,
             "standard_deviation": volatility,
         }
+        volatility_stats = _with_feature_coverage(
+            volatility_stats,
+            prior,
+            required=_required_coverage(cfg, horizon_hours=hours),
+        )
         _record_baseline_feature(
             row,
             evidence,
@@ -563,6 +701,11 @@ def _enrich_current_row(
             absolute_returns,
             minimum=cfg.min_baseline_observations,
         )
+        volatility_z_stats = _with_feature_coverage(
+            volatility_z_stats,
+            prior,
+            required=_required_coverage(cfg, horizon_hours=hours),
+        )
         _record_baseline_feature(
             row,
             evidence,
@@ -581,6 +724,7 @@ def _enrich_current_row(
     )
     return _finish_current_enrichment(
         row, current, observations, prior, warmup, baseline_values, evidence,
+        cfg=cfg,
     )
 
 
@@ -630,6 +774,11 @@ def _enrich_relative_baselines(
             relative_z, stats = _zscore(
                 relative, history, minimum=cfg.min_baseline_observations,
             )
+            stats = _with_feature_coverage(
+                stats,
+                prior,
+                required=_required_coverage(cfg, horizon_hours=hours),
+            )
             if relative is not None:
                 temporal_field = f"temporal_{feature}"
                 row[temporal_field] = relative
@@ -657,11 +806,19 @@ def _finish_current_enrichment(
     warmup: Mapping[str, Mapping[str, Any]],
     baseline_values: Mapping[str, Any],
     evidence: Mapping[str, Any],
+    *,
+    cfg: MarketHistoryConfig,
 ) -> dict[str, Any]:
     statuses = [str(item.get("status") or "unknown") for item in warmup.values()]
     required_statuses = [status for status in statuses if status != "not_applicable"]
-    warm_count = sum(status in {"ready", "constant_baseline"} for status in required_statuses)
-    if required_statuses and warm_count == len(required_statuses):
+    warm_count = sum(status in _WARM_FEATURE_STATUSES for status in required_statuses)
+    feature_readiness = _group_feature_readiness(warmup, cfg=cfg)
+    required_groups = [
+        details
+        for group, details in feature_readiness.items()
+        if group in cfg.required_feature_groups and details.get("required") is True
+    ]
+    if required_groups and all(details.get("status") == "warm" for details in required_groups):
         overall_status = "warm"
     elif prior:
         overall_status = "warming"
@@ -681,12 +838,19 @@ def _finish_current_enrichment(
         "feature_count": len(required_statuses),
         "not_applicable_feature_count": len(statuses) - len(required_statuses),
         "warmup": warmup,
+        "feature_readiness": feature_readiness,
         "baseline_values": baseline_values,
+        "baseline_counted": current.observation.get("baseline_counted") is True,
+        "baseline_counting_status": current.observation.get("baseline_counting_status"),
         "return_unit": RETURN_UNIT_PERCENT_POINTS,
         "research_only": True,
     }
     row["market_history_status"] = overall_status
     row["market_history_observation_id"] = current.observation["observation_id"]
+    row["market_history_baseline_counted"] = current.observation.get("baseline_counted") is True
+    row["market_history_baseline_counting_status"] = current.observation.get(
+        "baseline_counting_status"
+    )
     row["market_feature_evidence"] = dict(evidence)
     return row
 
@@ -710,6 +874,10 @@ def _record_baseline_feature(
         "status": status,
         "sample_count": int(stats.get("sample_count") or 0),
         "required_sample_count": int(stats.get("required_sample_count") or 0),
+        "coverage_seconds": int(stats.get("coverage_seconds") or 0),
+        "required_coverage_seconds": int(stats.get("required_coverage_seconds") or 0),
+        "oldest_sample_observed_at": stats.get("oldest_sample_observed_at"),
+        "newest_sample_observed_at": stats.get("newest_sample_observed_at"),
         "basis": TEMPORAL_BASELINE_BASIS,
     }
     baseline_values[feature] = {
@@ -717,6 +885,8 @@ def _record_baseline_feature(
         "mean": stats.get("mean"),
         "standard_deviation": stats.get("standard_deviation"),
         "sample_count": int(stats.get("sample_count") or 0),
+        "coverage_seconds": int(stats.get("coverage_seconds") or 0),
+        "required_coverage_seconds": int(stats.get("required_coverage_seconds") or 0),
         "status": status,
         "basis": TEMPORAL_BASELINE_BASIS,
     }
@@ -730,6 +900,95 @@ def _record_baseline_feature(
         calculation=feature,
         benchmark_asset_id=benchmark_asset_id,
     )
+
+
+def _required_coverage(cfg: MarketHistoryConfig, *, horizon_hours: int) -> timedelta:
+    cadence_span = cfg.minimum_observation_spacing * (cfg.min_baseline_observations - 1)
+    return timedelta(hours=horizon_hours) + cadence_span
+
+
+def _with_feature_coverage(
+    stats: Mapping[str, Any],
+    observations: Sequence[Mapping[str, Any]],
+    *,
+    required: timedelta,
+) -> dict[str, Any]:
+    output = dict(stats)
+    times = sorted(_observation_time(item) for item in observations)
+    coverage = times[-1] - times[0] if len(times) >= 2 else timedelta(0)
+    output.update({
+        "coverage_seconds": max(0, int(coverage.total_seconds())),
+        "required_coverage_seconds": int(required.total_seconds()),
+        "oldest_sample_observed_at": _iso(times[0]) if times else None,
+        "newest_sample_observed_at": _iso(times[-1]) if times else None,
+    })
+    if (
+        str(output.get("status") or "") in _WARM_FEATURE_STATUSES
+        and coverage < required
+    ):
+        output["status"] = "warming_time_coverage"
+    return output
+
+
+def _group_feature_readiness(
+    warmup: Mapping[str, Mapping[str, Any]],
+    *,
+    cfg: MarketHistoryConfig,
+) -> dict[str, dict[str, Any]]:
+    horizons = tuple(sorted(cfg.return_horizons_hours))
+    specs: dict[str, tuple[str, ...]] = {
+        "volume": ("volume_zscore_24h",),
+        "turnover": ("turnover_zscore",),
+        "volatility": tuple(
+            feature
+            for hours in horizons
+            for feature in (f"return_volatility_{hours}h", f"volatility_zscore_{hours}h")
+        ),
+        "returns_1h": ("return_zscore_1h",) if 1 in horizons else (),
+        "returns_4h": ("return_zscore_4h",) if 4 in horizons else (),
+        "returns_24h": ("return_zscore_24h",) if 24 in horizons else (),
+        "btc_eth_relative": tuple(
+            f"relative_return_vs_{benchmark}_{hours}h_zscore"
+            for benchmark in ("btc", "eth")
+            for hours in horizons
+        ),
+    }
+    result: dict[str, dict[str, Any]] = {}
+    for group in FEATURE_READINESS_GROUPS:
+        features = specs[group]
+        details = [dict(warmup[name]) for name in features if name in warmup]
+        applicable = [item for item in details if item.get("status") != "not_applicable"]
+        required = group in cfg.required_feature_groups and bool(features)
+        if not features:
+            status = "not_configured"
+        elif applicable and all(str(item.get("status")) in _WARM_FEATURE_STATUSES for item in applicable):
+            status = "warm"
+        elif applicable and any(int(item.get("sample_count") or 0) > 0 for item in applicable):
+            status = "warming"
+        else:
+            status = "cold"
+        result[group] = {
+            "status": status,
+            "required": required,
+            "features": list(features),
+            "sample_count": min(
+                (int(item.get("sample_count") or 0) for item in applicable),
+                default=0,
+            ),
+            "required_sample_count": max(
+                (int(item.get("required_sample_count") or 0) for item in applicable),
+                default=0,
+            ),
+            "coverage_seconds": min(
+                (int(item.get("coverage_seconds") or 0) for item in applicable),
+                default=0,
+            ),
+            "required_coverage_seconds": max(
+                (int(item.get("required_coverage_seconds") or 0) for item in applicable),
+                default=0,
+            ),
+        }
+    return result
 
 
 def _feature_evidence(
@@ -1185,7 +1444,11 @@ def _config_values(cfg: MarketHistoryConfig) -> dict[str, Any]:
         "future_tolerance_seconds": int(cfg.future_tolerance.total_seconds()),
         "max_observations_per_asset": cfg.max_observations_per_asset,
         "min_baseline_observations": cfg.min_baseline_observations,
+        "minimum_observation_spacing_seconds": int(
+            cfg.minimum_observation_spacing.total_seconds()
+        ),
         "return_horizons_hours": list(sorted(cfg.return_horizons_hours)),
+        "required_feature_groups": list(cfg.required_feature_groups),
         "anchor_tolerance_ratio": cfg.anchor_tolerance_ratio,
         "min_anchor_tolerance_seconds": int(cfg.min_anchor_tolerance.total_seconds()),
         "benchmark_alignment_tolerance_seconds": int(cfg.benchmark_alignment_tolerance.total_seconds()),

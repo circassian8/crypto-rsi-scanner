@@ -523,6 +523,17 @@ def _core_row_opportunity_market_fields(context: Mapping[str, Any]) -> dict[str,
     derivatives_confirmation = context["derivatives_confirmation"]
     dex_liquidity_confirmation = context["dex_liquidity_confirmation"]
     protocol_metrics_confirmation = context["protocol_metrics_confirmation"]
+    market_reference = {
+        "source": market_context.get("market_context_source"),
+        "observed_at": market_context.get("market_context_observed_at"),
+        "freshness_status": market_context.get("market_context_freshness_status"),
+        "market_snapshot_id": market_context.get("market_snapshot_id"),
+    }
+    market_reference = (
+        market_reference
+        if any(value not in (None, "") for value in market_reference.values())
+        else {}
+    )
     return {
         "market_snapshot": context["market_snapshot"],
         "latest_market_snapshot": context["market_snapshot"],
@@ -553,6 +564,8 @@ def _core_row_opportunity_market_fields(context: Mapping[str, Any]) -> dict[str,
         "market_context_freshness_status": market_context.get("market_context_freshness_status"),
         "market_context_source": market_context.get("market_context_source"),
         "market_context_observed_at": market_context.get("market_context_observed_at"),
+        "market_snapshot_id": market_context.get("market_snapshot_id"),
+        "market_context_reference": market_reference,
         "market_context_age_hours": market_context.get("market_context_age_hours"),
         "market_context_freshness_cap_applied": bool(market_context.get("market_context_freshness_cap_applied")),
         "market_context_data_quality": market_context.get("market_context_data_quality"),

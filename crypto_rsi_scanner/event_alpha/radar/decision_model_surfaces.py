@@ -88,6 +88,7 @@ DECISION_PROJECTION_FIELD_NAMES = (
     "observation_ids",
     "source_provider_lineage",
     "market_provenance",
+    "market_context_reference",
     "decision_evaluated_at",
     "decision_safety_invariants",
 )
@@ -197,6 +198,25 @@ def _nested_projection_matches_row(
             right = _items(right)
         if left != right:
             return False
+    market_reference = row.get("market_context_reference")
+    if isinstance(market_reference, Mapping) and market_reference:
+        if dict(projection.get("market_context_reference") or {}) != dict(market_reference):
+            return False
+        aliases = {
+            "source": ("market_context_source", "market_data_source"),
+            "observed_at": ("market_context_observed_at",),
+            "freshness_status": (
+                "market_context_freshness_status",
+                "market_data_freshness",
+            ),
+            "market_snapshot_id": ("market_snapshot_id",),
+        }
+        for reference_field, row_fields in aliases.items():
+            expected = market_reference.get(reference_field)
+            for row_field in row_fields:
+                observed = row.get(row_field)
+                if observed not in (None, "") and observed != expected:
+                    return False
     return True
 
 
@@ -344,6 +364,15 @@ def decision_model_markdown_lines(values: Mapping[str, Any]) -> list[str]:
     provenance = event_market_provenance.market_provenance_values(values)
     if provenance:
         lines.extend(_market_provenance_markdown_lines(provenance))
+    market_reference = values.get("market_context_reference")
+    if isinstance(market_reference, Mapping) and market_reference:
+        lines.append(
+            "- Market context reference: "
+            f"source={market_reference.get('source') or 'unknown'}; "
+            f"observed_at={market_reference.get('observed_at') or 'unknown'}; "
+            f"freshness={market_reference.get('freshness_status') or 'unknown'}; "
+            f"snapshot_id={market_reference.get('market_snapshot_id') or 'unknown'}"
+        )
     lines.append("- Research idea, not a trade instruction.")
     return lines
 
@@ -425,6 +454,7 @@ def _closed_projection_values(
         "rsi_context_references": rsi_references,
         "observation_ids": _observation_ids(source),
         "source_provider_lineage": _source_provider_lineage(source),
+        "market_context_reference": market_context_reference(source),
         "decision_evaluated_at": _evaluation_timestamp(source),
         "decision_safety_invariants": _safety_invariants(source),
     }
@@ -568,6 +598,8 @@ def _source_provider_lineage(source: Mapping[str, Any]) -> dict[str, Any]:
             lineage["market_provenance"] = deepcopy(provenance)
             lineage["candidate_source_mode"] = provenance.get("candidate_source_mode")
             lineage["provenance_contract_valid"] = provenance.get("provenance_contract_valid")
+            lineage["measurement_program"] = provenance.get("measurement_program")
+            lineage["decision_radar_campaign_counted"] = provenance.get("decision_radar_campaign_counted")
             lineage["burn_in_counted"] = provenance.get("burn_in_counted")
         return lineage
     providers = list(dict.fromkeys(
@@ -607,9 +639,81 @@ def _source_provider_lineage(source: Mapping[str, Any]) -> dict[str, Any]:
             "market_provenance": deepcopy(provenance),
             "candidate_source_mode": provenance.get("candidate_source_mode"),
             "provenance_contract_valid": provenance.get("provenance_contract_valid"),
+            "measurement_program": provenance.get("measurement_program"),
+            "decision_radar_campaign_counted": provenance.get("decision_radar_campaign_counted"),
             "burn_in_counted": provenance.get("burn_in_counted"),
         })
     return lineage
+
+
+def market_context_reference(source: Mapping[str, Any]) -> dict[str, Any]:
+    """Return one copy-safe identity for the market snapshot behind a decision."""
+
+    existing = source.get("market_context_reference")
+    if isinstance(existing, Mapping) and existing:
+        normalized = {
+            "source": _optional_text(existing.get("source")),
+            "observed_at": _optional_text(existing.get("observed_at")),
+            "freshness_status": _optional_text(existing.get("freshness_status")),
+            "market_snapshot_id": _optional_text(existing.get("market_snapshot_id")),
+        }
+        return normalized if any(value is not None for value in normalized.values()) else {}
+    snapshot: Mapping[str, Any] = {}
+    for field in ("latest_market_snapshot", "market_snapshot", "market_state_snapshot"):
+        value = source.get(field)
+        if isinstance(value, Mapping) and value:
+            snapshot = value
+            break
+    quality = (
+        snapshot.get("market_data_quality")
+        if isinstance(snapshot.get("market_data_quality"), Mapping)
+        else {}
+    )
+    provenance = event_market_provenance.market_provenance_values(source)
+    provenance_quality = (
+        provenance.get("data_quality")
+        if isinstance(provenance.get("data_quality"), Mapping)
+        else {}
+    )
+    reference = {
+        "source": _optional_text(
+            source.get("market_context_source")
+            or source.get("integrated_market_context_source")
+            or snapshot.get("market_data_source")
+            or snapshot.get("source_provider")
+            or snapshot.get("latest_source")
+            or snapshot.get("source")
+            or provenance.get("provider")
+        ),
+        "observed_at": _optional_text(
+            source.get("market_context_observed_at")
+            or snapshot.get("observed_at")
+            or snapshot.get("timestamp")
+            or provenance_quality.get("observed_at")
+        ),
+        "freshness_status": _optional_text(
+            source.get("market_context_freshness_status")
+            or source.get("market_data_freshness")
+            or source.get("integrated_market_freshness_status")
+            or snapshot.get("market_context_freshness_status")
+            or snapshot.get("freshness_status")
+            or provenance_quality.get("freshness_status")
+        ),
+        "market_snapshot_id": _optional_text(
+            source.get("market_snapshot_id")
+            or source.get("market_history_observation_id")
+            or snapshot.get("market_snapshot_id")
+            or snapshot.get("market_history_observation_id")
+            or quality.get("market_snapshot_id")
+            or quality.get("baseline_observation_id")
+        ),
+    }
+    return reference if any(value is not None for value in reference.values()) else {}
+
+
+def _optional_text(value: Any) -> str | None:
+    text = str(value or "").strip()
+    return text or None
 
 
 def _market_provenance_markdown_lines(provenance: Mapping[str, Any]) -> list[str]:
@@ -630,10 +734,10 @@ def _market_provenance_markdown_lines(provenance: Mapping[str, Any]) -> list[str
             f"{provenance.get('cache_status') or 'unknown'}"
         ),
         (
-            "- Burn-in eligible / counted: "
-            f"{str(bool(provenance.get('burn_in_eligible'))).lower()} / "
-            f"{str(bool(provenance.get('burn_in_counted'))).lower()} "
-            f"({provenance.get('burn_in_reason') or 'not_counted'})"
+            "- Decision Radar campaign eligible / counted: "
+            f"{str(bool(provenance.get('decision_radar_campaign_eligible'))).lower()} / "
+            f"{str(bool(provenance.get('decision_radar_campaign_counted'))).lower()} "
+            f"({provenance.get('decision_radar_campaign_reason') or 'not_counted'})"
         ),
         f"- Market request ledger / source artifact: {request_path} / {source_path}",
         f"- Feature basis: {_mapping_summary(provenance.get('feature_basis'))}",
@@ -763,4 +867,5 @@ __all__ = (
     "decision_model_values",
     "decision_preview_lane",
     "group_decision_rows",
+    "market_context_reference",
 )

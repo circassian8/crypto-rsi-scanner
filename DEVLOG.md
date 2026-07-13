@@ -17,6 +17,63 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-13 — Operationalize Decision Radar Observation Campaign v2 · Codex
+**Why:** The first real market pilot proved the product path but also showed
+that rapid snapshots could overstate warmup, strict-doctor clocks could disturb
+dashboard authority, market context could drift across surfaces, and the live
+campaign lacked one artifact-derived measurement and outcome loop.
+**Changes:**
+- Enforced a default 60-minute provider/observation cadence with a stable
+  base-root pre-network reservation, bounded cross-namespace attempt ledger,
+  shared provider backoff, and explicit duplicate/too-close retention that
+  never advances the temporal baseline. Readiness is now feature- and
+  horizon-aware for volume, turnover, volatility, 1h/4h/24h returns, and
+  BTC/ETH-relative evidence.
+- Made Decision Radar campaign measurement separate from Event Alpha Catalyst
+  Radar burn-in; added canonical campaign counting, pending/matured outcome
+  tracking, deterministic Markdown/JSON reporting, exact historical authority
+  bindings, monotonic authority history, and a cooldown-derived next safe
+  command.
+- Bound candidate, CoreOpportunity, integrated outcome, card, preview, daily
+  brief, and dashboard market source/time/freshness/snapshot identity. New
+  manifests hash-bind candidate/Core/outcome artifacts, downstream mutable
+  outcome rows are validated against the immutable projection, and doctor
+  checks fail closed on context or score drift.
+- Stabilized operator authority across unchanged doctor reruns while retaining
+  invalidation for substantive doctor/artifact drift; scoped unselected
+  CryptoPanic to informational status; expanded the CoinGecko request ledger
+  with sanitized HTTP timing/status/result/retry/cache/auth/no-send telemetry;
+  and made the supported review ZIP use reproducible UTC-safe entry timestamps
+  without mutating input mtimes or weakening descriptor-anchored TOCTOU/secret
+  checks.
+- After every offline gate passed, made exactly one authorized bounded live
+  call. Namespace `radar_market_no_send_20260713t190728z` fetched 80 rows,
+  retained 30, produced zero qualifying ideas, passed strict doctor with zero
+  blockers, and became dashboard authority at run
+  `2026-07-13T19:07:29.084694+00:00|no_key_live`, revision 9. The dashboard was
+  restarted and returned HTTP 200 with explicit LIVE / REAL DATA, NO-SEND, and
+  zero-current-candidate labels.
+**Verify:** Export parent-symlink regression 1/1; focused market/history/
+campaign/dashboard/operator/provenance/export/security suite 396/396;
+compileall and `git diff --check`; architecture cleanliness with zero new
+violations; market-no-send, dashboard, calendar, market-anomaly, and integrated
+radar smokes/doctors. `make verify-fast PYTHON=.venv/bin/python` passed 1,442
+pytest checks plus its offline smokes. Full `make verify
+PYTHON=.venv/bin/python` passed 1,330/1,330 standalone checks and 1,442/1,442
+pytest checks plus alert, fixture-backtest, and paper-scoreboard gates. The live
+request returned HTTP 200 in 1,605 ms with 80 results and zero retries; the
+post-live strict doctor, pointer readiness, dashboard smoke/load, and campaign
+report all passed.
+**Notes/risks:** Campaign history now contains 90 retained observations across
+31 assets: 60 baseline-counting, 30 too-close, and 0 globally warm. Volume and
+turnover are warming; return, volatility, and BTC/ETH-relative groups remain
+cold. Historical campaign evidence has one DEXE `risk_watch` idea with one
+pending outcome; the new cycle has no idea. Spread coverage remains 0/90, and
+no provider is chosen until the intended execution venue is known. The next
+eligible observation is `2026-07-13T20:07:29.084694+00:00`; readiness is the
+only safe command before then. Telegram sends, trades, Event Alpha paper
+trades, normal RSI writes, and `TRIGGERED_FADE` creations were all zero.
+
 ## 2026-07-13 — Publish the first trusted real/no-send Decision Radar observation · Codex
 **Why:** The live pilot contracts were fixture-proven, but the project still
 needed an explicitly authorized real market observation, exact post-doctor

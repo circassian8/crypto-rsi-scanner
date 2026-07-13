@@ -34,6 +34,7 @@ _DECISION_EXACT_CONSISTENCY_FIELDS = (
     "rsi_context_references",
     "observation_ids",
     "source_provider_lineage",
+    "market_context_reference",
     "decision_evaluated_at",
     "decision_safety_invariants",
 )
@@ -437,7 +438,7 @@ def _card_decision_projection_mismatch(
     decision = decision_model_values(candidate)
     if not decision:
         return True
-    expected_fragments = (
+    expected_fragments = [
         f"- Radar route: {decision.get('radar_route')}",
         f"- Radar actionable: {str(bool(decision.get('radar_actionable'))).lower()}",
         (
@@ -446,7 +447,16 @@ def _card_decision_projection_mismatch(
             f"{float(decision.get('evidence_confidence_score')):.1f}/100 / "
             f"{float(decision.get('risk_score')):.1f}/100"
         ),
-    )
+    ]
+    market_reference = decision.get("market_context_reference")
+    if isinstance(market_reference, Mapping) and market_reference:
+        expected_fragments.append(
+            "- Market context reference: "
+            f"source={market_reference.get('source') or 'unknown'}; "
+            f"observed_at={market_reference.get('observed_at') or 'unknown'}; "
+            f"freshness={market_reference.get('freshness_status') or 'unknown'}; "
+            f"snapshot_id={market_reference.get('market_snapshot_id') or 'unknown'}"
+        )
     return any(fragment not in card_text for fragment in expected_fragments)
 
 def _integrated_opportunity_rank(value: object) -> int:

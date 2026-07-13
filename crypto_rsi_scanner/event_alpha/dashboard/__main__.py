@@ -39,10 +39,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.readiness:
+            if args.smoke_now is not None:
+                raise DashboardReadinessError("--smoke-now is allowed only with --smoke")
             result = publish_current_namespace_pointer(
                 args.artifact_base,
                 args.namespace,
-                now=args.smoke_now,
             )
             snapshot = result.snapshot
             print(

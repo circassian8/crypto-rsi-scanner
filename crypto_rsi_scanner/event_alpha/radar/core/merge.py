@@ -67,6 +67,11 @@ _INTEGRATED_SCALAR_TRUTH_FIELDS = (
     "integrated_market_reaction_confirmation",
     "integrated_market_context_source",
     "integrated_market_freshness_status",
+    "market_context_source",
+    "market_context_observed_at",
+    "market_context_freshness_status",
+    "market_data_freshness",
+    "market_snapshot_id",
     "crowding_class",
     "fade_readiness",
     "why_now",
@@ -94,6 +99,10 @@ _INTEGRATED_SCALAR_TRUTH_FIELDS = (
     "provider_generation_id",
     "cache_status",
     "provenance_contract_valid",
+    "measurement_program",
+    "decision_radar_campaign_eligible",
+    "decision_radar_campaign_counted",
+    "decision_radar_campaign_reason",
     "burn_in_eligible",
     "burn_in_counted",
     "burn_in_reason",
@@ -141,6 +150,7 @@ _INTEGRATED_MAPPING_TRUTH_FIELDS = (
     "rsi_context_adjustment",
     "rsi_context_safety",
     "market_provenance",
+    "market_context_reference",
     "feature_basis",
     "data_quality",
 )
@@ -311,6 +321,9 @@ def _apply_integrated_candidate_truth(
         for field in DECISION_MODEL_FIELD_NAMES:
             if field in canonical_decision:
                 row[field] = canonical_decision[field]
+        market_reference = canonical_decision.get("market_context_reference")
+        if isinstance(market_reference, Mapping) and market_reference:
+            row["market_context_reference"] = dict(market_reference)
         row["decision_projection_source"] = "integrated_candidate"
         row["decision_projection_drift_detected"] = False
     elif any(

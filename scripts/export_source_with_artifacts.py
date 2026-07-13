@@ -15,7 +15,7 @@ import subprocess
 import stat
 import time
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -88,7 +88,8 @@ EXCLUDE_SUFFIXES = (
 )
 ARTIFACT_ROOTS = {"event_fade_cache"}
 MIN_ZIP_TIMESTAMP = 315532800.0  # 1980-01-01, earliest timestamp ZipInfo can represent.
-DEFAULT_EXPORT_MTIME_SAFETY_MARGIN_SECONDS = 300.0
+DEFAULT_EXPORT_MTIME_SAFETY_MARGIN_SECONDS = 36 * 60 * 60.0
+DEFAULT_REPRODUCIBLE_EXPORT_TIMESTAMP = MIN_ZIP_TIMESTAMP
 _ARTIFACT_SECRET_VALUE_RE = re.compile(
     r"(?<![A-Za-z0-9_-])(?P<label>(?:api[_-]?(?:key|secret)|api\s+(?:key|secret)|"
     r"auth[_-]?token|api[_-]?token|access[_-]?token|client[_-]?secret|private[_-]?key|"
@@ -576,10 +577,10 @@ def _safe_export_timestamp(*, now_ts: float | None = None) -> float:
     """Return the latest mtime allowed in the review archive.
 
     ``SOURCE_DATE_EPOCH`` is honored for reproducible exports, but never beyond
-    the conservative wall-clock-safe timestamp. Without it, clamp all archive
-    entries to a slightly old timestamp so review machines whose clocks lag the
-    export host do not see future-dated files and emit Make clock skew warnings
-    immediately after unzip.
+    the conservative wall-clock-safe timestamp.  Without it, every entry uses
+    the fixed ZIP epoch.  ZIP timestamps do not carry a timezone, so the large
+    safety margin also keeps explicitly selected epochs safe when an archive
+    created in Moscow is extracted on a UTC or UTC-12 review host.
     """
 
     current = time.time() if now_ts is None else float(now_ts)
@@ -590,7 +591,7 @@ def _safe_export_timestamp(*, now_ts: float | None = None) -> float:
             return min(max(float(raw_epoch), MIN_ZIP_TIMESTAMP), wall_clock_safe)
         except ValueError:
             pass
-    return wall_clock_safe
+    return min(DEFAULT_REPRODUCIBLE_EXPORT_TIMESTAMP, wall_clock_safe)
 
 
 def _zipinfo_for_path(
@@ -614,11 +615,14 @@ def _zipinfo_for_stat(
     *,
     now_ts: float,
 ) -> zipfile.ZipInfo:
-    # Zip timestamps cannot represent dates before 1980. More importantly for
-    # review zips, do not preserve future-dated mtimes from host/archive clock
-    # skew because extracted Makefiles can make every `make` command warn.
-    mtime = min(max(file_stat.st_mtime, MIN_ZIP_TIMESTAMP), now_ts)
-    info = zipfile.ZipInfo(arcname, datetime.fromtimestamp(mtime).timetuple()[:6])
+    # ZIP timestamps are timezone-less.  Use one UTC, reproducible timestamp for
+    # every entry instead of leaking host mtimes into archive bytes or allowing
+    # timezone reinterpretation to make extracted Makefiles appear future-dated.
+    mtime = max(MIN_ZIP_TIMESTAMP, now_ts)
+    info = zipfile.ZipInfo(
+        arcname,
+        datetime.fromtimestamp(mtime, timezone.utc).timetuple()[:6],
+    )
     info.compress_type = zipfile.ZIP_DEFLATED
     info.external_attr = (file_stat.st_mode & 0xFFFF) << 16
     return info
@@ -678,15 +682,9 @@ def main(root: Path = ROOT, out: Path = OUT) -> int:
     ]
 
     now_ts = _safe_export_timestamp()
-    try:
-        normalized_mtimes = _normalize_input_timestamps(
-            entries,
-            safe_export_timestamp=now_ts,
-            root=root,
-        )
-    except OSError as exc:
-        print(f"export_failed_closed={type(exc).__name__}")
-        return 1
+    # Export must be read-only with respect to source and research artifacts.
+    # Archive timestamps are normalized in ZipInfo, not by mutating inputs.
+    normalized_mtimes = 0
     candidate = out.with_name(f"{out.name}.tmp")
     candidate.unlink(missing_ok=True)
     try:

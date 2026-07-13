@@ -2,8 +2,8 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-13T15:40:28.147137+00:00`
-- public_class_count: `448`
+- generated_at: `2026-07-13T19:11:48.042754+00:00`
+- public_class_count: `453`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `0`
 - production_classes_over_limit: `3`
@@ -45,7 +45,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 9 | accepted_exception |
+| `production_files_over_1200_lines` | 12 | accepted_exception |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | accepted_exception |
@@ -92,7 +92,9 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines | status | revisit condition |
 |---|---:|---|---|
-| `crypto_rsi_scanner/config.py` | 1447 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1500 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1457 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/config.py` | 1450 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1398 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1338 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
@@ -127,7 +129,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.notifications.router` | 5 | 24 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.notifications.runs` | 2 | 4 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor` | 2 | 21 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
-| `crypto_rsi_scanner.event_alpha.operations.market_no_send_models` | 3 | 55 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.operations.market_no_send_models` | 7 | 59 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.outcomes.burn_in` | 3 | 30 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.outcomes.feedback` | 2 | 36 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.outcomes.feedback_labels` | 4 | 57 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
@@ -221,7 +223,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.notifications.router` | 5 | 24 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.notifications.runs` | 2 | 4 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor` | 2 | 21 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
-| `crypto_rsi_scanner.event_alpha.operations.market_no_send_models` | 3 | 55 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.operations.market_no_send_models` | 7 | 59 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.outcomes.burn_in` | 3 | 30 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.outcomes.feedback` | 2 | 36 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.outcomes.feedback_labels` | 4 | 57 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |

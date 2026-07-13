@@ -154,7 +154,7 @@ def test_dashboard_badges_distinguish_current_fixture_and_live_no_send():
     assert "LIVE / REAL DATA" not in live_page.body
 
 
-def test_dashboard_badges_disclose_exact_market_provenance_and_burn_in_status():
+def test_dashboard_badges_disclose_exact_market_provenance_and_campaign_status():
     from crypto_rsi_scanner.event_alpha.operations.market_provenance import (
         normalize_market_provenance,
     )
@@ -169,6 +169,7 @@ def test_dashboard_badges_disclose_exact_market_provenance_and_burn_in_status():
     )
     common_provenance = {
         "schema_version": "crypto_radar_market_provenance_v2",
+        "measurement_program": "decision_radar_live_observation_campaign_v2",
         "provider_call_attempted": True,
         "provider_call_succeeded": True,
         "request_ledger_path": "event_market_no_send_request_ledger.json",
@@ -229,9 +230,9 @@ def test_dashboard_badges_disclose_exact_market_provenance_and_burn_in_status():
     )
 
     assert "MOCKED FIXTURE" in mocked_page.body
-    assert "BURN-IN EXCLUDED" in mocked_page.body
+    assert "CAMPAIGN EXCLUDED" in mocked_page.body
     assert "LIVE / REAL DATA" in live_page.body
-    assert "BURN-IN COUNTED" in live_page.body
+    assert "CAMPAIGN COUNTED" in live_page.body
     detail = render_dashboard_page(
         live_snapshot,
         f"/candidate/{live['core_opportunity_id']}",

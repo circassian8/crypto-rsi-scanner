@@ -16,6 +16,79 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-13 - Measure live market evidence in a separate Decision Radar campaign
+**Status:** accepted
+**Decision:** `decision_radar_live_observation_campaign_v2` is the sole
+measurement program for the live/no-send Decision Radar market pilot. Its
+generations, candidates, feature maturity, routes, and outcomes remain separate
+from Event Alpha Catalyst Radar burn-in and must not enter Event Alpha burn-in
+thresholds or scorecards. Historical market-provenance v2 `burn_in_*` fields
+remain readable through a read-only compatibility adapter; new rows also carry
+explicit `decision_radar_campaign_*` fields, set the legacy burn-in booleans to
+false with `not_counted_separate_decision_radar_campaign`, and use the
+`operational` run mode. Historical rows are neither rewritten nor silently
+reclassified.
+
+The default campaign cadence is at least one hour between observations. A
+too-close observation remains retained evidence with an explicit status, but it
+does not enter the temporal baseline or advance warmup. Warmup is feature- and
+time-aware for volume, turnover, volatility, 1h/4h/24h returns, and BTC/ETH-
+relative groups. Eight samples alone are insufficient when the relevant
+horizon-plus-cadence coverage is still short; every configured required group
+must be warm before the asset is globally warm.
+
+Readiness remains no-network. The live command rechecks the already-existing
+CoinGecko authorization and cadence before the provider adapter, never sets
+authorization itself, and may attempt at most one bounded live request per
+eligible invocation. Missing authorization or a waiting cadence attempts no
+provider call. The provider-call reservation is persisted in a stable artifact-
+base receipt before the network boundary, so replacing the mutable campaign
+state directory cannot reset spacing or permit another call; the bounded attempt
+ledger and exact latest-attempt receipt preserve the same fail-closed boundary.
+Request ledgers persist only the allowlisted endpoint path, start/end times,
+duration, HTTP status, result count, retry count, safe error class, cache
+behavior, authorization boolean, and no-send state. Parameters, headers, tokens,
+raw bodies, raw exception text, and recipient identifiers are forbidden, and
+provider-health telemetry must reconcile.
+
+Each Decision projection carries one canonical market-context reference with
+source, observed time, freshness status, and market-snapshot id. Candidate,
+CoreOpportunity, card, preview, outcome, daily brief, and dashboard copy it;
+lineage drift is a strict-doctor blocker. Dashboard authority uses the canonical
+operator digest that excludes only the mutable top-level `updated_at` and nested
+`doctor.verified_at` verification clocks. Re-running an unchanged strict doctor
+therefore preserves pointer identity, while every substantive doctor value and
+artifact-manifest change remains bound and fail-closed. Pilot audits retain
+monotonic `ever_authoritative` and `first_authoritative_at` history separately
+from current exact-pointer readiness, so later re-audits cannot erase that a
+generation was previously authoritative or present it as current after drift.
+
+Campaign outcomes live in the shared mutable
+`radar_market_history_cache/event_decision_radar_campaign_outcomes.jsonl` ledger.
+It is rebuilt without providers from immutable generation candidate/Core rows
+and retained observed prices, preserving origin namespaces and pointer history;
+rows remain pending until due with sufficient price lineage and then mature
+deterministically. `make radar-market-campaign-report` rebuilds the canonical
+Markdown/JSON campaign report from local artifacts only, including authority,
+attempts, cadence, feature maturity, routes, outcomes, limitations, and the next
+safe command. The supported source-with-artifacts review export writes one
+reproducible UTC-safe ZIP timestamp for every entry without mutating source or
+research mtimes, while preserving descriptor-anchored symlink/TOCTOU checks and
+secret scanning.
+**Why:** Rapid duplicate snapshots are not independent temporal evidence, and
+calling a market observation "burn-in" made it too easy to mix Decision product
+measurement with Catalyst Radar readiness. Explicit cadence, closed lineage,
+stable authority, sanitized telemetry, and a separate outcome/reporting loop
+make the campaign auditable without creating provider, notification, trading,
+paper, RSI, or `TRIGGERED_FADE` side effects. This decision supersedes only the
+Decision-market measurement terminology/counting portions of the earlier
+2026-07-13 market-pilot decision; its provenance, quality-cap, and guarded-
+publication rules remain in force.
+**Revisit when:** A versioned campaign v3 provides equivalent or stronger
+cadence, lineage, telemetry, outcome, and exact-authority guarantees, or reviewed
+longitudinal evidence supports a human-approved change to spacing or required
+feature coverage without combining it with Event Alpha catalyst burn-in.
+
 ## 2026-07-13 - Treat every live market generation as single-use, including exact zeroes
 **Status:** accepted
 **Decision:** Every real Decision Radar market cycle uses a new lowercase
@@ -60,29 +133,38 @@ authority contracts.
 
 ## 2026-07-13 - Count market-pilot truth only from canonical provenance and bounded temporal evidence
 **Status:** accepted
-**Decision:** New Decision Radar market-led generations use the closed
+**Decision:** This entry's original Event Alpha `burn_in_*` terminology and
+count-only warmup wording are superseded by the Campaign v2 decision above; the
+provenance, evidence-quality caps, and guarded-publication rules remain accepted.
+New Decision Radar market-led generations use the closed
 `crypto_radar_market_provenance_v2` value (`contract_version=2`) as the only
-authority for acquisition mode, provider lineage, validity, and real burn-in
-counting. Consumers copy that value and its feature-basis/data-quality evidence;
-they do not trust caller-asserted `burn_in_eligible`, `burn_in_counted`, or
-contract-valid flags and do not silently reinterpret historical flat rows. A
-candidate-bearing generation must retain distinct request-ledger and provider-
-source artifacts with valid SHA-256 fingerprints, a provider generation id,
-cache status, explicit provider-call attempted/succeeded state, and explicit
-live authorization. Only a valid `live_provider` / `live_no_send` generation is
-eligible and counted. Mock/fixture generations may validate the pipeline but
-remain excluded from real burn-in and real dashboard authority; replay, cache,
-preflight, malformed, or conflicting provenance also remains excluded.
+authority for acquisition mode, provider lineage, validity, and Decision Radar
+campaign counting. Consumers copy that value and its feature-basis/data-quality
+evidence; they do not trust caller-asserted `decision_radar_campaign_*`, legacy
+`burn_in_*`, or contract-valid flags and do not silently reinterpret historical
+flat rows. A candidate-bearing generation must retain distinct request-ledger
+and provider-source artifacts with valid SHA-256 fingerprints, a provider
+generation id, cache status, explicit provider-call attempted/succeeded state,
+and explicit live authorization. Only a valid `live_provider` / `live_no_send`
+generation is eligible and counted in the Decision campaign. Mock/fixture
+generations may validate the pipeline but remain excluded from that campaign and
+real dashboard authority; replay, cache, preflight, malformed, or conflicting
+provenance also remains excluded. Decision campaign rows never count toward
+Event Alpha Catalyst Radar burn-in.
 
 Market anomaly evidence uses a bounded per-asset temporal history rather than
 presenting a one-snapshot cross-section as a mature time-series signal. The v1
 history policy retains at most 45 days and 256 observations per asset, requires
-eight strictly earlier observations to warm a feature baseline, and derives
-1h/4h/24h returns, volatility, turnover/volume z-scores, and BTC/ETH relative
-returns in percent points without including the current observation in its own
-baseline. Current rows older than six hours or beyond the five-minute future
-tolerance fail closed. Direct provider fields remain direct; only fields
-explicitly marked as proxy inputs may be replaced by a temporal derivation.
+at least one hour between baseline-counting observations, and retains too-close
+rows as explicit non-counting evidence. Volume, turnover, volatility, 1h/4h/24h
+return, and BTC/ETH-relative groups each require eight strictly earlier counted
+observations plus horizon-aware elapsed coverage; every configured required
+group must be warm before the asset is globally warm. Derived returns,
+volatility, turnover/volume z-scores, and BTC/ETH relative returns use percent
+points and never include the current observation in its own baseline. Current
+rows older than six hours or beyond the five-minute future tolerance fail
+closed. Direct provider fields remain direct; only fields explicitly marked as
+proxy inputs may be replaced by a temporal derivation.
 
 Decision Model v2 makes evidence limitations operational. Missing/stale spread
 caps urgency at 55 and cannot support actionable/rapid routing. Proxy-only
@@ -95,8 +177,9 @@ changes to Event Alpha's strict Catalyst Radar lanes.
 
 The live pilot remains no-send and research-only. Missing
 `RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1` authorization returns an explicit safe-
-blocked result, performs no provider call, writes only a credential-free pilot
-audit, and leaves the fixed dashboard pointer unchanged. Publication requires a
+blocked result, performs no provider call, writes only bounded local no-send
+attempt/audit/campaign-report evidence, and leaves the fixed dashboard pointer
+unchanged. Publication requires a
 real fresh complete generation, canonical v2 lineage, exact request/source/
 history/product fingerprints, matching candidate/Core/card/preview/pending-
 outcome counts, current operator-state binding, and a fresh full strict doctor
@@ -107,7 +190,7 @@ rows, execute orders, or let Event Alpha create `TRIGGERED_FADE`.
 **Why:** A provider name or mock snapshot is not evidence that a real market
 observation occurred, and a cross-sectional proxy is not a temporal baseline.
 Closed lineage, explicit warmup, and visible quality caps keep the pilot useful
-without overstating freshness, execution quality, or burn-in maturity. Guarded
+without overstating freshness, execution quality, or campaign maturity. Guarded
 publication prevents a blocked, partial, fixture, or drifted attempt from
 becoming current operator truth.
 **Revisit when:** A versioned provenance or history contract provides equivalent

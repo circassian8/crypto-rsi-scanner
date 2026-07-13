@@ -32,6 +32,12 @@ def _candidate(**overrides):
         "source_origin": "market_anomaly",
         "source_origins": ["market_anomaly"],
         "source_pack": "market_anomaly_pack",
+        "market_snapshot": {
+            "market_data_source": "coingecko",
+            "observed_at": "2026-06-15T16:00:00+00:00",
+            "freshness_status": "fresh",
+            "market_snapshot_id": "market-consistency-1",
+        },
         "market_state_snapshot": {
             "return_unit": "percent_points",
             "return_4h": 12.0,
@@ -90,6 +96,120 @@ def test_doctor_blocks_candidate_core_score_context_and_dashboard_drift():
     assert conflicts["integrated_candidate_core_decision_score_mismatch"] == 1
     assert conflicts["integrated_dashboard_decision_authority_invalid"] == 1
 
+    market_drifted = {
+        **core,
+        "market_context_reference": {
+            "source": "coingecko",
+            "observed_at": "2026-06-15T16:00:00+00:00",
+            "freshness_status": "fresh",
+            "market_snapshot_id": "market-consistency-drifted",
+        },
+    }
+    market_conflicts = artifact_doctor._integrated_radar_artifact_conflicts(  # noqa: SLF001
+        [candidate], core_rows=[market_drifted]
+    )
+    assert market_conflicts["integrated_candidate_core_decision_context_mismatch"] == 1
+
+
+def test_stored_projection_fails_closed_when_top_level_market_context_drifts():
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as artifact_doctor
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
+    )
+
+    candidate = _candidate()
+    projection = decision_model_values(candidate)
+    reference = dict(projection["market_context_reference"])
+    core = {
+        **_core(candidate),
+        "decision_projection": projection,
+        "market_context_reference": reference,
+        "market_context_source": reference["source"],
+        "market_context_observed_at": reference["observed_at"],
+        "market_context_freshness_status": reference["freshness_status"],
+        "market_data_freshness": reference["freshness_status"],
+        "market_snapshot_id": reference["market_snapshot_id"],
+    }
+    assert decision_model_values(core)["market_context_reference"] == reference
+
+    drifted = {
+        **core,
+        "market_context_reference": {
+            **reference,
+            "market_snapshot_id": "market-consistency-drifted",
+        },
+        "market_snapshot_id": "market-consistency-drifted",
+    }
+    assert decision_model_values(drifted) == {}
+    conflicts = artifact_doctor._integrated_radar_artifact_conflicts(  # noqa: SLF001
+        [candidate], core_rows=[drifted]
+    )
+    assert conflicts["integrated_candidate_core_decision_context_mismatch"] == 1
+
+
+def test_preview_doctor_binds_each_market_reference_to_its_candidate():
+    from crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_parts.provider_readiness_checks import (
+        _decision_preview_mismatch_count,
+    )
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        PREVIEW_LANE_TITLES,
+        decision_model_values,
+        decision_preview_lane,
+    )
+
+    first = _candidate(
+        candidate_id="candidate-context-a",
+        symbol="CONTEXTA",
+        coin_id="context-a",
+        canonical_asset_id="context-a",
+        market_snapshot={
+            "market_data_source": "coingecko",
+            "observed_at": "2026-06-15T16:00:00+00:00",
+            "freshness_status": "fresh",
+            "market_snapshot_id": "market-context-a",
+        },
+    )
+    second = _candidate(
+        candidate_id="candidate-context-b",
+        symbol="CONTEXTB",
+        coin_id="context-b",
+        canonical_asset_id="context-b",
+        market_snapshot={
+            "market_data_source": "coingecko",
+            "observed_at": "2026-06-15T16:00:00+00:00",
+            "freshness_status": "fresh",
+            "market_snapshot_id": "market-context-b",
+        },
+    )
+    first_decision = decision_model_values(first)
+    second_decision = decision_model_values(second)
+    lane = decision_preview_lane(first_decision)
+    assert decision_preview_lane(second_decision) == lane
+
+    def reference_line(decision):
+        reference = decision["market_context_reference"]
+        return (
+            "   - Market context reference: "
+            f"source={reference['source']}; observed_at={reference['observed_at']}; "
+            f"freshness={reference['freshness_status']}; "
+            f"snapshot_id={reference['market_snapshot_id']}"
+        )
+
+    sections = []
+    for preview_lane, title in PREVIEW_LANE_TITLES.items():
+        if preview_lane == "decision_diagnostic":
+            continue
+        sections.extend((f"## Lane: {title}", f"- rendered_items: {2 if preview_lane == lane else 0}"))
+        if preview_lane == lane:
+            sections.extend((
+                "1. CONTEXTA/context-a",
+                reference_line(second_decision),
+                "2. CONTEXTB/context-b",
+                reference_line(first_decision),
+            ))
+    swapped = "\n".join(sections)
+    assert _decision_preview_mismatch_count(swapped, [first, second]) == 2
+
 
 def test_doctor_blocks_card_decision_drift(tmp_path: Path):
     import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as artifact_doctor
@@ -133,6 +253,21 @@ def test_doctor_blocks_card_decision_drift(tmp_path: Path):
     )
     assert drifted["integrated_candidate_card_decision_mismatch"] == 1
 
+    card.write_text(
+        "\n".join(decision_model_markdown_lines(candidate)).replace(
+            "- Market context reference: source=coingecko; "
+            "observed_at=2026-06-15T16:00:00+00:00; freshness=fresh; "
+            "snapshot_id=market-consistency-1",
+            "",
+        )
+        + "\n\n## Artifact Lineage\n- Core opportunity ID: core-consistency\n",
+        encoding="utf-8",
+    )
+    missing_reference = artifact_doctor._integrated_radar_artifact_conflicts(  # noqa: SLF001
+        [candidate], core_rows=[_core(candidate)], research_card_paths=(card,)
+    )
+    assert missing_reference["integrated_candidate_card_decision_mismatch"] == 1
+
 
 def test_doctor_reconciles_preview_lane_identity_and_count():
     from crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_parts.provider_readiness_checks import (
@@ -145,11 +280,20 @@ def test_doctor_reconciles_preview_lane_identity_and_count():
 
     candidate = _candidate()
     lane = decision_preview_lane(candidate)
+    reference = (
+        "- Market context reference: source=coingecko; "
+        "observed_at=2026-06-15T16:00:00+00:00; freshness=fresh; "
+        "snapshot_id=market-consistency-1\n"
+    )
     sections = []
     for item_lane, title in PREVIEW_LANE_TITLES.items():
         if item_lane == "decision_diagnostic":
             continue
-        identity = "\n1. CONSIST/consistency-token\n" if item_lane == lane else "\n"
+        identity = (
+            f"\n1. CONSIST/consistency-token\n{reference}"
+            if item_lane == lane
+            else "\n"
+        )
         sections.append(
             f"## Lane: {title}\n- rendered_items: {1 if item_lane == lane else 0}{identity}"
         )
@@ -159,6 +303,7 @@ def test_doctor_reconciles_preview_lane_identity_and_count():
         preview.replace("CONSIST/consistency-token", "WRONG/identity"),
         (candidate,),
     ) > 0
+    assert _decision_preview_mismatch_count(preview.replace(reference, ""), (candidate,)) > 0
 
 
 def test_doctor_blocks_expired_current_actionable_surfaces(tmp_path: Path):
