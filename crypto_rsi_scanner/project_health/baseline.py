@@ -185,6 +185,10 @@ def _namespace_status_from_name(namespace: str) -> tuple[str, str]:
         return "active_provider_preflight", "provider preflight namespace"
     if "rehearsal" in namespace:
         return "active_provider_rehearsal", "provider no-send rehearsal namespace"
+    if namespace == "radar_market_history_cache":
+        return "active_live_rehearsal", "shared live/no-send market observation history"
+    if namespace.startswith("radar_market_no_send"):
+        return "active_live_rehearsal", "Decision Radar live/no-send observation generation"
     if namespace.startswith("notify_") or namespace in {
         "full_llm_live",
         "live_burn_in_no_send",
@@ -205,7 +209,9 @@ def _namespace_inventory(root: Path) -> dict[str, Any]:
             marker = _load_json(status_path) if status_path.exists() else {}
             status, reason = _namespace_status_from_name(path.name)
             if marker:
-                status = str(marker.get("status") or status)
+                marker_status = str(marker.get("status") or "")
+                if marker_status not in {"", "active", "unknown"}:
+                    status = marker_status
                 reason = str(marker.get("reason") or reason)
             artifact_counts = Counter(
                 item.suffix.lstrip(".") or "no_extension"

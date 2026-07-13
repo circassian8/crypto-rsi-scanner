@@ -17,6 +17,55 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-13 — Publish the first trusted real/no-send Decision Radar observation · Codex
+**Why:** The live pilot contracts were fixture-proven, but the project still
+needed an explicitly authorized real market observation, exact post-doctor
+audit evidence, and a dashboard authority that did not point to fixture data.
+The campaign also needed to expose real evidence gaps without manufacturing a
+warm baseline through rapid duplicate calls.
+**Changes:**
+- Ran two bounded, explicitly authorized CoinGecko market observations. The
+  first successful zero-idea cycle failed closed at publication because its
+  canonical empty CoreOpportunity surface was absent; the fixture pointer was
+  preserved. The second cycle used the new immutable namespace
+  `radar_market_no_send_20260713t152704z`, retained 30 of 80 fetched rows,
+  produced one DEXE `risk_watch` idea plus one pending outcome, passed strict
+  doctor with zero blockers, and became the exact live/no-send dashboard
+  authority at operator revision 9.
+- Made every existing market-generation namespace single-use before the
+  provider boundary, changed the Make default to a lowercase UTC-suffixed
+  namespace, materialized canonical empty CoreOpportunity and card-index
+  surfaces for successful zero-idea generations, and kept publication
+  conditional on exact authoritative strict-doctor state.
+- Expanded the final pilot audit with exact request/source/history lineage,
+  provider-adapter/network/success distinctions, complete per-asset warmup and
+  feature-basis evidence, idea quality, canonical operator-state digest
+  matching, pointer publication status, and zero side-effect counters. The Make
+  target now writes this audit once after doctor/publication even when an
+  earlier stage fails.
+- Classified Decision Radar generation/history namespaces as active live
+  no-send research in both lifecycle and static architecture inventories, with
+  regressions for generic `active` generation markers.
+- Added the in-progress Markdown/JSON campaign report, updated the Decision
+  Radar North Star, roadmap, and durable decisions, and documented the observed
+  highest-value missing input: trusted public spread/order-book data.
+**Verify:** The export parent-symlink security regression passed first. Focused
+Decision/calendar/security, market-provenance/history/no-send, Core/operator/
+dashboard, and campaign tests passed, including the clean-zero strict publish,
+single-use no-call, canonical audit-digest, and namespace-lifecycle regressions.
+Compileall, JSON validation, market-no-send smoke, dashboard smoke/readiness,
+architecture cleanliness, and live dashboard HTTP 200 passed. `make verify-fast
+PYTHON=.venv/bin/python` passed 1,385 pytest checks plus its offline smokes.
+Final `make verify PYTHON=.venv/bin/python` passed 1,307/1,307 standalone checks,
+1,385 pytest checks, alert rendering, the 33-observation fixture backtest, and
+the paper scoreboard.
+**Notes/risks:** The campaign remains honestly in progress: all 30 retained
+assets have two observations and are still warming; eight prior observations
+are required before a baseline is warm. Spread coverage is 0/30, the DEXE row
+is not actionable, and no rapid follow-up calls were made. Telegram sends,
+trades, Event Alpha paper trades, normal RSI writes, and `TRIGGERED_FADE`
+creations were all zero.
+
 ## 2026-07-13 — Keep the local dashboard responsive to stalled clients · Codex
 **Why:** The in-app browser opened an incomplete loopback HTTP connection, and
 the default single-threaded `wsgiref` server blocked in request-line reading so

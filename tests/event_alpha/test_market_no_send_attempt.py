@@ -133,3 +133,40 @@ def test_current_authority_namespace_blocks_before_live_provider_call(tmp_path):
     assert result.status == "blocked"
     assert result.provider_call_attempted is False
     assert calls == 0
+
+
+def test_existing_generation_namespace_is_single_use_before_live_provider_call(tmp_path):
+    namespace = "used_market_generation"
+    namespace_dir = tmp_path / namespace
+    namespace_dir.mkdir()
+    (namespace_dir / market_no_send.RUN_MANIFEST_FILENAME).write_text(
+        '{"status":"failed"}\n',
+        encoding="utf-8",
+    )
+    calls = 0
+
+    def forbidden(_limit):
+        nonlocal calls
+        calls += 1
+        return ()
+
+    readiness = market_no_send.build_market_no_send_readiness(
+        artifact_base_dir=tmp_path,
+        artifact_namespace=namespace,
+        environ={market_no_send.LIVE_AUTH_ENV: "1"},
+        fixture_dir=None,
+    )
+    result = market_no_send.run_market_no_send_generation(
+        artifact_base_dir=tmp_path,
+        artifact_namespace=namespace,
+        provider=forbidden,
+        environ={market_no_send.LIVE_AUTH_ENV: "1"},
+        fixture_dir=None,
+    )
+
+    assert readiness.ready is False
+    assert readiness.will_call_provider is False
+    assert "<new-generation>" in readiness.next_safe_command
+    assert result.status == "blocked"
+    assert result.provider_call_attempted is False
+    assert calls == 0

@@ -53,6 +53,33 @@ def test_known_architecture_and_manual_review_namespaces_are_not_unknown(tmp_pat
     assert not [row for row in rows.values() if row["status"] == "unknown"]
 
 
+def test_market_no_send_campaign_namespaces_are_live_rehearsals(tmp_path: Path):
+    from crypto_rsi_scanner.event_alpha.namespace import status as namespace_status
+
+    for namespace in (
+        "radar_market_history_cache",
+        "radar_market_no_send",
+        "radar_market_no_send_20260713t152704z",
+    ):
+        namespace_dir = tmp_path / namespace
+        namespace_dir.mkdir()
+        if namespace != "radar_market_history_cache":
+            namespace_status.write_namespace_status(
+                namespace_dir,
+                {
+                    "namespace": namespace,
+                    "status": "active",
+                    "profile": "no_key_live",
+                },
+            )
+
+    registry = lifecycle.build_namespace_registry(tmp_path)
+    rows = {row["namespace"]: row for row in registry["namespaces"]}
+
+    assert all(row["status"] == "active_live_rehearsal" for row in rows.values())
+    assert not [row for row in rows.values() if row["status"] == "unknown"]
+
+
 def test_event_alpha_artifact_doctor_scopes_readiness_to_claimed_provider_namespaces():
     import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
 

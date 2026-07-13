@@ -868,6 +868,14 @@ def _initial_artifact_entry(
         paths = tuple(str(item) for item in run_row.get("research_card_paths") or () if str(item))
         cards_written = _nonnegative_int(run_row.get("research_cards_written"))
         path = run_row.get("research_cards_dir") if paths or cards_written else None
+        if path is None and run_row.get("research_cards_dir"):
+            candidate = run_row.get("research_cards_dir")
+            resolved = _resolve_namespace_artifact_path(base, candidate)
+            if resolved is not None and (resolved / "index.md").is_file():
+                # A Decision generation with no visible ideas still renders an
+                # exact-run empty index. Keep that canonical zero distinct from
+                # a cycle that never wrote the card surface.
+                path = candidate
         if path is None and (paths or cards_written):
             path = base / "research_cards"
     else:

@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-13T06:45:40.024931+00:00`
+- generated_at: `2026-07-13T15:40:26.786583+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -105,9 +105,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py` | 1199 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 1199 |
 | `crypto_rsi_scanner/project_health/radar_north_star.py` | 1199 |
+| `crypto_rsi_scanner/event_alpha/artifacts/operator_state.py` | 1198 |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1198 |
 | `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1194 |
-| `crypto_rsi_scanner/event_alpha/artifacts/operator_state.py` | 1190 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1189 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1187 |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py` | 1187 |
@@ -164,7 +164,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_provider_activation.py` | 1452 |
 | `tests/event_alpha/test_operator_workflows.py` | 1449 |
 | `tests/event_alpha/test_artifact_schema.py` | 1427 |
-| `tests/event_alpha/test_core_opportunities.py` | 1337 |
+| `tests/event_alpha/test_core_opportunities.py` | 1360 |
 | `tests/event_alpha/test_fade_review_workflows.py` | 1309 |
 | `tests/event_alpha/test_doctor_notifications.py` | 1298 |
 | `tests/event_alpha/test_burn_in_outcomes.py` | 1289 |
@@ -184,9 +184,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_discovery_pipeline.py` | 993 |
 | `tests/event_alpha/test_doctor_provider_conflicts.py` | 979 |
 | `tests/event_alpha/test_namespace_integrations.py` | 962 |
+| `tests/event_alpha/test_radar_dashboard.py` | 950 |
 | `tests/event_alpha/test_notification_operations.py` | 925 |
 | `tests/event_alpha/test_impact_hypotheses.py` | 920 |
-| `tests/event_alpha/test_radar_dashboard.py` | 899 |
 | `tests/event_alpha/test_notification_routing.py` | 895 |
 | `tests/event_alpha/test_evidence_quality.py` | 874 |
 | `tests/event_alpha/test_claim_semantics.py` | 867 |

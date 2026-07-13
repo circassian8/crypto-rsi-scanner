@@ -197,6 +197,13 @@ behind the authoritative dashboard pointer is immutable, so each later live
 cycle uses a new generation namespace while retaining the shared bounded
 baseline.
 
+The Make target generates a lowercase UTC-suffixed namespace for every live
+cycle. Any already-existing generation directory is single-use and blocks
+before the provider adapter, even when it was never published. An explicit
+`RADAR_MARKET_NO_SEND_NAMESPACE` must likewise be new. Clean zero-idea cycles
+still materialize canonical empty CoreOpportunity/card surfaces so missing
+artifacts cannot be confused with an exact zero.
+
 The v1 history policy retains at most 45 days and 256 observations per asset,
 requires eight strictly earlier observations for a warm feature baseline, and
 derives 1h/4h/24h returns, volatility, turnover/volume z-scores, and BTC/ETH
@@ -225,6 +232,18 @@ attempt. Make may run the doctor and publisher only when that receipt matches
 the exact complete manifest, so a newly blocked attempt cannot accidentally
 reuse an older complete namespace. Provider health is namespace-local,
 fingerprinted for live authority, and stores only safe error classes.
+
+Each completed cycle writes one final post-doctor pilot audit. Pilot audit
+contract v1 is distinct from market provenance contract v2. The audit records
+the exact namespace/run/revision, canonical pointer binding, request/source/
+history fingerprints, full-universe cold/warming/warm counts and observations
+per asset, direct/proxy feature bases, spread coverage, routes/scores/outcomes,
+doctor and dashboard status, and zero-side-effect counters. It separately names
+`provider_adapter_invoked`, `network_call_attempted`, and
+`provider_request_succeeded`; mock adapter invocation is never presented as a
+network call. Campaign-level evidence is tracked in
+`research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.md` / `.json` without claiming
+a warm baseline before the required prior observations exist.
 
 ## Outcomes and Learning
 

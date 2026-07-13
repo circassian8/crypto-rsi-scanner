@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -15,7 +16,6 @@ from .market_no_send_features import finite_float, market_quality_counts
 from .market_no_send_io import (
     read_json_object,
     read_jsonl,
-    read_regular_bytes,
     safe_existing_namespace_dir,
     write_bytes_atomic,
     write_json_atomic,
@@ -119,7 +119,7 @@ def _build_audit(
     result_payload = result.to_dict() if result is not None else {}
     doctor = operator.get("doctor") if isinstance(operator.get("doctor"), Mapping) else {}
     status = str(manifest.get("status") or result_payload.get("status") or "blocked")
-    operator_digest = _operator_digest(namespace_dir)
+    operator_digest = _operator_digest(operator)
     points_to_attempt = bool(
         pointer.get("artifact_namespace") == namespace
         and pointer.get("run_id") == manifest.get("run_id")
@@ -146,7 +146,18 @@ def _build_audit(
     )
     universe_audit = manifest.get("universe_audit")
     universe_audit = dict(universe_audit) if isinstance(universe_audit, Mapping) else {}
-    quality = market_quality_counts(candidate_path) if candidate_path is not None else _empty_quality()
+    idea_quality = market_quality_counts(candidate_path) if candidate_path is not None else _empty_quality()
+    provenance = (
+        manifest.get("market_provenance")
+        if isinstance(manifest.get("market_provenance"), Mapping)
+        else {}
+    )
+    data_quality = (
+        provenance.get("data_quality")
+        if isinstance(provenance.get("data_quality"), Mapping)
+        else {}
+    )
+    quality = {**_empty_quality(), **dict(data_quality)}
     history = universe_audit.get("market_history")
     if isinstance(history, Mapping):
         retention = history.get("retention")
@@ -157,26 +168,53 @@ def _build_audit(
             "generation_seed_rows": int(history.get("generation_seed_rows") or 0),
             "retention": dict(retention) if isinstance(retention, Mapping) else {},
         })
+    quality["baseline_status"] = _baseline_status(quality)
+    quality["baseline_observations_per_asset"] = _history_observations_per_asset(
+        namespace_dir
+    )
     route_counts = Counter(str(row.get("radar_route") or "diagnostic") for row in candidates)
+    provider_call_attempted = _either_true(
+        manifest,
+        result_payload,
+        "provider_call_attempted",
+    )
+    acquisition_mode = str(
+        manifest.get("data_acquisition_mode")
+        or result_payload.get("data_acquisition_mode")
+        or "preflight_only"
+    )
     return {
         "contract_version": 1,
+        "pilot_audit_contract_version": 1,
+        "market_provenance_contract_version": provenance.get("contract_version"),
+        "market_provenance_schema_version": provenance.get("schema_version"),
         "row_type": "event_market_no_send_pilot_audit",
         "generated_at": checked_at.isoformat(),
         "artifact_namespace": namespace,
+        "exact_run_id": manifest.get("run_id"),
+        "exact_operator_revision": operator.get("revision"),
         "attempt_status": status,
         "provider": str(manifest.get("provider") or result_payload.get("provider") or "coingecko"),
-        "provider_call_attempted": _either_true(manifest, result_payload, "provider_call_attempted"),
+        "provider_adapter_invoked": provider_call_attempted,
+        "network_call_attempted": provider_call_attempted and acquisition_mode == "live_provider",
+        "provider_call_attempted": provider_call_attempted,
         "provider_request_succeeded": _either_true(manifest, result_payload, "provider_request_succeeded"),
         "live_provider_authorized": _either_true(manifest, result_payload, "live_provider_authorized"),
-        "data_acquisition_mode": str(manifest.get("data_acquisition_mode") or result_payload.get("data_acquisition_mode") or "preflight_only"),
+        "data_acquisition_mode": acquisition_mode,
         "candidate_source_mode": str(manifest.get("candidate_source_mode") or result_payload.get("candidate_source_mode") or "preflight_only"),
         "provenance_contract_valid": manifest.get("provenance_contract_valid") is True,
         "burn_in_eligible": manifest.get("burn_in_eligible") is True,
         "burn_in_counted": manifest.get("burn_in_counted") is True,
         "burn_in_reason": manifest.get("burn_in_reason") or "generation_not_available",
         "request_lineage": _request_lineage(manifest),
+        "history_lineage": {
+            "history_artifact": manifest.get("market_history_artifact"),
+            "history_sha256": manifest.get("market_history_sha256"),
+        },
         "universe": universe_audit,
         "baseline": quality,
+        "feature_basis": dict(provenance.get("feature_basis") or {}),
+        "idea_quality": idea_quality,
         "market_anomaly_count": int(manifest.get("market_anomaly_count") or 0),
         "candidate_count": len(candidates),
         "outcome_placeholder_count": len(outcomes),
@@ -231,19 +269,52 @@ def _empty_quality() -> dict[str, Any]:
         "baseline_warming_assets": 0,
         "direct_feature_count": 0,
         "proxy_feature_count": 0,
+        "spread_available_count": 0,
     }
 
 
-def _operator_digest(namespace_dir: Path | None) -> str | None:
-    if namespace_dir is None:
+def _operator_digest(operator: Mapping[str, Any]) -> str | None:
+    if not operator:
         return None
     try:
-        data = read_regular_bytes(
-            namespace_dir / operator_state.OPERATOR_STATE_FILENAME
-        )
-    except MarketNoSendError:
+        data = json.dumps(
+            operator,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError):
         return None
     return hashlib.sha256(data).hexdigest()
+
+
+def _baseline_status(quality: Mapping[str, Any]) -> str:
+    counts = quality.get("baseline_status_counts")
+    counts = counts if isinstance(counts, Mapping) else {}
+    if int(counts.get("warm") or 0) > 0:
+        return "warm"
+    if int(counts.get("warming") or 0) > 0:
+        return "warming"
+    if int(counts.get("cold") or 0) > 0:
+        return "cold"
+    return "not_evaluated"
+
+
+def _history_observations_per_asset(namespace_dir: Path | None) -> dict[str, int]:
+    if namespace_dir is None:
+        return {}
+    counts: Counter[str] = Counter()
+    for row in read_jsonl(namespace_dir / "event_market_history.jsonl"):
+        asset_id = str(
+            row.get("coin_id")
+            or row.get("canonical_asset_id")
+            or row.get("symbol")
+            or ""
+        ).strip()
+        if asset_id:
+            counts[asset_id] += 1
+    return dict(sorted(counts.items()))
 
 
 def _request_lineage(manifest: Mapping[str, Any]) -> dict[str, Any]:
@@ -310,14 +381,33 @@ def format_pilot_audit(audit: Mapping[str, Any]) -> str:
     lineage = audit.get("request_lineage") if isinstance(audit.get("request_lineage"), Mapping) else {}
     doctor = audit.get("doctor") if isinstance(audit.get("doctor"), Mapping) else {}
     dashboard = audit.get("dashboard") if isinstance(audit.get("dashboard"), Mapping) else {}
+    feature_basis = audit.get("feature_basis") if isinstance(audit.get("feature_basis"), Mapping) else {}
+    observations = (
+        baseline.get("baseline_observations_per_asset")
+        if isinstance(baseline.get("baseline_observations_per_asset"), Mapping)
+        else {}
+    )
+    baseline_counts = (
+        baseline.get("baseline_status_counts")
+        if isinstance(baseline.get("baseline_status_counts"), Mapping)
+        else {}
+    )
     lines = [
         "# Crypto Decision Radar market/no-send pilot audit",
         "",
         "Research-only. Human decision support; no trades, paper trades, RSI writes, fade triggers, or sends.",
         "",
+        f"- pilot_audit_contract_version: {audit.get('pilot_audit_contract_version')}",
+        f"- market_provenance_contract_version: {audit.get('market_provenance_contract_version')}",
+        f"- market_provenance_schema_version: {audit.get('market_provenance_schema_version')}",
+        f"- exact_namespace: {audit.get('artifact_namespace')}",
+        f"- exact_run_id: {audit.get('exact_run_id')}",
+        f"- exact_operator_revision: {audit.get('exact_operator_revision')}",
         f"- attempt_status: {audit.get('attempt_status')}",
         f"- provider: {audit.get('provider')}",
         f"- live_provider_authorized: {str(audit.get('live_provider_authorized')).lower()}",
+        f"- provider_adapter_invoked: {str(audit.get('provider_adapter_invoked')).lower()}",
+        f"- network_call_attempted: {str(audit.get('network_call_attempted')).lower()}",
         f"- provider_call_attempted: {str(audit.get('provider_call_attempted')).lower()}",
         f"- provider_request_succeeded: {str(audit.get('provider_request_succeeded')).lower()}",
         f"- data_acquisition_mode: {audit.get('data_acquisition_mode')}",
@@ -326,10 +416,12 @@ def format_pilot_audit(audit: Mapping[str, Any]) -> str:
         f"- burn_in_counted: {str(audit.get('burn_in_counted')).lower()}",
         f"- universe_fetched/kept/excluded: {universe.get('fetched_count', 0)}/{universe.get('kept_count', 0)}/{universe.get('excluded_count', 0)}",
         f"- baseline_status: {baseline.get('baseline_status')}",
+        "- baseline_cold/warming/warm: "
+        f"{baseline_counts.get('cold', 0)}/{baseline_counts.get('warming', 0)}/{baseline_counts.get('warm', 0)}",
         f"- baseline_cache_scope: {baseline.get('cache_scope')}",
         f"- baseline_shared_seed_rows: {baseline.get('shared_seed_rows', 0)}",
         f"- market_features_direct/proxy: {baseline.get('direct_feature_count', 0)}/{baseline.get('proxy_feature_count', 0)}",
-        f"- spread_available_assets: {universe.get('spread_available_count', 0)}",
+        f"- spread_available_assets: {baseline.get('spread_available_count', 0)}",
         f"- market_anomaly_count: {audit.get('market_anomaly_count')}",
         f"- candidate_count: {audit.get('candidate_count')}",
         f"- outcome_placeholder_count: {audit.get('outcome_placeholder_count')}",
@@ -341,9 +433,18 @@ def format_pilot_audit(audit: Mapping[str, Any]) -> str:
         f"- safety_zero: {all(value in (0, True) for value in safety.values())}",
         f"- next_safe_command: {audit.get('next_safe_command')}",
         "",
-        "## Decision routes",
-        "",
     ]
+    lines.extend(["## Baseline observations per asset", ""])
+    if observations:
+        lines.extend(f"- {key}: {value}" for key, value in sorted(observations.items()))
+    else:
+        lines.append("- none")
+    lines.extend(["", "## Feature basis", ""])
+    if feature_basis:
+        lines.extend(f"- {key}: {value}" for key, value in sorted(feature_basis.items()))
+    else:
+        lines.append("- none")
+    lines.extend(["", "## Decision routes", ""])
     route_counts = audit.get("decision_route_counts")
     if isinstance(route_counts, Mapping) and route_counts:
         lines.extend(f"- {key}: {value}" for key, value in sorted(route_counts.items()))

@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-13 - Treat every live market generation as single-use, including exact zeroes
+**Status:** accepted
+**Decision:** Every real Decision Radar market cycle uses a new lowercase
+UTC-suffixed namespace. Any existing generation directory blocks before the
+provider adapter, regardless of whether that generation published. A successful
+zero-idea generation must still materialize canonical empty CoreOpportunity and
+card-index artifacts so operator fingerprints distinguish an exact zero from a
+missing or failed surface. Make runs one full strict doctor, publishes only when
+its exact revision is authoritative with zero blockers, and then always writes
+the final pilot audit. Pilot audit v1 uses the same canonical operator-state
+digest as dashboard pointer v1 and explicitly separates adapter invocation,
+network-call attempt, and provider success from market provenance v2.
+**Why:** The first authorized cold-baseline run legitimately produced no ideas,
+but the absent empty CoreOpportunity file made the operator manifest incoherent
+and prevented doctor attestation. A later successful pointer publication also
+exposed that the pilot audit compared raw file bytes while the dashboard pointer
+uses canonical JSON. Single-use namespaces, materialized zeroes, and one digest
+definition preserve fail-closed behavior without rejecting honest zero-idea
+market observations.
+**Revisit when:** A versioned generation registry replaces directory existence
+as the immutable-attempt boundary, or pointer/audit contracts deliberately move
+to a new shared fingerprint version.
+
 ## 2026-07-13 - The local dashboard must tolerate stalled loopback clients
 **Status:** accepted
 **Decision:** The Crypto Radar dashboard remains loopback-only, GET/HEAD-only,

@@ -170,7 +170,7 @@
       ],
       "zero_idea_generation_may_be_clean": true
     },
-    "default_namespace": "radar_market_no_send",
+    "default_namespace": "radar_market_no_send_<lowercase-utc-timestamp>",
     "defaults": {
       "no_normal_rsi_writes": true,
       "no_paper_trades": true,
@@ -199,6 +199,24 @@
       "event_market_no_send_pilot_audit.md",
       "event_provider_health.json"
     ],
+    "pilot_audit_contract": {
+      "contract_version": 1,
+      "final_after_doctor": true,
+      "network_fields": [
+        "provider_adapter_invoked",
+        "network_call_attempted",
+        "provider_request_succeeded"
+      ],
+      "operator_identity_fields": [
+        "artifact_namespace",
+        "exact_run_id",
+        "exact_operator_revision"
+      ],
+      "provenance_version_fields": [
+        "market_provenance_contract_version",
+        "market_provenance_schema_version"
+      ]
+    },
     "provenance_fields": [
       "data_acquisition_mode",
       "candidate_source_mode",

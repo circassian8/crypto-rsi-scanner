@@ -243,6 +243,11 @@ def test_mocked_fresh_market_data_builds_market_led_ideas_and_blocks_low_liquidi
     assert audit["candidate_count"] == result.candidates
     assert audit["outcome_placeholder_count"] == result.candidates
     assert audit["candidate_outcome_count_match"] is True
+    assert audit["pilot_audit_contract_version"] == 1
+    assert audit["market_provenance_contract_version"] == market_no_send.CONTRACT_VERSION
+    assert audit["provider_adapter_invoked"] is True
+    assert audit["network_call_attempted"] is False
+    assert audit["baseline"]["baseline_observations_per_asset"]
 
 
 def test_provider_failure_is_fail_soft_and_preserves_dashboard_pointer(
@@ -422,6 +427,106 @@ def test_controlled_live_no_send_generation_publishes_exact_dashboard_authority(
     assert loaded.cumulative_history_metadata[
         "event_integrated_radar_outcomes.jsonl"
     ]["authority"] == "current_generation_fingerprint_verified"
+    _json_path, _md_path, audit = market_no_send.write_market_no_send_pilot_audit(
+        tmp_path,
+        namespace,
+        now=checked_at,
+    )
+    assert audit["publication"]["status"] == "published"
+    assert audit["publication"]["points_to_attempt"] is True
+    assert audit["dashboard"]["trusted_current"] is True
+    assert audit["provider_adapter_invoked"] is True
+    assert audit["network_call_attempted"] is True
+    assert audit["exact_run_id"] == result.run_id
+    assert audit["exact_operator_revision"] == published.snapshot.revision
+    assert audit["baseline"]["baseline_status_counts"]
+    assert audit["feature_basis"]
+
+
+def test_controlled_live_clean_zero_generation_is_strict_publishable(
+    tmp_path,
+    monkeypatch,
+):
+    """A real cold-baseline observation may publish honestly with zero ideas."""
+
+    _clear_context_overrides(monkeypatch)
+    observed = datetime.now(timezone.utc).replace(microsecond=0)
+    namespace = "controlled_live_clean_zero"
+    rows = [dict(row) for row in market_no_send._smoke_rows()]
+    for row in rows:
+        row.update({
+            "return_1h": 0.0,
+            "return_4h": 0.0,
+            "return_24h": 0.0,
+            "volume_zscore_24h": 0.0,
+        })
+    monkeypatch.setattr(
+        market_no_send,
+        "_fetch_live_coingecko_rows",
+        lambda _limit: rows,
+    )
+
+    result = market_no_send.run_market_no_send_generation(
+        artifact_base_dir=tmp_path,
+        artifact_namespace=namespace,
+        top_n=5,
+        observed_at=observed,
+        environ={market_no_send.LIVE_AUTH_ENV: "1"},
+        fixture_dir=None,
+    )
+
+    namespace_dir = tmp_path / namespace
+    core_path = namespace_dir / "event_core_opportunities.jsonl"
+    assert result.complete is True
+    assert result.candidates == 0
+    assert result.core_rows == 0
+    assert result.cards == 0
+    assert core_path.is_file()
+    assert core_path.read_bytes() == b""
+    before_doctor = json.loads(
+        (namespace_dir / "event_alpha_operator_state.json").read_text(encoding="utf-8")
+    )
+    assert before_doctor["manifest_status"] == "complete"
+
+    doctor_env = os.environ.copy()
+    doctor_env.update({
+        "RSI_EVENT_ALERTS_ENABLED": "0",
+        "RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED": "0",
+        "RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR": str(tmp_path),
+        "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE": namespace,
+        "RSI_EVENT_ALPHA_RUN_MODE": "burn_in",
+        "RSI_EVENT_RESEARCH_NOW": observed.isoformat(),
+    })
+    doctor = subprocess.run(
+        [
+            sys.executable,
+            str(_REPO_ROOT / "main.py"),
+            "--event-alpha-artifact-doctor",
+            "--event-alpha-profile",
+            "no_key_live",
+            "--event-alpha-artifact-namespace",
+            namespace,
+            "--event-alpha-artifact-doctor-strict",
+        ],
+        cwd=namespace_dir,
+        env=doctor_env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert doctor.returncode == 0, doctor.stdout + doctor.stderr
+    after_doctor = json.loads(
+        (namespace_dir / "event_alpha_operator_state.json").read_text(encoding="utf-8")
+    )
+    assert after_doctor["doctor"]["authoritative"] is True
+    assert after_doctor["doctor"]["blocker_count"] == 0
+
+    market_no_send.publish_market_no_send_generation(
+        tmp_path,
+        namespace,
+        now=datetime.now(timezone.utc),
+    )
+    assert read_current_namespace_pointer(tmp_path)["artifact_namespace"] == namespace
 
 
 def test_mock_generation_cannot_replace_existing_fixture_pointer(
@@ -528,6 +633,9 @@ def test_market_make_targets_do_not_force_live_authorization():
     assert "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1" not in target
     assert "--event-alpha-artifact-doctor-strict" in target
     assert "market_no_send publish" in target
+    assert "market_no_send audit" in target
+    assert "finalize_status" in target
+    assert "radar_market_no_send_$(shell date -u +%Y%m%dt%H%M%Sz)" in makefile
 
 
 def test_market_writer_namespace_parent_symlink_swap_fails_closed(

@@ -88,7 +88,9 @@ RADAR_DASHBOARD_PORT ?= 8765
 RADAR_DASHBOARD_FIXTURE_BASE ?= fixtures/event_alpha/radar_dashboard
 RADAR_DASHBOARD_FIXTURE_NAMESPACE ?= current
 RADAR_DASHBOARD_NAMESPACE_ARG = $(if $(strip $(RADAR_DASHBOARD_EXPLICIT_NAMESPACE)),--namespace $(RADAR_DASHBOARD_EXPLICIT_NAMESPACE),)
-RADAR_MARKET_NO_SEND_NAMESPACE ?= radar_market_no_send
+ifndef RADAR_MARKET_NO_SEND_NAMESPACE
+RADAR_MARKET_NO_SEND_NAMESPACE := radar_market_no_send_$(shell date -u +%Y%m%dt%H%M%Sz)
+endif
 RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE ?= radar_market_no_send_smoke
 RADAR_MARKET_NO_SEND_TOP_N ?= 30
 RADAR_MARKET_NO_SEND_FETCH_LIMIT ?=
@@ -990,7 +992,8 @@ radar-market-no-send:
 		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 		--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) \
 		--top-n $(RADAR_MARKET_NO_SEND_TOP_N) $(RADAR_MARKET_NO_SEND_FETCH_ARG)
-	@if env RSI_EVENT_ALERTS_ENABLED=0 \
+	@finalize_status=0; \
+	if env RSI_EVENT_ALERTS_ENABLED=0 \
 		RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 		$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send status \
 			--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
@@ -1001,18 +1004,21 @@ radar-market-no-send:
 			sh -c 'cd "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_NAMESPACE)" && exec "$(RADAR_MARKET_NO_SEND_PYTHON)" "$(RADAR_MARKET_NO_SEND_MAIN)" --event-alpha-artifact-doctor \
 				--event-alpha-profile no_key_live \
 				--event-alpha-artifact-namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) \
-				--event-alpha-artifact-doctor-strict' && \
-		env RSI_EVENT_ALERTS_ENABLED=0 \
+				--event-alpha-artifact-doctor-strict' || finalize_status=$$?; \
+		if test $$finalize_status -eq 0; then \
+			env RSI_EVENT_ALERTS_ENABLED=0 \
 			RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 			$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send publish \
 				--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-				--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE); \
-	fi
+				--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) || finalize_status=$$?; \
+		fi; \
+	fi; \
 	env RSI_EVENT_ALERTS_ENABLED=0 \
-	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send audit \
-		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-		--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE)
+		RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send audit \
+			--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+			--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) || finalize_status=$$?; \
+	exit $$finalize_status
 
 radar-market-no-send-smoke:
 	rm -rf $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)

@@ -52,6 +52,11 @@ def write_core_opportunities(
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         if not out_rows:
+            # A successful zero-row generation still needs a canonical artifact.
+            # Operator-state fingerprinting uses the empty JSONL file to
+            # distinguish an exact clean zero from a missing/failed store.
+            with path.open("a", encoding="utf-8"):
+                pass
             return EventCoreOpportunityStoreWriteResult(path=path, attempted=True, success=True, rows_written=0)
         with path.open("a", encoding="utf-8") as fh:
             for row in out_rows:

@@ -1675,7 +1675,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-13T06:45:40.024931+00:00",
+  "generated_at": "2026-07-13T15:40:26.786583+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1760,6 +1760,12 @@
     {
       "limit": 1500,
       "line_count": 1198,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1198,
       "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
       "source_kind": "production"
     },
@@ -1767,12 +1773,6 @@
       "limit": 1500,
       "line_count": 1194,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1190,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
       "source_kind": "production"
     },
     {
@@ -1965,7 +1965,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1337,
+      "line_count": 1360,
       "path": "tests/event_alpha/test_core_opportunities.py",
       "source_kind": "test"
     },
@@ -2085,6 +2085,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 950,
+      "path": "tests/event_alpha/test_radar_dashboard.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 925,
       "path": "tests/event_alpha/test_notification_operations.py",
       "source_kind": "test"
@@ -2093,12 +2099,6 @@
       "limit": 1500,
       "line_count": 920,
       "path": "tests/event_alpha/test_impact_hypotheses.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 899,
-      "path": "tests/event_alpha/test_radar_dashboard.py",
       "source_kind": "test"
     },
     {

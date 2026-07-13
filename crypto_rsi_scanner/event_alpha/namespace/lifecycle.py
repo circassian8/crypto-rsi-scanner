@@ -372,6 +372,10 @@ def _classify_namespace(
         return STATUS_ACTIVE_PROVIDER_PREFLIGHT, "provider preflight namespace", None
     if "rehearsal" in namespace:
         return STATUS_ACTIVE_PROVIDER_REHEARSAL, "provider no-send rehearsal namespace", None
+    if namespace == "radar_market_history_cache":
+        return STATUS_ACTIVE_LIVE_REHEARSAL, "shared live/no-send market observation history", None
+    if namespace.startswith("radar_market_no_send"):
+        return STATUS_ACTIVE_LIVE_REHEARSAL, "Decision Radar live/no-send observation generation", None
     if "burn_in" in namespace or namespace.startswith("notify_") or namespace.endswith("_live"):
         return STATUS_ACTIVE_LIVE_REHEARSAL, "active no-send live rehearsal namespace", None
     return STATUS_UNKNOWN, "namespace does not match a known lifecycle pattern", None

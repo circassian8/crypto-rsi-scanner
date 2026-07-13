@@ -33,16 +33,24 @@ def namespace_mutation_blocker(base: Path, namespace: str) -> str | None:
     try:
         pointer_path.lstat()
     except FileNotFoundError:
-        return None
+        pointer = None
     except OSError:
         return "dashboard pointer is unreadable"
-    try:
-        pointer = read_current_namespace_pointer(base)
-    except DashboardReadinessError:
-        return "dashboard pointer is invalid; refusing namespace mutation"
-    if pointer.get("artifact_namespace") == namespace:
+    else:
+        try:
+            pointer = read_current_namespace_pointer(base)
+        except DashboardReadinessError:
+            return "dashboard pointer is invalid; refusing namespace mutation"
+    if pointer is not None and pointer.get("artifact_namespace") == namespace:
         return "market generation namespace is current dashboard authority"
-    return None
+    namespace_dir = base / namespace
+    try:
+        namespace_dir.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError:
+        return "market generation namespace is unreadable"
+    return "market generation namespace already exists; choose a new generation namespace"
 
 
 def readiness_next_command(
@@ -52,7 +60,10 @@ def readiness_next_command(
     fixture_mode: bool,
     namespace_blocker: str | None,
 ) -> str:
-    if namespace_blocker and "current dashboard authority" in namespace_blocker:
+    if namespace_blocker and (
+        "current dashboard authority" in namespace_blocker
+        or "already exists" in namespace_blocker
+    ):
         return (
             "Choose RADAR_MARKET_NO_SEND_NAMESPACE=<new-generation>, then run "
             "make radar-market-no-send"

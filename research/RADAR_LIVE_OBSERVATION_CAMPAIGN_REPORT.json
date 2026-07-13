@@ -1,0 +1,131 @@
+{
+  "artifact_namespace_authoritative": "radar_market_no_send_20260713t152704z",
+  "authorized_cycles_completed": 2,
+  "campaign_complete": false,
+  "campaign_status": "in_progress_baseline_warming",
+  "contract_version": 1,
+  "dashboard": {
+    "exact_run_id": "2026-07-13T15:27:13.330145+00:00|no_key_live",
+    "http_status_verified": 200,
+    "ready": true,
+    "revision": 9,
+    "trusted_current": true,
+    "url": "http://127.0.0.1:8765/"
+  },
+  "decision_evidence": {
+    "anomalies_total": 1,
+    "pending_outcomes": 1,
+    "route_counts": {
+      "risk_watch": 1
+    },
+    "visible_ideas": [
+      {
+        "actionability_score": 42.32,
+        "actionable": false,
+        "catalyst_status": "unknown",
+        "evidence_confidence_score": 52.45,
+        "market_phase": "reversal",
+        "risk_score": 48.0,
+        "route": "risk_watch",
+        "soft_penalties": [
+          "catalyst_unknown_soft_penalty",
+          "spread_unavailable_dashboard_only",
+          "market_led_confirmation_gate_incomplete",
+          "temporal_market_baseline_not_warm"
+        ],
+        "spread_status": "unavailable",
+        "symbol": "DEXE"
+      }
+    ]
+  },
+  "doctor": {
+    "authoritative_generation_blockers": 0,
+    "authoritative_generation_status": "WARN",
+    "authoritative_generation_warnings": [
+      "cryptopanic_configured_but_not_observed=1"
+    ],
+    "campaign_failures": 1,
+    "failure_summary": "The first clean zero-idea run found zero artifact blockers but could not bind doctor authority because the successful zero-row CoreOpportunity surface was missing its canonical empty file. The pointer remained on the fixture until the defect was fixed and tested."
+  },
+  "feature_evidence": {
+    "direct_feature_count_latest_generation": 120,
+    "direct_features": {
+      "returns": "provider_derived_sparkline",
+      "volume_turnover": "provider_observed"
+    },
+    "proxy_feature_count_latest_generation": 90,
+    "proxy_features": {
+      "liquidity": "coingecko_total_volume_24h_proxy",
+      "volume_zscore": "cross_sectional_log_turnover_proxy",
+      "volume_zscore_24h": "cross_sectional_log_turnover_proxy"
+    },
+    "spread": "unavailable",
+    "spread_assets": 0,
+    "spread_coverage_ratio": 0.0,
+    "universe_assets": 30
+  },
+  "generated_at": "2026-07-13T15:31:26+00:00",
+  "highest_value_missing_input": {
+    "input": "public order-book or trusted spread data",
+    "reason": "Spread coverage was 0 of 30 assets and the only visible market-led idea was capped to risk_watch/dashboard-only. This is the first missing input that directly blocks execution-quality validation; derivatives or DEX enrichment should not be prioritized ahead of this observed limitation."
+  },
+  "market_history": {
+    "assets_cold": 0,
+    "assets_warm": 0,
+    "assets_warming": 30,
+    "minimum_prior_observations_for_warm": 8,
+    "observations_per_asset": 2,
+    "retained_assets": 30,
+    "retained_observations": 60,
+    "status": "warming"
+  },
+  "network": {
+    "non_network_blocked_attempts": 1,
+    "provider": "coingecko",
+    "provider_calls_attempted": 2,
+    "provider_calls_failed": 0,
+    "provider_calls_succeeded": 2
+  },
+  "next_cycle": {
+    "command": "make radar-market-no-send PYTHON=.venv/bin/python",
+    "namespace_policy": "Make generates a new lowercase UTC namespace; an explicit namespace must also be unused.",
+    "not_before": "2026-07-13T16:27:13+00:00",
+    "reason": "Preserve a meaningful observation cadence; do not manufacture warm-up with rapid duplicate calls."
+  },
+  "pilot_audit_contract_version": 1,
+  "provider_authorization_present": true,
+  "real_cycles": [
+    {
+      "anomalies": 0,
+      "candidates": 0,
+      "doctor_authoritative": false,
+      "namespace": "radar_market_no_send",
+      "observed_at": "2026-07-13T15:17:06.228233+00:00",
+      "provider_request_succeeded": true,
+      "published": false,
+      "run_id": "2026-07-13T15:17:06.228233+00:00|no_key_live"
+    },
+    {
+      "anomalies": 1,
+      "candidates": 1,
+      "doctor_authoritative": true,
+      "namespace": "radar_market_no_send_20260713t152704z",
+      "observed_at": "2026-07-13T15:27:13.330145+00:00",
+      "provider_request_succeeded": true,
+      "published": true,
+      "run_id": "2026-07-13T15:27:13.330145+00:00|no_key_live"
+    }
+  ],
+  "research_only": true,
+  "safety": {
+    "no_send": true,
+    "normal_rsi_signal_rows_written": 0,
+    "paper_trades_created": 0,
+    "telegram_sends": 0,
+    "trades_created": 0,
+    "triggered_fade_created": 0
+  },
+  "schema_id": "radar_live_observation_campaign_report_v1",
+  "schema_version": "radar_live_observation_campaign_report_v1",
+  "source_audit": "event_fade_cache/radar_market_no_send_20260713t152704z/event_market_no_send_pilot_audit.json"
+}

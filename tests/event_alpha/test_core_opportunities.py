@@ -470,6 +470,29 @@ def test_event_core_opportunity_store_persists_canonical_rows():
         assert set(by_symbol) == {"AAVE", "MEME", "RUNE", "VELVET"}
 
 
+def test_event_core_opportunity_store_materializes_canonical_empty_jsonl(tmp_path):
+    import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store
+
+    path = tmp_path / "event_core_opportunities.jsonl"
+    result = event_core_opportunity_store.write_core_opportunities(
+        (),
+        cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+        run_id="run-clean-zero",
+        profile="no_key_live",
+        run_mode="burn_in",
+        artifact_namespace="clean_zero",
+    )
+
+    assert result.success is True
+    assert result.rows_written == 0
+    assert path.is_file()
+    assert path.read_bytes() == b""
+    assert event_core_opportunity_store.load_core_opportunities(
+        path,
+        run_id="run-clean-zero",
+    ).rows == []
+
+
 def test_core_store_first_write_matches_read_normalization_for_diagnostic_support():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
